@@ -106,8 +106,8 @@
 //! **Constructor shape**: `ValidatedMir` + `MirDeviceContext` + per-kernel
 //! `MirKernelSignature` + `CollectionKernelPlan` → [`DeviceProgram`], via
 //! [`DeviceProgram::new`] and the typed adapters above. If a later stage finds
-//! this reading incompatible with the frozen schema, it stops and routes a
-//! need to the Mind (delivery spec §11); it does not fork silently.
+//! this reading incompatible with the frozen schema, it stops and raises
+//! the question (delivery spec §11); it does not fork silently.
 
 mod constructor;
 mod error;

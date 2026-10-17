@@ -2,8 +2,15 @@
    compile with -I <runtime>/c (runtime/c in the Faber tree). */
 #include "faber.h"
 
+FABER_TEXT_LITERAL(faber_L0, "hi", 2, 2);
+FABER_TEXT_LITERAL(faber_L1, "return", 6, 6);
+FABER_TEXT_LITERAL(faber_L2, "noisy", 5, 5);
+FABER_TEXT_LITERAL(faber_L3, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L4, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L5, "!", 1, 1);
+FABER_TEXT_LITERAL(faber_L6, "quiet", 5, 5);
 static const int64_t k_LIMIT = INT64_C(10);
-static const char *const k_GREETING = "hi";
+static const char *const k_GREETING = faber_L0.s;
 static const bool k_LOUD = (1);
 
 static int64_t f_fib(int64_t);
@@ -15,11 +22,11 @@ static int64_t f_fib(int64_t p_n) {
     if (p_n < INT64_C(2)) {
         return p_n;
     }
-    return faber_store_i64((__extension__ ({ int64_t faber_t0 = f_fib((__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(p_n, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_sub(p_n, INT64_C(1)), "argument") : faber_r; }))); int64_t faber_t1 = f_fib((__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(p_n, INT64_C(2), &faber_o); faber_o ? faber_store_i64(faber_sub(p_n, INT64_C(2)), "argument") : faber_r; }))); faber_add(faber_t0, faber_t1); })), "return");
+    return faber_store_i64((__extension__ ({ int64_t faber_t0 = f_fib((__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(p_n, INT64_C(1), &faber_o); faber_o ? faber_store_i64(faber_sub(p_n, INT64_C(1)), "argument") : faber_r; }))); int64_t faber_t1 = f_fib((__extension__ ({ int faber_o = 0; int64_t faber_r = faber_sub_o(p_n, INT64_C(2), &faber_o); faber_o ? faber_store_i64(faber_sub(p_n, INT64_C(2)), "argument") : faber_r; }))); faber_add(faber_t0, faber_t1); })), faber_L1.s);
 }
 
 static int64_t f_noisy(int64_t p_x) {
-    printf("%s %" PRId64 "\n", "noisy", p_x);
+    printf("%s %" PRId64 "\n", faber_L2.s, p_x);
     return p_x;
 }
 
@@ -29,7 +36,7 @@ static bool f_is_even(int64_t p_n) {
 
 static void f_shout(const char *p_s, bool p_loud) {
     if (p_loud) {
-        printf("%s %s\n", p_s, "!");
+        printf("%s %s\n", p_s, faber_L5.s);
     } else {
         printf("%s\n", p_s);
     }
@@ -45,11 +52,11 @@ int main(void) {
     bool l_flag = (f_is_even(k_LIMIT));
     {
         bool faber_t6 = (l_flag); bool faber_t7 = (f_is_even(INT64_C(7))); bool faber_t8 = (k_LOUD);
-        printf("%s %s %s\n", ((faber_t6) ? "true" : "false"), ((faber_t7) ? "true" : "false"), ((faber_t8) ? "true" : "false"));
+        printf("%s %s %s\n", ((faber_t6) ? faber_L3.s : faber_L4.s), ((faber_t7) ? faber_L3.s : faber_L4.s), ((faber_t8) ? faber_L3.s : faber_L4.s));
     }
     f_shout(k_GREETING, (k_LOUD));
-    f_shout("quiet", (0));
+    f_shout(faber_L6.s, (0));
     l_flag = (!(l_flag));
-    printf("%s\n", ((l_flag) ? "true" : "false"));
+    printf("%s\n", ((l_flag) ? faber_L3.s : faber_L4.s));
     return 0;
 }

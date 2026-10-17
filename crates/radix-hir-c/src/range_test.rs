@@ -3,26 +3,55 @@
 use crate::test_support::emitted;
 
 #[test]
-fn a_range_walks_an_exact_counter_from_the_bounds() {
+fn a_bounded_range_walks_an_int64_counter_from_the_bounds() {
     let code = emitted("main {\n    for range 0‥3 let i {\n        print i\n    }\n}");
     for part in [
         "const faber_i128 faber_a0 = INT64_C(0);",
         "const faber_i128 faber_e0 = INT64_C(3);",
-        "const bool faber_u0 = faber_a0 <= faber_e0;",
-        "for (faber_i128 faber_r0 = faber_a0; faber_u0 ? faber_r0 < faber_e0 : faber_r0 > faber_e0; faber_r0 = faber_u0 ? faber_add(faber_r0, 1) : faber_sub(faber_r0, 1)) {",
-        "const int64_t l_i = (int64_t)faber_r0;",
+        "for (int64_t faber_r0 = (int64_t)faber_a0; faber_r0 < (int64_t)faber_e0; faber_r0 += 1) {",
+        "const int64_t l_i = faber_r0;",
     ] {
         assert!(code.contains(part), "{part:?} missing in {code}");
     }
 }
 
 #[test]
+fn a_range_with_runtime_bounds_keeps_the_exact_counter() {
+    // Nothing folds until the program runs, so the walk stays on the exact
+    // carrier: an inclusive walk to `i64::MAX` steps past it, and only the
+    // boundedness proof may take the plain counter away.
+    let code = emitted(
+        "main {\n    mut int top ← 3\n    for range 0‥top let i {\n        print i\n    }\n}",
+    );
+    assert!(
+        code.contains("const bool faber_u0 = faber_a0 <= faber_e0;"),
+        "{code}"
+    );
+    assert!(
+        code.contains("for (faber_i128 faber_r0 = faber_a0; faber_u0 ? faber_r0 < faber_e0 : faber_r0 > faber_e0; faber_r0 = faber_u0 ? faber_add(faber_r0, 1) : faber_sub(faber_r0, 1)) {"),
+        "{code}"
+    );
+    assert!(
+        code.contains("const int64_t l_i = (int64_t)faber_r0;"),
+        "{code}"
+    );
+}
+
+#[test]
 fn an_inclusive_range_compares_with_the_end_included() {
     let code = emitted("main {\n    for range 0…3 let i {\n        print i\n    }\n}");
     assert!(
-        code.contains("faber_r0 <= faber_e0 : faber_r0 >= faber_e0"),
+        code.contains("faber_r0 <= (int64_t)faber_e0; faber_r0 += 1"),
         "{code}"
     );
+}
+
+#[test]
+fn an_inclusive_walk_to_the_cap_keeps_the_exact_counter() {
+    // The inclusive walk to `i64::MAX` steps past it once, which no
+    // `int64_t` counter holds, so the boundedness proof refuses it.
+    let code = emitted("main {\n    for range 0…9223372036854775807 let i {\n    }\n}");
+    assert!(code.contains("for (faber_i128 faber_r0"), "{code}");
 }
 
 #[test]
@@ -41,10 +70,10 @@ fn a_written_step_aborts_unless_positive() {
 #[test]
 fn a_range_product_evaluates_every_bound_before_the_walk() {
     let code = emitted("main {\n    for range 0‥2, 0‥3 let i, j {\n        print i, j\n    }\n}");
-    let heads = code.matches("for (faber_i128 faber_r").count();
+    let heads = code.matches("for (int64_t faber_r").count();
     assert_eq!(heads, 2, "{code}");
     let second_bounds = code.find("faber_a1 =").expect("second axis bounds");
-    let first_head = code.find("for (faber_i128 faber_r0").expect("first head");
+    let first_head = code.find("for (int64_t faber_r0").expect("first head");
     assert!(second_bounds < first_head, "{code}");
 }
 

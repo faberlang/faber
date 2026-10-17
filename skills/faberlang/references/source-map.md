@@ -86,7 +86,7 @@ and `locale/en/pack.toml`.
 ## Grep hints
 
 ```sh
-rg -n "functio|genus|discretio|discerne|elige" corpus
+rg -n "\b(fn|class|union|match|switch)\b" corpus
 rg -n '^explains = ' corpus
 rg -n "parse_discerne|parse_elige|parse_func|parse_class" crates
 rg -n "numeric_wrapper_retired" crates locale

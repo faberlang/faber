@@ -2241,13 +2241,13 @@ fn range_product_lowers_as_ordered_nest_without_zip_guard() {
 
 #[test]
 fn range_product_rumpe_exits_innermost_axis_and_perge_continues_it() {
-    // NR-4R decision test — Mind ruling 2026-08-26 on head-CTO finding 4
-    // (65c2edff): for the N-ary range PRODUCT, `rumpe`/`perge` bind the
-    // INNERMOST axis — the hand-nested-loop reading matching the
-    // leftmost-outermost row-major contract; outer axes continue after a
-    // break. `for from` (zip) keeps whole-construct exit. NR-3's MIR routes
-    // `rumpe_target` at the innermost level (control.rs pushes the breakable
-    // context only there); this pins that routing as the contract.
+    // NR-4R decision test — design ruling (2026-08-26): for the
+    // N-ary range PRODUCT, `rumpe`/`perge` bind the INNERMOST axis — the
+    // hand-nested-loop reading matching the leftmost-outermost row-major
+    // contract; outer axes continue after a break. `for from` (zip) keeps
+    // whole-construct exit. NR-3's MIR routes `rumpe_target` at the innermost
+    // level (control.rs pushes the breakable context only there); this pins
+    // that routing as the contract.
     //
     // Discrimination: if `rumpe` bound the whole product, the first break
     // would end the walk and rows "10"/"11" could never print — the second

@@ -331,11 +331,17 @@ fn build_and_run(name: &str, program: &MirProgram, types: &TypeTable) -> Output 
     let executable = dir.join("program");
 
     // The platform dead-strip flag is load-bearing (design review):
-    // without it the same link measured 13 MB.
+    // without it the same link measured 13 MB. A Rust staticlib also needs
+    // the system libraries on Linux.
+    let platform_args: &[&str] = if cfg!(target_os = "macos") {
+        &["-Wl,-dead_strip"]
+    } else {
+        &["-Wl,--gc-sections", "-lm", "-ldl", "-lpthread"]
+    };
     let linked = Command::new("cc")
         .arg(&object_path)
         .arg(build_archive())
-        .arg("-Wl,-dead_strip")
+        .args(platform_args)
         .arg("-o")
         .arg(&executable)
         .output()

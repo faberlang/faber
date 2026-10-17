@@ -21,6 +21,7 @@ pub mod kernel_lanes;
 mod regex_literal_raw_test;
 mod regex_program;
 mod routes;
+mod run_tier;
 mod runtime;
 pub mod sermo;
 #[cfg(test)]
@@ -33,6 +34,7 @@ mod tensor_lift;
 pub mod value;
 
 pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
+pub use run_tier::classify_run_tier;
 
 pub use host::{BufferHost, Host, StdioHost};
 pub use inf::{
@@ -642,6 +644,8 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     gradient_handles: FxHashMap<u64, GradientStorage>,
     /// Next gradient handle id (monotonic, never reused).
     next_gradient_handle: u64,
+    /// Compiled regex literals, keyed by their interned pattern and flags.
+    regex_literals: RefCell<FxHashMap<(Symbol, Option<Symbol>), Rc<RegexProgram>>>,
     /// Decoded `textus` literals, keyed by interned source symbol.
     textus_literals: RefCell<FxHashMap<Symbol, String>>,
     /// Owned ASCII literals, keyed by interned source symbol.
@@ -723,6 +727,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             block_cache,
             gradient_handles: FxHashMap::default(),
             next_gradient_handle: 0,
+            regex_literals: RefCell::new(FxHashMap::default()),
             textus_literals: RefCell::new(FxHashMap::default()),
             ascii_literals: RefCell::new(FxHashMap::default()),
             value_types: index_value_types(program),
@@ -1972,11 +1977,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 continue;
             }
 
-            let terminator = block_data.terminator.clone();
-            match terminator.kind {
+            let terminator = &block_data.terminator;
+            match &terminator.kind {
                 MirTerminatorKind::Return(operand) => {
                     let value = match operand {
-                        Some(operand) => match self.eval_operand(&operand, terminator.span) {
+                        Some(operand) => match self.eval_operand(operand, terminator.span) {
                             Ok(value) => value,
                             Err(error) => {
                                 self.fail(error);
@@ -2011,7 +2016,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     }
                 }
                 MirTerminatorKind::ReturnError(operand) => {
-                    let value = match self.eval_operand(&operand, terminator.span) {
+                    let value = match self.eval_operand(operand, terminator.span) {
                         Ok(value) => value,
                         Err(error) => {
                             self.fail(error);
@@ -2032,8 +2037,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 } => {
                     let call_result = if let Some(error) = try_call_shape_failure.take() {
                         match self.shape_failure_try_call_route_is_textus_compatible(
-                            &callee,
-                            &error_place,
+                            callee,
+                            error_place,
                             terminator.span,
                         ) {
                             Ok(true) => Ok(CallOutcome::Err(Value::Str(error.message))),
@@ -2050,27 +2055,27 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                             }
                         }
                     } else {
-                        self.invoke_call(&callee, &args, terminator.span)
+                        self.invoke_call(callee, args, terminator.span)
                     };
                     match call_result {
                         Ok(CallOutcome::Ok(value)) => {
                             if let Some(destination) = destination
                                 && let Err(error) =
-                                    self.write_place(&destination, value, terminator.span)
+                                    self.write_place(destination, value, terminator.span)
                             {
                                 self.fail(error);
                                 continue;
                             }
-                            self.set_active_block(ok_block, terminator.span);
+                            self.set_active_block(*ok_block, terminator.span);
                         }
                         Ok(CallOutcome::Err(error_value)) => {
                             if let Err(error) =
-                                self.write_place(&error_place, error_value, terminator.span)
+                                self.write_place(error_place, error_value, terminator.span)
                             {
                                 self.fail(error);
                                 continue;
                             }
-                            self.set_active_block(error_block, terminator.span);
+                            self.set_active_block(*error_block, terminator.span);
                         }
                         Err(error) => {
                             self.fail(error);
@@ -2078,17 +2083,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     }
                 }
                 MirTerminatorKind::Goto(target) => {
-                    self.set_active_block(target, terminator.span);
+                    self.set_active_block(*target, terminator.span);
                 }
                 MirTerminatorKind::Branch {
                     condition,
                     then_block,
                     else_block,
-                } => match self.eval_operand(&condition, terminator.span) {
+                } => match self.eval_operand(condition, terminator.span) {
                     Ok(cond) => match cond.as_bool(terminator.span) {
                         Ok(taken) => {
                             self.set_active_block(
-                                if taken { then_block } else { else_block },
+                                if taken { *then_block } else { *else_block },
                                 terminator.span,
                             );
                         }
@@ -2104,14 +2109,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     value,
                     cases,
                     default,
-                } => match self.eval_operand(&value, terminator.span) {
+                } => match self.eval_operand(value, terminator.span) {
                     Ok(switch_value) => {
                         let target = cases
                             .iter()
                             .find(|case| {
                                 constant_equals_value(&case.value, &switch_value, self.interner)
                             })
-                            .map_or(default, |case| case.target);
+                            .map_or(*default, |case| case.target);
                         self.set_active_block(target, terminator.span);
                     }
                     Err(error) => {
@@ -2926,14 +2931,25 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 // receive no Faber backslash processing. A `textus ↦ regex`
                 // conversion decodes the textus constant through
                 // `MirConstant::String` on its own path.
-                let pattern = regex_pattern(
-                    self.interner.resolve(*pattern),
-                    flags.map(|flags| self.interner.resolve(flags)),
-                );
-                let program = RegexProgram::compile(&pattern).map_err(|payload| {
-                    RunnerError::internal(span, format!("constant regex is invalid: {payload}"))
-                })?;
-                Value::Regex(Rc::new(program))
+                let key = (*pattern, *flags);
+                let cached = self.regex_literals.borrow().get(&key).cloned();
+                let program = if let Some(program) = cached {
+                    program
+                } else {
+                    let pattern_text = regex_pattern(
+                        self.interner.resolve(*pattern),
+                        flags.map(|flags| self.interner.resolve(flags)),
+                    );
+                    let program = RegexProgram::compile(&pattern_text).map_err(|payload| {
+                        RunnerError::internal(span, format!("constant regex is invalid: {payload}"))
+                    })?;
+                    let program = Rc::new(program);
+                    self.regex_literals
+                        .borrow_mut()
+                        .insert(key, Rc::clone(&program));
+                    program
+                };
+                Value::Regex(program)
             }
         })
     }

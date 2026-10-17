@@ -16,7 +16,7 @@
 
 use crate::Emitter;
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_int64, c_string};
+use crate::expr::{Operand, Value, c_int64};
 use crate::genus::{Field, Genus, Shape, Variant};
 use crate::helpers::Helper;
 use crate::names::Namer;
@@ -246,18 +246,18 @@ impl Emitter<'_> {
         let mut body = String::new();
         for (position, variant) in variants.iter().enumerate() {
             let last = position + 1 == variants.len();
-            let head = c_string(&format!("{name}.{}", variant.name))?;
+            let head = self.text_literal(&format!("{name}.{}", variant.name))?;
             let line = if variant.fields.is_empty() {
                 format!("return {head};")
             } else {
-                let mut parts = vec![c_string(&format!("{name}.{} {{ ", variant.name))?];
+                let mut parts = vec![self.text_literal(&format!("{name}.{} {{ ", variant.name))?];
                 for (at, field) in variant.fields.iter().enumerate() {
                     let separator = if at == 0 { "" } else { ", " };
-                    parts.push(c_string(&format!("{separator}{} = ", field.name))?);
+                    parts.push(self.text_literal(&format!("{separator}{} = ", field.name))?);
                     let read = format!("value->{}", field.c_name);
                     parts.push(self.show_field(&read, field.ty)?);
                 }
-                parts.push(c_string(" }")?);
+                parts.push(self.text_literal(" }")?);
                 self.support.need(Helper::Join);
                 format!(
                     "return faber_join(faber_a, {}, {});",
@@ -431,7 +431,7 @@ impl Emitter<'_> {
                 for (position, member) in members.iter().enumerate() {
                     let result = if text {
                         let raw = self.names.resolve_symbol(member.name).to_owned();
-                        c_string(&raw)?
+                        self.text_literal(&raw)?
                     } else {
                         let Some(number) = member.value else {
                             return Err(unsupported("ordo member without a numeric discriminant"));

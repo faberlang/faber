@@ -20,6 +20,11 @@ A measurement change is classified by the capability it carries:
 
 The comparison is keyed by term or conversion cell, so output ordering and
 summary totals cannot hide the exact row that drifted.
+
+``--only a,b`` limits the comparison to the named measurement files
+(``a.json``, ``b.json``) on both sides: a checkout that measures only some
+columns compares exactly those, and a column it was meant to produce but did
+not is still reported as removed.
 """
 
 from __future__ import annotations
@@ -316,10 +321,18 @@ def _compare_json(
         result.changes.append(f"{rel}: non-capability measurement content changed")
 
 
-def compare_roots(baseline_root: Path, candidate_root: Path) -> DiffResult:
+def compare_roots(
+    baseline_root: Path, candidate_root: Path, only: set[str] | None = None
+) -> DiffResult:
     result = DiffResult()
     baseline_files = _json_files(baseline_root)
     candidate_files = _json_files(candidate_root)
+    if only is not None:
+        wanted = {f"{name}.json" for name in only}
+        baseline_files = {rel: path for rel, path in baseline_files.items() if rel in wanted}
+        candidate_files = {rel: path for rel, path in candidate_files.items() if rel in wanted}
+        for rel in sorted(wanted - set(baseline_files) - set(candidate_files)):
+            result.regressions.append(f"{rel}: measurement artifact missing on both sides")
     for rel in sorted(set(baseline_files) | set(candidate_files)):
         baseline_path = baseline_files.get(rel)
         candidate_path = candidate_files.get(rel)
@@ -376,9 +389,15 @@ def main(argv: list[str] | None = None) -> int:
         help="record additive drift instead of failing it "
         "(capability regressions still fail)",
     )
+    parser.add_argument(
+        "--only",
+        help="comma-separated measurement names to compare (a.json, b.json); "
+        "other files on either side are ignored",
+    )
     args = parser.parse_args(argv)
+    only = set(args.only.split(",")) if args.only else None
     try:
-        result = compare_roots(args.baseline, args.candidate)
+        result = compare_roots(args.baseline, args.candidate, only)
     except (OSError, ValueError) as error:
         print(f"class-aware measurement diff: FAIL (comparison error): {error}", file=sys.stderr)
         return 1

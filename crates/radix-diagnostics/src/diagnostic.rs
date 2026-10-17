@@ -705,7 +705,7 @@ pub fn parse_arg_value(args: &[DiagnosticArg], name: &str) -> Option<String> {
 ///
 /// A hostile single-line input (multi-megabyte, newline-free) must not drive
 /// renderer output volume; longer lines clip to this head plus an ellipsis
-/// marker. Documented SEC-A1 default — Mind may pin an exact value later.
+/// marker. Documented SEC-A1 default — an exact value may be pinned later.
 pub const MAX_SOURCE_LINE_CHARS: usize = 400;
 
 const SOURCE_LINE_ELLIPSIS: &str = "…";

@@ -111,12 +111,12 @@ impl Emitter<'_> {
         let mut operands = [set, item];
         let prelude = self.sequence(&mut operands);
         let [set, item] = operands;
-        // `contains` is the list family's read; `add` allocates and takes the
-        // arena; `delete` only moves elements. A truth result is already
-        // parenthesized.
+        // `contains` is the set family's indexed read; `add` allocates and
+        // takes the arena; `delete` fixes its index in place. A truth result
+        // is already parenthesized.
         let call = match name {
             "contains" => format!(
-                "(faber_list_{}_contains({}, {}))",
+                "(faber_set_{}_has({}, {}))",
                 elem.suffix(),
                 set.text,
                 item.text

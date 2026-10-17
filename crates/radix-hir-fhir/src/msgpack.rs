@@ -1265,6 +1265,49 @@ struct HirArtifactDto {
     display_tokens: DisplayTokensWire,
 }
 
+impl From<HirArtifact> for HirArtifactDto {
+    /// Consuming form: the package encode path has just decoded the unit
+    /// and needs the DTO once, so every field moves instead of cloning the
+    /// largest object in the compiler.
+    fn from(artifact: HirArtifact) -> Self {
+        Self {
+            schema_version: artifact.schema_version,
+            source_identity: artifact.source_identity,
+            hir: artifact.hir,
+            presentation: artifact.presentation,
+            cli_program: artifact.cli_program,
+            types: artifact.types,
+            resolved_generic_calls: artifact.resolved_generic_calls,
+            radix_lanes: artifact.radix_lanes,
+            interner: artifact.interner,
+            resolver: artifact.resolver,
+            libraries: artifact.libraries,
+            function_facts: FunctionFactTableDto {
+                entries: artifact
+                    .function_facts
+                    .entries
+                    .into_iter()
+                    .map(|(def_id, facts)| FunctionFactEntryDto { def_id, facts })
+                    .collect(),
+                entry: artifact.function_facts.entry,
+            },
+            resolved_uses: artifact.resolved_uses,
+            analysis_stamp: artifact.analysis_stamp,
+            gpu_builtins: artifact
+                .gpu_builtins
+                .into_iter()
+                .map(|(def_id, builtin)| GpuBuiltinEntryDto { def_id, builtin })
+                .collect(),
+            capability_provenance: artifact.capability_provenance,
+            provider_units: artifact.provider_units,
+            shape_obligations: artifact.shape_obligations,
+            kernel_requirements: artifact.kernel_requirements,
+            tensor_edge_policies: artifact.tensor_edge_policies,
+            display_tokens: artifact.display_tokens,
+        }
+    }
+}
+
 impl From<&HirArtifact> for HirArtifactDto {
     fn from(artifact: &HirArtifact) -> Self {
         Self {
@@ -1408,7 +1451,7 @@ impl FhirPackageDto {
                 library_imports: module.library_imports.clone(),
                 source_hash: module.source_hash.clone(),
                 unit_schema_version: module.unit_schema_version,
-                unit: HirArtifactDto::from(&artifact),
+                unit: HirArtifactDto::from(artifact),
             });
         }
         Ok(Self {
@@ -1609,15 +1652,33 @@ fn gate_module_versions(module: &Value) -> Result<(), MsgpackError> {
 /// needed). Returns the legacy version number when the payload has that
 /// shape.
 fn legacy_postcard_version(bytes: &[u8]) -> Option<u32> {
-    let mut pos = 0;
-    // Parse the first value tolerating trailing bytes: a legacy envelope is
-    // never a single complete uint — the version varint is only its prefix.
-    let Ok(value) = read_value(bytes, &mut pos, 0) else {
-        return None;
+    // The first marker byte decides: a v2+ package is a top-level map
+    // (`0x80..=0x8f`, `0xde`, `0xdf`), a legacy envelope is a bare uint
+    // (the version varint) followed by the rest of the document, and
+    // everything else is neither. Walking the document to learn this costs
+    // a full parse plus a discarded DOM per load.
+    let (&marker, rest) = bytes.split_first()?;
+    let (width, value) = match marker {
+        0x00..=0x7f => (0usize, u64::from(marker)),
+        0xcc => (1, u64::from(*rest.first()?)),
+        0xcd => (
+            2,
+            u64::from(u16::from_be_bytes(rest.get(..2)?.try_into().ok()?)),
+        ),
+        0xce => (
+            4,
+            u64::from(u32::from_be_bytes(rest.get(..4)?.try_into().ok()?)),
+        ),
+        0xcf => (8, u64::from_be_bytes(rest.get(..8)?.try_into().ok()?)),
+        _ => return None,
     };
-    match value {
-        Value::Uint(found) if pos < bytes.len() => u32::try_from(found).ok(),
-        _ => None,
+    // A legacy envelope is never a single complete uint — the version
+    // varint is only its prefix; a bare uint takes the ordinary
+    // malformed path instead.
+    if rest.len() > width {
+        u32::try_from(value).ok()
+    } else {
+        None
     }
 }
 

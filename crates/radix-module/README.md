@@ -14,19 +14,18 @@ façade compile without call-site churn.
 
 ## CLI surface
 
-The developer `radix` binary lives in `radix-cli` (RTR4). Package and project
-workflows belong to the public sibling **`faber`** CLI (`../faber`, Cargo
-package `faber`).
+This crate has no binary. The **`faber`** CLI (`../faber`, Cargo package
+`faber`) drives it and owns package and project workflows.
 
-- inspection commands: `lex`, `parse`, `hir`, `mir`, `cli-ir`, `emit`, `check`, `targets`
-- no `build` subcommand — use `faber build` for package builds and `faber emit` for stdout-oriented file emission
-- formatter logic lives here as `forma` (invoked via `faber format`)
+- inspection commands: `faber lex`, `parse`, `hir`, `mir`, `cli-ir`, `emit`, `check`, `targets`
+- `faber build` for package builds and `faber emit` for stdout-oriented file emission
+- `faber format` and `faber convert` are thin compile entries over the HIR-backed Faber source emitter (`radix-hir-faber`); this crate's entry point for them is `src/driver/faber_format/compile.rs`
 
 ## Design overview
 
 - Frontend stages: lexing -> parsing -> semantic passes (in `radix-semantic`).
 - Semantic passes: collect -> resolve -> lower -> typecheck -> borrow -> exhaustive -> lint.
 - HIR is the stable, resolved AST used for codegen across targets.
-- MIR is the validated middle IR used by `mir`, `radix mir`, and systems-lane emitters such as `wasm-text` and `llvm-text`.
+- MIR is the validated middle IR used by `faber mir` and systems-lane emitters such as `wasm-text` and `llvm-text`.
 - Types are interned in a `TypeTable` and referenced by `TypeId`.
 - Name resolution uses a scoped symbol table keyed by `DefId`.

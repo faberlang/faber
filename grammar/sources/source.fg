@@ -1243,7 +1243,7 @@ hole_type       := '_'
 # `qualified_type`, accepted wherever `tabula<K, V>` is. The two spellings sit
 # one letter apart on purpose ("two shades of the same thing"; Roman account
 # books were called tabulae). It is not a typo and must not be "fixed" later
-# (operator ruling 2026-10-10, need).
+# (operator ruling 2026-10-10).
 qualified_type  := type_head ('.' IDENTIFIER)*
 type_head       := IDENTIFIER | 'modulus'
 # The bare numeric type words `numerus` and `fractus` (and their locale words)
@@ -1532,13 +1532,13 @@ iuncta_expr := 'iuncta' type_arguments '[' argument_list? ']'
 # head member is an `IDENTIFIER = value` init, so empty braces and quoted
 # members stay a json_literal. A stated type before a keyed literal builds
 # that type (`json { … }`, `map<K, V> { … }`), a bare keyed literal needs a
-# typed cell (operator ruling 2026-10-10, need). `*` is the
+# typed cell (operator ruling 2026-10-10). `*` is the
 # field-list hole: `record<*>` (la `ratio<*>`) is the whole field list, solved
 # from the shape. It is legal only as the sole argument of `record<...>`;
 # `record<g: f32, *>` is `ratio_field_list_hole_not_sole`, and `record<_>`
 # stays `ratio_type_arg_label_required`. A bare `{ field = value }` with no
 # typed cell is `record<*>` (a record), while `_ { ... }` has no default
-# (operator ruling 2026-10-14, need).
+# (operator ruling 2026-10-14).
 # The stated bracket constructor takes only collection words: `lista<…> [ … ]`
 # builds the stated list from its elements (an `array_literal` body), and
 # `lista<_> [ … ]` infers the element type. A tensor, vector, or matrix type

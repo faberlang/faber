@@ -67,6 +67,39 @@ pub fn shape_relation_applies_to_return(types: &TypeTable, relation: &ShapeRelat
         || (!has_expression_source(types, relation.left) && !has_expression_source(types, relation.right))
 }
 
+/// Signature of a synthesized check helper: two call sites whose helpers
+/// would be byte-identical share one function instead of minting a copy
+/// per site. The body depends only on these values (context, device role,
+/// and the type table are fixed for the whole lowering).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) enum SyntheticHelperKey {
+    CheckedAt {
+        keyed: bool,
+        params: [MirType; 2],
+        return_ty: MirType,
+        error_ty: MirType,
+    },
+    CheckedTensor {
+        op: MirCollectionOp,
+        params: Vec<MirType>,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
+    Conversio {
+        params: Vec<MirType>,
+        target: TypeId,
+        conversion_params: Vec<Symbol>,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
+    BoundedAppend {
+        receiver_ty: MirType,
+        item_ty: MirType,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
+}
+
 /// Whether a `⊥` default expression is side-effecting: a call or method call
 /// anywhere inside it. Pure recovery expressions (literals, paths, call-free
 /// compound values) need no deferral — evaluating them eagerly is
@@ -4860,6 +4893,16 @@ impl FunctionBuilder<'_> {
         error_ty: MirType,
         span: Span,
     ) -> MirFunctionId {
+        let key = SyntheticHelperKey::Conversio {
+            params: param_tys.to_vec(),
+            target,
+            conversion_params: params.to_vec(),
+            return_ty,
+            error_ty,
+        };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return id;
+        }
         #[expect(
             clippy::cast_possible_truncation,
             reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
@@ -4922,6 +4965,7 @@ impl FunctionBuilder<'_> {
             shader_stage: None,
             span,
         });
+        self.synthetic_helpers.insert(key, id);
         id
     }
 
@@ -4959,6 +5003,10 @@ impl FunctionBuilder<'_> {
         error_ty: MirType,
         span: Span,
     ) -> MirFunctionId {
+        let key = SyntheticHelperKey::BoundedAppend { receiver_ty, item_ty, return_ty, error_ty };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return id;
+        }
         #[expect(
             clippy::cast_possible_truncation,
             reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
@@ -5013,6 +5061,7 @@ impl FunctionBuilder<'_> {
             shader_stage: None,
             span,
         });
+        self.synthetic_helpers.insert(key, id);
         id
     }
 
@@ -5137,6 +5186,10 @@ impl FunctionBuilder<'_> {
         error_ty: MirType,
         span: Span,
     ) -> MirFunctionId {
+        let key = SyntheticHelperKey::CheckedAt { keyed, params: param_tys, return_ty, error_ty };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return id;
+        }
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         #[expect(
@@ -5224,7 +5277,7 @@ impl FunctionBuilder<'_> {
         let message = MirOperand::Constant(MirConstant::String(nested.context.diagnostic_at_out_of_range));
         nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
 
-        Self::finish_synthetic_function(
+        let id = Self::finish_synthetic_function(
             &mut self.errors,
             &mut self.synthetic_functions,
             id,
@@ -5232,7 +5285,9 @@ impl FunctionBuilder<'_> {
             return_ty,
             error_ty,
             span,
-        )
+        );
+        self.synthetic_helpers.insert(key, id);
+        id
     }
 
     /// The helper body, for `(in receiver, index[, value]) ⇥ textus`:
@@ -5257,6 +5312,10 @@ impl FunctionBuilder<'_> {
         error_ty: MirType,
         span: Span,
     ) -> Option<MirFunctionId> {
+        let key = SyntheticHelperKey::CheckedTensor { op, params: param_tys.to_vec(), return_ty, error_ty };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return Some(id);
+        }
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let Some(array) = self.types.find_array(numerus.semantic_id()) else {
@@ -5342,7 +5401,7 @@ impl FunctionBuilder<'_> {
         );
         emit_checked_tensor_helper_result(&mut nested, op, receiver, index, &locals, return_ty, ok, fail, span);
 
-        Some(Self::finish_synthetic_function(
+        let id = Self::finish_synthetic_function(
             &mut self.errors,
             &mut self.synthetic_functions,
             id,
@@ -5350,7 +5409,9 @@ impl FunctionBuilder<'_> {
             return_ty,
             error_ty,
             span,
-        ))
+        );
+        self.synthetic_helpers.insert(key, id);
+        Some(id)
     }
 
     /// Record a completed synthetic MIR function into the lowering's function

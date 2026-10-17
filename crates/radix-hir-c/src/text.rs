@@ -3,7 +3,7 @@
 
 use crate::Emitter;
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_string};
+use crate::expr::{Operand, Value};
 use crate::helpers::Helper;
 use radix_codegen_shared::CodegenError;
 use radix_hir::HirExpression;
@@ -113,19 +113,23 @@ impl Emitter<'_> {
         let mut parts = Vec::new();
         for piece in template_pieces(&raw) {
             match piece {
-                Piece::Text(text) => parts.push(c_string(&text)?),
+                Piece::Text(text) => parts.push(self.text_literal(&text)?),
                 Piece::Hole(index) => match shown.get(index) {
                     Some(text) => parts.push(text.clone()),
                     None => return Err(unsupported("template hole without an argument")),
                 },
             }
         }
-        let text = if parts.is_empty() {
-            "\"\"".to_owned()
-        } else {
-            self.support.need(Helper::Join);
-            let call = format!("faber_join(faber_a, {}, {})", parts.len(), parts.join(", "));
-            crate::expr::wrap(&prelude, &call)
+        let text = match parts.as_slice() {
+            [] => "\"\"".to_owned(),
+            // One piece is already the text: a join would allocate and copy
+            // the same immutable bytes a second time.
+            [only] => crate::expr::wrap(&prelude, only),
+            many => {
+                self.support.need(Helper::Join);
+                let call = format!("faber_join(faber_a, {}, {})", many.len(), many.join(", "));
+                crate::expr::wrap(&prelude, &call)
+            }
         };
         Ok(Operand::new(text, Value::Text).with_effect(effect))
     }
@@ -144,7 +148,10 @@ impl Emitter<'_> {
             }
             Value::Truth => {
                 let tokens = self.names.display_tokens();
-                let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
+                let (yes, no) = (
+                    self.text_literal(&tokens.true_)?,
+                    self.text_literal(&tokens.false_)?,
+                );
                 Ok(format!("({} ? {yes} : {no})", operand.text))
             }
             Value::Decimal => {
@@ -163,7 +170,7 @@ impl Emitter<'_> {
                 Ok(format!("faber_float_text_f32(faber_a, {})", operand.text))
             }
             Value::Opt(inner) => self.show_option(&operand.text, inner),
-            Value::None => Ok(c_string(&self.names.display_tokens().none)?),
+            Value::None => Ok(self.text_literal(&self.names.display_tokens().none)?),
             Value::Void => Err(unsupported("showing a call with no result")),
             Value::Func(_) => Err(unsupported("showing a function value")),
         }

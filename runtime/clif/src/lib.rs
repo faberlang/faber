@@ -24,8 +24,10 @@ mod magnus;
 mod regex_program;
 mod regex_rt;
 
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::CStr;
 use std::ffi::c_char;
+use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::sync::Mutex;
 use std::sync::OnceLock;
@@ -326,6 +328,12 @@ const TAG_INS: i32 = 17;
 pub struct Map {
     set: bool,
     entries: Vec<(i32, i64, i32, i64)>,
+    // Open-addressed entry positions; zero means empty, otherwise position + 1.
+    // Only keys with a content-consistent hash are indexed. Other key families
+    // retain the equality-preserving linear scan in `map_find`.
+    slots: Vec<usize>,
+    index_mask: usize,
+    indexed_len: usize,
 }
 
 /// A present optional payload.
@@ -435,6 +443,9 @@ fn duplicate(tag: i32, bits: i64) -> i64 {
             Box::into_raw(Box::new(Map {
                 set: source.set,
                 entries,
+                slots: Vec::new(),
+                index_mask: 0,
+                indexed_len: 0,
             })) as i64
         }
         TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
@@ -509,10 +520,110 @@ fn map_text(map: &Map) -> String {
     format!("{{{}}}", parts.join(", "))
 }
 
+fn map_key_hash(tag: i32, bits: i64) -> Option<u64> {
+    let mut hasher = DefaultHasher::new();
+    tag.hash(&mut hasher);
+    match tag {
+        TAG_INT | TAG_BOOL | TAG_BITS => bits.hash(&mut hasher),
+        TAG_FLOAT => {
+            let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
+            let normalized = if value == 0.0 { 0 } else { value.to_bits() };
+            normalized.hash(&mut hasher);
+        }
+        TAG_TEXT | TAG_CHAR => unsafe { text_bytes(bits as *const u8) }.hash(&mut hasher),
+        // Pointer-backed/deep values retain the equality-preserving scan;
+        // never use their addresses as a key hash.
+        _ => return None,
+    }
+    Some(hasher.finish())
+}
+
+fn map_index_capacity(count: usize) -> Option<usize> {
+    let required = count.checked_mul(10)?.checked_div(7)?.checked_add(1)?;
+    required
+        .checked_next_power_of_two()
+        .map(|capacity| capacity.max(8))
+}
+
+fn map_index_build(map: &mut Map) {
+    map.indexed_len = map
+        .entries
+        .iter()
+        .filter(|&&(tag, bits, _, _)| map_key_hash(tag, bits).is_some())
+        .count();
+    let Some(capacity) = map_index_capacity(map.indexed_len) else {
+        map.slots.clear();
+        map.indexed_len = 0;
+        return;
+    };
+    let mut slots = vec![0; capacity];
+    for (position, &(tag, bits, _, _)) in map.entries.iter().enumerate() {
+        if let Some(hash) = map_key_hash(tag, bits) {
+            let mut slot = hash as usize & (capacity - 1);
+            while slots[slot] != 0 {
+                slot = (slot + 1) & (capacity - 1);
+            }
+            slots[slot] = position + 1;
+        }
+    }
+    map.slots = slots;
+    map.index_mask = capacity - 1;
+}
+
+fn map_index_insert(map: &mut Map, position: usize) {
+    let (tag, bits, _, _) = map.entries[position];
+    let Some(hash) = map_key_hash(tag, bits) else {
+        return;
+    };
+    let Some(indexed_len) = map.indexed_len.checked_add(1) else {
+        map.slots.clear();
+        map.indexed_len = 0;
+        return;
+    };
+    map.indexed_len = indexed_len;
+    if map.slots.is_empty() {
+        if map.indexed_len >= 8 {
+            map_index_build(map);
+        }
+        return;
+    }
+    let needs_growth = map
+        .indexed_len
+        .checked_mul(10)
+        .zip(map.slots.len().checked_mul(7))
+        .is_none_or(|(count, limit)| count >= limit);
+    if needs_growth {
+        map_index_build(map);
+        return;
+    }
+    let mut slot = hash as usize & map.index_mask;
+    while map.slots[slot] != 0 {
+        slot = (slot + 1) & map.index_mask;
+    }
+    map.slots[slot] = position + 1;
+}
+
 fn map_find(map: &Map, tag: i32, bits: i64) -> Option<usize> {
+    if !map.slots.is_empty() {
+        if let Some(hash) = map_key_hash(tag, bits) {
+            let mut slot = hash as usize & map.index_mask;
+            loop {
+                let encoded = map.slots[slot];
+                if encoded == 0 {
+                    return None;
+                }
+                let position = encoded - 1;
+                let (key_tag, key_bits, _, _) = map.entries[position];
+                if key_tag == tag && element_equal(tag, key_bits, bits) {
+                    return Some(position);
+                }
+                slot = (slot + 1) & map.index_mask;
+            }
+        }
+    }
     map.entries
         .iter()
-        .position(|&(kt, kb, _, _)| kt == tag && element_equal(tag, kb, bits))
+        .position(|&(key_tag, key_bits, _, _)| key_tag == tag && element_equal(tag, key_bits, bits))
 }
 
 /// New empty map (flag 0) or set (flag 1).
@@ -521,6 +632,9 @@ pub extern "C" fn __faber_clif_v1_map_new(set: i32) -> *mut Map {
     Box::into_raw(Box::new(Map {
         set: set != 0,
         entries: Vec::new(),
+        slots: Vec::new(),
+        index_mask: 0,
+        indexed_len: 0,
     }))
 }
 
@@ -540,7 +654,11 @@ pub unsafe extern "C" fn __faber_clif_v1_map_set(
     let map = unsafe { &mut *map };
     match map_find(map, key_tag, key) {
         Some(at) => map.entries[at] = (key_tag, key, value_tag, value),
-        None => map.entries.push((key_tag, key, value_tag, value)),
+        None => {
+            let position = map.entries.len();
+            map.entries.push((key_tag, key, value_tag, value));
+            map_index_insert(map, position);
+        }
     }
 }
 
@@ -600,6 +718,9 @@ pub unsafe extern "C" fn __faber_clif_v1_map_remove(map: *mut Map, key_tag: i32,
     match map_find(map, key_tag, key) {
         Some(at) => {
             map.entries.remove(at);
+            if !map.slots.is_empty() {
+                map_index_build(map);
+            }
             1
         }
         None => 0,
@@ -1116,16 +1237,37 @@ pub unsafe extern "C" fn __faber_clif_v1_text_concat(
     right: *const u8,
 ) -> *const u8 {
     let (left, right) = unsafe { (text_bytes(left), text_bytes(right)) };
-    let mut joined = Vec::with_capacity(left.len() + right.len());
-    joined.extend_from_slice(left);
-    joined.extend_from_slice(right);
-    text_new(&joined)
+    let length = left.len() + right.len();
+    let mut buffer = Vec::with_capacity(8 + length);
+    buffer.extend_from_slice(&i64::try_from(length).unwrap_or(0).to_ne_bytes());
+    buffer.extend_from_slice(left);
+    buffer.extend_from_slice(right);
+    Box::leak(buffer.into_boxed_slice()).as_ptr()
 }
 
 /// Render an integer as text.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_text_from_i64(value: i64) -> *const u8 {
-    text_new(value.to_string().as_bytes())
+    let mut digits = [0u8; 20];
+    let mut cursor = digits.len();
+    let mut magnitude = value.unsigned_abs();
+    loop {
+        cursor -= 1;
+        digits[cursor] = b'0' + (magnitude % 10) as u8;
+        magnitude /= 10;
+        if magnitude == 0 {
+            break;
+        }
+    }
+    if value < 0 {
+        cursor -= 1;
+        digits[cursor] = b'-';
+    }
+    let text = &digits[cursor..];
+    let mut buffer = Vec::with_capacity(8 + text.len());
+    buffer.extend_from_slice(&i64::try_from(text.len()).unwrap_or(0).to_ne_bytes());
+    buffer.extend_from_slice(text);
+    Box::leak(buffer.into_boxed_slice()).as_ptr()
 }
 
 /// The only Unicode scalar of a text, if it holds exactly one.
@@ -1833,7 +1975,13 @@ pub unsafe extern "C" fn __faber_clif_v1_set_algebra(
             entries.extend(right.entries.iter().filter(|e| !has(left, e)).copied());
         }
     }
-    Box::into_raw(Box::new(Map { set: true, entries }))
+    Box::into_raw(Box::new(Map {
+        set: true,
+        entries,
+        slots: Vec::new(),
+        index_mask: 0,
+        indexed_len: 0,
+    }))
 }
 
 /// Subset (mode 0: left within right) or superset (mode 1) test.
@@ -1953,10 +2101,15 @@ pub unsafe extern "C" fn __faber_clif_v1_list_to_set(list: *const List) -> *mut 
     let mut set = Map {
         set: true,
         entries: Vec::new(),
+        slots: Vec::new(),
+        index_mask: 0,
+        indexed_len: 0,
     };
     for &(tag, bits) in &unsafe { list_ref(list) }.items {
         if map_find(&set, tag, bits).is_none() {
+            let position = set.entries.len();
             set.entries.push((tag, bits, 0, 0));
+            map_index_insert(&mut set, position);
         }
     }
     Box::into_raw(Box::new(set))
@@ -2436,6 +2589,9 @@ fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
                 Box::into_raw(Box::new(Map {
                     set: map.set,
                     entries,
+                    slots: Vec::new(),
+                    index_mask: 0,
+                    indexed_len: 0,
                 })) as i64,
             )
         }
@@ -2457,4 +2613,164 @@ fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
 pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const Present {
     let (_, boxed) = box_open_element(tag, bits);
     boxed as *const Present
+}
+
+#[cfg(test)]
+mod runtime_perf_tests {
+    use super::*;
+
+    #[test]
+    fn text_concat_and_integer_text_keep_exact_bytes() {
+        let left = text_new("héllo".as_bytes());
+        let right = text_new(" world".as_bytes());
+        let joined = unsafe { __faber_clif_v1_text_concat(left, right) };
+        assert_eq!(unsafe { text_bytes(joined) }, "héllo world".as_bytes());
+
+        for (value, expected) in [
+            (0, "0"),
+            (-1, "-1"),
+            (i64::MIN, "-9223372036854775808"),
+            (i64::MAX, "9223372036854775807"),
+        ] {
+            let text = __faber_clif_v1_text_from_i64(value);
+            assert_eq!(unsafe { text_bytes(text) }, expected.as_bytes());
+        }
+    }
+
+    #[test]
+    #[ignore = "timing oracle: run with --release -- --ignored --nocapture"]
+    fn indexed_map_insert_scaling_probe() {
+        use std::time::Instant;
+        for count in [256i64, 512, 1024, 2048] {
+            let before = Instant::now();
+            let mut entries = Vec::new();
+            for key in 0..count {
+                if entries
+                    .iter()
+                    .position(|&(tag, bits, _, _)| {
+                        tag == TAG_INT && element_equal(TAG_INT, bits, key)
+                    })
+                    .is_none()
+                {
+                    entries.push((TAG_INT, key, TAG_INT, key));
+                }
+            }
+            let before_us = before.elapsed().as_micros();
+
+            let after = Instant::now();
+            let map = __faber_clif_v1_map_new(0);
+            for key in 0..count {
+                unsafe { __faber_clif_v1_map_set(map, TAG_INT, key, TAG_INT, key) };
+            }
+            let after_us = after.elapsed().as_micros();
+            println!("map_insert_scaling n={count} scan_us={before_us} indexed_us={after_us}");
+        }
+    }
+
+    #[test]
+    fn indexed_map_preserves_order_equality_and_delete_probe_chains() {
+        let map = __faber_clif_v1_map_new(1);
+        for key in 0..512 {
+            unsafe { __faber_clif_v1_map_set(map, TAG_INT, key, TAG_INT, key * 10) };
+        }
+        for key in (0..512).step_by(3) {
+            assert_eq!(unsafe { __faber_clif_v1_map_remove(map, TAG_INT, key) }, 1);
+            assert_eq!(unsafe { __faber_clif_v1_map_has(map, TAG_INT, key) }, 0);
+            for probe in key.saturating_sub(2).max(0)..=(key + 2).min(511) {
+                assert_eq!(
+                    unsafe { __faber_clif_v1_map_has(map, TAG_INT, probe) },
+                    i8::from(probe % 3 != 0 || probe > key),
+                    "removed {key}, probing {probe}"
+                );
+            }
+        }
+        for key in 0..512 {
+            assert_eq!(
+                unsafe { __faber_clif_v1_map_has(map, TAG_INT, key) },
+                i8::from(key % 3 != 0)
+            );
+        }
+        let expected: Vec<i64> = (0..512).filter(|key| key % 3 != 0).collect();
+        assert_eq!(
+            unsafe { list_ref(__faber_clif_v1_map_keys(map)) }.items,
+            expected
+                .iter()
+                .map(|&key| (TAG_INT, key))
+                .collect::<Vec<_>>()
+        );
+
+        // Equal text at distinct addresses must share a bucket and replace.
+        let text_map = __faber_clif_v1_map_new(0);
+        let first = text_new(b"same key");
+        let second = text_new(b"same key");
+        for key in 0..12 {
+            let text = text_new(format!("key-{key}").as_bytes());
+            unsafe { __faber_clif_v1_map_set(text_map, TAG_TEXT, text as i64, TAG_INT, key) };
+        }
+        unsafe { __faber_clif_v1_map_set(text_map, TAG_TEXT, first as i64, TAG_INT, 1) };
+        unsafe { __faber_clif_v1_map_set(text_map, TAG_TEXT, second as i64, TAG_INT, 99) };
+        assert_eq!(unsafe { __faber_clif_v1_map_len(text_map) }, 13);
+        assert_eq!(
+            unsafe { __faber_clif_v1_map_get(text_map, TAG_TEXT, first as i64) },
+            99
+        );
+
+        // Deep/pointer-backed keys stay on the equality scan even after the
+        // scalar index has been built; distinct but equal list handles match.
+        let deep_map = __faber_clif_v1_map_new(0);
+        for key in 0..8 {
+            unsafe { __faber_clif_v1_map_set(deep_map, TAG_INT, key, TAG_INT, key) };
+        }
+        let left = list_new_from(vec![(TAG_INT, 41), (TAG_BOOL, 1)]);
+        let right = list_new_from(vec![(TAG_INT, 41), (TAG_BOOL, 1)]);
+        unsafe { __faber_clif_v1_map_set(deep_map, TAG_LIST, left as i64, TAG_INT, 77) };
+        assert_eq!(
+            unsafe { __faber_clif_v1_map_get(deep_map, TAG_LIST, right as i64) },
+            77
+        );
+
+        // Floats use the fallback so the existing EQ rules stay authoritative.
+        let float_map = __faber_clif_v1_map_new(0);
+        for value in 2..10 {
+            unsafe {
+                __faber_clif_v1_map_set(
+                    float_map,
+                    TAG_FLOAT,
+                    (value as f64).to_bits() as i64,
+                    TAG_INT,
+                    value,
+                )
+            };
+        }
+        unsafe {
+            __faber_clif_v1_map_set(float_map, TAG_FLOAT, 0.0f64.to_bits() as i64, TAG_INT, 5)
+        };
+        assert_eq!(
+            unsafe { __faber_clif_v1_map_has(float_map, TAG_FLOAT, (-0.0f64).to_bits() as i64) },
+            1
+        );
+        let nan = f64::NAN.to_bits() as i64;
+        unsafe { __faber_clif_v1_map_set(float_map, TAG_FLOAT, nan, TAG_INT, 6) };
+        assert_eq!(
+            unsafe { __faber_clif_v1_map_has(float_map, TAG_FLOAT, nan) },
+            0
+        );
+
+        let list = list_new_from(vec![(TAG_INT, 7), (TAG_INT, 8), (TAG_INT, 7), (TAG_INT, 9)]);
+        let set = unsafe { __faber_clif_v1_list_to_set(list) };
+        assert_eq!(unsafe { __faber_clif_v1_map_len(set) }, 3);
+        assert_eq!(
+            unsafe { list_ref(__faber_clif_v1_map_keys(set)) }.items,
+            vec![(TAG_INT, 7), (TAG_INT, 8), (TAG_INT, 9)]
+        );
+        assert_eq!(unsafe { __faber_clif_v1_map_has(set, TAG_INT, 8) }, 1);
+        assert_eq!(unsafe { __faber_clif_v1_map_remove(set, TAG_INT, 8) }, 1);
+        assert_eq!(unsafe { __faber_clif_v1_map_has(set, TAG_INT, 8) }, 0);
+        assert_eq!(unsafe { __faber_clif_v1_map_has(set, TAG_INT, 9) }, 1);
+
+        let ordered_other = list_new_from(vec![(TAG_INT, 9), (TAG_INT, 7)]);
+        let other_set = unsafe { __faber_clif_v1_list_to_set(ordered_other) };
+        assert_eq!(unsafe { __faber_clif_v1_set_subset(set, other_set, 0) }, 1);
+        assert_eq!(unsafe { __faber_clif_v1_set_subset(other_set, set, 0) }, 1);
+    }
 }

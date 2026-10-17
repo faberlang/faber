@@ -1,8 +1,7 @@
 //! Goal Stage 3 gate: complete lowering coverage of HIR presentation trivia.
 //!
-//! Unit U-3 (faberlang tugboat fleet, wave spine). These integration proofs
-//! run the full parse → collect → resolve → lower frontend and inspect the
-//! presentation sidecar that U-4/U-5/U-6 consume:
+//! These integration proofs run the full parse → collect → resolve → lower
+//! frontend and inspect the presentation sidecar that U-4/U-5/U-6 consume:
 //!
 //! - every syntax boundary owning `leading_trivia` lowers to a stable
 //!   `HirSourceAnchorId` owner (statement, item, member, entry);

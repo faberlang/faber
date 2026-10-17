@@ -2,6 +2,22 @@
    compile with -I <runtime>/c (runtime/c in the Faber tree). */
 #include "faber.h"
 
+FABER_TEXT_LITERAL(faber_L0, "item ", 5, 5);
+FABER_TEXT_LITERAL(faber_L1, ": ", 2, 2);
+FABER_TEXT_LITERAL(faber_L2, "argument", 8, 8);
+FABER_TEXT_LITERAL(faber_L3, "x\ty", 3, 3);
+FABER_TEXT_LITERAL(faber_L4, "default", 7, 7);
+FABER_TEXT_LITERAL(faber_L5, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L6, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L7, "shared", 6, 6);
+FABER_TEXT_LITERAL(faber_L8, "Item { ", 7, 7);
+FABER_TEXT_LITERAL(faber_L9, "id = ", 5, 5);
+FABER_TEXT_LITERAL(faber_L10, ", tag = ", 8, 8);
+FABER_TEXT_LITERAL(faber_L11, ", counts = ", 11, 11);
+FABER_TEXT_LITERAL(faber_L12, " }", 2, 2);
+FABER_TEXT_LITERAL(faber_L13, "Tag { ", 6, 6);
+FABER_TEXT_LITERAL(faber_L14, "label = ", 8, 8);
+FABER_TEXT_LITERAL(faber_L15, ", hot = ", 8, 8);
 typedef struct g_Tag g_Tag;
 typedef struct g_Item g_Item;
 
@@ -22,27 +38,27 @@ static const char *g_Item_show(faber_arena *faber_a, const g_Item *value);
 static const char *g_Tag_show(faber_arena *faber_a, const g_Tag *value);
 
 static const char *g_Item_describe(faber_arena *faber_a, g_Item *faber_self) {
-    return (__extension__ ({ int64_t faber_t0 = (faber_self)->m_id; const char *faber_t1 = ((faber_self)->m_tag)->m_label; faber_join(faber_a, 4, "item ", faber_int_text(faber_a, faber_t0), ": ", faber_t1); }));
+    return (__extension__ ({ int64_t faber_t0 = (faber_self)->m_id; const char *faber_t1 = ((faber_self)->m_tag)->m_label; faber_join(faber_a, 4, faber_L0.s, faber_int_text(faber_a, faber_t0), faber_L1.s, faber_t1); }));
 }
 
 static void f_heat(faber_arena *faber_a, g_Item *p_item) {
     ((p_item)->m_tag)->m_hot = (1);
-    faber_list_i64_push(faber_a, (p_item)->m_counts, (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_mul_o((p_item)->m_id, INT64_C(10), &faber_o); faber_o ? faber_store_i64(faber_mul((p_item)->m_id, INT64_C(10)), "argument") : faber_r; })));
+    faber_list_i64_push(faber_a, (p_item)->m_counts, (__extension__ ({ int faber_o = 0; int64_t faber_r = faber_mul_o((p_item)->m_id, INT64_C(10), &faber_o); faber_o ? faber_store_i64(faber_mul((p_item)->m_id, INT64_C(10)), faber_L2.s) : faber_r; })));
 }
 
 static const char *g_Item_show(faber_arena *faber_a, const g_Item *value) {
-    return faber_join(faber_a, 8, "Item { ", "id = ", faber_int_text(faber_a, value->m_id), ", tag = ", g_Tag_show(faber_a, value->m_tag), ", counts = ", faber_list_i64_show(faber_a, value->m_counts), " }");
+    return faber_join(faber_a, 8, faber_L8.s, faber_L9.s, faber_int_text(faber_a, value->m_id), faber_L10.s, g_Tag_show(faber_a, value->m_tag), faber_L11.s, faber_list_i64_show(faber_a, value->m_counts), faber_L12.s);
 }
 
 static const char *g_Tag_show(faber_arena *faber_a, const g_Tag *value) {
-    return faber_join(faber_a, 6, "Tag { ", "label = ", faber_quoted(faber_a, value->m_label), ", hot = ", ((value->m_hot) ? "true" : "false"), " }");
+    return faber_join(faber_a, 6, faber_L13.s, faber_L14.s, faber_quoted(faber_a, value->m_label), faber_L15.s, ((value->m_hot) ? faber_L5.s : faber_L6.s), faber_L12.s);
 }
 
 int main(void) {
     faber_arena faber_root = {0};
     faber_arena *const faber_a = &faber_root;
-    g_Item *l_a = (__extension__ ({ g_Item *faber_t2 = faber_alloc(faber_a, sizeof *faber_t2); faber_t2->m_id = INT64_C(1); faber_t2->m_tag = (__extension__ ({ g_Tag *faber_t3 = faber_alloc(faber_a, sizeof *faber_t3); faber_t3->m_label = "x\ty"; faber_t3->m_hot = (0); faber_t3; })); faber_t2->m_counts = faber_list_i64_new(faber_a, 0); faber_t2; }));
-    g_Item *l_b = (__extension__ ({ g_Item *faber_t4 = faber_alloc(faber_a, sizeof *faber_t4); faber_t4->m_id = INT64_C(2); faber_t4->m_tag = (__extension__ ({ g_Tag *faber_t5 = faber_alloc(faber_a, sizeof *faber_t5); faber_t5->m_label = "default"; faber_t5->m_hot = (0); faber_t5; })); faber_t4->m_counts = faber_list_i64_new(faber_a, 0); faber_t4; }));
+    g_Item *l_a = (__extension__ ({ g_Item *faber_t2 = faber_alloc(faber_a, sizeof *faber_t2); faber_t2->m_id = INT64_C(1); faber_t2->m_tag = (__extension__ ({ g_Tag *faber_t3 = faber_alloc(faber_a, sizeof *faber_t3); faber_t3->m_label = faber_L3.s; faber_t3->m_hot = (0); faber_t3; })); faber_t2->m_counts = faber_list_i64_new(faber_a, 0); faber_t2; }));
+    g_Item *l_b = (__extension__ ({ g_Item *faber_t4 = faber_alloc(faber_a, sizeof *faber_t4); faber_t4->m_id = INT64_C(2); faber_t4->m_tag = (__extension__ ({ g_Tag *faber_t5 = faber_alloc(faber_a, sizeof *faber_t5); faber_t5->m_label = faber_L4.s; faber_t5->m_hot = (0); faber_t5; })); faber_t4->m_counts = faber_list_i64_new(faber_a, 0); faber_t4; }));
     f_heat(faber_a, l_a);
     f_heat(faber_a, l_a);
     printf("%s\n", g_Item_show(faber_a, l_a));
@@ -52,7 +68,7 @@ int main(void) {
         printf("%s %s\n", faber_t6, faber_t7);
     }
     (l_b)->m_tag = (l_a)->m_tag;
-    ((l_b)->m_tag)->m_label = "shared";
-    printf("%s %s\n", ((l_a)->m_tag)->m_label, ((((l_b)->m_tag)->m_hot) ? "true" : "false"));
+    ((l_b)->m_tag)->m_label = faber_L7.s;
+    printf("%s %s\n", ((l_a)->m_tag)->m_label, ((((l_b)->m_tag)->m_hot) ? faber_L5.s : faber_L6.s));
     return 0;
 }

@@ -1,5 +1,12 @@
 # Faber
 
+> **About this repository's history.** It was produced by running
+> `git filter-repo` over the private Radix compiler repository as part of the
+> public release. Only the open-source paths were kept, so commit messages may
+> refer to commits, issues and files that are not here. The earlier public
+> repository is archived as
+> [faber-1.x](https://github.com/faberlang/faber-1.x).
+
 Faber is a programming language designed to be written by language models and
 read by people. It is built on a small number of uniform, mechanical rules, so
 that a model can predict what a program means without importing the habits of
@@ -365,13 +372,13 @@ How mature each target is, measured on the corpus (662 programs the suite runs, 
 | **Application languages** | | | | |
 | Rust | `rust` | Rust source, or a full Cargo project | suite 645 / 654 | official binary |
 | Go | `go` | Go source | suite 568 / 662 | official binary |
-| TypeScript | `ts` | TypeScript source | suite 609 / 662 | official binary |
+| TypeScript | `ts` | TypeScript source | suite 618 / 662 | official binary |
 | Swift | `swift` | Swift source | suite 347 / 662 | official binary |
-| Python | `python` | self-contained Python | suite 480 / 649 | official binary |
+| Python | `python` | self-contained Python | suite 500 / 649 | official binary |
 | Haskell | `haskell` | Haskell source | 77 of 593 single-file programs emit; 30 of those match the runner | official binary |
 | **Systems and native** | | | | |
-| C | `c` | C11 with a header-only runtime | preview: 223 of 593 single-file programs emit; 222 of those match the runner | public |
-| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 535 / 662 | official binary |
+| C | `c` | C11 with a header-only runtime | preview: 282 of 593 single-file programs emit; 282 of those match the runner | public |
+| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 536 / 662 | official binary |
 | WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 470 / 662 assemble (no host runtime yet) | official binary |
 | Cranelift | `clif` | native objects with no external toolchain | preview: suite 509 / 649 | public |
 | **GPU kernels** (kernel functions only) | | | | |
@@ -442,9 +449,29 @@ This repository is the open-source core of Faber:
 The official `faber` release also includes the code generators that are not in
 this repository (see Targets).
 
+## Install
+
+Prebuilt `faber` binaries for macOS (Apple silicon) and Linux (x86-64) are
+published on the [releases page](https://github.com/faberlang/releases/releases/latest);
+this one is [Faber 1.14.0](https://github.com/faberlang/releases/releases/tag/faber-v1.14.0).
+Download the tarball for your platform and its `.sha256` file into one
+directory, check it, and put `faber` on your `PATH`. The tarball holds a single
+file, `bin/faber`.
+
+```sh
+shasum -a 256 -c faber-v1.14.0-aarch64-apple-darwin.tar.gz.sha256   # Linux: sha256sum -c
+tar -xzf faber-v1.14.0-aarch64-apple-darwin.tar.gz
+sudo mv bin/faber /usr/local/bin/faber
+faber --version
+```
+
+On Linux the platform name is `x86_64-unknown-linux-gnu`. Documentation, the
+language reference and the target matrix are at <https://faberlang.dev>.
+
 ## Build and run
 
-You need a recent stable Rust toolchain.
+To build the open-source core from this repository instead, you need a recent
+stable Rust toolchain.
 
 ```sh
 cargo build --release -p faber

@@ -37,9 +37,9 @@ use radix_mir::{
 use rustc_hash::FxHashSet;
 
 /// Slug for an unsupported MIR shape (mirrors `mir::coverage`).
-const SLUG_UNSUPPORTED: &str = "unsupported-mir-shape";
+pub(crate) const SLUG_UNSUPPORTED: &str = "unsupported-mir-shape";
 /// Slug for a target-policy rejection (mirrors `mir::coverage`).
-const SLUG_POLICY: &str = "target-policy-rejection";
+pub(crate) const SLUG_POLICY: &str = "target-policy-rejection";
 
 /// Runner dispatch status for a [`MirRuntimeAbiFamily`].
 ///

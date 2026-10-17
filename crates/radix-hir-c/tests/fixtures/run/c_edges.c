@@ -2,22 +2,30 @@
    compile with -I <runtime>/c (runtime/c in the Faber tree). */
 #include "faber.h"
 
+FABER_TEXT_LITERAL(faber_L0, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L1, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L2, "100%s and %d stay text", 22, 22);
+FABER_TEXT_LITERAL(faber_L3, "what\?\?!", 7, 7);
+FABER_TEXT_LITERAL(faber_L4, "caf\303\251", 5, 4);
+FABER_TEXT_LITERAL(faber_L5, "h\303\251ab", 5, 4);
+FABER_TEXT_LITERAL(faber_L6, "shadow", 6, 6);
+FABER_TEXT_LITERAL(faber_L7, "mutable", 7, 7);
 int main(void) {
     printf("%" PRId64 "\n", INT64_MIN);
     printf("%" PRId64 "\n", INT64_C(9223372036854775807));
-    printf("%s\n", "100%s and %d stay text");
-    printf("%s\n", "what\?\?!");
-    printf("%s\n", "caf\303\251");
-    printf("%s\n", "h\303\251ab");
+    printf("%s\n", faber_L2.s);
+    printf("%s\n", faber_L3.s);
+    printf("%s\n", faber_L4.s);
+    printf("%s\n", faber_L5.s);
     const int64_t l_char = INT64_C(1);
     const int64_t l_goto = INT64_C(2);
     const int64_t l_stdout = INT64_C(3);
     const int64_t l_size_t = INT64_C(4);
     const int64_t l_INT64_MAX = INT64_C(5);
-    const char *const l_printf = "shadow";
+    const char *const l_printf = faber_L6.s;
     printf("%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %s\n", l_char, l_goto, l_stdout, l_size_t, l_INT64_MAX, l_printf);
     int64_t l_count = INT64_C(5);
-    const char *l_label = "mutable";
+    const char *l_label = faber_L7.s;
     printf("%" PRId64 " %s\n", l_count, l_label);
     return 0;
 }

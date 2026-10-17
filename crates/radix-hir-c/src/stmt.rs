@@ -1,7 +1,7 @@
 //! Statement emission: locals, assignment, control flow, and print.
 
 use crate::error::unsupported;
-use crate::expr::{Operand, Value, c_string, construct_name};
+use crate::expr::{Operand, Value, construct_name};
 use crate::helpers::{Helper, ListOp};
 use crate::items::Returns;
 use crate::ty::{Ty, classify};
@@ -433,7 +433,7 @@ impl Emitter<'_> {
                 }
                 message.text
             }
-            None => c_string("assertion failed")?,
+            None => self.text_literal("assertion failed")?,
         };
         self.support.need(Helper::Trap);
         self.line(out, &format!("if (!{test}) {{"));
@@ -475,7 +475,7 @@ impl Emitter<'_> {
                 };
                 self.support.need(helper);
                 self.support.need(Helper::StoreI64);
-                let at = c_string(&format!("assignment to `{written}`"))?;
+                let at = self.text_literal(&format!("assignment to `{written}`"))?;
                 self.line(
                     out,
                     &format!("{name} = faber_store_i64({call}({name}, 1), {at});"),
@@ -484,7 +484,7 @@ impl Emitter<'_> {
             Ty::Sized(width) => {
                 let call = if inc { "faber_add" } else { "faber_sub" };
                 self.support.need(Helper::SizedStore);
-                let at = c_string(&format!("assignment to `{written}`"))?;
+                let at = self.text_literal(&format!("assignment to `{written}`"))?;
                 self.line(
                     out,
                     &format!(
@@ -1074,7 +1074,10 @@ impl Emitter<'_> {
         }
         let prelude = self.sequence(&mut operands);
         let tokens = self.names.display_tokens();
-        let (yes, no) = (c_string(&tokens.true_)?, c_string(&tokens.false_)?);
+        let (yes, no) = (
+            self.text_literal(&tokens.true_)?,
+            self.text_literal(&tokens.false_)?,
+        );
         let mut specs = Vec::with_capacity(operands.len());
         let mut values = Vec::with_capacity(operands.len());
         for value in operands {
@@ -1117,7 +1120,7 @@ impl Emitter<'_> {
                     ("%s", format!("faber_dec_fmt(faber_a, {})", value.text))
                 }
                 // A bare `none` prints the locale's none word.
-                Value::None => ("%s", c_string(&tokens.none)?),
+                Value::None => ("%s", self.text_literal(&tokens.none)?),
                 Value::Func(_) => return Err(unsupported("printing a function value")),
                 Value::Void => return Err(unsupported("printing a call with no result")),
             };

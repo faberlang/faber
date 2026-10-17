@@ -2,6 +2,15 @@
    compile with -I <runtime>/c (runtime/c in the Faber tree). */
 #include "faber.h"
 
+FABER_TEXT_LITERAL(faber_L0, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L1, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L2, "b=", 2, 2);
+FABER_TEXT_LITERAL(faber_L3, ", n\303\2672=", 7, 6);
+FABER_TEXT_LITERAL(faber_L4, "r", 1, 1);
+FABER_TEXT_LITERAL(faber_L5, "Reading { ", 10, 10);
+FABER_TEXT_LITERAL(faber_L6, "label = ", 8, 8);
+FABER_TEXT_LITERAL(faber_L7, ", value = ", 10, 10);
+FABER_TEXT_LITERAL(faber_L8, " }", 2, 2);
 typedef struct g_Reading g_Reading;
 
 struct g_Reading {
@@ -27,7 +36,7 @@ static double f_mean(faber_arena *faber_a, faber_list_f64 *p_xs) {
 }
 
 static const char *g_Reading_show(faber_arena *faber_a, const g_Reading *value) {
-    return faber_join(faber_a, 6, "Reading { ", "label = ", faber_quoted(faber_a, value->m_label), ", value = ", faber_float_text(faber_a, value->m_value), " }");
+    return faber_join(faber_a, 6, faber_L5.s, faber_L6.s, faber_quoted(faber_a, value->m_label), faber_L7.s, faber_float_text(faber_a, value->m_value), faber_L8.s);
 }
 
 int main(void) {
@@ -61,16 +70,16 @@ int main(void) {
     printf("%" PRId64 "\n", faber_nearest_i64(1e300));
     int64_t l_edge = INT64_C(9007199254740993);
     double l_near = 9007199254740992.0;
-    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? "true" : "false"));
-    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? "true" : "false"));
-    printf("%s\n", ((faber_int_le_float(l_edge, l_near)) ? "true" : "false"));
-    printf("%s\n", ((l_b < 1.0) ? "true" : "false"));
-    printf("%s\n", ((l_a == 0.1) ? "true" : "false"));
+    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((faber_int_gt_float(l_edge, l_near)) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((faber_int_le_float(l_edge, l_near)) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((l_b < 1.0) ? faber_L0.s : faber_L1.s));
+    printf("%s\n", ((l_a == 0.1) ? faber_L0.s : faber_L1.s));
     faber_list_f64 *const l_xs = faber_list_f64_of(faber_a, 2, (double[]){1.5, 2.25});
     printf("%s\n", faber_list_f64_show(faber_a, l_xs));
     printf("%s\n", faber_f64_text(f_mean(faber_a, l_xs), (char[FABER_F64_TEXT]){0}));
-    printf("%s\n", (__extension__ ({ double faber_t1 = faber_true_div(l_n, INT64_C(2)); faber_join(faber_a, 4, "b=", faber_float_text(faber_a, l_b), ", n\303\2672=", faber_float_text(faber_a, faber_t1)); })));
-    g_Reading *l_r = (__extension__ ({ g_Reading *faber_t2 = faber_alloc(faber_a, sizeof *faber_t2); faber_t2->m_value = 2.0; faber_t2->m_label = "r"; faber_t2; }));
+    printf("%s\n", (__extension__ ({ double faber_t1 = faber_true_div(l_n, INT64_C(2)); faber_join(faber_a, 4, faber_L2.s, faber_float_text(faber_a, l_b), faber_L3.s, faber_float_text(faber_a, faber_t1)); })));
+    g_Reading *l_r = (__extension__ ({ g_Reading *faber_t2 = faber_alloc(faber_a, sizeof *faber_t2); faber_t2->m_value = 2.0; faber_t2->m_label = faber_L4.s; faber_t2; }));
     printf("%s\n", g_Reading_show(faber_a, l_r));
     return 0;
 }

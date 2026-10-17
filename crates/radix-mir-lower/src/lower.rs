@@ -100,6 +100,7 @@ pub use package_instantiate::{
     instantiate_merged_generic_calls_with_devices_and_metadata,
     instantiate_merged_generic_calls_with_tensor_edge_policy,
 };
+use runtime::SyntheticHelperKey;
 
 /// Developer-facing MIR lowering diagnostic.
 ///
@@ -2601,6 +2602,9 @@ pub struct FunctionBuilder<'a> {
     pub errors: Vec<MirError>,
     next_value: u32,
     synthetic_functions: Vec<MirFunction>,
+    /// Synthesized check helpers keyed by signature: byte-identical helpers
+    /// are emitted once per lowering instead of once per call site.
+    synthetic_helpers: FxHashMap<SyntheticHelperKey, MirFunctionId>,
     closure_environments: Vec<MirClosureEnvironment>,
     device_function_metadata: MirDeviceFunctionMetadataMap,
     closure_temp_callees: FxHashMap<MirTempId, MirClosureCallee>,
@@ -2674,6 +2678,7 @@ impl<'a> FunctionBuilder<'a> {
             errors: Vec::new(),
             next_value: 0,
             synthetic_functions: Vec::new(),
+            synthetic_helpers: FxHashMap::default(),
             closure_environments: Vec::new(),
             device_function_metadata: MirDeviceFunctionMetadataMap::default(),
             closure_temp_callees: FxHashMap::default(),

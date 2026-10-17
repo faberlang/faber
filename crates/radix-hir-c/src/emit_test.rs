@@ -5,6 +5,7 @@ use crate::test_support::emitted;
 const SCALARS: &str = include_str!("../tests/fixtures/run/scalars.c");
 const C_EDGES: &str = include_str!("../tests/fixtures/run/c_edges.c");
 const LOOPS: &str = include_str!("../tests/fixtures/run/loops.c");
+const SWITCH: &str = include_str!("../tests/fixtures/run/switch.c");
 const FUNCTIONS: &str = include_str!("../tests/fixtures/run/functions.c");
 const NARROWING: &str = include_str!("../tests/fixtures/run/narrowing.c");
 const TEXT: &str = include_str!("../tests/fixtures/run/text.c");
@@ -178,6 +179,12 @@ fn loops_program_is_pinned() {
     let source = include_str!("../tests/fixtures/run/loops.fab");
     let source = crate::test_support::program("loops.fab", source);
     assert_eq!(source, LOOPS);
+}
+
+fn switch_program_is_pinned() {
+    let source = include_str!("../tests/fixtures/run/switch.fab");
+    let source = crate::test_support::program("switch.fab", source);
+    assert_eq!(source, SWITCH);
 }
 
 /// The case the target exists to get right: `n + 1` over a variable could

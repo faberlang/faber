@@ -11,7 +11,7 @@
 //! helper with no remaining reference is pruned so no standalone helper
 //! symbol survives; fragment bodies stay for the package body sidecar.
 //!
-//! Documented budget defaults (starting anchors; head-cto confirms on land):
+//! Documented budget defaults (starting anchors):
 //! - depth 16
 //! - `65_536` cloned MIR nodes per `Entry`
 //! - `32_768` cloned MIR nodes per root call site

@@ -2,7 +2,9 @@
 
 Use this file when the task is about writing Faber naturally rather than merely legally. Default to application code, especially command-line applications and packages, before compiler-internal concerns.
 
-Locale convention: prose names constructs by their stable Latin keys (`genus`, `fixum`, `redde`).
+Locale convention: prose names constructs by their en spellings (`class`, `const`, `return`);
+the stable Latin key appears as a short `(la ...)` gloss where a reader will meet it in the corpus,
+in diagnostics, or in `faber explain`.
 Every fenced code block below is written in the **en** reader surface and was checked with
 `faber check` or `faber run`; a file with no `+++` frontmatter and no manifest `[locale]` reads as
 en, and a Latin file needs `+++ locale = "la" +++`. Spellings come from
@@ -27,13 +29,14 @@ Prefer:
 - small direct blocks
 - vocabulary already present in `corpus` and stdlib
 - visible control flow over compressed cleverness
-- `ergo redde` (en `then return`) for compact single-statement returns; `∴` is the closure joint only
+- `then return` (la `ergo redde`) for compact single-statement returns; `∴` is the closure joint only
 - `const T X = e` (la `fixum T X = e`) for a module constant, `=` because the value is a compile-time fact; run-time names are `let` (write-once, la `sit`), `mut` (writable, la `varia`) and `ref` (re-pointable read-only, la `de`), never `const`
 - bare width markers (`i32`, `u8`, `f32`, `inf`) in every type position
 - the parameter's access marker at the call: `bump(mut a)`, `eat(own a)`, `dup(copy a)` (la `in` / `own` / `copy`), optional `ref`; a bare argument to a marked parameter is `SEM057 call_marker_missing`
 - parameters take no `let`/`mut`/`const`: `own` and `copy` parameters are writable by the callee, `mut` writes the caller's value, unmarked and `ref` are read-only; `own` takes only a whole local binding or a fresh value (`eat(own make())`), and `a` is dead after `eat(own a)` (`SEM050 use_after_own`); to give away a field write `dup(copy b.xs)` instead
 - a comment on its own line: `#` must be the first non-whitespace token, and `code # note` is `LEX007 inline_hash_after_code`
-- `fiet` / `fiunt` / `fient` for new async and stream code
+- `async` / `generator` / `async_generator` (la `fiet` / `fiunt` / `fient`) for new async and stream code
+- the long type spellings (`list<f32>`, `tensor<f32, [2, 2]>`) in general code; the width sugar (`lf32`, `tf32[2, 2]`, bare `f32`) belongs in numeric and tensor code. Match the surrounding file
 
 Avoid:
 
@@ -41,24 +44,25 @@ Avoid:
 - JavaScript or Rust habits pasted through a Latin thesaurus
 - hiding meaning behind dense helper layers
 - mixing stylistic dialects in one file
-- nullable or optional syntax that is not in `EBNF.md` (`T?`, prefix `si` on types, etc.); the null type is `T ∪ none` in en and `T ∪ nihil` in la (D23), and the null value is `null` / `nulla`
-- the retired wrapped numerics `numerus<i32>` / `int<i32>` / `fractus<f32>` (`PARSE040 numeric_wrapper_retired`); write `i32`, `f32`
-- `static` / `generis` anywhere: a module-level `static` is `PARSE010 static_decl_retired` and a class member `static` is `static_member_retired`; a type-level constant is a class member `const T X = e`
+- sugaring every type with `tf32` / `lf32` outside numeric and tensor code
+- nullable or optional syntax that is not in `EBNF.md` (`T?`, prefix `if` (la `si`) on types, etc.); the null type is `T ∪ none` in en and `T ∪ nihil` in la, and the null value is `null` (la `nulla`)
+- the retired wrapped numerics `int<i32>` / `float<f32>` (la `numerus<i32>` / `fractus<f32>`; `PARSE040 numeric_wrapper_retired`); write `i32`, `f32`
+- `static` (la `generis`) anywhere: a module-level `static` is `PARSE010 static_decl_retired` and a class member `static` is `static_member_retired`; a type-level constant is a class member `const T X = e`
 - the retired binding words: en `var` (now `mut`, `PARSE010 var_retired`) and a run-time `const T x ← e` (now `let`, `PARSE010 runtime_const_retired`; la `fixum T x ← e` becomes `sit`)
-- `@ futura` / `@ cursor` in new code
+- `@ future` / `@ cursor` (la `@ futura`) in new code
 - anonymous `{ key = expr }` objects — use JSON `{ "key": constant }` or `Type { field = expr }`
 
 ## CLI Application Style
 
 For command-line applications, prefer:
 
-- one clear `incipit` or `incipit argumenta args` entry surface (en `main` / `main args args`)
+- one clear `main` or `main args args` entry surface (la `incipit` / `incipit argumenta args`)
 - command functions with typed parameters and direct names
 - explicit validation before work begins
-- predictable `scribe`, `mone`, `vide`, or `nota` output (en `write`, `warn`, `debug`, `print`) instead of hidden side effects; `print` of a `genus` shows its construction literal (`Pulsus { x = 1, y = "hello" }`, D2.8), and formatting goes through `"Summa: §"(value ¶ ".2")`; `sink ⇇ payload` is the typed-sink alternative that adds no formatting
+- predictable `write`, `warn`, `debug`, or `print` output (la `scribe`, `mone`, `vide`, `nota`) instead of hidden side effects; `print` of a `class` (la `genus`) shows its construction literal (`Click { x = 1, y = "hello" }`), and formatting goes through `"Total: §"(value ¶ ".2")`; `sink ⇇ payload` is the typed-sink alternative that adds no formatting
 - a failable `↦` needs `⊥ default`, a catch, or an enclosing `⇥ E`; `main` is exempt and panics
-- small modules imported through canonical `importa` forms
-- concrete error paths using `fac` / `cape`, `iace`, and `mori`
+- small modules imported through canonical `import` forms (la `importa`)
+- concrete error paths using `do` / `catch`, `throw`, and `panic` (la `fac` / `cape`, `iace`, `mori`)
 
 Before using CLI annotations or argument-binding forms, verify current support in:
 
@@ -91,7 +95,7 @@ Collection primitives (en `string`, `int`, `float`, `list<T>`, `map<K,V>`, `set<
 
 User-facing `norma:*` modules live in `lib/norma/src/` (flat, English-spelled module names: `norma:fs`, `norma:text`, `norma:json`, `norma:console`, `norma:time`; `lib/norma/src/*.fab` is the module list). Optional libraries live in their own repos and are not universal stdlib. Generated-code runtime types live under `runtime/`.
 
-When calling methods such as `myList.appende(x)`, check the live library source and the relevant Radix lowering path before assuming whether the method is native Faber, `ad`-routed, deferred with `mori`, or runtime-backed.
+When calling methods such as `myList.append(x)` (la `appende`), check the live library source and the relevant Radix lowering path before assuming whether the method is native Faber, `call`-routed (la `ad`), deferred with `panic` (la `mori`), or runtime-backed.
 
 ## Naming Rhythm
 
@@ -103,7 +107,7 @@ The codebase commonly uses:
 
 When writing user-facing Faber examples, keep names short and semantically sharp:
 
-- `nomen`, `verbum`, `persona`, `event`, `item`, `mem`
+- `name`, `word`, `person`, `event`, `item`, `mem`
 
 Optimize for semantic distinctness under repeated model use, not literal English-to-Latin translation.
 
@@ -116,19 +120,19 @@ From exempla:
 - opening brace on the same line (Stroustrup)
 - one statement per line
 - four-space indentation
-- every class field declares exactly one of `let` / `mut` / `const` (la `sit` / `varia` / `fixum`, D16.1), written `<modifier> <type> <name>`: `let` is per instance and set once in the construction literal, `mut` is per instance and reassignable, `const T X = e` is the type-level compile-time constant read as `Persona.X` (a store is `SEM020 assignment_to_const_member`; `ref` on a field is `ref_field_refused`); an unmarked field is `PARSE010 field_modifier_missing`
+- every class field declares exactly one of `let` / `mut` / `const` (la `sit` / `varia` / `fixum`), written `<modifier> <type> <name>`: `let` is per instance and set once in the construction literal, `mut` is per instance and reassignable, `const T X = e` is the type-level compile-time constant read as `Person.X` (a store is `SEM020 assignment_to_const_member`; `ref` on a field is `ref_field_refused`); an unmarked field is `PARSE010 field_modifier_missing`
 - default field values written with `=`
-- explicit `redde` for returned values inside blocks
+- explicit `return` (la `redde`) for returned values inside blocks
 
 ```fab
-class Persona {
-    mut string nomen
-    mut int aetas = 0
-    const string gens = "Roma"
+class Person {
+    mut string name
+    mut int age = 0
+    const string city = "Rome"
 }
 
-fn nomen() → string {
-    return "Marcus Aurelius"
+fn name() → string {
+    return "Mark Aurelius"
 }
 ```
 
@@ -163,11 +167,11 @@ In a right-associated chain the `⊥` attaches to the nearest `↤`: after
 Keep ordinary `←` for plain stores, and keep explicit `↦` for conversions
 whose destination is not an assignable place. `⊥` is legal only after a
 failable call, a `↦ T`, or a `↤`; after ordinary `←` it is
-`PARSE030 default_requires_failable`. Typed `sit` / `varia` initializers
-accept `↤` (`fixum_decl` in the EBNF). `↤` never appears on `varia _`, inferred `sit`,
+`PARSE030 default_requires_failable`. Typed `let` / `mut` (la `sit` / `varia`) initializers
+accept `↤` (`fixum_decl` in the EBNF). `↤` never appears on `mut _`, inferred `let`,
 or untyped destructuring: they have no concrete destination and reject
 `PARSE002 conversio_assign_requires_concrete_type`. Outside `main` an
-unhandled failable `↤` / `↦` needs `⊥`, a catch, or an enclosing `⇥ E` (D17.8).
+unhandled failable `↤` / `↦` needs `⊥`, a catch, or an enclosing `⇥ E`.
 A convert hint is a `via` clause, never a type argument: `"ff" ↦ i32 via Hex`.
 
 ## Exact Big Integers: Opt In With `inf`
@@ -219,7 +223,7 @@ Short form of the "Numeric model" in `grammar/EBNF.md`:
 main {
     let u8 a ← 200
     let u8 b ← 100
-    let sum ← a + b
+    let _ sum ← a + b
     let int q ← -7 / 2
     let f64 r ← 7 ÷ 2
     print sum, q, r
@@ -256,7 +260,8 @@ locale = "en"
 # =============================================================================
 ```
 
-The frontmatter also carries `grammar = [...]` (EBNF production names) and feeds `faber explain`; the
+The frontmatter `term` and `related` values are Latin registry keys, so `itera` is en `for`, `ex` is `from`,
+`de` is `ref`, and `apud` is `at`. The frontmatter also carries `grammar = [...]` (EBNF production names) and feeds `faber explain`; the
 `locale` key is mandatory for a non-default surface. Older files still carry `GRAMMAR:` / `EXPECTED OUTPUT:` /
 `BACKEND:` comment blocks; new exempla use the shape above and put expected stdout in the `.expected` sidecar.
 
@@ -264,13 +269,13 @@ The frontmatter also carries `grammar = [...]` (EBNF production names) and feeds
 
 Preserve visible distinctions:
 
-- `sit` versus `varia` versus `de` versus `fixum` (en `let` / `mut` / `ref` / `const`): write-once name, writable name, re-pointable read-only name, compile-time constant
-- `genus` versus `implendum`
-- `ordo` versus `discretio`
-- `elige` versus `discerne`: `discerne` (en `match`) matches a closed set only (variants of a `discretio`/`ordo`, or members of a union), and a pattern outside it is `SEM010 discerne_pattern_not_in_closed_set` (`case u32` over an `int`, `case list<int, 4>` over a `list<int>`); an open scrutinee uses `elige` (en `switch`), and an integer's width or a length is asked with `est` or `.length()` in an `si`
-- `de` versus `in` versus `ex`
-- `T ∪ none` (la `T ∪ nihil`) versus `sponte` optional slots
-- `fiet` / `fiunt` / `fient` versus ordinary functions
+- `let` versus `mut` versus `ref` versus `const` (la `sit` / `varia` / `de` / `fixum`): write-once name, writable name, re-pointable read-only name, compile-time constant
+- `class` versus `interface` (la `genus` / `implendum`)
+- `enum` versus `union` (la `ordo` / `discretio`)
+- `switch` versus `match` (la `elige` / `discerne`): `match` matches a closed set only (variants of a `union`/`enum`, or members of a union), and a pattern outside it is `SEM010 discerne_pattern_not_in_closed_set` (`case u32` over an `int`, `case list<int, 4>` over a `list<int>`); an open scrutinee uses `switch`, and an integer's width or a length is asked with `is` or `.length()` in an `if`
+- `ref` versus `mut` versus `from` (la `de` / `in` / `ex`)
+- `T ∪ none` (la `T ∪ nihil`) versus `optional` (la `sponte`) slots
+- `async` / `generator` / `async_generator` (la `fiet` / `fiunt` / `fient`) versus ordinary functions
 - JSON `{ "key": constant }` versus `Type { field = expr }`
 
 Do not flatten these into generic “type”, “class”, or “match” language without naming the actual Faber construct.
@@ -307,12 +312,12 @@ The glyphs act on `tensor` / `vector` / `matrix` values (`vf32[3]`, `tf32[4]`, `
 main {
     let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
     let vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
-    let dot ← a · b
-    let outer ← a ⊗ b
-    let had ← a ⊙ b
-    let quot ← a ⊘ b
-    let cross ← a × b
-    let gram ← outer · outerᵀ
+    let _ dot ← a · b
+    let _ outer ← a ⊗ b
+    let _ had ← a ⊙ b
+    let _ quot ← a ⊘ b
+    let _ cross ← a × b
+    let _ gram ← outer · outerᵀ
     print dot, had, quot, cross, gram
 }
 ```
@@ -325,10 +330,10 @@ product. See "Tensor lifting" in `grammar/EBNF.md`.
 ## Iteration and reduction — pick the construct, not the loop
 
 Before writing any loop, check whether a dedicated construct states the intent:
-- Element walk with coordinates → `for from x at [i]` (en) / `itera … apud`
-  (la). Never hand-index with a counter loop when `at [...]` exists.
-- Lockstep walk of N aligned lists → `for from a, b let x, y` (en) /
-  `itera ex a, b sit x, y` (la). N sources carry N name binders; one
+- Element walk with coordinates → `for from x at [i]` (la `itera … apud`).
+  Never hand-index with a counter loop when `at [...]` exists.
+- Lockstep walk of N aligned lists → `for from a, b let x, y`
+  (la `itera ex a, b sit x, y`). N sources carry N name binders; one
   optional shared `at [i]` names the common index and never grows with N.
   Lengths must be equal — statically known lengths are compared at check and
   dynamic lengths abort before the first body visit (fail-closed, never
@@ -347,13 +352,13 @@ Before writing any loop, check whether a dedicated construct states the intent:
   visits coordinates. Authority: `corpus/itera/range-product-n2.fab`,
   `range-product-n3.fab`; declines and semantics in
   `range-product-decline.fab` and `range-product-semantics.fab`.
-- Sum/reduce over an axis → `reduce via sum from` (en) / `reducta via summa ex`
-  (la). A body returns one term per element:
+- Sum/reduce over an axis → `reduce via sum from` (la `reducta via summa ex`).
+  A body returns one term per element:
   `reduce via sum from a at [i] let s { return s }`
   (exemplar `corpus/summa/summa-en-no-thread.fab`); `thread f` selects
   the distributed kernel-plan path inside a kernel entry. Never hand-accumulate.
 - Minimum/maximum over a shaped tensor → `reduce via min from` / `reduce via
-  max from` (en) / `reducta via minima` / `reducta via maxima` (la). The
+  max from` (la `reducta via minima` / `reducta via maxima`). The
   canonical form is bodiless — `reduce via max from values` on a statically
   non-empty `tf32[4]` is a plain `f32`
   (`corpus/summa/extrema-no-coalesce.fab`) — and an expression operand
@@ -392,13 +397,13 @@ Before writing any loop, check whether a dedicated construct states the intent:
   winners the least index wins. The same law is the parallel-combine law:
   partials pair as `(value desc, index asc)`, so sequential scan and
   tree-combine agree. An empty source yields the null (`int ∪ none`), so
-  compose `vel` / `coalesce` at the call site; never use a `−1` sentinel.
+  compose `coalesce` (la `vel`) at the call site; never use a `−1` sentinel.
   NaN behavior is aligned with `reduce via max from`'s implemented fold: NaN
   never wins while a number participates, and an all-NaN source keeps index 0.
   `argmin()` mirrors `argmax()` for the least value.
 - Mathematical max identity for empty-possible input →
-  `reduce via max from xs coalesce -∞` (en) /
-  `reducta via maxima ex xs vel -∞` (la). Use `-∞`, not a runtime `0.0`:
+  `reduce via max from xs coalesce -∞`
+  (la `reducta via maxima ex xs vel -∞`). Use `-∞`, not a runtime `0.0`:
   zero changes the result for all-negative data, while `max(x, -∞) = x`.
   `coalesce` is the caller-supplied fallback for the nullable empty reduction,
   not an invented reduction identity. For finite/NaN detection, read the bit
@@ -512,7 +517,7 @@ spells out that the condition belongs in the body and the loop walks the full
 grid. `corpus/itera/apud-decline.fab` records the matching
 fail-closed boundaries: the `at` coordinate count must equal the iterable rank
 (`itera_apud_arity_mismatch`, which also rejects a ragged `list<list<T>>`
-walked with two coordinates), a `copia` has no index to name
+walked with two coordinates), a `set` (la `copia`) has no index to name
 (`itera_apud_requires_indexed_iterable`), and generic dimensions decline at MIR
 when they are not concrete at lowering.
 
@@ -537,7 +542,7 @@ place of one of these is non-idiomatic.
 - Host exemplars: `corpus/tensor/glyph-matmul.fab`, `glyph-outer.fab`,
   `glyph-elementwise.fab`, `glyph-hadamard-divide.fab`, `glyph-transpose.fab`
   (rank-dispatch WHY notes and expected outputs).
-- **Device form**: glyph operators are legal in `@ kernel`/`@ nucleum` bodies
+- **Device form**: glyph operators are legal in `@ kernel` (la `@ nucleum`) bodies
   and lower through the plan recipes — `out ← a · b` is the glyph spelling of
   the tiled matmul recipe
   (likewise `⊗` `⊙` `×` and `ᵀ`). Kernel bodies are checked at
@@ -560,7 +565,7 @@ to miss in a scan of the core declarations or that have an active library
 consumer. The grammar and corpus remain the authorities; these are authoring
 reminders, not a second EBNF.
 
-### Shared fields on tagged unions (`@ commune` / `@ shared`)
+### Shared fields on tagged unions (`@ shared`, la `@ commune`)
 
 - **What:** A shared-field region on a tagged union declares one field carried
   by every variant, so a union value can use direct member access such as
@@ -590,17 +595,17 @@ reminders, not a second EBNF.
   shape is `class Box<T>` with `Box<tf32[4]>`.
 - **Wrong form:** `tf32` is a shape-bearing tensor sugar, not a scalar. A bare
   `Box<tf32>` is rejected in the current check (`expression_type_mismatch`), so give a
-  shape witness such as `Box<tf32[4]>`. `magnitudo` (English `size`) parameters
+  shape witness such as `Box<tf32[4]>`. `size` (la `magnitudo`) parameters
   follow the type parameters (`<T, size N>`, `max_dynamic<size Figura>` in
   `corpus/summa/max-min.fab`); an applied natural-number argument is a
   capacity fact, not a width marker.
 
-### Nucleus fragments versus graphics fragments
+### Kernel fragments versus graphics fragments
 
-- **What:** The stable role is `@ nucleum fragment`; its English reader
-  spelling is `@ kernel fragment`. It is a device-composition helper, while
+- **What:** The role is spelled `@ kernel fragment` in the English reader
+  surface (la `@ nucleum fragment`, the stable registry spelling). It is a device-composition helper, while
   `@ fragment` is the graphics fragment stage.
-- **Why:** A nucleus fragment is not a dispatch entry. It has no entry ABI,
+- **Why:** A kernel fragment is not a dispatch entry. It has no entry ABI,
   reflection identity, standalone symbol, or runtime address; it is composed
   into an `@ kernel` entry.
 - **Exemplar:** the surface spelling is checked by
@@ -629,13 +634,13 @@ reminders, not a second EBNF.
   with commas.
 - **Wrong form:** Do not write `Type { … }` when the target is a tagged variant,
   and do not treat `∪` as a set operator. `∪` in a type alias is an inline value
-  union; `discretio` is the tagged form.
+  union; the declared `union` (la `discretio`) is the tagged form.
 
-### Recoverable `require` (`requirit`)
+### Recoverable `require` (la `requirit`)
 
-- **What:** `require condition throw error` (stable `requirit … iace …`)
+- **What:** `require condition throw error` (la `requirit … iace …`)
   enters the function's declared `⇥ E` channel when the condition is false.
-- **Why:** It is the recoverable twin of `assert`/`adfirma`: the caller can
+- **Why:** It is the recoverable twin of `assert` (la `adfirma`): the caller can
   catch or propagate the typed error instead of taking the fatal path. This
   is a real library idiom.
 - **Exemplar:** `corpus/meta/requirit.fab` checks the success path, the
@@ -643,9 +648,9 @@ reminders, not a second EBNF.
 - **Wrong form:** Do not use `require` in a function with no alternate exit,
   and do not substitute fatal `assert` when the API promises recovery.
 
-### Reject (`reice`)
+### Reject (la `reice`)
 
-- **What:** `reject condition throw error` (stable `reice … iace …`) enters
+- **What:** `reject condition throw error` (la `reice … iace …`) enters
   the function's declared `⇥ E` channel when the condition is **true** — the
   boolean opposite of `require`; `require not (p) throw e` is spelled
   `reject p throw e`.
@@ -653,10 +658,10 @@ reminders, not a second EBNF.
   `require not A or B` forms become `reject (A and not (B))` by De Morgan.
 - **Exemplar:** `corpus/meta/reice.fab`.
 - **Wrong form:** Do not read `reject` as `require` — it fails when the
-  condition holds; and like `require`/`iace`, it is a compile error in a
+  condition holds; and like `require`/`throw`, it is a compile error in a
   `⇥`-less function.
 
-### Labeled tuple values (`iuncta` / `tuple`)
+### Labeled tuple values (`tuple`, la `iuncta`)
 
 - **What:** A tuple may label type slots (`tuple<gx: string, gw: int>`),
   construct positionally, and read a labeled member (`pair.gx`) or a literal
@@ -666,11 +671,11 @@ reminders, not a second EBNF.
 - **Exemplar:** `corpus/literalia/labeled-elements.fab` checks labels,
   construction, holes, by-label destructuring, rest binding, and identity
   erasure.
-- **Wrong form:** Do not use `.0`, label a non-`iuncta` type argument, or put
+- **Wrong form:** Do not use `.0`, label a non-`tuple` type argument, or put
   the union hole `∪` in an element slot. Use a binary cup inside the slot when
   the element itself is a union.
 
-### Precision-tagged instants (`instans` / `instant`)
+### Precision-tagged instants (`instant`, la `instans`)
 
 - **What:** `instant`, `instant<ms>`, `instant<us>`, and `instant<ns>` are the
   absolute-time carrier and its precision contract in the English surface.
@@ -678,7 +683,7 @@ reminders, not a second EBNF.
   narrow, widen, or emit the wire form, and keep sub-second equality explicit.
 - **Exemplar:** `corpus/instans/instans.fab` checks wall-clock precision,
   offset normalization, TOML provenance, and cross-precision conversion; the
-  Norma `tempus`, `toml`, and `valor` modules consume the same carrier.
+  Norma `time`, `toml`, and `value` modules consume the same carrier.
 - **Wrong form:** Do not use `∷` for datetime parsing or treat `instant<ms>`
   as a formatting alias. Static ascription and runtime conversion are distinct.
 
@@ -686,14 +691,14 @@ reminders, not a second EBNF.
 
 - **What:** Annotation spellings are selected by the file's reader locale just
   like keywords and types. In an English file the registered device annotation
-  is `@ kernel`, not `@ nucleum`.
+  is `@ kernel`, not `@ nucleum` (the la spelling).
 - **Why:** An annotation from another pack must fail closed instead of silently
   becoming a different compiler role. The current binary reports
   `PARSE018:wrong_locale_annotation` for the mixed English form.
 - **Exemplar:** English device sources such as
   `corpus/vector/kernel.fab` use `@ kernel`
   (a la package would use `@ nucleum`); `references/locales.md` records the locale-diagnosis route.
-- **Wrong form:** Do not copy `@ nucleum` into an `en` file, or mix `@ shared`
+- **Wrong form:** Do not copy `@ nucleum` (la) into an `en` file, or mix `@ shared`
   with a locale's other annotation spellings. Resolve the pack before judging
   an annotation; see `references/locales.md`.
 

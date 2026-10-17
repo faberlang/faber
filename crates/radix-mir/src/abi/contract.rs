@@ -178,7 +178,7 @@ pub enum CollectionOpContract {
         output_elements: u64,
     },
     /// PGC-R5 row-reduction contract (`TensorRmsNorm` /
-    /// `TensorCausalMaskedSoftmax`, head-cto verdict `91fe3d59`): one
+    /// `TensorCausalMaskedSoftmax`): one
     /// workgroup per row — `ROW_REDUCTION_WORKGROUP_X` lanes tree-reduce
     /// the row statistic in threadgroup memory, then a vectorized scale
     /// pass writes the row. Buffer counts and element counts are

@@ -2,16 +2,21 @@
    compile with -I <runtime>/c (runtime/c in the Faber tree). */
 #include "faber.h"
 
+FABER_TEXT_LITERAL(faber_L0, "true", 4, 4);
+FABER_TEXT_LITERAL(faber_L1, "false", 5, 5);
+FABER_TEXT_LITERAL(faber_L2, "hi", 2, 2);
+FABER_TEXT_LITERAL(faber_L3, "say \"hi\"\tand\\done", 17, 17);
+FABER_TEXT_LITERAL(faber_L4, "h\303\251llo", 6, 5);
 int main(void) {
     printf("%" PRId64 "\n", INT64_C(3));
-    printf("%s\n", "hi");
+    printf("%s\n", faber_L2.s);
     printf("%" PRId64 "\n", INT64_C(10));
     const int64_t l_neg = -INT64_C(7);
     printf("%" PRId64 "\n", -INT64_C(4));
     printf("%" PRId64 "\n", INT64_C(1));
-    printf("%s\n", "say \"hi\"\tand\\done");
+    printf("%s\n", faber_L3.s);
     const int64_t l_answer = INT64_C(42);
-    const char *const l_greeting = "h\303\251llo";
+    const char *const l_greeting = faber_L4.s;
     printf("%" PRId64 " %s\n", l_answer, l_greeting);
     return 0;
 }

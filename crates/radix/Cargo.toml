@@ -23,5 +23,10 @@ mir-core = ["radix-module/mir-core"]
 runner = ["mir-core", "radix-module/runner", "radix-program/runner"]
 hir-c = ["radix-module/hir-c", "radix-program/hir-c"]
 
+[[example]]
+name = "compat_measure"
+path = "examples/compat_measure.rs"
+required-features = ["runner"]
+
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }

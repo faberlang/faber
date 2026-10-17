@@ -66,17 +66,31 @@ fn text_compares_by_bytes_and_booleans_by_equality() {
 }
 
 #[test]
-fn a_switch_is_an_if_chain_over_once_evaluated_subjects() {
+fn an_integer_switch_is_a_jump_table_over_once_evaluated_subjects() {
     let code = emitted(
         "main {\n    let int code ← 404\n    switch code {\n        case 200 { print \"ok\" }\n        case 404 { print \"missing\" }\n        default { print \"other\" }\n    }\n}",
     );
     assert!(code.contains("int64_t faber_t0 = l_code;"), "{code}");
-    assert!(code.contains("if (faber_t0 == INT64_C(200)) {"), "{code}");
+    assert!(code.contains("switch (faber_t0) {"), "{code}");
+    assert!(code.contains("case INT64_C(200): {"), "{code}");
+    assert!(code.contains("case INT64_C(404): {"), "{code}");
+    assert!(code.contains("default: {"), "{code}");
+    assert!(code.contains("} break;"), "{code}");
+}
+
+#[test]
+fn a_switch_with_a_break_keeps_the_if_chain() {
+    // A Faber break must leave the loop around the dispatch; inside a C
+    // `switch` it would leave the switch instead, so the arm that holds one
+    // keeps the whole statement on the chain.
+    let code = emitted(
+        "main {\n    mut int n ← 0\n    while n ≺ 3 {\n        n ← n + 1\n        switch n {\n            case 2 { print \"two\" }\n            case 3 { break }\n            default { print \"other\" }\n        }\n    }\n    print n\n}",
+    );
+    assert!(!code.contains("switch ("), "{code}");
     assert!(
-        code.contains("} else if (faber_t0 == INT64_C(404)) {"),
+        code.contains("} else if (faber_t0 == INT64_C(3)) {"),
         "{code}"
     );
-    assert!(code.contains("} else {"), "{code}");
 }
 
 #[test]

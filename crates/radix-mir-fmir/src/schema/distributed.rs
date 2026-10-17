@@ -831,8 +831,8 @@ fn wire_packed_layout(layout: WirePackedStorageLayout) -> PackedStorageLayout {
 }
 
 /// Decode the legacy name-keyed Elementwise discriminant off the wire into
-/// the canonical typed tag, exactly once, at this boundary (head-cto PD-29
-/// ruling, Option A). The persisted entry name is the wire ABI; the
+/// the canonical typed tag, exactly once, at this boundary (PD-29,
+/// Option A). The persisted entry name is the wire ABI; the
 /// predecessor contract applies verbatim: `swiglu*` selects `SwiGlu`,
 /// `*residual*` and `sum_o_*` select `ResidualRmsNorm`. In-memory selection
 /// stays typed-only.
