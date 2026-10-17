@@ -1726,6 +1726,33 @@ impl<'a> MirLowerer<'a> {
         );
     }
 
+    fn applied_genus_receiver(&self, def_id: DefId, strukt: &HirStruct) -> Option<TypeId> {
+        if strukt.type_params.is_empty() {
+            return None;
+        }
+
+        use radix_types::AppliedArg;
+
+        #[expect(clippy::cast_possible_truncation, reason = "TypeId is u32 by design")]
+        (0..self.types.type_count()).find_map(|index| {
+            let id = TypeId(index as u32);
+            let Type::Applied(base, args) = self.types.get(id) else {
+                return None;
+            };
+            if !matches!(self.types.get(*base), Type::Struct(found) if *found == def_id)
+                || args.len() != strukt.type_params.len()
+            {
+                return None;
+            }
+            args.iter()
+                .zip(&strukt.type_params)
+                .all(|(arg, param)| {
+                    matches!(arg, AppliedArg::Type(ty) if matches!(self.types.get(*ty), Type::Param(name) if *name == param.name))
+                })
+                .then_some(id)
+        })
+    }
+
     /// Lower a genus method as an ordinary MIR function with an explicit
     /// receiver parameter bound to the struct definition used by `ego`.
     fn lower_method(
@@ -1740,7 +1767,10 @@ impl<'a> MirLowerer<'a> {
                 .push(MirError::missing_type(method.span, "method return type"));
             return;
         };
-        let Some(receiver_ty) = self.types.find_struct(struct_item.def_id) else {
+        let receiver_ty = self
+            .applied_genus_receiver(struct_item.def_id, strukt)
+            .or_else(|| self.types.find_struct(struct_item.def_id));
+        let Some(receiver_ty) = receiver_ty else {
             self.errors
                 .push(MirError::missing_type(method.span, "method receiver type"));
             return;
