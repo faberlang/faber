@@ -549,7 +549,9 @@ place of one of these is non-idiomatic.
   `faber check` time for the host-free subset with named `nucleum_*`
   diagnostics (`corpus/kernel/legality-reject.fab`). Tensor/matrix iteration
   coordinates in a kernel use `i32`; host iteration coordinates remain `int`
-  (AIR retains its constant-extent narrowing). Kernel launch requirements
+  (AIR retains its constant-extent narrowing). Kernel reduction coordinates,
+  `count` results and `argmax`/`argmin` coordinates use the same `i32` carrier
+  (including tuple, optional and grouped results); host reductions keep `int`. Kernel launch requirements
   prove the coordinate extent and exact index arithmetic fit; an unproven
   tensor access still carries its runtime bounds guard and WARN033. A kernel may call
   kernels, and a private kernel is not callable from host code. The GPU path is

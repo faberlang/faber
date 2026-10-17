@@ -498,7 +498,12 @@ pub(super) fn check_reduction_expr(
         }
     }
     checker.push_scope();
-    let integer = checker.numerus_type();
+    let integer = if checker.current_nucleum_entry {
+        checker.width_type(radix_types::NumericWidth::I32)
+    } else {
+        checker.numerus_type()
+    };
+    checker.types.array(integer);
     for (id, _) in coordinates {
         checker.insert_binding(*id, integer);
     }
@@ -639,6 +644,7 @@ pub(super) fn check_reduction_expr(
     }
     if grouped {
         if let Some((_, shape)) = expected_group {
+            checker.types.array(result);
             return checker.types.tensor_with_shape(result, shape);
         }
         return checker.error_type;

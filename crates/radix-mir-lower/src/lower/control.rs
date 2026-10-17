@@ -87,6 +87,10 @@ fn body_bracket_stores_into(body: &HirBlock, def: DefId) -> bool {
 /// Read a coordinate binder's checked type from its body uses. HIR keeps
 /// coordinate declarations as ids; the path carries the semantic type.
 pub(super) fn coordinate_type(body: &HirBlock, def: DefId) -> Option<TypeId> {
+    reduction_coordinate_type(Some(body), None, def)
+}
+
+fn reduction_coordinate_type(body: Option<&HirBlock>, group: Option<&HirExpression>, def: DefId) -> Option<TypeId> {
     struct Find {
         def: DefId,
         ty: Option<TypeId>,
@@ -100,7 +104,12 @@ pub(super) fn coordinate_type(body: &HirBlock, def: DefId) -> Option<TypeId> {
         }
     }
     let mut find = Find { def, ty: None };
-    find.visit_block(body);
+    if let Some(body) = body {
+        find.visit_block(body);
+    }
+    if let Some(group) = group {
+        find.visit_expr(group);
+    }
     find.ty
 }
 
@@ -1289,7 +1298,26 @@ impl FunctionBuilder<'_> {
             element
         };
         let term_ty = MirType::semantic(term);
-        let integer = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        // Count and arg-extrema carry the checked result's integer width;
+        // other operators still bind coordinates at their checked body type.
+        let mut payload = expr.ty?;
+        loop {
+            payload = match self.types.get(payload) {
+                Type::Option(inner) | Type::Tensor(inner, _) => *inner,
+                Type::Tuple(elements) if !elements.is_empty() => elements[0],
+                _ => break,
+            };
+        }
+        let result_integer = matches!(op, Op::Count | Op::ArgMax | Op::ArgMin).then_some(payload);
+        let integer = MirType::semantic(
+            result_integer
+                .or_else(|| {
+                    coordinates
+                        .iter()
+                        .find_map(|(id, _)| reduction_coordinate_type(body, group, *id))
+                })
+                .unwrap_or_else(|| self.types.primitive(Primitive::Numerus)),
+        );
         let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let accumulator_ty = match op {
             Op::Sum if group.is_some() => match self.normalized_type(expr.ty?) {
@@ -1417,6 +1445,7 @@ impl FunctionBuilder<'_> {
             accumulator_ty,
             buckets: buckets.clone(),
             coordinates: coordinate_locals.clone(),
+            coordinate_ty: integer,
             group: group.cloned(),
             group_dims: group_dims.clone(),
             error_tensor,
@@ -1590,9 +1619,9 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(span, "reducta_rank_zero_not_lowered"));
             return None;
         }
-        let integer = MirType::semantic(self.types.primitive(Primitive::Numerus));
-        let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let coordinate = coordinates[axis];
+        let integer = self.locals.iter().find(|local| local.id == coordinate)?.ty;
+        let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         self.assign(
             MirPlace::local(coordinate),
             MirOperand::Constant(MirConstant::Int(0)),
@@ -1677,6 +1706,7 @@ impl FunctionBuilder<'_> {
                         .iter()
                         .map(|c| MirOperand::Place(MirPlace::local(*c)))
                         .collect(),
+                    integer.semantic_id(),
                     span,
                 )?;
                 let option_ty = MirType::semantic(self.types.find_equal(&Type::Option(element))?);
@@ -1732,8 +1762,7 @@ impl FunctionBuilder<'_> {
         found
     }
 
-    fn reduction_indices(&mut self, indices: Vec<MirOperand>, span: Span) -> Option<MirOperand> {
-        let integer = self.types.primitive(Primitive::Numerus);
+    fn reduction_indices(&mut self, indices: Vec<MirOperand>, integer: TypeId, span: Span) -> Option<MirOperand> {
         let ty = MirType::semantic(self.require_array(integer, span, "reduction index list")?);
         Some(self.construct_temp(
             MirAggregateKind::Array,
@@ -1796,7 +1825,15 @@ impl FunctionBuilder<'_> {
                 self.terminate_open_current(MirTerminatorKind::Goto(join), span);
                 self.switch_to(next);
             }
-            if let (Some(tensor), Some(indices)) = (fold.error_tensor.clone(), self.reduction_indices(keys, span)) {
+            let Some(key_ty) = radix_hir::reduction_group_keys(group)
+                .first()
+                .and_then(|key| key.ty)
+            else {
+                return;
+            };
+            if let (Some(tensor), Some(indices)) =
+                (fold.error_tensor.clone(), self.reduction_indices(keys, key_ty, span))
+            {
                 // Preserve the existing write failure, never reinterpret a bad key.
                 self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::TensorSet),
@@ -1856,7 +1893,7 @@ impl FunctionBuilder<'_> {
             self.assign(MirPlace::temp(bucket.score), value.clone(), fold.term_ty, span);
             self.assign(MirPlace::temp(bucket.accumulator), value, fold.accumulator_ty, span);
             for (winner, coordinate) in bucket.coordinates.iter().zip(&fold.coordinates) {
-                let integer = MirType::semantic(self.types.primitive(Primitive::Numerus));
+                let integer = fold.coordinate_ty;
                 self.assign(
                     MirPlace::temp(*winner),
                     MirOperand::Place(MirPlace::local(*coordinate)),
@@ -1991,6 +2028,8 @@ impl FunctionBuilder<'_> {
         let mut saved_bindings: Vec<(DefId, Option<LocalBinding>)> = Vec::new();
         let mut coordinate_facts = Vec::with_capacity(coordinates.len());
         for (def_id, name) in coordinates {
+            let numerus_ty =
+                MirType::semantic(reduction_coordinate_type(body, None, *def_id).unwrap_or(numerus_ty.semantic_id()));
             let local = self.next_local_id();
             self.locals.push(MirLocalDecl {
                 id: local,

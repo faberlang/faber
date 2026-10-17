@@ -1387,7 +1387,7 @@ impl BodyFacts<'_> {
                 ..
             } => {
                 self.evaluate(iter);
-                self.visit_tensor_loop(iter, coordinates, *binding, body);
+                self.visit_tensor_loop(iter, coordinates, *binding, body, None);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -1561,9 +1561,6 @@ impl BodyFacts<'_> {
         identity: &Option<Box<HirExpression>>,
     ) -> AbstractRange {
         use radix_hir::HirReductionOp as Op;
-        if let Some(group) = group {
-            self.evaluate(group);
-        }
         if let Some(identity) = identity {
             self.evaluate(identity);
         }
@@ -1571,20 +1568,49 @@ impl BodyFacts<'_> {
             (Some((binding, _)), Some(body)) => {
                 // The term's `redde` returns the term, not the kernel result.
                 let return_type = self.return_type.take();
-                self.visit_tensor_loop(source, coordinates, *binding, body);
+                self.visit_tensor_loop(source, coordinates, *binding, body, group.as_deref());
                 self.return_type = return_type;
             }
             _ => {
                 self.evaluate(source);
+                if let Some(group) = group {
+                    let before = self.ranges.clone();
+                    self.bind_tensor_coordinates(source, coordinates, expr.span);
+                    self.evaluate(group);
+                    self.ranges = before;
+                }
             }
         }
-        let declared = || {
-            expr.ty.map_or_else(AbstractRange::unknown, |ty| {
-                AbstractRange::from_type(ty, self.types)
-            })
-        };
+        let declared = expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+            AbstractRange::from_type(ty, self.types)
+        });
         if group.is_some() {
-            return declared();
+            if op == Op::Count {
+                let dims = source
+                    .ty
+                    .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
+                let total =
+                    dims.into_iter()
+                        .try_fold(KernelRangeExpr::Constant(1), |total, dim| {
+                            let extent = match evaluate_index_dimension(dim, self.types) {
+                                Ok(Some(extent)) => KernelRangeExpr::Constant(i128::from(extent)),
+                                Ok(None) => KernelRangeExpr::Shape(dim),
+                                Err(_) => return None,
+                            };
+                            Some(multiply(total, extent))
+                        });
+                if let Some(element) = expr.ty.and_then(|ty| tensor_element(ty, self.types)) {
+                    self.check_store(
+                        expr.span,
+                        element,
+                        AbstractRange(total.map(|total| KernelValueRange {
+                            minimum: KernelRangeExpr::Constant(0),
+                            maximum: total,
+                        })),
+                    );
+                }
+            }
+            return declared;
         }
         let dims = source
             .ty
@@ -1597,7 +1623,7 @@ impl BodyFacts<'_> {
                     let extent = match evaluate_index_dimension(dim, self.types) {
                         Ok(Some(extent)) => KernelRangeExpr::Constant(i128::from(extent)),
                         Ok(None) => KernelRangeExpr::Shape(dim),
-                        Err(_) => return declared(),
+                        Err(_) => return declared.clone(),
                     };
                     total = multiply(total, extent);
                 }
@@ -1606,7 +1632,7 @@ impl BodyFacts<'_> {
                     maximum: total,
                 }))
             }
-            _ => declared(),
+            _ => declared.clone(),
         }
     }
 
@@ -1709,12 +1735,45 @@ impl BodyFacts<'_> {
         })))
     }
 
+    fn bind_tensor_coordinates(
+        &mut self,
+        iter: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        span: Span,
+    ) {
+        let dims = iter
+            .ty
+            .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
+        for (axis, (def_id, _)) in coordinates.iter().enumerate() {
+            let range = dims
+                .get(axis)
+                .copied()
+                .map_or_else(AbstractRange::unknown, |dim| {
+                    coordinate_range(dim, self.types)
+                });
+            if let Some(extent) = &range.0 {
+                self.check_intermediate_with_bounds(
+                    span,
+                    AbstractRange(Some(KernelValueRange {
+                        minimum: extent.minimum.clone(),
+                        maximum: add(extent.maximum.clone(), KernelRangeExpr::Constant(1)),
+                    })),
+                    i128::from(i32::MIN),
+                    i128::from(i32::MAX),
+                );
+            }
+            self.ranges.insert(*def_id, range);
+            self.range_only_bindings.insert(*def_id);
+        }
+    }
+
     fn visit_tensor_loop(
         &mut self,
         iter: &HirExpression,
         coordinates: &[(DefId, Symbol)],
         binding: DefId,
         body: &HirBlock,
+        group: Option<&HirExpression>,
     ) {
         let before = self.ranges.clone();
         // A single counted range lowers as Itera, not IteraRange. Its
@@ -1729,29 +1788,9 @@ impl BodyFacts<'_> {
             self.ranges = merge_loop_ranges(before, after);
             return;
         }
-        let dims = iter
-            .ty
-            .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
-        for (axis, (def_id, _)) in coordinates.iter().enumerate() {
-            let range = dims
-                .get(axis)
-                .copied()
-                .map_or_else(AbstractRange::unknown, |dim| {
-                    coordinate_range(dim, self.types)
-                });
-            if let Some(extent) = &range.0 {
-                self.check_intermediate_with_bounds(
-                    body.span,
-                    AbstractRange(Some(KernelValueRange {
-                        minimum: extent.minimum.clone(),
-                        maximum: add(extent.maximum.clone(), KernelRangeExpr::Constant(1)),
-                    })),
-                    i128::from(i32::MIN),
-                    i128::from(i32::MAX),
-                );
-            }
-            self.ranges.insert(*def_id, range);
-            self.range_only_bindings.insert(*def_id);
+        self.bind_tensor_coordinates(iter, coordinates, body.span);
+        if let Some(group) = group {
+            self.evaluate(group);
         }
         if let Some(element) = iter.ty.and_then(|ty| tensor_element(ty, self.types)) {
             self.record_type(element, body.span);

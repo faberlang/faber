@@ -129,12 +129,12 @@ fn thread_rank2_argmax_tie_returns_the_lowest_row_major_coordinate() {
     let source = r"
 @ kernel
 @ public
-fn t_hi<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
+fn t_hi<size H, size W>(tf32[H, W] m) → tuple<i32, i32> ∪ none {
     return reduce via argmax from m at [i, j] thread lane let s { return s }
 }
 @ kernel
 @ public
-fn t_lo<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
+fn t_lo<size H, size W>(tf32[H, W] m) → tuple<i32, i32> ∪ none {
     return reduce via argmin from m at [i, j] thread lane let s { return s }
 }
 fn p_hi<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
@@ -145,8 +145,8 @@ fn p_lo<size H, size W>(tf32[H, W] m) → tuple<int, int> ∪ none {
 }
 main {
     let tf32[2, 3] m ← [[1.0, 5.0, 2.0], [5.0, 0.0, 1.0]] ↦ tf32[2, 3]
-    let tuple<int, int> hi ← t_hi(m) coalesce tuple<int, int> [9, 9]
-    let tuple<int, int> lo ← t_lo(m) coalesce tuple<int, int> [9, 9]
+    let tuple<i32, i32> hi ← t_hi(m) coalesce tuple<i32, i32> [9, 9]
+    let tuple<i32, i32> lo ← t_lo(m) coalesce tuple<i32, i32> [9, 9]
     let tuple<int, int> phi ← p_hi(m) coalesce tuple<int, int> [9, 9]
     let tuple<int, int> plo ← p_lo(m) coalesce tuple<int, int> [9, 9]
     print hi[0]
@@ -207,7 +207,7 @@ fn t_max(tf32[0] a) → f32 {
 }
 @ kernel
 @ public
-fn t_argmax(tf32[0] a) → int ∪ none {
+fn t_argmax(tf32[0] a) → i32 ∪ none {
     return reduce via argmax from a at [i] thread lane let s { return s }
 }
 @ kernel
