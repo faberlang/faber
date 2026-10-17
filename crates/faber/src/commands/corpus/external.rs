@@ -463,15 +463,7 @@ fn run_case(
         );
     }
     let source = case_dir.join(format!("main.{extension}"));
-    let artifact = case_dir.join("program");
-    let paths = Paths {
-        suite,
-        workspace,
-        runtime: recipe.runtime.as_deref(),
-        case_dir: &case_dir,
-        source: &source,
-        artifact: &artifact,
-    };
+    let mut artifact = case_dir.join("program");
     let emitting = Instant::now();
     // Binary emit (the `clif` object): the API output carries bytes the text
     // channel cannot, so they travel here and replace the text on write.
@@ -480,7 +472,89 @@ fn run_case(
     let api_target = (!matches!(mode, "mir") && case.input.is_file())
         .then(|| external_target(target))
         .flatten();
-    let (emitted_code, emit_ms, emit_command) = if let Some(api_target) = api_target {
+    // A package-directory input has no single source file to emit: `faber build`
+    // emits and links the package in one step and prints the artifact path, so the
+    // file-shaped emit and the recipe build are both replaced by that command.
+    let package_build = case.input.is_dir() && matches!(mode, "external" | "build");
+    let (emitted_code, emit_ms, emit_command) = if package_build {
+        let build_args = vec![
+            faber.display().to_string(),
+            "build".to_owned(),
+            "-t".to_owned(),
+            recipe.emit.as_deref().unwrap_or("").to_owned(),
+            case.input.display().to_string(),
+            "--out-dir".to_owned(),
+            case_dir.display().to_string(),
+        ];
+        let built = run_bounded(
+            Command::new(faber)
+                .args(&build_args[1..])
+                .current_dir(&case_dir),
+            Stdio::null(),
+            // A package build stands in for the recipe build step, so it gets the
+            // suite step budget rather than the per-case run budget.
+            SUITE_STEP_TIMEOUT,
+        );
+        let emit_ms = ms(emitting);
+        let output = match built {
+            Ok(output) => output,
+            Err(error) => {
+                return result(
+                    case,
+                    target,
+                    "fail",
+                    "build",
+                    Some(error.describe("Faber")),
+                    Some(&build_args),
+                    started,
+                );
+            }
+        };
+        // `faber build` performs emission and linking, so a failure belongs to the
+        // phase the case pins when that pin is emission; otherwise it is a build.
+        let judged_phase = if case.target.phase.as_deref() == Some("emit") {
+            "emit"
+        } else {
+            "build"
+        };
+        if !output.status.success() || case.target.phase.as_deref() == Some(judged_phase) {
+            let (status, reason) = judge_phase(case, judged_phase, &output);
+            let mut row = result(
+                case,
+                target,
+                status,
+                judged_phase,
+                reason,
+                Some(&build_args),
+                started,
+            );
+            row["exit"] = json!(output.status.code());
+            row["timing_ms"]["emit"] = json!(emit_ms);
+            return row;
+        }
+        match printed_artifact(&output) {
+            Some(path) => artifact = path,
+            None => {
+                let mut row = result(
+                    case,
+                    target,
+                    "fail",
+                    "build",
+                    Some("package build printed no artifact path".to_owned()),
+                    Some(&build_args),
+                    started,
+                );
+                row["exit"] = json!(output.status.code());
+                row["timing_ms"]["emit"] = json!(emit_ms);
+                return row;
+            }
+        }
+        (
+            String::new(),
+            emit_ms,
+            json!({"argv":build_args,"cwd":case_dir}),
+        )
+    } else if let Some(api_target) = api_target {
         let compilation = radix::services::compile_cli_path(&case.input, false, api_target);
         let emit_ms = ms(emitting);
         let diagnostics = compilation
@@ -592,14 +666,24 @@ fn run_case(
         emitted_code
     };
     let emitted_bytes = object_bytes.unwrap_or_else(|| emitted_code.clone().into_bytes());
-    if let Err(error) = prepare_files(recipe, &paths, &emitted_bytes) {
+    let paths = Paths {
+        suite,
+        workspace,
+        runtime: recipe.runtime.as_deref(),
+        case_dir: &case_dir,
+        source: &source,
+        artifact: &artifact,
+    };
+    if !package_build && let Err(error) = prepare_files(recipe, &paths, &emitted_bytes) {
         return result(case, target, "fail", "setup", Some(error), None, started);
     }
     let mut row = result(case, target, "fail", "build", None, None, started);
     let mut stale_build_pin = false;
     row["emit_command"] = emit_command;
     row["timing_ms"]["emit"] = json!(emit_ms);
-    if !recipe.build.is_empty() {
+    if package_build {
+        // The package build above already emitted and linked the artifact.
+    } else if !recipe.build.is_empty() {
         let building = Instant::now();
         let build = run_command(&recipe.build, &paths, &case_dir, None, case.setup_timeout());
         let build_ms = ms(building);
@@ -672,6 +756,17 @@ fn run_case(
     row["reason"] = json!(reason);
     row["timing_ms"]["compare"] = json!(ms(comparing));
     row
+}
+
+/// The artifact path `faber build` prints on stdout for a package input.
+fn printed_artifact(output: &Output) -> Option<PathBuf> {
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .rev()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(PathBuf::from)
+        .find(|path| path.is_file())
 }
 
 fn external_target(target: &str) -> Option<radix::module::Target> {

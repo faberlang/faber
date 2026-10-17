@@ -974,6 +974,72 @@ fn corpus_external_recipe_builds_and_checks_the_program_golden() {
     assert_eq!(records(&mismatch.stdout)[0]["reason"], "stdout mismatch");
 }
 
+#[cfg(feature = "hir-go")]
+fn go_available() -> bool {
+    Command::new("go")
+        .arg("version")
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+/// A rooted case whose input is a package directory: `faber build` owns emission
+/// and linking, so the file-shaped emit and the recipe build step must not run.
+#[cfg(feature = "hir-go")]
+#[test]
+fn corpus_external_recipe_builds_a_package_directory_golden() {
+    if !go_available() {
+        missing_tool(
+            "go",
+            "corpus_external_recipe_builds_a_package_directory_golden",
+            "go is required: the package-directory external proof builds with `faber build -t go`",
+        );
+        return;
+    }
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases").join("package");
+    let package = temp.path().join("inputs").join("probe");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::create_dir_all(package.join("src")).expect("create package source directory");
+    fs::write(
+        package.join("faber.toml"),
+        "[package]\nname = \"probe\"\nversion = \"0.1.0\"\nedition = \"2026\"\n\n[paths]\nsource = \"src\"\nentry = \"main.fab\"\n\n[build]\ntarget = \"go\"\nkind = \"bin\"\n",
+    )
+    .expect("write package manifest");
+    fs::write(
+        package.join("src/main.fab"),
+        "main {\n    print \"package ok\"\n}\n",
+    )
+    .expect("write package source");
+    fs::write(case.join("stdout.expected"), "package ok\n").expect("write golden");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\nid = \"package\"\ninput_root = \"input\"\ninput = \"probe\"\n\n[expect]\nstdout = \"stdout.expected\"\n\n[targets.go]\noutcome = \"pass\"\n",
+    )
+    .expect("write case");
+    // The build recipe names a source that cannot exist: a package case must skip it.
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[roots]\ninput = \"inputs\"\n\n[targets.go]\nemit = \"go\"\nextension = \"go\"\nbuild = [\"go\", \"build\", \"-o\", \"{artifact}\", \"absent-source.go\"]\nrun = [\"{artifact}\"]\n",
+    )
+    .expect("write suite");
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "go"])
+        .arg(temp.path())
+        .output()
+        .expect("run package corpus recipe");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let rows = records(&output.stdout);
+    assert_eq!(rows[0]["status"], "pass");
+    assert_eq!(rows[0]["phase"], "run");
+    assert_eq!(rows[0]["emit_command"]["argv"][1], "build");
+    assert!(rows[0]["build_command"].is_null());
+    assert_eq!(rows[1]["passed"], 1);
+}
+
 /// Whether an LLVM IR verifier (`llvm-as` or `opt`) is on PATH — the same
 /// availability the gpu corpus target fail-closes on
 /// (`commands/corpus/gpu.rs` `find_verifier`).
