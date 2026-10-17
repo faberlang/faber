@@ -48,6 +48,8 @@ mod commune_emit_test;
 // Mirrors the lint-fix-1 cfg-gate landing on main: ungated test modules fail
 // stage-2 clippy (unused/dead) in non-test builds.
 #[cfg(test)]
+mod bitnot_spacing_test;
+#[cfg(test)]
 mod instance_spacing_test;
 #[cfg(test)]
 mod intervallum_spacing_test;
