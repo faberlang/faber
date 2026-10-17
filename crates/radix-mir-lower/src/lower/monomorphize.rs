@@ -448,11 +448,23 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
 
     /// Non-template functions whose bodies already call a generic definition.
     /// These seed the worklist; every later entry is a freshly created instance.
+    ///
+    /// A param-bearing function is skipped: a genus method carries its genus's
+    /// type parameters (genus methods have no per-genus instance to be written
+    /// against), so every witness its body can offer for a nested generic call
+    /// is its own unresolved parameter. Instantiating from it would mint a
+    /// param-bearing instance — exactly the survivor the final net rejects —
+    /// so the call stays a `Definition` callee and resolves to the retained
+    /// template by `DefId`, matching how the method itself is executed.
     fn seed_worklist(&self) -> Vec<MirFunctionId> {
         self.lowerer
             .functions
             .iter()
-            .filter(|function| !self.is_template_function(function) && self.function_has_generic_callee(function))
+            .filter(|function| {
+                !self.is_template_function(function)
+                    && !function_contains_param(self.types(), function)
+                    && self.function_has_generic_callee(function)
+            })
             .map(|function| function.id)
             .collect()
     }
@@ -1648,9 +1660,51 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             .values()
             .map(|function| function.id)
             .collect::<FxHashSet<_>>();
-        self.lowerer
+        // A call site whose caller is param-polymorphic keeps the template's
+        // source `DefId` (see `seed_worklist`), and the runner resolves a
+        // `Definition` callee through that index. Dropping a still-referenced
+        // template would leave the call with no function to run, so those are
+        // retained. A concrete instance of the same source is appended after
+        // its template, so the `DefId` index still prefers the concrete one.
+        let retained_sources = self.referenced_template_sources(&template_ids);
+        self.lowerer.functions.retain(|function| {
+            !template_ids.contains(&function.id)
+                || function
+                    .source
+                    .is_some_and(|source| retained_sources.contains(&source))
+        });
+    }
+
+    /// Source defs of templates that a kept function still names. Non-template
+    /// functions seed the set and a retained template contributes its own
+    /// callees, so a helper-to-helper chain survives as a chain.
+    fn referenced_template_sources(&self, template_ids: &FxHashSet<MirFunctionId>) -> FxHashSet<DefId> {
+        let mut retained_sources = FxHashSet::default();
+        let mut pending: Vec<&MirFunction> = self
+            .lowerer
             .functions
-            .retain(|function| !template_ids.contains(&function.id));
+            .iter()
+            .filter(|function| !template_ids.contains(&function.id))
+            .collect();
+        let mut scanned = 0;
+        while let Some(function) = pending.get(scanned) {
+            let sources = definition_callee_sources(function);
+            scanned += 1;
+            for source in sources {
+                if !self.templates.contains_key(&source) || !retained_sources.insert(source) {
+                    continue;
+                }
+                if let Some(function) = self
+                    .lowerer
+                    .functions
+                    .iter()
+                    .find(|candidate| candidate.source == Some(source))
+                {
+                    pending.push(function);
+                }
+            }
+        }
+        retained_sources
     }
 
     fn operand_ty(&mut self, operand: &MirOperand, scope: &FunctionTypeScope, span: Span) -> Option<MirType> {
@@ -2390,6 +2444,25 @@ fn static_axis_extent(types: &TypeTable, mut ty: TypeId, axis: u32) -> Option<u6
         IndexExpr::Literal(value) => Some(*value),
         _ => None,
     }
+}
+
+/// Source defs of the `MirCallee::Definition` call sites in one function. A
+/// rewritten generic call names a `MirCallee::Function` id instead, so every
+/// entry is a call still resolved by `DefId` when the program runs.
+fn definition_callee_sources(function: &MirFunction) -> Vec<DefId> {
+    let mut sources = Vec::new();
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if let MirStatementKind::Call { callee: MirCallee::Definition { source, .. }, .. } = &statement.kind {
+                sources.push(*source);
+            }
+        }
+        if let MirTerminatorKind::TryCall { callee: MirCallee::Definition { source, .. }, .. } = &block.terminator.kind
+        {
+            sources.push(*source);
+        }
+    }
+    sources
 }
 
 /// Whether any param-bearing type survives in a function (D6 net).
