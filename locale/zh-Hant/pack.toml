@@ -1528,6 +1528,30 @@ help = "修正用於降階的 AST 結構"
 message = "width marker 不能接受參數"
 help = "修正用於降階的 AST 結構"
 
+[diagnostics.SEM008.issues.nucleum_d64]
+message = "d64 不受 nucleum 核心支援"
+help = "請使用受支援的核心值型別"
+
+[diagnostics.SEM008.issues.nucleum_extent_unproven]
+message = "核心整數範圍 {extent} 尚未證明落在可攜式整數範圍內"
+help = "將範圍限制為可攜式整數範圍內的值"
+
+[diagnostics.SEM008.issues.nucleum_f64]
+message = "f64 不受 nucleum 核心支援"
+help = "浮點核心值請使用 f32"
+
+[diagnostics.SEM008.issues.nucleum_trapping_store]
+message = "寬度為 {width} 的儲存可能在 nucleum 核心中觸發陷阱"
+help = "證明儲存範圍有效，或使用環繞或飽和儲存格"
+
+[diagnostics.SEM008.issues.nucleum_wide_integer]
+message = "整數寬度 {width} 超出 nucleum 核心支援的寬度"
+help = "請使用不超過 32 位元的整數寬度"
+
+[diagnostics.SEM008.issues.nucleum_wide_intermediate]
+message = "核心中間範圍 {extent} 超出可攜式整數範圍"
+help = "讓中間值維持在可攜式整數範圍內"
+
 [diagnostics.SEM009]
 message = "CLI 驗證錯誤"
 help = "在產生可執行的 CLI 程式碼前，修正 CLI 註解契約"
@@ -2115,6 +2139,14 @@ help = "使運算式型別符合預期型別"
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
 message = "postfix gradient selection（`call(...) ∇ [places]`）在 tensor-glyphs 2B autograd surface 落地之前不會被 lowering；Phase 2A 中沒有 operand、selector 或 result 規則生效"
 help = "Phase 2A 中 gradient selection（`∇`）僅為 parse-only；eligibility/selector 規則隨 tensor-glyphs 2B 落地"
+
+[diagnostics.SEM010.issues.implet_method_signature_mismatch]
+message = "類型 {genus} 的 {method} 方法與其對 {contract} 的 {implet} 不相符：預期為 {expected}，實際為 {found}"
+help = "使方法簽章符合契約宣告的簽章"
+
+[diagnostics.SEM010.issues.implet_missing_method]
+message = "類型 {genus} 未提供其對 {contract} 的 {implet} 所要求的 {method} 方法"
+help = "新增簽章符合契約宣告的 {method} 方法，或移除 {implet}"
 
 [diagnostics.SEM011]
 message = "運算元型別無效"
