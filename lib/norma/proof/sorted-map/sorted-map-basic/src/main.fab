@@ -1,0 +1,29 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:sorted_map, the key-ordered collection.
+# Covers emptiness, insertion order vs. key order, overwrite, projections
+# (keys / values / length), lookup (present and missing), membership and
+# removal. Output must match under `faber run` and a `faber build` Rust
+# binary.
+
+import from "norma:sorted_map" sorted_map
+
+main {
+    mut sorted_map.SortedMap<string, int> m ← sorted_map.empty<string, int>()
+    print m.is_empty()
+    m.put("b", 2)
+    m.put("a", 1)
+    m.put("c", 3)
+    m.put("a", 10)
+    print m.keys()
+    print m.values()
+    print m.length()
+    print m.get("a")
+    print m.get("zz")
+    print m.has("b")
+    m.delete("b")
+    print m.has("b")
+    print m.keys()
+}
