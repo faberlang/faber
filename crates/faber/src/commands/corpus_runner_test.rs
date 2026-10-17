@@ -138,6 +138,9 @@ fn library_case(check_only: bool, outcome: Outcome, fragment: Option<&str>) -> C
     library.target.outcome = outcome;
     library.target.diagnostic_contains = fragment.map(str::to_owned);
     library.dir = std::env::temp_dir();
+    // Load-robust deadline: the synthetic 1s case deadline from `case` flakes under the
+    // loaded parallel stage-4b gate; real corpus cases use CASE_TIMEOUT_SECS = 120.
+    library.timeout = Duration::from_secs(30);
     library
 }
 
