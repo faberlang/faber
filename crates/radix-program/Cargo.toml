@@ -35,6 +35,7 @@ radix-mir-fmir = { path = "../radix-mir-fmir", optional = true }
 radix-mir = { path = "../radix-mir", optional = true }
 radix-mir-lower = { path = "../radix-mir-lower", optional = true }
 radix-mir-runner = { path = "../radix-mir-runner", optional = true }
+radix-mir-clif = { path = "../radix-mir-clif", optional = true }
 # RP5: the moved package-MIR linker works with the shared semantic TypeId
 # surface directly (mirroring faber's own direct radix-types dependency).
 radix-types = { path = "../radix-types" }
@@ -59,7 +60,7 @@ hir-faber = ["radix-module/hir-faber"]
 hir-c = ["radix-module/hir-c"]
 hir-fhir = ["radix-module/hir-fhir", "dep:handroll", "dep:radix-mir-lower"]
 mir-fmir = ["package-mir", "radix-module/mir-fmir"]
-mir-clif = ["radix-module/mir-clif"]
+mir-clif = ["package-mir", "radix-module/mir-clif", "dep:radix-mir-clif"]
 runner = ["package-mir", "radix-module/runner"]
 
 [lints]
