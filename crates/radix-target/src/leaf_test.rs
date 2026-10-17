@@ -13,6 +13,7 @@ fn from_route_maps_each_n2_family() {
     assert_eq!(Leaf::from_route("caelum:necte"), Some(Leaf::Tcp));
     assert_eq!(Leaf::from_route("http:get"), Some(Leaf::Http));
     assert_eq!(Leaf::from_route("websocket:connect"), Some(Leaf::Websocket));
+    assert_eq!(Leaf::from_route("machina:specimen"), Some(Leaf::Machine));
 }
 
 #[test]
@@ -34,7 +35,8 @@ fn all_is_the_n2_set() {
             Leaf::Entropy,
             Leaf::Tcp,
             Leaf::Http,
-            Leaf::Websocket
+            Leaf::Websocket,
+            Leaf::Machine
         ]
     );
 }
