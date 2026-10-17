@@ -1129,6 +1129,7 @@ impl BodyFacts<'_> {
                 self.check_intermediate(index.span, index_range);
                 if let HirExpressionKind::Path(def_id) = base.kind
                     && let Some(axes) = self.coordinate_ranges.get(&def_id)
+                    && is_integer_value_type(expr.ty, self.types)
                 {
                     if let Some(axis) = crate::passes::const_int_value(index)
                         .and_then(|axis| usize::try_from(axis).ok())
@@ -1424,7 +1425,9 @@ impl BodyFacts<'_> {
                         .get(index)
                         .map(|range| self.range_binding(range))
                         .unwrap_or_else(AbstractRange::unknown);
+                    self.check_intermediate(body.span, range.clone());
                     self.ranges.insert(*def_id, range);
+                    self.range_only_bindings.insert(*def_id);
                 }
                 self.visit_block_stateful(body);
                 let after = self.ranges.clone();
@@ -1627,14 +1630,9 @@ impl BodyFacts<'_> {
         }
     }
 
-    /// The device linear address of an N-D tensor index `t[[a0, a1, ...]]`
-    /// whose coordinates are bounded by a proven range, typically lane binders
-    /// over a runtime extent. It is `((a0 * E1 + a1) * E2 + a2) ...`; the
-    /// recorded range is `[0, sum(max(ak) * stride_k)]`, so a runtime extent
-    /// yields an extent condition (`E0 * E1 ... - 1 < 2^32` when the binders
-    /// iterate this tensor's own shape) rather than a rejection. Unbounded
-    /// scalar coordinates (a full-width integer parameter) are not admitted:
-    /// they keep the unknown range and are rejected.
+    /// Bound the exact row-major address arithmetic before its runtime guard.
+    /// Signed coordinates may fault at runtime, but both ends of their linear
+    /// address range must still fit the portable representation envelope.
     fn linear_tensor_index_range(
         &self,
         base: &HirExpression,
@@ -1649,22 +1647,26 @@ impl BodyFacts<'_> {
             base_ty = *target;
         }
         let dims = shape_dimensions(base_ty, self.types);
-        if axes.is_empty() || axes.len() != dims.len() {
+        if axes.is_empty()
+            || axes.len() != dims.len()
+            || dims.iter().any(|dim| {
+                matches!(
+                    self.types.get_index(*dim),
+                    IndexExpr::Unspecified | IndexExpr::Infer(_)
+                )
+            })
+        {
             return None;
         }
+        let mut minimum_index = KernelRangeExpr::Constant(0);
         let mut maximum_index = KernelRangeExpr::Constant(0);
         for (axis, range) in axes.iter().enumerate() {
             let range = range.0.as_ref()?;
-            // A coordinate may be negative at run time (`j - 1`) as long as it
-            // is bounded by a symbolic extent: the per-axis guard is the
-            // runtime check, so a shape-bounded coordinate is admitted rather
-            // than rejected. A full-width scalar parameter stays unbounded
-            // (no shape) and is still refused.
-            let nonnegative = constant(&range.minimum).is_some_and(|minimum| minimum >= 0);
-            let shape_bounded = contains_shape(range);
-            let bounded =
-                constant(&range.maximum).map_or(shape_bounded, |maximum| maximum <= 2_147_483_647);
-            if (!nonnegative && !shape_bounded) || !bounded {
+            // A full unsigned scalar is not a signed device coordinate.
+            // Keep its admission closed unless a binder/guard narrows it.
+            if constant(&range.maximum).is_some_and(|maximum| maximum > i128::from(i32::MAX))
+                || constant(&range.minimum).is_some_and(|minimum| minimum < i128::from(i32::MIN))
+            {
                 return None;
             }
             let stride = dims[axis + 1..]
@@ -1676,10 +1678,14 @@ impl BodyFacts<'_> {
                     };
                     multiply(acc, extent)
                 });
+            minimum_index = add(
+                minimum_index,
+                multiply(range.minimum.clone(), stride.clone()),
+            );
             maximum_index = add(maximum_index, multiply(range.maximum.clone(), stride));
         }
         Some(AbstractRange(Some(KernelValueRange {
-            minimum: KernelRangeExpr::Constant(0),
+            minimum: minimum_index,
             maximum: maximum_index,
         })))
     }
@@ -1692,6 +1698,18 @@ impl BodyFacts<'_> {
         body: &HirBlock,
     ) {
         let before = self.ranges.clone();
+        // A single counted range lowers as Itera, not IteraRange. Its
+        // binder has the interval's bounds, not a tensor element's range.
+        if matches!(iter.kind, HirExpressionKind::Intervallum { .. }) {
+            let range = self.range_binding(iter);
+            self.check_intermediate(iter.span, range.clone());
+            self.ranges.insert(binding, range);
+            self.range_only_bindings.insert(binding);
+            self.visit_block_stateful(body);
+            let after = self.ranges.clone();
+            self.ranges = merge_loop_ranges(before, after);
+            return;
+        }
         let dims = iter
             .ty
             .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
@@ -1702,6 +1720,17 @@ impl BodyFacts<'_> {
                 .map_or_else(AbstractRange::unknown, |dim| {
                     coordinate_range(dim, self.types)
                 });
+            if let Some(extent) = &range.0 {
+                self.check_intermediate_with_bounds(
+                    body.span,
+                    AbstractRange(Some(KernelValueRange {
+                        minimum: extent.minimum.clone(),
+                        maximum: add(extent.maximum.clone(), KernelRangeExpr::Constant(1)),
+                    })),
+                    i128::from(i32::MIN),
+                    i128::from(i32::MAX),
+                );
+            }
             self.ranges.insert(*def_id, range);
             self.range_only_bindings.insert(*def_id);
         }
@@ -1735,6 +1764,17 @@ impl BodyFacts<'_> {
                 .map_or_else(AbstractRange::unknown, |dim| {
                     coordinate_range(dim, self.types)
                 });
+            if let Some(extent) = &range.0 {
+                self.check_intermediate_with_bounds(
+                    body.span,
+                    AbstractRange(Some(KernelValueRange {
+                        minimum: extent.minimum.clone(),
+                        maximum: add(extent.maximum.clone(), KernelRangeExpr::Constant(1)),
+                    })),
+                    i128::from(i32::MIN),
+                    i128::from(i32::MAX),
+                );
+            }
             self.ranges.insert(*def_id, range);
             self.range_only_bindings.insert(*def_id);
         }
@@ -2202,6 +2242,13 @@ impl BodyFacts<'_> {
                 HirArrayElement::Expr(expr) => self.range_only_expression(expr),
                 HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => false,
             }),
+            // Shape metadata passed to a tensor recipe is not an i64 value
+            // cell. The receiver's extents carry its launch requirements.
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
+                args.is_empty()
+                    && self.interner.resolve(*method) == "magnitudines"
+                    && receiver.ty.is_some_and(|ty| is_tensor_type(ty, self.types))
+            }
             HirExpressionKind::Reduction { .. } => self.range_proven_reduction(expr),
             _ => false,
         }
@@ -2515,12 +2562,13 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
             let Some(divisor_max) = constant(&rhs.maximum) else {
                 return AbstractRange::unknown();
             };
-            if divisor_min != divisor_max || divisor_min == 0 {
+            if divisor_min <= 0 && divisor_max >= 0 {
                 return AbstractRange::unknown();
             }
             let Some(bound) = divisor_min
                 .checked_abs()
-                .map(|value| value.saturating_sub(1))
+                .zip(divisor_max.checked_abs())
+                .map(|(lo, hi)| lo.max(hi).saturating_sub(1))
             else {
                 return AbstractRange::unknown();
             };

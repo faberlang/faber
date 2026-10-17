@@ -48,8 +48,8 @@ functio gemv<magnitudo N, magnitudo K>(
     de tensor<f32, [K]> x,
     varia tensor<f32, [N]> out,
     varia tensor<f32, [K]> tmp,
-    varia tensor<numerus, [N]> lens,
-    numerus n
+    varia tensor<i32, [N]> lens,
+    i32 n
 ) → vacuum {{
     itera ex dom apud [i] filum lane sit e {{
         {body}
@@ -246,8 +246,10 @@ functio range_loop(tensor<f32, [8]> x, i32 n) → f32 {
 @ publica
 functio range_loop(tensor<f32, [8]> x, u32 n) → f32 {
     varia f32 acc ← 0.0
-    itera ab 0‥n sit k {
-        acc ← acc + x[[k]]
+    si n ≤ 2147483647 {
+        itera ab 0‥n sit k {
+            acc ← acc + x[[k]]
+        }
     }
     redde acc
 }",

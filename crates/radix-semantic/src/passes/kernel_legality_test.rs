@@ -163,15 +163,17 @@ fn recursion_is_legal_and_reported_as_a_fact() {
     let fixture = analyze_source(
         r"
 @ nucleum
-functio down(numerus n) → numerus {
+functio down(i32 n) → i32 {
     si n ≤ 0 {
         redde 0
     }
-    redde down(n - 1)
+    secus {
+        redde down(n - 1)
+    }
 }
 
 @ nucleum
-functio flat(numerus n) → numerus {
+functio flat(i32 n) → i32 {
     redde n
 }
 ",
@@ -538,14 +540,14 @@ functio k(tensor<f32, [8]> x, varia tensor<f32, [8]> out) → vacuum {
 
 #[test]
 fn a_conversion_default_in_a_kernel_selects_a_value_and_is_legal() {
-    // Operator ruling 2026-10-08 (KCONVDEF): `n ↦ i32 ⊥ 0` is compare plus
+    // Operator ruling 2026-10-08 (KCONVDEF): `n ↦ i16 ⊥ 0` is compare plus
     // select, never a handler.
     assert_accepts(
         r"
 @ nucleum
 @ publica
-functio k(i64 n) → i32 {
-    redde n ↦ i32 ⊥ 0
+functio k(i32 n) → i16 {
+    redde n ↦ i16 ⊥ 0
 }
 ",
     );

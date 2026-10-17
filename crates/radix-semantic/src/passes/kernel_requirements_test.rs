@@ -934,3 +934,60 @@ main {}
         fixture.diagnostics
     );
 }
+
+#[test]
+fn signed_gather_coordinates_fit_the_address_envelope() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn gather(tensor<i32, [4]> ids, tensor<f32, [8]> data, mut tensor<f32, [4]> out) → void {
+    for from ids at [i] thread lane let row {
+        out[[i]] ← data[[row]]
+    }
+}
+main {}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    let row = target_row(&fixture, "gather", Target::MirMetal);
+    assert!(row.admitted, "{:?}", row.failures);
+}
+
+#[test]
+fn tensor_addressing_does_not_hide_wide_coordinate_arithmetic() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn gather(tensor<i32, [4]> ids, tensor<f32, [8]> data, mut tensor<f32, [4]> out) → void {
+    for from ids at [i] thread lane let row {
+        out[[i]] ← data[[row * 4]]
+    }
+}
+main {}
+",
+    );
+    assert!(issue_arg(&fixture, "nucleum_wide_intermediate", "extent").is_some());
+    assert!(!target_row(&fixture, "gather", Target::MirMetal).admitted);
+}
+
+#[test]
+fn remainder_accepts_a_positive_variable_divisor_but_not_a_possible_zero() {
+    for (guard, admitted) in [("d ≻ 0", true), ("d ≥ 0", false)] {
+        let fixture = analyze_en(&format!(
+            r"
+@ kernel
+@ public
+fn rem(i32 x, i32 d) → void {{
+    if {guard} {{
+        let i32 y ← x % d
+    }}
+}}
+main {{}}
+"
+        ));
+        let row = target_row(&fixture, "rem", Target::MirMetal);
+        assert_eq!(row.admitted, admitted, "{:?}", row.failures);
+    }
+}

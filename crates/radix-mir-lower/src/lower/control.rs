@@ -84,6 +84,26 @@ fn body_bracket_stores_into(body: &HirBlock, def: DefId) -> bool {
     stores.found
 }
 
+/// Read a coordinate binder's checked type from its body uses. HIR keeps
+/// coordinate declarations as ids; the path carries the semantic type.
+fn coordinate_type(body: &HirBlock, def: DefId) -> Option<TypeId> {
+    struct Find {
+        def: DefId,
+        ty: Option<TypeId>,
+    }
+    impl HirVisitor for Find {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if matches!(expr.kind, HirExpressionKind::Path(id) if id == self.def) {
+                self.ty = self.ty.or(expr.ty);
+            }
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut find = Find { def, ty: None };
+    find.visit_block(body);
+    find.ty
+}
+
 fn mir_reduce_op(op: radix_hir::HirReductionOp) -> MirReduceOp {
     match op {
         radix_hir::HirReductionOp::Sum => MirReduceOp::Sum,
@@ -3523,7 +3543,9 @@ impl FunctionBuilder<'_> {
     }
 
     fn lower_range_itera(&mut self, range: RangeIteraLowering<'_>) -> Option<()> {
-        let index_ty = self.range_index_ty(&[Some(range.start), Some(range.end), range.step]);
+        let index_ty = coordinate_type(range.body, range.binding)
+            .map(MirType::semantic)
+            .unwrap_or_else(|| self.range_index_ty(&[Some(range.start), Some(range.end), range.step]));
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
 
         let index = self.next_local_id();
@@ -3728,7 +3750,9 @@ impl FunctionBuilder<'_> {
 
         let mut axes = Vec::with_capacity(axis_count);
         for (position, ((start, end, step, kind), (binding, name))) in members.iter().zip(bindings).enumerate() {
-            let index_ty = self.range_index_ty(&[Some(*start), Some(*end), *step]);
+            let index_ty = coordinate_type(body, *binding)
+                .map(MirType::semantic)
+                .unwrap_or_else(|| self.range_index_ty(&[Some(*start), Some(*end), *step]));
             let index = self.next_local_id();
             self.locals.push(MirLocalDecl {
                 id: index,
@@ -4883,8 +4907,16 @@ impl FunctionBuilder<'_> {
         level: usize,
         continuation: MirBlockId,
     ) -> Option<()> {
-        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
         let (coordinate_def, coordinate_name) = iter.coordinates[level];
+        let numerus = MirType::semantic(
+            coordinate_type(iter.body, coordinate_def)
+                .or_else(|| {
+                    iter.coordinates
+                        .iter()
+                        .find_map(|(def, _)| coordinate_type(iter.body, *def))
+                })
+                .unwrap_or_else(|| self.types.primitive(Primitive::Numerus)),
+        );
         let coordinate = self.next_local_id();
         self.locals.push(MirLocalDecl {
             id: coordinate,
@@ -4965,12 +4997,8 @@ impl FunctionBuilder<'_> {
         increment_id: MirBlockId,
         loop_after_id: MirBlockId,
     ) -> Option<()> {
-        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
-        let Some(index_array) = self.types.find_array(numerus.semantic_id()) else {
-            self.errors
-                .push(MirError::missing_type(iter.iter.span, "shaped itera coordinate list"));
-            return None;
-        };
+        let numerus = self.bindings.get(&iter.coordinates.first()?.0)?.ty;
+        let index_array = self.require_array(numerus.semantic_id(), iter.iter.span, "shaped itera coordinate list")?;
         let mut coordinate_operands = Vec::with_capacity(iter.coordinates.len());
         for (def_id, _) in iter.coordinates {
             let Some(binding) = self.bindings.get(def_id) else {

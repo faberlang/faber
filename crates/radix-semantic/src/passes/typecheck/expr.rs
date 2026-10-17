@@ -1441,6 +1441,17 @@ impl TypeChecker<'_> {
 
         if self.current_air_function {
             self.narrow_apud_coordinates(dispatch_ty, &mut coordinate_types);
+        } else if self.current_nucleum_entry
+            && matches!(
+                self.types.get(dispatch_ty),
+                Type::Tensor(..) | Type::Matrix(..)
+            )
+        {
+            // Device coordinate cells use the portable signed carrier. Launch
+            // requirements still prove that each extent fits that carrier.
+            let coordinate = self.width_type(radix_types::NumericWidth::I32);
+            self.types.array(coordinate);
+            coordinate_types.fill(coordinate);
         }
 
         let elem_ty = if matches!(mode, radix_hir::HirIteraMode::Ab) {

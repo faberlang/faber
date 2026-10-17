@@ -354,3 +354,25 @@ functio sparse(sparsa<f32, [2, 3]> s) → vacuum {
 }",
     );
 }
+
+#[test]
+fn kernel_tensor_coordinates_use_i32_without_changing_host_coordinates() {
+    test_support::assert_accepts(
+        r"
+@ nucleum
+@ publica
+functio device(tensor<f32, [2, 3]> src, i32 row, i32 col) → vacuum {
+    itera ex src apud [i, j] filum lane sit v {
+        sit bivalens row_matches ← i ≡ row
+        sit bivalens col_matches ← j ≡ col
+    }
+}
+functio host(tensor<f32, [2, 3]> src, numerus row, numerus col) → vacuum {
+    itera ex src apud [i, j] sit v {
+        sit bivalens row_matches ← i ≡ row
+        sit bivalens col_matches ← j ≡ col
+    }
+}
+",
+    );
+}
