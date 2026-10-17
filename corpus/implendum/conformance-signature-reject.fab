@@ -1,0 +1,31 @@
++++
+locale = "en"
+term = "implendum"
+kind = "reject"
+category = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "implendum_decl", "implendum_method_decl", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+canonical = false
+summary = "A class that implements an interface must match each method's signature."
+no_expected = "rejects"
+diagnostic = "SEM010:implet_method_signature_mismatch"
++++
+
+# This exemplum intentionally fails to compile: `Quadratum` declares `area`
+# with a `string` return where `Figurabile` requires `int`.
+
+interface Figurabile {
+    fn area() → int
+}
+
+class Quadratum implements Figurabile {
+    mut int latus = 3
+
+    fn area() → string {
+        return "nine"
+    }
+}
+
+main {
+    let Quadratum quadratum ← Quadratum { latus = 4 }
+    print quadratum.area()
+}
