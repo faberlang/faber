@@ -176,3 +176,13 @@ fn legacy_redirect_resolves_to_canonical_term() {
         ResolvedTerm::Canonical(_) => panic!("expected legacy redirect"),
     }
 }
+
+#[test]
+fn nihil_entry_states_type_value_rule() {
+    let registry = Registry::load().expect("embedded registry");
+    let nihil = render_plain(&registry.lookup("nihil").expect("nihil resolves"));
+    assert!(nihil.contains("is none"), "names the none-type check");
+    assert!(nihil.contains("null"), "names the null value");
+    assert!(nihil.contains("nihil"), "keeps the la gloss");
+    assert!(!nihil.contains("used for null/none values"));
+}

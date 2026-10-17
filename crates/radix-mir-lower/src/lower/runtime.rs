@@ -3802,6 +3802,12 @@ impl FunctionBuilder<'_> {
                 Primitive::Bivalens | Primitive::Numerus | Primitive::Fractus | Primitive::Octeti | Primitive::Valor,
             )
             | Type::Array(_)
+            // An inline collection literal types as the exact-length witness
+            // (`BoundedArray`), while a declared binding gets plain `Array`;
+            // both render through the same Debug-shape opaque carrier, so the
+            // grouping predicate must admit the literal shape too. Otherwise
+            // `nota 1, [2]` splits into one diagnostic call per argument.
+            | Type::BoundedArray { .. }
             | Type::Map(_, _)
             | Type::Set(_)
             | Type::SizedNumeric(_, _)
@@ -3864,14 +3870,16 @@ impl FunctionBuilder<'_> {
             // Opaque collections (lista, octeti, valor, tabula, copia) format
             // through the single-opaque-arg format carrier, which every MIR
             // consumer renders in the Rust-oracle Debug shape.
-            Type::Primitive(Primitive::Octeti | Primitive::Valor) | Type::Array(_) | Type::Map(_, _) | Type::Set(_) => {
-                self.runtime_call_value(
-                    MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },
-                    vec![value],
-                    text_ty,
-                    span,
-                )
-            }
+            Type::Primitive(Primitive::Octeti | Primitive::Valor)
+            | Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::Map(_, _)
+            | Type::Set(_) => self.runtime_call_value(
+                MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },
+                vec![value],
+                text_ty,
+                span,
+            ),
             Type::Option(inner) => {
                 let inner_ty = MirType::semantic(*inner);
                 self.lower_option_scribe_text(value, inner_ty, text_ty, span)

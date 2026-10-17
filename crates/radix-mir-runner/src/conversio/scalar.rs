@@ -21,8 +21,11 @@
 )]
 
 use super::*;
+use crate::value::round_float_at_slot;
+use handroll::Magnus;
 use radix_codegen_shared::hints::{self, EndianHint};
 use radix_types::IndexExpr;
+use radix_types::exact_rational::ExactRational;
 
 use super::rounding::RoundingMode;
 
@@ -30,6 +33,15 @@ fn octeti_array<const N: usize>(bytes: &[u8]) -> [u8; N] {
     let mut arr = [0_u8; N];
     arr.copy_from_slice(bytes);
     arr
+}
+
+fn exact_integer_to_narrow_float(value: Magnus, width: NumericWidth) -> f64 {
+    let exact = ExactRational::from_integer(value);
+    match width {
+        NumericWidth::F16 => f64::from(exact.to_f16()),
+        NumericWidth::BF16 => f64::from(exact.to_bf16()),
+        _ => unreachable!("narrow integer conversion requires f16 or bf16"),
+    }
 }
 
 fn pack_ascii_digits(value: u128, width: usize, radix: u32) -> Option<String> {
@@ -714,11 +726,16 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             other => other,
         };
         match value {
-            // Text parses as `f64` then narrows: a double rounding for `f32`,
-            // accepted for text sources.
+            // Text parses as `f64` then narrows: double rounding for `f16`,
+            // `bf16` and `f32` is accepted for text sources.
             Value::Str(text) => match text.parse::<f64>() {
-                Ok(v) if matches!(width, NumericWidth::F32) => {
-                    Ok(Value::Float(f64::from(v as f32)))
+                Ok(v)
+                    if matches!(
+                        width,
+                        NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32
+                    ) =>
+                {
+                    Ok(Value::Float(round_float_at_slot(v, width)))
                 }
                 Ok(v) => Ok(Value::Float(v)),
                 Err(_) => {
@@ -734,13 +751,24 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::UInt(v) if matches!(width, NumericWidth::F32) => {
                 Ok(Value::Float(f64::from(v as f32)))
             }
+            Value::Int(v) if matches!(width, NumericWidth::F16 | NumericWidth::BF16) => Ok(
+                Value::Float(exact_integer_to_narrow_float(Magnus::from_i64(v), width)),
+            ),
+            Value::UInt(v) if matches!(width, NumericWidth::F16 | NumericWidth::BF16) => Ok(
+                Value::Float(exact_integer_to_narrow_float(Magnus::from_u64(v), width)),
+            ),
             Value::Int(v) => Ok(Value::Float(v as f64)),
             Value::UInt(v) => Ok(Value::Float(v as f64)),
             Value::Bool(v) => Ok(Value::Float(if v { 1.0 } else { 0.0 })),
-            // `f64 ↦ f32` rounds to the nearest binary32, ties to even;
+            // Float sources round directly to the requested binary format;
             // overflow is ±inf (IEEE), nothing clamps.
-            Value::Float(v) if matches!(width, NumericWidth::F32) => {
-                Ok(Value::Float(f64::from(v as f32)))
+            Value::Float(v)
+                if matches!(
+                    width,
+                    NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32
+                ) =>
+            {
+                Ok(Value::Float(round_float_at_slot(v, width)))
             }
             Value::Float(v) => Ok(Value::Float(v)),
             other => Err(RunnerError::internal(

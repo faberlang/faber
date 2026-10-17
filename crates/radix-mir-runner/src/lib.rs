@@ -1604,13 +1604,6 @@ pub(crate) fn f16_round_f64(v: f64) -> f64 {
 }
 
 /// Round the runner's f64 carrier to bfloat16 using round-to-nearest-even.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "GAPS #1 stages this primitive before store/conversion wiring"
-    )
-)]
 pub(crate) fn bf16_round_f64(v: f64) -> f64 {
     let bits = (v as f32).to_bits();
     let rounded = if v.is_nan() {

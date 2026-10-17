@@ -5,28 +5,30 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "nota_stmt"]
 category = "boolean"
 canonical = true
-summary = "Represents the null value and can prefix a null check."
-syntax = "nihil [<expression>]"
+summary = "The absent-member type: none (la nihil) is the type, null (la nulla) is its value."
+syntax = "T ∪ none | null"
 related = ["∪", "sponte"]
 locale = "en"
 +++
 # =============================================================================
-# nihil — Represents the null value and can prefix a null check.
+# nihil — The absent-member type: none (la nihil) is the type, null (la nulla) is its value.
 # =============================================================================
 #
 # What this teaches:
-#   • the `nihil` keyword — used for null/none values
+#   • the type — `none` (la `nihil`) is the absent member of a nullable union `T ∪ none` (la `T ∪ nihil`)
+#   • the value — `null` (la `nulla`) is the null value; `none` is never a value (SEM001 name_not_value)
+#   • the check — `x is none` (la `est nihil`) tests the none type; `is` with the `null` value literal is refused (PARSE040 est_value_literal_names_equality)
 #
 # Common mistakes:
-#   • Using nihil without ∪ in the type position — nullable types must be declared as T ∪ nihil.
+#   • Putting the null value literal in a type position — PARSE040 null_value_in_type_position; the nullable union is `T ∪ none`.
 #
 # See also: ∪, sponte
 # =============================================================================
 
-# nihil — null literal
+# nihil — the none type and the null value
 #
 # GRAMMAR:
-#   literal :← 'nihil'
+#   literal :← 'null'
 #
 # EXPECTED OUTPUT:
 #   Scalar stdout smoke (see body).
