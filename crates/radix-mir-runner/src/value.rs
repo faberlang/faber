@@ -1658,6 +1658,15 @@ impl Value {
                 .map(|item| item.to_key(span))
                 .collect::<Result<Vec<_>, _>>()
                 .map(MapKey::Tuple),
+            Value::EnumVariant(def, fields) => {
+                let mut parts: Vec<(Symbol, MapKey)> = fields
+                    .borrow()
+                    .iter()
+                    .map(|(name, value)| Ok((*name, value.to_key(span)?)))
+                    .collect::<Result<Vec<_>, _>>()?;
+                parts.sort_by_key(|(name, _)| name.0);
+                Ok(MapKey::Enum(*def, parts))
+            }
             _ => Err(RunnerError::internal(
                 span,
                 "value is not a valid map/set key",

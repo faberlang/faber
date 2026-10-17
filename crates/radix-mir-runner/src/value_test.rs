@@ -1377,3 +1377,44 @@ fn interval_displays_its_construction_literal() {
         format!("{exclusive:?}")
     );
 }
+
+#[test]
+fn enum_variant_map_key_payload_fields_sorted_and_read_back() {
+    let mut interner = radix_lexer::Interner::new();
+    let n = interner.intern("n");
+    let m = interner.intern("m");
+    let def = radix_hir::DefId(6201);
+    let span = Span::default();
+
+    let single = Value::EnumVariant(def, field_map(&[(n, Value::Int(1))]))
+        .to_key(span)
+        .expect("hashable enum payload is a key");
+    assert_eq!(single, MapKey::Enum(def, vec![(n, MapKey::UInt(1))]));
+
+    let first_order = Value::EnumVariant(def, field_map(&[(m, Value::Int(2)), (n, Value::Int(1))]))
+        .to_key(span)
+        .expect("hashable enum payload is a key");
+    let second_order =
+        Value::EnumVariant(def, field_map(&[(n, Value::Int(1)), (m, Value::Int(2))]))
+            .to_key(span)
+            .expect("hashable enum payload is a key");
+    assert_eq!(first_order, second_order);
+
+    let MapKey::Enum(key_def, parts) = &first_order else {
+        panic!("enum variant produces an enum key");
+    };
+    assert_eq!(*key_def, def);
+    assert!(n.0 < m.0);
+    assert_eq!(
+        parts.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+        vec![n, m]
+    );
+
+    let read_back = first_order.to_value();
+    assert!(matches!(
+        &read_back,
+        Value::EnumVariant(found_def, fields)
+            if *found_def == def && fields.borrow().get(&n) == Some(&Value::UInt(1))
+    ));
+    assert!(!first_order.document_key().is_empty());
+}
