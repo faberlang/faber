@@ -295,11 +295,17 @@ pub enum TokenKind {
     NotElementOf, // ∉ non-membership over a range or collection
 
     // === Operators ===
-    Plus,       // +
-    Minus,      // -
-    Star,       // *
-    Slash,      // /
-    Obelus,     // ÷ U+00F7 true division
+    Plus,   // +
+    Minus,  // -
+    Star,   // *
+    Slash,  // /
+    Obelus, // ÷ U+00F7 true division
+
+    // === Prefix radicals (radical-glyphs family) ===
+    RadicalSqrt,   // √ U+221A prefix square root (never a keyword)
+    RadicalCbrt,   // ∛ U+221B prefix real cube root (never a keyword)
+    RadicalFourth, // ∜ U+221C prefix fourth root (never a keyword)
+
     Percent,    // %
     BitwiseAnd, // ∧
     BitwiseOr,  // ∨
