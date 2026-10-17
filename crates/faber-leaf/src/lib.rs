@@ -12,6 +12,7 @@ pub mod clock;
 pub mod entropy;
 pub mod fs;
 pub mod http;
+pub mod machine;
 pub mod process;
 pub mod stdio;
 pub mod tcp;
@@ -30,6 +31,7 @@ pub fn is_route(route: &str) -> bool {
         || entropy::is_route(route)
         || tcp::is_route(route)
         || http::is_route(route)
+        || machine::is_route(route)
         || websocket::is_route(route)
 }
 
@@ -56,6 +58,9 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
     if let Some(reply) = http::serve(route, args) {
         return Some(reply);
     }
+    if let Some(reply) = machine::serve(route, args) {
+        return Some(reply);
+    }
     websocket::serve(route, args)
 }
 
@@ -71,5 +76,6 @@ pub fn reset_execution_state() {
     process::reset_argv();
     tcp::reset_handles();
     http::reset_handles();
+    machine::reset_previous();
     websocket::reset_handles();
 }
