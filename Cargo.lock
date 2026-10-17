@@ -1333,6 +1333,7 @@ dependencies = [
  "radix-codegen-shared",
  "radix-hygiene",
  "radix-mir",
+ "radix-mir-clif",
  "radix-mir-fmir",
  "radix-mir-lower",
  "radix-mir-runner",

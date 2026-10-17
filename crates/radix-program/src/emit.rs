@@ -380,6 +380,46 @@ fn compile_package_ts(
     }
 }
 
+/// Compile a package `.fab` entry to a native object through the interpreted
+/// merged package MIR.
+///
+/// [`radix_mir_clif::emit_object`] runs the CLIF capability classifier itself,
+/// so a package shape outside the CLIF subset fails here with its named gap —
+/// the caller never classifies again.
+/// # Errors
+/// Returns no output and the decline diagnostics when the package-MIR link or
+/// the CLIF lowering fails.
+#[cfg(feature = "mir-clif")]
+#[must_use]
+pub fn compile_package_clif(
+    config: &Config,
+    input: &Path,
+    mir_seams: &crate::mir::MirSeams,
+) -> CompileResult {
+    let emitted =
+        crate::mir::with_interpreted_lowered_package_mir(config, input, mir_seams, |lowered| {
+            radix_mir_clif::emit_object(&lowered.validated, &lowered.interner).map_err(|error| {
+                vec![
+                    crate::package_diagnostic_error(error.message)
+                        .with_file(input.display().to_string())
+                        .with_arg("issue", error.category)
+                        .with_arg("shape", error.shape),
+                ]
+            })
+        });
+    match emitted {
+        Ok(Ok(object)) => CompileResult {
+            output: Some(radix_module::Output::ClifObject(
+                radix_module::ClifObjectOutput {
+                    bytes: object.bytes,
+                },
+            )),
+            diagnostics: Vec::new(),
+        },
+        Ok(Err(diagnostics)) | Err(diagnostics) => compile_failure(diagnostics).compile_result,
+    }
+}
+
 fn compile_package_wasm(package: AnalyzedProgram, input: &Path) -> PackageCompileResult {
     #[cfg(not(feature = "mir-wasm"))]
     return compile_failure(vec![
