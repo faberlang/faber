@@ -6165,3 +6165,21 @@ fn option_chain_call_method_callee_arity_still_checked() {
         "a method call through ?. must still require its non-receiver arguments, got: {errors:?}"
     );
 }
+
+#[test]
+fn dependent_parameter_axes_use_exact_actual_argument_witnesses() {
+    for try_call in [false, true] {
+        let mut types = TypeTable::new();
+        let mut program = runtime_shape_call_program(&mut types, false, 0, None, try_call);
+        assert!(
+            validate(&program, &types)
+                .iter()
+                .any(|message| message.contains("call argument type mismatch"))
+        );
+        program.functions[0].locals[1].ty = program.functions[0].locals[0].ty;
+        assert!(
+            validate(&program, &types).is_empty(),
+            "equal actual axes prove the dependent parameter without a runtime guard"
+        );
+    }
+}

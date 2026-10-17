@@ -991,3 +991,38 @@ main {{}}
         assert_eq!(row.admitted, admitted, "{:?}", row.failures);
     }
 }
+
+#[test]
+fn scalar_clamps_preserve_portable_sampler_coordinate_bounds() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn sample<size H, size W>(tensor<f32, [H, W]> grid, i32 x, i32 y, i32 width, i32 height, i32 step) → f32 {
+    let i32 cx ← (x ⤒ 0) ⤓ ((width ⤒ 1) - 1)
+    let i32 cy ← (y ⤒ 0) ⤓ ((height ⤒ 1) - 1)
+    if step ≻ 0 {
+        let i32 qx ← cx / step
+        let i32 qy ← cy / step
+        let i32 x0 ← qx ⤓ ((width ⤒ 2) - 2)
+        let i32 y0 ← qy ⤓ ((height ⤒ 2) - 2)
+        return grid[[y0 + 1, x0 + 1]]
+    }
+    return 0.0
+}
+@ kernel
+@ public
+fn bad(i32 x) → i32 {
+    return ((x ⤒ 0) + 1) * 3
+}
+",
+    );
+    let sample = target_row(&fixture, "sample", Target::MirMetal);
+    assert!(sample.admitted, "{:?}", sample.failures);
+    assert!(sample.failures.is_empty());
+    let bad = target_row(&fixture, "bad", Target::MirMetal);
+    assert!(bad.failures.iter().any(|failure| matches!(
+        failure,
+        KernelRequirementFailure::IntermediateOutOfRange { .. }
+    )));
+}

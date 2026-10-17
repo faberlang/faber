@@ -588,7 +588,9 @@ impl Validator<'_, '_> {
                 ) {
                     continue;
                 }
-                if self.call_argument_matches_own_axes(
+                if self.call_argument_matches_parameter_axes(
+                    scope,
+                    args,
                     expected.ty,
                     arg_ty,
                     u32::try_from(index).unwrap_or(u32::MAX),
@@ -658,9 +660,12 @@ impl Validator<'_, '_> {
     /// axis (size-type Z3 law 3), so the formal dimension is the argument's
     /// extent by construction: it is a wildcard bound at run time and every
     /// argument of the same element type and rank satisfies it. Axes that are
-    /// not the parameter's own formal axis must still be equal.
-    fn call_argument_matches_own_axes(
+    /// not the parameter's own formal axis must equal the corresponding
+    /// actual argument axis. This is a static witness, not a runtime wildcard.
+    fn call_argument_matches_parameter_axes(
         &self,
+        scope: &FunctionScope<'_, '_>,
+        args: &[MirOperand],
         expected: MirType,
         actual: MirType,
         argument: u32,
@@ -690,7 +695,24 @@ impl Validator<'_, '_> {
                 IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
                     parameter,
                     axis: formal_axis,
-                }) if *parameter == argument && *formal_axis as usize == axis => wildcard = true,
+                }) => {
+                    if *parameter == argument && *formal_axis as usize == axis {
+                        wildcard = true;
+                        continue;
+                    }
+                    let Some(carrier) = args
+                        .get(*parameter as usize)
+                        .and_then(|operand| direct_operand_type(scope, operand))
+                        .and_then(|ty| tensor_type_dims(types, ty.semantic_id()))
+                        .and_then(|(_, dims)| dims.get(*formal_axis as usize).copied())
+                    else {
+                        return false;
+                    };
+                    if !types.index_equals(carrier, *actual_dim) {
+                        return false;
+                    }
+                    wildcard = true;
+                }
                 _ => return false,
             }
         }

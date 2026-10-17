@@ -1443,6 +1443,25 @@ impl BodyFacts<'_> {
                     .map(|argument| self.evaluate(&argument.expr))
                     .collect();
                 let method_name = self.interner.resolve(*method);
+                if is_integer_value_type(receiver.ty, self.types)
+                    && let Some(AbstractRange(Some(right))) = argument_ranges.first()
+                    && let AbstractRange(Some(left)) = &receiver_range
+                {
+                    let range = match method_name {
+                        "minimus" => Some(KernelValueRange {
+                            minimum: minimum(left.minimum.clone(), right.minimum.clone()),
+                            maximum: minimum(left.maximum.clone(), right.maximum.clone()),
+                        }),
+                        "maximus" => Some(KernelValueRange {
+                            minimum: maximum(left.minimum.clone(), right.minimum.clone()),
+                            maximum: maximum(left.maximum.clone(), right.maximum.clone()),
+                        }),
+                        _ => None,
+                    };
+                    if let Some(range) = range {
+                        return AbstractRange(Some(range));
+                    }
+                }
                 if matches!(
                     self.tensor_edge_policies.calls.get(&expr.id),
                     Some(ResolvedTensorEdgePolicy::Deferred { .. })
