@@ -608,6 +608,8 @@ pub struct RunnerRunOutcome {
     pub return_value: Option<Value>,
 }
 
+type RegexLiteralMap = FxHashMap<(Symbol, Option<Symbol>), Rc<RegexProgram>>;
+
 pub(crate) struct Runner<'a, H: Host + ?Sized> {
     program: &'a MirProgram,
     function_index: MirFunctionIndex,
@@ -645,7 +647,7 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Next gradient handle id (monotonic, never reused).
     next_gradient_handle: u64,
     /// Compiled regex literals, keyed by their interned pattern and flags.
-    regex_literals: RefCell<FxHashMap<(Symbol, Option<Symbol>), Rc<RegexProgram>>>,
+    regex_literals: RefCell<RegexLiteralMap>,
     /// Decoded `textus` literals, keyed by interned source symbol.
     textus_literals: RefCell<FxHashMap<Symbol, String>>,
     /// Owned ASCII literals, keyed by interned source symbol.

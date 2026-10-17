@@ -2175,7 +2175,7 @@ impl Emitter<'_> {
         if let Some(&index) = self.text_literal_index.get(&source) {
             return Ok(format!("faber_L{index}.s"));
         }
-        let bytes = decoded.as_bytes().len() as i64;
+        let bytes = decoded.len() as i64;
         let cps = decoded.chars().count() as i64;
         let index = self.text_literals.len();
         self.text_literals.push((source.clone(), bytes, cps));

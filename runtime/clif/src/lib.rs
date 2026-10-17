@@ -604,21 +604,19 @@ fn map_index_insert(map: &mut Map, position: usize) {
 }
 
 fn map_find(map: &Map, tag: i32, bits: i64) -> Option<usize> {
-    if !map.slots.is_empty() {
-        if let Some(hash) = map_key_hash(tag, bits) {
-            let mut slot = hash as usize & map.index_mask;
-            loop {
-                let encoded = map.slots[slot];
-                if encoded == 0 {
-                    return None;
-                }
-                let position = encoded - 1;
-                let (key_tag, key_bits, _, _) = map.entries[position];
-                if key_tag == tag && element_equal(tag, key_bits, bits) {
-                    return Some(position);
-                }
-                slot = (slot + 1) & map.index_mask;
+    if let Some(hash) = map_key_hash(tag, bits).filter(|_| !map.slots.is_empty()) {
+        let mut slot = hash as usize & map.index_mask;
+        loop {
+            let encoded = map.slots[slot];
+            if encoded == 0 {
+                return None;
             }
+            let position = encoded - 1;
+            let (key_tag, key_bits, _, _) = map.entries[position];
+            if key_tag == tag && element_equal(tag, key_bits, bits) {
+                return Some(position);
+            }
+            slot = (slot + 1) & map.index_mask;
         }
     }
     map.entries
