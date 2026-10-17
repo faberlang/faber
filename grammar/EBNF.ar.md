@@ -429,7 +429,7 @@ call_marker ::= 'عن' | 'متغير' | 'ملك' | 'نسخة'
 # [209] template_argument
 template_argument ::= 'انشر'? IDENTIFIER ':' expression
 # [210] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'خال' | '∞' | 'nan'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'غائب' | '∞' | 'nan'
 # [211] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [212] primary
@@ -982,7 +982,7 @@ productions. It is not a second keyword authority.
 | Diagnostics | `اعرض` | note |
 | Annotation | `نواة` | kernel annotation |
 | JSON | `null` | JSON null |
-| Literals | `خال` | null |
+| Literals | `غائب` | null |
 | Expression | `العدّ` | count reduction operator (en `count`) |
 | Testing | `أهمل` | skip |
 | Params | `الكل` | all reduction operator / glob |
@@ -2385,11 +2385,11 @@ test on the value. They never convert and never compare values; a value spelling
 on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
 pointing at the equality family. The null type is the one type spelling that also
 names a literal slot: `x هو nihil` tests the null *type*, while the null *value*
-is `خال` (`null` in the English reader).
+is `غائب` (`null` in the English reader).
 Use `≡` / `≢` for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr ≡ صواب`,
-`expr ≡ خطأ`, `expr ≡ خال`, `expr هو nihil` (the null *type* test),
+`expr ≡ خطأ`, `expr ≡ غائب`, `expr هو nihil` (the null *type* test),
 `expr ≺ 0`, or `expr ≻ 0`.
 
 The ASCII spellings `<` and `>` are not comparison operators — they are generic delimiters only. The parser rejects one in comparison position with `PARSE030 comparison_ascii_retired` (operator ruling TZ-2); write `≺` and `≻`.
