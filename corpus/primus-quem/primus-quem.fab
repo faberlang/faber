@@ -5,7 +5,7 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "binding_decl", "fixum_decl", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "first_match_expr", "incipit_stmt", "optional_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = true
-summary = "Dedicated total first-match expression: first live element of a source satisfying the owned ubi predicate, nihil for no-match and empty sources."
+summary = "Dedicated total first-match expression: first live element of a source satisfying the owned ubi predicate, `nulla` for no-match and empty sources."
 syntax = "primus_quem(<source>, ubi <binder> { <predicate> })"
 aliases = ["primus quem"]
 related = ["nihil"]
@@ -23,9 +23,9 @@ locale = "la"
 #   • total evaluation — the predicate is evaluated for EVERY candidate lane
 #     (post-match lanes included); selection is dataflow first-live, never an
 #     early exit
-#   • `T ∪ nihil` — no-match and empty sources return `nihil`, never an error;
+#   • `T ∪ nihil` — no-match and empty sources return `nulla`, never an error;
 #     a predicate ERROR rides the error channel and is never converted to
-#     `nihil`
+#     `nulla`
 #   • first-live — later live lanes never overwrite the first stored match
 #     ([1.0, 5.0, 3.0] over `> 2.0` picks 5.0, not 3.0)
 #   • declines — unbounded sources fail closed (SEM059
@@ -46,12 +46,12 @@ functio elige_litteram() → fractus ∪ nihil {
     redde primus_quem([1.0, -2.0, 3.0], ubi x { x ≻ 0.0 })
 }
 
-# No-match — no live lane yields nihil, never an error.
+# No-match — no live lane yields `nulla`, never an error.
 functio elige_nullum() → fractus ∪ nihil {
     redde primus_quem([1.0, 2.0], ubi x { x ≻ 9.0 })
 }
 
-# Empty source — a statically zero-length array yields nihil.
+# Empty source — a statically zero-length array yields `nulla`.
 functio elige_vacuum(lista<f32> xs) → fractus ∪ nihil {
     redde primus_quem(xs, ubi x { x ≻ 0.0 })
 }
