@@ -610,3 +610,50 @@ fn load_target_bindings_accepts_a_target_spelling_table() {
         super::load_target_bindings(root.path(), "wgsl-text").expect("a known target table loads");
     assert!(bindings.functions.is_empty() && bindings.types.is_empty());
 }
+
+const WGSL_STAGE_SOURCE: &str = "@ public
+@ annotatio { target = fn }
+class Fragment {
+}
+
+@ public
+@ annotatio { target = field }
+class Position {
+}
+";
+
+#[test]
+fn wgsl_annotation_bindings_verify_and_load() {
+    let root = wgsl_package(
+        WGSL_STAGE_SOURCE,
+        r#"[annotations."fixture:api.Fragment"]
+symbol = "fragment"
+
+[annotations."fixture:api.Position"]
+symbol = "builtin(position)"
+"#,
+    );
+
+    let result = verify_library_bindings(root.path(), WGSL_TARGET).expect("wgsl annotation bindings verify");
+    assert_eq!(result.bindings, 0);
+    let loaded = super::load_target_bindings(root.path(), WGSL_TARGET).expect("load bindings");
+    assert_eq!(loaded.annotations.get("fixture:api.Fragment").map(String::as_str), Some("fragment"));
+    assert_eq!(
+        loaded.annotations.get("fixture:api.Position").map(String::as_str),
+        Some("builtin(position)")
+    );
+}
+
+#[test]
+fn wgsl_annotation_binding_naming_no_declared_contract_is_rejected() {
+    let root = wgsl_package(
+        WGSL_STAGE_SOURCE,
+        r#"[annotations."fixture:api.Absens"]
+symbol = "fragment"
+"#,
+    );
+
+    let diagnostics =
+        verify_library_bindings(root.path(), WGSL_TARGET).expect_err("unknown annotation rejected");
+    assert!(has_issue(&diagnostics, "binding_unknown_annotation"));
+}
