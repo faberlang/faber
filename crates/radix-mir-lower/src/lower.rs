@@ -1863,7 +1863,8 @@ impl<'a> MirLowerer<'a> {
             .unwrap_or_default();
         let formal_parameter_offset = u32::from(matches!(&config.target, CallableLoweringTarget::Method { .. }));
         let callable = config.target.hir_function();
-        let shader_stage = shader_stage_for_function(callable);
+        let shader_stage =
+            shader_stage_for_function(callable).or_else(|| self.options.stage_bindings.get(&config.def_id).copied());
         let mut builder = FunctionBuilder::for_function(
             self.types,
             config.error_ty,
