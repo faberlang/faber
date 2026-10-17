@@ -779,6 +779,7 @@ fn external_target(target: &str) -> Option<radix::module::Target> {
         "wasm" => Target::MirWasm,
         "llvm" => Target::MirLlvm,
         "clif" => Target::MirClif,
+        "c" => Target::HirC,
         "sexp" => Target::MirSexp,
         _ => return None,
     })
