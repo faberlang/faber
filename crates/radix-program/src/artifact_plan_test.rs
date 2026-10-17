@@ -37,6 +37,17 @@ fn plan_package_rust_is_supported() {
 }
 
 #[test]
+fn artifact_plan_supports_clif() {
+    let plan = plan_package(&empty_package("g4-plan-clif"), Target::MirClif);
+    assert!(
+        plan.supported,
+        "clif plan must be supported: {:?}",
+        plan.rejection
+    );
+    assert_eq!(plan.target, "clif");
+}
+
+#[test]
 fn plan_package_rust_is_deterministic() {
     let package = empty_package("g4-plan-det");
     let a = plan_package(&package, Target::HirRust);

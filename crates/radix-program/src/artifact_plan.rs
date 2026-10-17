@@ -189,6 +189,10 @@ pub fn plan_package(package: &AnalyzedProgram, target: Target) -> ArtifactPlan {
             plan_wasm_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
             (true, None, generated_entry_id(&nodes))
         }
+        Target::MirClif => {
+            plan_clif_artifacts(package, &package_id, &mut nodes, &mut edges, &mut seen_ids);
+            (true, None, generated_entry_id(&nodes))
+        }
         other => (
             false,
             Some(format!(
@@ -990,6 +994,48 @@ fn plan_wasm_artifacts(
             kind: DependencyKind::SourceImport,
         });
     }
+}
+
+fn plan_clif_artifacts(
+    package: &AnalyzedProgram,
+    package_id: &PackageId,
+    nodes: &mut Vec<ArtifactNode>,
+    edges: &mut Vec<DependencyEdge>,
+    seen: &mut BTreeSet<String>,
+) {
+    // CLIF packages land as one native object under target/faber/clif, with no
+    // generated project: the entry object is the whole artifact set.
+    let Some(entry) = package.nodes.values().find(|unit| unit.is_entry) else {
+        return;
+    };
+    let module = ModuleId {
+        package: package_id.clone(),
+        segments: entry.module_segments.clone(),
+    };
+    let source_id = format!("source:{}", module_key(&module));
+    let object_id = format!("clif:entry:{}", package_id.name);
+    push_unique_node(
+        nodes,
+        seen,
+        ArtifactNode {
+            id: object_id.clone(),
+            kind: ArtifactKind::GeneratedEntry,
+            target: Some("clif"),
+            path: package
+                .spec
+                .package_root
+                .join("target")
+                .join("faber")
+                .join("clif")
+                .join(format!("{}.o", sanitize_crate_name(&package_id.name))),
+            depends_on: vec![source_id.clone()],
+        },
+    );
+    edges.push(DependencyEdge {
+        from: object_id,
+        to: source_id,
+        kind: DependencyKind::SourceImport,
+    });
 }
 
 #[cfg(test)]
