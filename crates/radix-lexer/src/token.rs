@@ -308,6 +308,7 @@ pub enum TokenKind {
     BitwiseShl, // ⇐
     BitwiseShr, // ⇒
     Transfer,   // ⇇ U+21C7 copy-into operator (never a keyword)
+    SinkInto,   // ⇜ U+21DC sink-into operator (never a keyword)
     Bang,       // !
     Question,   // ?
 

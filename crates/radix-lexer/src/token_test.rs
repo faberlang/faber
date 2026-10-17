@@ -82,6 +82,7 @@ fn conversio_assign_glyph_pins_exact_scalar_mapping() {
     assert_ne!('\u{21A4}', '\u{21A6}'); // ↦ explicit conversion
     assert_ne!('\u{21A4}', '\u{21E5}'); // ⇥ inline recovery
     assert_ne!('\u{21A4}', '\u{21C7}'); // ⇇ copy-into
+    assert_ne!('\u{21DC}', '\u{21C7}'); // ⇜ sink-into vs ⇇ copy-into
 }
 
 #[test]

@@ -1318,8 +1318,8 @@ fn bare_cr_in_ascii_literal_rejected() {
 // These tests encode the U+21A4 lexer contract before the token exists (U3).
 // The positive assertions FAIL today with the expected missing-feature reason:
 // the glyph is unknown and lexes as `unexpected_character`. The confusion
-// tests pin scalar distinctness against the neighbor glyphs ← ↦ ⇥ ⇇ and must
-// stay green (U+21C7 is the copy-into operator).
+// tests pin scalar distinctness against the neighbor glyphs ← ↦ ⇥ ⇇ ⇜ and must
+// stay green (U+21C7 is copy-into; U+21DC is sink-into).
 
 #[test]
 fn lexes_conversio_assign_glyph_as_dedicated_token() {
@@ -2309,6 +2309,26 @@ mod line_start_comment {
 }
 
 // =============================================================================
+// U+21DC — exact sink-into operator token
+// =============================================================================
+
+#[test]
+fn sink_into_token_scan() {
+    let result = lex("output ⇜ \"salve\"");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(result.tokens.len(), 4);
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+    assert_eq!(result.tokens[1].kind, TokenKind::SinkInto);
+    assert!(matches!(result.tokens[2].kind, TokenKind::String(_)));
+    assert_eq!(result.tokens[3].kind, TokenKind::Eof);
+    assert_eq!(result.tokens[0].span, crate::Span::new(0, 6));
+    assert_eq!(result.tokens[1].span, crate::Span::new(7, 10));
+    assert_eq!(result.tokens[2].span, crate::Span::new(11, 18));
+    assert_eq!(result.tokens[3].span, crate::Span::new(18, 18));
+    assert_eq!('\u{21DC}', '⇜');
+}
+
+// =============================================================================
 // EOT-3L — U+21C7 exact-output transfer token
 // =============================================================================
 // U+21C7 (`⇇`) is one exact operator token, never a keyword. The scanner maps
@@ -2434,7 +2454,7 @@ fn former_await_assign_glyph_is_rejected() {
 
 #[test]
 fn await_assign_glyph_is_distinct_from_neighbor_arrows() {
-    let result = lex("↢ ← ↤ ⇥ ⇇ → ↦");
+    let result = lex("↢ ← ↤ ⇥ ⇇ ⇜ → ↦");
     assert!(result.errors.is_empty(), "{:?}", result.errors);
     assert_eq!(
         result
@@ -2448,6 +2468,7 @@ fn await_assign_glyph_is_distinct_from_neighbor_arrows() {
             TokenKind::ConversioAssign,
             TokenKind::ExitArrow,
             TokenKind::Transfer,
+            TokenKind::SinkInto,
             TokenKind::Arrow,
             TokenKind::Conversio,
             TokenKind::Eof,

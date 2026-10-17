@@ -322,6 +322,7 @@ impl<'a> Lexer<'a> {
             '⇐' => TokenKind::BitwiseShl,
             '⇒' => TokenKind::BitwiseShr,
             '⇇' => TokenKind::Transfer,
+            '⇜' => TokenKind::SinkInto,
             '↦' => TokenKind::Conversio,
             '↤' => TokenKind::ConversioAssign,
             '↢' => TokenKind::AwaitAssign,
