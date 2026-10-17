@@ -1,0 +1,8 @@
++++
+locale = "en"
++++
+import from "norma:random" random
+main {
+    print random.random_int(5, 1)
+    print random.random_bytes(-1).length()
+}
