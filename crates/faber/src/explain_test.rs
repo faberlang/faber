@@ -267,3 +267,14 @@ fn lookup_nonexistent_term_returns_none() {
     assert!(registry.lookup("no_such_term_xyzzy").is_none());
     assert!(registry.lookup("").is_none());
 }
+
+#[test]
+fn explain_is_alias_resolves_and_est_wording() {
+    let registry = disk_registry();
+    assert!(
+        matches!(registry.lookup("is"), Some(Lookup::Alias { entry, .. }) if entry.term == "est")
+    );
+    let est = render_plain(&registry.lookup("est").expect("est resolves"));
+    assert!(est.contains("is none"));
+    assert!(!est.contains("est null"));
+}
