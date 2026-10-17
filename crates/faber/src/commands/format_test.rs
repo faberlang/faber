@@ -1401,7 +1401,7 @@ fn format_usage_errors_exit_two() {
 
 // ── membership-glyph 3a: `∈` / `∉` survive the format round trip ──────────
 
-const MEMBERSHIP_EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    let list<int> xs ← [1, 2]\n    if 1 ∈ xs {\n        print \"in\"\n    }\n    if 3 ∉ xs {\n        print \"out\"\n    }\n    if 5 ∉ 0‥10 {\n        print \"outside\"\n    }\n}\n";
+const MEMBERSHIP_EN_SOURCE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    let list<int> xs ← [1, 2]\n    if 1 ∈ xs {\n        print \"in\"\n    }\n    if 3 ∉ xs {\n        print \"out\"\n    }\n    if 5 ∉ 0 ‥ 10 {\n        print \"outside\"\n    }\n}\n";
 
 #[test]
 fn format_stdin_keeps_membership_glyphs_at_the_source_locale() {
@@ -1413,7 +1413,7 @@ fn format_stdin_keeps_membership_glyphs_at_the_source_locale() {
     assert!(body.contains("if 1 ∈ xs {"), "∈ must be kept:\n{stdout}");
     assert!(body.contains("if 3 ∉ xs {"), "∉ must be kept:\n{stdout}");
     assert!(
-        body.contains("if 5 ∉ 0‥10 {"),
+        body.contains("if 5 ∉ 0 ‥ 10 {"),
         "range ∉ must be kept:\n{stdout}"
     );
     assert!(
@@ -1445,7 +1445,7 @@ fn convert_keeps_membership_glyphs_across_locales() {
     assert!(success, "{stderr}");
     assert!(stdout.contains("si 1 ∈ xs {"), "{stdout}");
     assert!(stdout.contains("si 3 ∉ xs {"), "{stdout}");
-    assert!(stdout.contains("si 5 ∉ 0‥10 {"), "{stdout}");
+    assert!(stdout.contains("si 5 ∉ 0 ‥ 10 {"), "{stdout}");
 }
 
 fn run_faber_capture_stdout(args: &[&str], stdin: &str) -> (String, String, bool) {
