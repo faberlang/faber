@@ -3,7 +3,8 @@
 //! The spec is checked against the left side's type: numbers take the full
 //! pattern, `textus` takes fill/align/width/truncate, `instans` takes only the
 //! named presets. `¶` is closed to built-in types; `d64` takes the float
-//! parts except the radix and scientific kinds (fork F4, ruled).
+//! parts, the radix kinds stay refused and `e` is admitted (operator ruling
+//! 2026-10-17).
 
 use crate::test_support;
 use radix_diagnostics::DiagnosticArg;
@@ -113,13 +114,13 @@ fn bivalens_is_not_a_format_subject() {
 #[test]
 fn decimal_takes_the_float_parts() {
     test_support::assert_accepts(
-        "functio f(d64 d) → textus { redde (d ¶ \".2\") + (d ¶ \"*^+12.3\") + (d ¶ \"08\") + (d ¶ \"\") }",
+        "functio f(d64 d) → textus { redde (d ¶ \".2\") + (d ¶ \"*^+12.3\") + (d ¶ \"08\") + (d ¶ \"\") + (d ¶ \"e\") + (d ¶ \".3e\") }",
     );
 }
 
 #[test]
 fn decimal_rejects_every_kind_by_part() {
-    for kind in ["x", "b", "o", "e"] {
+    for kind in ["x", "b", "o"] {
         let source = format!("functio f(d64 d) → textus {{ redde d ¶ \"{kind}\" }}");
         test_support::assert_rejects_with_args(
             &source,
