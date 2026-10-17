@@ -117,3 +117,19 @@ fn desinit_rejects_arguments() {
         .expect_err("arity");
     assert_eq!(error.kind(), crate::LeafErrorKind::InvalidArgument);
 }
+
+#[test]
+fn tty_size_is_zero_zero_when_stdout_is_not_a_terminal() {
+    let reply = serve("consolum:metire", &[])
+        .expect("route")
+        .expect("measure");
+    assert_eq!(reply, Reply::List(vec![Reply::Int(0), Reply::Int(0)]));
+}
+
+#[test]
+fn tty_size_rejects_arguments() {
+    let error = serve("consolum:metire", &[Arg::Int(1)])
+        .expect("route")
+        .expect_err("arity");
+    assert_eq!(error.kind(), crate::LeafErrorKind::InvalidArgument);
+}
