@@ -1422,8 +1422,14 @@ fn sectio_axis0_shape(
         return None;
     }
     let resolved = checker.resolve_index(input_shape);
-    let IndexExpr::Tuple(dims) = checker.types.get_index(resolved).clone() else {
-        return None;
+    let dims = match checker.types.get_index(resolved).clone() {
+        IndexExpr::Tuple(dims) => dims,
+        // WHY: axis reductions keep the surviving dim as the result shape
+        // itself (`reduction.rs` returns `dims[only]`), so a reduced tensor's
+        // rank-1 shape is a `Literal` rather than a singleton tuple. Read it as
+        // the one-element dim list it means, as the element-count solver does.
+        IndexExpr::Literal(_) => vec![resolved],
+        _ => return None,
     };
     if dims.is_empty() {
         return None;
