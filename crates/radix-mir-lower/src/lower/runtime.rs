@@ -794,11 +794,16 @@ impl FunctionBuilder<'_> {
 
         let mut lowered_receiver = self.lower_expr_value(receiver)?;
         let expr_ty = self.expr_ty(expr)?;
-        // A bounded textus slices as its initialized prefix: widen it to the
-        // unbounded carrier first (D7), the same copy `↦ textus` performs.
-        if op == MirCollectionOp::Slice
+        // A bounded cord (`ascii<N>` / `textus<N>`) receiver widens to the
+        // unbounded `textus` carrier before a text-receiver runtime call, the
+        // same copy `↦ textus` performs (D7). The checker already resolves
+        // these intrinsics for cord receivers; the MIR rows require `textus`.
+        if is_text_receiver_op(op)
             && let Some(source_ty) = self.expr_ty(receiver)
-            && matches!(self.normalized_type(source_ty.semantic_id()), Type::BoundedTextus { .. })
+            && matches!(
+                self.normalized_type(source_ty.semantic_id()),
+                Type::BoundedTextus { .. } | Type::BoundedAscii { .. }
+            )
         {
             let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
             lowered_receiver = self.runtime_call_value(
@@ -5686,6 +5691,25 @@ fn vector_swizzle_lane(ch: char) -> Option<u8> {
         'w' => Some(3),
         _ => None,
     }
+}
+
+/// Ops whose MIR validator rows require a `textus` receiver. A bounded cord
+/// receiver must widen to the unbounded carrier before the runtime call.
+fn is_text_receiver_op(op: MirCollectionOp) -> bool {
+    matches!(
+        op,
+        MirCollectionOp::Slice
+            | MirCollectionOp::Index
+            | MirCollectionOp::Contains
+            | MirCollectionOp::StartsWith
+            | MirCollectionOp::EndsWith
+            | MirCollectionOp::Split
+            | MirCollectionOp::Uppercase
+            | MirCollectionOp::Lowercase
+            | MirCollectionOp::Trim
+            | MirCollectionOp::Replace
+            | MirCollectionOp::TextEscape
+    )
 }
 
 /// Position of the structural shape argument for the tensor operations whose

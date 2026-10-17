@@ -48,6 +48,10 @@ mod itera_destructure_tests;
 mod bounded_itera_test;
 
 #[cfg(test)]
+#[path = "bounded_cord_methods_test.rs"]
+mod bounded_cord_methods_test;
+
+#[cfg(test)]
 #[path = "affine_destination_test.rs"]
 mod affine_destination_test;
 
