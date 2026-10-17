@@ -10,25 +10,25 @@ related = ["∪", "sponte", "nihil"]
 locale = "en"
 +++
 # =============================================================================
-# nihil — Null literal and nullable union bindings.
+# nihil — The null value and nullable union bindings.
 # =============================================================================
 #
 # What this teaches:
-#   • the `nihil` literal — represents absence of a value (null)
-#   • nullable union types with `∪` — `T ∪ nihil` for values that may be absent
-#   • null checks with `est nihil` and `non est nihil`
+#   • the `null` value (la `nulla`) — the sole value of the `none` type (la `nihil`)
+#   • nullable union types with `∪` — `T ∪ none` (la `T ∪ nihil`) for values that may be absent
+#   • null checks with `is none` and `not is none` (la `est nihil` / `non est nihil`)
 #
 # Common mistakes:
-#   • Using nihil without declaring the type as T ∪ nihil — nihil requires a nullable union type.
+#   • Storing `null` without declaring the type as `T ∪ none` — the null value requires a nullable union type.
 #
 # See also: ∪, sponte, nihil
 # =============================================================================
 
-# literalia/nihil — nihil literal and T ∪ nihil
+# literalia/nihil — the null value and T ∪ none
 #
 # GRAMMAR:
-#   literal :← 'nihil'
-#   unionType :← type '∪' 'nihil'
+#   literal :← 'null'
+#   unionType :← type '∪' 'none'
 #
 # EXPECTED OUTPUT:
 #   nihil, verum, 42
