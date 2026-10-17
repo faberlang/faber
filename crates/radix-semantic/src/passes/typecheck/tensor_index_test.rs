@@ -1088,3 +1088,33 @@ nota "generic shape keeps the unbounded list"
 "#,
     );
 }
+
+#[test]
+fn tensor_sectio_on_reduction_output_literal_shape_constrains_result() {
+    rejects_with_issue(
+        r"incipit {
+  sit tensor<f32, [3, 2]> grid ← vacua
+  sit tensor<f32, [3]> reduced ← grid.summa(axis 1)
+  sit tensor<f32, [3]> sliced ← reduced.sectio(0, 2)
+  nota sliced
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn tensor_sectio_on_inferred_reduction_output_slices_the_kept_axis() {
+    // WHY: `summa(axis 1)` over `[3, 2]` keeps axis 0 as the result shape
+    // itself (a rank-1 `Literal`, not a singleton tuple). `sectio(0, 2)` must
+    // read that shape as one dim and constrain the result to `[2]`; before the
+    // literal arm existed the result shape stayed unbound and this correct
+    // slice was rejected as uninferable.
+    accepts(
+        r"incipit {
+  sit tensor<f32, [3, 2]> grid ← vacua
+  sit _ reduced ← grid.summa(axis 1)
+  sit tensor<f32, [2]> sliced ← reduced.sectio(0, 2)
+  nota sliced
+}",
+    );
+}
