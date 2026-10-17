@@ -5,7 +5,7 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "si_stmt", "call_expr", "call_suffix", "argument_list", "argument", "vel_expr", "vel_rhs", "proba_stmt", "adfirma_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "logic"
 canonical = true
-summary = "Provides a default when the left side is null."
+summary = "Provides a default when the left side holds `null`."
 syntax = "<expression> vel <expression>"
 aliases = ["nullish coalescing"]
 related = ["nihil"]
@@ -34,16 +34,16 @@ test "vel chains to the first non-nihil value" {
     assert primum ≡ "inventum"
 }
 # =============================================================================
-# vel — Provides a default when the left side is null.
+# vel — Provides a default when the left side holds `null`.
 # =============================================================================
 #
 # What this teaches:
-#   • Nullish coalescing — `vel` supplies a fallback when the left operand is `nihil`
-#   • Chaining — multiple `vel` expressions fall through until the first non-`nihil` value
-#   • Short-circuit — like `et`/`aut`, the right operand runs only when the left is `nihil`
+#   • Nullish coalescing — `vel` supplies a fallback when the left operand holds `null` (the `none` type's value)
+#   • Chaining — multiple `vel` expressions fall through until the first non-`null` value
+#   • Short-circuit — like `et`/`aut`, the right operand runs only when the left holds `null`
 #
 # Common mistakes:
-#   • confusing vel (nullish coalescing, checks nihil only) with aut (logical OR), or using vel for conversio recovery instead of ⇥
+#   • confusing vel (nullish coalescing, checks for `null` only) with aut (logical OR), or using vel for conversio recovery instead of ⇥
 #
 # See also: nihil
 # =============================================================================
