@@ -545,7 +545,7 @@ Grounded in `EBNF.md` and probes against the built binary.
 
 `call 'route'` (la `ad`) is an expression that yields a `channel` (la `sermo`) conversation handle. The route is an `ascii` string. Optional opener `(expr)` is request data.
 
-Legacy typed `call "route" (args) → T { }` and statement-level `send`/`recv` (la `meus`/`tuus`) blocks are parse errors. Use postfix `↦ T` or `s.send<T>()` / `s.recv<T>()` on the handle.
+Legacy typed `call "route" (args) → T { }` and statement-level `send`/`recv` (la `meus`/`tuus`) blocks are parse errors. Use postfix `↦ T` or `s.send<T>()` / `s.recv<T>()` on the handle. View methods in en: `finish` (la `fini`), `get` (la `accipe`), `drain` (la `exhauri`), `cursor`; `da` is unchanged. Latin spellings are refused in en files.
 
 `channel<O, R>` carries its types: `O` each item sent, `R` each item framed back; bare
 `channel` means `channel<value, value>`. Types `frame` (la `scrinium`; opaque frame) and

@@ -136,6 +136,9 @@ fn en_kernel_annotation_identity_is_sealed() {
 fn en_annotation_contract_family_spelling_is_sealed() {
     assert!(parse_en("@ annotation { target = fn }\nclass Meta { }\n").success());
     assert!(parse_en("@ annotation\nclass Meta { }\n").success());
-    assert_wrong_locale_annotation("@ annotatio { target = fn }\nclass Meta { }\n", "annotation");
+    assert_wrong_locale_annotation(
+        "@ annotatio { target = fn }\nclass Meta { }\n",
+        "annotation",
+    );
     assert_wrong_locale_annotation("@ annotatio\nclass Meta { }\n", "annotation");
 }

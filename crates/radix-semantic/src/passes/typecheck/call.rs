@@ -780,7 +780,16 @@ impl TypeChecker<'_> {
         {
             *name = canonical_name;
         }
-        self.canonicalize_sermo_view_method(receiver_ty, name);
+        if self.canonicalize_sermo_view_method(receiver_ty, name)
+            || self.canonicalize_directional_view_method(receiver_ty, name)
+        {
+            // WHY: under a non-la pack the canonical Latin spelling of a
+            // channel view method is a wrong-locale miss, the same compile
+            // error an ordinary intrinsic gets (no Latin fallback).
+            self.typecheck_call_arg_exprs(args);
+            self.undefined_member("unknown_method", receiver.span);
+            return self.error_type;
+        }
         let method_name = self.method_display_name(*name);
         let method_name = if let Some(canonical) = method_name.strip_prefix("__faber_glyph_round:")
         {
@@ -1374,24 +1383,67 @@ impl TypeChecker<'_> {
     /// Rewrite a pack spelling of a sermo view method (`s.recv<T>()` under
     /// en) to its canonical Latin symbol (`tuus`) so lint, MIR lowering and
     /// every backend keep matching canonical names. The view methods share
-    /// the directional view type rows (DECISIONS D6.16). The canonical Latin
-    /// spelling stays accepted, as Latin type names are under every pack.
-    fn canonicalize_sermo_view_method(&self, receiver_ty: TypeId, name: &mut Symbol) {
+    /// the directional view type rows (DECISIONS D6.16).
+    ///
+    /// Returns `true` when the method is the canonical Latin spelling under a
+    /// non-`la` pack that declares its own surface for the view: a wrong-locale
+    /// miss the caller reports as `unknown_method`.
+    fn canonicalize_sermo_view_method(&self, receiver_ty: TypeId, name: &mut Symbol) -> bool {
         let (Some(pack), Some(interner)) = (self.locale_pack, self.interner) else {
-            return;
-        };
-        let Some(crate::locale::TypeBindingKind::Frame(
-            view @ (crate::locale::FrameTypeKind::Meus | crate::locale::FrameTypeKind::Tuus),
-        )) = pack.type_binding_kind(interner.resolve(*name))
-        else {
-            return;
+            return false;
         };
         if !self.is_sermo_receiver(receiver_ty) {
-            return;
+            return false;
         }
-        if let Some(canonical) = interner.lookup(view.latin()) {
-            *name = canonical;
+        let spelling = interner.resolve(*name);
+        if let Some(crate::locale::TypeBindingKind::Frame(
+            view @ (crate::locale::FrameTypeKind::Meus | crate::locale::FrameTypeKind::Tuus),
+        )) = pack.type_binding_kind(spelling)
+        {
+            if let Some(canonical) = interner.lookup(view.latin()) {
+                *name = canonical;
+            }
+            return false;
         }
+        let Some(view @ (crate::locale::FrameTypeKind::Meus | crate::locale::FrameTypeKind::Tuus)) =
+            crate::locale::FrameTypeKind::from_latin(spelling)
+        else {
+            return false;
+        };
+        pack.metadata.id != "la"
+            && pack.type_surface(crate::locale::TypeBindingKind::Frame(view)) != view.latin()
+    }
+
+    /// Rewrite a pack spelling of a directional view method (`t.get()` under
+    /// en) to its canonical Latin symbol (`accipe`). `da` is not a projected
+    /// row and passes through unchanged.
+    ///
+    /// Returns `true` for the canonical Latin spelling under a non-`la` pack
+    /// (a wrong-locale miss), mirroring [`Self::canonicalize_sermo_view_method`].
+    fn canonicalize_directional_view_method(&self, receiver_ty: TypeId, name: &mut Symbol) -> bool {
+        let (Some(pack), Some(interner)) = (self.locale_pack, self.interner) else {
+            return false;
+        };
+        if pack.metadata.id == "la" {
+            return false;
+        }
+        let Some((view, _)) = self.directional_view_payload(receiver_ty) else {
+            return false;
+        };
+        let view = match view {
+            DirectionalViewKind::Meus => radix_intrinsics::SermoViewKind::Meus,
+            DirectionalViewKind::Tuus => radix_intrinsics::SermoViewKind::Tuus,
+        };
+        let spelling = interner.resolve(*name);
+        if let Some(canonical) = pack.sermo_view_method_canonical(view, spelling)
+            && let Some(symbol) = interner.lookup(canonical)
+        {
+            *name = symbol;
+            return false;
+        }
+        radix_intrinsics::SERMO_VIEW_METHODS
+            .iter()
+            .any(|entry| entry.view == view && entry.faber_name == spelling)
     }
 
     /// `s.tuus<T>()` / `s.meus<T>()` on `sermo<O, R>` (D6.11): the payload is

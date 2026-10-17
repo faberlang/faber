@@ -38,10 +38,10 @@ main {
     let channel s ← call 'runtime:echo' ("salve")
     let send<value> outbound ← s.send<value>()
     outbound.da("ping")
-    outbound.fini()
+    outbound.finish()
     print count_items(s)
 
     let channel second ← call 'runtime:echo' ("vale")
-    let frame<string> ∪ none first ← second.recv<string>().accipe()
+    let frame<string> ∪ none first ← second.recv<string>().get()
     print first?.data
 }

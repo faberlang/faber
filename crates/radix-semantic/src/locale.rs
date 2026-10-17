@@ -33,7 +33,7 @@ use crate::{
     primitive_type_specs, tensor_family_type_specs,
 };
 use radix_diagnostics::{Diagnostic, DiagnosticArg};
-use radix_intrinsics::{INTRINSICS, IntrinsicReceiver};
+use radix_intrinsics::{INTRINSICS, IntrinsicReceiver, SERMO_VIEW_METHODS, SermoViewKind};
 use radix_lexer::{
     KeywordGroupSpec, KeywordSpec, TokenKind, keyword_group_specs, keyword_specs,
     keyword_spelling_for_token, keyword_token_kind, lookup_keyword_spec,
@@ -118,6 +118,10 @@ pub struct LocalePack {
     // scoping is required: one surface may map to different canonicals in
     // different families, and validation rejects family-local collisions.
     intrinsic_canonical_by_surface: HashMap<IntrinsicReceiver, HashMap<String, String>>,
+    // (sermo view, surface spelling) → canonical view-method name. The view
+    // methods share the `[intrinsics]` rows but are checked bespoke, so they
+    // keep their own family-scoped reverse cache.
+    sermo_view_canonical_by_surface: HashMap<SermoViewKind, HashMap<String, String>>,
 }
 
 impl LocalePack {
@@ -527,6 +531,19 @@ impl LocalePack {
             .map(String::as_str)
     }
 
+    /// Resolve one localized view-method spelling to its canonical name on a
+    /// directional sermo view (`t.get()` → `accipe` on a `tuus`).
+    ///
+    /// `None` when this pack has no row for the surface on that view; the
+    /// canonical Latin spelling is then a miss under a non-`la` pack.
+    #[must_use]
+    pub fn sermo_view_method_canonical(&self, view: SermoViewKind, surface: &str) -> Option<&str> {
+        self.sermo_view_canonical_by_surface
+            .get(&view)
+            .and_then(|by_surface| by_surface.get(surface))
+            .map(String::as_str)
+    }
+
     /// Total count of keyword and type kinds falling back to Latin.
     #[must_use]
     pub fn fallback_count(&self) -> usize {
@@ -554,6 +571,8 @@ impl LocalePack {
         self.intrinsic_surfaces = build_intrinsic_surfaces(&self.intrinsics);
         self.intrinsic_canonical_by_surface =
             build_intrinsic_canonical_by_surface(&self.intrinsics);
+        self.sermo_view_canonical_by_surface =
+            build_sermo_view_canonical_by_surface(&self.intrinsics);
     }
 
     /// Render localized message/help text for a normalized diagnostic when this
@@ -795,6 +814,11 @@ fn build_intrinsic_surfaces(
             surfaces.insert(entry.faber_name, binding.canonical.clone());
         }
     }
+    for entry in SERMO_VIEW_METHODS {
+        if let Some(binding) = intrinsics.get(entry.faber_name) {
+            surfaces.insert(entry.faber_name, binding.canonical.clone());
+        }
+    }
     surfaces
 }
 
@@ -825,6 +849,29 @@ fn build_intrinsic_canonical_by_surface(
         }
     }
     by_family
+}
+
+/// Build the (sermo view, surface) → canonical view-method reverse cache from
+/// the same `[intrinsics]` rows the receiver families use.
+fn build_sermo_view_canonical_by_surface(
+    intrinsics: &BTreeMap<String, IntrinsicBinding>,
+) -> HashMap<SermoViewKind, HashMap<String, String>> {
+    let mut by_view: HashMap<SermoViewKind, HashMap<String, String>> = HashMap::new();
+    for entry in SERMO_VIEW_METHODS {
+        let Some(binding) = intrinsics.get(entry.faber_name) else {
+            continue;
+        };
+        let surfaces = by_view.entry(entry.view).or_default();
+        surfaces
+            .entry(binding.canonical.clone())
+            .or_insert_with(|| entry.faber_name.to_owned());
+        for alias in &binding.aliases {
+            surfaces
+                .entry(alias.clone())
+                .or_insert_with(|| entry.faber_name.to_owned());
+        }
+    }
+    by_view
 }
 
 /// Collect canonical type identities with no localized row, by diffing the
@@ -1367,6 +1414,7 @@ pub fn latin_locale_pack() -> LocalePack {
         type_binding_by_spelling: HashMap::new(),
         intrinsic_surfaces: HashMap::new(),
         intrinsic_canonical_by_surface: HashMap::new(),
+        sermo_view_canonical_by_surface: HashMap::new(),
     };
     pack.rebuild_surfaces();
     pack
@@ -2117,6 +2165,9 @@ fn validate_intrinsics(pack: &LocalePack, issues: &mut Vec<LocalePackIssue>) {
                 }
             }
         }
+        registered |= SERMO_VIEW_METHODS
+            .iter()
+            .any(|entry| entry.faber_name == key);
         if !registered {
             issues.push(LocalePackIssue::UnknownIntrinsic { key: key.clone() });
         }
@@ -2488,6 +2539,7 @@ impl ReaderPackToml {
             type_binding_by_spelling: HashMap::new(),
             intrinsic_surfaces: HashMap::new(),
             intrinsic_canonical_by_surface: HashMap::new(),
+            sermo_view_canonical_by_surface: HashMap::new(),
         };
         pack.rebuild_surfaces();
         pack

@@ -2973,7 +2973,10 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
 - Types: compiler-owned `scrinium`, `status`; opaque `sermo` conversation handle.
 - English reader spellings: `sermo` is `channel`, `scrinium` is `frame`, and
   the views `meus<T>` / `tuus<T>` are `send<T>` / `recv<T>` (`s.send<T>()`,
-  `s.recv<T>()`). The Latin spellings are unchanged.
+  `s.recv<T>()`), and the view methods `fini` / `accipe` / `exhauri` are
+  `finish` / `get` / `drain` (`cursor` and `da` keep their spelling). An en file
+  uses the English spellings only; the Latin ones are `unknown_method` there, and
+  a `la` file uses the Latin ones only.
 - `sermo ↦ T` materializes inbound frames into one value of type `T` using
   the type-directed collector for `T`.
 - **`sermo<O, R>` (D6.11, D6.12).** A conversation carries its types: `O` is

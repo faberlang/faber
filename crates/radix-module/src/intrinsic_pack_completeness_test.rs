@@ -12,6 +12,7 @@
 
 use super::LocalePack;
 use crate::intrinsics::{INTRINSICS, IntrinsicReceiver};
+use radix_intrinsics::{SERMO_VIEW_METHODS, SermoViewKind};
 use std::collections::BTreeSet;
 
 /// Load a pack's **owned** rows from the raw file (no `inherits` merge).
@@ -51,7 +52,11 @@ fn en_pack_covers_every_registry_intrinsic() {
 #[test]
 fn en_pack_intrinsic_keys_match_registry_exactly() {
     let en = owned_installed_pack("en");
-    let registry: BTreeSet<&str> = INTRINSICS.iter().map(|entry| entry.faber_name).collect();
+    let registry: BTreeSet<&str> = INTRINSICS
+        .iter()
+        .map(|entry| entry.faber_name)
+        .chain(SERMO_VIEW_METHODS.iter().map(|entry| entry.faber_name))
+        .collect();
     let pack_keys: BTreeSet<&str> = en.intrinsics.keys().map(String::as_str).collect();
     assert_eq!(
         pack_keys, registry,
@@ -192,4 +197,40 @@ fn queue_stack_method_rows_are_owned_by_all_installed_packs() {
     let la = owned_installed_pack("la");
     assert_eq!(la.intrinsic_canonical(IntrinsicReceiver::Queue, "appende"), None);
     assert_eq!(la.intrinsic_canonical(IntrinsicReceiver::Stack, "detrahe"), None);
+}
+
+/// The directional sermo view methods (`SERMO_VIEW_METHODS`) are spelled by
+/// every non-la pack, each spelling resolves back to its canonical on its
+/// view, and no pack keeps the Latin spelling (en: `t.get()` / `t.finish()`).
+#[test]
+fn sermo_view_method_rows_are_owned_and_resolve_in_every_pack() {
+    for locale in ["en", "th-TH", "ar", "zh-Hans", "zh-Hant", "vi", "hi"] {
+        let pack = owned_installed_pack(locale);
+        for entry in SERMO_VIEW_METHODS {
+            let surface = pack.intrinsic_surface(entry.faber_name);
+            assert!(
+                pack.intrinsics.contains_key(entry.faber_name),
+                "{locale}: missing [intrinsics] row for view method `{}`",
+                entry.faber_name
+            );
+            // `cursor` is an English word already, so en keeps the identity row.
+            if !(locale == "en" && entry.faber_name == "cursor") {
+                assert_ne!(surface, entry.faber_name, "{locale}: `{surface}` keeps the Latin spelling");
+            }
+            assert_eq!(
+                pack.sermo_view_method_canonical(entry.view, surface),
+                Some(entry.faber_name),
+                "{locale}: `{surface}` must resolve to `{}` on {:?}",
+                entry.faber_name,
+                entry.view
+            );
+        }
+        // The inbound view's four methods are pairwise distinct spellings.
+        let tuus: BTreeSet<&str> = SERMO_VIEW_METHODS
+            .iter()
+            .filter(|entry| entry.view == SermoViewKind::Tuus)
+            .map(|entry| pack.intrinsic_surface(entry.faber_name))
+            .collect();
+        assert_eq!(tuus.len(), 4, "{locale}: tuus view surfaces collide: {tuus:?}");
+    }
 }
