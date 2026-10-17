@@ -93,7 +93,8 @@ impl super::FaberCodegen<'_> {
         match op {
             HirUnOp::Neg => "-".to_owned(),
             HirUnOp::Not => format!("{} ", surface.keyword(TokenKind::Non)),
-            HirUnOp::BitNot => "¬".to_owned(),
+            // need: prefix glyph operator is spaced like its word sibling `non`.
+            HirUnOp::BitNot => "¬ ".to_owned(),
         }
     }
 
