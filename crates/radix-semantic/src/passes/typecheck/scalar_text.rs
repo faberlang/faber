@@ -253,6 +253,12 @@ impl TypeChecker<'_> {
         if !self.is_text_family(lhs_ty) || !self.is_text_family(rhs_ty) {
             return false;
         }
+        // A whole `textus` cord and an `ascii`/`ascii<1>` char never order
+        // against each other: the runner has no such comparison row, so the
+        // mixed pair falls through to the numeric-operand rejection instead.
+        if self.is_textus(lhs_ty) != self.is_textus(rhs_ty) {
+            return false;
+        }
         if !self.is_provably_single_scalar_text(lhs) || !self.is_provably_single_scalar_text(rhs) {
             return false;
         }
