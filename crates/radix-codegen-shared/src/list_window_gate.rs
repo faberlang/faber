@@ -64,7 +64,7 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bo
     let (Some(object_ty), Some(index_ty)) = (object.ty, index.ty) else {
         return false;
     };
-    if !matches!(resolved(types, index_ty), Type::Intervallum(_)) {
+    if !matches!(resolved(types, index_ty), Type::Intervallum(..)) {
         return false;
     }
     // The Rust emitter copies the window of any list or bounded list.

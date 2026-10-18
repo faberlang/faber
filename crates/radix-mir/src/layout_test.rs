@@ -164,7 +164,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
             panic!("policy-float has no MIR layout yet; pinned separately, not a census row")
         }
         Type::BoundedOcteti { .. }
-        | Type::Intervallum(_)
+        | Type::Intervallum(..)
         | Type::SizedInstans(_)
         | Type::Promissum(_)
         | Type::PromissumFailable(_, _)
@@ -190,6 +190,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     let float64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
     let cap = types.intern_index(IndexExpr::Literal(8));
     let dynamic_cap = types.intern_index(IndexExpr::Unspecified);
+    let interval_step = types.intern_index(IndexExpr::Literal(1));
     let tensor_shape = types.intern_index(IndexExpr::Literal(1));
     let vector_width = tensor_shape;
     let two = types.intern_index(IndexExpr::Literal(2));
@@ -261,7 +262,7 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::BoundedOcteti {
         capacity: dynamic_cap,
     });
-    rows.push(Type::Intervallum(float64_ty));
+    rows.push(Type::Intervallum(float64_ty, interval_step));
     rows.push(Type::SizedInstans(InstansPrecision::Millis));
     rows.push(Type::Promissum(float64_ty));
     rows.push(Type::PromissumFailable(float64_ty, int64_ty));
@@ -718,6 +719,7 @@ fn bounded_families_with_non_literal_capacity_stay_opaque() {
     let mut types = TypeTable::new();
     let numerus = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
     let dynamic_cap = types.intern_index(IndexExpr::Unspecified);
+    let interval_step = types.intern_index(IndexExpr::Literal(1));
     let bounded = [
         types.intern(Type::BoundedArray {
             element: numerus,
