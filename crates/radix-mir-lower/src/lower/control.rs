@@ -1109,7 +1109,7 @@ impl FunctionBuilder<'_> {
                         return None;
                     };
                     let interval_element = match self.normalized_type(iter_ty) {
-                        Type::Intervallum(element) => Some(*element),
+                        Type::Intervallum(element, _) => Some(*element),
                         _ => None,
                     };
                     let Some(element) = interval_element else {

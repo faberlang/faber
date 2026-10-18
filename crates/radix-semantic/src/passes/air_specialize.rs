@@ -535,7 +535,7 @@ fn contains_unresolved_type(
         | Type::Promissum(inner)
         | Type::Cursor(inner)
         | Type::Atomic(inner)
-        | Type::Intervallum(inner)
+        | Type::Intervallum(inner, _)
         | Type::Option(inner) => contains_unresolved_type(*inner, types, seen),
         Type::BoundedArray { element, capacity }
         | Type::BoundedQueue { element, capacity }
@@ -742,9 +742,10 @@ fn substitute_type(
         Type::Atomic(inner) => {
             Type::Atomic(substitute_type(inner, type_map, index_map, types, interner))
         }
-        Type::Intervallum(inner) => {
-            Type::Intervallum(substitute_type(inner, type_map, index_map, types, interner))
-        }
+        Type::Intervallum(inner, step) => Type::Intervallum(
+            substitute_type(inner, type_map, index_map, types, interner),
+            substitute_index(step, index_map, types),
+        ),
         Type::Option(inner) => {
             Type::Option(substitute_type(inner, type_map, index_map, types, interner))
         }

@@ -351,7 +351,7 @@ impl TypeChecker<'_> {
         }
 
         match self.types.get(self.resolve_inferred_type(idx_ty)).clone() {
-            Type::Intervallum(bound) => self.is_integer(bound),
+            Type::Intervallum(bound, _) => self.is_integer(bound),
             Type::Union(types) => types.into_iter().all(|ty| self.is_integer(ty)),
             _ => false,
         }
@@ -362,7 +362,7 @@ impl TypeChecker<'_> {
     fn is_range_index(&mut self, idx_ty: TypeId) -> bool {
         matches!(
             self.types.get(self.resolve_inferred_type(idx_ty)),
-            Type::Intervallum(_)
+            Type::Intervallum(..)
         )
     }
     /// Validate a tensor bracket index and return the element type `T`.

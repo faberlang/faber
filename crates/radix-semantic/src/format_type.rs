@@ -132,7 +132,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format_faber_type(*elem, types, interner, resolve_def)
         ),
 
-        Type::Intervallum(bound) => {
+        Type::Intervallum(bound, _) => {
             format!(
                 "intervallum<{}>",
                 format_faber_type(*bound, types, interner, resolve_def)

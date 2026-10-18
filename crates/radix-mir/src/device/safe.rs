@@ -368,7 +368,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::Queue(_)
             | Type::Stack(_)
             | Type::Sparsa(_, _)
-            | Type::Intervallum(_)
+            | Type::Intervallum(..)
             | Type::Option(_)
             | Type::Ref(_, _)
             | Type::Enum(_)

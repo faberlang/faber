@@ -4120,7 +4120,7 @@ impl FunctionBuilder<'_> {
         let ty = self.expr_ty(expr)?;
         let target = self.materialized_conversio_target(target, ty);
         if recovery.is_none()
-            && matches!(self.normalized_type(source_type_id), Type::Intervallum(_))
+            && matches!(self.normalized_type(source_type_id), Type::Intervallum(..))
             && matches!(self.normalized_type(target), Type::Array(_) | Type::Tensor(_, _))
         {
             let source = self.lower_expr_value(source)?;

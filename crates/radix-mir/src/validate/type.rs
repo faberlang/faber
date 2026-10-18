@@ -292,7 +292,7 @@ impl Validator<'_, '_> {
         match self.type_kind(base_ty).clone() {
             Type::Array(inner) | Type::BoundedArray { element: inner, .. }
                 if index.is_some_and(|(_, index_ty)| {
-                    matches!(self.type_kind(index_ty), Type::Intervallum(_))
+                    matches!(self.type_kind(index_ty), Type::Intervallum(..))
                 }) =>
             {
                 // A range index is a window: a new `lista<T>` of the range
@@ -395,7 +395,7 @@ impl Validator<'_, '_> {
     /// is one.
     fn intervallum_bound(&self, ty: MirType) -> Option<TypeId> {
         match self.type_kind(ty) {
-            Type::Intervallum(bound) => Some(*bound),
+            Type::Intervallum(bound, _) => Some(*bound),
             _ => None,
         }
     }
@@ -779,7 +779,7 @@ impl Validator<'_, '_> {
             | Type::SaturatingWord(_)
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)
-            | Type::Intervallum(_)
+            | Type::Intervallum(..)
             | Type::Tuple(_)
             | Type::Struct(_)
             | Type::Enum(_)

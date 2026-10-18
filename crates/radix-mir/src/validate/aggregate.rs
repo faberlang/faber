@@ -81,7 +81,7 @@ impl Validator<'_, '_> {
                 }
             }
             (MirAggregateKind::Interval { .. }, MirAggregateFields::Ordered(items)) => {
-                let Type::Intervallum(element) = self.type_kind(aggregate.ty) else {
+                let Type::Intervallum(element, _) = self.type_kind(aggregate.ty) else {
                     self.error(span, "interval aggregate type is not intervallum");
                     return;
                 };

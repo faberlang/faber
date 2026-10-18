@@ -434,7 +434,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
             | Type::Promissum(t)
             | Type::Cursor(t)
             | Type::Atomic(t)
-            | Type::Intervallum(t)
+            | Type::Intervallum(t, _)
             | Type::Option(t)
             | Type::Alias(_, t)
             | Type::Ref(_, t) => vec![*t],

@@ -560,7 +560,7 @@ fn portable_tensor_edge_type_identity(
         | Type::Cursor(_)
         | Type::AsyncCursor(_, _)
         | Type::Atomic(_)
-        | Type::Intervallum(_)
+        | Type::Intervallum(..)
         // Bits have no tensor-edge provider identity.
         | Type::Bits(_)
         | Type::Func(_)
@@ -1435,7 +1435,7 @@ fn ensure_intervallum_iteration_array_types(hir: &radix_hir::HirModule, types: &
                 && matches!(mode, HirIteraMode::Ab)
                 && !matches!(&iter.kind, HirExpressionKind::Intervallum { .. })
                 && let Some(ty) = iter.ty
-                && let Type::Intervallum(bound) = self.types.get(ty)
+                && let Type::Intervallum(bound, _) = self.types.get(ty)
             {
                 self.elements.insert(*bound);
             }

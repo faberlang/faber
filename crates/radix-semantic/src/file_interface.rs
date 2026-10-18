@@ -902,7 +902,7 @@ fn snapshot_interface_type_inner(
         Type::Atomic(element) => Ok(InterfaceTypeSnapshot::Atomic(Box::new(
             snapshot_interface_type_inner(*element, types, interner, resolver, module_identity)?,
         ))),
-        Type::Intervallum(bound) => Ok(InterfaceTypeSnapshot::Intervallum(Box::new(
+        Type::Intervallum(bound, _) => Ok(InterfaceTypeSnapshot::Intervallum(Box::new(
             snapshot_interface_type_inner(*bound, types, interner, resolver, module_identity)?,
         ))),
         Type::SizedNumeric(primitive, width) => {

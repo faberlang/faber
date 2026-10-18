@@ -876,7 +876,7 @@ fn validate_type_form(
                 | radix_types::Type::Cursor(element)
                 | radix_types::Type::Set(element)
                 | radix_types::Type::Atomic(element)
-                | radix_types::Type::Intervallum(element)
+                | radix_types::Type::Intervallum(element, _)
                 | radix_types::Type::Option(element) => {
                     if level.0 != 0 {
                         return Err(type_presentation_issue("semantic_level", site));
@@ -3414,7 +3414,7 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::Queue(t)
             | radix_types::Type::Stack(t)
             | radix_types::Type::Atomic(t)
-            | radix_types::Type::Intervallum(t)
+            | radix_types::Type::Intervallum(t, _)
             | radix_types::Type::Option(t)
             | radix_types::Type::Ref(_, t) => {
                 checks.check_type(*t)?;

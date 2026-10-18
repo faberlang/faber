@@ -958,7 +958,7 @@ impl TypeChecker<'_> {
                 let alternate = self.freshen_anonymous_type_holes(alternate, holes);
                 self.types.async_cursor(item, alternate)
             }
-            Type::Intervallum(inner) => {
+            Type::Intervallum(inner, _) => {
                 let inner = self.freshen_anonymous_type_holes(inner, holes);
                 self.types.intervallum(inner)
             }
@@ -1200,7 +1200,7 @@ impl TypeChecker<'_> {
                     self.substitute_type_params(alternate, vars, shape_vars.as_deref_mut());
                 self.types.async_cursor(item, alternate)
             }
-            Type::Intervallum(inner) => {
+            Type::Intervallum(inner, _) => {
                 self.substitute_unary_type(inner, vars, shape_vars, |this, inner| {
                     this.types.intervallum(inner)
                 })
@@ -1719,7 +1719,7 @@ fn collect_type_param_symbols(
         | Type::Promissum(inner)
         | Type::Cursor(inner)
         | Type::Atomic(inner)
-        | Type::Intervallum(inner)
+        | Type::Intervallum(inner, _)
         | Type::Option(inner)
         | Type::Ref(_, inner)
         | Type::Alias(_, inner) => collect(*inner, seen_types, symbols),
@@ -1797,7 +1797,7 @@ fn first_index_arithmetic_error_in_type(
         | radix_types::Type::Promissum(inner)
         | radix_types::Type::Cursor(inner)
         | radix_types::Type::Atomic(inner)
-        | radix_types::Type::Intervallum(inner)
+        | radix_types::Type::Intervallum(inner, _)
         | radix_types::Type::Option(inner)
         | radix_types::Type::Ref(_, inner)
         | radix_types::Type::Alias(_, inner) => check_type(*inner, seen_types, seen_indices),

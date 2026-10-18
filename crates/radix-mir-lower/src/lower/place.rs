@@ -102,7 +102,7 @@ impl FunctionBuilder<'_> {
         };
         let object_ty = self.types.peel_access_marker(object_ty).1;
         matches!(self.normalized_type(object_ty), Type::Array(_) | Type::BoundedArray { .. })
-            && matches!(self.normalized_type(index_ty), Type::Intervallum(_))
+            && matches!(self.normalized_type(index_ty), Type::Intervallum(..))
     }
 
     /// The projection of `base[index]`.

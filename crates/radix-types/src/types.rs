@@ -66,6 +66,9 @@ pub struct TypeTable {
     indices: Vec<IndexExpr>,
     primitives: FxHashMap<Primitive, TypeId>,
     unspecified_shape: Option<IndexId>,
+    /// Memoized `IndexExpr::Literal(1)` index used as the default interval step.
+    /// Keeps `intervallum<T>` on one interned step so repeated calls hash-cons.
+    interval_step_one: Option<IndexId>,
     /// Monotonic source for [`IndexExpr::Infer`] vars across lowering passes.
     next_index_var: u32,
     /// Memo for [`Self::equals`] results by ordered `(TypeId, TypeId)` pair.
@@ -226,6 +229,7 @@ impl TypeTable {
             indices: Vec::new(),
             primitives: FxHashMap::default(),
             unspecified_shape: None,
+            interval_step_one: None,
             next_index_var: 0,
             equals_memo: RefCell::new(FxHashMap::default()),
             assignable_memo: RefCell::new(FxHashMap::default()),
@@ -497,12 +501,18 @@ impl TypeTable {
                 first_modular_word = Some(*width);
             }
         }
+        let interval_step_one = snapshot
+            .indices
+            .iter()
+            .position(|expr| matches!(expr, IndexExpr::Literal(1)))
+            .map(|index| IndexId(index as u32));
         Ok(Self {
             types: snapshot.types,
             intern_map,
             indices: snapshot.indices,
             primitives,
             unspecified_shape: snapshot.unspecified_shape,
+            interval_step_one,
             next_index_var: snapshot.next_index_var,
             equals_memo: RefCell::new(FxHashMap::default()),
             assignable_memo: RefCell::new(FxHashMap::default()),
@@ -567,7 +577,7 @@ impl TypeTable {
                 | Type::Promissum(inner)
                 | Type::Cursor(inner)
                 | Type::Atomic(inner)
-                | Type::Intervallum(inner)
+                | Type::Intervallum(inner, _)
                 | Type::Option(inner)
                 | Type::Ref(_, inner)
                 | Type::Alias(_, inner) => child(*inner, seen),
@@ -1115,9 +1125,32 @@ impl TypeTable {
         }
     }
 
-    /// Allocate an `intervallum<T>` interval over bound type `T`.
+    /// Allocate an `intervallum<T>` interval over bound type `T` with step 1.
     pub fn intervallum(&mut self, bound: TypeId) -> TypeId {
-        self.intern(Type::Intervallum(bound))
+        let step = self.interval_step_one();
+        self.intervallum_with_step(bound, step)
+    }
+
+    /// Allocate an `intervallum<T, S>` interval with a compile-time step index.
+    ///
+    /// An explicit step of `Literal(1)` canonicalizes to the same interned
+    /// step as [`Self::intervallum`], so both spellings share one `TypeId`.
+    pub fn intervallum_with_step(&mut self, bound: TypeId, step: IndexId) -> TypeId {
+        let step = if matches!(self.get_index(step), IndexExpr::Literal(1)) {
+            self.interval_step_one()
+        } else {
+            step
+        };
+        self.intern(Type::Intervallum(bound, step))
+    }
+
+    fn interval_step_one(&mut self) -> IndexId {
+        if let Some(id) = self.interval_step_one {
+            return id;
+        }
+        let id = self.intern_index(IndexExpr::Literal(1));
+        self.interval_step_one = Some(id);
+        id
     }
 
     /// Allocate a sized `numerus<W>` / `fractus<W>` primitive.
@@ -1272,7 +1305,9 @@ impl TypeTable {
                 self.equals(*ae, *be) && self.index_equals(*a_shape, *b_shape)
             }
             (Type::Atomic(ae), Type::Atomic(be)) => self.equals(*ae, *be),
-            (Type::Intervallum(ae), Type::Intervallum(be)) => self.equals(*ae, *be),
+            (Type::Intervallum(ae, a_step), Type::Intervallum(be, b_step)) => {
+                self.equals(*ae, *be) && self.index_equals(*a_step, *b_step)
+            }
             (Type::Array(ae), Type::Array(be))
             | (Type::Option(ae), Type::Option(be))
             | (Type::Set(ae), Type::Set(be))
@@ -1701,8 +1736,11 @@ impl TypeTable {
                         .all(|(f, t)| self.is_assignable(*f, *t))
             }
 
-            (Type::Intervallum(from_bound), Type::Intervallum(to_bound)) => {
-                self.is_assignable(*from_bound, *to_bound)
+            // Steps are part of the type identity: assigning across steps is a
+            // type error, never a silent conversion.
+            (Type::Intervallum(from_bound, from_step), Type::Intervallum(to_bound, to_step)) => {
+                self.index_equals(*from_step, *to_step)
+                    && self.is_assignable(*from_bound, *to_bound)
             }
 
             (Type::Array(from_elem), Type::Array(to_elem))
@@ -1937,8 +1975,11 @@ pub enum Type {
     /// `atomic<T>` storage cell; V1 permits `i32` and `u32` elements only.
     Atomic(TypeId),
 
-    /// `intervallum<T>` numeric interval (bounds share `T`).
-    Intervallum(TypeId),
+    /// `intervallum<T, S>` numeric interval (bounds share `T`).
+    ///
+    /// The second field is the compile-time integer step; the one-argument
+    /// spelling `intervallum<T>` is step `Literal(1)`.
+    Intervallum(TypeId, IndexId),
 
     /// Sized `numerus<W>` or `fractus<W>` primitive.
     SizedNumeric(Primitive, NumericWidth),
@@ -2028,8 +2069,11 @@ impl Hash for Type {
             | Self::Promissum(t)
             | Self::Cursor(t)
             | Self::Atomic(t)
-            | Self::Intervallum(t)
             | Self::Option(t) => t.hash(state),
+            Self::Intervallum(t, step) => {
+                t.hash(state);
+                step.hash(state);
+            }
             Self::PromissumFailable(t, e) | Self::AsyncCursor(t, e) => {
                 t.hash(state);
                 e.hash(state);
@@ -2633,13 +2677,13 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::Stack(e)
         | Type::Option(e)
         | Type::Atomic(e)
-        | Type::Intervallum(e)
         | Type::Ref(_, e)
         | Type::Alias(_, e) => type_in_bounds(e),
         Type::Map(k, v)
         | Type::Ledger(k, v)
         | Type::PromissumFailable(k, v)
         | Type::AsyncCursor(k, v) => type_in_bounds(k) && type_in_bounds(v),
+        Type::Intervallum(e, step) => type_in_bounds(e) && index_in_bounds(step),
         Type::Record(fields) => fields.values().all(type_in_bounds),
         Type::Tuple(elems) => elems.iter().all(type_in_bounds),
         Type::Union(members) | Type::Intersection(members) => members.iter().all(type_in_bounds),
