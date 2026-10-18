@@ -121,3 +121,22 @@ fn setup_timeout_is_not_consumed_by_a_one_second_run_bound() {
     long.timeout = Duration::from_secs(300);
     assert_eq!(long.setup_timeout(), Duration::from_secs(300));
 }
+
+#[test]
+fn external_target_maps_recipe_names_and_rejects_unknown() {
+    use radix::module::Target;
+
+    for (name, expected) in [
+        ("go", Target::HirGo),
+        ("ts", Target::HirTypeScript),
+        ("swift", Target::HirSwift),
+        ("wasm", Target::MirWasm),
+        ("llvm", Target::MirLlvm),
+        ("clif", Target::MirClif),
+        ("sexp", Target::MirSexp),
+        ("c", Target::HirC),
+    ] {
+        assert_eq!(super::external_target(name), Some(expected), "{name}");
+    }
+    assert_eq!(super::external_target("oracle"), None);
+}
