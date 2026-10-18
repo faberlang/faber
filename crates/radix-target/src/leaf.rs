@@ -6,8 +6,9 @@
 //! (`leaf_unsupported_on_target`).
 //!
 //! Route prefixes are the identity: `solum` is fs, `consolum` is stdio,
-//! `processus` is process, `tempus` is clock, `aleator` is entropy.
-//! `processus:exi` and `runtime:*` are language builtins, not leaves.
+//! `processus` is process, `tempus` is clock, `aleator` is entropy,
+//! `machina` is machine. `processus:exi` and `runtime:*` are language
+//! builtins, not leaves.
 
 /// One native effect leaf. Spellings match the campaign contract names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -28,6 +29,8 @@ pub enum Leaf {
     Http,
     /// WebSocket (`websocket:*`).
     Websocket,
+    /// Host machine snapshot (`machina:*`).
+    Machine,
 }
 
 impl Leaf {
@@ -41,6 +44,7 @@ impl Leaf {
         Self::Tcp,
         Self::Http,
         Self::Websocket,
+        Self::Machine,
     ];
 
     /// Canonical leaf spelling used in diagnostics and `faber targets`.
@@ -55,6 +59,7 @@ impl Leaf {
             Self::Tcp => "tcp",
             Self::Http => "http",
             Self::Websocket => "websocket",
+            Self::Machine => "machine",
         }
     }
 
@@ -70,6 +75,7 @@ impl Leaf {
             Self::Tcp => "caelum",
             Self::Http => "http",
             Self::Websocket => "websocket",
+            Self::Machine => "machina",
         }
     }
 
@@ -91,6 +97,7 @@ impl Leaf {
             "caelum" => Some(Self::Tcp),
             "http" => Some(Self::Http),
             "websocket" => Some(Self::Websocket),
+            "machina" => Some(Self::Machine),
             _ => None,
         }
     }

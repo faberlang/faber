@@ -697,6 +697,7 @@ pub fn lower_analyzed_unit(
     ensure_intervallum_iteration_array_types(unit.hir, &mut types);
     ensure_tensor_bracket_index_array_types(unit.hir, &mut types);
     ensure_runtime_extent_shape_array_type(&mut types);
+    ensure_applied_genus_self_types(unit.hir, &mut types);
     if options.kernel_lowering == KernelLowering::Device {
         lane_form::ensure_lane_word_type(&mut types);
     }
@@ -1289,6 +1290,49 @@ fn ensure_runtime_extent_shape_array_type(types: &mut TypeTable) {
     }
 }
 
+/// A generic genus's canonical self form `Genus<Param…>` is what a method
+/// receiver must name: `applied_genus_receiver` reads the receiver from the
+/// type table, and a bare `Type::Struct` binds no class parameter, so a call on
+/// `Genus<3>` could never witness `N`. Intern one applied form per generic
+/// genus, in declaration param order, so the receiver exists before the read-only
+/// lowering walk starts. Lowering holds the type table immutably afterwards.
+fn ensure_applied_genus_self_types(hir: &radix_hir::HirModule, types: &mut TypeTable) {
+    use radix_types::AppliedArg;
+
+    for item in &hir.items {
+        let HirItemKind::Struct(strukt) = &item.kind else {
+            continue;
+        };
+        if strukt.type_params.is_empty() {
+            continue;
+        }
+        let base = types.intern(Type::Struct(item.def_id));
+        let args = strukt
+            .type_params
+            .iter()
+            .map(|param| {
+                if param.is_typus() {
+                    AppliedArg::Type(types.intern(Type::Param(param.name)))
+                } else {
+                    AppliedArg::Size(size_param_index(types, param.name))
+                }
+            })
+            .collect();
+        types.intern(Type::Applied(base, args));
+    }
+}
+
+/// The interned `IndexExpr::Param` node for a declared size parameter, reusing
+/// an existing node so shape witnesses share one identity (GSF-1).
+fn size_param_index(types: &mut TypeTable, name: Symbol) -> IndexId {
+    let existing = (0..types.index_count()).find_map(|ordinal| {
+        #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
+        let id = IndexId(ordinal as u32);
+        matches!(types.get_index(id), IndexExpr::Param(found) if *found == name).then_some(id)
+    });
+    existing.unwrap_or_else(|| types.intern_index(IndexExpr::Param(name)))
+}
+
 fn ensure_itera_coordinate_array_types(hir: &radix_hir::HirModule, types: &mut TypeTable) {
     struct IteraCoordinateCollector<'a> {
         types: &'a TypeTable,
@@ -1726,6 +1770,39 @@ impl<'a> MirLowerer<'a> {
         );
     }
 
+    fn applied_genus_receiver(&self, def_id: DefId, strukt: &HirStruct) -> Option<TypeId> {
+        if strukt.type_params.is_empty() {
+            return None;
+        }
+
+        use radix_types::AppliedArg;
+
+        #[expect(clippy::cast_possible_truncation, reason = "TypeId is u32 by design")]
+        (0..self.types.type_count()).find_map(|index| {
+            let id = TypeId(index as u32);
+            let Type::Applied(base, args) = self.types.get(id) else {
+                return None;
+            };
+            if !matches!(self.types.get(*base), Type::Struct(found) if *found == def_id)
+                || args.len() != strukt.type_params.len()
+            {
+                return None;
+            }
+            args.iter()
+                .zip(&strukt.type_params)
+                .all(|(arg, param)| match arg {
+                    AppliedArg::Type(ty) => {
+                        param.is_typus() && matches!(self.types.get(*ty), Type::Param(name) if *name == param.name)
+                    }
+                    AppliedArg::Size(index) => {
+                        !param.is_typus()
+                            && matches!(self.types.get_index(*index), IndexExpr::Param(name) if *name == param.name)
+                    }
+                })
+                .then_some(id)
+        })
+    }
+
     /// Lower a genus method as an ordinary MIR function with an explicit
     /// receiver parameter bound to the struct definition used by `ego`.
     fn lower_method(
@@ -1740,7 +1817,10 @@ impl<'a> MirLowerer<'a> {
                 .push(MirError::missing_type(method.span, "method return type"));
             return;
         };
-        let Some(receiver_ty) = self.types.find_struct(struct_item.def_id) else {
+        let receiver_ty = self
+            .applied_genus_receiver(struct_item.def_id, strukt)
+            .or_else(|| self.types.find_struct(struct_item.def_id));
+        let Some(receiver_ty) = receiver_ty else {
             self.errors
                 .push(MirError::missing_type(method.span, "method receiver type"));
             return;

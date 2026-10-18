@@ -153,6 +153,44 @@ fn var_nested_list_element_shared_into_var_is_accepted() {
 }
 
 #[test]
+fn window_from_const_source_value_elements_passes() {
+    let source = "incipit {\n    sit lista<numerus> xs ← [1, 2, 3]\n    varia lista<numerus> ys ← xs[0‥2]\n    ys.appende(4)\n    nota ys\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        !has_const_shared_into_var(&result),
+        "a value-element window owns its slots, got {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result.diagnostics.iter().any(|err| err.is_error()),
+        "expected the window bind to be accepted, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn window_from_const_source_reference_elements_keeps_sem065() {
+    let source = "genus Punctum {\n    varia numerus x\n}\nincipit {\n    sit lista<Punctum> xs ← [Punctum { x = 1 }, Punctum { x = 2 }]\n    varia lista<Punctum> ys ← xs[0‥2]\n    nota ys\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        has_const_shared_into_var(&result),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn window_of_nested_list_elements_keeps_sem065() {
+    let source = "incipit {\n    sit lista<lista<numerus>> xs ← [[1], [2]]\n    varia lista<lista<numerus>> ys ← xs[0‥1]\n    nota ys\n}";
+    let result = test_support::analyze_source(source);
+    assert!(
+        has_const_shared_into_var(&result),
+        "expected SEM065 {ISSUE}, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
 fn const_genus_copy_into_var_is_accepted() {
     test_support::assert_accepts(
         "genus Custos {\n    varia lista<numerus> res\n}\nincipit {\n    sit Custos c ← Custos { res = [1, 2] }\n    varia Custos d ← copy c\n    nota d\n}",

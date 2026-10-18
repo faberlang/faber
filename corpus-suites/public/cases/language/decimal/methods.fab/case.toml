@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/decimal/methods.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/methods.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

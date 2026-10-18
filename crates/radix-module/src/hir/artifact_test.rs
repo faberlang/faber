@@ -2451,6 +2451,53 @@ functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vac
 }
 
 #[test]
+fn extent_condition_parameter_term_round_trips() {
+    use crate::semantic::passes::kernel_requirements::KernelRangeExpr;
+    use radix_types::DefId;
+
+    // The same launch-condition fixture as the neighboring symbolic-extent
+    // round trip; the condition's bounds are replaced with a parameter term
+    // so the wire carries a `DefId` where only constants and shapes rode
+    // before.
+    let source = r"
+@ nucleum
+@ publica
+functio copy_coordinate<magnitudo N>(
+    tensor<f32, [N]> input,
+    varia tensor<u32, [N]> output
+) → vacuum {
+    itera ex input apud [i] sit value {
+        output[i] ← i
+    }
+}
+
+@ nucleum
+@ publica
+functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vacuum {
+    copy_coordinate(input, varia output)
+}
+";
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let mut unit = crate::driver::analyze_source(&session, "kernel-parameter.fab", source, AnalyzeRequest::default())
+        .expect("analyze kernel parameter fixture");
+    let position = unit.kernel_requirements.kernels[0]
+        .target_reports
+        .iter()
+        .position(|target| !target.extent_conditions.is_empty())
+        .expect("kernel reports a launch condition");
+    let mut condition = unit.kernel_requirements.kernels[0].target_reports[position].extent_conditions[0].clone();
+    condition.range.minimum = KernelRangeExpr::Parameter(DefId(7));
+    condition.range.maximum = KernelRangeExpr::Parameter(DefId(7));
+    unit.kernel_requirements.kernels[0].target_reports[position].extent_conditions = vec![condition];
+    let original = unit.kernel_requirements.clone();
+
+    let artifact = crate::hir::serialize::from_analyzed(&unit, "kernel-parameter", "kernel-parameter.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize kernel parameter artifact");
+    let loaded = load_fhir(&bytes).expect("validate and load kernel parameter artifact");
+    assert_eq!(loaded.kernel_requirements, original);
+}
+
+#[test]
 fn kernel_requirements_wire_omits_rows_without_a_device_or_numeric_encoding() {
     let source = r"
 @ nucleum

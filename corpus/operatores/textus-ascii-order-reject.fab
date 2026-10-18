@@ -1,0 +1,38 @@
++++
+term = "≺"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "comparison", "equality", "equality_tail", "et_expr", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "A whole `textus` cord never orders against a single `ascii` char; both sides must be the same carrier."
+syntax = "<textus> ≺ <ascii> — rejected"
+related = ["comparatio", "littera", "textus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:numeric_operands_required"
++++
+# =============================================================================
+# textus-ascii-order-reject — mixed carrier ordering is refused
+# =============================================================================
+#
+# What this teaches:
+#   • Order two strings ("a" ≺ "b") or two chars ('a' ≺ 'b'); a string never
+#     orders against a char, however short the string is.
+#   • The pair has no comparison row at run time, so the checker refuses it
+#     instead of letting the program abort on `comparison type mismatch`.
+#
+# Common mistakes:
+#   • Writing "a" ≺ 'b' and expecting code-point order; compare two strings or
+#     convert the char to a one-scalar string first.
+#
+# See also: comparatio, littera, textus
+# =============================================================================
+
+# operatores/textus-ascii-order-reject — a textus/ascii order pair
+#
+# This exemplum intentionally fails to check: the left side is a whole cord and
+# the right side is one ascii char, and the runner has no such comparison row.
+
+main {
+    print "a" ≺ 'b'
+}

@@ -26,6 +26,8 @@ use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::discover_build_layout;
 use radix::program::discovery::{BuildLayout, PackageSpec, sanitize_crate_name};
 use radix::program::emit::compile_package as compile_package_compiler;
+#[cfg(feature = "mir-clif")]
+use radix::program::emit::compile_package_clif;
 #[cfg(feature = "hir-go")]
 use radix::program::emit::compile_package_result;
 #[cfg(feature = "hir-rust")]
@@ -5283,7 +5285,7 @@ import from "norma:text" text
 
 main {
   print text.keep_between("hello7!", "a", "z")
-  print text.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
+  print text.keep_if("hello7!", string c ∴ c ≥ "a" and c ≤ "z")
   print text.drop_between("hello7!", "0", "9")
 }
 "#,
@@ -10829,6 +10831,51 @@ kind = "bin"
         code.contains("kernel void"),
         "expected emitted MSL kernels, got:\n{code}"
     );
+}
+
+/// The `clif` package build emits a native object through the package-MIR
+/// object emitter. A leafless package is inside the CLIF capability subset, so
+/// the object must arrive with bytes and no diagnostics.
+#[cfg(feature = "mir-clif")]
+#[test]
+fn clif_package_object_emits_for_a_leafless_package() {
+    let dir = test_temp_dir("clif-package-object");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/main.fab"), "main {}\n").expect("entry");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "clif-package-object"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("manifest");
+    let entry = dir.join("src/main.fab");
+
+    assert!(use_package_compiler(Target::MirClif, dir.path(), false));
+    let (config, _) = config_with_locale(Target::MirClif, &entry, None, None).expect("config");
+    let result = compile_package_clif(&config, &entry, &super::mir::faber_mir_seams());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error()),
+        "unexpected diagnostics: {:?}",
+        result.diagnostics
+    );
+    let Some(radix::module::Output::ClifObject(object)) = result.output else {
+        panic!("expected a clif object output");
+    };
+    assert!(!object.bytes.is_empty(), "expected emitted object bytes");
 }
 
 #[test]

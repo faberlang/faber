@@ -1,0 +1,74 @@
++++
+term = "d64 methods"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "array_literal"]
+category = "arithmetic"
+canonical = false
+summary = "d64 methods: sign is the decimal -1/0/1, and power is exact at the scaled carrier (1.5² = 2.25)."
+syntax = "d64 s ← b.sign()"
+related = ["numerus", "d64", "signum", "potentia"]
+locale = "en"
++++
+# =============================================================================
+# d64 — the numeric method surface on the decimal carrier
+# =============================================================================
+#
+# What this teaches:
+#   • `sign` is the decimal sign — a stored `d64` returns the decimal `-1`,
+#     `0` or `1`, never the raw scaled `i64` carrier. `-2.25.sign()` is `-1`,
+#     `1.5.sign()` is `1`, and `0.0.sign()` is `0` (D2.6 prints it as `0`).
+#   • `power` is exact at the scaled carrier — `a.power(2)` squares 1.5
+#     exactly and stores `2.25`, not a float approximation, because the
+#     exponent runs at plain `numerus` over the exact 128-bit product and the
+#     slot rounds once, half-even, to scale 8. A negative exponent is
+#     `potentia_exponent_negative` on an integer receiver.
+#   • `minimum`, `maximum`, `abs`, `⤒` and `⤓` are the same numeric method
+#     surface for `d64` — they compare at the carrier and return the decimal,
+#     so `a.minimum(b)` is `-2.25`, `b.abs()` is `2.25`, `a ⤒ 2.0` is the
+#     larger `2` and `a ⤓ 1.0` the smaller `1`. `sum` folds a
+#     `list<d64>` at the carrier, so `[0.1, 0.2, 0.3].sum()` is `0.6`
+#     exactly.
+#   • A whole decimal prints without a fraction (D2.6) — `1.5 ⤒ 2.0` prints
+#     `2`, `1.5 ⤓ 1.0` prints `1`, and `0.0` prints `0`, never `2.0` or
+#     `0.0`; trailing zeros are dropped, so `0.6` keeps its digit text.
+#
+# Common mistakes:
+#   • expecting the raw carrier from `sign` — a `d64` returns the decimal
+#     `-1`/`0`/`1`, not the scale-8 integer behind it
+#   • expecting `power` to round at each multiply — the product is exact and
+#     the slot rounds once, so `1.5.power(2)` is `2.25`, not `2.2499999`
+#   • expecting a fractional whole number — `⤒`/`⤓`/`sum` results that land
+#     whole print `2` and `1`, since a `.0` would read as a float
+#   • mixing a typed integer or float with a decimal — `a.minimum(n)` with
+#     `n` an `int` or `f64` variable is
+#     `numeric_family_crossing_requires_conversio`; a written constant needs
+#     no conversion
+#
+# See also: numerus, d64, signum, potentia
+# =============================================================================
+
+# decimal methods — sign, power and the comparison surface at d64
+#
+# WHY: pins the d64 method contract end-to-end — the decimal sign (not the
+# carrier), exact `power`, the minimum/maximum/abs/sum family, and the D2.6
+# shortest-decimal display. Each line below prints one method result.
+#
+# EXPECTED OUTPUT:
+#   methods.expected — shortest decimals, one per print.
+
+main {
+    let d64 a ← 1.5
+    let d64 b ← -2.25
+    let d64 z ← 0.0
+    print a.minimum(b)
+    print a.maximum(b)
+    print b.abs()
+    print b.sign()
+    print a.sign()
+    print z.sign()
+    print a ⤒ 2.0
+    print a ⤓ 1.0
+    let list<d64> ds ← [0.1, 0.2, 0.3]
+    print ds.sum()
+    print a.power(2)
+}

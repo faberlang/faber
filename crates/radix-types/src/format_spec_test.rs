@@ -178,7 +178,8 @@ fn validate_table() {
         (".2", Decimal, Ok(())),
         ("*>+10.3", Decimal, Ok(())),
         ("x", Decimal, Err(PartNotAllowed(Kind))),
-        ("e", Decimal, Err(PartNotAllowed(Kind))),
+        ("e", Decimal, Ok(())),
+        (".3e", Decimal, Ok(())),
         ("<05", Decimal, Err(PartNotAllowed(Zero))),
         ("iso", Decimal, Err(PresetNotAllowed)),
         ("*<8.3", Text, Ok(())),
@@ -406,6 +407,18 @@ fn render_magnus_handles_values_beyond_every_machine_integer() {
 fn decimal_render_table() {
     // (carrier, scale, spec, expected)
     let cases: &[(i128, u32, &str, &str)] = &[
+        (12_345, 1, "e", "1.2345e3"),
+        (12_345, 1, ".3e", "1.234e3"),
+        (125, 1, "e", "1.25e1"),
+        (125, 1, "+e", "+1.25e1"),
+        (-125, 1, "e", "-1.25e1"),
+        (1, 8, "e", "1e-8"),
+        (0, 8, "e", "0e0"),
+        (0, 8, ".3e", "0.000e0"),
+        (9_995, 2, ".1e", "1.0e2"),
+        (1_234_500, 3, ".2e", "1.23e3"),
+        (100, 0, "e", "1e2"),
+        (100, 0, ".2e", "1.00e2"),
         // Stored scale 8: 12.5, 0.25, 0.35, 3.375.
         (1_250_000_000, 8, ".2", "12.50"),
         (25_000_000, 8, ".1", "0.2"),

@@ -23,7 +23,7 @@ locale = "en"
 #     `mixed : int ∪ string` without authoring the member list by hand.
 #   • `list<∪>` learns heterogeneous element types the same way:
 #     `list<∪> nodes ← [1, "two", 3]` solves to `list<int ∪ string>`.
-#   • `T ∪ null` (canonical `T ∪ nihil`) is a single OPTIONAL inhabitant,
+#   • `T ∪ none` (la `T ∪ nihil`) is a single OPTIONAL inhabitant,
 #     not a multi-member sum — a `_` hole solved to it emits no shape
 #     warning.
 #
@@ -60,7 +60,7 @@ fn consume(int ∪ string value) → int {
     return 0
 }
 
-# `T ∪ null` is one optional inhabitant, so a `null` arm is the null case.
+# `T ∪ none` is one optional inhabitant, so a `case none` arm is the absent case.
 fn maybe_len(string ∪ none value) → int {
     match value {
         case none { return 0 }
@@ -79,7 +79,7 @@ test "the two hole kinds infer cleanly without shape warnings" {
     # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
     let list<∪> nodes ← [1, "two", 3]
 
-    # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
+    # `T ∪ none`: one optional inhabitant — `_` over it stays quiet.
     let string ∪ none opt ← "text"
     let _ maybe ← opt
 
@@ -106,7 +106,7 @@ main {
     # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
     let list<∪> nodes ← [1, "two", 3]
 
-    # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
+    # `T ∪ none`: one optional inhabitant — `_` over it stays quiet.
     let string ∪ none opt ← "text"
     let _ maybe ← opt
 

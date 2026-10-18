@@ -6,4 +6,5 @@ input = "tensor/placement-execution-v1.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
