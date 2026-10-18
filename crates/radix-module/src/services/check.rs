@@ -164,7 +164,18 @@ fn check_source_deferring_locale(
         return CheckDiagnosticsResult { diagnostics, success: false };
     }
 
-    let mut pass_config = crate::semantic::PassConfig::for_target(crate::codegen::Target::HirRust);
+    // A program bound to a target by a target-native import is checked for
+    // that target: `check` has no build target of its own to compare.
+    let check_target = program
+        .statements
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            crate::syntax::StmtKind::Import(decl) => decl.target.as_ref(),
+            _ => None,
+        })
+        .and_then(|word| crate::codegen::Target::from_import_word(interner.resolve(word.name)))
+        .unwrap_or(crate::codegen::Target::HirRust);
+    let mut pass_config = crate::semantic::PassConfig::for_target(check_target);
     // WHY: same pack seam as `cmd_check` — the resolved reader pack must reach
     // the semantic passes so localized intrinsic surfaces resolve to their
     // canonical registry names instead of falling through the unknown-method
