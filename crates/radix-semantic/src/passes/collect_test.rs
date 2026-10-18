@@ -124,6 +124,7 @@ fn inferred_import_name_collision_requests_explicit_alias() {
             alias: None,
             inferred: true,
         },
+        target: None,
         span: Span::default(),
     };
     let program = program(vec![
@@ -447,6 +448,7 @@ fn allows_duplicate_import_module_bindings() {
             alias: None,
             inferred: false,
         },
+        target: None,
         span: Span::default(),
     };
     let import2 = ImportDecl {
@@ -457,6 +459,7 @@ fn allows_duplicate_import_module_bindings() {
             alias: None,
             inferred: false,
         },
+        target: None,
         span: Span::default(),
     };
     let program = program(vec![
@@ -484,6 +487,7 @@ fn import_alias_binds_visible_name() {
             alias: Some(alias),
             inferred: false,
         },
+        target: None,
         span: Span::default(),
     };
     let program = program(vec![stmt(StmtKind::Import(import))]);

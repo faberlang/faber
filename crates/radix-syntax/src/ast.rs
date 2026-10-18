@@ -623,6 +623,11 @@ pub struct ImportDecl {
     /// Source visibility marker; package resolution interprets its reach.
     pub visibility: Visibility,
     pub kind: ImportKind,
+
+    /// Target word of a target-native import (`import python "math" m`),
+    /// exactly as spelled. `None` for an ordinary Faber import. When set,
+    /// `path` is the target's own module specifier, copied verbatim.
+    pub target: Option<Ident>,
     pub span: Span,
 }
 
