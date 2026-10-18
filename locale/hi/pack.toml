@@ -384,6 +384,10 @@ help = "spread तर्क से लेबल हटा दें"
 message = "कॉपी-इन ऑपरेटर `{operator}` के बाद एक मान आवश्यक है"
 help = "`⇇` के बाद स्रोत अभिव्यक्ति लिखें"
 
+[diagnostics.PARSE001.issues.sink_into_item_expected]
+message = "सिंक-इन ऑपरेटर `{operator}` के बाद एक आइटम आवश्यक है"
+help = "`⇜` के बाद आइटम अभिव्यक्ति लिखें"
+
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "टपल तत्व लेबल `{label}` एक से अधिक बार प्रयोग किया गया है"
 help = "प्रत्येक तत्व को अलग लेबल दें, या लेबल हटा दें"
@@ -759,6 +763,10 @@ help = "मान्य case expression उपयोग करें"
 [diagnostics.PARSE030]
 message = "अमान्य अभिव्यक्ति"
 help = "अभिव्यक्ति syntax जांचें"
+
+[diagnostics.PARSE030.issues.sink_into_chain]
+message = "'⇜' श्रृंखलाबद्ध नहीं होता"
+help = "प्रति कथन एक 'sink ⇜ item' लिखें; '⇜' एक ही लेखन है और उसमें श्रृंखला के लिए कोई परिणाम नहीं है"
 
 [diagnostics.PARSE030.issues.ceiling_floor_delimiters]
 message = "ceiling के delimiter `⌈` और `⌉` ceiling बंद करते हैं; `⌈x⌋` rounding का रूप नहीं है"
@@ -1475,6 +1483,10 @@ help = "लोअरिंग के लिए AST संरचना ठीक 
 [diagnostics.SEM008.issues.unknown_lowering_error]
 message = "HIR लोअरिंग विफल हुई"
 help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.sink_into_unsupported]
+message = "'⇜' सिंक-इन रूप का अभी कोई लोअरिंग नहीं है"
+help = "sinking अनुबंध बाद की इकाई में लोअर होगा; अभी के लिए '⇜' कथन हटा दें"
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "अज्ञात namespace"
