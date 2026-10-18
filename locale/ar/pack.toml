@@ -2732,6 +2732,10 @@ help = "استخدم chorda أو explicit byte conversion helpers"
 message = "لا تتحول {lista} إلى {textus}؛ نوع العنصر لا يحدد ترميز النص"
 help = "حوّل إلى lista<b8> أو lista<b16> أو lista<b32> أولاً ثم ↦ textus (فك UTF-8 أو UTF-16 أو UTF-32، وقد يفشل)؛ أو اعرض القائمة بسلسلة التنسيق \"§\"(xs)"
 
+[diagnostics.SEM016.issues.textus_to_lista_unsupported]
+message = "لا يتحول {textus} إلى {lista}؛ نوع العنصر لا يحدد ترميز النص"
+help = "رمّز بـ ↦ lista<b8> (أو lista<b16>/lista<b32>) واعمل من البايتات؛ أو ابنِ قائمة المحارف صراحة"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "conversion إلى {promissum} يعبر async/sync boundary؛ استخدم `@ futura` أو `.tum()` للـ async wrapping"
 help = "resolve أو wrap async value صراحة"
