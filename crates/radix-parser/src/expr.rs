@@ -134,6 +134,7 @@ impl Parser {
         let start = self.current_span();
         let expr = self.parse_ternary()?;
         let expr = self.parse_copy_into(expr, start)?;
+        let expr = self.parse_sink_into(expr, start)?;
         self.parse_assignment_tail(expr, start)
     }
 
@@ -174,6 +175,50 @@ impl Parser {
         Ok(Expr {
             id,
             kind: ExprKind::CopyInto(CopyIntoExpr { target, value }),
+            span,
+        })
+    }
+
+    /// Parse the `⇜` (U+21DC) sink-into suffix at the locked low precedence —
+    /// below assignment, above ternary.
+    ///
+    /// GRAMMAR:
+    ///   sink_into := ternary ('⇜' ternary)?
+    ///
+    /// WHY: `sink ⇜ item` delivers one `item` to the sinking contract of
+    /// `sink`. The sink is the complete expression already parsed (calls,
+    /// conversions, and string-constructor applications finished inside
+    /// `parse_ternary`'s postfix level); the item is a complete ternary so
+    /// binary operators group into the item, not around the statement. One `⇜`
+    /// is one write, so a second `⇜`, a following `⇇`, or a sink that is
+    /// already a copy-into is rejected here as a chain.
+    fn parse_sink_into(&mut self, sink: Expr, start: Span) -> Result<Expr, ParseError> {
+        if !self.check(&TokenKind::SinkInto) {
+            return Ok(sink);
+        }
+        if matches!(sink.kind, ExprKind::CopyInto(_)) {
+            return Err(self.invalid_expression_error("sink_into_chain"));
+        }
+
+        let sink = Box::new(sink);
+        self.advance();
+        if !Self::can_start_expression(&self.peek().kind) {
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, self.current_span())
+                    .with_arg("issue", "sink_into_item_expected")
+                    .with_arg("operator", "⇜"),
+            );
+        }
+        let item = Box::new(self.parse_ternary()?);
+        if self.check(&TokenKind::SinkInto) || self.check(&TokenKind::Transfer) {
+            return Err(self.invalid_expression_error("sink_into_chain"));
+        }
+
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        Ok(Expr {
+            id,
+            kind: ExprKind::SinkInto(SinkIntoExpr { sink, item }),
             span,
         })
     }

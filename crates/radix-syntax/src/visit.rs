@@ -623,6 +623,10 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             visitor.visit_expr(&copy.target);
             visitor.visit_expr(&copy.value);
         }
+        ExprKind::SinkInto(sink) => {
+            visitor.visit_expr(&sink.sink);
+            visitor.visit_expr(&sink.item);
+        }
         ExprKind::Trap(trap) => {
             visitor.visit_block(&trap.body);
         }

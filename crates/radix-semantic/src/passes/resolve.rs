@@ -1739,6 +1739,12 @@ fn resolve_expr(
             resolve_expr(resolver, interner, &expr.target, errors);
             resolve_expr(resolver, interner, &expr.value, errors);
         }
+        // `⇜` sink-into: name resolution walks sink and item so ordinary
+        // binding-wins lookup applies to both. Lowering is the follow-up unit.
+        ExprKind::SinkInto(expr) => {
+            resolve_expr(resolver, interner, &expr.sink, errors);
+            resolve_expr(resolver, interner, &expr.item, errors);
+        }
         // UT: the capture boundary's body is an ordinary block — binding-wins
         // lookup applies to every subexpression inside it.
         ExprKind::Trap(trap) => {

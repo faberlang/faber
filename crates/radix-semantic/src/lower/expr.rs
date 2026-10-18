@@ -45,6 +45,11 @@ use rustc_hash::FxHashSet;
 const GLYPH_TRANSPOSE_MARKER: &str = "__faber_glyph_transpose";
 const ROUNDING_GLYPH_MARKER: &str = "__faber_glyph_round:";
 
+/// TEMPORARY (unit 0c4d3dc1-4 replaces this with the real lowering): the `⇜`
+/// sink-into form has no lowering yet, so it fails closed with a named issue
+/// instead of reaching HIR.
+const ISSUE_SINK_INTO_UNSUPPORTED: &str = "sink_into_unsupported";
+
 /// Lower one AST expression into the HIR expression contract.
 ///
 /// The entry point owns the cross-cutting guarantees for this file: assign a
@@ -128,6 +133,15 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
         ExprKind::CopyInto(copy) => lowerer.lower_copy_into(copy),
+        // `⇜` sink-into fails closed until its lowering lands: the sink/item
+        // pair is not representable in HIR yet, so the placeholder errors.
+        ExprKind::SinkInto(sink) => {
+            lowerer.error_with_args_at(
+                vec![DiagnosticArg::new("issue", ISSUE_SINK_INTO_UNSUPPORTED)],
+                sink.item.span,
+            );
+            HirExpressionKind::Error
+        }
         ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
         ExprKind::Trap(trap) => lower_trap(lowerer, trap),
         ExprKind::CallDefault(call_default) => lower_call_default(lowerer, call_default),

@@ -425,6 +425,10 @@ help = "remove the label from the spread argument"
 message = "a value is required after the copy-in operator `{operator}`"
 help = "write the source expression after `⇇`"
 
+[diagnostics.PARSE001.issues.sink_into_item_expected]
+message = "res post operatorem iniectionis `{operator}` requiritur"
+help = "scribe expressionem rei post `⇜`"
+
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "tuple element label `{label}` is used more than once"
 help = "give each element a distinct label, or drop the labels"
@@ -985,6 +989,10 @@ help = "write the spec in quotes, like 'x ¶ \".2\"'; a computed spec is not all
 [diagnostics.PARSE030.issues.copy_into_chain]
 message = "'⇇' does not chain"
 help = "write one 'target ⇇ value' per statement; '⇇' has no result to chain"
+
+[diagnostics.PARSE030.issues.sink_into_chain]
+message = "'⇜' non catenatur"
+help = "scribe unum 'sink ⇜ res' per sententiam; '⇜' unus scriptus est, sine resultato catenando"
 
 [diagnostics.PARSE030.issues.format_chained]
 message = "'¶' does not chain"
@@ -1897,6 +1905,10 @@ help = "scribe latitudinem numero, ut vector<f32, 4>"
 [diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
 message = "dimensiones constructionis litteras, nomina magnitudinum, et sublatas scriptas admittunt"
 help = "termini affines in constructionibus nondum sustinentur"
+
+[diagnostics.SEM008.issues.sink_into_unsupported]
+message = "forma iniectionis '⇜' nondum in HIR deducitur"
+help = "contractus iniectionis in unitate posteriori deducetur; ad tempus sententiam '⇜' tolle"
 
 
 [diagnostics.SEM008.issues.unknown_namespace]

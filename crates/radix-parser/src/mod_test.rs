@@ -5562,6 +5562,62 @@ fn eot_transfer_missing_payload_rejected() {
     );
 }
 
+// =============================================================================
+// 0c4d3dc1 — `s ⇜ x` sink-into syntax
+// =============================================================================
+
+#[test]
+fn sink_into_statement_parses() {
+    let result = parse_ok("output \u{21dc} \"salve\\n\"");
+    let ExprKind::SinkInto(sink) = &eot_transfer_expr(&result).kind else {
+        panic!(
+            "expected sink-into expression, got {:?}",
+            eot_transfer_expr(&result).kind
+        );
+    };
+    let ExprKind::Ident(sink_name) = &sink.sink.kind else {
+        panic!("expected ident sink, got {:?}", sink.sink.kind);
+    };
+    assert_eq!(symbol_name(&result, sink_name.name), "output");
+    assert!(
+        matches!(sink.item.kind, ExprKind::Literal(Literal::String(_))),
+        "item is the string literal, got {:?}",
+        sink.item.kind
+    );
+}
+
+#[test]
+fn sink_into_chain_rejected() {
+    // One `⇜` is one write: neither a second `⇜` nor a following `⇇` is a
+    // chain of results.
+    assert_parse_error_matches(
+        r#"output ⇜ "a" ⇜ "b""#,
+        ParseExpectation::Issue("sink_into_chain"),
+    );
+    assert_parse_error_matches(
+        r#"output ⇜ "a" ⇇ "b""#,
+        ParseExpectation::Issue("sink_into_chain"),
+    );
+}
+
+#[test]
+fn sink_into_item_expected() {
+    assert_parse_error_matches(
+        r"output ⇜",
+        ParseExpectation::Issue("sink_into_item_expected"),
+    );
+}
+
+#[test]
+fn sink_into_copy_into_mix_rejected() {
+    // `a ⇇ b ⇜ c` reaches the sink-into suffix with a copy-into already
+    // parsed: that is a mixed chain, not a nested statement.
+    assert_parse_error_matches(
+        r#"output ⇇ "a" ⇜ "b""#,
+        ParseExpectation::Issue("sink_into_chain"),
+    );
+}
+
 struct EnSizePack;
 
 impl KeywordPack for EnSizePack {

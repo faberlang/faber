@@ -440,6 +440,12 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_go_expr(&copy.target, file, diagnostics);
             scan_go_expr(&copy.value, file, diagnostics);
         }
+        // `⇜` sink-into: walk the subexpressions only; semantic lowering fails
+        // closed until the sinking lowering lands.
+        ExprKind::SinkInto(sink) => {
+            scan_go_expr(&sink.sink, file, diagnostics);
+            scan_go_expr(&sink.item, file, diagnostics);
+        }
         ExprKind::Paren(expr) => scan_go_expr(expr, file, diagnostics),
         ExprKind::Format(format) => scan_go_expr(&format.value, file, diagnostics),
         ExprKind::Literal(_)
@@ -812,6 +818,12 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::CopyInto(copy) => {
             scan_rust_expr(&copy.target, file, diagnostics);
             scan_rust_expr(&copy.value, file, diagnostics);
+        }
+        // `⇜` sink-into: walk the subexpressions only; semantic lowering fails
+        // closed until the sinking lowering lands.
+        ExprKind::SinkInto(sink) => {
+            scan_rust_expr(&sink.sink, file, diagnostics);
+            scan_rust_expr(&sink.item, file, diagnostics);
         }
         ExprKind::Paren(expr) => scan_rust_expr(expr, file, diagnostics),
         ExprKind::Format(format) => scan_rust_expr(&format.value, file, diagnostics),
