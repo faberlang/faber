@@ -1063,6 +1063,10 @@ impl Validator<'_, '_> {
             if !(3..=4).contains(&call.args.len()) {
                 self.error(span, "collection TensorSlice expects 3 or 4 MIR arguments");
             }
+        } else if matches!(op, MirCollectionOp::TensorSliceNd) {
+            if call.args.len() != 6 {
+                self.error(span, "collection TensorSliceNd expects 6 MIR arguments");
+            }
         } else if matches!(op, MirCollectionOp::TensorBatchedAttention) {
             // This compiler-owned primitive has tensor peers followed by
             // shape/layout constants. Cache-aware projections may carry
@@ -2122,7 +2126,7 @@ impl Validator<'_, '_> {
                 );
             }
             MirCollectionOp::TensorSliceNd => {
-                // Placeholder so this exhaustive dispatch compiles; the full contract lands in 5433ed4f-3.2.
+                self.validate_tensor_slice_nd(scope, call, span);
             }
             MirCollectionOp::TensorGet => {
                 let Some(receiver_ty) = first_arg_ty else {
@@ -2503,6 +2507,76 @@ impl Validator<'_, '_> {
         }
         if !self.context.types.index_equals(dest_shape, src_shape) {
             self.error(span, "tensor copy-into shapes differ");
+        }
+    }
+
+    /// `TensorSliceNd(receiver, starts, ends, steps, keeps, inclusives)`: the
+    /// trapping multi-axis bracket-range view. The receiver is a tensor and the
+    /// result is a tensor — a view of the receiver storage, never a copy. The
+    /// five lists each carry one entry per receiver axis and share one length;
+    /// starts/ends/steps are integer lists and keeps/inclusives are `bivalens`
+    /// lists. Unbounded `lista<T>` types carry no static length, so only
+    /// bounded list capacities are held to the shared-axis rule.
+    fn validate_tensor_slice_nd(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        let receiver_ty = call
+            .args
+            .first()
+            .and_then(|arg| self.validate_operand(scope, arg, span));
+        if let Some(receiver_ty) = receiver_ty {
+            self.require_tensor_type(receiver_ty, span, "tensor slice-nd receiver is not tensor");
+        }
+        self.require_tensor_type(call.return_ty, span, "tensor slice-nd result is not tensor");
+        let mut axis_length: Option<u64> = None;
+        let mut length_error = false;
+        for (index, arg) in call.args.iter().enumerate().skip(1) {
+            let Some(arg_ty) = self.validate_operand(scope, arg, span) else {
+                continue;
+            };
+            let axis = match self.type_kind(arg_ty) {
+                Type::Array(element) => Some((*element, None)),
+                Type::BoundedArray { element, capacity } => Some((*element, Some(*capacity))),
+                _ => None,
+            };
+            let Some((element, capacity)) = axis else {
+                self.error(
+                    span,
+                    format!("tensor slice-nd argument {index} is not a lista"),
+                );
+                continue;
+            };
+            let element_ok = if index >= 4 {
+                matches!(
+                    self.context.types.get(element),
+                    Type::Primitive(Primitive::Bivalens)
+                )
+            } else {
+                self.is_numeric_integral_type(MirType::semantic(element))
+            };
+            if !element_ok {
+                self.error(
+                    span,
+                    format!("tensor slice-nd argument {index} has the wrong element type"),
+                );
+            }
+            let Some(capacity) = capacity else {
+                continue;
+            };
+            let IndexExpr::Literal(length) = *self.context.types.get_index(capacity) else {
+                continue;
+            };
+            match axis_length {
+                None => axis_length = Some(length),
+                Some(first) if first != length && !length_error => {
+                    self.error(span, "tensor slice-nd lists do not share one axis length");
+                    length_error = true;
+                }
+                Some(_) => {}
+            }
         }
     }
 
