@@ -135,6 +135,14 @@ pub struct TypeTable {
     /// `Closable`, DECISIONS D8.3) when this unit declares or imports it.
     /// `sermo` conforms without an `implet` clause.
     pub closing_contract: Option<DefId>,
+
+    /// The implendum marked `@ radix contract "sinking"` (norma's `Sink`, need
+    /// 0c4d3dc1) when this unit declares or imports it.
+    pub sinking_contract: Option<DefId>,
+
+    /// Selective import bindings that name the sinking contract. The compiler
+    /// supplies that contract, so backends emit no import for them.
+    pub sinking_contract_bindings: rustc_hash::FxHashSet<DefId>,
 }
 
 /// Opaque serialized view of a [`TypeTable`] for MIR images.
@@ -230,6 +238,8 @@ impl TypeTable {
             ordering_contract: None,
             ordering_contract_bindings: rustc_hash::FxHashSet::default(),
             closing_contract: None,
+            sinking_contract: None,
+            sinking_contract_bindings: rustc_hash::FxHashSet::default(),
         };
 
         for prim in REQUIRED_PRIMITIVES {
@@ -505,6 +515,8 @@ impl TypeTable {
             ordering_contract: None,
             ordering_contract_bindings: rustc_hash::FxHashSet::default(),
             closing_contract: None,
+            sinking_contract: None,
+            sinking_contract_bindings: rustc_hash::FxHashSet::default(),
         })
     }
 
