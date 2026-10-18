@@ -1164,6 +1164,12 @@ pub enum ExprKind {
     /// Copies every value of `value` into the existing storage of `target`;
     /// the whole expression is `vacuum`-shaped.
     CopyInto(CopyIntoExpr),
+    /// Sink-into statement: `sink ⇜ item` (U+21DC).
+    ///
+    /// Delivers one `item` to the sinking contract of `sink`; the whole
+    /// expression is `vacuum`-shaped. One `⇜` is one write, so the form has no
+    /// chain.
+    SinkInto(SinkIntoExpr),
     /// Capture boundary: `capta { body }`.
     ///
     /// Reifies the error channel into a value union (`success ∪ errata`). The
@@ -1230,6 +1236,16 @@ pub struct CopyIntoExpr {
     pub target: Box<Expr>,
     /// The value expression copied into the target.
     pub value: Box<Expr>,
+}
+
+/// Source shape for the `⇜` sink-into statement: `sink ⇜ item` delivers one
+/// `item` to the sinking contract implemented by `sink`.
+#[derive(Debug)]
+pub struct SinkIntoExpr {
+    /// The sinking receiver that consumes the item.
+    pub sink: Box<Expr>,
+    /// The item expression delivered to the sink.
+    pub item: Box<Expr>,
 }
 
 /// Source-owned clauses for the closed contextual reduction family.
