@@ -43,13 +43,16 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn bounded_ops_accipe_and_sectio_typecheck() {
+    // need Q3 (operator 2026-10-17): list `sectio` (slice) reports
+    // on the error channel the way `at` does, so a helper calling it needs
+    // `⇥ textus`; textus/ascii `sectio` keep trimming and need no handler.
     assert_accepts_la(
         r"functio probe(
     lista<numerus, 8> xs,
     textus<8> t,
     ascii<8> a,
     lista<b8, 8> o
-) → vacuum {
+) → vacuum ⇥ textus {
     sit numerus ∪ nihil got ← xs.accipe(0)
     sit lista<numerus> slice ← xs.sectio(0, 2)
     nota got
@@ -65,6 +68,18 @@ fn bounded_ops_accipe_and_sectio_typecheck() {
 incipit {
     nota 0
 }",
+    );
+    // The ruling's SEM011 pin: the same list `sectio` in a helper without
+    // an error channel is rejected.
+    assert_rejects_with_issue_la(
+        r"functio probe(lista<numerus, 8> xs) → vacuum {
+    nota xs.sectio(0, 2)
+}
+
+incipit {
+    nota 0
+}",
+        FAILABLE_ISSUE,
     );
 }
 
