@@ -22,8 +22,18 @@ LLM Guidance:
      faber explain --list --json
   6. Compatibility aliases (`lex`, `parse`, `hir`, `cli-ir`, `emit`) match `radix`
      for single-file inspection; package paths still prefer explicit `faber` commands.
+  7. Update this faber installation from the public release channel:
+     faber update --check
+     faber update
+     faber update --version <VERSION>   # switch installed versions / roll back
+     faber versions
 
 Common flows:
+  Install or update:
+    curl -fsSL https://raw.githubusercontent.com/faberlang/faber/main/install.sh | sh
+    faber update --check
+    faber update
+
   New package:
     faber init hello
     faber check hello
@@ -164,4 +174,6 @@ Output contract:
   - `targets`: capability rows on stdout
   - `doctor`: resolved library home and per-library availability as key=value on stdout
   - `check-library`: selected home/root as key=value on stdout; diagnostics on stderr
+  - `update --check`: current and latest version on stdout; exit 0 current, 1 update available, 2 lookup error
+  - `versions`: one installed version per line; `*` marks the active one
   - errors: stderr with hints (e.g. `faber explain --list`)

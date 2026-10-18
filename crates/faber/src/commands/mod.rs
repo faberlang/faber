@@ -55,10 +55,6 @@ mod run_stats;
 #[cfg(all(feature = "runner", test))]
 #[path = "run_stats_test.rs"]
 mod run_stats_test;
-pub(crate) mod self_update;
-#[cfg(test)]
-#[path = "self_update_test.rs"]
-mod self_update_test;
 pub(crate) mod targets;
 #[cfg(feature = "runner")]
 mod test;
@@ -70,6 +66,10 @@ mod test_stats_test;
 #[cfg(test)]
 #[path = "typed_zero_format_test.rs"]
 mod typed_zero_format_test;
+pub(crate) mod update;
+#[cfg(test)]
+#[path = "update_test.rs"]
+mod update_test;
 
 use crate::cli::Command;
 use clap::Parser;
@@ -91,10 +91,10 @@ use init::cmd_init;
 use model::cmd_model;
 #[cfg(feature = "runner")]
 use run::{cmd_eval, cmd_fmir_run_image, cmd_repl, cmd_run};
-use self_update::cmd_self;
 use targets::cmd_targets;
 #[cfg(feature = "runner")]
 use test::cmd_test;
+use update::{cmd_uninstall, cmd_update, cmd_versions};
 
 pub(crate) const PACKAGE_CHECK_MESSAGE: &str =
     "error: package checking is owned by the `faber` tool; rerun with `faber check --package`";
@@ -397,7 +397,9 @@ fn dispatch(command: Command) {
         }
         Command::Host(args) => cmd_host(args.command),
         Command::Model(args) => cmd_model(args.command),
-        Command::SelfManage(args) => cmd_self(&args),
+        Command::Update(args) => cmd_update(&args),
+        Command::Uninstall(args) => cmd_uninstall(&args),
+        Command::Versions(args) => cmd_versions(&args),
     }
 }
 

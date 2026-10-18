@@ -3,3 +3,5 @@
 # binary detection and would mangle them (CR bytes stripped) on renormalize.
 docs/** text eol=lf
 docs/**/*.bin binary
+# Exported public installer: keep the shell script LF in every checkout.
+install.sh text eol=lf

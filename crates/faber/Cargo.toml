@@ -50,6 +50,13 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # Embedded reader-locale packs: gzip via flate2 (already in the workspace lock
 # through zip's deflate backend). Build-time compressor + runtime decoder.
 flate2 = "1"
+# `faber update`: public release lookup, verified archive download, and the
+# versioned install layout. TLS is rustls (already linked via faber-leaf); the
+# updater does not shell out to curl or python3.
+ureq = { version = "2", default-features = false, features = ["tls"] }
+sha2 = "0.10"
+tar = "0.4"
+semver = "1"
 handroll = { path = "../handroll" }
 # Shared native leaves (core-norma N2): plan-time `solum:*` classification.
 faber-leaf = { path = "../faber-leaf" }

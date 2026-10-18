@@ -154,6 +154,15 @@ pub enum Command {
     /// Show resolved library home, probing provenance, and availability
     Doctor(DoctorArgs),
 
+    /// Check for or install a newer released faber
+    Update(crate::commands::update::UpdateArgs),
+
+    /// Remove installed faber versions (product files only)
+    Uninstall(crate::commands::update::UninstallArgs),
+
+    /// List installed faber versions and the active one
+    Versions(crate::commands::update::VersionsArgs),
+
     /// Report static runtime-cost classes over lowered MIR
     #[command(long_about = COST_LONG_ABOUT)]
     Cost(CostArgs),
@@ -227,10 +236,6 @@ pub enum Command {
 
     /// Inspect model file metadata (safetensors)
     Model(ModelArgs),
-
-    /// Manage this faber installation (update / uninstall)
-    #[command(name = "self")]
-    SelfManage(crate::commands::self_update::SelfManageArgs),
 }
 
 impl Command {
