@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/lista/sum-empty-float.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/sum-empty-float.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
