@@ -310,6 +310,14 @@ impl TypeChecker<'_> {
         if marker.is_some() || !self.is_shareable_payload(payload) {
             return;
         }
+        // A window `xs[lo ‥ hi]` is a copy, never a view, and the copy is
+        // shallow (operator ruling 2026-10-17, Q1/Q2): value elements share
+        // nothing with the source, so the window owns every slot it holds and
+        // needs no `copy`. Reference elements still alias their state and keep
+        // SEM065.
+        if self.is_value_element_window(init) {
+            return;
+        }
         // A wrapper passes its value's state through unchanged, so any
         // read-only root among the value branches is enough to reject; when
         // the initializer is a bare call (no place roots at all), a
@@ -564,6 +572,48 @@ impl TypeChecker<'_> {
             Type::Param(_) => false,
             _ => false,
         }
+    }
+
+    /// Whether `expr` is a window over a list whose elements are values, so
+    /// the window's own slots share nothing with the source.
+    ///
+    /// A window is `xs[lo ‥ hi]`: the object is a list or bounded list and the
+    /// index is an `Intervallum`, not a scalar element read. A bounded list
+    /// keeps its size, so `BoundedArray` counts too.
+    fn is_value_element_window(&self, expr: &HirExpression) -> bool {
+        let HirExpressionKind::Index(object, index) = &expr.kind else {
+            return false;
+        };
+        let Some(index_ty) = index.ty else {
+            return false;
+        };
+        if !matches!(
+            self.types.get(self.resolve_inferred_type(index_ty)),
+            Type::Intervallum(_)
+        ) {
+            return false;
+        }
+        let Some(object_ty) = self.place_type(object) else {
+            return false;
+        };
+        let object_ty = self.types.peel_access_marker(object_ty).1;
+        let element = match self.types.get(object_ty) {
+            Type::Array(element) => *element,
+            Type::BoundedArray { element, .. } => *element,
+            _ => return false,
+        };
+        !self.is_shareable_payload(element)
+    }
+
+    /// The resolved type of a place expression: its stamped type, else the
+    /// bound local's type for a bare path.
+    fn place_type(&self, expr: &HirExpression) -> Option<TypeId> {
+        let ty = match (expr.ty, &expr.kind) {
+            (Some(ty), _) => ty,
+            (None, HirExpressionKind::Path(def_id)) => self.lookup_binding(*def_id)?.ty,
+            (None, _) => return None,
+        };
+        Some(self.resolve_inferred_type(ty))
     }
 
     /// The local at the root of a path/field/index/deref chain.
