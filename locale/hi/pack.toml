@@ -2744,6 +2744,10 @@ help = "chorda या स्पष्ट byte conversion helpers का उप�
 message = "lista से textus में रूपांतरण नहीं होता; element type से text encoding तय नहीं होती"
 help = "पहले lista<b8>, lista<b16> या lista<b32> में बदलें, फिर ↦ textus (UTF-8, UTF-16 या UTF-32 decode, विफल हो सकता है); या format string \"§\"(xs) से lista दिखाएँ"
 
+[diagnostics.SEM016.issues.textus_to_lista_unsupported]
+message = "textus से lista में रूपांतरण नहीं होता; element type से text encoding तय नहीं होती"
+help = "↦ lista<b8> (या lista<b16>/lista<b32>) से encode करें और बाइट से काम करें; या characters की lista स्पष्ट रूप से बनाएँ"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "promissum में रूपांतरण async/sync boundary पार करता है; async wrapping के लिए `@ futura` या `.tum()` का उपयोग करें"
 help = "async value को स्पष्ट रूप से resolve या wrap करें"
