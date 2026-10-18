@@ -1,0 +1,64 @@
++++
+term = "sum-empty-float"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "return_clause", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = true
+summary = "Returns 0.0, not 0, for an empty float list."
+syntax = "<lista<float>>.sum()"
+related = ["prima", "ultima", "lista"]
+locale = "en"
++++
+# =============================================================================
+# summa — an empty float list sums to the float zero.
+# =============================================================================
+#
+# What this teaches:
+#   • `sum()` is the fold that starts at the element type's additive identity,
+#     so an empty `list<float>` sums to the float zero `0.0` — never to the
+#     integer `0`, and never to a trap.
+#   • Empty input is not a special case at the call site: the same `sum()` works
+#     on an empty list, a populated list, and a list bound inside a function that
+#     returns the fold.
+#
+# Common mistakes:
+#   • Assuming an empty `sum()` has no answer and guarding it — it has one, and
+#     the guard hides the type the fold carries.
+#   • Assuming the empty result is the integer `0`; it is `0.0`, the float
+#     additive identity of the element type.
+#
+# See also: prima, ultima, lista
+# =============================================================================
+
+# lista<T>.sum() additive identity on the empty list
+#
+# e.sum()                  -- sum of the elements, element type's zero when empty
+#
+# GRAMMAR:
+#   listDecl :← ('sit' | 'varia') 'lista<' type '>' ident '←' expr
+#   listSum  :← expr '.' 'summa' '(' ')'
+#
+# EXPECTED OUTPUT:
+#   0.0
+#   0.0
+#   true
+#   4.0
+#   0.0
+#
+# BACKEND: runner-pinned stdout (sum-empty-float.expected).
+
+main {
+    let list<float> e ← empty
+    print e.sum()
+    let float z ← e.sum()
+    print z
+    print e.sum() ≡ 0.0
+    let list<float> f ← [1.5, 2.5]
+    print f.sum()
+    print sum_return()
+}
+
+fn sum_return() → float {
+    let list<float> none_yet ← empty
+    return none_yet.sum()
+}
