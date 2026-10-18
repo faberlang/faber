@@ -40,15 +40,23 @@ impl KeywordPack for EnLikePack {
             "int" => Some("numerus"),
             "list" => Some("lista"),
             "none" => Some("nihil"),
+            "range" => Some("intervallum"),
+            "sparse" => Some("sparsa"),
             _ => None,
         }
     }
 
     fn type_surfaces(&self) -> Vec<(String, String)> {
-        [("numerus", "int"), ("lista", "list"), ("nihil", "none")]
-            .into_iter()
-            .map(|(latin, surface)| (latin.to_owned(), surface.to_owned()))
-            .collect()
+        [
+            ("numerus", "int"),
+            ("lista", "list"),
+            ("nihil", "none"),
+            ("intervallum", "range"),
+            ("sparsa", "sparse"),
+        ]
+        .into_iter()
+        .map(|(latin, surface)| (latin.to_owned(), surface.to_owned()))
+        .collect()
     }
 
     fn keyword_suggestion(&self, _text: &str) -> Option<String> {
@@ -121,6 +129,38 @@ fn en_file_rejects_latin_iuncta_type() {
 }
 
 #[test]
+fn en_file_rejects_latin_intervallum_type() {
+    let result = parse_en("fn f(intervallum<int> i) { }");
+    assert_eq!(
+        wrong_locale_types(&result),
+        vec!["intervallum".to_owned()],
+        "en file must reject Latin `intervallum`: {:?}",
+        result.errors
+    );
+    assert_eq!(
+        expected_of(&result).as_deref(),
+        Some("range"),
+        "`intervallum` must point at `range`"
+    );
+}
+
+#[test]
+fn en_file_rejects_latin_sparsa_type() {
+    let result = parse_en("fn f(sparsa<f32, [2, 3]> s) { }");
+    assert_eq!(
+        wrong_locale_types(&result),
+        vec!["sparsa".to_owned()],
+        "en file must reject Latin `sparsa`: {:?}",
+        result.errors
+    );
+    assert_eq!(
+        expected_of(&result).as_deref(),
+        Some("sparse"),
+        "`sparsa` must point at `sparse`"
+    );
+}
+
+#[test]
 fn en_file_names_its_own_spelling_in_the_diagnostic() {
     let result = parse_en("const numerus x = 1");
     let expected = result
@@ -135,6 +175,12 @@ fn en_file_names_its_own_spelling_in_the_diagnostic() {
 #[test]
 fn en_file_accepts_its_own_type_spellings() {
     let result = parse_en("const int x = 1\nfn f(list<int> xs, int ∪ none v) { }");
+    assert!(result.success(), "{:?}", result.errors);
+}
+
+#[test]
+fn en_file_accepts_english_range_and_sparse_type_spellings() {
+    let result = parse_en("fn f(range<int> r, sparse<f32, [2, 3]> s) { }");
     assert!(result.success(), "{:?}", result.errors);
 }
 
