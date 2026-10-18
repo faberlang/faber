@@ -360,6 +360,7 @@ fn kernel_range_expr_wire(
         Live::Maximum(lhs, rhs) => {
             KernelRangeExprWire::Maximum(Box::new(kernel_range_expr_wire(lhs)), Box::new(kernel_range_expr_wire(rhs)))
         }
+        Live::Parameter(def_id) => KernelRangeExprWire::Parameter(*def_id),
     }
 }
 

@@ -584,6 +584,7 @@ fn map_kernel_range_expr(
         radix_hir_fhir::KernelRangeExprWire::Maximum(lhs, rhs) => {
             Live::Maximum(Box::new(map_kernel_range_expr(*lhs)), Box::new(map_kernel_range_expr(*rhs)))
         }
+        radix_hir_fhir::KernelRangeExprWire::Parameter(def_id) => Live::Parameter(def_id),
     }
 }
 
