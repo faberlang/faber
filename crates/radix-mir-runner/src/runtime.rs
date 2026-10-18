@@ -1733,6 +1733,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorFlatten => self.tensor_flatten(args, span),
             MirCollectionOp::TensorMaterialize => self.tensor_materialize(args, span),
             MirCollectionOp::TensorSlice => self.tensor_slice(args, span),
+            MirCollectionOp::TensorSliceNd => {
+                Err(RunnerError::unsupported(span, "tensor slice-nd"))
+            }
             MirCollectionOp::TensorExpand => self.tensor_expand(args, span),
             MirCollectionOp::TensorShift => self.tensor_shift(args, span),
             MirCollectionOp::TensorCopyInto => self.tensor_copy_into(args, span),

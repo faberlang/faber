@@ -1017,6 +1017,8 @@ impl Validator<'_, '_> {
             MirCollectionOp::TensorRmsNorm
             | MirCollectionOp::TensorRope
             | MirCollectionOp::TensorRopeHalf => 4,
+            // [receiver, starts, ends, steps, keeps, inclusives]: one entry per axis.
+            MirCollectionOp::TensorSliceNd => 6,
             // Compiler-owned M3 lowering carries tensor peers followed by a
             // variable const contract: projections may carry fused rope and
             // bias peers, while scores/context/softmax carry their normal
@@ -2118,6 +2120,9 @@ impl Validator<'_, '_> {
                     span,
                     "tensor intrinsic result is not tensor",
                 );
+            }
+            MirCollectionOp::TensorSliceNd => {
+                // Placeholder so this exhaustive dispatch compiles; the full contract lands in 5433ed4f-3.2.
             }
             MirCollectionOp::TensorGet => {
                 let Some(receiver_ty) = first_arg_ty else {

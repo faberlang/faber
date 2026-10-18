@@ -830,6 +830,9 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::TensorFlatten,
         MirCollectionOp::TensorMaterialize,
         MirCollectionOp::TensorSlice,
+        // Bracket-range syntax surface (t[1..2, 0..3]): lowers from HIR slice
+        // expressions, not a method row.
+        MirCollectionOp::TensorSliceNd,
         // K6 zero-copy views: registry rows `expande` and `disloco`, probed
         // green by the direction-1 sweep (reachable, not permanent).
         MirCollectionOp::TensorExpand,
@@ -905,6 +908,9 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::IntervalMaterialize,
         // Statement surface: `target ⇇ value` lowers from HIR `CopyInto`.
         MirCollectionOp::TensorCopyInto,
+        // Bracket-range syntax surface (t[1..2, 0..3]): lowers from HIR slice
+        // expressions, not a method row.
+        MirCollectionOp::TensorSliceNd,
         // Lowering composite: the closure form of regex `muta` maps its closure
         // over the matches in a lowered loop, then joins the results (RX-5);
         // the registry row of `muta` names the literal op, not this one.
