@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/tuple-record-sized-literal.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/tuple-record-sized-literal.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
