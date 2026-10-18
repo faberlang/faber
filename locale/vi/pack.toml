@@ -2720,6 +2720,10 @@ help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte r
 message = "lista không chuyển đổi sang textus; kiểu phần tử không cho biết mã hóa văn bản"
 help = "chuyển sang lista<b8>, lista<b16> hoặc lista<b32> trước, rồi ↦ textus (giải mã UTF-8, UTF-16 hoặc UTF-32, có thể thất bại); hoặc hiển thị lista bằng chuỗi định dạng \"§\"(xs)"
 
+[diagnostics.SEM016.issues.textus_to_lista_unsupported]
+message = "textus không chuyển đổi sang lista; kiểu phần tử không cho biết mã hóa văn bản"
+help = "mã hóa bằng ↦ lista<b8> (hoặc lista<b16>/lista<b32>) rồi làm việc từ byte, hoặc dựng danh sách ký tự một cách rõ ràng"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "chuyển đổi sang promissum vượt qua ranh giới bất đồng bộ/đồng bộ; sử dụng `@ futura` hoặc `.tum()` để bọc bất đồng bộ"
 help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"

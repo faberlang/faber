@@ -2732,6 +2732,10 @@ help = "ใช้ chorda หรือ helper การแปลงไบต์�
 message = "lista ไม่แปลงเป็น textus; ชนิดของ element ไม่ระบุการเข้ารหัสข้อความ"
 help = "แปลงเป็น lista<b8>, lista<b16> หรือ lista<b32> ก่อน แล้ว ↦ textus (ถอดรหัส UTF-8, UTF-16 หรือ UTF-32 อาจล้มเหลว); หรือแสดง lista ด้วยสตริงรูปแบบ \"§\"(xs)"
 
+[diagnostics.SEM016.issues.textus_to_lista_unsupported]
+message = "textus ไม่แปลงเป็น lista; ชนิดของ element ไม่ระบุการเข้ารหัสข้อความ"
+help = "เข้ารหัสด้วย ↦ lista<b8> (หรือ lista<b16>/lista<b32>) แล้วทำงานจากไบต์ หรือสร้าง lista ของอักขระอย่างชัดเจน"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "การแปลงเป็น promissum ข้ามขอบเขต async/sync; ใช้ `@ futura` หรือ `.tum()` สำหรับการห่อแบบ async"
 help = "resolve หรือห่อค่า async อย่างชัดเจน"
