@@ -209,6 +209,27 @@ fn lista_textus_to_textus_conversio_rejects() {
 }
 
 #[test]
+fn textus_to_lista_of_textus_is_a_named_reject() {
+    test_support::assert_rejects_with_issue_la(
+        "incipit {\n  sit _ cs ← \"abc\" ↦ lista<textus>\n}",
+        "textus_to_lista_unsupported",
+    );
+}
+
+#[test]
+fn textus_to_lista_of_numerus_is_a_named_reject() {
+    test_support::assert_rejects_with_issue_la(
+        "incipit {\n  sit _ cs ← \"abc\" ↦ lista<numerus>\n}",
+        "textus_to_lista_unsupported",
+    );
+}
+
+#[test]
+fn textus_to_lista_of_bits_stays_accepted() {
+    test_support::assert_accepts_la("incipit {\n  sit _ b ← \"abc\" ↦ lista<b8>\n}");
+}
+
+#[test]
 fn bounded_lista_to_bounded_textus_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
         "incipit {\n  sit lista<numerus> base ← [1, 2]\n  sit lista<numerus, 8> raw ← base ↦ lista<numerus, 8>\n  sit textus<8> out ← raw ↦ textus<8>\n}",
