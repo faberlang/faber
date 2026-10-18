@@ -486,7 +486,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     }
 
     let result = if is_package {
-        radix::program::emit::compile_package(&config, &input_path, &super::faber_emission_seams())
+        package_compile_result(&config, &input_path, target)
     } else {
         let compiler = radix::module::Compiler::new(config.clone());
         compiler.compile(&input_path)
@@ -1153,6 +1153,28 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
         linter,
     );
     print!("{code}");
+}
+
+/// Route a package build to the emitter that owns the target.
+///
+/// `clif` is emitted by the package-MIR object emitter, whose capability
+/// classifier names the package shape when it is outside the CLIF subset;
+/// every other target keeps the plan-driven package emitter.
+#[cfg_attr(not(feature = "mir-clif"), allow(unused_variables))]
+fn package_compile_result(
+    config: &radix::module::Config,
+    input_path: &Path,
+    target: Target,
+) -> CompileResult {
+    #[cfg(feature = "mir-clif")]
+    if target == Target::MirClif {
+        return radix::program::emit::compile_package_clif(
+            config,
+            input_path,
+            &super::mir::faber_mir_seams(),
+        );
+    }
+    radix::program::emit::compile_package(config, input_path, &super::faber_emission_seams())
 }
 
 /// Compile a package `.fab` entry to metal-text through the interpreted
