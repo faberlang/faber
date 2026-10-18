@@ -1,0 +1,36 @@
++++
+term = "json"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "json_literal", "json_member", "json_value", "json_object", "json_string", "json_number", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A JSON object literal cannot repeat a key: the second occurrence rejects with SEM011:json_duplicate_key."
+syntax = "{ \"a\": 1, \"a\": 2 }"
+related = ["json"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:json_duplicate_key"
++++
+# =============================================================================
+# json — A JSON object literal cannot repeat a key
+# =============================================================================
+#
+# What this teaches:
+#   • An object literal like `{ "a": 1, "a": 2 }` is ambiguous: which value wins?
+#   • The typechecker rejects the second occurrence at its key, not the object as a whole
+#   • Nested objects are checked the same way
+#
+# Common mistakes:
+#   • Retyping an object and leaving an older key in place
+#
+# See also: json
+# =============================================================================
+
+# JSON duplicate-key reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let json a ← { "a": 1, "a": 2 }
+    print a
+}
