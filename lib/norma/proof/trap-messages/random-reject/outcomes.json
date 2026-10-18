@@ -12,6 +12,18 @@
       "phase": "run",
       "diagnostic_contains": "failable call failed",
       "reason": "The runner reports the random-argument trap as a clean nonzero exit with `error: InvalidArgument`; the generated Rust executable converts the same rejected argument into a panic (thread 'main' panicked at ...: failable call failed: \"InvalidArgument\", exit 101) instead of printing the trap diagnostic, so the rust lane's stderr is not the product error surface. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
+    },
+    "clif": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "clif-subset",
+      "reason": "The clif package emitter declines this case at emit: the MIR capability classifier reports the `clif-subset` issue before any code is generated, so the entropy leaf (`aleator`) is never lowered and the object is never linked. The clif lane carries no leaf port for `aleator` yet; re-measure this row when that port lands."
+    },
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
     }
   }
 }
