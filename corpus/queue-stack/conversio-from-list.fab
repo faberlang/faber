@@ -1,0 +1,50 @@
++++
+term = "queue-stack"
+kind = "concept"
+category = "collection"
+canonical = false
+locale = "en"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "conversio_expr", "expression", "literal", "nota_stmt"]
+summary = "A list fills a queue or a stack, and both convert back to a list in carrier order."
+syntax = "l ↦ queue<T> / l ↦ stack<T>"
+related = ["queue-stack", "lista", "↦"]
++++
+# =============================================================================
+# queue / stack — conversio from a list
+# =============================================================================
+#
+# What this teaches:
+#   • list → queue — `l ↦ queue<int>` keeps the insertion order, so the
+#     queue is FIFO with `1` at the front.
+#   • list → stack — `l ↦ stack<int>` keeps the same order in the carrier,
+#     so the stack's top is the last element, `3`.
+#   • queue → list and stack → list — the round trips preserve the carrier
+#     order untouched; they do not walk a queue or pop a stack.
+#   • printing a queue or a stack writes the list shape, `[1, 2, 3]`, for
+#     both kinds: the carrier order is what prints.
+#
+# Common mistakes:
+#   • expecting a stack to print reversed — the carrier order prints, and a
+#     stack reads it top-first only through `for from` or `remove_last`.
+#   • expecting `l ↦ queue<int>` to drain `l` — the source list is untouched.
+#
+# See also: queue-stack, lista, ↦
+# =============================================================================
+
+# list → queue / stack, and both back to a list
+#
+# WHY: pins the C2 conversio row end-to-end. The four prints are the two
+# carriers and the two round trips, all in carrier order.
+#
+# EXPECTED OUTPUT:
+#   conversio-from-list.expected — one value per print, in order.
+
+main {
+    let list<int> l ← [1, 2, 3]
+    let queue<int> q ← l ↦ queue<int>
+    let stack<int> s ← l ↦ stack<int>
+    print q
+    print s
+    print q ↦ list<int>
+    print s ↦ list<int>
+}
