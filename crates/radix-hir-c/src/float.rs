@@ -245,6 +245,7 @@ impl Emitter<'_> {
         let base = match function {
             MirMathFunction::Abs => "fabs",
             MirMathFunction::Sqrt => "sqrt",
+            MirMathFunction::Cbrt => "cbrt",
             MirMathFunction::Exp => "exp",
             MirMathFunction::Ln => "log",
             MirMathFunction::Log10 => "log10",
