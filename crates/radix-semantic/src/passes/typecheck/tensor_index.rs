@@ -7,7 +7,9 @@
 
 use crate::index::{IndexExpr, IndexId};
 use crate::{SemanticErrorKind, Type, TypeId};
-use radix_hir::{DefId, HirArrayElement, HirBinOp, HirExpression, HirExpressionKind, HirLiteral};
+use radix_hir::{
+    DefId, HirArrayElement, HirBinOp, HirExpression, HirExpressionKind, HirLiteral, HirRangeKind,
+};
 use radix_lexer::Span;
 
 #[allow(clippy::wildcard_imports)]
@@ -783,6 +785,7 @@ pub(super) fn classify_static_index_range(
     let resolved = checker.resolve_inferred_type(receiver_ty);
     let (_, payload) = checker.types.peel_access_marker(resolved);
     let receiver = checker.types.get(payload).clone();
+    let is_tensor = matches!(receiver, Type::Tensor(..));
     let bounds = match receiver {
         Type::BoundedArray { capacity, .. }
         | Type::BoundedTextus { capacity }
@@ -797,6 +800,39 @@ pub(super) fn classify_static_index_range(
         Type::Tensor(_, shape) | Type::Matrix(_, shape) => static_tensor_bounds(checker, shape),
         _ => return StaticIndexRange::Unknown,
     };
+    if is_tensor && bounds.len() == 1 {
+        if let HirExpressionKind::Intervallum {
+            start,
+            end,
+            step: _,
+            kind,
+        } = &index.kind
+        {
+            let Some(start) = static_signed_numerus_literal(start) else {
+                return StaticIndexRange::Unknown;
+            };
+            let Some(end) = static_signed_numerus_literal(end) else {
+                return StaticIndexRange::Unknown;
+            };
+            let bound = bounds[0];
+            let end_eff = if *kind == HirRangeKind::Inclusive {
+                end.checked_add(1).unwrap_or(i128::MAX)
+            } else {
+                end
+            };
+            let out_of_bounds = |value: i128| {
+                value < 0 || u128::try_from(value).map_or(true, |value| value >= u128::from(bound))
+            };
+            if out_of_bounds(start) || out_of_bounds(end_eff - 1) {
+                return StaticIndexRange::OutOfRange {
+                    indices: vec![start, end_eff - 1],
+                    bound,
+                    axis: 0,
+                };
+            }
+            return StaticIndexRange::InRange;
+        }
+    }
     let Some(indices) = static_index_literals(index) else {
         return StaticIndexRange::Unknown;
     };
