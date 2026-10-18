@@ -58,16 +58,30 @@ fn textus_to_numerus_relational_rejects() {
 }
 
 #[test]
-fn sectio_binding_scalar_order_typechecks() {
-    accepts(&compile(
-        r#"
+fn sectio_binding_mixed_ascii_order_rejects() {
+    // WHY: `s.sectio(0, 1)` types as a whole `textus` cord, and the runner has
+    // no `textus`/`ascii` comparison row; the mixed pair is refused here rather
+    // than passing the checker and aborting at run.
+    rejects_with_issue(
+        &compile(
+            r#"
 incipit {
     sit textus s ← "az"
     sit textus c ← s.sectio(0, 1)
     si c ≥ 'a' { nota "ok" }
 }
 "#,
-    ));
+        ),
+        "numeric_operands_required",
+    );
+}
+
+#[test]
+fn string_literal_vs_ascii_literal_order_rejects() {
+    rejects_with_issue(
+        &compile("incipit { si \"a\" ≺ 'b' { nota \"bad\" } }"),
+        "numeric_operands_required",
+    );
 }
 
 #[test]
@@ -220,9 +234,13 @@ fn char_literal_assigns_to_textus_slot() {
 }
 
 #[test]
-fn en_predicate_helper_closure_scalar_order_typechecks() {
-    accepts(&compile(
-        r#"
+fn en_predicate_helper_closure_mixed_ascii_order_rejects() {
+    // WHY: the predicate parameter is marked single-scalar text for the checker,
+    // but the helper passes it a one-scalar `textus` slice, and the runner has
+    // no `textus`/`ascii` ordering row.
+    rejects_with_issue(
+        &compile(
+            r#"
 functio keep_if(textus s, (textus) → bivalens pred) → textus {
     redde s
 }
@@ -231,12 +249,14 @@ incipit {
     sit textus out ← keep_if("abc", textus c ∴ c ≥ 'a' aut c ≤ 'z')
 }
 "#,
-    ));
+        ),
+        "numeric_operands_required",
+    );
 }
 
 // SEM011 / BB-2: char literals are BoundedAscii{1}. Relational compare is
-// code-point order for char pairs; mixed char/string stays rejected unless the
-// live single-scalar convention already accepts it.
+// code-point order for char pairs; a `textus` cord never orders against a
+// single `ascii` char, however short the cord is.
 
 #[test]
 fn bounded_ascii_one_literals_ge_typechecks() {
@@ -285,8 +305,14 @@ fn char_to_multi_char_string_relational_rejects() {
 }
 
 #[test]
-fn char_to_single_char_string_follows_scalar_convention() {
-    accepts(&compile("incipit { si 'a' ≥ \"x\" { nota \"ok\" } }"));
+fn char_to_single_char_string_order_rejects() {
+    // FLIPPED (F9): `'a'` is `BoundedAscii{1}` and `"x"` is a whole `textus`
+    // cord; the runner has no `textus`/`ascii` ordering row, so the mixed pair
+    // is refused at check instead of aborting at run.
+    rejects_with_issue(
+        &compile("incipit { si 'a' ≥ \"x\" { nota \"bad\" } }"),
+        "numeric_operands_required",
+    );
 }
 
 #[test]
