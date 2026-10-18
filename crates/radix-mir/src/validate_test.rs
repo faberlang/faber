@@ -6183,3 +6183,158 @@ fn dependent_parameter_axes_use_exact_actual_argument_witnesses() {
         );
     }
 }
+
+/// Build a one-function program whose block holds a single `TensorSliceNd`
+/// runtime call: `[receiver, starts, ends, steps, keeps, inclusives]`.
+fn tensor_slice_nd_program(
+    types: &mut TypeTable,
+    int_list_len: u64,
+    keeps_list_len: u64,
+    inclusives_list_len: u64,
+    arity: usize,
+) -> MirProgram {
+    let receiver_ty = MirType::semantic(tensor_type(types, Primitive::Fractus, &[2, 3]));
+    let numerus = types.primitive(Primitive::Numerus);
+    let starts_capacity = types.intern_index(IndexExpr::Literal(int_list_len));
+    let int_list_ty = MirType::semantic(types.bounded_array(numerus, starts_capacity));
+    let bivalens = types.primitive(Primitive::Bivalens);
+    let keeps_capacity = types.intern_index(IndexExpr::Literal(keeps_list_len));
+    let keeps_ty = MirType::semantic(types.bounded_array(bivalens, keeps_capacity));
+    let inclusives_capacity = types.intern_index(IndexExpr::Literal(inclusives_list_len));
+    let inclusives_ty = MirType::semantic(types.bounded_array(bivalens, inclusives_capacity));
+    let locals = vec![
+        MirLocal {
+            id: MirLocalId(0),
+            ty: receiver_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(1),
+            ty: int_list_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(2),
+            ty: keeps_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(3),
+            ty: inclusives_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+        MirLocal {
+            id: MirLocalId(4),
+            ty: receiver_ty,
+            name: None,
+            mutable: false,
+            span: Span::default(),
+        },
+    ];
+
+    let mut args = vec![local_operand(0)];
+    for index in 1..arity {
+        args.push(local_operand(match index {
+            1..=3 => 1,
+            4 => 2,
+            _ => 3,
+        }));
+    }
+
+    MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals,
+            temps: vec![],
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace {
+                            base: MirPlaceBase::Local(MirLocalId(4)),
+                            projections: vec![],
+                        }),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSliceNd),
+                            args,
+                            return_ty: receiver_ty,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    }
+}
+
+/// Operand reading a program local by index.
+fn local_operand(id: u32) -> MirOperand {
+    MirOperand::Place(MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(id)),
+        projections: vec![],
+    })
+}
+
+/// `TensorSliceNd` with one entry per axis on all five lists is valid.
+#[test]
+fn tensor_slice_nd_validates_six_arg_form() {
+    let mut types = TypeTable::new();
+    let program = tensor_slice_nd_program(&mut types, 2, 2, 2, 6);
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "six in-range axis lists must validate, got: {errors:?}"
+    );
+}
+
+/// Both the operand count and the shared axis length are enforced.
+#[test]
+fn tensor_slice_nd_rejects_arity_and_length_mismatch() {
+    let mut types = TypeTable::new();
+    let program = tensor_slice_nd_program(&mut types, 2, 2, 2, 5);
+    let errors = validate(&program, &types);
+    assert_eq!(
+        errors.len(),
+        1,
+        "five operands must report exactly one arity error, got: {errors:?}"
+    );
+    assert!(
+        errors[0].contains("collection TensorSliceNd expects 6 MIR arguments"),
+        "unexpected arity diagnostic: {errors:?}"
+    );
+
+    let mut types = TypeTable::new();
+    let program = tensor_slice_nd_program(&mut types, 2, 3, 2, 6);
+    let errors = validate(&program, &types);
+    assert_eq!(
+        errors.len(),
+        1,
+        "a keeps list longer than the starts list must report exactly one length error, got: {errors:?}"
+    );
+    assert!(
+        errors[0].contains("tensor slice-nd lists do not share one axis length"),
+        "unexpected length diagnostic: {errors:?}"
+    );
+}
