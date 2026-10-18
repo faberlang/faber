@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/copia/filter-map.fab"
+group = "language"
+input_root = "corpus"
+input = "copia/filter-map.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

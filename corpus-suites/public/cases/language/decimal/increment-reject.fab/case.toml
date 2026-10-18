@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/decimal/increment-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/increment-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "postfix_inc_dec_numerus_operand"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "postfix_inc_dec_numerus_operand"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM011:postfix_inc_dec_numerus_operand"

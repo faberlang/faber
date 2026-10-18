@@ -1,10 +1,10 @@
-//! Leaf identity pins: route prefixes, builtins, and the N2 set.
+//! Leaf identity pins: route prefixes, builtins, and the declared set.
 
 use super::Leaf;
 use crate::Target;
 
 #[test]
-fn from_route_maps_each_n2_family() {
+fn from_route_maps_each_declared_family() {
     assert_eq!(Leaf::from_route("solum:lege"), Some(Leaf::Fs));
     assert_eq!(Leaf::from_route("consolum:dic"), Some(Leaf::Stdio));
     assert_eq!(Leaf::from_route("processus:argumenta"), Some(Leaf::Process));
@@ -24,7 +24,7 @@ fn builtins_and_unknown_routes_are_not_leaves() {
 }
 
 #[test]
-fn all_is_the_n2_set() {
+fn all_is_the_declared_set() {
     assert_eq!(
         Leaf::ALL,
         &[
@@ -36,7 +36,7 @@ fn all_is_the_n2_set() {
             Leaf::Tcp,
             Leaf::Http,
             Leaf::Websocket,
-            Leaf::Machine
+            Leaf::Machine,
         ]
     );
 }
@@ -53,6 +53,7 @@ fn supported_leaves_go_is_exactly_the_ported_set() {
         Leaf::Tcp,
         Leaf::Http,
         Leaf::Websocket,
+        Leaf::Machine,
     ] {
         assert!(
             !Target::HirGo.supports_leaf(leaf),

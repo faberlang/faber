@@ -1,0 +1,40 @@
++++
+term = "d64 increment"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "assignment", "place", "inc_dec_stmt", "expression", "literal"]
+category = "arithmetic"
+canonical = false
+summary = "Postfix ↑/↓ take integer operands only; on d64 the runner would otherwise add one 10^-8 carrier unit (1.5 → 1.50000001), wrong under the decimal model — increment an `int`, or write `d ← d + 1.0`."
+syntax = "d64"
+related = ["numerus", "d64"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:postfix_inc_dec_numerus_operand"
++++
+# =============================================================================
+# d64 increment — postfix ↑/↓ reject on decimal operands
+# =============================================================================
+#
+# What this teaches:
+#   • Postfix `↑`/`↓` take integer operands only (Q-L4 ruling, 2026-10-15).
+#     On a `d64` the runner would otherwise add one 10^-8 carrier unit
+#     (1.5 → 1.50000001), wrong under the decimal model.
+#   • The operand fails closed at check time with
+#     `SEM011:postfix_inc_dec_numerus_operand`, the same diagnostic a float
+#     operand gets.
+#
+# Common mistakes:
+#   • incrementing money — increment an `int`, or write `d ← d + 1.0`
+#
+# See also: numerus, d64
+# =============================================================================
+
+# decimal/increment-reject — d64 is not an integer operand
+#
+# WHY: one carrier unit is not the value one; `↑` would silently corrupt a
+# decimal, so it must reject, as it does for floats.
+
+main {
+    mut d64 d ← 1.5
+    d ↑
+}
