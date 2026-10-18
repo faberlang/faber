@@ -4290,6 +4290,10 @@ mod stats_test;
 mod format_value_test;
 
 #[cfg(test)]
+#[path = "scribe_scriptum_parity_test.rs"]
+mod scribe_scriptum_parity_test;
+
+#[cfg(test)]
 #[path = "shuffle_test.rs"]
 mod shuffle_test;
 
