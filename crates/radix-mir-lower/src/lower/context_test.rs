@@ -127,6 +127,7 @@ fn import_unit(hir_name: &str, hir_alias: Option<&str>, binding: &str, decoy: bo
                 visibility: Visibility::Privata,
                 items: vec![HirImportItem { def_id: import_item_def_id, name, alias }],
                 selective: false,
+                target: None,
             }),
             span: Span::default(),
         }],

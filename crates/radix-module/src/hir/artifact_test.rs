@@ -292,6 +292,7 @@ fn selective_import_survives_module_hir_load() {
                 },
             ],
             selective: true,
+            target: None,
         }),
         span: radix_lexer::Span::default(),
     });

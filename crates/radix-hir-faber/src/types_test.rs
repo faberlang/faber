@@ -503,6 +503,7 @@ fn multi_import_emits_all_items() {
             },
         ],
         selective: false,
+        target: None,
     };
 
     let program = HirModule {
@@ -1361,6 +1362,7 @@ fn import_privata_emits_no_visibility_keyword() {
             alias: None,
         }],
         selective: false,
+        target: None,
     };
 
     let program = HirModule {
@@ -1432,6 +1434,7 @@ fn selective_import_program(interner: &mut Interner, publica: bool) -> HirModule
             },
         ],
         selective: true,
+        target: None,
     };
 
     HirModule {
@@ -1518,6 +1521,7 @@ fn selective_import_identity_alias_collapses_to_member_name() {
             alias: Some(funde),
         }],
         selective: true,
+        target: None,
     };
 
     let program = HirModule {
@@ -1930,6 +1934,7 @@ fn import_publica_annotation_reemits() {
                 alias: None,
             }],
             selective: false,
+            target: None,
         }),
         span: span(),
     };
