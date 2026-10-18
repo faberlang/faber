@@ -403,8 +403,10 @@ impl Target {
     /// Rust and the runner (`fmir*`, stepper) share `faber-leaf`. Faber
     /// re-emit and FHIR keep the `call` in the artifact. Go declares exactly
     /// the leaves its `runtime/go` ports implement (clock 4/4, entropy 5/5,
-    /// stdio 17/17 routes). Every other emit target has no native leaf port
-    /// and must fail closed.
+    /// stdio 17/17 routes). Wasm text declares stdio: the WAT probe carries
+    /// the closed-set v1 stdio rows, so the leaf gate admits them and the
+    /// probe's own per-shape refusals decide what is emittable. Every other
+    /// emit target has no native leaf port and must fail closed.
     #[must_use]
     pub fn supported_leaves(self) -> &'static [Leaf] {
         match self {
@@ -416,6 +418,7 @@ impl Target {
             | Target::HirFaber
             | Target::HirFhir => Leaf::ALL,
             Target::HirGo => &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy],
+            Target::MirWasm => &[Leaf::Stdio],
             Target::HirTypeScript
             | Target::HirSwift
             | Target::HirPython
@@ -425,7 +428,6 @@ impl Target {
             | Target::HirFortran
             | Target::HirOdin
             | Target::HirC
-            | Target::MirWasm
             | Target::MirLlvm
             | Target::MirLlvmHost
             | Target::MirClif

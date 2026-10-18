@@ -62,6 +62,27 @@ fn supported_leaves_go_is_exactly_the_ported_set() {
 }
 
 #[test]
+fn supported_leaves_wasm_is_stdio_only() {
+    assert_eq!(Target::MirWasm.supported_leaves(), &[Leaf::Stdio]);
+    assert!(Target::MirWasm.supports_leaf(Leaf::Stdio));
+    for leaf in [
+        Leaf::Fs,
+        Leaf::Process,
+        Leaf::Clock,
+        Leaf::Entropy,
+        Leaf::Tcp,
+        Leaf::Http,
+        Leaf::Websocket,
+        Leaf::Machine,
+    ] {
+        assert!(
+            !Target::MirWasm.supports_leaf(leaf),
+            "wasm must refuse {leaf:?}: no WAT probe carrier"
+        );
+    }
+}
+
+#[test]
 fn supported_leaves_other_emit_targets_refuse_every_leaf() {
     for target in Target::ALL {
         if matches!(
@@ -74,6 +95,7 @@ fn supported_leaves_other_emit_targets_refuse_every_leaf() {
                 | Target::HirFaber
                 | Target::HirFhir
                 | Target::HirGo
+                | Target::MirWasm
         ) {
             continue;
         }
