@@ -2329,6 +2329,30 @@ fn sink_into_token_scan() {
 }
 
 // =============================================================================
+// Prefix radicals — U+221A / U+221B / U+221C exact tokens
+// =============================================================================
+
+#[test]
+fn radical_glyphs_scan_as_prefix_operators() {
+    let cases = [
+        ("√ x", TokenKind::RadicalSqrt),
+        ("∛ y", TokenKind::RadicalCbrt),
+        ("∜ z", TokenKind::RadicalFourth),
+    ];
+    for (source, glyph) in cases {
+        let result = lex(source);
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        assert_eq!(result.tokens.len(), 3);
+        assert_eq!(result.tokens[0].kind, glyph);
+        assert!(matches!(result.tokens[1].kind, TokenKind::Ident(_)));
+        assert_eq!(result.tokens[2].kind, TokenKind::Eof);
+    }
+    assert_eq!('\u{221A}', '√');
+    assert_eq!('\u{221B}', '∛');
+    assert_eq!('\u{221C}', '∜');
+}
+
+// =============================================================================
 // EOT-3L — U+21C7 exact-output transfer token
 // =============================================================================
 // U+21C7 (`⇇`) is one exact operator token, never a keyword. The scanner maps
