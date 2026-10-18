@@ -676,7 +676,7 @@ fn layout_kind_for_type(
         | Type::Cursor(_)
         | Type::Queue(_)
         | Type::Stack(_)
-        | Type::Intervallum(_)
+        | Type::Intervallum(..)
         | Type::Ref(_, _)
         | Type::Interface(_)
         | Type::Func(_)

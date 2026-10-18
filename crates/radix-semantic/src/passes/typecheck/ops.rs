@@ -1035,7 +1035,7 @@ impl TypeChecker<'_> {
             | Type::Matrix(inner, _)
             | Type::Vector(inner, _)
             | Type::Atomic(inner)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Option(inner) => self.destination_type_has_inference_hole_inner(*inner, seen),
             Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.destination_type_has_inference_hole_inner(*key, seen)

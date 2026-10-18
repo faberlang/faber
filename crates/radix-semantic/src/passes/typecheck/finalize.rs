@@ -431,7 +431,7 @@ impl TypeChecker<'_> {
             Type::Matrix(elem, _) => self.type_has_unsolved_union_hole(*elem),
             Type::Sparsa(elem, _) => self.type_has_unsolved_union_hole(*elem),
             Type::Atomic(elem) => self.type_has_unsolved_union_hole(*elem),
-            Type::Intervallum(elem) => self.type_has_unsolved_union_hole(*elem),
+            Type::Intervallum(elem, _) => self.type_has_unsolved_union_hole(*elem),
             Type::Applied(base, args) => {
                 self.type_has_unsolved_union_hole(*base)
                     || args.iter().any(|arg| match arg {
@@ -596,7 +596,7 @@ impl TypeChecker<'_> {
             Type::Matrix(elem, _) => self.collect_hole_shape_warnings(elem, span),
             Type::Sparsa(elem, _) => self.collect_hole_shape_warnings(elem, span),
             Type::Atomic(elem) => self.collect_hole_shape_warnings(elem, span),
-            Type::Intervallum(elem) => self.collect_hole_shape_warnings(elem, span),
+            Type::Intervallum(elem, _) => self.collect_hole_shape_warnings(elem, span),
             Type::Applied(base, args) => {
                 self.collect_hole_shape_warnings(base, span);
                 for arg in args {

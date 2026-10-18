@@ -541,7 +541,7 @@ fn describe(ty: &Type) -> &'static str {
         | Type::Cursor(_)
         | Type::AsyncCursor(..) => "async or generator type",
         Type::Atomic(_) => "atomic type",
-        Type::Intervallum(_) => "range type",
+        Type::Intervallum(..) => "range type",
         Type::Bits(_) => "raw-bits type",
         Type::SizedInstans(_) => "time instant type",
         Type::Intersection(_) => "intersection type",

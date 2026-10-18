@@ -469,7 +469,7 @@ fn type_param_in(
         | Type::Promissum(inner)
         | Type::Cursor(inner)
         | Type::Atomic(inner)
-        | Type::Intervallum(inner)
+        | Type::Intervallum(inner, _)
         | Type::Set(inner)
         | Type::Queue(inner)
         | Type::Stack(inner)

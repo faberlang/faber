@@ -346,7 +346,7 @@ impl UseVisitor<'_> {
             | Type::Queue(inner)
             | Type::Stack(inner)
             | Type::Atomic(inner)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Option(inner)
             | Type::Ref(_, inner) => vec![inner],
             Type::BoundedArray { element, .. }

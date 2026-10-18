@@ -298,7 +298,7 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
         }
         // An integer interval is a runtime list of start, end and the
         // inclusive flag.
-        Type::Intervallum(element) => match resolve(table, *element) {
+        Type::Intervallum(element, _) => match resolve(table, *element) {
             Type::Primitive(Primitive::Numerus) => Ok(Rep::Tuple),
             _ => Err(Decline::new("interval of non-integers")),
         },

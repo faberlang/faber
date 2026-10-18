@@ -1329,7 +1329,7 @@ impl TypeChecker<'_> {
             | Type::Option(inner)
             | Type::Ref(_, inner)
             | Type::Alias(_, inner)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Atomic(inner) => {
                 self.valor_extraction_type_has_non_textus_map_key(*inner, seen)
             }
@@ -1378,7 +1378,7 @@ impl TypeChecker<'_> {
             | Type::Option(inner)
             | Type::Ref(_, inner)
             | Type::Alias(_, inner)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Atomic(inner) => {
                 self.valor_extraction_type_needs_missing_width_runtime(*inner, true, seen)
             }
@@ -3056,7 +3056,7 @@ impl TypeChecker<'_> {
                 | Type::Option(_)
                 | Type::Ref(_, _)
                 | Type::Atomic(_)
-                | Type::Intervallum(_)
+                | Type::Intervallum(..)
                 | Type::Alias(_, _)
                 | Type::Union(_)
                 | Type::Tuple(_)
@@ -4083,7 +4083,7 @@ impl TypeChecker<'_> {
             | Type::Matrix(inner, _)
             | Type::Vector(inner, _)
             | Type::Atomic(inner)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Option(inner) => self.verte_type_has_inference_hole_inner(*inner, seen),
             Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.verte_type_has_inference_hole_inner(*key, seen)

@@ -54,6 +54,10 @@ impl TypeChecker<'_> {
             self.register_local_closing_contract(def_id, interface, span);
             return;
         }
+        if role == Some(RadixContractRole::Sinking) {
+            self.register_local_sinking_contract(def_id, interface, span);
+            return;
+        }
         if role != Some(RadixContractRole::Ordering) {
             return;
         }

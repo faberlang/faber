@@ -232,7 +232,7 @@ impl ConversioTypeFamily {
             Type::Array(_) | Type::BoundedArray { .. } => Some(Self::Lista),
             Type::Map(_, _) => Some(Self::Tabula),
             Type::Set(_) => Some(Self::Copia),
-            Type::Intervallum(_) => Some(Self::Intervallum),
+            Type::Intervallum(..) => Some(Self::Intervallum),
             Type::Tensor(_, _) => Some(Self::Tensor),
             Type::Vector(_, _) => Some(Self::Vector),
             Type::Matrix(_, _) => Some(Self::Matrix),

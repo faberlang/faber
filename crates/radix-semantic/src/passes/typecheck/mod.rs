@@ -190,6 +190,7 @@ pub use numeric_twin::{
 };
 pub mod ops;
 mod ordering;
+mod sinking;
 mod store;
 
 #[cfg(test)]
@@ -228,6 +229,9 @@ mod reduction_test;
 pub mod relations_test;
 pub mod scalar_text;
 pub mod sermo_route;
+#[cfg(test)]
+#[path = "sinking_test.rs"]
+mod sinking_test;
 pub mod stmt;
 pub mod tensor_index;
 pub mod tensor_type_directed;

@@ -836,7 +836,7 @@ fn collect_value_parameter_extents(
         | Type::Promissum(inner)
         | Type::Cursor(inner)
         | Type::Atomic(inner)
-        | Type::Intervallum(inner)
+        | Type::Intervallum(inner, _)
         | Type::Option(inner)
         | Type::Ref(_, inner)
         | Type::Alias(_, inner) => check_type(*inner, seen_types, seen_indices, out),

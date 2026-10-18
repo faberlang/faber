@@ -77,7 +77,7 @@ impl TypeChecker<'_> {
             | Type::Promissum(inner)
             | Type::Cursor(inner)
             | Type::Atomic(inner)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Set(inner)
             | Type::Alias(_, inner)
             | Type::Tensor(inner, _)
@@ -707,7 +707,7 @@ impl TypeChecker<'_> {
                 let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
                 return self.types.atomic(inner);
             }
-            (Type::Intervallum(inner_a), Type::Intervallum(inner_b)) => {
+            (Type::Intervallum(inner_a, _), Type::Intervallum(inner_b, _)) => {
                 let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
                 return self.types.intervallum(inner);
             }
