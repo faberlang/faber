@@ -227,3 +227,28 @@ fn lowers_cli_entry_is_exactly_rust_ts_py_go_wasm_clif() {
         ]
     );
 }
+
+#[test]
+fn import_words_name_source_languages_only() {
+    assert_eq!(Target::from_import_word("python"), Some(Target::HirPython));
+    assert_eq!(Target::from_import_word("ts"), Some(Target::HirTypeScript));
+    assert_eq!(
+        Target::from_import_word("typescript"),
+        Some(Target::HirTypeScript)
+    );
+    assert_eq!(Target::from_import_word("rs"), Some(Target::HirRust));
+    // Not languages whose modules an import can name.
+    for word in [
+        "faber",
+        "fhir",
+        "stepper",
+        "fmir",
+        "wasm-text",
+        "metal-text",
+        "sexp",
+    ] {
+        assert_eq!(Target::from_import_word(word), None, "{word}");
+    }
+    assert_eq!(Target::nearest_import_word("pyton"), Some("python"));
+    assert_eq!(Target::nearest_import_word("zzzzzzzz"), None);
+}
