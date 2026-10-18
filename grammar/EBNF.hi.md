@@ -429,7 +429,7 @@ call_marker ::= 'से' | 'चर' | 'स्वामित्व' | 'प्र
 # [209] template_argument
 template_argument ::= 'फैलाओ'? IDENTIFIER ':' expression
 # [210] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'शून्यवत्' | '∞' | 'nan'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'अभाव' | '∞' | 'nan'
 # [211] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [212] primary
@@ -982,7 +982,7 @@ productions. It is not a second keyword authority.
 | Diagnostics | `दिखाओ` | note |
 | Annotation | `कर्नेल` | kernel annotation |
 | JSON | `null` | JSON null |
-| Literals | `शून्यवत्` | null |
+| Literals | `अभाव` | null |
 | Expression | `गिनती` | count reduction operator (en `count`) |
 | Testing | `छोड़ो` | skip |
 | Params | `सभी` | all reduction operator / glob |
@@ -2385,11 +2385,11 @@ test on the value. They never convert and never compare values; a value spelling
 on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
 pointing at the equality family. The null type is the one type spelling that also
 names a literal slot: `x है nihil` tests the null *type*, while the null *value*
-is `शून्यवत्` (`null` in the English reader).
+is `अभाव` (`null` in the English reader).
 Use `≡` / `≢` for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr ≡ सत्य`,
-`expr ≡ असत्य`, `expr ≡ शून्यवत्`, `expr है nihil` (the null *type* test),
+`expr ≡ असत्य`, `expr ≡ अभाव`, `expr है nihil` (the null *type* test),
 `expr ≺ 0`, or `expr ≻ 0`.
 
 The ASCII spellings `<` and `>` are not comparison operators — they are generic delimiters only. The parser rejects one in comparison position with `PARSE030 comparison_ascii_retired` (operator ruling TZ-2); write `≺` and `≻`.

@@ -429,7 +429,7 @@ call_marker ::= 'จาก' | 'แปร' | 'เป็นเจ้าของ' 
 # [209] template_argument
 template_argument ::= 'กระจาย'? IDENTIFIER ':' expression
 # [210] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ว่างเปล่า' | '∞' | 'nan'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'จริง' | 'เท็จ' | 'ขาดหาย' | '∞' | 'nan'
 # [211] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [212] primary
@@ -982,7 +982,7 @@ productions. It is not a second keyword authority.
 | Diagnostics | `บันทึก` | note |
 | Annotation | `เคอร์เนล` | kernel annotation |
 | JSON | `null` | JSON null |
-| Literals | `ว่างเปล่า` | null |
+| Literals | `ขาดหาย` | null |
 | Expression | `นับ` | count reduction operator (en `count`) |
 | Testing | `ละเว้น` | skip |
 | Params | `ทั้งหมด` | all reduction operator / glob |
@@ -2385,11 +2385,11 @@ test on the value. They never convert and never compare values; a value spelling
 on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
 pointing at the equality family. The null type is the one type spelling that also
 names a literal slot: `x เป็น nihil` tests the null *type*, while the null *value*
-is `ว่างเปล่า` (`null` in the English reader).
+is `ขาดหาย` (`null` in the English reader).
 Use `≡` / `≢` for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr ≡ จริง`,
-`expr ≡ เท็จ`, `expr ≡ ว่างเปล่า`, `expr เป็น nihil` (the null *type* test),
+`expr ≡ เท็จ`, `expr ≡ ขาดหาย`, `expr เป็น nihil` (the null *type* test),
 `expr ≺ 0`, or `expr ≻ 0`.
 
 The ASCII spellings `<` and `>` are not comparison operators — they are generic delimiters only. The parser rejects one in comparison position with `PARSE030 comparison_ascii_retired` (operator ruling TZ-2); write `≺` and `≻`.

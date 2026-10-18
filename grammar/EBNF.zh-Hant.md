@@ -429,7 +429,7 @@ call_marker ::= '從' | '變值' | '擁有' | '拷貝'
 # [209] template_argument
 template_argument ::= '展開'? IDENTIFIER ':' expression
 # [210] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '可空' | '∞' | 'nan'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '缺失' | '∞' | 'nan'
 # [211] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [212] primary
@@ -982,7 +982,7 @@ productions. It is not a second keyword authority.
 | Diagnostics | `註記` | note |
 | Annotation | `內核` | kernel annotation |
 | JSON | `null` | JSON null |
-| Literals | `可空` | null |
+| Literals | `缺失` | null |
 | Expression | `計數` | count reduction operator (en `count`) |
 | Testing | `略過` | skip |
 | Params | `全部` | all reduction operator / glob |
@@ -2385,11 +2385,11 @@ test on the value. They never convert and never compare values; a value spelling
 on the right is rejected in the reader's own words (`SEM011:est_value_rhs`),
 pointing at the equality family. The null type is the one type spelling that also
 names a literal slot: `x 是 nihil` tests the null *type*, while the null *value*
-is `可空` (`null` in the English reader).
+is `缺失` (`null` in the English reader).
 Use `≡` / `≢` for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr ≡ 真`,
-`expr ≡ 假`, `expr ≡ 可空`, `expr 是 nihil` (the null *type* test),
+`expr ≡ 假`, `expr ≡ 缺失`, `expr 是 nihil` (the null *type* test),
 `expr ≺ 0`, or `expr ≻ 0`.
 
 The ASCII spellings `<` and `>` are not comparison operators — they are generic delimiters only. The parser rejects one in comparison position with `PARSE030 comparison_ascii_retired` (operator ruling TZ-2); write `≺` and `≻`.
