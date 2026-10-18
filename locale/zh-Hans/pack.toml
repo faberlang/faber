@@ -2776,6 +2776,10 @@ help = "使用 chorda 或显式 byte conversion helpers"
 message = "lista 不能 conversion 为 textus；element type 没有指明 text encoding"
 help = "先转换为 lista<b8>、lista<b16> 或 lista<b32>，再 ↦ textus（UTF-8、UTF-16 或 UTF-32 decode，可能失败）；或用 format string \"§\"(xs) 显示 lista"
 
+[diagnostics.SEM016.issues.textus_to_lista_unsupported]
+message = "textus 不能转换为 lista；element type 没有指明是哪一种文字编码"
+help = "用 ↦ lista<b8>（或 lista<b16>/lista<b32>）编码，再从 octeti 着手，或显式构造字符的 lista"
+
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "conversion 到 promissum 跨越 async/sync boundary"
 help = "显式 resolve 或 wrap async value"
