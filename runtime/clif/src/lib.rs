@@ -23,6 +23,10 @@ mod ins;
 mod magnus;
 mod regex_program;
 mod regex_rt;
+// Public so the ABI layer (`crates/radix-mir-clif`) can reach it without an
+// export of its own: `-D warnings` treats an unreachable `pub` item in a
+// private module as dead code.
+pub mod sermo;
 
 use std::collections::hash_map::DefaultHasher;
 use std::ffi::CStr;

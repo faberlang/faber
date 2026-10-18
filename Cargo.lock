@@ -593,6 +593,7 @@ dependencies = [
 name = "faber-host-clif"
 version = "0.84.0"
 dependencies = [
+ "faber-leaf",
  "radix-runtime-contract",
  "regex",
  "regex-syntax",
