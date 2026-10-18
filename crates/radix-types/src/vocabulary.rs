@@ -295,6 +295,20 @@ pub enum MirCollectionOp {
     TensorFlatten,
     TensorMaterialize,
     TensorSlice,
+    /// Bracket-range multi-axis slice: the trapping multi-axis strided *view* of
+    /// the receiver storage (ruling 2026-10-17: "a slice is a real view of the
+    /// source storage"; "Out of range: the bracket dies") — deliberately
+    /// distinct from the method-form [`Self::TensorSlice`], which carries
+    /// sectio's own clamp-or-report contract. Args `[receiver, starts, ends,
+    /// steps, keeps, inclusives]`, one entry per receiver axis: `starts`/`ends`/
+    /// `steps` are integer lists, `keeps`/`inclusives` are `bivalens` lists. A
+    /// kept axis survives with extent `ceil((end_eff - start) / step)` and its
+    /// stride multiplied by `step`. A dropped axis (bare integer slot, NumPy
+    /// rule) is `keep = false` with `end_eff = start + 1`. An inclusive axis end
+    /// raises the effective bound: `end_eff = end + 1`. Out-of-range or negative
+    /// bounds and `step < 1` are runtime deaths, never clamps; the result aliases
+    /// the receiver storage (a view, never a copy).
+    TensorSliceNd,
     TensorAdd,
     TensorSub,
     TensorMul,
