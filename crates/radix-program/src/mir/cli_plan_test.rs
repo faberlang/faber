@@ -149,7 +149,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option verbose long "verbose" type bool global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#;
     let jobs = r#"
@@ -179,7 +179,7 @@ fn package_mir_cli_double_dash_passes_dash_operand_to_a_mounted_command() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#;
     let jobs = r#"

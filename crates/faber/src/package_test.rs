@@ -3417,7 +3417,7 @@ fn package_mir_cli_mounted_command_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3458,7 +3458,7 @@ fn package_mir_cli_mounted_text_operand_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3501,7 +3501,7 @@ fn package_mir_cli_mounted_numerus_operand_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3544,7 +3544,7 @@ fn package_mir_cli_mounted_rest_numerus_operand_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3593,7 +3593,7 @@ fn package_mir_cli_mounted_defaulted_text_operand_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3643,7 +3643,7 @@ fn package_mir_cli_mounted_flag_option_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3697,7 +3697,7 @@ fn package_mir_cli_mounted_defaulted_text_option_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3756,7 +3756,7 @@ fn package_mir_cli_mounted_optional_text_option_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3807,7 +3807,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option verbose long "verbose" type bool global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3857,7 +3857,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option name long "name" type string coalesce "worker" global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3907,7 +3907,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option name long "name" type string global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -3957,7 +3957,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ operand string tenant global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -4004,7 +4004,7 @@ fn package_mir_cli_mounted_alias_text_operand_executes_without_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -6910,7 +6910,7 @@ fn compile_package_mounts_wildcard_imported_cli_commands() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -6963,7 +6963,7 @@ fn check_package_validates_mounted_cli_commands_without_emitting() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -7002,7 +7002,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option verbose long "verbose" type bool global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -7052,7 +7052,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option verbose long "verbose" type bool global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -7086,7 +7086,7 @@ fn compile_package_rejects_named_import_mount_targets() {
 import from "./jobs" set_config as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -7114,7 +7114,7 @@ fn compile_package_rejects_mounted_global_options() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -7144,7 +7144,7 @@ fn compile_package_rejects_mounted_command_path_collisions() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 
 @ command "jobs/run"
@@ -7173,7 +7173,7 @@ fn compile_package_rejects_mounted_alias_collisions() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -8527,7 +8527,7 @@ fn compile_package_rejects_nested_module_mounts() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -8535,7 +8535,7 @@ main args args {}
     fs::write(
         dir.join("jobs.fab"),
         r#"
-@ imperia "again" ex jobs
+@ commands "again" ex jobs
 @ command "run"
 fn run() {}
 "#,
@@ -12959,7 +12959,7 @@ fn shell(d.Scope scope) → void {}
 #[test]
 fn g10_web3_rejects_local_web_controller_shadowing_with_tela_import() {
     // web-mig U2: a tela-importing package that defines its own local
-    // `@ annotatio WebController` (instead of importing the `tela:web`
+    // `@ annotation WebController` (instead of importing the `tela:web`
     // contract) must still fail closed — the tela-origin acceptance must not
     // weaken the no-local-shadowing rejection.
     let root = test_temp_dir("g10-web3-tela-local-controller");
@@ -12972,7 +12972,7 @@ fn g10_web3_rejects_local_web_controller_shadowing_with_tela_import() {
         r##"
 import from "tela:dom" d
 
-@ annotatio { target = fn }
+@ annotation { target = fn }
 class WebController {
     mut string selector
 }

@@ -152,6 +152,8 @@ longum = "詳"
 lane = "車道"
 ubique = "全局"
 annotatio = "註解"
+versio = "版本"
+imperia = "命令集"
 # Reduction expression surface (`reducta via Op ex source`).
 reducta = "歸約"
 pro = "按"

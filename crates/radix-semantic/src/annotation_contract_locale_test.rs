@@ -95,21 +95,24 @@ fn la_refuses_the_en_annotation_family_word() {
 }
 
 #[test]
-fn every_pack_resolves_its_annotation_family_spelling_to_the_latin_key() {
-    for (id, word) in [
-        ("en", "annotation"),
-        ("la", "annotatio"),
-        ("ar", "تعليق_توضيحي"),
-        ("hi", "टीका"),
-        ("th-TH", "คำอธิบายประกอบ"),
-        ("vi", "chú_thích"),
-        ("zh-Hans", "注解"),
-        ("zh-Hant", "註解"),
+fn every_pack_resolves_its_annotation_family_spellings_to_the_latin_keys() {
+    // (pack, annotatio, versio, imperia)
+    for (id, words) in [
+        ("en", ["annotation", "version", "commands"]),
+        ("la", ["annotatio", "versio", "imperia"]),
+        ("ar", ["تعليق_توضيحي", "إصدار", "أوامر"]),
+        ("hi", ["टीका", "संस्करण", "आदेश_सूची"]),
+        ("th-TH", ["คำอธิบายประกอบ", "เวอร์ชัน", "ชุดคำสั่ง"]),
+        ("vi", ["chú_thích", "phiên_bản", "các_lệnh"]),
+        ("zh-Hans", ["注解", "版本", "命令集"]),
+        ("zh-Hant", ["註解", "版本", "命令集"]),
     ] {
-        assert_eq!(
-            pack(id).keyword_latin_key(&word.nfkc().collect::<String>()),
-            Some("annotatio"),
-            "{id} must spell the annotation family word {word:?}"
-        );
+        for (word, latin) in words.into_iter().zip(["annotatio", "versio", "imperia"]) {
+            assert_eq!(
+                pack(id).keyword_latin_key(&word.nfkc().collect::<String>()),
+                Some(latin),
+                "{id} must spell the annotation family word {word:?}"
+            );
+        }
     }
 }

@@ -152,6 +152,8 @@ longum = "ยาว"
 lane = "เลน"
 ubique = "โกลบอล"
 annotatio = "คำอธิบายประกอบ"
+versio = "เวอร์ชัน"
+imperia = "ชุดคำสั่ง"
 # Reduction expression surface (`reducta via Op ex source`).
 reducta = "ลดรูป"
 pro = "ตาม"

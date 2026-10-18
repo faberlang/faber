@@ -152,6 +152,8 @@ longum = "مفصل"
 lane = "مسار"
 ubique = "عمومي"
 annotatio = "تعليق_توضيحي"
+versio = "إصدار"
+imperia = "أوامر"
 # Reduction expression surface (`reducta via Op ex source`).
 reducta = "اختزل"
 pro = "حسب"

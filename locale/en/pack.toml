@@ -157,6 +157,8 @@ longum = "long"
 lane = "lane"
 ubique = "global"
 annotatio = "annotation"
+versio = "version"
+imperia = "commands"
 # Empty-collection expression marker (contextual, tokenless).
 # en accepts only `empty`; the Latin spelling is not an alias.
 vacua = "empty"

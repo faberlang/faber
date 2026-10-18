@@ -1335,6 +1335,22 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(ANNOTATION_NAME),
         category: KeywordKind::Annotation,
     },
+    // CLI metadata families (`@ versio "1.0"`, `@ imperia mount`). Tokenless
+    // like `commune`: the pack spelling is claimed as a raw annotation name
+    // and normalized to the canonical family; annotation ownership seals the
+    // Latin spelling out of translated readers.
+    KeywordSpec {
+        text: "versio",
+        token_kind: None,
+        scope: KeywordScope::Contextual(ANNOTATION_NAME),
+        category: KeywordKind::Annotation,
+    },
+    KeywordSpec {
+        text: "imperia",
+        token_kind: None,
+        scope: KeywordScope::Contextual(ANNOTATION_NAME),
+        category: KeywordKind::Annotation,
+    },
     KeywordSpec {
         text: "cli",
         token_kind: Some(TokenKind::Cli),

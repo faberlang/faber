@@ -25,6 +25,8 @@ impl KeywordPack for EnAnnotationPack {
             "let" => Some("sit"),
             "kernel" => Some("nucleum"),
             "annotation" => Some("annotatio"),
+            "version" => Some("versio"),
+            "commands" => Some("imperia"),
             "fragment" => Some("fragment"),
             "lane" => Some("lane"),
             "public" => Some("publica"),
@@ -38,6 +40,8 @@ impl KeywordPack for EnAnnotationPack {
         match latin_key {
             "nucleum" => Some("kernel"),
             "annotatio" => Some("annotation"),
+            "versio" => Some("version"),
+            "imperia" => Some("commands"),
             "fragment" => Some("fragment"),
             "lane" => Some("lane"),
             "publica" => Some("public"),
@@ -141,4 +145,12 @@ fn en_annotation_contract_family_spelling_is_sealed() {
         "annotation",
     );
     assert_wrong_locale_annotation("@ annotatio\nclass Meta { }\n", "annotation");
+}
+
+#[test]
+fn en_cli_metadata_family_spellings_are_sealed() {
+    assert!(parse_en("@ version \"1.0.0\"\nfn probe() { }\n").success());
+    assert!(parse_en("@ commands \"jobs\" ex jobs\nfn probe() { }\n").success());
+    assert_wrong_locale_annotation("@ versio \"1.0.0\"\nfn probe() { }\n", "version");
+    assert_wrong_locale_annotation("@ imperia \"jobs\" ex jobs\nfn probe() { }\n", "commands");
 }

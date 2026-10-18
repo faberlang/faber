@@ -6,7 +6,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "cli"
 canonical = true
 summary = "Attaches a version string to a CLI root."
-syntax = "@ versio <string>"
+syntax = "@ version <string>"
 related = ["cli", "descriptio"]
 locale = "en"
 +++
@@ -16,11 +16,11 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • the `@versio` annotation — attaches a semantic version string to a CLI application
+#   • the `@version` annotation — attaches a semantic version string to a CLI application
 #   • combining with `@cli` and `@descriptio` for complete CLI metadata
 #
 # Common mistakes:
-#   • Applying @ versio without @ cli — @ versio only has meaning when attached to a CLI incipit.
+#   • Applying @ version without @ cli — @ version only has meaning when attached to a CLI incipit.
 #
 # See also: cli, descriptio
 # =============================================================================
@@ -28,7 +28,7 @@ locale = "en"
 # meta/versio — CLI version annotation
 #
 # GRAMMAR:
-#   annotation :← '@' 'versio' stringLit
+#   annotation :← '@' 'version' stringLit
 #
 # EXPECTED OUTPUT:
 #   none — the runner executes the entry and prints nothing; empty golden.
@@ -37,7 +37,7 @@ locale = "en"
 #   declaration-only CLI metadata (whitelist: meta/versio.fab).
 
 @ cli "versio-smoke"
-@ versio "0.1.0"
+@ version "0.1.0"
 @ description "Version metadata exemplum"
 main args args {
 }
