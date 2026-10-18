@@ -1,0 +1,43 @@
++++
+term = "generic"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "function_type", "type_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "itera_stmt", "compact_clausura_expr", "clausura_signature", "clausura_params", "clausura_param", "clausura_joint", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A function-typed generic parameter called in argument position infers its result"
+syntax = "fn f<T, U>((T) → U g, list<T> xs) → list<U>"
+related = ["generic", "clausura", "lista"]
+locale = "en"
++++
+# =============================================================================
+# generic — f(x) in argument position
+# =============================================================================
+#
+# What this teaches:
+#   • A function-typed generic parameter called in argument position infers
+#     its result: `ap` binds T from the list element and U from the closure
+#   • Related keywords: fn, for, ←
+#
+# See also: generic, clausura, lista
+# =============================================================================
+
+# generic fn-param-call — a generic parameter called as a function value
+#
+# EXPECTED OUTPUT:
+#   [5, 6]
+#
+# BACKEND:
+#   Runner: a value callee whose function type mentions generic parameters
+#   borrows the enclosing function's bindings, so `f(x)` typechecks and runs.
+
+fn ap<T, U>((T) → U f, list<T> xs) → list<U> {
+    mut list<U> out ← empty
+    for from xs let x {
+        out.append(f(x))
+    }
+    return out
+}
+
+main {
+    print ap(int x ∴ x + 1, [4, 5])
+}

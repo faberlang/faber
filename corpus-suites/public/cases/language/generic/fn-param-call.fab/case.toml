@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/generic/fn-param-call.fab"
+group = "language"
+input_root = "corpus"
+input = "generic/fn-param-call.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
