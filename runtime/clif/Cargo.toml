@@ -17,6 +17,10 @@ crate-type = ["staticlib", "rlib"]
 workspace = true
 
 [dependencies]
+# One archive, no feature split: the conversation core links the same native
+# leaves `faber run` and generated Rust use (sync-first; the archive-size
+# measurement is a separate decision).
+faber-leaf = { path = "../../crates/faber-leaf" }
 radix-runtime-contract = { path = "../../crates/radix-runtime-contract" }
 regex = "1"
 regex-syntax = "0.8"
