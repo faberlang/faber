@@ -10,16 +10,17 @@ use radix_mir::{
 use radix_types::{IndexExpr, Primitive, TypeTable};
 use rustc_hash::FxHashMap;
 
-fn eval_missing_tabula_key(optional: bool) -> Result<Value, RunnerError> {
+/// Index an empty `map<textus, element>` with `read` deciding the MIR call's declared result
+/// type from the element type.
+fn eval_missing_tabula_key_typed(
+    element: Primitive,
+    read: impl FnOnce(&mut TypeTable, TypeId) -> TypeId,
+) -> Result<Value, RunnerError> {
     let mut type_table = TypeTable::new();
     let key = type_table.primitive(Primitive::Textus);
-    let value = type_table.primitive(Primitive::Numerus);
-    let return_ty = if optional {
-        type_table.option(value)
-    } else {
-        value
-    };
-    let _declared = type_table.map(key, return_ty);
+    let element = type_table.primitive(element);
+    let return_ty = read(&mut type_table, element);
+    let _declared = type_table.map(key, element);
     let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
@@ -60,6 +61,16 @@ fn eval_missing_tabula_key(optional: bool) -> Result<Value, RunnerError> {
     runner.eval_runtime_call(&call, Span::default())
 }
 
+fn eval_missing_tabula_key(optional: bool) -> Result<Value, RunnerError> {
+    eval_missing_tabula_key_typed(Primitive::Numerus, |table, element| {
+        if optional {
+            table.option(element)
+        } else {
+            element
+        }
+    })
+}
+
 #[test]
 fn non_optional_tabula_missing_key_is_a_hard_runner_error() {
     let error = eval_missing_tabula_key(false)
@@ -76,6 +87,13 @@ fn non_optional_tabula_missing_key_is_a_hard_runner_error() {
 fn optional_tabula_missing_key_returns_none() {
     let value = eval_missing_tabula_key(true)
         .expect("tabula<textus, numerus union nihil> missing key must stay legal");
+    assert_eq!(value, Value::Nil);
+}
+
+#[test]
+fn valor_tabula_missing_key_returns_nil() {
+    let value = eval_missing_tabula_key_typed(Primitive::Valor, |_, element| element)
+        .expect("tabula<textus, value> missing key must yield nihil, not a hard runner error");
     assert_eq!(value, Value::Nil);
 }
 

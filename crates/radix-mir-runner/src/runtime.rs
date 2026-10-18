@@ -1332,7 +1332,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         items[start..end].iter().step_by(step).cloned().collect(),
                     ));
                 }
-                let item = if matches!(self.types.get(return_ty.semantic_id()), Type::Option(_)) {
+                // WHY: a `value`/`ignotum` cell admits nihil by name behavior, so a missing key
+                // is an optional read even when the declared type is not an option form; a
+                // strict cell that cannot hold nihil still fails hard.
+                let item = if matches!(
+                    self.types.get(return_ty.semantic_id()),
+                    Type::Option(_) | Type::Primitive(Primitive::Valor | Primitive::Ignotum)
+                ) {
                     Self::optional_collection_index(receiver, &index, span)?
                 } else {
                     Self::collection_index(receiver, &index, span)?
