@@ -1,0 +1,35 @@
++++
+term = "copia"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "sort_expr", "sort_direction", "sort_body", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Filters and maps a copia of integers."
+syntax = "<copia>.filter(<clausula>) | <copia>.map(<clausula>)"
+related = ["copia", "lista", "sort"]
+locale = "en"
++++
+# =============================================================================
+# copia — Filters and maps a copia of integers.
+# =============================================================================
+#
+# What this teaches:
+#   • higher-order methods on copia (set) values — filter and map return new sets
+#   • a bracket literal takes the set cell's type: `let set<int> s ← [1, 2, 3]`
+#   • set iteration order is unspecified (D19.2) — print set-derived values
+#     through `sort via asc from`, which yields a sorted list
+#
+# Common mistakes:
+#   • Printing a set (or a set-derived value) directly — the order is not defined.
+#
+# See also: copia, lista, sort
+# =============================================================================
+
+main {
+    let set<int> res ← [1, 2, 3, 4, 5]
+    let set<int> magni ← res.filter(int x ∴ x ≻ 2)
+    print sort via asc from magni
+    let set<int> paria ← res.map(int x ∴ x % 2)
+    print sort via asc from paria
+    print magni.length()
+}
