@@ -2697,16 +2697,27 @@ For `textus`, bracket indexing is Unicode-scalar based:
 
 Text slices accept the full range form, including `per`.
 
-For `lista<T>`, bracket indexing is a single-element access. The index must be
-one integer; range slices are not accepted (use `sectio(start, end)` for a
-copied range):
+For `lista<T>`, bracket indexing is a single element or an exclusive window.
+A single-element index must be one integer. A window `xs[lo‥hi]` takes the full
+range form (`‥`, `…`, and `per`), and the window is a **new list of the same
+elements**: the copy is shallow, so reference-type elements are shared and
+`copy` is not read as deep. The range must lie fully inside `0‥length` and run
+forward; otherwise the run dies. An empty window at a valid position
+(`xs[0‥0]`, `xs[n‥n]`) is `[]`.
 
 ```fab
 # Element at position i.
 xs[i]
 # Write element at position i.
 xs[i] ← v
+# Exclusive window → a new lista<T>. Fully in bounds or the run dies.
+xs[lo‥hi]
 ```
+
+The copy-out methods report on the error channel instead of trimming:
+`xs.sectio(start, end)` (en `slice`) and `xs.prima(n)` (en `take`) are failable
+(`⇥`; a `⊥` default or a handler takes the fault), and the fault carries the
+requested bounds or count and the list length as data.
 
 Lista bracket access is **plain**, not nullable: it returns the bare element
 `T` and traps on out-of-bounds. A `tensor` bracket read is plain in the same
@@ -2746,8 +2757,9 @@ buf[lo‥hi]
 
 The index must be an integer or a range. A compile-time-provable out-of-range
 index on an octeti literal (`|de ad be ef|[0‥5]`) is a structured reject.
-Runtime out-of-bounds traps — the same trapping model as lista bracket access,
-not textus short-slice. Lista `[lo‥hi]` stays rejected.
+Runtime out-of-bounds traps — the same trapping model as
+lista bracket access, not textus short-slice. A lista `[lo‥hi]` is a live window
+(a new list of the same elements), fully in bounds or the run dies.
 
 `octeti` is the endian host. Parse byte windows on the buffer
 (`buf[lo‥hi] ↦ W via Be|Le`). Cross to a list once, for element work,

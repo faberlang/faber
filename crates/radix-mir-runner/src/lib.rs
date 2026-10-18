@@ -877,7 +877,7 @@ fn holds_interval(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
         return false;
     }
     match types.get(ty) {
-        Type::Intervallum(_) => true,
+        Type::Intervallum(..) => true,
         Type::Map(_, elem) | Type::Option(elem) => holds_interval(*elem, types, depth + 1),
         Type::Queue(elem) | Type::Stack(elem) => holds_interval(*elem, types, depth + 1),
         Type::Vector(elem, _)

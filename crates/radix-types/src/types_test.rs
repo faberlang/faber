@@ -1711,6 +1711,33 @@ fn f066_intervallum_covariant_assignable() {
 }
 
 #[test]
+fn intervallum_step_is_part_of_type_identity() {
+    // `intervallum<T>` is step `Literal(1)`; an explicit step is a distinct
+    // type identity, and equality never converts across steps.
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let step_one = types.intern_index(IndexExpr::Literal(1));
+    let step_two = types.intern_index(IndexExpr::Literal(2));
+
+    let implicit_one = types.intervallum(numerus);
+    let explicit_one = types.intervallum_with_step(numerus, step_one);
+    let explicit_two = types.intervallum_with_step(numerus, step_two);
+
+    assert_eq!(
+        implicit_one, explicit_one,
+        "intervallum<T> interns as step Literal(1)"
+    );
+    assert_ne!(
+        implicit_one, explicit_two,
+        "different steps are different types"
+    );
+    assert!(types.equals(implicit_one, explicit_one));
+    assert!(!types.equals(implicit_one, explicit_two));
+    assert!(!types.is_assignable(implicit_one, explicit_two));
+    assert!(!types.is_assignable(explicit_two, implicit_one));
+}
+
+#[test]
 fn f066_collection_covariant_assignable() {
     // lista<numerus<i32>> must be assignable to lista<numerus<i64>> (element-covariant).
     let mut types = TypeTable::new();

@@ -614,7 +614,7 @@ impl TypeName for Type {
             Type::Matrix(_, _) => "matrix",
             Type::Sparsa(_, _) => "sparsa",
             Type::Atomic(_) => "atomic",
-            Type::Intervallum(_) => "intervallum",
+            Type::Intervallum(..) => "intervallum",
             Type::ModularWord(_) => "modular",
             Type::SaturatingWord(_) => "saturating",
             Type::PolicyFloat(_, _) => "policy_float",

@@ -704,7 +704,7 @@ fn from_type_maps_collection_and_ml_families() {
         ConversioTypeFamily::from_type_id(&types, cursor),
         Some(ConversioTypeFamily::Cursor)
     );
-    let intervallum = types.intern(Type::Intervallum(numerus));
+    let intervallum = types.intervallum(numerus);
     assert_eq!(
         ConversioTypeFamily::from_type_id(&types, intervallum),
         Some(ConversioTypeFamily::Intervallum)

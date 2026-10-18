@@ -187,7 +187,7 @@ fn try_bind_generic_type_witness(
         | (Type::Cursor(expected_inner), Type::Cursor(actual_inner))
         | (Type::Queue(expected_inner), Type::Queue(actual_inner))
         | (Type::Stack(expected_inner), Type::Stack(actual_inner))
-        | (Type::Intervallum(expected_inner), Type::Intervallum(actual_inner))
+        | (Type::Intervallum(expected_inner, _), Type::Intervallum(actual_inner, _))
         | (Type::Option(expected_inner), Type::Option(actual_inner)) => {
             try_bind_generic_type_witness(
                 types,
@@ -1093,15 +1093,12 @@ fn instantiate_type_id<W: InstantiateWalk>(
             )?;
             resolve_type(types, &Type::AsyncCursor(item, alternate), span, index)
         }
-        Type::Intervallum(inner) => instantiate_unary_type(
-            types,
-            inner,
-            generic_bindings,
-            shape_bindings,
-            span,
-            index,
-            Type::Intervallum,
-        ),
+        Type::Intervallum(inner, step) => {
+            let inner =
+                instantiate_type_id(types, inner, generic_bindings, shape_bindings, span, index)?;
+            let step = types.substitute_index(step, shape_bindings, span)?;
+            resolve_type(types, &Type::Intervallum(inner, step), span, index)
+        }
         Type::Option(inner) => instantiate_unary_type(
             types,
             inner,
@@ -1616,7 +1613,7 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         | (Type::Cursor(a), Type::Cursor(b))
         | (Type::Queue(a), Type::Queue(b))
         | (Type::Stack(a), Type::Stack(b))
-        | (Type::Intervallum(a), Type::Intervallum(b))
+        | (Type::Intervallum(a, _), Type::Intervallum(b, _))
         | (Type::Option(a), Type::Option(b))
         | (Type::Atomic(a), Type::Atomic(b)) => types.equals(*a, *b),
         (Type::AsyncCursor(a_item, a_alternate), Type::AsyncCursor(b_item, b_alternate)) => {
@@ -1773,7 +1770,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Queue(inner)
         | Type::Stack(inner)
         | Type::Atomic(inner)
-        | Type::Intervallum(inner)
+        | Type::Intervallum(inner, _)
         | Type::Option(inner)
         | Type::Ref(_, inner)
         | Type::Alias(_, inner) => type_contains_param_inner(types, *inner, seen),

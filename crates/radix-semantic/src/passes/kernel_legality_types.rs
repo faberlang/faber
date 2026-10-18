@@ -75,7 +75,7 @@ impl Walk<'_> {
             | Type::Vector(element, _)
             | Type::Matrix(element, _)
             | Type::Sparsa(element, _)
-            | Type::Intervallum(element)
+            | Type::Intervallum(element, _)
             | Type::Option(element)
             | Type::Ref(_, element)
             | Type::Alias(_, element) => self.family(*element),

@@ -5530,7 +5530,7 @@ fn applied_receiver_of_the_same_class_satisfies_a_struct_self_parameter() {
 /// One function constructing `intervallum<numerus>` from `items`.
 fn interval_program(types: &mut TypeTable, items: Vec<MirAggregateItem>) -> MirProgram {
     let numerus = types.primitive(Primitive::Numerus);
-    let interval_ty = MirType::semantic(types.intern(Type::Intervallum(numerus)));
+    let interval_ty = MirType::semantic(types.intervallum(numerus));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     MirProgram {
         functions: vec![MirFunction {

@@ -123,7 +123,7 @@ fn unify_with_policy_handles_vector_matrix_sparsa_atomic_intervallum() {
     let joined = checker.unify_join(int_a, int_b, vacuous_span, "test");
     let resolved = checker.resolve_inferred_type(joined);
     assert!(
-        matches!(checker.types.get(resolved), Type::Intervallum(_)),
+        matches!(checker.types.get(resolved), Type::Intervallum(..)),
         "F-010: unify_join(Intervallum<f32>, Intervallum<numerus>) must produce an Intervallum, got {:?}",
         checker.types.get(resolved),
     );

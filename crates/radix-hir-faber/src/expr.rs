@@ -2340,7 +2340,7 @@ impl super::FaberCodegen<'_> {
                             | Type::Matrix(_, _)
                             | Type::Vector(_, _)
                             | Type::Sparsa(_, _)
-                            | Type::Intervallum(_)
+                            | Type::Intervallum(..)
                             | Type::Atomic(_)
                             | Type::SizedNumeric(_, _)
                             | Type::ModularWord(_)

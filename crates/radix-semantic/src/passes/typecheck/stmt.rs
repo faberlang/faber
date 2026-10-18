@@ -589,7 +589,7 @@ impl TypeChecker<'_> {
         };
         if !matches!(
             self.types.get(self.resolve_inferred_type(index_ty)),
-            Type::Intervallum(_)
+            Type::Intervallum(..)
         ) {
             return false;
         }

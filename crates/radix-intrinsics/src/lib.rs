@@ -221,7 +221,7 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
         Type::Matrix(_, _) => &[IntrinsicReceiver::Matrix],
         Type::Vector(_, _) => &[IntrinsicReceiver::Vector],
         Type::Sparsa(_, _) => &[IntrinsicReceiver::Sparsa],
-        Type::Intervallum(_) => &[IntrinsicReceiver::Intervallum],
+        Type::Intervallum(..) => &[IntrinsicReceiver::Intervallum],
         Type::Atomic(_) => &[IntrinsicReceiver::Atomic],
         _ => &[],
     }
