@@ -1,0 +1,23 @@
++++
+locale = "en"
+term = "itera-loop-shape-reject-list-remove-first"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "expression", "call_expr"]
+canonical = false
+summary = "A remove_first inside a loop over that same list is refused at check time."
+no_expected = "rejects"
+diagnostic = "SEM011:loop_collection_shape_change"
++++
+
+# This exemplum intentionally fails to compile: `xs.remove_first()` takes an
+# element out of the list that the loop is walking, so the loop would walk a
+# shape that no longer matches the shape it started with. Methods are checked;
+# a bracket store is the unchecked "developer knows best" form. Drain a list
+# with `while` plus `xs.remove_first()` when a worklist is what is meant.
+main {
+    mut list<int> xs ← [1, 2]
+    for from xs let x {
+        let int ∪ none y ← xs.remove_first()
+    }
+}
