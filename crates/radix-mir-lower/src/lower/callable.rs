@@ -461,6 +461,8 @@ impl FunctionBuilder<'_> {
             diagnostic_ponde_invalid_index: context.diagnostic_ponde_invalid_index,
             diagnostic_accipe_invalid_index: context.diagnostic_accipe_invalid_index,
             diagnostic_at_out_of_range: context.diagnostic_at_out_of_range,
+            diagnostic_slice_out_of_range: context.diagnostic_slice_out_of_range,
+            diagnostic_take_out_of_range: context.diagnostic_take_out_of_range,
             fault_delivery: context.fault_delivery,
             function_errors: Arc::clone(&context.function_errors),
             function_params: Arc::clone(&context.function_params),

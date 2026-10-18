@@ -42,6 +42,10 @@ fn registry_rows_are_unique_per_receiver_name_generic_arity_and_value_arity() {
 fn macro_rows_keep_default_policy_unless_named() {
     let special: HashSet<(IntrinsicReceiver, &str, usize)> = [
         (IntrinsicReceiver::Lista, "apud", 1),
+        // need: the list trims report on `⇥`, so they deviate from
+        // the `intrinsic!` default policy exactly as the `at` read does.
+        (IntrinsicReceiver::Lista, "prima", 1),
+        (IntrinsicReceiver::Lista, "sectio", 2),
         (IntrinsicReceiver::Tabula, "apud", 1),
         (IntrinsicReceiver::Textus, "apud", 1),
         (IntrinsicReceiver::Tensor, "accipe", 1),

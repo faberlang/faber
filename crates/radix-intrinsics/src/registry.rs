@@ -441,7 +441,13 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         ArrayInner,
         HigherOrderSortBy
     ),
-    intrinsic!(Lista, "prima", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection Take),
+    // need: the `take` trim (`prima`) reports an out-of-range count
+    // on `⇥`, the same fault family as the `at` read: the payload is data
+    // (count and list length), never prose.
+    MethodIntrinsic {
+        failable: true,
+        ..intrinsic!(Lista, "prima", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection Take)
+    },
     intrinsic!(Lista, "primus", 0, &[], OptionInner, collection First),
     intrinsic!(
         Lista,
@@ -460,14 +466,21 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         HigherOrderReduce
     ),
     intrinsic!(Lista, "detrahe", 0, &[], OptionInner, collection RemoveLast),
-    intrinsic!(
-        Lista,
-        "sectio",
-        2,
-        &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::NumerusIndex],
-        ArrayInner,
-        collection Slice
-    ),
+    // need: the `slice` window (`sectio`) reports out-of-range
+    // bounds on `⇥`, the same fault family as the `at` read: the payload is
+    // data (start, end, list length), never prose. `Textus "sectio"` below
+    // keeps trimming — the text library depends on it.
+    MethodIntrinsic {
+        failable: true,
+        ..intrinsic!(
+            Lista,
+            "sectio",
+            2,
+            &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::NumerusIndex],
+            ArrayInner,
+            collection Slice
+        )
+    },
     intrinsic!(Lista, "summa", 0, &[], NumericSum, collection Sum),
     intrinsic!(Lista, "ultima", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection TakeLast),
     intrinsic!(Lista, "ultimus", 0, &[], OptionInner, collection Last),

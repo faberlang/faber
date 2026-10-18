@@ -350,6 +350,8 @@ impl<'a> LoweringContextMaps<'a> {
             diagnostic_ponde_invalid_index: diagnostics.ponde_invalid_index,
             diagnostic_accipe_invalid_index: diagnostics.accipe_invalid_index,
             diagnostic_at_out_of_range: diagnostics.at_out_of_range,
+            diagnostic_slice_out_of_range: diagnostics.slice_out_of_range,
+            diagnostic_take_out_of_range: diagnostics.take_out_of_range,
             fault_delivery: self.frozen.fault_delivery,
             function_errors: Arc::clone(&self.frozen.function_errors),
             function_async: Arc::clone(&self.frozen.function_async),
