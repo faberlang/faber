@@ -80,6 +80,7 @@ const ISSUE_FLOAT_TO_INTEGER_REQUIRES_ROUNDING: &str = "float_to_integer_require
 const ISSUE_CONVERSIO_VIA_UNKNOWN_HINT: &str = "conversio_via_unknown_hint";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_LISTA_TO_TEXTUS_UNSUPPORTED: &str = "lista_to_textus_unsupported";
+const ISSUE_TEXTUS_TO_LISTA_UNSUPPORTED: &str = "textus_to_lista_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
 const ISSUE_PROMISSUM_SOURCE_BOUNDARY: &str = "promissum_source_boundary";
 const ISSUE_SPARSA_COLLECTION_UNSUPPORTED: &str = "sparsa_collection_unsupported";
@@ -823,6 +824,12 @@ impl TypeChecker<'_> {
 
         if let Some(error_ty) =
             self.check_lista_to_textus_conversio(source_ty, target_resolved, target_carrier, span)
+        {
+            return error_ty;
+        }
+
+        if let Some(error_ty) =
+            self.check_textus_to_lista_conversio(source_ty, target_resolved, target_carrier, span)
         {
             return error_ty;
         }
@@ -1827,6 +1834,42 @@ impl TypeChecker<'_> {
             return None;
         }
         self.invalid_conversion(ISSUE_LISTA_TO_TEXTUS_UNSUPPORTED, span);
+        Some(self.error_type)
+    }
+
+    /// The mirror of [`Self::check_lista_to_textus_conversio`]: a string does
+    /// not become a list of anything — the element type does not say which
+    /// encoding it is. `textus ↦ lista<bN>` is the encoded text row and is
+    /// handled earlier by `check_bits_text_conversio`; a registered user
+    /// conversion row for the pair stays authoritative.
+    fn check_textus_to_lista_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        target_carrier: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !matches!(
+            self.types.get(target_carrier),
+            Type::Array(_) | Type::BoundedArray { .. }
+        ) {
+            return None;
+        }
+        let source = self.resolve_inferred_type(source_ty);
+        if !matches!(
+            self.types.get(source),
+            Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. }
+        ) {
+            return None;
+        }
+        if self
+            .resolver
+            .conversion_row_for(source, target_resolved)
+            .is_some()
+        {
+            return None;
+        }
+        self.invalid_conversion(ISSUE_TEXTUS_TO_LISTA_UNSUPPORTED, span);
         Some(self.error_type)
     }
 
