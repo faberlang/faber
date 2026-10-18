@@ -8389,7 +8389,7 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     // keywords and the `nihil` type row), emitted as Rust string literals.
     assert!(
         rust.contains(
-            r#"faber::display::bivalens_with(สอบผ่าน(l_mark), &faber::display::DisplayTokens { true_: "จร\u{e34}ง", false_: "เท\u{e47}จ", none: "น\u{e31}ล", tuple: "ท\u{e39}เพ\u{e34}ล" })"#
+            r#"faber::display::bivalens_with(สอบผ่าน(l_mark), &faber::display::DisplayTokens { true_: "จร\u{e34}ง", false_: "เท\u{e47}จ", none: "ไม\u{e48}ม\u{e35}", tuple: "ท\u{e39}เพ\u{e34}ล" })"#
         ),
         "{rust}"
     );
