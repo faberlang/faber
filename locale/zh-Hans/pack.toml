@@ -384,6 +384,10 @@ help = "去掉 spread 实参上的标签"
 message = "复制入运算符 `{operator}` 后需要一个值"
 help = "在 `⇇` 之后写源表达式"
 
+[diagnostics.PARSE001.issues.sink_into_item_expected]
+message = "汇入运算符 `{operator}` 后需要一个条目"
+help = "在 `⇜` 之后写条目表达式"
+
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "元组元素标签 `{label}` 被使用了多次"
 help = "为每个元素取不同的标签，或去掉标签"
@@ -803,6 +807,10 @@ help = "使用有效的 case 表达式"
 [diagnostics.PARSE030]
 message = "无效表达式"
 help = "检查表达式语法"
+
+[diagnostics.PARSE030.issues.sink_into_chain]
+message = "'⇜' 不能链式连接"
+help = "每条语句只写一个 'sink ⇜ item'；'⇜' 是一次写入，没有可供链式连接的结果"
 
 [diagnostics.PARSE030.issues.ceiling_floor_delimiters]
 message = "上取整的定界符是 `⌈` 和 `⌉`；`⌈x⌋` 不是取整形式"
@@ -1507,6 +1515,10 @@ help = "修正用于 lowering 的 AST construct"
 [diagnostics.SEM008.issues.unknown_lowering_error]
 message = "HIR lowering 失败"
 help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.sink_into_unsupported]
+message = "'⇜' 的 sink-into 形式尚未实现 lowering"
+help = "sinking 契约会在后续单元中 lowering；暂时移除 '⇜' 语句"
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "未知 namespace"
