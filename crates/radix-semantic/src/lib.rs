@@ -1278,6 +1278,10 @@ mod numeric_width_test;
 mod nucleum_lane_test;
 
 #[cfg(test)]
+#[path = "radix_contract_test.rs"]
+mod radix_contract_test;
+
+#[cfg(test)]
 #[path = "radix_lane_test.rs"]
 mod radix_lane_test;
 

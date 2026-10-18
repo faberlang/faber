@@ -158,19 +158,3 @@ pub(crate) fn contract_error(span: Span, issue: &'static str) -> SemanticError {
         .with_arg("issue", issue)
         .with_arg("annotation", "@ radix contract")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sinking_role_round_trips() {
-        assert_eq!(
-            RadixContractRole::parse("sinking"),
-            Some(RadixContractRole::Sinking)
-        );
-        assert_eq!(RadixContractRole::Sinking.as_str(), "sinking");
-        assert_eq!(SINKING_METHOD, "sink");
-        assert_eq!(SINKING_FLUSH_METHOD, "flush");
-    }
-}
