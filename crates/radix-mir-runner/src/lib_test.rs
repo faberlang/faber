@@ -4780,6 +4780,76 @@ fn runner_type_check_dispatches_nominal_struct_and_enum_tags() {
 }
 
 #[test]
+fn runner_type_check_matches_variant_member_type() {
+    use crate::Value;
+    use crate::host::BufferHost;
+    use radix_hir::DefId;
+    use radix_lexer::Interner;
+    use radix_mir::MirType;
+    use radix_mir::MirTypeCheckOp;
+    use radix_mir::MirValidationContext;
+    use radix_types::{Primitive, Type, TypeTable};
+
+    let mut host = BufferHost::default();
+    let mut type_table = TypeTable::default();
+    let interner = Interner::new();
+    let enum_def = DefId(40);
+    let variant_a = DefId(41);
+    let variant_b = DefId(42);
+    let bivalens = type_table.primitive(Primitive::Bivalens);
+    let variant_a_ty = type_table.intern(Type::Struct(variant_a));
+    let variant_b_ty = type_table.intern(Type::Struct(variant_b));
+    let mut context = MirValidationContext::new(&type_table);
+    context
+        .enum_variants
+        .insert(enum_def, vec![variant_a, variant_b]);
+    context.variant_parents.insert(variant_a, enum_def);
+    context.variant_parents.insert(variant_b, enum_def);
+    context.rebuild_variant_positions();
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner.frames.last_mut().unwrap().values.extend([(
+        MirValueId(0),
+        Value::EnumVariant(variant_a, Rc::new(RefCell::new(FxHashMap::default()))),
+    )]);
+
+    let type_check = |positive: bool, ty: TypeId| MirRuntimeCall {
+        intrinsic: MirIntrinsic::TypeCheck(MirTypeCheckOp {
+            positive,
+            ty: MirType::semantic(ty),
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(bivalens),
+    };
+
+    // The value IS variant_a: the member-type check is true.
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(true, variant_a_ty), Span::default())
+            .expect("variant_a matches its own member type"),
+        Value::Bool(true)
+    );
+    // The value is not variant_b: the member-type check is false.
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(true, variant_b_ty), Span::default())
+            .expect("variant_a does not match variant_b member type"),
+        Value::Bool(false)
+    );
+    // `non est` inverts: variant_a is not variant_b.
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(false, variant_a_ty), Span::default())
+            .expect("variant_a is not variant_b"),
+        Value::Bool(false)
+    );
+}
+
+#[test]
 fn runner_type_check_accepts_union_member_tags() {
     use crate::Value;
     use crate::host::BufferHost;
