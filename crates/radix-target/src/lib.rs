@@ -189,6 +189,66 @@ impl Target {
             .find(|target| target.as_str() == spelling)
     }
 
+    /// Resolve the target word of a target-native import (`import python
+    /// "math" m`) to its [`Target`].
+    ///
+    /// The word is a target CLI name: the canonical [`Self::as_str`] spelling
+    /// or one of [`Self::availability_spellings`]. Target names are proper
+    /// nouns and are never translated, so there is no locale hop here.
+    #[must_use]
+    pub fn from_import_word(word: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|target| {
+            target.is_source_language()
+                && (target.as_str() == word || target.availability_spellings().contains(&word))
+        })
+    }
+
+    /// Whether the target emits a programming language whose modules a
+    /// target-native import can name (not Faber itself, an IR, the runner,
+    /// or a MIR text/device target).
+    #[must_use]
+    pub fn is_source_language(self) -> bool {
+        matches!(
+            self,
+            Target::HirRust
+                | Target::HirTypeScript
+                | Target::HirGo
+                | Target::HirSwift
+                | Target::HirPython
+                | Target::HirHaskell
+                | Target::HirPascal
+                | Target::HirCobol
+                | Target::HirFortran
+                | Target::HirOdin
+                | Target::HirC
+        )
+    }
+
+    /// Every spelling [`Self::from_import_word`] accepts, canonical first.
+    pub fn import_words() -> impl Iterator<Item = &'static str> {
+        Self::ALL
+            .iter()
+            .filter(|target| target.is_source_language())
+            .flat_map(|target| {
+                std::iter::once(target.as_str())
+                    .chain(target.availability_spellings().iter().copied())
+            })
+    }
+
+    /// The accepted import word nearest to a misspelled one, for a
+    /// did-you-mean. `None` when nothing is within two edits.
+    #[must_use]
+    pub fn nearest_import_word(word: &str) -> Option<&'static str> {
+        let mut best: Option<(usize, &'static str)> = None;
+        for candidate in Self::import_words() {
+            let distance = edit_distance(word, candidate);
+            if distance <= 2 && best.is_none_or(|(d, _)| distance < d) {
+                best = Some((distance, candidate));
+            }
+        }
+        best.map(|(_, candidate)| candidate)
+    }
+
     /// Spellings an availability gate (`@ nondum` / `@ unstable(target)`)
     /// may use to name this backend.
     ///
@@ -448,3 +508,21 @@ impl Target {
 #[cfg(test)]
 #[path = "lib_test.rs"]
 mod tests;
+
+/// Levenshtein distance over chars; the target-word did-you-mean is the only
+/// caller, and the word sets are tiny.
+fn edit_distance(left: &str, right: &str) -> usize {
+    let left: Vec<char> = left.chars().collect();
+    let right: Vec<char> = right.chars().collect();
+    let mut previous: Vec<usize> = (0..=right.len()).collect();
+    let mut current = vec![0; right.len() + 1];
+    for (i, l) in left.iter().enumerate() {
+        current[0] = i + 1;
+        for (j, r) in right.iter().enumerate() {
+            let substitution = previous[j] + usize::from(l != r);
+            current[j + 1] = substitution.min(current[j] + 1).min(previous[j + 1] + 1);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    previous[right.len()]
+}
