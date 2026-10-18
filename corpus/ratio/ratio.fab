@@ -26,7 +26,7 @@ locale = "en"
 #   • objectPattern destructuring: let {g, w} ← point
 #   • partial + rest: let {loss, rest leftover} ← metrics
 #   • element holes: record<g: _> solved from the construction witness
-#   • binary cup element: record<g: string ∪ null>
+#   • binary cup element: record<g: string ∪ none>
 #
 # Reject teaching rows (comments only; these must not become stage-3 inputs):
 #   • positional access attempt: point[0] / point.0
