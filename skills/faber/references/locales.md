@@ -35,7 +35,7 @@ Differences that matter when writing source:
 - The null value and the null type are separate words in every pack: in
   `en` the literal is `null` and the type is `none`; in `la` they are
   `nulla` and `nihil`. The translated packs spell them from their own rows (probe:
-  `zh-Hans` `皆无` value, `空类型` type).
+  `zh-Hans` `缺失` value, `无` type).
 - Width markers (`i8`..`u64`, `f16 f32 f64 bf16`) and the unbounded integer
   `inf` are bare and locale-invariant in every pack; they are not pack rows.
   The wrapped forms `int<i32>`, `int<32>` and the hole `int<_>` (la
