@@ -853,55 +853,8 @@ fn judge_phase(case: &Case, phase: &str, output: &Output) -> (&'static str, Opti
         String::from_utf8_lossy(&output.stdout)
     );
     if matches!(case.target.outcome, Outcome::KnownFail) {
-        if case.target.failure_kind.as_deref() == Some("stdout-mismatch") {
-            let expected = match case.expected() {
-                Ok(expected) => expected,
-                Err(reason) => return ("fail", Some(reason)),
-            };
-            if !super::exit_matches(expected, &output.status) {
-                return (
-                    "fail",
-                    Some(format!(
-                        "exit mismatch: expected {}, got {}",
-                        expected.exit, output.status
-                    )),
-                );
-            }
-            let Some(path) = expected.stdout.as_ref() else {
-                return (
-                    "fail",
-                    Some(format!("{}: stdout-mismatch has no stdout golden", case.id)),
-                );
-            };
-            let golden = match fs::read(path) {
-                Ok(bytes) => bytes,
-                Err(error) => return ("fail", Some(format!("cannot read stdout golden: {error}"))),
-            };
-            return if super::normalize_stdout(&golden) != super::normalize_stdout(&output.stdout) {
-                ("expected-fail", None)
-            } else {
-                (
-                    "fail",
-                    Some("unexpected output match; update target expectation".to_owned()),
-                )
-            };
-        }
-        if case.target.failure_kind.as_deref() == Some("nonzero-exit") {
-            let expected = match case.expected() {
-                Ok(expected) => expected,
-                Err(reason) => return ("fail", Some(reason)),
-            };
-            return if super::exit_matches(expected, &output.status) {
-                ("expected-fail", None)
-            } else {
-                (
-                    "fail",
-                    Some(format!(
-                        "known nonzero exit changed: expected nonzero, got {}",
-                        output.status
-                    )),
-                )
-            };
+        if let Some(judged) = super::judge_known_run_kind(case, output) {
+            return judged;
         }
         if output.status.success() {
             return (

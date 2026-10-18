@@ -950,9 +950,9 @@ fn check_executor_support(
         ("runner", Outcome::Pass) if !matches!(phase, None | Some("run")) => {
             unsupported("a passing case with a phase other than run")
         }
-        ("rust" | "canonical" | "gpu", Outcome::KnownFail) if kind != "diagnostic" => unsupported(
-            &format!("failure_kind {kind}; only diagnostic is supported"),
-        ),
+        ("canonical" | "gpu", Outcome::KnownFail) if kind != "diagnostic" => unsupported(&format!(
+            "failure_kind {kind}; only diagnostic is supported"
+        )),
         ("canonical", Outcome::KnownFail) if phase == Some("run") => {
             unsupported("a known failure in the run phase; it never runs the program")
         }
@@ -1258,6 +1258,70 @@ fn judge_known_fail(
         } else {
             ("expected-fail", None)
         }
+    }
+}
+
+/// Judge a known-fail pin whose oracle is the program's own run (`stdout-mismatch`,
+/// `nonzero-exit`) rather than a diagnostic fragment. `None` means the pin is a
+/// diagnostic pin and the caller judges it. Shared by every executor that runs the
+/// built program, so one definition decides what each run-phase kind means.
+fn judge_known_run_kind(case: &Case, output: &Output) -> Option<(&'static str, Option<String>)> {
+    match case.target.failure_kind.as_deref() {
+        Some("stdout-mismatch") => {
+            let expected = match case.expected() {
+                Ok(expected) => expected,
+                Err(reason) => return Some(("fail", Some(reason))),
+            };
+            if !exit_matches(expected, &output.status) {
+                return Some((
+                    "fail",
+                    Some(format!(
+                        "exit mismatch: expected {}, got {}",
+                        expected.exit, output.status
+                    )),
+                ));
+            }
+            let Some(path) = expected.stdout.as_ref() else {
+                return Some((
+                    "fail",
+                    Some(format!("{}: stdout-mismatch has no stdout golden", case.id)),
+                ));
+            };
+            let golden = match fs::read(path) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    return Some(("fail", Some(format!("cannot read stdout golden: {error}"))));
+                }
+            };
+            Some(
+                if normalize_stdout(&golden) != normalize_stdout(&output.stdout) {
+                    ("expected-fail", None)
+                } else {
+                    (
+                        "fail",
+                        Some("unexpected output match; update target expectation".to_owned()),
+                    )
+                },
+            )
+        }
+        Some("nonzero-exit") => {
+            let expected = match case.expected() {
+                Ok(expected) => expected,
+                Err(reason) => return Some(("fail", Some(reason))),
+            };
+            Some(if exit_matches(expected, &output.status) {
+                ("expected-fail", None)
+            } else {
+                (
+                    "fail",
+                    Some(format!(
+                        "known nonzero exit changed: expected nonzero, got {}",
+                        output.status
+                    )),
+                )
+            })
+        }
+        _ => None,
     }
 }
 

@@ -452,11 +452,40 @@ this repository (see Targets).
 ## Install
 
 Prebuilt `faber` binaries for macOS (Apple silicon) and Linux (x86-64) are
-published on the [releases page](https://github.com/faberlang/releases/releases/latest);
+published on the [releases page](https://github.com/faberlang/releases/releases);
 this one is [Faber 1.14.0](https://github.com/faberlang/releases/releases/tag/faber-v1.14.0).
-Download the tarball for your platform and its `.sha256` file into one
-directory, check it, and put `faber` on your `PATH`. The tarball holds a single
-file, `bin/faber`.
+The installer downloads a release, verifies its SHA-256, installs it as
+`<prefix>/bin/faber-<version>`, and points a `faber` symlink at it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/faberlang/faber/main/install.sh | sh
+```
+
+The default prefix is `~/.faber`; add `~/.faber/bin` to `PATH`. Pass `--prefix`
+or `--version` to choose another location or pin a release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/faberlang/faber/main/install.sh \
+  | sh -s -- --version 1.14.0 --prefix "$HOME/.local"
+```
+
+Check for and install updates with:
+
+```sh
+faber update --check
+faber update
+```
+
+Every released version stays in `<prefix>/bin/faber-<version>`, and `faber
+update` moves the `faber` symlink. `faber update --version 1.13.0` switches
+back, and `faber versions` lists what is installed. If you installed with an
+earlier faber installer, run `install.sh` once to adopt the versioned layout;
+`faber update` manages installs that have the `faber` symlink.
+
+### Manual install
+
+The tarball holds a single file, `bin/faber`. Download the archive and its
+`.sha256` file into one directory, check it, and put `faber` on your `PATH`:
 
 ```sh
 shasum -a 256 -c faber-v1.14.0-aarch64-apple-darwin.tar.gz.sha256   # Linux: sha256sum -c
