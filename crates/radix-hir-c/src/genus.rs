@@ -692,7 +692,8 @@ impl Emitter<'_> {
                 | Inner::Bool
                 | Inner::Float
                 | Inner::Float32
-                | Inner::Modular(_) => read.to_owned(),
+                | Inner::Modular(_)
+                | Inner::Bits(_) => read.to_owned(),
                 Inner::List(elem) => {
                     self.support.need(Helper::List(elem, ListOp::Of));
                     format!(
