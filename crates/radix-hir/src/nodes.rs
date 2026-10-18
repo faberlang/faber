@@ -855,6 +855,14 @@ pub struct HirImport {
     /// imports keep `false` and their existing item shape.
     #[serde(default)]
     pub selective: bool,
+
+    /// Target word of a target-native import (`import python "math" m`).
+    ///
+    /// When set, `path` is the target's own module specifier, copied
+    /// verbatim, and every item binds a trusted `ignotum` value. The program
+    /// is bound to that target.
+    #[serde(default)]
+    pub target: Option<Symbol>,
 }
 
 /// One binding introduced by an import declaration.

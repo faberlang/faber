@@ -157,6 +157,7 @@ pub(crate) fn selective_import_artifact() -> HirArtifact {
             },
         ],
         selective: true,
+        target: None,
     };
     artifact.hir.items.push(radix_hir::HirItem {
         annotations: Vec::new(),

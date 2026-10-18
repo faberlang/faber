@@ -709,6 +709,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
             },
         ],
         selective: false,
+        target: None,
     };
     let hir = radix_hir::HirModule {
         items: vec![

@@ -1293,6 +1293,7 @@ impl Lowerer<'_> {
                 visibility: decl.visibility,
                 items,
                 selective,
+                target: None,
             }),
             span: stmt.span,
         })
