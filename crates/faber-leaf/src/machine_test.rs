@@ -78,3 +78,49 @@ fn fresh_snapshot_reports_memory() {
     assert!(*total > 0, "host total memory must be positive");
     assert!(*used <= *total, "used memory cannot exceed total");
 }
+
+#[test]
+fn out_of_order_guard_rejects_older_generation() {
+    let _guard = crate::test_support::handle_table_guard();
+    super::reset_previous();
+    super::store_if_newer(super::make_previous(
+        2,
+        super::collected_for_test(222),
+        None,
+    ));
+    // The late straggler of an earlier read: it started first, so its
+    // generation is behind the slot's even though its `taken_at` is newer.
+    super::store_if_newer(super::make_previous(
+        1,
+        super::collected_for_test(111),
+        None,
+    ));
+    let reply = serve("machina:specimen", &[Arg::Int(0)])
+        .expect("route")
+        .expect("specimen");
+    let Reply::Map(fields) = &reply else {
+        panic!("expected map, got {reply:?}");
+    };
+    assert_eq!(field(fields, "stale"), &Reply::Bool(true));
+    let Reply::Map(memory) = field(fields, "memory") else {
+        panic!("expected memory map");
+    };
+    assert_eq!(field(memory, "used_bytes"), &Reply::Int(222));
+
+    // A newer generation is still admitted.
+    super::store_if_newer(super::make_previous(
+        3,
+        super::collected_for_test(333),
+        None,
+    ));
+    let reply = serve("machina:specimen", &[Arg::Int(0)])
+        .expect("route")
+        .expect("specimen");
+    let Reply::Map(fields) = &reply else {
+        panic!("expected map, got {reply:?}");
+    };
+    let Reply::Map(memory) = field(fields, "memory") else {
+        panic!("expected memory map");
+    };
+    assert_eq!(field(memory, "used_bytes"), &Reply::Int(333));
+}

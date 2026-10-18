@@ -15,6 +15,7 @@ mod tests;
 
 use crate::error::LeafError;
 use crate::value::{Arg, Reply};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
@@ -46,7 +47,7 @@ struct ProcTicks {
 }
 
 /// One worker-thread host read, stamped when it completed.
-struct Collected {
+pub(crate) struct Collected {
     taken_at: Instant,
     cores: Vec<CoreTicks>,
     used_bytes: u64,
@@ -85,6 +86,9 @@ struct Rendered {
 // TARGET: c1de1950-2/-3 read the absolute tick vectors.
 #[allow(dead_code)]
 struct Previous {
+    /// Issue order of the read that produced this snapshot. A straggler whose
+    /// generation is older than the slot's is rejected on arrival.
+    generation: u64,
     taken_at: Instant,
     cores_ticks: Vec<CoreTicks>,
     proc_ticks: Vec<ProcTicks>,
@@ -92,6 +96,10 @@ struct Previous {
 }
 
 static PREVIOUS: Mutex<Option<Previous>> = Mutex::new(None);
+
+/// Monotonic issue counter for reads, so slot writes are ordered by issue and
+/// not by `taken_at` (which is stamped when a read completes).
+static GENERATION: AtomicU64 = AtomicU64::new(0);
 
 fn slot() -> MutexGuard<'static, Option<Previous>> {
     match PREVIOUS.lock() {
@@ -142,6 +150,9 @@ fn sample(args: &[Arg]) -> Result<Reply, LeafError> {
     if deadline_ms == 0 {
         return Ok(previous_reply());
     }
+    // WHY: the generation is taken before the read starts, so a straggler that
+    // started first can never outrank a snapshot that started later.
+    let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let (tx, rx) = std::sync::mpsc::channel::<Result<Collected, LeafError>>();
     std::thread::spawn(move || {
         // WHY: the receiver may already be gone (deadline expired); a failed
@@ -150,14 +161,14 @@ fn sample(args: &[Arg]) -> Result<Reply, LeafError> {
     });
     let wait = Duration::from_millis(u64::try_from(deadline_ms).unwrap_or(u64::MAX));
     match rx.recv_timeout(wait) {
-        Ok(Ok(fresh)) => Ok(store_and_render(fresh)),
+        Ok(Ok(fresh)) => Ok(store_and_render(generation, fresh)),
         Ok(Err(error)) => Err(error),
         Err(_timeout) => {
             // The earlier read is never cancelled: it keeps running and owns
             // the receiver, so its late value becomes the next previous slot.
             std::thread::spawn(move || {
                 if let Ok(Ok(late)) = rx.recv() {
-                    *slot() = Some(make_previous(late, None));
+                    store_if_newer(make_previous(generation, late, None));
                 }
             });
             Ok(previous_reply())
@@ -165,21 +176,46 @@ fn sample(args: &[Arg]) -> Result<Reply, LeafError> {
     }
 }
 
-fn store_and_render(fresh: Collected) -> Reply {
+fn store_and_render(generation: u64, fresh: Collected) -> Reply {
     let old = slot().take();
     let rendered = render_intervals(old.as_ref(), &fresh);
     let reply = snapshot_reply(&rendered, false, 0);
-    *slot() = Some(make_previous(fresh, Some(rendered)));
+    store_if_newer(make_previous(generation, fresh, Some(rendered)));
     reply
 }
 
-fn make_previous(collected: Collected, rendered: Option<Rendered>) -> Previous {
+/// Store `previous` only if it is newer than the slot's current snapshot.
+/// Callers have already released their guard (`store_and_render` drops the
+/// `slot()` guard of its `take()` at the semicolon), so this never nests.
+fn store_if_newer(previous: Previous) {
+    let mut guard = slot();
+    if guard
+        .as_ref()
+        .is_none_or(|prev| prev.generation < previous.generation)
+    {
+        *guard = Some(previous);
+    }
+}
+
+fn make_previous(generation: u64, collected: Collected, rendered: Option<Rendered>) -> Previous {
     let rendered = rendered.unwrap_or_else(|| render_intervals(None, &collected));
     Previous {
+        generation,
         taken_at: collected.taken_at,
         cores_ticks: collected.cores,
         proc_ticks: collected.procs,
         rendered,
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn collected_for_test(used_bytes: u64) -> Collected {
+    Collected {
+        taken_at: Instant::now(),
+        cores: Vec::new(),
+        used_bytes,
+        total_bytes: 0,
+        procs: Vec::new(),
     }
 }
 
