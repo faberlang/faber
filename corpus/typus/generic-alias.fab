@@ -1,0 +1,42 @@
++++
+term = "typus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "A generic typus alias applied to type arguments expands like its body"
+syntax = "typus <name><T> = <type>; <name><type-args>"
+related = ["typus", "generic", "lista", "tabula"]
+locale = "en"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "generic_params", "generic_param", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
++++
+
+# =============================================================================
+# typus — A generic typus alias applied to type arguments expands like its body
+# =============================================================================
+#
+# What this teaches:
+#   • Generic aliases — an alias declared with type parameters names a family of types
+#   • Applying an alias to type arguments — `Pairs<int>` expands like its body `list<int>`
+#
+# Common mistakes:
+#   • treating an alias as a new type — a typus alias is transparent, not nominal
+#
+# See also: typus, generic, lista, tabula
+# =============================================================================
+
+type Pairs<T> = list<T>
+type Table<K, V> = map<K, V>
+
+fn count(Pairs<int> p) → int {
+    return p.length()
+}
+
+main {
+    let Pairs<int> p ← [1, 2]
+    print p.length()
+    print count(p)
+    print p
+    mut Table<string, int> t ← empty
+    t.put("a", 1)
+    print t.length()
+}
