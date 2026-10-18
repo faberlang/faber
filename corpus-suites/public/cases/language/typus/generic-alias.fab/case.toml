@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/typus/generic-alias.fab"
+group = "language"
+input_root = "corpus"
+input = "typus/generic-alias.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
