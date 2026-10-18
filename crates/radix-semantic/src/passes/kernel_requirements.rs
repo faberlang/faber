@@ -456,6 +456,8 @@ fn analyze_kernel(
         tensor_edge_policies,
         const_values,
         ranges: FxHashMap::default(),
+        parameter_types: FxHashMap::default(),
+        parameter_aliases: FxHashMap::default(),
         range_only_bindings: FxHashSet::default(),
         coordinate_ranges: FxHashMap::default(),
         expression_vectors: FxHashMap::default(),
@@ -466,6 +468,9 @@ fn analyze_kernel(
         widths: Vec::new(),
         return_type: function.ret_ty,
     };
+    for param in &function.params {
+        base.parameter_types.insert(param.def_id, param.ty);
+    }
     for (position, param) in function.params.iter().enumerate() {
         if position == 0
             && let Some(coordinates) = coordinate_ranges
@@ -982,6 +987,8 @@ struct BodyFacts<'a> {
     tensor_edge_policies: &'a TensorEdgePolicyTable,
     const_values: &'a FxHashMap<DefId, i128>,
     ranges: FxHashMap<DefId, AbstractRange>,
+    parameter_types: FxHashMap<DefId, TypeId>,
+    parameter_aliases: FxHashMap<DefId, DefId>,
     range_only_bindings: FxHashSet<DefId>,
     coordinate_ranges: FxHashMap<DefId, Vec<AbstractRange>>,
     expression_vectors: FxHashMap<HirId, Vec<AbstractRange>>,
@@ -1088,6 +1095,12 @@ impl BodyFacts<'_> {
                 self.coordinate_ranges.insert(local.def_id, vector_ranges);
             }
         }
+        if let Some(init) = &local.init
+            && let HirExpressionKind::Path(source) = init.kind
+            && let Some(parameter) = self.parameter_of(source)
+        {
+            self.parameter_aliases.insert(local.def_id, parameter);
+        }
         let stored = declared.map_or(value.clone(), |ty| {
             self.check_store(
                 local.init.as_ref().map_or(Span::default(), |e| e.span),
@@ -1187,13 +1200,34 @@ impl BodyFacts<'_> {
                 }
                 let left = self.evaluate(lhs);
                 let right = self.evaluate(rhs);
+                let mut assumed_divisor_max = None;
                 if is_integer_value_type(expr.ty, self.types) {
                     match op {
                         HirBinOp::Div | HirBinOp::Mod if !excludes_zero(&right) => {
-                            self.failures
-                                .push(KernelRequirementFailure::DivideByZeroPossible {
+                            let positive = (*op == HirBinOp::Mod)
+                                .then(|| self.positive_parameter_divisor(rhs))
+                                .flatten();
+                            if let Some((parameter, divisor_max)) = positive {
+                                // The launch contract binds a positive size-class
+                                // parameter to [1, DEVICE_INTEGER_MAX], so the
+                                // remainder site needs no zero proof of its own.
+                                self.conditions.push(KernelExtentCondition {
                                     span: expr.span,
+                                    range: KernelValueRange {
+                                        minimum: KernelRangeExpr::Parameter(parameter),
+                                        maximum: KernelRangeExpr::Parameter(parameter),
+                                    },
+                                    minimum: 1,
+                                    maximum: DEVICE_INTEGER_MAX,
                                 });
+                                assumed_divisor_max = Some(divisor_max);
+                            } else {
+                                self.failures.push(
+                                    KernelRequirementFailure::DivideByZeroPossible {
+                                        span: expr.span,
+                                    },
+                                );
+                            }
                         }
                         HirBinOp::Shl | HirBinOp::Shr if !proves_nonnegative(&right) => {
                             self.failures.push(
@@ -1213,6 +1247,13 @@ impl BodyFacts<'_> {
                     merge_abstract_ranges(&[left, right])
                 } else if let Some(ty) = modular_ty {
                     AbstractRange::from_type(ty, self.types)
+                } else if let Some(divisor_max) = assumed_divisor_max {
+                    // A floored remainder by a divisor in [1, divisor_max]
+                    // lies in [0, divisor_max - 1] for either numerator sign.
+                    AbstractRange(Some(KernelValueRange {
+                        minimum: KernelRangeExpr::Constant(0),
+                        maximum: KernelRangeExpr::Constant(divisor_max.saturating_sub(1)),
+                    }))
                 } else {
                     binary_range(*op, left, right)
                 };
@@ -1998,6 +2039,49 @@ impl BodyFacts<'_> {
             _ => expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                 AbstractRange::from_type(ty, self.types)
             }),
+        }
+    }
+
+    /// The kernel parameter a path denotes, following `let` re-bindings of a
+    /// parameter. `None` for any value the launch contract does not name.
+    fn parameter_of(&self, def_id: DefId) -> Option<DefId> {
+        if self.parameter_types.contains_key(&def_id) {
+            return Some(def_id);
+        }
+        self.parameter_aliases.get(&def_id).copied()
+    }
+
+    /// A divisor proven positive by the launch contract: a size-class value
+    /// *derived* from one kernel integer parameter — a `let T hf ← span`
+    /// binding, optionally converted (`span ↦ int`) or scaled by a positive
+    /// constant (`2 * hf`) — whose declared type has a finite positive maximum.
+    /// A bare parameter reference is not a size-class derivation, so it stays
+    /// an unproven divisor. Returns the parameter and its assumed maximum.
+    fn positive_parameter_divisor(&self, expr: &HirExpression) -> Option<(DefId, i128)> {
+        match &expr.kind {
+            HirExpressionKind::Path(def_id) => {
+                let parameter = self.parameter_aliases.get(def_id).copied()?;
+                // Use the parameter's own type, never a widened expression type:
+                // `span ↦ int` stays bounded by `span`'s declared width.
+                let declared = self.parameter_types.get(&parameter).copied()?;
+                let range = type_range(declared, self.types)?;
+                let maximum = constant(&range.maximum).filter(|maximum| *maximum > 0)?;
+                Some((parameter, maximum))
+            }
+            HirExpressionKind::Conversio { source, .. }
+            | HirExpressionKind::Widen {
+                operand: source, ..
+            } => self.positive_parameter_divisor(source),
+            HirExpressionKind::Binary(HirBinOp::Mul, lhs, rhs) => {
+                let scaled = |factor: &HirExpression, inner: &HirExpression| {
+                    let factor =
+                        crate::passes::const_int_value(factor).filter(|factor| *factor > 0)?;
+                    let (parameter, maximum) = self.positive_parameter_divisor(inner)?;
+                    Some((parameter, maximum.checked_mul(factor)?))
+                };
+                scaled(lhs, rhs).or_else(|| scaled(rhs, lhs))
+            }
+            _ => None,
         }
     }
 
