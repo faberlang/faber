@@ -1,0 +1,43 @@
++++
+term = "est"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "redde_stmt", "equality", "equality_tail", "comparison", "finge_expr", "qualified_ident", "field_list", "field_init", "field_key", "cast_expr", "call_expr", "call_suffix", "argument_list", "argument", "template_argument", "expression", "literal", "nota_stmt"]
+category = "logic"
+canonical = false
+summary = "`is` against a union variant name tests which variant the value is"
+syntax = "<expr> is <variant>"
+related = ["est", "discretio", "discerne"]
+locale = "en"
++++
+# =============================================================================
+# est — `is` against a union variant name tests which variant the value is.
+# =============================================================================
+#
+# What this teaches:
+#   • Variant testing — `<expr> is <Variant>` tests a union value's runtime
+#     variant tag without extracting the payload; the result is a bool.
+#   • Cast construction — `variant <Name> { fields } ∷ <Union>` builds a
+#     tagged union value that can be passed to functions.
+#
+# Common mistakes:
+#   • Using `est`/`is` to compare values — its right-hand side is always a
+#     type or variant name; use `≡` for value comparison.
+#   • Using `discerne` when only a yes/no test is needed — `is` reads
+#     directly as a bool expression.
+#
+# See also: est, discretio, discerne
+# =============================================================================
+
+union Forma {
+    Numerus { int v },
+    Textus { string v }
+}
+
+fn est_numerum(Forma f) → bool {
+    return f is Numerus
+}
+
+main {
+    print est_numerum(variant Numerus { v = 7 } ∷ Forma)
+    print est_numerum(variant Textus { v = "faber" } ∷ Forma)
+}

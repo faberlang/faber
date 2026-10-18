@@ -1,0 +1,49 @@
++++
+term = "iuncta"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "binding_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "ratio_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "typed_constructor", "field_list", "field_init", "field_key", "array_element_list", "iuncta_expr", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "redde_stmt", "expr_stmt", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Sized tuple and record literal constructors: sized numeric element types store through `tuple<u8, i16> [7, 9]` and `record<g: u8, w: i16> { g = 7, w = 9 }`, printed decimal."
+syntax = "tuple<A, B> [<elements>] | record<label: A, …> { label = value }"
+related = ["iuncta", "ratio"]
+locale = "en"
++++
+# =============================================================================
+# iuncta / ratio — sized tuple and record literal constructors
+# =============================================================================
+#
+# What this teaches:
+#   • a sized tuple literal `tuple<u8, i16> [7, 9]` stores into a matching
+#     `tuple<u8, i16>` slot: as a declaration value, a return value, and an
+#     argument
+#   • a sized record literal `record<g: u8, w: i16> { g = 7, w = 9 }` works the
+#     same way: the constructor's own labeled type arguments carry the field
+#     types
+#   • sized numerics print decimal (`7`, `9`), not hex, and an en program
+#     prints the word `tuple` for a printed tuple value
+#
+# EXPECTED OUTPUT:
+#   tuple [7, 9]
+#   7
+#   9
+#   7
+#   9
+#   tuple [7, 9]
+
+fn pair() → tuple<u8, i16> {
+    return tuple<u8, i16> [7, 9]
+}
+
+main {
+    let tuple<u8, i16> t ← tuple<u8, i16> [7, 9]
+    print t
+    print t[0]
+    print t[1]
+
+    let record<g: u8, w: i16> r ← record<g: u8, w: i16> { g = 7, w = 9 }
+    print r.g
+    print r.w
+
+    print pair()
+}
