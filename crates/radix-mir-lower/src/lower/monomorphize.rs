@@ -1999,8 +1999,20 @@ fn generic_param_order(hir: &radix_hir::HirModule) -> FxHashMap<DefId, Vec<Order
                 }
             }
             HirItemKind::Struct(strukt) => {
+                let class_params = generic_param_names(&strukt.type_params);
                 for method in &strukt.methods {
-                    let params = generic_param_names(&method.func.type_params);
+                    let method_params = generic_param_names(&method.func.type_params);
+                    // A method generic shadows the class parameter with the same name.
+                    let mut params = class_params
+                        .iter()
+                        .filter(|class_param| {
+                            !method_params
+                                .iter()
+                                .any(|method_param| method_param.name == class_param.name)
+                        })
+                        .copied()
+                        .collect::<Vec<_>>();
+                    params.extend(method_params);
                     if !params.is_empty() {
                         order.insert(method.def_id, params);
                     }
