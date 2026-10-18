@@ -1,0 +1,15 @@
+[package]
+name = "reader-locale-vi-sample"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "rust"
+kind = "bin"
+
+[reader]
+locale = "vi"
