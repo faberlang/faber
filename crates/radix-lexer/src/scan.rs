@@ -342,6 +342,10 @@ impl<'a> Lexer<'a> {
             '⊙' => TokenKind::CircledDot,
             '⊘' => TokenKind::CircledDivide,
             '÷' => TokenKind::Obelus,
+            // Prefix radicals (radical-glyphs family); single-codepoint scans.
+            '√' => TokenKind::RadicalSqrt,
+            '∛' => TokenKind::RadicalCbrt,
+            '∜' => TokenKind::RadicalFourth,
 
             // Infix extrema (minmax-infix-glyphs family).
             '⤒' => TokenKind::Maximum,
