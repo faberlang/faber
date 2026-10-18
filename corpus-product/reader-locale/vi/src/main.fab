@@ -1,0 +1,12 @@
++++
+locale = "vi"
++++
+hàm chào(văn_bản khách) → văn_bản {
+    đặt văn_bản thông_điệp ← "Xin chào, §!"(khách)
+    trả thông_điệp
+}
+
+bắt_đầu {
+    đặt văn_bản lời_chào ← chào("bạn")
+    ghi_chú lời_chào
+}
