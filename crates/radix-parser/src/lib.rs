@@ -1865,6 +1865,10 @@ mod static_decl_test;
 mod binding_words_test;
 
 #[cfg(test)]
+#[path = "import_target_test.rs"]
+mod import_target_test;
+
+#[cfg(test)]
 #[path = "nondum_function_test.rs"]
 mod nondum_function_test;
 

@@ -1981,10 +1981,11 @@ impl Parser {
         let start = self.current_span();
         self.expect_keyword_ident(TokenKind::Importa)?;
 
-        let (path, visibility, kind) = if self.check(&TokenKind::LBrace) {
+        let target = self.parse_import_target()?;
+        let (path, visibility, kind) = if target.is_none() && self.check(&TokenKind::LBrace) {
             self.parse_import_record()?
         } else {
-            self.parse_import_sugar()?
+            self.parse_import_sugar(target.is_some())?
         };
 
         let span = start.merge(self.previous_span());
@@ -1992,14 +1993,52 @@ impl Parser {
             path,
             visibility,
             kind,
+            target,
             span,
         }))
     }
 
+    /// Whether the cursor sits on a target-import slot: a plain word (never a
+    /// keyword of the reader pack) directly followed by the specifier string,
+    /// where `from` / `{` would otherwise stand (`import python "math" m`).
+    fn at_import_target_slot(&self, offset: usize) -> bool {
+        matches!(self.peek_at(offset).kind, TokenKind::Ident(_))
+            && self.keyword_ident_at(offset).is_none()
+            && matches!(self.peek_at(offset + 1).kind, TokenKind::String(_))
+    }
+
+    /// Parse the optional target word of a target-native import.
+    ///
+    /// GRAMMAR:
+    ///   target-import := `importa` target string [`publica`] import-kind
+    ///
+    /// The target word is a target CLI name, contextual in this slot only and
+    /// never translated. A word that names no target is `PARSE050
+    /// import_target_unknown` with a did-you-mean over the target names.
+    fn parse_import_target(&mut self) -> Result<Option<Ident>, ParseError> {
+        if !self.at_import_target_slot(0) {
+            return Ok(None);
+        }
+        let word = self.parse_ident()?;
+        let spelled = self.interner.resolve(word.name).to_owned();
+        if radix_target::Target::from_import_word(&spelled).is_none() {
+            let mut error = Self::invalid_import_error_at("import_target_unknown", word.span)
+                .with_arg("target", spelled.clone());
+            if let Some(near) = radix_target::Target::nearest_import_word(&spelled) {
+                error = error.with_arg("suggestion", near);
+            }
+            return Err(error);
+        }
+        Ok(Some(word))
+    }
+
     fn parse_import_sugar(
         &mut self,
+        targeted: bool,
     ) -> Result<(radix_lexer::Symbol, Visibility, ImportKind), ParseError> {
-        self.expect_keyword_ident(TokenKind::Ex)?;
+        if !targeted {
+            self.expect_keyword_ident(TokenKind::Ex)?;
+        }
 
         let path = self.parse_string()?;
         let path_span = self.previous_span();
@@ -2047,6 +2086,13 @@ impl Parser {
                 alias,
                 inferred: false,
             }
+        } else if targeted {
+            // A target specifier is the target's own module name; Faber never
+            // infers a binding from it.
+            return Err(Self::invalid_import_error_at(
+                "import_target_binding_required",
+                self.current_span(),
+            ));
         } else {
             let name = self.infer_import_name(path, path_span)?;
             ImportKind::Named {
@@ -2177,7 +2223,8 @@ impl Parser {
     fn at_following_import_decl(&self) -> bool {
         self.check_keyword_ident(TokenKind::Importa)
             && (self.keyword_ident_at(1) == Some(TokenKind::Ex)
-                || self.peek_at(1).kind == TokenKind::LBrace)
+                || self.peek_at(1).kind == TokenKind::LBrace
+                || self.at_import_target_slot(1))
     }
 
     /// Whether a token may occupy an import binding name slot.

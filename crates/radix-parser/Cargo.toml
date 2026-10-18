@@ -11,6 +11,7 @@ radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-types = { path = "../radix-types" }
+radix-target = { path = "../radix-target" }
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }
