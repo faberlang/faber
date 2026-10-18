@@ -384,6 +384,10 @@ help = "ลบป้ายกำกับออกจากอาร์กิว
 message = "ต้องมีค่าหลังตัวดำเนินการคัดลอกเข้า `{operator}`"
 help = "เขียนนิพจน์ต้นทางหลัง `⇇`"
 
+[diagnostics.PARSE001.issues.sink_into_item_expected]
+message = "ต้องมีรายการหลังตัวดำเนินการซิงก์เข้า `{operator}`"
+help = "เขียนนิพจน์รายการหลัง `⇜`"
+
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "ป้ายกำกับสมาชิกทูเพิล `{label}` ถูกใช้มากกว่าหนึ่งครั้ง"
 help = "ตั้งป้ายกำกับที่แตกต่างกันให้แต่ละสมาชิก หรือลบป้ายกำกับออก"
@@ -759,6 +763,10 @@ help = "ใช้ expression ของกรณีที่ถูกต้อง
 [diagnostics.PARSE030]
 message = "นิพจน์ไม่ถูกต้อง"
 help = "ตรวจไวยากรณ์นิพจน์"
+
+[diagnostics.PARSE030.issues.sink_into_chain]
+message = "'⇜' ต่อกันเป็นลูกโซ่ไม่ได้"
+help = "เขียน 'sink ⇜ item' หนึ่งครั้งต่อหนึ่งคำสั่ง; '⇜' เป็นการเขียนครั้งเดียวที่ไม่มีผลลัพธ์ให้ต่อ"
 
 [diagnostics.PARSE030.issues.ceiling_floor_delimiters]
 message = "ตัวคั่น ceiling `⌈` และ `⌉` ปิด ceiling; `⌈x⌋` ไม่ใช่รูปแบบการปัดเศษ"
@@ -1475,6 +1483,10 @@ help = "แก้ไขโครงสร้าง AST สำหรับกา�
 [diagnostics.SEM008.issues.unknown_lowering_error]
 message = "การลดรูป HIR ล้มเหลว"
 help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.sink_into_unsupported]
+message = "รูปแบบซิงก์เข้า '⇜' ยังไม่มีการลดรูป"
+help = "สัญญาการซิงก์จะลดรูปในหน่วยถัดไป; ลบคำสั่ง '⇜' ออกก่อนในตอนนี้"
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "ไม่รู้จัก namespace"
