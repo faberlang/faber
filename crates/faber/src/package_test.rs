@@ -5283,7 +5283,7 @@ import from "norma:text" text
 
 main {
   print text.keep_between("hello7!", "a", "z")
-  print text.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
+  print text.keep_if("hello7!", string c ∴ c ≥ "a" and c ≤ "z")
   print text.drop_between("hello7!", "0", "9")
 }
 "#,
