@@ -384,6 +384,10 @@ help = "احذف التسمية من وسيط spread"
 message = "مطلوب قيمة بعد عامل النسخ الداخلي `{operator}`"
 help = "اكتب تعبير المصدر بعد `⇇`"
 
+[diagnostics.PARSE001.issues.sink_into_item_expected]
+message = "مطلوب عنصر بعد عامل الإغراق الداخلي `{operator}`"
+help = "اكتب تعبير العنصر بعد `⇜`"
+
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "تسمية عنصر الصف `{label}` مستخدمة أكثر من مرة"
 help = "أعطِ كل عنصر تسمية مختلفة، أو احذف التسميات"
@@ -759,6 +763,10 @@ help = "استخدم تعبير case صالحا"
 [diagnostics.PARSE030]
 message = "تعبير غير صالح"
 help = "تحقق من صياغة التعبير"
+
+[diagnostics.PARSE030.issues.sink_into_chain]
+message = "لا يقبل '⇜' التسلسل"
+help = "اكتب 'sink ⇜ item' واحدة لكل جملة؛ '⇜' كتابة واحدة بلا نتيجة للتسلسل"
 
 [diagnostics.PARSE030.issues.ceiling_floor_delimiters]
 message = "حدّا السقف `⌈` و`⌉` يغلقان السقف؛ `⌈x⌋` ليس صيغة تقريب"
@@ -1463,6 +1471,10 @@ help = "أصلح تركيب AST للتخفيض"
 [diagnostics.SEM008.issues.unknown_lowering_error]
 message = "فشل HIR lowering"
 help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.sink_into_unsupported]
+message = "صيغة الإغراق '⇜' بلا تخفيض بعد"
+help = "عقد الإغراق يُخفَّض في وحدة لاحقة؛ احذف جملة '⇜' في الوقت الحالي"
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "namespace غير معروف"
