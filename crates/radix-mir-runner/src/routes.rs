@@ -2,7 +2,7 @@
 //!
 //! Shared leaves (`faber-leaf`) serve `solum:*`, `consolum:*`, `processus:*`
 //! (except `processus:exi`), `tempus:*`, `aleator:*`, `caelum:*`, `http:*`,
-//! and `websocket:*`. `processus:exi` stays on `Host::exit`.
+//! `websocket:*`, and `machina:*`. `processus:exi` stays on `Host::exit`.
 
 use super::{Host, MapKey, Value};
 use faber_leaf::{self as leaf, Arg, Reply};

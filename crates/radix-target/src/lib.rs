@@ -460,13 +460,15 @@ impl Target {
 
     /// Leaves this target declares.
     ///
-    /// Rust and the runner (`fmir*`, stepper) share `faber-leaf`. Faber
-    /// re-emit and FHIR keep the `call` in the artifact. Go declares exactly
-    /// the leaves its `runtime/go` ports implement (clock 4/4, entropy 5/5,
-    /// stdio 17/17 routes). Wasm text declares stdio: the WAT probe carries
-    /// the closed-set v1 stdio rows, so the leaf gate admits them and the
-    /// probe's own per-shape refusals decide what is emittable. Every other
-    /// emit target has no native leaf port and must fail closed.
+    /// Rust, the runner family (`MirStepper`, `MirFmir*`), and Faber/FHIR
+    /// share `faber-leaf` or preserve its calls, and declare all nine leaves
+    /// (129 routes: fs 47, stdio 18, process 12, clock 4, entropy 5, tcp 14,
+    /// http 20, websocket 8, machine 1). Go declares only its complete ports:
+    /// clock 4/4, entropy 5/5, and stdio 18/18 (including `consolum:metire`).
+    /// Its process module implements only 5 of 12 routes, so process remains
+    /// undeclared; partial coverage is never declared as a whole leaf. Wasm
+    /// declares stdio for its closed-set WAT probe. Every other emit target
+    /// fails closed.
     #[must_use]
     pub fn supported_leaves(self) -> &'static [Leaf] {
         match self {
