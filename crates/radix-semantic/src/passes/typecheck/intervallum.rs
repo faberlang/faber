@@ -109,14 +109,14 @@ impl TypeChecker<'_> {
 
     pub fn intervallum_bound_type(&self, ty: TypeId) -> Option<TypeId> {
         match self.types.get(self.resolve_inferred_type(ty)) {
-            Type::Intervallum(bound) => Some(*bound),
+            Type::Intervallum(bound, _) => Some(*bound),
             _ => None,
         }
     }
 
     pub fn intervallum_type_id(&self, ty: TypeId) -> Option<TypeId> {
         let resolved = self.resolve_inferred_type(ty);
-        matches!(self.types.get(resolved), Type::Intervallum(_)).then_some(resolved)
+        matches!(self.types.get(resolved), Type::Intervallum(..)).then_some(resolved)
     }
 
     pub fn resolve_intervallum_type(

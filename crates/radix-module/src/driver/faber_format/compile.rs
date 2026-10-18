@@ -789,7 +789,7 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
             crate::semantic::format_figura(*shape, &analysis.types, &analysis.interner)
         ),
         Type::Atomic(element) => format!("atomic<{}>", canonical_type_shape(analysis, *element, active)),
-        Type::Intervallum(bound) => format!("intervallum<{}>", canonical_type_shape(analysis, *bound, active)),
+        Type::Intervallum(bound, _) => format!("intervallum<{}>", canonical_type_shape(analysis, *bound, active)),
         Type::SizedNumeric(primitive, width) => format!("sized-numeric:{primitive:?}:{}", width.faber_marker()),
         Type::ModularWord(width) => format!("modular-word:{}", width.faber_marker()),
         Type::Bits(width) => format!("bits:{}", width.faber_marker()),

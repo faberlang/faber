@@ -100,7 +100,7 @@ impl IntrinsicTypeContext {
             | Type::Sparsa(inner, _)
             | Type::Matrix(inner, _)
             | Type::Vector(inner, _)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Atomic(inner) => Self {
                 inner: Some(*inner),
                 key: None,

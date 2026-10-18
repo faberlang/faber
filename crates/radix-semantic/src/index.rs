@@ -103,7 +103,7 @@ pub(crate) fn substitute_alias_params(
             let inner = substitute_alias_params(types, inner, vars);
             types.atomic(inner)
         }
-        Type::Intervallum(inner) => {
+        Type::Intervallum(inner, _) => {
             let inner = substitute_alias_params(types, inner, vars);
             types.intervallum(inner)
         }

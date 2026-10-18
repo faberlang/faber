@@ -48,8 +48,8 @@ locale = "en"
 main {
     let _ res ← [1, 2, 3, 4, 5] ∷ list<int>
     let _ addita ← res.added(6)
-    let _ sectio ← res.slice(1, 4)
-    let _ primaduo ← res.take(2)
+    let _ sectio ← res.slice(1, 4) ⊥ [0]
+    let _ primaduo ← res.take(2) ⊥ [0]
     let _ ultimaduo ← res.take_last(2)
     let _ omissaduo ← res.drop(2)
     let _ inversa ← res.invert()

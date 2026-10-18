@@ -878,7 +878,7 @@ impl Lowerer<'_> {
             | Type::Promissum(inner)
             | Type::Cursor(inner)
             | Type::Atomic(inner)
-            | Type::Intervallum(inner)
+            | Type::Intervallum(inner, _)
             | Type::Alias(_, inner)
             | Type::Ref(_, inner)
             | Type::Tensor(inner, _)

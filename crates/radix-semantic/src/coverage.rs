@@ -398,7 +398,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         | Type::Queue(element)
         | Type::Stack(element)
         | Type::Atomic(element)
-        | Type::Intervallum(element)
+        | Type::Intervallum(element, _)
         | Type::Option(element)
         | Type::Ref(_, element)
         | Type::BoundedArray { element, .. }

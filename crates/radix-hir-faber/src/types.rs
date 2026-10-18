@@ -178,7 +178,7 @@ impl super::FaberCodegen<'_> {
                 surface,
             ),
 
-            Type::Intervallum(bound) => self.format_unary_type(
+            Type::Intervallum(bound, _) => self.format_unary_type(
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
                 *bound,
                 names,
@@ -854,7 +854,7 @@ impl super::FaberCodegen<'_> {
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic)),
                 self.single_type_form_child(form, names, surface)?
             )),
-            Type::Intervallum(_) => Ok(format!(
+            Type::Intervallum(..) => Ok(format!(
                 "{}<{}>",
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
                 self.single_type_form_child(form, names, surface)?

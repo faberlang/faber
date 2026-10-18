@@ -168,6 +168,16 @@ fn matrix_bracket_rejects_float_coordinate() {
 }
 
 #[test]
+fn tensor_bracket_range_literal_out_of_range_rejects() {
+    rejects_with_issue(
+        r"functio bad(tf32[4] t) → tf32[4] {
+    redde t[3 ‥ 7]
+}",
+        "index_provably_out_of_bounds",
+    );
+}
+
+#[test]
 fn matrix_bracket_rejects_literal_out_of_range() {
     rejects_with_issue(
         r"functio bad(matrix<f32, [2, 2]> m) → f32 {

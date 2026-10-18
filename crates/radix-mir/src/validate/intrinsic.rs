@@ -2353,7 +2353,7 @@ impl Validator<'_, '_> {
             MirCollectionOp::TensorBatchedAttention => {}
             MirCollectionOp::IntervalLength => {
                 if !first_arg_ty
-                    .is_some_and(|ty| matches!(self.type_kind(ty), Type::Intervallum(_)))
+                    .is_some_and(|ty| matches!(self.type_kind(ty), Type::Intervallum(..)))
                 {
                     self.error(span, "interval length receiver is not intervallum");
                 }
@@ -2368,7 +2368,7 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                let Type::Intervallum(element) = self.type_kind(receiver_ty) else {
+                let Type::Intervallum(element, _) = self.type_kind(receiver_ty) else {
                     self.error(span, "interval contains receiver is not intervallum");
                     return;
                 };
@@ -2396,7 +2396,7 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                if !matches!(self.type_kind(receiver_ty), Type::Intervallum(_)) {
+                if !matches!(self.type_kind(receiver_ty), Type::Intervallum(..)) {
                     self.error(span, "interval algebra receiver is not intervallum");
                 }
                 if let Some(other_ty) = call
@@ -2426,13 +2426,13 @@ impl Validator<'_, '_> {
                 else {
                     return;
                 };
-                if !matches!(self.type_kind(target_ty), Type::Intervallum(_)) {
+                if !matches!(self.type_kind(target_ty), Type::Intervallum(..)) {
                     self.error(span, "interval clamp target is not intervallum");
                 }
             }
             MirCollectionOp::IntervalMaterialize => {
                 if !first_arg_ty
-                    .is_some_and(|ty| matches!(self.type_kind(ty), Type::Intervallum(_)))
+                    .is_some_and(|ty| matches!(self.type_kind(ty), Type::Intervallum(..)))
                 {
                     self.error(span, "interval materialize receiver is not intervallum");
                 }

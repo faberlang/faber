@@ -1441,7 +1441,7 @@ pub(super) fn import_semantic_type_with_nominal(
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.atomic(inner)
         }
-        Type::Intervallum(inner) => {
+        Type::Intervallum(inner, _) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.intervallum(inner)
         }

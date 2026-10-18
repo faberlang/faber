@@ -292,7 +292,7 @@ impl<'a> ClifCapability<'a> {
             Type::AsyncCursor(_, _) | Type::PromissumFailable(_, _) => {
                 Some(Gap::Subset("async value".to_owned()))
             }
-            Type::Intervallum(element) => (!matches!(
+            Type::Intervallum(element, _) => (!matches!(
                 self.types.get(*element),
                 Type::Primitive(Primitive::Numerus)
             ))
