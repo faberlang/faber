@@ -384,6 +384,10 @@ help = "bỏ nhãn khỏi đối số spread"
 message = "cần một giá trị sau toán tử sao chép vào `{operator}`"
 help = "viết biểu thức nguồn sau `⇇`"
 
+[diagnostics.PARSE001.issues.sink_into_item_expected]
+message = "cần một mục sau toán tử đổ vào `{operator}`"
+help = "viết biểu thức mục sau `⇜`"
+
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "nhãn phần tử tuple `{label}` được dùng nhiều hơn một lần"
 help = "đặt nhãn khác nhau cho mỗi phần tử, hoặc bỏ nhãn"
@@ -759,6 +763,10 @@ help = "dùng một biểu thức case hợp lệ"
 [diagnostics.PARSE030]
 message = "biểu thức không hợp lệ"
 help = "kiểm tra cú pháp biểu thức"
+
+[diagnostics.PARSE030.issues.sink_into_chain]
+message = "`⇜` không nối chuỗi"
+help = "viết mỗi câu lệnh một dạng 'sink ⇜ item'; '⇜' là một lần ghi và không có kết quả để nối chuỗi"
 
 [diagnostics.PARSE030.issues.ceiling_floor_delimiters]
 message = "dấu phân cách trần `⌈` và `⌉` đóng một phép lấy trần; `⌈x⌋` không phải dạng làm tròn"
@@ -1463,6 +1471,10 @@ help = "sửa cấu trúc AST để hạ cấp"
 [diagnostics.SEM008.issues.unknown_lowering_error]
 message = "hạ cấp HIR thất bại"
 help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.sink_into_unsupported]
+message = "dạng đổ vào '⇜' chưa có hạ cấp"
+help = "hợp đồng đổ sẽ được hạ cấp ở một đơn vị sau; hãy bỏ câu lệnh '⇜' trong lúc này"
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "không biết không gian tên"
