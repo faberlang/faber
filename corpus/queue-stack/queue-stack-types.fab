@@ -49,7 +49,7 @@ fn queue_length(queue<int> input) → int {
     return input.length()
 }
 
-# Bounded push remains a recoverable alternate exit; empty pop is nullable.
+# Bounded push remains a recoverable alternate exit; an empty pop yields `null`.
 fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
     mut queue<int, 2> q ← copy input
     q.append(1)
@@ -73,7 +73,7 @@ fn stack_iteration(stack<int> input) → void {
     }
 }
 
-# Empty pop is T ∪ null, so coalesce recovers a value instead of entering ⇥.
+# Empty pop is `T ∪ none`, so `coalesce` recovers a value instead of entering ⇥.
 # The in-place pop lands on a local copy, like the C2 walkers above.
 fn queue_pop_recover(queue<int> input) → int {
     mut queue<int> q ← copy input

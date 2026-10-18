@@ -2420,6 +2420,9 @@ fn validate_kernel_value_range(
                 validate_expression(rhs, checks)
             }
             Range::Constant(_) => Ok(()),
+            // A parameter term names a definition, not an arena index; there
+            // is nothing referential to check here.
+            Range::Parameter(_) => Ok(()),
         }
     }
 

@@ -1,0 +1,144 @@
++++
+locale = "en"
++++
+
+# machine.fab - Host snapshot device
+#
+# Etymology: machine — the host computer; Latin locale spelling `machina`.
+#
+# One verb, one call: sample(deadline_ms) reads the whole host — per-core
+# CPU interval, memory, and the process table — inside one host call.
+# The deadline lives inside the leaf, not in Faber: a read that does not
+# finish in time returns the previous snapshot with stale = true instead
+# of stalling the program. Counters are already differenced over the
+# interval between snapshots; a first-ever snapshot reports zero intervals.
+
+import from "norma:fault" fault
+
+# Boundary row: the leaf's `{kind, path}` crossing record becomes the
+# declared IoFault; the reporting bodies stay canonical `call` one-liners.
+@ conversion
+fn io_fault(value raw) → fault.IoFault {
+    return fault.io_fault_from(raw)
+}
+
+# One CPU core's interval counters. `busy_ns` is user+system+nice time;
+# `total_ns` adds idle, so total ≥ busy within one interval.
+@ public
+class Core {
+    let string name
+    let int busy_ns
+    let int total_ns
+}
+
+# One process row, capped by the leaf (top consumers first). `cpu_ns` uses
+# the same interval as the cores; a first-ever snapshot reports 0.
+@ public
+class Proc {
+    let int pid
+    let string command
+    let int cpu_ns
+    let int mem_bytes
+}
+
+# Host memory. `used_bytes` is active + wired + compressed.
+@ public
+class Memory {
+    let int used_bytes
+    let int total_bytes
+}
+
+# One host snapshot. `stale` is true when the host returned the previous
+# snapshot because a read missed its deadline; `age_ms` is then the age of
+# those counters, else 0.
+@ public
+class Sample {
+    let bool stale
+    let int age_ms
+    let list<Core> cores
+    let Memory memory
+    let list<Proc> procs
+}
+
+# Read one host snapshot. deadline_ms bounds the read inside the host
+# call: 0 returns the previous snapshot immediately (stale = true; a
+# first-ever call has no previous snapshot and reports empty lists).
+@ public
+fn sample(int deadline_ms) → Sample ⇥ fault.IoFault {
+    let value raw ← call 'machina:specimen' (deadline_ms) ↦ value
+    return sample_of(raw)
+}
+
+fn sample_of(value raw) → Sample {
+    do {
+        let map<string, value> fields ↤ raw
+        return Sample {
+            stale = fields["stale"] ↦ bool,
+            age_ms = fields["age_ms"] ↦ int,
+            cores = cores_of(fields["cores"]),
+            memory = memory_of(fields["memory"]),
+            procs = procs_of(fields["procs"])
+        }
+    }
+    catch err {
+        panic "norma:machine.sample: malformed carrier: §"(err)
+    }
+}
+
+fn cores_of(value raw) → list<Core> {
+    mut list<Core> out ← []
+    if raw not is list<value> then return out
+    do {
+        let list<value> items ↤ raw
+        for from items let item {
+            if item is map<string, value> {
+                let map<string, value> row ↤ item
+                out.append(Core {
+                    name = row["name"] ↦ string,
+                    busy_ns = row["busy_ns"] ↦ int,
+                    total_ns = row["total_ns"] ↦ int
+                })
+            }
+        }
+        return out
+    }
+    catch err {
+        panic "norma:machine.sample: malformed cores carrier: §"(err)
+    }
+}
+
+fn procs_of(value raw) → list<Proc> {
+    mut list<Proc> out ← []
+    if raw not is list<value> then return out
+    do {
+        let list<value> items ↤ raw
+        for from items let item {
+            if item is map<string, value> {
+                let map<string, value> row ↤ item
+                out.append(Proc {
+                    pid = row["pid"] ↦ int,
+                    command = row["command"] ↦ string,
+                    cpu_ns = row["cpu_ns"] ↦ int,
+                    mem_bytes = row["mem_bytes"] ↦ int
+                })
+            }
+        }
+        return out
+    }
+    catch err {
+        panic "norma:machine.sample: malformed procs carrier: §"(err)
+    }
+}
+
+fn memory_of(value raw) → Memory {
+    do {
+        let map<string, value> fields ↤ raw
+        return Memory {
+            used_bytes = fields["used_bytes"] ↦ int,
+            total_bytes = fields["total_bytes"] ↦ int
+        }
+    }
+    catch err {
+        panic "norma:machine.sample: malformed memory carrier: §"(err)
+    }
+}

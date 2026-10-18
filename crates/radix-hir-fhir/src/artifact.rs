@@ -735,6 +735,7 @@ pub enum KernelRangeExprWire {
     FloorDivide(Box<Self>, Box<Self>),
     Minimum(Box<Self>, Box<Self>),
     Maximum(Box<Self>, Box<Self>),
+    Parameter(DefId),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

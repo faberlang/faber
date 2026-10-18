@@ -234,7 +234,7 @@ fn rendered_table_contains_capability_rows_under_full_build() {
     let table = rendered_targets_table().expect("every CLI target maps to a faber feature");
     assert!(table.contains("rust available=yes"), "{table}");
     assert!(
-        table.contains("leaves=fs,stdio,process,clock,entropy,tcp,http,websocket"),
+        table.contains("leaves=fs,stdio,process,clock,entropy,tcp,http,websocket,machine"),
         "rust must declare the N2+N4b+N5 leaves:\n{table}"
     );
     // Capability truth under the default build: device-runtime is compiled,

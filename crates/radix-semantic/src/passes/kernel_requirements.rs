@@ -102,6 +102,9 @@ pub enum KernelRangeExpr {
     FloorDivide(Box<Self>, Box<Self>),
     Minimum(Box<Self>, Box<Self>),
     Maximum(Box<Self>, Box<Self>),
+    /// A kernel parameter named by its definition. The value is unknown at
+    /// check time; the term only makes sense inside a launch-time condition.
+    Parameter(DefId),
 }
 
 /// An implicit trapping store whose value is not statically proven to fit.
@@ -2764,13 +2767,14 @@ fn constant(expr: &KernelRangeExpr) -> Option<i128> {
         }
         KernelRangeExpr::Minimum(lhs, rhs) => Some(constant(lhs)?.min(constant(rhs)?)),
         KernelRangeExpr::Maximum(lhs, rhs) => Some(constant(lhs)?.max(constant(rhs)?)),
+        KernelRangeExpr::Parameter(_) => None,
     }
 }
 
 fn contains_shape(range: &KernelValueRange) -> bool {
     fn visit(expr: &KernelRangeExpr) -> bool {
         match expr {
-            KernelRangeExpr::Shape(_) => true,
+            KernelRangeExpr::Shape(_) | KernelRangeExpr::Parameter(_) => true,
             KernelRangeExpr::Constant(_) => false,
             KernelRangeExpr::Add(lhs, rhs)
             | KernelRangeExpr::Subtract(lhs, rhs)
@@ -2867,6 +2871,10 @@ fn symbolic_bounds(expr: &KernelRangeExpr) -> SymbolicBounds {
         },
         KernelRangeExpr::Shape(_) => SymbolicBounds {
             minimum: Some(0),
+            maximum: None,
+        },
+        KernelRangeExpr::Parameter(_) => SymbolicBounds {
+            minimum: None,
             maximum: None,
         },
         KernelRangeExpr::Add(lhs, rhs) => {

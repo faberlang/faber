@@ -16,7 +16,7 @@ locale = "en"
 #   • First-index tie law — among equal winners the least index wins. The
 #     same law is the parallel-combine law: partials pair as
 #     (value desc, index asc), so sequential scan and tree-combine agree.
-#   • Empty source → nihil — the twins return `int ∪ null`, never a −1
+#   • Empty source → `null` — the twins return `int ∪ none`, never a −1
 #     sentinel; a caller that needs an int composes `coalesce` (`vel`) at
 #     the call site.
 #   • NaN law — aligned with `reduce via max from`'s implemented fold: NaN

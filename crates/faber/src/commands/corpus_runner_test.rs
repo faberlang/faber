@@ -138,11 +138,11 @@ fn library_case(check_only: bool, outcome: Outcome, fragment: Option<&str>) -> C
     library.target.outcome = outcome;
     library.target.diagnostic_contains = fragment.map(str::to_owned);
     library.dir = std::env::temp_dir();
-    // Load-robust deadline: the synthetic 1s case deadline from `case` flakes under the
-    // loaded parallel stage-4b gate; real corpus cases use CASE_TIMEOUT_SECS = 120.
-    // 30s was still exceeded twice under full-fleet saturation (2026-10-17 gates at
-    // 19:58Z and 20:26Z), so library cases now use the real-case budget.
-    library.timeout = Duration::from_secs(120);
+    // The synthetic deadline follows the real corpus floor: Case::timeout takes the
+    // maximum of this value and CASE_TIMEOUT_SECS = 120. The 1s bound, then the 30s
+    // bound, were each breached under the loaded parallel full-suite gate (a31d7dfef0
+    // and this recurrence), so library cases use the production floor.
+    library.timeout = Duration::from_secs(crate::commands::corpus::CASE_TIMEOUT_SECS);
     library
 }
 
