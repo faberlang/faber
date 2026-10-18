@@ -25,6 +25,7 @@ postfix `↑` / `↓` as statements (not expressions).
 | `ᵀ` / `ᵗ` | postfix rank-2 transpose; `ᵗ` is the rejected lookalike (it reads as an identifier), use capital superscript `ᵀ`. |
 | `⤒` / `⤓` | infix maximum/minimum, additive tier, left-associative; chains on tensors express elementwise clamp. Whole-tensor reductions are `reduce via max from` / `reduce via min from` (`reducta via maxima` / `reducta via minima`), which take a shaped tensor or matrix; a `list` operand is `reducta_requires_shaped_iterable`, and an empty-possible result needs a `coalesce` (la `vel`) identity or nullable handling. |
 | `⌊x⌋` / `⌈x⌉` / `⌊x⌉` | rounding glyphs: floor, ceiling, nearest; each reads as a method twin (`floor`, `ceiling`, `round`) and the result is an integer. Nearest sends ties to the even neighbour: `⌊2.5⌉` is 2, `⌊3.5⌉` is 4, `⌊-2.5⌉` is -2, on every target. `⌈x⌋` is the named `PARSE030 ceiling_floor_delimiters` error pointing at `⌊x⌉`; a tensor operand is `SEM011 glyph_rounding_tensor_unsupported` until the elementwise lift is built. |
+| `√` `∛` `∜` | radical prefixes, spaced prefix sugar binding like unary `-` / `¬` (`√ x + 1` is `(√ x) + 1`): `√` is `.sqrt()` exactly where the method is legal (floats and float tensors; an int operand is the `.sqrt()` error), `∛` is the real cube root of `.cbrt()` (`∛ -8.0` is `-2.0`), `∜` is `.sqrt().sqrt()` (NaN for negatives, as `sqrt`). Locale-invariant math glyphs, no word twin. |
 | `.argmax()` / `.argmin()` | list-only (a tensor gives `SEM004 unknown_method`). First-index tie law; empty source yields the null value; NaN never wins while a number participates, and an all-NaN source keeps index 0. Keep the result as `int ∪ none` or coalesce it: a plain `int` store checks but fails at run on empty input; there is no `-1` sentinel. |
 | `≡` / `≢` | strict equality and its one negation; identical types are required (`≡` between different widths, or between `T ∪ none` and `T`, is `SEM010 equality_exact_types_required`). `≠` is retired: it is `PARSE030 neq_glyph_retired` naming `≢`. |
 | `≅` / `≇` | promoted-exact equality for numbers: widths join losslessly and compare exactly (`i8` -1 `≇` `u64` max; `int ≅ f64` joins exactly). Use it for numbers only; mixed non-numeric operands are `SEM011 numeric_value_equality_operands_required`, and same-typed lists or strings currently pass as plain equality, which is not a contract. |
@@ -54,7 +55,7 @@ postfix `↑` / `↓` as statements (not expressions).
 
 Precedence, loosest to tightest: `⇇`; `✓ ✗`; `or`; `and`; equality (`≡ ≅ ≈ is`);
 comparison (`≺ ≻ ≤ ≥ ∈ ∉`); `¶`; `∨`; `⊻`; `∧`; `⇐ ⇒`; ranges; `+ - ⤒ ⤓`;
-`* / ÷ % · ⊙ ⊗ ⊘ ×`; `coalesce`; unary (`- ¬ not`). In la, `or`, `and`, `is`, `coalesce` and `not` are `aut`, `et`,
+`* / ÷ % · ⊙ ⊗ ⊘ ×`; `coalesce`; unary (`- ¬ not √ ∛ ∜`). In la, `or`, `and`, `is`, `coalesce` and `not` are `aut`, `et`,
 `est`, `vel` and `non`. So `1 ∨ 2 ≡ 3` is true, `1 ⇐ 2 + 1`
 is 8, and `10 - 3 ⤒ 5` is 7. Confirm against the `EBNF.md` expression productions
 before relying on a corner.
