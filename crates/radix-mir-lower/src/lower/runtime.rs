@@ -98,6 +98,14 @@ pub(super) enum SyntheticHelperKey {
         return_ty: MirType,
         error_ty: MirType,
     },
+    /// A checked list trim: `Slice` (the window) or `Take` (the prefix), with
+    /// the receiver and index parameter types.
+    CheckedTrim {
+        op: MirCollectionOp,
+        params: Vec<MirType>,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
 }
 
 /// Whether a `⊥` default expression is side-effecting: a call or method call
@@ -960,6 +968,53 @@ impl FunctionBuilder<'_> {
             let keyed = matches!(self.types.get(receiver_ty.semantic_id()), Type::Map(..) | Type::Ledger(..));
             let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
             let helper = self.push_checked_at_helper(keyed, [receiver_ty, index_ty], expr_ty, textus, expr.span);
+            return self.lower_failable_call(
+                MirCallee::Function(helper),
+                lowered_args,
+                expr_ty,
+                textus,
+                None,
+                expr.span,
+            );
+        }
+        if op == MirCollectionOp::Slice
+            && method_name == "sectio"
+            && args.len() == 2
+            && self.device_role.is_none()
+            && self.is_lista_receiver(receiver)
+            && let (Some(start_ty), Some(end_ty), Some(receiver_ty)) = (
+                self.expr_ty(&args[0].expr),
+                self.expr_ty(&args[1].expr),
+                self.checked_tensor_receiver_ty(receiver),
+            )
+        {
+            // need: the list window reports out-of-range bounds on
+            // `⇥`, the same fault family as the `at` read. The bare runtime
+            // op still trims, so it is only reached behind the guard.
+            let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+            let helper =
+                self.push_checked_trim_helper(op, &[receiver_ty, start_ty, end_ty], expr_ty, textus, expr.span);
+            return self.lower_failable_call(
+                MirCallee::Function(helper),
+                lowered_args,
+                expr_ty,
+                textus,
+                None,
+                expr.span,
+            );
+        }
+        if op == MirCollectionOp::Take
+            && method_name == "prima"
+            && args.len() == 1
+            && self.device_role.is_none()
+            && self.is_lista_receiver(receiver)
+            && let (Some(count_ty), Some(receiver_ty)) =
+                (self.expr_ty(&args[0].expr), self.checked_tensor_receiver_ty(receiver))
+        {
+            // need: the list prefix reports a count over the length
+            // on `⇥`; the runtime `Take` below only ever runs guarded.
+            let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+            let helper = self.push_checked_trim_helper(op, &[receiver_ty, count_ty], expr_ty, textus, expr.span);
             return self.lower_failable_call(
                 MirCallee::Function(helper),
                 lowered_args,
@@ -5296,6 +5351,153 @@ impl FunctionBuilder<'_> {
         nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
 
         let id = Self::finish_synthetic_function(
+            &mut self.errors,
+            &mut self.synthetic_functions,
+            id,
+            nested,
+            return_ty,
+            error_ty,
+            span,
+        );
+        self.synthetic_helpers.insert(key, id);
+        id
+    }
+
+    /// Whether this method's receiver is a `lista` — a run-time `Array` or a
+    /// fixed-capacity `BoundedArray` — and never a `textus`, whose `sectio`
+    /// keeps trimming quietly.
+    fn is_lista_receiver(&self, receiver: &HirExpression) -> bool {
+        receiver.ty.is_some_and(|ty| {
+            matches!(
+                self.types.get(self.method_receiver_payload_id(ty)),
+                Type::Array(_) | Type::BoundedArray { .. }
+            )
+        })
+    }
+
+    /// The helper body, for `(in receiver, start, end) ⇥ textus` (`Slice`) and
+    /// `(in receiver, count) ⇥ textus` (`Take`):
+    ///
+    /// ```text
+    /// entry: len = Length(recv)
+    ///        start < 0 ? fail : next
+    /// next:  start > end ? fail : next        (Slice only)
+    /// next:  end > len ? fail : ok
+    /// ok:    return Slice(recv, start, end)
+    /// fail:  ReturnError(FormatString("slice_out_of_range § § §", start, end, len))
+    /// ```
+    ///
+    /// `Take` checks `0 <= count <= len` and reports `count` and `len`. The
+    /// payload is the fault kind plus the numbers as data, never prose. Only a
+    /// guarded trim reaches the runtime op, so the strict call keeps its quiet
+    /// trimming semantics without the source surface ever trimming.
+    fn push_checked_trim_helper(
+        &mut self,
+        op: MirCollectionOp,
+        param_tys: &[MirType],
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> MirFunctionId {
+        let key = SyntheticHelperKey::CheckedTrim { op, params: param_tys.to_vec(), return_ty, error_ty };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return id;
+        }
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            Some(error_ty),
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let mut locals = Vec::with_capacity(param_tys.len());
+        for (index, &ty) in param_tys.iter().enumerate() {
+            // The receiver is borrowed; the bounds are plain values.
+            let mode = if index == 0 {
+                MirParamMode::Ref
+            } else {
+                MirParamMode::Owned
+            };
+            let local = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable: false, span });
+            locals.push(local);
+        }
+        let receiver = MirOperand::Place(MirPlace::local(locals[0]));
+        let bounds: Vec<MirOperand> = locals[1..]
+            .iter()
+            .map(|&local| MirOperand::Place(MirPlace::local(local)))
+            .collect();
+
+        let entry = nested.fresh_block(span);
+        let ok = nested.fresh_block(span);
+        let fail = nested.fresh_block(span);
+        nested.switch_to(entry);
+        let length = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![receiver.clone()],
+            numerus,
+            span,
+        );
+        let zero = MirOperand::Constant(MirConstant::Int(0));
+        // `take` admits `0 <= count <= len`; `slice` also requires the window
+        // to run forward, so an empty window at a legal position is fine.
+        let checks = if op == MirCollectionOp::Take {
+            vec![
+                (bounds[0].clone(), MirBinOp::Lt, zero),
+                (bounds[0].clone(), MirBinOp::Gt, length.clone()),
+            ]
+        } else {
+            vec![
+                (bounds[0].clone(), MirBinOp::Lt, zero),
+                (bounds[0].clone(), MirBinOp::Gt, bounds[1].clone()),
+                (bounds[1].clone(), MirBinOp::Gt, length.clone()),
+            ]
+        };
+        for (index, (lhs, comparison, rhs)) in checks.iter().enumerate() {
+            let condition = nested.binary_temp(*comparison, lhs.clone(), rhs.clone(), bivalens, span);
+            let next = if index + 1 == checks.len() {
+                ok
+            } else {
+                nested.fresh_block(span)
+            };
+            nested.terminate_current(
+                MirTerminatorKind::Branch { condition, then_block: fail, else_block: next },
+                span,
+            );
+            nested.switch_to(next);
+        }
+
+        nested.switch_to(ok);
+        let mut call_args = vec![receiver];
+        call_args.extend(bounds.iter().cloned());
+        let trimmed = nested.runtime_call_value(MirIntrinsic::Collection(op), call_args, return_ty, span);
+        nested.terminate_current(MirTerminatorKind::Return(Some(trimmed)), span);
+
+        nested.switch_to(fail);
+        let template = if op == MirCollectionOp::Take {
+            nested.context.diagnostic_take_out_of_range
+        } else {
+            nested.context.diagnostic_slice_out_of_range
+        };
+        let mut payload = bounds;
+        payload.push(length);
+        let message = nested.runtime_call_value(MirIntrinsic::FormatString { template }, payload, error_ty, span);
+        nested.terminate_current(MirTerminatorKind::ReturnError(message), span);
+
+        Self::finish_synthetic_function(
             &mut self.errors,
             &mut self.synthetic_functions,
             id,

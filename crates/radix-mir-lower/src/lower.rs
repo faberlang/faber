@@ -724,6 +724,8 @@ pub fn lower_analyzed_unit(
         ponde_invalid_index: interner.intern(radix_runtime_contract::tensor::ERR_PONDE_INVALID_INDEX),
         accipe_invalid_index: interner.intern(radix_runtime_contract::tensor::ERR_ACCIPE_INVALID_INDEX),
         at_out_of_range: interner.intern("at: index out of range or key missing"),
+        slice_out_of_range: interner.intern("slice_out_of_range § § §"),
+        take_out_of_range: interner.intern("take_out_of_range § §"),
     };
     let kernel_lowering = options.kernel_lowering;
     let mut lowerer = MirLowerer {
@@ -1518,6 +1520,12 @@ struct DiagnosticSymbols {
     /// The `at` read's (la `apud`) out-of-range index / missing key textus
     ///.
     at_out_of_range: Symbol,
+    /// The list `slice` window's (la `sectio`) fault payload template: the
+    /// fault kind plus start, end and list length as data.
+    slice_out_of_range: Symbol,
+    /// The list `take` trim's (la `prima`) fault payload template: the fault
+    /// kind plus count and list length as data.
+    take_out_of_range: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -2471,6 +2479,10 @@ pub struct FunctionBuilderContext<'a> {
     diagnostic_ponde_invalid_index: Symbol,
     diagnostic_accipe_invalid_index: Symbol,
     diagnostic_at_out_of_range: Symbol,
+    /// The list `slice` fault payload template.
+    diagnostic_slice_out_of_range: Symbol,
+    /// The list `take` fault payload template.
+    diagnostic_take_out_of_range: Symbol,
     /// A `⇥` kernel exists in the unit: handled blocks emit the device
     /// fault-delivery markers (U9-5).
     fault_delivery: bool,
@@ -2569,6 +2581,8 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_ponde_invalid_index: Symbol(0),
             diagnostic_accipe_invalid_index: Symbol(0),
             diagnostic_at_out_of_range: Symbol(0),
+            diagnostic_slice_out_of_range: Symbol(0),
+            diagnostic_take_out_of_range: Symbol(0),
             fault_delivery: false,
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
