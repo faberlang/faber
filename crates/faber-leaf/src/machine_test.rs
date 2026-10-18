@@ -124,3 +124,24 @@ fn out_of_order_guard_rejects_older_generation() {
     };
     assert_eq!(field(memory, "used_bytes"), &Reply::Int(333));
 }
+
+#[test]
+fn collect_override_feeds_reply() {
+    let _guard = crate::test_support::handle_table_guard();
+    super::reset_previous();
+    super::set_collect_override(Some(std::sync::Arc::new(|| {
+        Ok(super::collected_for_test(777))
+    })));
+    let reply = serve("machina:specimen", &[Arg::Int(5000)])
+        .expect("route")
+        .expect("specimen");
+    super::set_collect_override(None);
+    let Reply::Map(fields) = &reply else {
+        panic!("expected map, got {reply:?}");
+    };
+    assert_eq!(field(fields, "stale"), &Reply::Bool(false));
+    let Reply::Map(memory) = field(fields, "memory") else {
+        panic!("expected memory map");
+    };
+    assert_eq!(field(memory, "used_bytes"), &Reply::Int(777));
+}
