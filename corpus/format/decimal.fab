@@ -3,7 +3,7 @@ term = "¶"
 kind = "operator"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "format"
-summary = "Format operator on decimals: d64 prints its exact digits and .N rounds half-even."
+summary = "Format operator on decimals: d64 prints its exact digits, `e` is exact scientific from those digits, and .N rounds half-even."
 syntax = "<d64 value> ¶ \"[fill][align][sign][0][width][.precision]\""
 aliases = ["format"]
 related = ["scriptum", "textus", "d64"]
@@ -23,10 +23,15 @@ locale = "en"
 #   • An expression is formatted exactly before it is stored: `1.5 * 2.25` is
 #     exactly 3.375, so `.2` gives `3.38`.
 #   • Plain display keeps the shortest form: `12.5` stays `12.5`.
+#   • The `e` kind is exact scientific built from the same decimal digits, not
+#     from a binary approximation: `1234.5 ¶ "e"` is `1.2345e3`, zero is
+#     `0e0`, a negative keeps its sign (`-12.5 ¶ "e"` is `-1.25e1`) and the
+#     smallest unit is `1e-8` (`0.00000001 ¶ "e"`). With `.N` the coefficient
+#     keeps N digits and rounds half-even (`1234.5 ¶ ".3e"` is `1.234e3`).
 #
 # Common mistakes:
-#   • A kind on a decimal (`p ¶ "x"`, `p ¶ "e"`) — a compile error, so `¶`
-#     itself never fails.
+#   • A radix kind on a decimal (`p ¶ "x"`) — a compile error, so `¶` itself
+#     never fails. Scientific is the `e` kind, not a radix.
 #
 # See also: scriptum, textus
 # =============================================================================
@@ -43,4 +48,15 @@ main {
     print u ¶ ".1"
     print a * b ¶ ".2"
     print p ¶ ">8"
+
+    let d64 q ← 1234.5
+    let d64 z ← 0.0
+    let d64 n ← -12.5
+    let d64 m ← 0.00000001
+
+    print q ¶ "e"
+    print q ¶ ".3e"
+    print z ¶ "e"
+    print n ¶ "e"
+    print m ¶ "e"
 }
