@@ -255,9 +255,12 @@ fn run_bounded(command: &mut Command, stdin: Stdio, limit: Duration) -> Result<O
     };
     // The deadline stays in force past the direct child's exit: a descendant that
     // inherited a pipe keeps it open, so joining the drain threads could block
-    // until that descendant exits on its own.
+    // until that descendant exits on its own. A parent that only observes the exit
+    // after the deadline still needs a fresh grace floor for in-flight drain sends;
+    // with the deadline still ahead of that floor the bound is unchanged.
     let mut parts = [None, None];
-    if collect_drains(&receiver, &mut parts, deadline) {
+    let collected = deadline.max(Instant::now() + DRAIN_GRACE);
+    if collect_drains(&receiver, &mut parts, collected) {
         return Ok(Output {
             status,
             stdout: parts[0].take().unwrap_or_default(),
@@ -293,17 +296,20 @@ fn drain(
 
 /// Collect both drain results into `parts`, bounded by `deadline`. Returns whether
 /// both streams reported EOF in time.
+///
+/// The receiver is polled before the clock: a buffered result must never be
+/// discarded because the parent was scheduled late. `recv_timeout` with a zero
+/// remaining bound still delivers a buffered message, so results the drains
+/// already sent are collected even after the deadline passed, while a stream
+/// that has genuinely not reached EOF still times out.
 fn collect_drains(
     receiver: &Receiver<(usize, Vec<u8>)>,
     parts: &mut [Option<Vec<u8>>; 2],
     deadline: Instant,
 ) -> bool {
     while parts[0].is_none() || parts[1].is_none() {
-        let now = Instant::now();
-        if now >= deadline {
-            return false;
-        }
-        match receiver.recv_timeout(deadline - now) {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match receiver.recv_timeout(remaining) {
             Ok((which, bytes)) => parts[which] = Some(bytes),
             Err(_) => return false,
         }

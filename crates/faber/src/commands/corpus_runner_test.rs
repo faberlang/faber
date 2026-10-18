@@ -1,5 +1,5 @@
 use super::{
-    Case, ChildError, Expected, Outcome, TargetExpectation, run_bounded, run_case,
+    Case, ChildError, Expected, Outcome, TargetExpectation, collect_drains, run_bounded, run_case,
     runner_lower_args, runner_run_args,
 };
 use std::fs;
@@ -161,6 +161,25 @@ fn lower_calls(dir: &std::path::Path) -> usize {
 }
 
 const NO_ENTRY: &str = radix_mir::names::NO_ENTRY_FUNCTION;
+
+#[test]
+fn collect_drains_returns_buffered_results_even_when_the_deadline_has_passed() {
+    // A parent scheduled late (a saturated machine) must still collect drain results
+    // that were already sent; the deadline bounds the wait, not the delivery.
+    let (sender, receiver) = std::sync::mpsc::channel();
+    sender.send((0, b"out".to_vec())).expect("send stdout");
+    sender.send((1, b"err".to_vec())).expect("send stderr");
+    drop(sender);
+    let mut parts = [None, None];
+    let passed = collect_drains(
+        &receiver,
+        &mut parts,
+        Instant::now() - Duration::from_secs(1),
+    );
+    assert!(passed);
+    assert_eq!(parts[0].as_deref(), Some(&b"out"[..]));
+    assert_eq!(parts[1].as_deref(), Some(&b"err"[..]));
+}
 
 #[test]
 fn runner_lower_standard_checks_then_lowers() {
