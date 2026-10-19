@@ -1269,7 +1269,7 @@ impl TypeChecker<'_> {
         let nihil = self.types.primitive(Primitive::Nihil);
 
         match (view_kind, method_name) {
-            (DirectionalViewKind::Meus, "da") if self.is_closed_meus(receiver_ty) => {
+            (DirectionalViewKind::Meus, "sink") if self.is_closed_meus(receiver_ty) => {
                 self.typecheck_call_arg_exprs(args);
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
@@ -1278,7 +1278,7 @@ impl TypeChecker<'_> {
                 );
                 Some(self.error_type)
             }
-            (DirectionalViewKind::Meus, "da") => Some(self.check_known_method_args(
+            (DirectionalViewKind::Meus, "sink") => Some(self.check_known_method_args(
                 args,
                 vec![ParamType {
                     ty: payload_ty,
@@ -1425,7 +1425,7 @@ impl TypeChecker<'_> {
     }
 
     /// Rewrite a pack spelling of a directional view method (`t.get()` under
-    /// en) to its canonical Latin symbol (`accipe`). `da` is not a projected
+    /// en) to its canonical Latin symbol (`accipe`). `sink` is not a projected
     /// row and passes through unchanged.
     ///
     /// Returns `true` for the canonical Latin spelling under a non-`la` pack
