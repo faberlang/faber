@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/importa/lib.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/lib.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

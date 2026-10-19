@@ -1,0 +1,24 @@
++++
+term = "importa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_sugar", "selective_import", "import_value_binding", "incipit_stmt", "block_stmt", "nota_stmt"]
+category = "package"
+summary = "A selective import must name a member the imported module exports."
+syntax = "import from <source> const <member>"
+related = ["importa", "fixum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM006:selective_import_missing_member"
++++
+# =============================================================================
+# importa — a selective import names an exported member
+# =============================================================================
+# `nosuch` is not on `lib`'s exported surface (`@ public`), and it is not a
+# module-private name either: a selective binding that names nothing the module
+# exports is its own error, reported at the import.
+
+import from "./lib" const nosuch
+
+main {
+    print 1
+}

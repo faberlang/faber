@@ -1,0 +1,24 @@
++++
+term = "importa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_sugar", "named_import", "incipit_stmt", "block_stmt", "call_expr", "call_suffix", "member_suffix", "argument_list", "expression", "nota_stmt"]
+category = "package"
+summary = "An unmarked top-level member of an imported module is module-private."
+syntax = "lib.hidden()"
+related = ["importa", "publica"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM006:import_module_private"
++++
+# =============================================================================
+# importa — a module-private member is not reachable through the import
+# =============================================================================
+# `hidden` carries no `@ public`, so it belongs to `lib` alone. Reaching it
+# through the module binding is a semantic error, not a name that falls back to
+# a module-local definition.
+
+import from "./lib" lib
+
+main {
+    print lib.hidden()
+}
