@@ -1029,6 +1029,12 @@ fn semantic_unavailable_declaration_help(args: &[DiagnosticArg]) -> Option<Strin
         "nondum_method_for_target" | "nondum_function_for_target" => {
             Some("use an available declaration or change the target".to_owned())
         }
+        "import_target_bound" => {
+            let target = arg_value(args, "target")?;
+            Some(format!(
+                "build this program for `{target}`, or remove the target import"
+            ))
+        }
         _ => None,
     }
 }

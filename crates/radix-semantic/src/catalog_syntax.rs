@@ -1153,6 +1153,13 @@ fn invalid_import_message(args: &[DiagnosticArg]) -> Option<String> {
             let path = arg_value(args, "path")?;
             Some(format!("could not infer import name from {path}"))
         }
+        "import_target_unknown" => {
+            let target = arg_value(args, "target")?;
+            Some(format!("`{target}` is not a target name"))
+        }
+        "import_target_binding_required" => Some(
+            "a target import names its binding; none is inferred from the specifier".to_owned(),
+        ),
         _ => None,
     }
 }
@@ -1174,6 +1181,13 @@ fn invalid_import_help(args: &[DiagnosticArg]) -> Option<String> {
             let path = arg_value(args, "path")?;
             Some(format!("spell nomen or an explicit alias for {path}"))
         }
+        "import_target_unknown" => match arg_value(args, "suggestion") {
+            Some(suggestion) => Some(format!("did you mean `{suggestion}`?")),
+            None => Some("write a target name from `faber targets`".to_owned()),
+        },
+        "import_target_binding_required" => Some(
+            "write a binding name after the specifier, e.g. `import python \"math\" m`".to_owned(),
+        ),
         _ => None,
     }
 }
