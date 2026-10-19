@@ -8,7 +8,7 @@
 
 use crate::{
     NumericWidth, Primitive, ResolvedTensorEdgePolicy, Resolver, SemanticError, SemanticErrorKind,
-    TensorEdgePolicyTable, Type, TypeId, TypeTable,
+    SymbolKind, TensorEdgePolicyTable, Type, TypeId, TypeTable,
 };
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
@@ -998,10 +998,6 @@ struct BodyFacts<'a> {
     interner: &'a Interner,
     tensor_edge_policies: &'a TensorEdgePolicyTable,
     const_values: &'a FxHashMap<DefId, i128>,
-    #[expect(
-        dead_code,
-        reason = "unused until d40af598-2.3 folds imported module.CONST ints; expect expires when read"
-    )]
     resolver: &'a Resolver,
     ranges: FxHashMap<DefId, AbstractRange>,
     parameter_types: FxHashMap<DefId, TypeId>,
@@ -1618,6 +1614,30 @@ impl BodyFacts<'_> {
                         result
                     };
                 }
+                expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                    AbstractRange::from_type(ty, self.types)
+                })
+            }
+            HirExpressionKind::Field(object, member) => {
+                let resolver = self.resolver;
+                let imported = match &object.kind {
+                    HirExpressionKind::Path(module) => resolver
+                        .get_symbol(*module)
+                        .filter(|namespace| namespace.kind == SymbolKind::Module)
+                        .and_then(|namespace| {
+                            resolver.namespace_file_const_value_canonical(namespace.name, *member)
+                        })
+                        .and_then(|value| match value {
+                            crate::file_interface::InterfaceConstValue::Int(value) => Some(*value),
+                            _ => None,
+                        }),
+                    _ => None,
+                };
+                if let Some(value) = imported {
+                    self.evaluate(object);
+                    return AbstractRange::exact(value);
+                }
+                walk_expr(self, expr);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
