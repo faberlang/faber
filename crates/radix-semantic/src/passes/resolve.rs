@@ -75,6 +75,8 @@ const ISSUE_FIGURA_ARITHMETIC_INVALID: &str = "figura_arithmetic_invalid";
 const ISSUE_INVALID_PRECISION_MARKER: &str = "invalid_precision_marker";
 const ISSUE_INTERVALLUM_ARITY: &str = "intervallum_arity";
 const ISSUE_INTERVALLUM_BOUND: &str = "intervallum_bound";
+const ISSUE_INTERVALLUM_STEP_MUST_BE_CONSTANT: &str = "intervallum_step_must_be_constant";
+const ISSUE_INTERVALLUM_STEP_BOUND_NOT_INTEGER: &str = "intervallum_step_bound_not_integer";
 const ISSUE_MATRIX_INCOMPLETE: &str = "matrix_incomplete";
 const ISSUE_MATRIX_MISSING_FIGURA: &str = "matrix_missing_figura";
 const ISSUE_MATRIX_SHAPE_TWO_DIM: &str = "matrix_shape_two_dim";
@@ -1964,6 +1966,16 @@ fn resolve_type_expr(
                     }
                     return;
                 }
+            }
+            if name_str == "intervallum" {
+                // The first argument is the bound type; the optional second is
+                // the compile-time step, which the type-lowering sites validate
+                // by shape. A bare name there is not an unknown type — it is
+                // `intervallum_step_must_be_constant`.
+                if let Some(bound) = params.first() {
+                    resolve_generic_arg(resolver, interner, bound, errors);
+                }
+                return;
             }
             if let Some(collection) = CollectionKind::from_name(name_str) {
                 match collection {
@@ -3897,6 +3909,37 @@ fn lower_generic_type_arg(
     }
 }
 
+/// Lower the compile-time step argument of `intervallum<T, S>`.
+///
+/// The step is a positive literal only: a zero literal reports the value-level
+/// `range_step_not_positive` law, and any other shape (a name, an arithmetic
+/// expression, `_`) reports `intervallum_step_must_be_constant` rather than
+/// guessing a run-time step.
+pub(crate) fn intervallum_step_index(
+    arg: &GenericArgExpr,
+    types: &mut TypeTable,
+) -> Result<radix_types::IndexId, &'static str> {
+    let GenericArgExpr::Size(FiguraExpr::Literal(value)) = arg else {
+        return Err(ISSUE_INTERVALLUM_STEP_MUST_BE_CONSTANT);
+    };
+    if *value == 0 {
+        return Err("range_step_not_positive");
+    }
+    Ok(types.intern_index(IndexExpr::Literal(*value)))
+}
+
+/// True when an `intervallum` bound is an integer type.
+///
+/// A stepped interval takes integer bounds only; `instans` is the one legal
+/// non-integer bound and carries no step.
+#[must_use]
+pub(crate) fn is_integer_intervallum_bound(types: &TypeTable, ty: TypeId) -> bool {
+    matches!(
+        types.get(ty),
+        Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+    )
+}
+
 fn lower_generic_index_arg(
     arg: &GenericArgExpr,
     resolver: &Resolver,
@@ -4109,6 +4152,30 @@ fn lower_named_type(
         return Ok(collection.lower(types, &lowered));
     }
 
+    // `intervallum<T, S>` takes a type bound and an optional compile-time
+    // natural step. Its second argument is not a type position, so this arm
+    // sits ahead of the type-only generic-argument guard below; the step shape
+    // is validated when the type is lowered.
+    if name_str == "intervallum" {
+        if params.len() != 1 && params.len() != 2 {
+            return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_ARITY));
+        }
+        let bound = lower_generic_type_arg(&params[0], resolver, interner, types)?;
+        if !crate::is_intervallum_bound_type(types, bound) {
+            return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_BOUND));
+        }
+        let Some(step_arg) = params.get(1) else {
+            return Ok(types.intervallum(bound));
+        };
+        let step = intervallum_step_index(step_arg, types).map_err(TypeLowerError::Issue)?;
+        if !is_integer_intervallum_bound(types, bound) {
+            return Err(TypeLowerError::Issue(
+                ISSUE_INTERVALLUM_STEP_BOUND_NOT_INTEGER,
+            ));
+        }
+        return Ok(types.intervallum_with_step(bound, step));
+    }
+
     let Some(type_params) = generic_type_exprs(params) else {
         return Err(TypeLowerError::Issue(
             "generic_size_argument_in_type_position",
@@ -4137,17 +4204,6 @@ fn lower_named_type(
         let textus = types.primitive(Primitive::Textus);
         let valor = types.primitive(Primitive::Valor);
         return Ok(types.map(textus, valor));
-    }
-
-    if name_str == "intervallum" {
-        if params.len() != 1 {
-            return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_ARITY));
-        }
-        let bound = lower_generic_type_arg(&params[0], resolver, interner, types)?;
-        if !crate::is_intervallum_bound_type(types, bound) {
-            return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_BOUND));
-        }
-        return Ok(types.intervallum(bound));
     }
 
     if name_str == "sermo" && !params.is_empty() {
