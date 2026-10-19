@@ -1,0 +1,75 @@
++++
+term = "ordo"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "unary_expr", "literal", "member_suffix", "nota_stmt", "param_list", "itera_stmt", "elige_stmt", "casu_elige_clause", "array_literal", "type_arguments", "type_argument", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "type"
+canonical = false
+summary = "Using enum values: equality, printing, lists, switch, and a class field."
+syntax = "a ≡ Color.red"
+related = ["ordo", "genus"]
+locale = "en"
++++
+# =============================================================================
+# enum-usage — Enum values in use: compare, print, list, switch, class field.
+# =============================================================================
+#
+# What this teaches:
+#   • Equality — two enum values compare with `≡`; members of one enum are
+#     distinct, so `Color.red ≡ Color.green` is false.
+#   • Printing — `print a` and `"§"(a)` show the same form for one value
+#     (`Color.red`), so one value has one display.
+#   • Lists — an enum is an ordinary value element: build `list<Color>`, walk
+#     it with `for from xs let c`, and read `xs[1]` / `xs.contains(...)`.
+#   • switch — `case Color.red { … }` selects on the member; a `mut` name can
+#     be re-pointed with `←`.
+#   • Class field — a `class` field of an enum type is read and stored like any
+#     other field, including through a function call.
+#
+# Common mistakes:
+#   • Comparing an enum value with a number — enum values are not integers
+#     here; read the number with `↦ int` (see enum-values).
+#   • Writing `=` for a run-time store — re-pointing a name is `←`.
+#
+# See also: ordo, genus
+# =============================================================================
+
+enum Color { red, green, blue }
+enum S { on, off }
+
+class Lamp { mut S state = S.off }
+
+fn flip(S s) → S {
+    switch s {
+        case S.on { return S.off }
+        case S.off { return S.on }
+    }
+}
+
+main {
+    let Color a ← Color.red
+    let Color b ← Color.red
+    print a ≡ b
+    print a ≡ Color.green
+    print a
+    print Color.blue
+    mut Color m ← Color.green
+    m ← Color.blue
+    print m ≡ Color.blue
+    print "§"(a)
+    let list<Color> xs ← [Color.red, Color.blue, Color.green]
+    mut int n ← 0
+    for from xs let c {
+        switch c {
+            case Color.red { n ← n + 1 }
+            case Color.green { n ← n + 10 }
+            case Color.blue { n ← n + 100 }
+        }
+    }
+    print n
+    print xs[1] ≡ Color.blue
+    print xs.contains(Color.green)
+    mut Lamp l ← Lamp {}
+    print l.state
+    l.state ← flip(l.state)
+    print l.state
+}
