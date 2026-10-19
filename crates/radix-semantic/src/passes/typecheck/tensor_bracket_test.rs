@@ -186,3 +186,29 @@ fn matrix_bracket_rejects_literal_out_of_range() {
         "index_provably_out_of_bounds",
     );
 }
+
+#[test]
+fn tensor_bracket_range_rank1_accepts() {
+    accepts(
+        r"functio lega(tf32[4] t) → tf32[2] {
+    sit tf32[2] s ← t[1 ‥ 3]
+    redde s
+}",
+    );
+    accepts(
+        r"functio lega(tf32[4] t) → tf32[2] {
+    sit tf32[2] s ← t[1 … 2]
+    redde s
+}",
+    );
+}
+
+#[test]
+fn tensor_bracket_range_rank2_scalar_range_rejects() {
+    rejects_with_issue(
+        r"functio bad(tf32[2, 2] g) → tf32[1] {
+    redde g[0 ‥ 1]
+}",
+        "tensor_scalar_index_rank",
+    );
+}
