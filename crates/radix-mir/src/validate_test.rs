@@ -5536,10 +5536,12 @@ fn applied_receiver_of_the_same_class_satisfies_a_struct_self_parameter() {
 // Interval aggregate window step
 // -----------------------------------------------------------------------
 
-/// One function constructing `intervallum<numerus>` from `items`.
-fn interval_program(types: &mut TypeTable, items: Vec<MirAggregateItem>) -> MirProgram {
-    let numerus = types.primitive(Primitive::Numerus);
-    let interval_ty = MirType::semantic(types.intervallum(numerus));
+/// One function constructing an interval of `interval_ty` from `items`.
+fn interval_program_with_ty(
+    types: &mut TypeTable,
+    interval_ty: MirType,
+    items: Vec<MirAggregateItem>,
+) -> MirProgram {
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     MirProgram {
         functions: vec![MirFunction {
@@ -5587,6 +5589,13 @@ fn interval_program(types: &mut TypeTable, items: Vec<MirAggregateItem>) -> MirP
     }
 }
 
+/// One function constructing `intervallum<numerus>` from `items`.
+fn interval_program(types: &mut TypeTable, items: Vec<MirAggregateItem>) -> MirProgram {
+    let numerus = types.primitive(Primitive::Numerus);
+    let interval_ty = MirType::semantic(types.intervallum(numerus));
+    interval_program_with_ty(types, interval_ty, items)
+}
+
 fn interval_items(step: Option<MirAggregateItem>) -> Vec<MirAggregateItem> {
     let mut items = vec![
         MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(0))),
@@ -5629,6 +5638,18 @@ fn interval_aggregate_rejects_non_numeric_step() {
             .any(|e| e.contains("interval aggregate step must be numeric")),
         "expected non-numeric step rejected, got: {errors:?}"
     );
+}
+
+#[test]
+fn interval_aggregate_accepts_stepped_type_and_third_field() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let step_index = types.intern_index(IndexExpr::Literal(2));
+    let interval_ty = MirType::semantic(types.intervallum_with_step(numerus, step_index));
+    let step = MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(2)));
+    let program = interval_program_with_ty(&mut types, interval_ty, interval_items(Some(step)));
+    let errors = validate(&program, &types);
+    assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
 }
 
 #[test]
