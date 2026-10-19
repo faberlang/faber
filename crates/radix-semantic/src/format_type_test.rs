@@ -4,7 +4,7 @@
 //! for tensor, indexed, numeric, and collection types.
 
 use super::format_faber_type;
-use crate::{NumericWidth, Primitive, TypeTable, index::IndexExpr};
+use crate::{NumericWidth, Primitive, Type, TypeTable, index::IndexExpr};
 use radix_lexer::{Interner, lex};
 use radix_parser::parse;
 
@@ -136,5 +136,62 @@ fn policy_float_cells_format_with_policy_word_and_width() {
     assert_eq!(
         format_faber_type(saturating, &types, &interner, &name),
         "saturatus<f16>"
+    );
+}
+
+/// Need-2.2: an interval's compile-time step prints after the bound.
+#[test]
+fn format_faber_type_renders_intervallum_step_suffix() {
+    let interner = Interner::new();
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let stepped = types.intervallum_with_step(numerus, lit2);
+    let plain = types.intervallum(numerus);
+
+    let name = |_| "unused".to_owned();
+    assert_eq!(
+        format_faber_type(stepped, &types, &interner, &name),
+        "intervallum<numerus, 2>"
+    );
+    assert_eq!(
+        format_faber_type(plain, &types, &interner, &name),
+        "intervallum<numerus>"
+    );
+}
+
+/// Need-2.2: only a literal step other than 1 prints; step 1 and
+/// symbolic steps keep the bare `intervallum<T>` spelling byte for byte.
+#[test]
+fn format_faber_type_renders_intervallum_step_one_stays_bare() {
+    let interner = Interner::new();
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let lit1 = types.intern_index(IndexExpr::Literal(1));
+    let canonical = types.intervallum_with_step(numerus, lit1);
+    let plain = types.intervallum(numerus);
+    // `intervallum_with_step` canonicalizes `Literal(1)`, so intern the raw
+    // step directly to prove the formatter itself keeps step 1 bare.
+    let raw_lit1 = types.intern(Type::Intervallum(numerus, lit1));
+    let affine = types.intern_index(IndexExpr::Affine {
+        base: lit1,
+        offset: 0,
+    });
+    let symbolic = types.intern(Type::Intervallum(numerus, affine));
+
+    let name = |_| "unused".to_owned();
+    let canonical = format_faber_type(canonical, &types, &interner, &name);
+    assert_eq!(
+        canonical,
+        format_faber_type(plain, &types, &interner, &name)
+    );
+    assert_eq!(canonical, "intervallum<numerus>");
+    assert_eq!(
+        format_faber_type(raw_lit1, &types, &interner, &name),
+        "intervallum<numerus>"
+    );
+    assert_eq!(
+        format_faber_type(symbolic, &types, &interner, &name),
+        "intervallum<numerus>"
     );
 }

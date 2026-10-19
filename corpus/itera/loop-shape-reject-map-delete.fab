@@ -1,0 +1,25 @@
++++
+locale = "en"
+term = "itera-loop-shape-reject-map-delete"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "expression", "call_expr"]
+canonical = false
+summary = "A delete inside a loop over that same map is refused at check time."
+no_expected = "rejects"
+diagnostic = "SEM011:loop_collection_shape_change"
++++
+
+# This exemplum intentionally fails to compile: `m.delete("a")` takes a key
+# out of the map that the loop is walking, so the loop would walk a shape
+# that no longer matches the shape it started with. A method that changes
+# the iterated collection's shape or order is refused at check time.
+# Methods are checked; drain a map with `while` plus `m.delete(k)` when a
+# worklist is what is meant.
+main {
+    mut map<string, int> m ← empty
+    m["a"] ← 1
+    for from m let v {
+        m.delete("a")
+    }
+}
