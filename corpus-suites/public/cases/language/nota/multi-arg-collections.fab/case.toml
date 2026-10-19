@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/nota/multi-arg-collections.fab"
+group = "language"
+input_root = "corpus"
+input = "nota/multi-arg-collections.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
