@@ -366,6 +366,10 @@ mod first_match_contract_test;
 mod k8_filum_calls_test;
 
 #[cfg(test)]
+#[path = "k8_filum_foreign_test.rs"]
+mod k8_filum_foreign_test;
+
+#[cfg(test)]
 #[path = "k8_filum_independence_test.rs"]
 mod k8_filum_independence_test;
 

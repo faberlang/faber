@@ -38,7 +38,7 @@ use super::{
     is_access_intrinsic, is_aggregate, param_root,
 };
 use crate::passes::fragment_definition::struct_def_from_type;
-use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
+use crate::{Primitive, SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItemKind,
@@ -358,6 +358,12 @@ fn is_tensor_typed(types: &TypeTable, ty: TypeId) -> bool {
     matches!(types.get(inner), Type::Tensor(_, _))
 }
 
+/// Whether the receiver's type is a foreign value (`ignotum`): a method called
+/// on it is a host effect with no Faber body to look through.
+fn is_foreign_callee(ty: Option<TypeId>, types: &TypeTable) -> bool {
+    ty.is_some_and(|ty| matches!(types.get(ty), Type::Primitive(Primitive::Ignotum)))
+}
+
 /// A receiver typed by a contract or a type parameter: which body a call
 /// reaches is decided at run time (or per instantiation), not here.
 fn is_dispatched_at_run_time(types: &TypeTable, ty: TypeId) -> bool {
@@ -496,6 +502,9 @@ impl<'a> BodyProof<'a> {
         args: &[HirCallArg],
     ) {
         let module = self.module;
+        if is_foreign_callee(receiver.ty, self.types) {
+            return self.decline_call(expr, "foreign_call_effect");
+        }
         match module.resolve_method(receiver, name, self.types) {
             Resolved::Helper(def, helper) => self.inline(expr, def, helper, Some(receiver), args),
             Resolved::Dynamic => self.decline_call(expr, "dynamic_dispatch"),
