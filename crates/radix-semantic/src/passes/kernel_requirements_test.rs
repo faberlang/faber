@@ -1573,3 +1573,37 @@ fn caller_al(tensor<f32, [24]> clock) → vector<f32, 3> {
         assert!(row.admitted, "{caller}: {:?}", row.failures);
     }
 }
+
+#[test]
+fn mixed_constant_and_dynamic_call_sites_keep_the_conservative_row_when_merging() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller_const(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, 8)
+}
+
+@ kernel
+@ public
+fn caller_dynamic(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return helper(clock, base)
+}
+",
+    );
+    let helper = target_row(&fixture, "helper", Target::MirWgsl);
+    assert!(!helper.admitted, "{:?}", helper.failures);
+    assert!(
+        helper.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::IntermediateOutOfRange { .. }
+        )),
+        "one non-constant argument keeps the conservative row: {:?}",
+        helper.failures
+    );
+}
