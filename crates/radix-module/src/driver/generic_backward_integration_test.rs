@@ -724,3 +724,56 @@ fn chained_companion_call_reads_the_rewritten_destination_type() {
         ]
     );
 }
+
+#[test]
+fn local_helper_companion_names_resolve_through_validated_context() {
+    // GT01/E06: an annotated primal calling an unannotated local AIR helper
+    // interns `__backward_callee_N` companion names into the unit interner
+    // AFTER the validated context cloned it. Every MIR function name must
+    // resolve through the validated context's interner — the table execution
+    // images snapshot — not only through `lowered.interner`.
+    let source = r#"
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio simple_loss(tensor<f32, [2,2]> x, tensor<f32, [2,2]> w) → f32 {
+    sit tensor<f32, [2,2]> product ← x ⊙ inner(x, w)
+    redde product.media()
+}
+
+@ radix lane "air"
+functio inner(tensor<f32, [2,2]> a, tensor<f32, [2,2]> b) → tensor<f32, [2,2]> {
+    redde a + b
+}
+"#;
+    let session = test_session_la(Target::MirLlvm);
+    let mut analysis = analyze_source(&session, "local_helper_backward.fab", source, AnalyzeRequest::default())
+        .expect("local helper backward should analyze cleanly");
+    let lowered = expect_codegen_ok(
+        lower_mir_with_context_for_target(&mut analysis, false),
+        "local helper backward should lower after bundle application",
+    );
+    let table = lowered
+        .validated
+        .validation()
+        .interner
+        .as_interner()
+        .expect("validated context must carry an interner");
+    let names = lowered
+        .validated
+        .program()
+        .functions
+        .iter()
+        .filter_map(|function| function.name)
+        .map(|symbol| table.resolve(symbol).to_owned())
+        .collect::<Vec<_>>();
+    assert!(
+        names.iter().any(|name| name == "loss_backward"),
+        "annotated companion must be installed; got functions: {names:?}"
+    );
+    assert!(
+        names
+            .iter()
+            .any(|name| name.starts_with("__backward_callee_")),
+        "local helper companion name must resolve through the validated context; got: {names:?}"
+    );
+}
