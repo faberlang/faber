@@ -53,3 +53,17 @@ incipit {
         Target::HirPython,
     );
 }
+
+#[test]
+fn ignotum_into_text_cell_converts_for_the_import_target() {
+    test_support::assert_accepts_for_target_la(
+        r#"
+importa python "math" m
+
+incipit {
+    sit textus s ← m.name()
+}
+"#,
+        Target::HirPython,
+    );
+}
