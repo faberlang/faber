@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/decimal/store-rounding.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/store-rounding.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
