@@ -1,0 +1,77 @@
++++
+term = "sparge"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "return_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "binding_decl", "assignment", "array_literal", "array_element", "array_element_list", "argument_list", "argument", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Every spread form: twice, empty, inline literal, mixed with positionals, self-alias, and a whole-argument call spread."
+syntax = "sparge <expression>"
+related = ["lista"]
+locale = "en"
++++
+# =============================================================================
+# sparge — the spread forms on one page
+# =============================================================================
+#
+# What this teaches:
+#   • A spread reads its source, it does not move it — `[spread a, spread a]`
+#     splices the same two elements twice and stores `[1, 2, 1, 2]`.
+#   • An empty list spreads to nothing — `[0, spread e, 9]` is `[0, 9]`, with
+#     no hole and no placeholder left behind.
+#   • The spread operand may itself be a literal, so
+#     `[spread [7, 8], spread a]` splices `7, 8` then `1, 2` in written order.
+#   • A spread may mix with positionals in the same list literal, so
+#     `varsum([spread a, 3])` passes three elements and returns `6`.
+#   • `b ← [spread b, spread b]` reads `b` before the assignment stores into
+#     it, so the self-alias doubles `[1, 2]` instead of losing it.
+#   • A list literal takes a copy of the elements it spreads: after
+#     `b.append(9)`, the earlier `let list<int> c ← [spread b]` still has four
+#     elements and `c.length()` is `4`.
+#   • A spread at the argument list expands the whole list into the
+#     positional parameters — `sum3(spread d)` passes `1, 2, 3`.
+#
+# Common mistakes:
+#   • expecting a spread to consume its source — it reads it, so the same list
+#     can be spread twice and stays usable afterwards
+#   • expecting an empty spread to leave a gap — `[0, spread e, 9]` is
+#     `[0, 9]`
+#   • spreading a list into one list parameter — `takes_list(spread xs)`
+#     expands to positional arguments, so it is an arity error, not a copy
+#
+# See also: lista
+# =============================================================================
+
+# spread forms — each print names one form; the rows are read in order.
+#
+# WHY: pins the running answer of every spread form in one page, so a
+# regression in the expander shows up as one wrong row, not as a compile error.
+
+fn varsum(list<int> xs) → int {
+    return xs.sum()
+}
+
+fn sum3(int a, int b, int c) → int {
+    return a + b + c
+}
+
+main {
+    # (a) twice, empty, inline literal, mixed with positionals
+    let list<int> a ← [1, 2]
+    let list<int> e ← empty
+    print [spread a, spread a]
+    print [0, spread e, 9]
+    print [spread [7, 8], spread a]
+    print varsum([spread a, 3])
+
+    # (b) self-alias: the source is read before the store lands
+    mut list<int> b ← [1, 2]
+    b ← [spread b, spread b]
+    print b
+    let list<int> c ← [spread b]
+    b.append(9)
+    print c.length()
+
+    # (c) the whole argument list expands into positional parameters
+    let list<int> d ← [1, 2, 3]
+    print sum3(spread d)
+}
