@@ -1,0 +1,46 @@
++++
+term = "⇇ runtime extent"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "generic_params", "generic_param", "incipit_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "array_literal", "fac_stmt", "cape_clause", "assignment", "transfer", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt", "expression", "literal"]
+category = "collection"
+canonical = false
+summary = "A ⇇ whose extents are run-time values is a failable statement; a mismatched shape is a recoverable error caught by do/catch."
+related = ["⇇", "tensor", "magnitudo", "fac"]
+locale = "en"
++++
+# =============================================================================
+# ⇇ — run-time extents make copy-into failable (EBNF row [158] transfer).
+# =============================================================================
+#
+# What this teaches:
+#   • a static shape mismatch in `⇇` is a compile error, but extents that are
+#     run-time values cannot be decided at check time, so a `⇇` between them is
+#     a failable statement: the function declares `⇥ string`
+#   • the mismatch surfaces as an error value, so `do { } catch error { }`
+#     recovers instead of the program dying, and only the catch line prints
+#
+# See also: ⇇, tensor, magnitudo, fac
+# =============================================================================
+
+fn runtime_extent(int value) → int {
+    return value
+}
+
+fn assign<size N>(mut tf32[N] dst, tf32[N] src) → void ⇥ string {
+    dst ⇇ src
+}
+
+main {
+    let int n ← runtime_extent(2)
+    let int m ← runtime_extent(3)
+    let list<f32> l2 ← [1.0, 2.0]
+    let list<f32> l3 ← [1.0, 2.0, 3.0]
+    mut tf32[size n] d ← l2 ↦ tf32[size n]
+    let tf32[size m] s ← l3 ↦ tf32[size m]
+    do {
+        assign(mut d, s)
+        print d.flatten()
+    } catch error {
+        print "shape mismatch"
+    }
+}
