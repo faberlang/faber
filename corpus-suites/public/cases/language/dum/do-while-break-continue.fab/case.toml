@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/dum/do-while-break-continue.fab"
+group = "language"
+input_root = "corpus"
+input = "dum/do-while-break-continue.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
