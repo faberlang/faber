@@ -1,0 +1,42 @@
++++
+term = "store rule"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Tensor intermediates are typed by the scalar range rule; the declared element width applies only at the store."
+syntax = "(a + b) / 2 | (tensor + scalar) / scalar"
+related = ["tensor", "lift-arith", "arithmetic-elementwise"]
+locale = "en"
++++
+
+# =============================================================================
+# store rule — Q-X3 (operator ruling 2026-10-15, need): `(a + b) / 2`
+# over `tu8` is 150. Intermediates are typed by the scalar range rule — the sum
+# 200 + 100 = 300 is carried exactly — and the declared element width applies
+# once, at the store into the declared tensor. The register lift
+# (`(va + 100) / 2`) follows the same rule: 300 / 2 = 150 and 110 / 2 = 55.
+# =============================================================================
+
+main {
+    let list<u8> flat_a ← [200, 10]
+    let list<u8> flat_b ← [100, 20]
+
+    let tu8[2] a ← flat_a ↦ tu8[2]
+    let tu8[2] b ← flat_b ↦ tu8[2]
+    let tu8[2] c ← (a + b) / 2
+    print c.flatten()
+
+    let tu8[1, 2] m ← flat_a ↦ tu8[1, 2]
+    let tu8[1, 2] n ← flat_b ↦ tu8[1, 2]
+    let tu8[1, 2] p ← (m + n) / 2
+    print p.flatten()
+
+    let vector<u8, 2> va ← [200, 10] ↦ vector<u8, 2>
+    let vector<u16, 2> vc ← (va + 100) / 2
+    print vc
+
+    let matrix<u8, [1, 2]> ma ← [[200, 10]] ↦ matrix<u8, [1, 2]>
+    let matrix<u16, [1, 2]> mc ← (ma + 100) / 2
+    print mc
+}
