@@ -566,8 +566,9 @@ impl HirVisitor for KernelCallCollector<'_, '_> {
 
 /// Rule 12.7 inlines private kernel helpers at their call sites, so a call
 /// with constant arguments proves the callee's parameter ranges. A callee is
-/// only re-analyzed when every call site agrees on the same constant tuple;
-/// otherwise its conservative row stands.
+/// analyzed once per distinct constant argument tuple and those specializations
+/// are merged into its conservative row; a call site with a non-constant
+/// argument for an integer parameter keeps the conservative row instead.
 #[allow(clippy::too_many_arguments)]
 fn seed_constant_kernel_arguments(
     kernels: &mut [KernelRequirement],
@@ -608,42 +609,78 @@ fn seed_constant_kernel_arguments(
         if !private_kernels.contains(&callee) || recursive_kernels.contains(&callee) {
             continue;
         }
-        let Some(Some(tuple)) = sites.first() else {
+        if sites.iter().any(|site| site.is_none()) {
             continue;
-        };
-        if tuple.is_empty() || sites.iter().any(|site| site.as_ref() != Some(tuple)) {
+        }
+        let mut tuples: Vec<&FxHashMap<DefId, i128>> = Vec::new();
+        for tuple in sites.iter().flatten() {
+            if !tuples.contains(&tuple) {
+                tuples.push(tuple);
+            }
+        }
+        if tuples.len() == 1 && tuples[0].is_empty() {
             continue;
         }
         let Some((function, _)) = callables.get(&callee).copied() else {
             continue;
         };
-        let mut seeded = analyze_kernel(
-            callee,
-            function,
-            facts,
-            const_values,
-            resolver,
-            types,
-            interner,
-            tensor_edge_policies,
-            recursive_kernels.contains(&callee),
-            None,
-            Some(tuple),
-        );
-        analyze_limes_callbacks(
-            &mut seeded,
-            function,
-            tensor_edge_policies,
-            callables,
-            types,
-            interner,
-            facts,
-            resolver,
-            const_values,
-            recursive_kernels,
-        );
-        if let Some(row) = kernels.iter_mut().find(|kernel| kernel.def_id == callee) {
-            *row = seeded;
+        let Some(conservative) = kernels
+            .iter()
+            .find(|kernel| kernel.def_id == callee)
+            .cloned()
+        else {
+            continue;
+        };
+        let mut seeded_rows: Vec<KernelRequirement> = Vec::new();
+        for tuple in tuples {
+            let mut seeded = analyze_kernel(
+                callee,
+                function,
+                facts,
+                const_values,
+                resolver,
+                types,
+                interner,
+                tensor_edge_policies,
+                recursive_kernels.contains(&callee),
+                None,
+                Some(tuple),
+            );
+            analyze_limes_callbacks(
+                &mut seeded,
+                function,
+                tensor_edge_policies,
+                callables,
+                types,
+                interner,
+                facts,
+                resolver,
+                const_values,
+                recursive_kernels,
+            );
+            seeded_rows.push(seeded);
+        }
+        let Some(row) = kernels.iter_mut().find(|kernel| kernel.def_id == callee) else {
+            continue;
+        };
+        for conservative_report in &conservative.target_reports {
+            let seeded_reports: Vec<KernelTargetRequirement> = seeded_rows
+                .iter()
+                .filter_map(|seeded| {
+                    seeded
+                        .target_reports
+                        .iter()
+                        .find(|report| report.target == conservative_report.target)
+                        .cloned()
+                })
+                .collect();
+            if let Some(target_report) = row
+                .target_reports
+                .iter_mut()
+                .find(|report| report.target == conservative_report.target)
+            {
+                *target_report = merge_seeded_target_report(conservative_report, &seeded_reports);
+            }
         }
     }
 }
@@ -656,8 +693,6 @@ fn seed_constant_kernel_arguments(
 /// callee. Requirements are the union of what any call shape needs, and the
 /// conservative row keeps its identity and call graph, extended by any callee
 /// only the specialized shapes reached.
-// The per-tuple call site lands with the seeding change that consumes it.
-#[allow(dead_code)]
 pub(super) fn merge_seeded_target_report(
     conservative: &KernelTargetRequirement,
     seeded: &[KernelTargetRequirement],
