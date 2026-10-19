@@ -6336,14 +6336,14 @@ fn tensor_slice_nd_rejects_arity_and_length_mismatch() {
 
     let mut types = TypeTable::new();
     let program = tensor_slice_nd_program(&mut types, 2, 3, 2, 6);
-    let errors = validate(&program, &types);
+    let errors = validate_structured(&program, &types);
     assert_eq!(
         errors.len(),
         1,
         "a keeps list longer than the starts list must report exactly one length error, got: {errors:?}"
     );
-    assert!(
-        errors[0].contains("tensor slice-nd lists do not share one axis length"),
+    assert_eq!(
+        errors[0].issue, "mir_validation_tensor_slice_nd_lists_do_not_share_one_axis_length",
         "unexpected length diagnostic: {errors:?}"
     );
 }
