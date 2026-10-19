@@ -33,6 +33,78 @@ fn target_row<'a>(
         .unwrap_or_else(|| panic!("missing {target:?} row for {name}"))
 }
 
+fn params_interface(
+    whole: Option<crate::file_interface::InterfaceConstValue>,
+    frac: Option<crate::file_interface::InterfaceConstValue>,
+) -> crate::file_interface::FileInterface {
+    use crate::file_interface::{FileExport, FileExportKind, InterfaceTypeSnapshot};
+    let mut interface = crate::file_interface::FileInterface::new();
+    interface.insert(FileExport {
+        name: "CLK_T_WHOLE".to_owned(),
+        kind: FileExportKind::Const(
+            InterfaceTypeSnapshot::Primitive(crate::Primitive::Numerus),
+            whole,
+        ),
+    });
+    interface.insert(FileExport {
+        name: "CLK_T_FRAC".to_owned(),
+        kind: FileExportKind::Const(
+            InterfaceTypeSnapshot::Primitive(crate::Primitive::Numerus),
+            frac,
+        ),
+    });
+    interface
+}
+
+fn analyze_en_with_params(
+    source: &str,
+    whole: Option<crate::file_interface::InterfaceConstValue>,
+    frac: Option<crate::file_interface::InterfaceConstValue>,
+) -> crate::test_support::AnalyzedFixture {
+    use crate::passes::visibility_annotation::VisibilityTier::Publica;
+    use std::collections::BTreeMap;
+    let mut config = PassConfig::for_target(Target::HirRust);
+    config.locale_pack = Some(
+        LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    config.namespace_exports = BTreeMap::from([(
+        "params".to_owned(),
+        BTreeMap::from([
+            ("CLK_T_WHOLE".to_owned(), Publica),
+            ("CLK_T_FRAC".to_owned(), Publica),
+        ]),
+    )]);
+    config.file_interfaces = BTreeMap::from([("params".to_owned(), params_interface(whole, frac))]);
+    analyze_source_with_config(source, config)
+}
+
+#[test]
+fn imported_const_without_folded_value_keeps_out_of_range() {
+    let fixture = analyze_en_with_params(
+        r#"
+import from "./params" params
+
+@ kernel
+@ public
+fn now(tensor<f32, [24]> clock) → f32 {
+    return clock[params.CLK_T_WHOLE] + clock[params.CLK_T_FRAC]
+}
+"#,
+        None,
+        None,
+    );
+    let now = target_row(&fixture, "now", Target::MirWgsl);
+    assert!(
+        now.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::IntermediateOutOfRange { .. }
+        )),
+        "{:?}",
+        now.failures
+    );
+}
+
 #[test]
 fn module_const_index_folds_to_its_exact_value() {
     let fixture = analyze_en(
