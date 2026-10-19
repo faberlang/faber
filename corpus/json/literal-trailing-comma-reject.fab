@@ -1,0 +1,36 @@
++++
+term = "json"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "json_literal", "json_member", "json_value", "json_object", "json_string", "json_number", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "JSON follows RFC 8259: a comma before the closing brace rejects with PARSE001:item_list_trailing_comma."
+syntax = "{ \"a\": 1, }"
+related = ["json"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:item_list_trailing_comma"
++++
+# =============================================================================
+# json — JSON follows RFC 8259: a comma before the closing brace rejects
+# =============================================================================
+#
+# What this teaches:
+#   • A JSON object literal is an RFC 8259 document: `{ "a": 1, }` is not one
+#   • A comma directly before the closing brace rejects at parse time
+#   • The same item-list law holds everywhere; JSON rows also name RFC 8259
+#
+# Common mistakes:
+#   • Copying a pretty-printed object that leaves a dangling comma
+#
+# See also: json
+# =============================================================================
+
+# JSON trailing-comma reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let json a ← { "a": 1, }
+    print a
+}

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/json/literal-trailing-comma-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "json/literal-trailing-comma-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "item_list_trailing_comma"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "item_list_trailing_comma"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "item_list_trailing_comma"
