@@ -20,7 +20,7 @@ use radix_types::{
     BitsWidth, MirMathFunction, NumericWidth, Primitive, SemanticMutability, Type, TypeId,
     TypeTable,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::abi::{self, AbiTy, RuntimeSymbol};
 
@@ -376,9 +376,44 @@ struct ModuleState<'a> {
     /// Function-value shims by function, and those still to define.
     shims: FxHashMap<MirFunctionId, FuncId>,
     pending_shims: Vec<MirFunctionId>,
+    /// Semantic types of the conversation handles this program opens. The
+    /// type table carries no `sermo` identity, so the handle is recognized by
+    /// the `SermoOpen` result type it was opened as (mirrors
+    /// `capability::sermo_handle_types`).
+    sermo_handles: FxHashSet<TypeId>,
+}
+
+/// The semantic types conversations are opened as, across the whole program.
+///
+/// Handles enter MIR only as a `SermoOpen` result, so its `return_ty` is the
+/// handle identity available to a lowering that never sees the builtin
+/// definition.
+fn sermo_handle_types(program: &MirProgram) -> FxHashSet<TypeId> {
+    let mut handles = FxHashSet::default();
+    for function in &program.functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::RuntimeCall { call, .. } = &statement.kind
+                    && matches!(call.intrinsic, MirIntrinsic::SermoOpen)
+                {
+                    handles.insert(call.return_ty.semantic_id());
+                }
+            }
+        }
+    }
+    handles
 }
 
 impl<'a> ModuleState<'a> {
+    /// Whether `ty` is a conversation handle this program opened.
+    fn is_sermo_handle(&self, ty: MirType) -> bool {
+        let mut id = ty.semantic_id();
+        while let Type::Alias(_, inner) = self.input.types.get(id) {
+            id = *inner;
+        }
+        self.sermo_handles.contains(&id)
+    }
+
     /// The type a parameter is passed as: an optional parameter admits none.
     fn param_type(&self, function: MirFunctionId, index: usize, declared: MirType) -> MirType {
         self.input
@@ -559,6 +594,7 @@ pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
         texts: FxHashMap::default(),
         shims: FxHashMap::default(),
         pending_shims: Vec::new(),
+        sermo_handles: sermo_handle_types(input.program),
     };
 
     let entry = match input.entry {
@@ -4078,6 +4114,30 @@ impl FunctionLower<'_, '_> {
         let [argument] = args else {
             return Err(Decline::new("conversion arity"));
         };
+        // The sync conversation's `sermo ↦ numerus` route materializes the
+        // opened conversation's leaf value. Only `numerus` has a CLIF
+        // materialize symbol; every other target falls through to the decline
+        // paths below rather than widen the capability.
+        if conversion.store.is_none()
+            && self.state.is_sermo_handle(conversion.source_ty)
+            && matches!(
+                resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Numerus)
+            )
+        {
+            let (handle, _rep) = self.scalar(argument)?;
+            let fallback = match &conversion.recovery {
+                Some(recovery) => self.scalar(recovery)?.0,
+                None => self.builder.ins().iconst(types::I64, 0),
+            };
+            let value = self.call_runtime(&abi::SERMO_MATERIALIZE_I64, &[handle, fallback])?;
+            return self.define_result(destination, value, Rep::Int);
+        }
+        // Every other target from a conversation handle has no CLIF materialize
+        // symbol; decline it rather than let the handle render as a record.
+        if conversion.store.is_none() && self.state.is_sermo_handle(conversion.source_ty) {
+            return Err(Decline::new("sermo materialization target"));
+        }
         let Some(site) = &conversion.store else {
             let (value, rep) = self.scalar(argument)?;
             let (variable, slot_rep) = self.place_slot(destination)?;
@@ -5688,5 +5748,93 @@ mod sermo_lower_test {
                 .any(|window| window == name.as_bytes());
             assert!(named, "the object names {name}");
         }
+    }
+
+    /// The 8.1 program plus a materializing conversion out of the handle.
+    fn open_then_convert(target: Primitive) -> (MirProgram, TypeTable, Interner) {
+        let mut types = TypeTable::new();
+        let handle = sermo_handle(&mut types);
+        let vacuum = ty(&types, Primitive::Vacuum);
+        let target_ty = ty(&types, target);
+        let mut interner = Interner::new();
+        let route = interner.intern("tempus:monotonicum");
+        let program = single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, handle), local(1, target_ty)],
+            temps: Vec::new(),
+            statements: vec![
+                runtime_call(
+                    MirIntrinsic::SermoOpen,
+                    vec![MirOperand::Constant(MirConstant::String(route))],
+                    Some(MirPlace::local(MirLocalId(0))),
+                    handle,
+                ),
+                runtime_call(
+                    MirIntrinsic::SermoSetOpener,
+                    vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Constant(MirConstant::Int(0)),
+                    ],
+                    None,
+                    vacuum,
+                ),
+                runtime_call(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty: handle,
+                        target_ty,
+                        params: Vec::new(),
+                        recovery: Some(MirOperand::Constant(MirConstant::Int(0))),
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                    Some(MirPlace::local(MirLocalId(1))),
+                    target_ty,
+                ),
+            ],
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        });
+        (program, types, interner)
+    }
+
+    #[test]
+    fn sermo_lower_scalar_materialization_emits_the_leaf_call() {
+        let (program, types, interner) = open_then_convert(Primitive::Numerus);
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the sync scalar materialization lowers");
+
+        let name = b"__faber_clif_v1_sermo_materialize_i64";
+        let named = object
+            .bytes
+            .windows(name.len())
+            .any(|window| window == name);
+        assert!(named, "the object names the materialize call");
+    }
+
+    #[test]
+    fn sermo_lower_text_materialization_still_declines() {
+        let (program, types, interner) = open_then_convert(Primitive::Textus);
+        let lowered = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        );
+
+        assert!(lowered.is_err(), "textus materialization stays declined");
     }
 }
