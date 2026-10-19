@@ -1,0 +1,52 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "redde_stmt", "fixum_decl", "genus_decl", "genus_member", "genus_field_decl", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "package"
+canonical = false
+summary = "Sibling module whose exported members cross the interface and whose unmarked member stays module-private."
+syntax = "@ public fn <name>(<type> <param>) → <type> | @ public const <type> <name> = <expression>"
+related = ["importa", "fixum", "publica"]
+locale = "en"
++++
+# =============================================================================
+# importa — Sibling module with an exported surface and a private member
+# =============================================================================
+#
+# What this teaches:
+#   • `@ public` marks the importable surface: an exported function, a
+#     compile-time constant and a class all cross the file interface.
+#   • An unmarked top-level declaration (`hidden`) is module-private: an
+#     importer reaching it is `import_module_private`, and a selective import
+#     naming a member the module does not export is
+#     `selective_import_missing_member`.
+#
+# See also: importa, fixum, publica
+# =============================================================================
+
+# importa lib — sibling module for private-reject.fab and
+# selective-missing-reject.fab
+#
+# EXPECTED OUTPUT:
+#   7 when run standalone.
+
+@ public
+fn greet(string n) → string {
+    return "hi §!"(n)
+}
+
+@ public
+const int K = 7
+
+fn hidden() → int {
+    return 1
+}
+
+@ public
+class Pt {
+    mut int x
+}
+
+main {
+    print K
+}
