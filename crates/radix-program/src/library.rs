@@ -2049,6 +2049,10 @@ mod tests;
 #[path = "library_transitive_nominal_test.rs"]
 mod transitive_nominal_tests;
 
+#[cfg(test)]
+#[path = "library_air_import_boundary_test.rs"]
+mod air_import_boundary_tests;
+
 // In-file pin for the interface scan above.
 #[cfg(test)]
 #[path = "ad_finder_budget_test.rs"]
