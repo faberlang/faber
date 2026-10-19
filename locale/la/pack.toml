@@ -3863,6 +3863,10 @@ help = "declare `{implendum} Orderable<T>` with the single method `{functio} com
 message = "the closing contract must declare exactly `close() → {bivalens} ⇥ {textus}` and no type parameters"
 help = "declare `{implendum} Closable` with the single method `{functio} close() → {bivalens} ⇥ {textus}`"
 
+[diagnostics.SEM018.issues.radix_contract_sinking_shape]
+message = "the sinking contract must declare exactly `sink(T) → vacuum ⇥ E` and `flush() → vacuum ⇥ E` over one type parameter"
+help = "declare `{implendum} Sink<T>` with `{functio} sink(T res) → vacuum ⇥ E` and `{functio} flush() → vacuum ⇥ E`"
+
 [diagnostics.SEM018.issues.radix_contract_duplicate]
 message = "a second {implendum} claims the ordering contract"
 help = "import or declare exactly one ordering contract"

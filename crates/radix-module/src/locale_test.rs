@@ -224,6 +224,11 @@ fn locale_pack_completeness_nominal_ascription_row_in_every_pack() {
 }
 
 #[test]
+fn locale_pack_completeness_sinking_contract_row_in_la() {
+    assert_issue_template(&owned_pack("la"), "SEM018", "radix_contract_sinking_shape");
+}
+
+#[test]
 fn latin_pack_projects_existing_registries() {
     let pack = latin_locale_pack();
 
