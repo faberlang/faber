@@ -2002,6 +2002,61 @@ async_main {
     );
 }
 
+/// b494bfce-3: `norma:fs` exposes the durable atomic replace
+/// (`solum:conde`) as `write_file_durably` / `write_bytes_durably`. A consumer
+/// that imports only `norma:fs` must resolve both members — the test fails if
+/// either wrapper is missing or malformed in the imported interface.
+#[test]
+fn durable_fs_write_wrapper_resolves_for_consumers() {
+    let (_td, home) = temp_dir("durable-fs-write");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"+++
+locale = "en"
++++
+
+import from "norma:fs" charta
+
+main {
+    charta.write_file_durably("checkpoint.txt", "weights-v1")
+    charta.write_bytes_durably("checkpoint.bin", |00 ff 10|)
+    print "durable wrappers ok"
+}
+"#,
+    )
+    .expect("write consumer");
+    let source = fs::read_to_string(&app).expect("read consumer");
+
+    let library_home = crate::import_resolve::in_tree_library_home().expect("<repo>/lib exists in the tree");
+    let _guard = LibraryHomeGuard::set(&library_home);
+
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "durable fs wrappers must typecheck for an fs-only consumer: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    for wrapper in ["write_file_durably", "write_bytes_durably"] {
+        assert!(
+            !result
+                .diagnostics
+                .iter()
+                .any(|d| format!("{:?}", (d.code, d.issue(), d.args.clone())).contains(wrapper)),
+            "{wrapper} must resolve in the imported `norma:fs` interface; diagnostics={:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|d| (d.code, d.issue(), d.args.clone()))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
 /// cds-u6 snapshot-nomen-collision (extension-lib `Scopulum` shape): two
 /// providers each export a same-named class and class-returning functions.
 /// Same-named local classes must not cascade-skip both providers' exports

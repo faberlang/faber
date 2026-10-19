@@ -160,6 +160,23 @@ fn write_bytes_async(string path, list<b8> data) → void ⇥ fault.IoFault {
     return call 'solum:funde' (args) ↦ void
 }
 
+# Durable atomic replace (GT34): hidden sibling temporary, flush, rename,
+# directory flush where the platform supports it. A failure or interruption
+# leaves the previous complete file; the target is never partial.
+
+# Write text to file durably: atomic replace, never a partial target (sync)
+@ public
+fn write_file_durably(string path, string data) → void ⇥ fault.IoFault {
+    return call 'solum:conde' ([path, data]) ↦ void
+}
+
+# Write bytes to file durably: atomic replace, never a partial target (sync)
+@ public
+fn write_bytes_durably(string path, list<b8> data) → void ⇥ fault.IoFault {
+    let list<value> args ← [path ↦ value, data ↦ value]
+    return call 'solum:conde' (args) ↦ void
+}
+
 # =========================================================================
 # WRITING - Append
 # =========================================================================
