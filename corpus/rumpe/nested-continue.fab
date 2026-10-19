@@ -1,0 +1,50 @@
++++
+term = "rumpe"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "dum_stmt", "si_stmt", "arm", "ergo_joint", "rumpe_stmt", "perge_stmt", "itera_stmt", "sit_decl", "assignment", "place", "comparison", "equality", "equality_tail", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "transfer"
+canonical = false
+summary = "Break and continue in nested while and for-range loops."
+syntax = "continue | break inside nested loops"
+related = ["perge", "dum", "itera"]
+locale = "en"
++++
+
+# =============================================================================
+# rumpe — break and continue in nested while and for-range loops
+# =============================================================================
+#
+# What this teaches:
+#   • `rumpe` (break) and `perge` (continue) act on the innermost loop only
+#   • The same rule holds in a `dum` loop and in an `itera` for-range loop
+#   • `perge` skips the rest of the body; a nested loop does not escape with it
+#
+# Common mistakes:
+#   • Expecting `rumpe` to exit both nested loops
+#   • Expecting `perge` to skip the outer loop's tail
+#
+# See also: perge, dum, itera
+# =============================================================================
+
+main {
+    mut int out ← 0
+    while out ≺ 3 {
+        out ← out + 1
+        mut int inn ← 0
+        while true {
+            inn ← inn + 1
+            if inn ≡ 2 { continue }
+            if inn ≥ 4 { break }
+            print "§.§"(out, inn)
+        }
+        if out ≡ 2 { continue }
+        print "after §"(out)
+    }
+    for range 0‥3 let i {
+        for range 0‥3 let j {
+            if j ≡ 1 { continue }
+            if i ≡ 1 { break }
+            print "ij § §"(i, j)
+        }
+    }
+}
