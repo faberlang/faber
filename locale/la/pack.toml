@@ -2245,6 +2245,10 @@ help = "make the expression type match the expected type"
 message = "expression type mismatch"
 help = "make the expression type match the expected type"
 
+[diagnostics.SEM010.issues.import_conversion_required]
+message = "valor peregrinus ignoti generis ({found}) in cellam {expected} reponi non potest"
+help = "translationem fidei per conversionem coge: `valor ↦ {expected}`"
+
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "equality requires identical types; use `≅` to compare numeric values across types, or `↦` to convert one side explicitly before comparing (ascii ↦ numerus for the scalar value, or compare against an ascii literal like 'a')"
 help = "make the expression type match the expected type"
