@@ -804,6 +804,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // semantics as the tensor lift below. Scalar `absolutum` is the numeric
     // row above.
     intrinsic!(Fractus, "radix", 0, &[], SameAsReceiver, scalar_math Sqrt),
+    intrinsic!(Fractus, "radix_cubica", 0, &[], SameAsReceiver, scalar_math Cbrt),
     intrinsic!(Fractus, "exponentia", 0, &[], SameAsReceiver, scalar_math Exp),
     intrinsic!(Fractus, "logarithmus", 0, &[], SameAsReceiver, scalar_math Ln),
     intrinsic!(Fractus, "logarithmus_decimalis", 0, &[], SameAsReceiver, scalar_math Log10),
@@ -1032,6 +1033,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // carries for sqrt, exp and ln.
     intrinsic!(Tensor, "absolutum", 0, &[], SameAsReceiver, math Abs),
     intrinsic!(Tensor, "radix", 0, &[], SameAsReceiver, math Sqrt),
+    intrinsic!(Tensor, "radix_cubica", 0, &[], SameAsReceiver, math Cbrt),
     intrinsic!(Tensor, "exponentia", 0, &[], SameAsReceiver, math Exp),
     intrinsic!(Tensor, "logarithmus", 0, &[], SameAsReceiver, math Ln),
     intrinsic!(Tensor, "logarithmus_decimalis", 0, &[], SameAsReceiver, math Log10),

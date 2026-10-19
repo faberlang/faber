@@ -17,7 +17,8 @@ use super::{
     namespace_positions, receivers_for_type, receivers_for_type_id, unique_bucket_row,
 };
 use radix_types::{
-    GenericParamSort, IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type,
+    GenericParamSort, IndexExpr, MirAtomicOp, MirCollectionOp, MirMathFunction, Primitive,
+    SemanticMutability, Type,
 };
 
 #[test]
@@ -203,6 +204,32 @@ fn cumulata_is_a_lista_scan_row() {
         Some("cumulata")
     );
     assert!(lookup_method(IntrinsicReceiver::Tensor, "cumulata", 2).is_none());
+}
+
+#[test]
+fn radix_cubica_rows_resolve() {
+    let scalar = lookup_method(IntrinsicReceiver::Fractus, "radix_cubica", 0)
+        .expect("fractus radix_cubica row");
+    assert_eq!(scalar.return_kind, IntrinsicReturnKind::SameAsReceiver);
+    assert!(scalar.params.is_empty() && scalar.generic.is_empty());
+    assert_eq!(
+        scalar.mir_kind,
+        IntrinsicMirKind::Collection(MirCollectionOp::ScalarMath(MirMathFunction::Cbrt))
+    );
+
+    let tensor = lookup_method(IntrinsicReceiver::Tensor, "radix_cubica", 0)
+        .expect("tensor radix_cubica row");
+    assert_eq!(tensor.return_kind, IntrinsicReturnKind::SameAsReceiver);
+    assert!(tensor.params.is_empty() && tensor.generic.is_empty());
+    assert_eq!(
+        tensor.mir_kind,
+        IntrinsicMirKind::Collection(MirCollectionOp::TensorMath(MirMathFunction::Cbrt))
+    );
+
+    assert!(
+        lookup_method(IntrinsicReceiver::Fractus, "radix_cubica", 1).is_none(),
+        "radix_cubica takes no arguments"
+    );
 }
 
 #[test]
