@@ -677,6 +677,9 @@ fn resolve_selective_imports(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let radix_syntax::ImportKind::Selective { members } = &decl.kind else {
             continue;
         };

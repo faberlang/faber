@@ -808,6 +808,9 @@ impl<'a> Lowerer<'a> {
             let StmtKind::Import(decl) = &stmt.kind else {
                 continue;
             };
+            if decl.target.is_some() {
+                continue;
+            }
             if self.interner.resolve(decl.path) != crate::kernel::KERNEL_GLOB_IMPORT {
                 continue;
             }

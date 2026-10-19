@@ -1293,7 +1293,7 @@ impl Lowerer<'_> {
                 visibility: decl.visibility,
                 items,
                 selective,
-                target: None,
+                target: decl.target.as_ref().map(|word| word.name),
             }),
             span: stmt.span,
         })
