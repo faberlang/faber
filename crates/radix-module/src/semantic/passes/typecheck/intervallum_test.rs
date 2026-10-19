@@ -412,3 +412,53 @@ fn intervallum_sized_numerus_longitudo_rejects_until_runtime_helpers_exist() {
 }";
     rejects_with_issue(&compile(source), "intervallum_longitudo_bound");
 }
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn intervallum_step_type_parameter_accepts() {
+    accepts(&compile(r"functio probe(intervallum<numerus, 2> fines) → vacuum { }"));
+    accepts(&compile(r"functio probe(intervallum<numerus, 1> fines) → vacuum { }"));
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn intervallum_step_type_alias_accepts() {
+    let source = r"typus Stepped = intervallum<numerus, 2>
+functio probe(Stepped fines) → vacuum { }";
+    accepts(&compile(source));
+}
+
+#[test]
+fn intervallum_step_zero_rejects_not_positive() {
+    let source = r"functio probe(intervallum<numerus, 0> fines) → vacuum { }";
+    rejects_with_issue(&compile(source), "range_step_not_positive");
+}
+
+#[test]
+fn intervallum_step_name_rejects_must_be_constant() {
+    let source = r"functio probe(intervallum<numerus, n> fines) → vacuum { }";
+    rejects_with_issue(&compile(source), "intervallum_step_must_be_constant");
+}
+
+#[test]
+fn intervallum_step_instans_bound_rejects_not_integer() {
+    let source = r"functio probe(intervallum<instans, 2> fines) → vacuum { }";
+    rejects_with_issue(&compile(source), "intervallum_step_bound_not_integer");
+}
+
+#[test]
+fn intervallum_step_arity_still_rejects_three_args() {
+    let source = r"functio probe(intervallum<numerus, 2, 3> fines) → vacuum { }";
+    rejects_with_issue(&compile(source), "intervallum_arity");
+}
+
+#[test]
+fn intervallum_step_binding_initializer_still_rejects() {
+    // Intermediate state: the type accepts a step, the value-level stopgap
+    // does not store one yet (unit 3061f86f-11 switches stored steps on);
+    // step 1 initializer vs declared step 2 is a type mismatch (infer.rs).
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10
+}";
+    assert!(!compile(source).success());
+}
