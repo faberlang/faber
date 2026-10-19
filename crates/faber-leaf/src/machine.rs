@@ -97,6 +97,13 @@ struct Previous {
 
 static PREVIOUS: Mutex<Option<Previous>> = Mutex::new(None);
 
+/// Test-only stand-in for the host read, so a test can drive the reader
+/// thread deterministically on any target.
+#[cfg(test)]
+static COLLECT_OVERRIDE: Mutex<
+    Option<std::sync::Arc<dyn Fn() -> Result<Collected, LeafError> + Send + Sync>>,
+> = Mutex::new(None);
+
 /// Monotonic issue counter for reads, so slot writes are ordered by issue and
 /// not by `taken_at` (which is stamped when a read completes).
 static GENERATION: AtomicU64 = AtomicU64::new(0);
@@ -111,6 +118,16 @@ fn slot() -> MutexGuard<'static, Option<Previous>> {
 /// Drop the previous sample. Test isolation and execution boundaries only.
 pub fn reset_previous() {
     *slot() = None;
+}
+
+#[cfg(test)]
+pub(crate) fn set_collect_override(
+    f: Option<std::sync::Arc<dyn Fn() -> Result<Collected, LeafError> + Send + Sync>>,
+) {
+    match COLLECT_OVERRIDE.lock() {
+        Ok(mut guard) => *guard = f,
+        Err(poisoned) => *poisoned.into_inner() = f,
+    }
 }
 
 /// Whether `route` belongs to this leaf. Pure name lookup; samples nothing.
@@ -157,7 +174,7 @@ fn sample(args: &[Arg]) -> Result<Reply, LeafError> {
     std::thread::spawn(move || {
         // WHY: the receiver may already be gone (deadline expired); a failed
         // send drops the late value without cancelling the read.
-        let _sent = tx.send(collect());
+        let _sent = tx.send(read_host());
     });
     let wait = Duration::from_millis(u64::try_from(deadline_ms).unwrap_or(u64::MAX));
     match rx.recv_timeout(wait) {
@@ -300,6 +317,25 @@ fn proc_reply(proc_row: &IntervalProc) -> Reply {
         ("cpu_ns".to_owned(), Reply::Int(proc_row.cpu_ns)),
         ("mem_bytes".to_owned(), Reply::Int(proc_row.mem_bytes)),
     ])
+}
+
+/// The reader thread's host read. Tests substitute `COLLECT_OVERRIDE`; every
+/// other build reaches `collect()` unchanged.
+fn read_host() -> Result<Collected, LeafError> {
+    #[cfg(test)]
+    {
+        // WHY: the Arc is cloned out and the guard dropped at this `;` before
+        // the closure runs. Holding the lock across a blocking read would
+        // deadlock a second reader.
+        let override_fn = match COLLECT_OVERRIDE.lock() {
+            Ok(guard) => guard.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        };
+        if let Some(f) = override_fn {
+            return f();
+        }
+    }
+    collect()
 }
 
 #[cfg(target_os = "macos")]
