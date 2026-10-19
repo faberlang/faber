@@ -409,6 +409,34 @@ fn collect_named_type_defs(artifact: &HirArtifact) -> FxHashSet<radix_types::Def
     defs
 }
 
+/// Every typus parameter each type-alias item declares, keyed by the item's
+/// `DefId`.
+///
+/// A generic alias body is parametric in its declared typus parameters only:
+/// `magnitudo` size parameters are compile-time facts that never appear as a
+/// `Type::Param` in the recorded body, so collecting them would invite
+/// bindings no structural match can consume.
+#[allow(dead_code)] // wired in by unit pumpfix-gd96b2e21-1.1.3
+fn collect_generic_alias_params(
+    artifact: &HirArtifact,
+) -> FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>> {
+    let mut params = FxHashMap::default();
+    for item in &artifact.hir.items {
+        if let radix_hir::HirItemKind::TypeAlias(alias) = &item.kind {
+            params.insert(
+                item.def_id,
+                alias
+                    .type_params
+                    .iter()
+                    .filter(|param| param.is_typus())
+                    .map(|param| param.name)
+                    .collect(),
+            );
+        }
+    }
+    params
+}
+
 fn type_site_anchor(site: &radix_hir::HirTypeSite) -> u32 {
     match site.owner {
         radix_hir::HirOwnerRef::Hir(id) => id.0,
@@ -780,6 +808,53 @@ fn generic_alias_body_matches(
         // unhandled variant pair never counts as a structural match.
         (body_ty, witness_ty) => body_ty == witness_ty,
     }
+}
+
+/// The applied-argument witness for a generic alias form, when it resolves.
+///
+/// A generic alias site is finalized to the substitution (`pairs<int, str>`)
+/// while the recorded body keeps its declared parameters (`pairs<K, V>`), so
+/// the authored arguments cannot be checked against the body directly. This
+/// helper binds each typus parameter to the authored argument that names it
+/// and accepts only when the body structurally matches the site witness under
+/// those bindings (see [`generic_alias_body_matches`]); the returned arguments
+/// are the witnesses the matched site itself carries. An alias the artifact
+/// never declared, a body the table lost, an arity mismatch, or any
+/// non-type argument fails closed.
+#[allow(dead_code)] // wired in by unit pumpfix-gd96b2e21-1.1.3
+fn transparent_generic_alias_witness(
+    types: &radix_types::TypeTableSnapshot,
+    alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
+    path_def: radix_types::DefId,
+    form: &radix_hir::HirTypeForm,
+) -> Option<Vec<radix_types::AppliedArg>> {
+    let params = alias_params.get(&path_def)?;
+    let body = types.types().iter().find_map(|ty| match ty {
+        radix_types::Type::Alias(def, alias_body) if *def == path_def => Some(*alias_body),
+        _ => None,
+    })?;
+    if form.args.len() != params.len() {
+        return None;
+    }
+    let children: Vec<&radix_hir::HirTypeForm> = form
+        .args
+        .iter()
+        .map(|arg| match arg {
+            radix_hir::HirTypeFormArg::Type(child) => Some(child.as_ref()),
+            radix_hir::HirTypeFormArg::Name(_) | radix_hir::HirTypeFormArg::Size(_) => None,
+        })
+        .collect::<Option<Vec<&radix_hir::HirTypeForm>>>()?;
+    let bindings: Vec<(radix_lexer::Symbol, radix_types::TypeId)> = params
+        .iter()
+        .copied()
+        .zip(children.iter().map(|child| child.ty))
+        .collect();
+    generic_alias_body_matches(types, &bindings, body, form.ty).then(|| {
+        children
+            .iter()
+            .map(|child| radix_types::AppliedArg::Type(child.ty))
+            .collect()
+    })
 }
 
 fn named_witness(

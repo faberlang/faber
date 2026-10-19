@@ -11,7 +11,9 @@ use radix_lexer::Span;
 use radix_types::{Primitive, Type};
 
 use super::TypeChecker;
-use crate::radix_contract::{SINKING_FLUSH_METHOD, SINKING_METHOD, contract_error};
+use crate::radix_contract::{
+    RadixContractRole, SINKING_FLUSH_METHOD, SINKING_METHOD, contract_error,
+};
 
 /// `@ radix contract "sinking"` on an implendum whose shape is not
 /// `Name<T> { sink(T) → vacuum ⇥ E; flush() → vacuum ⇥ E }`.
@@ -34,6 +36,18 @@ impl TypeChecker<'_> {
             return;
         }
         self.claim_sinking_contract(def_id, span);
+    }
+
+    /// Record an imported implendum whose file interface names the role.
+    pub(super) fn register_imported_sinking_contract(&mut self, def_id: DefId) {
+        if self
+            .resolver
+            .imported_contract_role(def_id)
+            .and_then(RadixContractRole::parse)
+            == Some(RadixContractRole::Sinking)
+        {
+            self.claim_sinking_contract(def_id, Span::default());
+        }
     }
 
     fn claim_sinking_contract(&mut self, def_id: DefId, span: Span) {

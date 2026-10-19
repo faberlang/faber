@@ -72,6 +72,7 @@ impl TypeChecker<'_> {
     /// Record an imported implendum whose file interface names the role.
     pub(super) fn register_imported_contract_role(&mut self, def_id: DefId) {
         self.register_imported_closing_contract(def_id);
+        self.register_imported_sinking_contract(def_id);
         let role = self
             .resolver
             .imported_contract_role(def_id)
@@ -81,21 +82,21 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Record selective import bindings that name the ordering contract;
-    /// backends emit no import for a compiler-supplied contract.
+    /// Record selective import bindings that name a compiler-supplied
+    /// contract (ordering, sinking); backends emit no import for them.
     pub(super) fn record_ordering_contract_bindings(&mut self, import: &radix_hir::HirImport) {
-        let Some(contract) = self.types.ordering_contract else {
-            return;
-        };
         for item in &import.items {
-            let names_contract = self
-                .resolver
-                .selective_import_type(item.def_id)
-                .is_some_and(
-                    |ty| matches!(self.types.get(ty), Type::Interface(def) if *def == contract),
-                );
-            if names_contract {
+            let Some(ty) = self.resolver.selective_import_type(item.def_id) else {
+                continue;
+            };
+            let Type::Interface(def) = self.types.get(ty) else {
+                continue;
+            };
+            let def = *def;
+            if Some(def) == self.types.ordering_contract {
                 self.types.ordering_contract_bindings.insert(item.def_id);
+            } else if Some(def) == self.types.sinking_contract {
+                self.types.sinking_contract_bindings.insert(item.def_id);
             }
         }
     }

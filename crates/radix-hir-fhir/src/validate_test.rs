@@ -1203,3 +1203,120 @@ fn generic_alias_body_matches_fails_closed() {
         "a Param on the witness side never binds"
     );
 }
+
+/// The collector keeps every declared typus parameter of an alias and drops
+/// `magnitudo` size parameters, and non-alias items contribute nothing: a
+/// generic alias body only ever binds `Type::Param` names.
+#[test]
+fn collect_generic_alias_params_maps_typus_only() {
+    let mut artifact = stub_artifact();
+    let alias_def = DefId(USER_DEF_ID_BASE + 1);
+    artifact.hir.items.push(radix_hir::HirItem {
+        annotations: Vec::new(),
+        id: HirId(9),
+        def_id: alias_def,
+        kind: radix_hir::HirItemKind::TypeAlias(radix_hir::HirTypeAlias {
+            name: Symbol(2),
+            type_params: vec![
+                radix_hir::HirTypeParam {
+                    def_id: DefId(USER_DEF_ID_BASE + 2),
+                    kind: radix_syntax::GenericParamKind::Typus,
+                    name: Symbol(3),
+                    span: Span::default(),
+                    constraint: radix_hir::HirTypeParamConstraint::Any,
+                    default: None,
+                },
+                radix_hir::HirTypeParam {
+                    def_id: DefId(USER_DEF_ID_BASE + 3),
+                    kind: radix_syntax::GenericParamKind::Magnitudo,
+                    name: Symbol(4),
+                    span: Span::default(),
+                    constraint: radix_hir::HirTypeParamConstraint::Any,
+                    default: None,
+                },
+            ],
+            ty: TypeId(0),
+        }),
+        span: Span::default(),
+    });
+
+    let params = super::collect_generic_alias_params(&artifact);
+    assert_eq!(
+        params.get(&alias_def),
+        Some(&vec![Symbol(3)]),
+        "only the typus parameter must be collected"
+    );
+    assert_eq!(params.len(), 1, "only the alias item must contribute");
+    assert!(
+        !params.contains_key(&DefId(0)),
+        "the function item contributes nothing"
+    );
+}
+
+/// The witness helper binds each authored argument to the alias parameter it
+/// names and only accepts when the body matches the site witness under those
+/// bindings; a disagreeing binding or an undeclared alias fails closed.
+#[test]
+fn transparent_generic_alias_witness_binds_authored_args() {
+    let mut types = TypeTable::new();
+    let sym_t = Symbol(1);
+    let param_t = types.intern(Type::Param(sym_t));
+    let list_t = types.array(param_t);
+    let pairs_def = DefId(USER_DEF_ID_BASE + 7);
+    let _alias_body = types.intern(Type::Alias(pairs_def, list_t));
+    let int_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let list_int = types.array(int_ty);
+    let string_ty = types.primitive(Primitive::Textus);
+    let _list_string = types.array(string_ty);
+    let snapshot = types.snapshot();
+    let sym_pairs = Symbol(2);
+    let alias_params = rustc_hash::FxHashMap::from_iter([(pairs_def, vec![sym_t])]);
+    let named_head = radix_hir::HirTypeFormHead::Named {
+        def_id: pairs_def,
+        path: vec![sym_pairs],
+    };
+    let arg_form = |element: radix_types::TypeId| radix_hir::HirTypeForm {
+        ty: element,
+        head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+        args: Vec::new(),
+        label: None,
+    };
+
+    let int_form = radix_hir::HirTypeForm {
+        ty: list_int,
+        head: named_head.clone(),
+        args: vec![radix_hir::HirTypeFormArg::Type(Box::new(arg_form(int_ty)))],
+        label: None,
+    };
+    assert_eq!(
+        super::transparent_generic_alias_witness(&snapshot, &alias_params, pairs_def, &int_form),
+        Some(vec![radix_types::AppliedArg::Type(int_ty)]),
+        "list<T> with T=int must witness its applied argument"
+    );
+
+    let string_form = radix_hir::HirTypeForm {
+        ty: list_int,
+        head: named_head.clone(),
+        args: vec![radix_hir::HirTypeFormArg::Type(Box::new(arg_form(
+            string_ty,
+        )))],
+        label: None,
+    };
+    assert_eq!(
+        super::transparent_generic_alias_witness(&snapshot, &alias_params, pairs_def, &string_form),
+        None,
+        "a T=string binding must not match a list<int> site witness"
+    );
+
+    let undeclared_params = rustc_hash::FxHashMap::default();
+    assert_eq!(
+        super::transparent_generic_alias_witness(
+            &snapshot,
+            &undeclared_params,
+            pairs_def,
+            &int_form
+        ),
+        None,
+        "an alias the artifact never declared must fail closed"
+    );
+}
