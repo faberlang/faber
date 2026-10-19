@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use radix_lexer::{Interner, Span};
 use radix_mir::*;
@@ -44,14 +44,55 @@ fn is_transient_build_failure(output: &str) -> bool {
     .any(|marker| output.contains(marker))
 }
 
+/// Record the newest modification time of any file under `dir`, recursively.
+fn newest_mtime(dir: &Path, newest: &mut Option<SystemTime>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if metadata.is_dir() {
+            newest_mtime(&entry.path(), newest);
+            continue;
+        }
+        let Ok(modified) = metadata.modified() else {
+            continue;
+        };
+        if newest.is_none_or(|current| modified > current) {
+            *newest = Some(modified);
+        }
+    }
+}
+
+/// Whether `archive` was built from the current `runtime/clif/src` tree: it
+/// exists and is at least as new as every file under that directory. A missing
+/// archive, an unreadable source tree, or an older archive keeps the build path.
+fn archive_is_current(archive: &Path) -> bool {
+    let Ok(built) = std::fs::metadata(archive).and_then(|metadata| metadata.modified()) else {
+        return false;
+    };
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../runtime/clif/src");
+    let mut newest = None;
+    newest_mtime(&source, &mut newest);
+    newest.is_some_and(|newest| built >= newest)
+}
+
 /// Build `faber-host-clif` into the profile directory this test executable
 /// lives in (`<target>/<profile>/deps/<exe>`) and return the archive path.
 ///
-/// A concurrent tree teardown can fail one `cargo` invocation transiently; up
-/// to three attempts are made. If every attempt fails but `libfaber_rt_clif.a`
-/// already sits in the profile directory, the workspace `--no-run` pass built
-/// it from this same tree moments earlier, so that archive is returned instead
-/// of asserting; only a genuinely absent archive keeps the loud assert.
+/// The workspace `--no-run` pass that produced this executable also built the
+/// staticlib from this same tree moments earlier, so when the archive is there
+/// and not older than the runtime sources it is reused as-is: a second `cargo`
+/// only queues on the target-directory file lock the workspace pass and its
+/// parallel lanes are holding, and burns the executable's deadline doing it.
+///
+/// Otherwise a concurrent tree teardown can fail one `cargo` invocation
+/// transiently; up to three attempts are made. If every attempt fails but
+/// `libfaber_rt_clif.a` already sits in the profile directory, that archive is
+/// returned instead of asserting; only a genuinely absent archive keeps the
+/// loud assert.
 fn build_archive() -> PathBuf {
     let exe = std::env::current_exe().expect("test executable path");
     let profile_dir = exe
@@ -67,6 +108,7 @@ fn build_archive() -> PathBuf {
         .and_then(|name| name.to_str())
         .expect("profile directory name");
 
+    let archive = profile_dir.join("libfaber_rt_clif.a");
     let mut build = Command::new(env!("CARGO"));
     build
         .args(["build", "--locked", "-p", "faber-host-clif"])
@@ -80,6 +122,11 @@ fn build_archive() -> PathBuf {
     let _guard = ARCHIVE_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    if archive_is_current(&archive) {
+        wait_for_archive(&archive);
+        return archive;
+    }
 
     let mut last_failure = None;
     for attempt in 1..=3 {
@@ -102,7 +149,6 @@ fn build_archive() -> PathBuf {
         last_failure = Some(output);
     }
 
-    let archive = profile_dir.join("libfaber_rt_clif.a");
     wait_for_archive(&archive);
     assert!(
         archive.exists(),
