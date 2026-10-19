@@ -86,6 +86,10 @@ pub struct FaberCodegen<'a> {
     /// Ids of transpose `MethodCall`s authored with the `ᵀ` glyph; only these
     /// re-emit as `receiverᵀ` rather than `.transpose()`.
     pub(crate) glyph_ids: FxHashSet<radix_hir::HirId>,
+    /// Ids of the outer `MethodCall` expressions lowered from an authored ∜
+    /// glyph; only these re-emit as "∜ operand" rather than nested `.radix()`
+    /// calls.
+    pub(crate) radical_quarta_ids: FxHashSet<radix_hir::HirId>,
     /// Ids of expressions desugared from numeric twin method calls (operator,
     /// assignment, or effect-hoisted block); only these re-emit as
     /// `place.method(arg)`.
@@ -172,6 +176,7 @@ impl<'a> FaberCodegen<'a> {
             guard_si_ids: FxHashSet::default(),
             elige_expr_ids: FxHashSet::default(),
             glyph_ids: FxHashSet::default(),
+            radical_quarta_ids: FxHashSet::default(),
             numeric_twin_ids: FxHashSet::default(),
             empty_dense_ids: FxHashSet::default(),
             inferred_constructor_ids: FxHashSet::default(),
@@ -356,6 +361,7 @@ impl FaberCodegen<'_> {
         self.guard_si_ids = presentation.guard_si_ids.iter().copied().collect();
         self.elige_expr_ids = presentation.elige_expr_ids.iter().copied().collect();
         self.glyph_ids = presentation.glyph_ids.iter().copied().collect();
+        self.radical_quarta_ids = presentation.radical_quarta_ids.iter().copied().collect();
         self.numeric_twin_ids = presentation.numeric_twin_ids.iter().copied().collect();
         self.empty_dense_ids = presentation.empty_dense_ids.iter().copied().collect();
         self.inferred_constructor_ids = presentation
