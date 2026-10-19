@@ -1440,6 +1440,52 @@ pub struct NamespaceIntrinsic {
     pub return_kind: NamespaceReturnKind,
 }
 
+/// Directional views of a `sermo` conversation (`meus` outbound, `tuus`
+/// inbound).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SermoViewKind {
+    Meus,
+    Tuus,
+}
+
+/// One locale-projected method of a directional sermo view.
+///
+/// These methods have bespoke typing in the checker, so the row carries only
+/// the canonical Latin name: it is the identity the reader packs' `[intrinsics]`
+/// rows key on (an en file writes `t.get()`, never `t.accipe()`).
+///
+/// `da` (the send view's push) is deliberately absent: the Sink<T> rename owns
+/// it, and until then it keeps its single spelling in every locale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SermoViewMethod {
+    pub view: SermoViewKind,
+    pub faber_name: &'static str,
+}
+
+/// Locale-projected methods of the directional sermo views.
+pub static SERMO_VIEW_METHODS: &[SermoViewMethod] = &[
+    SermoViewMethod {
+        view: SermoViewKind::Meus,
+        faber_name: "fini",
+    },
+    SermoViewMethod {
+        view: SermoViewKind::Tuus,
+        faber_name: "accipe",
+    },
+    SermoViewMethod {
+        view: SermoViewKind::Tuus,
+        faber_name: "cursor",
+    },
+    SermoViewMethod {
+        view: SermoViewKind::Tuus,
+        faber_name: "exhauri",
+    },
+    SermoViewMethod {
+        view: SermoViewKind::Tuus,
+        faber_name: "fini",
+    },
+];
+
 /// Namespace and sermo-view catalog. Empty generic lists are illegal here.
 pub static NAMESPACE_INTRINSICS: &[NamespaceIntrinsic] = &[
     NamespaceIntrinsic {

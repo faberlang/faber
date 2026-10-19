@@ -17,12 +17,12 @@ no_expected = "prints-nothing"
 # =============================================================================
 #
 # What this teaches:
-#   • Full CLI framework — `@ cli`, `@ versio`, `@ descriptio`, `@ optio`,
+#   • Full CLI framework — `@ cli`, `@ version`, `@ descriptio`, `@ optio`,
 #     `@ operandus`, `@ imperium`, and `@ alias` compose a complete CLI
 #     application definition
 #   • Subcommands — `@ imperium "greet"` declares a subcommand with its own
 #     options and operands
-#   • Module mounting — `@ imperia` imports command modules from packages
+#   • Module mounting — `@ commands` imports command modules from packages
 #
 # Common mistakes:
 #   • attaching `@ cli` to a `functio` instead of an `incipit` (SEM009), or reusing duplicate CLI flags or binding names within the same CLI surface
@@ -33,8 +33,8 @@ no_expected = "prints-nothing"
 
 # cli — structured CLI annotation tour
 #
-# @ cli / @ versio / @ descriptio / @ optio / @ operandus / @ imperium / @ alias
-# @ imperia mounts imported command modules (see package-cli fixture).
+# @ cli / @ version / @ descriptio / @ optio / @ operandus / @ imperium / @ alias
+# @ commands mounts imported command modules (see package-cli fixture).
 #
 # GRAMMAR:
 #   cliDecl :← '@' 'cli' stringLit
@@ -48,7 +48,7 @@ no_expected = "prints-nothing"
 #   Cross-ref optio/, operandus/, descriptio/, ubique/, argumenta/ keyword dirs.
 
 @ cli "exemplum"
-@ versio "0.1.0"
+@ version "0.1.0"
 @ description "Faber CLI framework smoke exemplum"
 @ option verbose short "v" long "verbose" type bool global description "Enable verbose output"
 main args args {

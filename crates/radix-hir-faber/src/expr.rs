@@ -2267,6 +2267,10 @@ impl super::FaberCodegen<'_> {
     ) -> String {
         if self.receiver_projects_intrinsic(receiver) {
             self.method_name_to_surface(name, surface)
+        } else if self.directional_view_projects_method(receiver, name, names) {
+            // `t.accipe()` / `t.fini()` on a directional view re-emit as the
+            // pack's `[intrinsics]` row (en: `t.get()` / `t.finish()`).
+            self.method_name_to_surface(name, surface)
         } else if let Some(view) = self.sermo_view_method(receiver, name, names) {
             // `s.meus<T>()` / `s.tuus<T>()` share the view type's pack row
             // (DECISIONS D6.16): en re-emits `s.send<T>()` / `s.recv<T>()`.
@@ -2275,6 +2279,39 @@ impl super::FaberCodegen<'_> {
                 .to_owned()
         } else {
             self.symbol_to_string(name)
+        }
+    }
+
+    /// Whether `name` is a locale-projected method (`radix_intrinsics::SERMO_VIEW_METHODS`)
+    /// called on a `meus`/`tuus` directional view receiver.
+    fn directional_view_projects_method(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        names: &FxHashMap<DefId, Symbol>,
+    ) -> bool {
+        let spelling = self.interner.resolve(name);
+        if !radix_intrinsics::SERMO_VIEW_METHODS
+            .iter()
+            .any(|entry| entry.faber_name == spelling)
+        {
+            return false;
+        }
+        let Some(mut ty) = receiver.ty else {
+            return false;
+        };
+        loop {
+            match self.types.get(ty) {
+                Type::Ref(_, inner) | Type::Option(inner) | Type::Alias(_, inner) => ty = *inner,
+                Type::Applied(base, _) => ty = *base,
+                Type::Struct(def_id) => {
+                    return matches!(
+                        self.builtin_frame_family(*def_id, names),
+                        Some(FrameFamily::Meus | FrameFamily::Tuus)
+                    );
+                }
+                _ => return false,
+            }
         }
     }
 

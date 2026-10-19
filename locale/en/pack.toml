@@ -156,6 +156,9 @@ descriptio = "description"
 longum = "long"
 lane = "lane"
 ubique = "global"
+annotatio = "annotation"
+versio = "version"
+imperia = "commands"
 # Empty-collection expression marker (contextual, tokenless).
 # en accepts only `empty`; the Latin spelling is not an alias.
 vacua = "empty"
@@ -274,6 +277,10 @@ store = "store"
 
 # lista (27)
 accipe = "get"
+# sermo directional view methods (SERMO_VIEW_METHODS): `accipe` / `cursor`
+# are shared with the rows above and below; `fini` / `exhauri` live only here.
+fini = "finish"
+exhauri = "drain"
 apud = "at"
 addita = "added"
 appende = "append"
@@ -1075,7 +1082,7 @@ message = "annotation `@ {annotation}` is not declared on this reader surface"
 help = "use `@ {expected}` for this file's reader locale"
 
 [diagnostics.PARSE018.issues.annotatio_unknown_target]
-message = "unknown `@ annotatio` target"
+message = "unknown `@ annotation` target"
 help = "use `target = {functio}` in v1"
 
 [diagnostics.PARSE018.issues.duplicate_nucleum]
@@ -4272,19 +4279,19 @@ message = "`@ commune` is only valid on union shared fields"
 help = "declare shared fields in a union `@ commune` region"
 
 [diagnostics.SEM018.issues.annotatio_misplaced]
-message = "`@ annotatio` is only valid immediately before a {genus} declaration{?placement|, not on |}"
-help = "write `@ annotatio` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+message = "`@ annotation` is only valid immediately before a {genus} declaration{?placement|, not on |}"
+help = "write `@ annotation` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
 
 [diagnostics.SEM018.issues.annotatio_invalid_marker]
-message = "invalid `@ annotatio` marker{?detail|: |}"
-help = "write `@ annotatio` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+message = "invalid `@ annotation` marker{?detail|: |}"
+help = "write `@ annotation` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
 
 [diagnostics.SEM018.issues.annotatio_duplicate_marker]
-message = "a {genus} declares `@ annotatio` more than once"
-help = "write `@ annotatio` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+message = "a {genus} declares `@ annotation` more than once"
+help = "write `@ annotation` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
 
 [diagnostics.SEM018.issues.annotatio_unknown_target]
-message = "unknown `@ annotatio` target{?target|: |}"
+message = "unknown `@ annotation` target{?target|: |}"
 help = "use `target = {functio}` in v1"
 
 [diagnostics.SEM018.issues.annotatio_invalid_field_type]
@@ -4297,11 +4304,11 @@ help = "declare scalar fields only: `{textus} name`, `{numerus} n`, `{fractus} f
 
 [diagnostics.SEM018.issues.annotatio_unknown_contract]
 message = "unknown annotation contract `{name}`"
-help = "import or declare the contract {genus} with `@ annotatio` before applying it"
+help = "import or declare the contract {genus} with `@ annotation` before applying it"
 
 [diagnostics.SEM018.issues.annotatio_not_a_contract]
 message = "`{name}` is not an annotation contract"
-help = "import or declare the contract {genus} with `@ annotatio` before applying it"
+help = "import or declare the contract {genus} with `@ annotation` before applying it"
 
 [diagnostics.SEM018.issues.annotatio_unknown_field]
 message = "annotation contract{?contract| `|`} has no field `{field}`"
