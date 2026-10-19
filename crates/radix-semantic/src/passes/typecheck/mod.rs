@@ -1667,6 +1667,10 @@ mod conversio_extra_width_argument_test;
 mod sermo_route_typing_test;
 
 #[cfg(test)]
+#[path = "sermo_view_locale_test.rs"]
+mod sermo_view_locale_test;
+
+#[cfg(test)]
 #[path = "pin_store_test.rs"]
 mod pin_store_test;
 

@@ -1287,6 +1287,7 @@ dependencies = [
  "radix-diagnostics",
  "radix-hir",
  "radix-hygiene",
+ "radix-intrinsics",
  "radix-lexer",
  "radix-parser",
  "radix-semantic",

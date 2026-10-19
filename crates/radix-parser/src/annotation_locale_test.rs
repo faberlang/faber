@@ -24,6 +24,9 @@ impl KeywordPack for EnAnnotationPack {
             "const" => Some("fixum"),
             "let" => Some("sit"),
             "kernel" => Some("nucleum"),
+            "annotation" => Some("annotatio"),
+            "version" => Some("versio"),
+            "commands" => Some("imperia"),
             "fragment" => Some("fragment"),
             "lane" => Some("lane"),
             "public" => Some("publica"),
@@ -36,6 +39,9 @@ impl KeywordPack for EnAnnotationPack {
     fn keyword_spelling(&self, latin_key: &str) -> Option<&str> {
         match latin_key {
             "nucleum" => Some("kernel"),
+            "annotatio" => Some("annotation"),
+            "versio" => Some("version"),
+            "imperia" => Some("commands"),
             "fragment" => Some("fragment"),
             "lane" => Some("lane"),
             "publica" => Some("public"),
@@ -128,4 +134,23 @@ fn en_kernel_annotation_identity_is_sealed() {
         result.errors
     );
     assert_wrong_locale_annotation("@ nucleum\nfn probe() { }\n", "kernel");
+}
+
+#[test]
+fn en_annotation_contract_family_spelling_is_sealed() {
+    assert!(parse_en("@ annotation { target = fn }\nclass Meta { }\n").success());
+    assert!(parse_en("@ annotation\nclass Meta { }\n").success());
+    assert_wrong_locale_annotation(
+        "@ annotatio { target = fn }\nclass Meta { }\n",
+        "annotation",
+    );
+    assert_wrong_locale_annotation("@ annotatio\nclass Meta { }\n", "annotation");
+}
+
+#[test]
+fn en_cli_metadata_family_spellings_are_sealed() {
+    assert!(parse_en("@ version \"1.0.0\"\nfn probe() { }\n").success());
+    assert!(parse_en("@ commands \"jobs\" ex jobs\nfn probe() { }\n").success());
+    assert_wrong_locale_annotation("@ versio \"1.0.0\"\nfn probe() { }\n", "version");
+    assert_wrong_locale_annotation("@ imperia \"jobs\" ex jobs\nfn probe() { }\n", "commands");
 }

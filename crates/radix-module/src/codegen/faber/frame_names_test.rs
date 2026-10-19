@@ -64,9 +64,9 @@ fn drain(channel s) → int {
 main {
     let channel s ← call 'runtime:echo' ("salve")
     let send<value> outbound ← s.send<value>()
-    let status closed ← outbound.fini()
+    let status closed ← outbound.finish()
     let recv<string> t ← s.recv<string>()
-    let frame<string> ∪ none received ← t.accipe()
+    let frame<string> ∪ none received ← t.get()
     print closed
     print received
     print drain(call 'runtime:echo' ("salve"))
@@ -147,10 +147,12 @@ fn convert_la_to_en_spells_family_in_en() {
         "let recv<string> t ← s.recv<string>()",
         "let frame<string> ∪ none received",
         "s.recv<string>().cursor()",
+        "outbound.finish()",
+        "t.get()",
     ] {
         assert!(en.contains(needle), "en convert must contain `{needle}`:\n{en}");
     }
-    for latin in ["sermo", "scrinium", "meus", "tuus"] {
+    for latin in ["sermo", "scrinium", "meus", "tuus", ".fini(", ".accipe(", ".exhauri("] {
         assert!(!en.contains(latin), "en convert must not keep `{latin}`:\n{en}");
     }
     assert_checks("converted-en.fab", "en", &en);
@@ -167,10 +169,12 @@ fn convert_en_to_la_round_trips_family() {
         "sit meus<valor> outbound ← s.meus<valor>()",
         "sit tuus<textus> t ← s.tuus<textus>()",
         "sit scrinium<textus> ∪ nihil received",
+        "outbound.fini()",
+        "t.accipe()",
     ] {
         assert!(la.contains(needle), "la convert must contain `{needle}`:\n{la}");
     }
-    for en_word in ["channel", "frame<", "send<", "recv<"] {
+    for en_word in ["channel", "frame<", "send<", "recv<", ".finish(", ".get("] {
         assert!(!la.contains(en_word), "la convert must not keep `{en_word}`:\n{la}");
     }
     assert_checks("converted-la.fab", "la", &la);
