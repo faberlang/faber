@@ -1755,33 +1755,30 @@ fn transformer_operand_dims(
     crate::tensor_type::tensor_literal_dims(ty, validation).ok()
 }
 
-/// The flattened element count of the literal dims.
-fn dims_product(dims: &[u64]) -> Option<u64> {
+/// The flattened element count of the literal dims. A product that does not
+/// fit a `u64` fails closed (`None` = no plan) rather than saturating: a
+/// saturated count is not a real buffer size, and launching against it is a
+/// defect, not a clamp.
+pub(super) fn dims_product(dims: &[u64]) -> Option<u64> {
     if dims.is_empty() {
         return None;
     }
-    let mut product = 1u64;
-    for &dim in dims {
-        product = product.saturating_mul(dim);
-    }
-    Some(product)
+    dims.iter().copied().try_fold(1_u64, u64::checked_mul)
 }
 
 /// The flattened element count of the dims with `axis` removed — the output
 /// shape of an axis reduction (`result rank = input rank - 1`; a rank-1
 /// reduction over its only axis yields the scalar 1-element output).
-fn dims_without_axis_product(dims: &[u64], axis: u64) -> Option<u64> {
+pub(super) fn dims_without_axis_product(dims: &[u64], axis: u64) -> Option<u64> {
     let axis = usize::try_from(axis).ok()?;
     if axis >= dims.len() {
         return None;
     }
-    let mut product = 1u64;
-    for (index, &dim) in dims.iter().enumerate() {
-        if index != axis {
-            product = product.saturating_mul(dim);
-        }
-    }
-    Some(product)
+    dims.iter()
+        .enumerate()
+        .filter(|(index, _)| *index != axis)
+        .map(|(_, &dim)| dim)
+        .try_fold(1_u64, u64::checked_mul)
 }
 
 /// The producer-defined reduced-buffer projection of an axis reduction
