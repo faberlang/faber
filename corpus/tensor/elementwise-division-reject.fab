@@ -1,0 +1,35 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "`/` between two aggregates is not elementwise; ⊘ floors and ÷ is true division."
+syntax = "<tensor expression> / <tensor expression>"
+related = ["tensor", "⊘", "÷", "glyph-elementwise"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:elementwise_division_requires_glyph"
++++
+
+# =============================================================================
+# tensor — `/` between two aggregates names neither division.
+# =============================================================================
+#
+# What this teaches:
+#   • Elementwise division has two spellings, and they differ on integers:
+#     `⊘` floors, `÷` is true division.
+#   • `/` between two aggregates picks neither, so it is refused by name and
+#     the source must say which rounding it wants.
+#   • `/` stays scalar: dividing a tensor by a number.
+#
+# See also: tensor, ⊘, ÷, glyph-elementwise
+# =============================================================================
+
+# `/` over two [2] tensors: the elementwise glyph is ⊘ or ÷.
+main {
+    let tf32[2] a ← [4.0, 9.0] ↦ tf32[2]
+    let tf32[2] b ← [2.0, 3.0] ↦ tf32[2]
+    let tf32[2] q ← a / b
+    print q.flatten()
+}
