@@ -1799,6 +1799,10 @@ help = "使運算式型別符合預期型別"
 message = "運算式型別不相符"
 help = "使運算式型別符合預期型別"
 
+[diagnostics.SEM010.issues.import_conversion_required]
+message = "未知型別的外部值（{found}）不能存入型別為 {expected} 的儲存格"
+help = "用轉換強制完成信任轉移：`value ↦ {expected}`"
+
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "相等性比較需要完全相同的型別"
 help = "使運算式型別符合預期型別"

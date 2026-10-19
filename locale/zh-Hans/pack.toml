@@ -1811,6 +1811,10 @@ help = "使表达式类型与期望类型一致"
 message = "表达式类型不匹配"
 help = "使表达式类型与期望类型一致"
 
+[diagnostics.SEM010.issues.import_conversion_required]
+message = "未知类型的外部值（{found}）不能存入类型为 {expected} 的单元"
+help = "用转换强制完成信任转移：`value ↦ {expected}`"
+
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "equality 要求类型完全一致"
 help = "使表达式类型与期望类型一致"
