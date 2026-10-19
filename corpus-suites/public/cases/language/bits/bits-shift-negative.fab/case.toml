@@ -1,0 +1,18 @@
+version = 1
+id = "corpus/bits/bits-shift-negative.fab"
+group = "language"
+input_root = "corpus"
+input = "bits/bits-shift-negative.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "negative shift count"
+check_only = false
