@@ -888,6 +888,82 @@ pub(super) fn reject_static_bounded_index_oob(
     report_static_index_oob(checker, index, &range);
 }
 
+/// Check a bracket range read on a rank-1 tensor: `t[lo ‥ hi]` reads a sliced
+/// tensor, not a list window (operator ruling 2026-10-17: every slot of a
+/// bracket index takes a range, with step; out of range, the bracket dies).
+///
+/// Only the rank-1 scalar range is admitted. Per-slot list indexes and
+/// matrix/vector receivers keep declining as before. The caller guarantees the
+/// receiver is a tensor and passes its element type and shape.
+// Uncalled until the bracket-index caller unit (5433ed4f-1.2.3) wires it; the
+// literal-shape tail is 5433ed4f-1.2.2. Dead until then by design, like the
+// `FactKey::Field` producer in control.rs.
+#[allow(dead_code)]
+pub(super) fn check_tensor_bracket_range_index(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    elem: TypeId,
+    shape: IndexId,
+    index: &mut HirExpression,
+) -> TypeId {
+    let HirExpressionKind::Intervallum {
+        start,
+        end,
+        step,
+        kind: _,
+    } = &mut index.kind
+    else {
+        return tensor_with_fresh_shape(checker, elem);
+    };
+    // WHY: a scalar range indexes one axis, so a statically-known rank other
+    // than one is the same rank decline a scalar index reports. A bare
+    // `Literal` shape is rank 1; anything else (param, runtime, hole) is an
+    // unknown rank and proceeds rather than guessing.
+    let resolved_shape = checker.resolve_index(shape);
+    if matches!(
+        checker.types.get_index(resolved_shape),
+        IndexExpr::Tuple(dims) if dims.len() != 1
+    ) {
+        checker.invalid_operand_types(super::access::ISSUE_TENSOR_SCALAR_INDEX_RANK, index.span);
+        return tensor_with_fresh_shape(checker, elem);
+    }
+    let start_ty = checker.check_expr(start);
+    let start_ty = checker.resolve_inferred_type(start_ty);
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, start_ty) {
+        checker.invalid_operand_types(
+            super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+            start.span,
+        );
+    }
+    let end_ty = checker.check_expr(end);
+    let end_ty = checker.resolve_inferred_type(end_ty);
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, end_ty) {
+        checker.invalid_operand_types(
+            super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+            end.span,
+        );
+    }
+    if let Some(step_expr) = step {
+        // WHY: the step of an `intervallum` here is a direct step by
+        // construction, so the flag admits it the same way the range
+        // expression does; the step's value is not consumed yet.
+        let prev = checker.allow_intervallum_step;
+        checker.allow_intervallum_step = true;
+        let step_ty = checker.check_expr(step_expr);
+        checker.allow_intervallum_step = prev;
+        let step_ty = checker.resolve_inferred_type(step_ty);
+        if !crate::numeric_width::is_integer_index_scalar(checker.types, step_ty) {
+            checker.invalid_operand_types(
+                super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+                step_expr.span,
+            );
+        }
+    }
+    let result = tensor_with_fresh_shape(checker, elem);
+    reject_static_bounded_index_oob(checker, receiver_ty, index);
+    result
+}
+
 /// Axis extents of a tensor type, resolved; `None` when the type is not a
 /// tensor or its shape is not a literal/tuple of dimensions.
 fn tensor_axis_extents(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<Vec<IndexExpr>> {
