@@ -291,6 +291,7 @@ impl<'a> Lowerer<'a> {
                 guard_si_ids: Vec::new(),
                 elige_expr_ids: Vec::new(),
                 glyph_ids: Vec::new(),
+                radical_quarta_ids: Vec::new(),
                 numeric_twin_ids: Vec::new(),
                 empty_dense_ids: Vec::new(),
                 inferred_constructor_ids: Vec::new(),
@@ -1390,3 +1391,7 @@ mod signed_pattern_test;
 #[cfg(test)]
 #[path = "pattern_import_test.rs"]
 mod pattern_import_test;
+
+#[cfg(test)]
+#[path = "radical_glyph_test.rs"]
+mod radical_glyph_test;

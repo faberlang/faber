@@ -61,9 +61,33 @@ main {
 }
 "#;
 
+/// The namespace-import spelling of a name that is a *module* inside the
+/// package, not an exported function: `scale_layer` is bound leniently as an
+/// untyped namespace, so no import-surface diagnostic is produced and the first
+/// named failure lands at the call site in typecheck.
+const LEAF_SOURCE: &str = r#"+++
+locale = "en"
++++
+import from "libgt:nn" scale_layer
+
+@ radix { lane = "air" }
+fn probe(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> t) → f32 {
+    let _ y ← scale_layer(x)
+    let _ r ← y - t
+    return (r ⊙ r).mean()
+}
+
+main {
+    let list<f32> x_data ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [2, 2]> x ← x_data ↦ tensor<f32, [2, 2]>
+    let tensor<f32, [2, 2]> t ← x_data ↦ tensor<f32, [2, 2]>
+    print probe(x, t)
+}
+"#;
+
 /// Write the one-module library plus a consuming package; return the package
 /// entry path.
-fn write_fixture(dir: &Path) -> std::path::PathBuf {
+fn write_fixture_with(dir: &Path, source: &str) -> std::path::PathBuf {
     let lib_root = dir.join("libhome").join("libgt");
     let lib_src = lib_root.join("src");
     fs::create_dir_all(&lib_src).expect("create libgt src");
@@ -72,12 +96,16 @@ fn write_fixture(dir: &Path) -> std::path::PathBuf {
     let app = dir.join("app");
     fs::create_dir_all(&app).expect("create app");
     let entry = app.join("main.fab");
-    fs::write(&entry, MAIN_SOURCE).expect("write main.fab");
+    fs::write(&entry, source).expect("write main.fab");
     entry
 }
 
 fn diagnostic_pairs(dir: &Path) -> Vec<(Option<String>, Option<String>)> {
-    let entry = write_fixture(dir);
+    diagnostic_pairs_for(dir, MAIN_SOURCE)
+}
+
+fn diagnostic_pairs_for(dir: &Path, source: &str) -> Vec<(Option<String>, Option<String>)> {
+    let entry = write_fixture_with(dir, source);
     let config = Config::default().with_library_home(dir.join("libhome"));
     let seams = crate::test_support::test_analysis_seams();
     let diagnostics = match analyze_package(&config, &entry, &seams) {
@@ -107,5 +135,25 @@ fn air_import_boundary_module_qualified_call_declines_method_call() {
                 && issue.as_deref() == Some("method_call")),
         "a module-qualified imported layer call in the air lane must decline as \
          SEM059.method_call: {pairs:?}"
+    );
+}
+
+#[test]
+fn air_import_boundary_leaf_binding_types_ignotum() {
+    let dir = crate::test_support::test_temp_dir("gt02-leaf-binding");
+    let pairs = diagnostic_pairs_for(&dir, LEAF_SOURCE);
+    assert!(
+        pairs
+            .iter()
+            .any(|(code, issue)| code.as_deref() == Some("SEM011")
+                && issue.as_deref() == Some("numeric_operands_required")),
+        "a namespace-imported name that is not an exported function must reach \
+         typecheck and decline as SEM011.numeric_operands_required: {pairs:?}"
+    );
+    assert!(
+        !pairs
+            .iter()
+            .any(|(_, issue)| issue.as_deref() == Some("selective_import_missing_member")),
+        "the lenient namespace path must not emit an import-surface diagnostic: {pairs:?}"
     );
 }

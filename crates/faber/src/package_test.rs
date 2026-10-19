@@ -2774,10 +2774,12 @@ import from "norma:deque" deque
 main {
   mut deque.Deque<int> d ← deque.from_list<int>([1, 2])
   d.prepend(0)
+  print d.to_list().length()
   mut list<int> out ← d.to_list()
-  print out.length()
   print out.first()
   print out.last()
+  mut deque.Deque<int> e ← deque.empty<int>()
+  print e.to_list().length()
 }
 "#,
     )
@@ -2798,7 +2800,12 @@ main {
     );
     assert_eq!(
         host.stdout_lines,
-        vec!["3".to_owned(), "0".to_owned(), "2".to_owned(),]
+        vec![
+            "3".to_owned(),
+            "0".to_owned(),
+            "2".to_owned(),
+            "0".to_owned(),
+        ]
     );
 }
 
