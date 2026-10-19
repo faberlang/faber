@@ -3743,6 +3743,56 @@ impl FunctionLower<'_, '_> {
                 let copied = self.call_runtime(&abi::LIST_SLICE, &[cursor, start, end])?;
                 self.define_result(destination, copied, Rep::List)
             }
+            // A conversation opens on a route: the route literal lowers to raw
+            // bytes — a bare data symbol, deliberately not the headered text
+            // handle — and the leaf answers a handle the destination carries.
+            MirIntrinsic::SermoOpen => {
+                let Some(destination) = destination else {
+                    return Err(Decline::new("sermo open without destination"));
+                };
+                let [MirOperand::Constant(MirConstant::String(symbol))] = call.args.as_slice()
+                else {
+                    return Err(Decline::new("sermo route operand"));
+                };
+                let text = radix_lexer::textus_literal::decode_textus_literal(
+                    self.state.input.interner.resolve(*symbol),
+                );
+                let data = self.state.string_data(text.as_bytes())?;
+                let global = self
+                    .state
+                    .module
+                    .declare_data_in_func(data, self.builder.func);
+                let route = self.builder.ins().symbol_value(self.state.pointer, global);
+                let length = self
+                    .builder
+                    .ins()
+                    .iconst(types::I64, i64::try_from(text.len()).unwrap_or(0));
+                let handle = self.call_runtime(&abi::SERMO_OPEN, &[route, length])?;
+                self.define_result(destination, handle, Rep::Record)
+            }
+            // The opener a conversation reopens on: `nihil` clears it, a
+            // `numerus` passes itself, and no other representation has a leaf
+            // symbol. The call answers nothing, so nothing is stored.
+            MirIntrinsic::SermoSetOpener => {
+                let [handle, opener] = call.args.as_slice() else {
+                    return Err(Decline::new("sermo opener shape"));
+                };
+                let (handle, _) = self.scalar(handle)?;
+                match self.operand(opener)? {
+                    (_, Rep::Unit) => {
+                        self.call_runtime(&abi::SERMO_SET_OPENER_NIL, &[handle])?;
+                    }
+                    (_, Rep::Opt) if matches!(opener, MirOperand::Constant(MirConstant::Nil)) => {
+                        self.call_runtime(&abi::SERMO_SET_OPENER_NIL, &[handle])?;
+                    }
+                    (Some(value), Rep::Int) => {
+                        let value = self.narrow(value)?;
+                        self.call_runtime(&abi::SERMO_SET_OPENER_I64, &[handle, value])?;
+                    }
+                    _ => return Err(Decline::new("sermo opener representation")),
+                }
+                Ok(())
+            }
             MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
             MirIntrinsic::TypeCheck(op) => {
                 let ([operand], Some(destination)) = (call.args.as_slice(), destination) else {
@@ -5483,5 +5533,160 @@ impl FunctionLower<'_, '_> {
             .get(&id)
             .copied()
             .ok_or_else(|| Decline::new("unknown block"))
+    }
+}
+
+/// Proof that the sync scalar `sermo` conversation lowers to the runtime
+/// calls the `clif` leaf exports (unit bbf72360-8.1).
+#[cfg(test)]
+mod sermo_lower_test {
+    //! Hand-built MIR fixtures drive the lowering of `SermoOpen` and
+    //! `SermoSetOpener`; the emitted object's symbol table is the evidence.
+
+    use crate::{StructMeta, emit_program};
+    use radix_lexer::{Interner, Span};
+    use radix_mir::*;
+    use radix_types::{Primitive, Type, TypeTable};
+
+    fn sample_span() -> Span {
+        Span::default()
+    }
+
+    fn ty(types: &TypeTable, primitive: Primitive) -> MirType {
+        MirType::semantic(types.primitive(primitive))
+    }
+
+    struct FunctionShape {
+        params: Vec<MirParam>,
+        locals: Vec<MirLocal>,
+        temps: Vec<MirTemp>,
+        statements: Vec<MirStatement>,
+        terminator: MirTerminatorKind,
+        return_ty: MirType,
+        error_ty: Option<MirType>,
+        is_async: bool,
+        is_generator: bool,
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn single_function(shape: FunctionShape) -> MirProgram {
+        MirProgram {
+            functions: vec![MirFunction {
+                id: MirFunctionId(0),
+                source: None,
+                name: None,
+                params: shape.params,
+                locals: shape.locals,
+                temps: shape.temps,
+                blocks: vec![MirBlock {
+                    id: MirBlockId(0),
+                    statements: shape.statements,
+                    terminator: MirTerminator {
+                        kind: shape.terminator,
+                        span: sample_span(),
+                    },
+                    span: sample_span(),
+                }],
+                return_ty: shape.return_ty,
+                error_ty: shape.error_ty,
+                is_async: shape.is_async,
+                is_generator: shape.is_generator,
+                shader_stage: None,
+                span: sample_span(),
+            }],
+        }
+    }
+
+    fn local(id: u32, ty: MirType) -> MirLocal {
+        MirLocal {
+            id: MirLocalId(id),
+            name: None,
+            ty,
+            mutable: false,
+            span: sample_span(),
+        }
+    }
+
+    /// `sermo` is a builtin frame struct: one builtin struct identity stands in
+    /// for the conversation handle.
+    fn sermo_handle(types: &mut TypeTable) -> MirType {
+        MirType::semantic(types.intern(Type::Struct(radix_hir::DefId(1))))
+    }
+
+    fn runtime_call(
+        intrinsic: MirIntrinsic,
+        args: Vec<MirOperand>,
+        destination: Option<MirPlace>,
+        return_ty: MirType,
+    ) -> MirStatement {
+        MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination,
+                call: MirRuntimeCall {
+                    intrinsic,
+                    args,
+                    return_ty,
+                },
+            },
+            span: sample_span(),
+        }
+    }
+
+    #[test]
+    fn sermo_lower_open_and_set_opener_emit_runtime_calls() {
+        let mut types = TypeTable::new();
+        let handle = sermo_handle(&mut types);
+        let numerus = ty(&types, Primitive::Numerus);
+        let vacuum = ty(&types, Primitive::Vacuum);
+        let mut interner = Interner::new();
+        let route = interner.intern("tempus:monotonicum");
+        let program = single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, handle), local(1, numerus)],
+            temps: Vec::new(),
+            statements: vec![
+                runtime_call(
+                    MirIntrinsic::SermoOpen,
+                    vec![MirOperand::Constant(MirConstant::String(route))],
+                    Some(MirPlace::local(MirLocalId(0))),
+                    handle,
+                ),
+                runtime_call(
+                    MirIntrinsic::SermoSetOpener,
+                    vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Constant(MirConstant::Int(0)),
+                    ],
+                    None,
+                    vacuum,
+                ),
+            ],
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        });
+
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the sync scalar conversation lowers");
+
+        for name in [
+            "__faber_clif_v1_sermo_open",
+            "__faber_clif_v1_sermo_set_opener_i64",
+        ] {
+            let named = object
+                .bytes
+                .windows(name.len())
+                .any(|window| window == name.as_bytes());
+            assert!(named, "the object names {name}");
+        }
     }
 }
