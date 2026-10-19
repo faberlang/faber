@@ -1883,12 +1883,20 @@ message = "instant accepts at most one precision marker"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.intervallum_arity]
-message = "intervallum requires one type parameter"
-help = "fix the AST construct for lowering"
+message = "intervallum takes one bound and an optional compile-time step"
+help = "write intervallum<T> or intervallum<T, S>"
 
 [diagnostics.SEM008.issues.intervallum_bound]
 message = "intervallum bound type must be int or instant"
 help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.intervallum_step_must_be_constant]
+message = "intervallum step must be a positive integer literal"
+help = "write the compile-time step as an integer literal: intervallum<int, 2>"
+
+[diagnostics.SEM008.issues.intervallum_step_bound_not_integer]
+message = "a stepped intervallum takes integer bounds only"
+help = "drop the step for instant bounds; write intervallum<instant>"
 
 [diagnostics.SEM008.issues.atomic_arity]
 message = "atomic requires exactly one element type; use atomic<T>"
