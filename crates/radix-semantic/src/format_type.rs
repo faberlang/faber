@@ -6,7 +6,7 @@
 use super::{MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable, format_figura};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
-use radix_types::AppliedArg;
+use radix_types::{AppliedArg, IndexExpr};
 use rustc_hash::FxHashMap;
 
 /// Recover Faber source type syntax for one resolved [`TypeId`].
@@ -132,11 +132,14 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format_faber_type(*elem, types, interner, resolve_def)
         ),
 
-        Type::Intervallum(bound, _) => {
-            format!(
-                "intervallum<{}>",
-                format_faber_type(*bound, types, interner, resolve_def)
-            )
+        Type::Intervallum(bound, step) => {
+            let bound = format_faber_type(*bound, types, interner, resolve_def);
+            // A literal step other than 1 renders as `intervallum<T, S>`; the
+            // canonical step 1 and any symbolic term keep the bare spelling.
+            match types.get_index(*step) {
+                IndexExpr::Literal(s) if *s != 1 => format!("intervallum<{bound}, {s}>"),
+                _ => format!("intervallum<{bound}>"),
+            }
         }
 
         // Bare width marker: the wrapped `numerus<W>` / `fractus<W>` spellings
