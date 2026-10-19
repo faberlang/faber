@@ -1562,6 +1562,9 @@ fn library_imports_from_cached(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let import_path = cached.interner.resolve(decl.path);
         match library_resolver.resolve(import_path) {
             Ok(Some(resolved)) => {

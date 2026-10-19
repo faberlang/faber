@@ -195,6 +195,9 @@ fn import_aliases(spec: &PackageSpec, file: &PackageFile) -> ImportAliases {
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let import_path = file.interner.resolve(decl.path);
         let Ok(Some(target)) = resolve_local_import(spec, &file.path, import_path) else {
             continue;
@@ -407,6 +410,9 @@ pub fn detect_import_cycles(spec: &PackageSpec, files: &[PackageFile]) -> Vec<Di
             let StmtKind::Import(decl) = &stmt.kind else {
                 continue;
             };
+            if decl.target.is_some() {
+                continue;
+            }
             let import_path = file.interner.resolve(decl.path);
             if let Ok(Some(target)) = resolve_local_import(spec, &file.path, import_path) {
                 edges.push((normalize_path(&target), decl.span));
