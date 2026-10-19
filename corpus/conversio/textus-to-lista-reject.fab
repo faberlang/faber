@@ -1,0 +1,33 @@
++++
+term = "↦"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Rejected route: a string does not convert to a list."
+syntax = "\"abc\" ↦ list<string> — rejected; encode via ↦ list<b8|b16|b32> or build the character list"
+related = ["↦", "textus", "lista"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM016:textus_to_lista_unsupported"
+ruling = "5dccc092"
++++
+# =============================================================================
+# textus to lista — rejected route
+# =============================================================================
+#
+# What this teaches:
+#   • A string is not a list of strings — the element type does not say which
+#     encoding, so the checker refuses "abc" ↦ list<string> with one named
+#     diagnostic (SEM016 textus_to_lista_unsupported, need).
+#   • Say the encoding: ↦ list<b8> gives the UTF-8 octets (list<b16> and
+#     list<b32> are the wider rows), or build the character list explicitly.
+#
+# Common mistakes:
+#   • reading ↦ as "split the characters" — the element type is not an
+#     encoding choice.
+# =============================================================================
+
+main {
+    let list<string> cs ← "abc" ↦ list<string>
+}
