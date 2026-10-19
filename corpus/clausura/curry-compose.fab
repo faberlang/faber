@@ -1,0 +1,60 @@
++++
+term = "clausura"
+explains = ["clausura"]
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt", "array_literal", "itera_stmt", "assignment", "place"]
+category = "declaration"
+canonical = false
+summary = "Closures returned from functions: counters with captured state, compose, curry, two-level nesting, and a list of closures called in a loop."
+syntax = "fn mk(int start) → () → int"
+aliases = []
+related = ["clausura", "functio"]
+locale = "en"
++++
+# =============================================================================
+# clausura/curry-compose — closures returned from functions.
+# =============================================================================
+#
+# What this teaches:
+#   • A closure returned by a `fn` keeps its own captured state: `mk(10)` and
+#     `mk(100)` are independent counters, each carrying its own `c`.
+#   • `compose` returns a closure built from two closure parameters;
+#     `both(5)` is `dbl(inc(5))`.
+#   • `curry` returns a closure that returns a closure; the innermost body
+#     still reads the outermost parameter.
+#   • A `list<(int) → int>` holds closures and is folded in a `for from` loop;
+#     indexing the list yields a callable.
+# =============================================================================
+
+fn mk(int start) → () → int {
+    mut int c ← start
+    return () → int ∴ do { c ← c + 1
+        return c }
+}
+
+fn compose((int) → int f, (int) → int g) → (int) → int {
+    return int x → int ∴ g(f(x))
+}
+
+fn curry(int a) → (int) → (int) → int {
+    return int b → (int) → int ∴ int c → int ∴ a + b + c
+}
+
+main {
+    let () → int a ← mk(10)
+    let () → int b ← mk(100)
+    print a()
+    print a()
+    print b()
+    print a()
+    let (int) → int inc ← int x ∴ x + 1
+    let (int) → int dbl ← int x ∴ x * 2
+    let (int) → int both ← compose(inc, dbl)
+    print both(5)
+    print curry(1)(2)(3)
+    let list<(int) → int> fs ← [int x ∴ x + 1, int x ∴ x * 2, int x ∴ x - 3]
+    mut int v ← 5
+    for from fs let f { v ← f(v) }
+    print v
+    print fs[1](10)
+}
