@@ -707,9 +707,16 @@ impl TypeChecker<'_> {
                 let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
                 return self.types.atomic(inner);
             }
-            (Type::Intervallum(inner_a, _), Type::Intervallum(inner_b, _)) => {
+            (Type::Intervallum(inner_a, a_step), Type::Intervallum(inner_b, b_step)) => {
                 let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
-                return self.types.intervallum(inner);
+                // Steps are part of the type identity (`TypeTable::is_assignable`),
+                // so an assignment across steps is a type error, never a silent
+                // conversion to step 1.
+                if !self.types.index_equals(a_step, b_step) {
+                    self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
+                    return self.error_type;
+                }
+                return self.types.intervallum_with_step(inner, b_step);
             }
             (Type::Func(sig_a), Type::Func(sig_b)) => {
                 return self.unify_function_signatures(sig_a, sig_b, span, issue, policy);
