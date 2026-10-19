@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::{Duration, Instant, SystemTime};
 
+use radix_hir::DefId;
 use radix_lexer::{Interner, Span};
 use radix_mir::*;
 use radix_types::{NumericWidth, Primitive, Type, TypeTable};
@@ -358,12 +359,16 @@ fn fixture(tail: Vec<MirStatement>, extra_temps: Vec<MirTemp>) -> (MirProgram, T
     )
 }
 
-fn build_and_run(name: &str, program: &MirProgram, types: &TypeTable) -> Output {
-    let interner = Interner::new();
+fn build_and_run(
+    name: &str,
+    program: &MirProgram,
+    types: &TypeTable,
+    interner: &mut Interner,
+) -> Output {
     let object = radix_mir_clif::emit_program(
         program,
         types,
-        &interner,
+        interner,
         Some(MirFunctionId(1)),
         ["true", "false", "none", "tuple"].map(str::to_owned),
         &radix_mir_clif::StructMeta::default(),
@@ -414,7 +419,7 @@ fn build_and_run(name: &str, program: &MirProgram, types: &TypeTable) -> Output 
 #[test]
 fn recursive_function_links_and_prints_scalars() {
     let (program, types) = fixture(vec![], vec![]);
-    let run = build_and_run("fact", &program, &types);
+    let run = build_and_run("fact", &program, &types, &mut Interner::new());
     assert!(run.status.success(), "exit {:?}", run.status.code());
     assert_eq!(String::from_utf8_lossy(&run.stdout), "3628800\n1.5\ntrue\n");
 }
@@ -441,7 +446,7 @@ fn division_by_zero_exits_one_with_a_named_trap() {
         let (_, table) = fixture(vec![], vec![]);
         (program, table)
     };
-    let run = build_and_run("divzero", &program, &table);
+    let run = build_and_run("divzero", &program, &table, &mut Interner::new());
     assert_eq!(run.status.code(), Some(1));
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
@@ -493,7 +498,12 @@ fn exact_intermediates_pass_the_i64_carrier() {
     ];
     let temps = (1..=6).map(|id| temp(id, numerus)).collect();
     let (program, _) = fixture(tail, temps);
-    let run = build_and_run("exact-intermediates", &program, &table);
+    let run = build_and_run(
+        "exact-intermediates",
+        &program,
+        &table,
+        &mut Interner::new(),
+    );
     let stdout = String::from_utf8_lossy(&run.stdout).into_owned();
     assert_eq!(
         stdout,
@@ -573,7 +583,7 @@ fn decimals_compute_exactly_and_print_shortest() {
         temp(6, bivalens),
     ];
     let (program, _) = fixture(tail, temps);
-    let run = build_and_run("decimals", &program, &table);
+    let run = build_and_run("decimals", &program, &table, &mut Interner::new());
     let stdout = String::from_utf8_lossy(&run.stdout).into_owned();
     assert_eq!(
         stdout,
@@ -582,4 +592,67 @@ fn decimals_compute_exactly_and_print_shortest() {
         String::from_utf8_lossy(&run.stderr)
     );
     assert_eq!(run.status.code(), Some(0));
+}
+
+/// The public clif lane serves a native clock leaf end to end: `SermoOpen` on
+/// `tempus:monotonicum`, a materializing `numerus` conversion, then a
+/// comparison against zero. A monotonic reading is always positive, so the
+/// printed boolean is `true`; a faulted leaf or a missed route answers the
+/// recovery `0` and the comparison is honestly `false`.
+#[test]
+fn sermo_clock_leaf_materializes_and_prints() {
+    let (_, mut table) = fixture(vec![], vec![]);
+    let handle = MirType::semantic(table.intern(Type::Struct(DefId(1))));
+    let numerus = MirType::semantic(table.primitive(Primitive::Numerus));
+    let bivalens = MirType::semantic(table.primitive(Primitive::Bivalens));
+    let vacuum = MirType::semantic(table.primitive(Primitive::Vacuum));
+    let mut interner = Interner::new();
+    let route = interner.intern("tempus:monotonicum");
+    let tail = vec![
+        statement(MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::temp(MirTempId(1))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::SermoOpen,
+                args: vec![MirOperand::Constant(MirConstant::String(route))],
+                return_ty: handle,
+            },
+        }),
+        statement(MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::temp(MirTempId(2))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Convert(MirConversion {
+                    store: None,
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty: handle,
+                    target_ty: numerus,
+                    params: vec![],
+                    recovery: Some(MirOperand::Constant(MirConstant::Int(0))),
+                    struct_defaults: vec![],
+                }),
+                args: vec![MirOperand::Temp(MirTempId(1))],
+                return_ty: numerus,
+            },
+        }),
+        assign(
+            MirPlace::temp(MirTempId(3)),
+            10,
+            bivalens,
+            binary(
+                MirBinOp::Gt,
+                MirOperand::Temp(MirTempId(2)),
+                MirOperand::Constant(MirConstant::Int(0)),
+            ),
+        ),
+        nota(MirOperand::Temp(MirTempId(3)), vacuum),
+    ];
+    let extra_temps = vec![temp(1, handle), temp(2, numerus), temp(3, bivalens)];
+    let (program, _) = fixture(tail, extra_temps);
+    let run = build_and_run("sermo-clock", &program, &table, &mut interner);
+    assert!(run.status.success(), "exit {:?}", run.status.code());
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout),
+        "3628800\n1.5\ntrue\ntrue\n",
+        "stderr: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
 }
