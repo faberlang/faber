@@ -569,7 +569,13 @@ fn run_single_file(path: &Path) -> Result<ExitCode, RunSourceError> {
     let config = script_package_config(path, None, None).expect("single-file config");
     let session = radix::module::driver::Session::new(config);
     let mut host = radix::module::mir::BufferHost::default();
-    crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host)
+    crate::script::run_with_session(
+        &session,
+        &path.display().to_string(),
+        &source,
+        &mut host,
+        DeviceSelection::Auto,
+    )
 }
 
 #[test]
