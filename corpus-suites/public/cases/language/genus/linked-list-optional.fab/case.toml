@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/genus/linked-list-optional.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/linked-list-optional.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
