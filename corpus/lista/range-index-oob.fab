@@ -1,0 +1,51 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "member_suffix", "range_expr", "range_tail", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = true
+summary = "A list range index copies the window between the bounds; an index past the end is checked at run time and aborts."
+syntax = "xs[<start>‥<end>]"
+related = ["lista", "numerus-overflow"]
+locale = "en"
++++
+# =============================================================================
+# lista — a range index copies a window; the bounds are checked at run time.
+# =============================================================================
+#
+# What this teaches:
+#   • Range index on a list — `xs[0‥n]` copies the elements from `0` up to
+#     but not including `n` into a new list; both bounds may be computed at
+#     run time.
+#   • The bounds are checked at run time — `xs[0‥n]` with `mut int n ← 9`
+#     is not a compile error: the bounds are values. The run prints its
+#     earlier output, then aborts when the index is evaluated with
+#     "list range 0‥9 outside 0‥3"; the program exits non-zero and the
+#     rest of the body never runs.
+#
+# Common mistakes:
+#   • Expecting a range index past the end to clamp to the list length or
+#     yield an empty list — the window must lie inside `0‥len`.
+#   • Expecting the out-of-bounds window to be a compile error — the bounds
+#     are run-time values, so the check fires where the index is evaluated,
+#     and earlier prints are already on stdout.
+#   • Expecting the trap to be recoverable with `fac … cape` — an implicit
+#     index trap is not in the `⇥` channel.
+#
+# See also: lista, numerus-overflow
+# =============================================================================
+
+# range-index-oob — a window past the end dies
+#
+# POLICY:
+#   A list range index copies a copied window whose bounds must lie inside
+#   `0‥len`; a window past the end is a run-time trap, not a compile error,
+#   so it aborts the run where the index is evaluated.
+
+main {
+    let list<int> xs ← [10, 20, 30]
+    mut int n ← 9
+    print "before"
+    print xs[0‥n]
+    print "after"
+}

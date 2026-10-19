@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/lista/range-index-oob.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/range-index-oob.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "list range 0‥9 outside 0‥3"
+check_only = false
