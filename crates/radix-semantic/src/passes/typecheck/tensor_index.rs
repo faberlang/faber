@@ -947,7 +947,7 @@ pub(super) fn check_tensor_bracket_range_index(
     if let Some(step_expr) = step {
         // WHY: the step of an `intervallum` here is a direct step by
         // construction, so the flag admits it the same way the range
-        // expression does; the step's value is not consumed yet.
+        // expression does.
         let prev = checker.allow_intervallum_step;
         checker.allow_intervallum_step = true;
         let step_ty = checker.check_expr(step_expr);
@@ -960,19 +960,24 @@ pub(super) fn check_tensor_bracket_range_index(
             );
         }
     }
-    // WHY: the step is not consumed yet -- the shape below assumes step 1,
-    // and a later unit consumes the step value.
+    // WHY: a static result shape needs every part of the range static -- a
+    // non-literal bound or step leaves the sliced length unknown, so the shape
+    // stays a fresh hole, the same posture `sectio` takes.
+    let static_step: Option<u64> = match step.as_deref() {
+        Some(step_expr) => static_numerus_literal(step_expr),
+        None => Some(1),
+    };
     let literal_extent = static_tensor_bounds(checker, shape).first().copied();
     let bounds = static_numerus_literal(start).zip(static_numerus_literal(end));
     if literal_extent.is_some()
-        && let Some((start, end)) = bounds
+        && let (Some((start, end)), Some(step_value)) = (bounds, static_step)
     {
         let end_eff = if range_kind == HirRangeKind::Inclusive {
             end.saturating_add(1)
         } else {
             end
         };
-        if let Some(output) = sectio_axis0_shape(checker, shape, start, end_eff, 1) {
+        if let Some(output) = sectio_axis0_shape(checker, shape, start, end_eff, step_value) {
             // WHY: the slice shape only says how long the window is; it does
             // not say the window lies inside the extent, so the static
             // out-of-range proof still runs on this path.
