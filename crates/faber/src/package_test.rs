@@ -2810,6 +2810,66 @@ main {
 }
 
 #[test]
+fn package_mir_norma_deque_basic_ops() {
+    let dir = test_temp_dir("package-mir-norma-deque-basic-ops");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "norma:deque" deque
+
+main {
+  mut deque.Deque<int> d ← deque.from_list<int>([1, 2])
+  d.prepend(0)
+  print d.length()
+  print d.to_list().length()
+  print d.is_empty()
+  print d.first()
+  print d.last()
+  print d.pop_front()
+  print d.pop_back()
+  print d.length()
+  mut deque.Deque<int> e ← deque.empty<int>()
+  print e.first()
+  print e.pop_front()
+  print e.is_empty()
+}
+"#,
+    )
+    .expect("write entry");
+
+    let mut host = BufferHost::default();
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
+
+    assert!(
+        result.is_ok(),
+        "expected norma:deque basic ops composed on one deque to run, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), format!("{diag:?}")))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        host.stdout_lines,
+        vec![
+            "3".to_owned(),
+            "3".to_owned(),
+            "false".to_owned(),
+            "0".to_owned(),
+            "2".to_owned(),
+            "0".to_owned(),
+            "2".to_owned(),
+            "1".to_owned(),
+            "none".to_owned(),
+            "none".to_owned(),
+            "true".to_owned(),
+        ]
+    );
+}
+
+#[test]
 fn package_mir_bridges_norma_fs_exscribe_renomina() {
     let dir = test_temp_dir("package-mir-solum-copy-rename");
     let entry = dir.join("main.fab");
