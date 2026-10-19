@@ -1463,12 +1463,15 @@ pub struct UnaryExpr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnOp {
-    Neg,     // -
-    Not,     // non
-    BitNot,  // ¬
-    Floor,   // ⌊x⌋
-    Ceil,    // ⌈x⌉
-    Nearest, // ⌊x⌉ (ties to the even neighbour)
+    Neg,           // -
+    Not,           // non
+    BitNot,        // ¬
+    Floor,         // ⌊x⌋
+    Ceil,          // ⌈x⌉
+    Nearest,       // ⌊x⌉ (ties to the even neighbour)
+    RadicalSqrt,   // √ x
+    RadicalCbrt,   // ∛ x
+    RadicalFourth, // ∜ x
 }
 
 /// The value conditional `cond ✓ then ✗ else_` (D4.5), one level only.

@@ -1921,6 +1921,10 @@ mod regex_literal_test;
 mod rounding_glyph_test;
 
 #[cfg(test)]
+#[path = "radical_glyph_test.rs"]
+mod radical_glyph_test;
+
+#[cfg(test)]
 #[path = "typed_zero_test.rs"]
 mod typed_zero_test;
 
