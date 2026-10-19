@@ -202,3 +202,34 @@ fn radical_glyphs_are_distinct_kinds() {
     assert_ne!(TokenKind::RadicalFourth, TokenKind::BitwiseNot); // ∜ vs ¬
     assert_ne!(TokenKind::RadicalFourth, TokenKind::Minus); // ∜ vs -
 }
+
+#[test]
+fn radical_glyph_tokens_are_operators_not_registered_keywords() {
+    use crate::keyword_spelling_for_token;
+
+    // Locale-invariant glyphs: there is no word twin behind any radical kind.
+    for kind in [
+        TokenKind::RadicalSqrt,
+        TokenKind::RadicalCbrt,
+        TokenKind::RadicalFourth,
+    ] {
+        assert_eq!(keyword_spelling_for_token(&kind), None, "{kind:?}");
+        assert!(
+            !kind.is_comment(),
+            "{kind:?} must not classify as a comment"
+        );
+        assert!(!kind.is_trivia(), "{kind:?} must not classify as trivia");
+    }
+
+    let result = crate::lex("\u{221B}");
+    assert!(
+        result.errors.is_empty(),
+        "U+221B must lex as a dedicated token; errors: {:?}",
+        result.errors
+    );
+    assert!(
+        result.tokens[0].kind == TokenKind::RadicalCbrt,
+        "U+221B must lex as RadicalCbrt, got {:?}",
+        result.tokens[0].kind
+    );
+}
