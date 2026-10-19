@@ -1,0 +1,23 @@
++++
+locale = "en"
+term = "itera-loop-shape-reject-set-add"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "expression", "call_expr"]
+canonical = false
+summary = "An add inside a loop over that same set is refused at check time."
+no_expected = "rejects"
+diagnostic = "SEM011:loop_collection_shape_change"
++++
+
+# This exemplum intentionally fails to compile: `s.add(x + 1)` inserts into
+# the set that the loop is walking, so the loop may walk a value it just
+# added. A method that changes the iterated collection's shape or order is
+# refused at check time. Methods are checked; collect into a fresh set
+# declared before the loop when growth is what is meant.
+main {
+    mut set<int> s ← [1]
+    for from s let x {
+        s.add(x + 1)
+    }
+}
