@@ -3,8 +3,7 @@
 //! en spells the view constructors `send<T>()` / `recv<T>()` and the view
 //! methods `get` / `finish` / `drain` / `cursor`; the Latin spellings are a
 //! wrong-locale miss (`unknown_method`) under en, like any intrinsic method,
-//! and stay the only spelling under la. `da` is not a projected row (its
-//! rename belongs to the Sink<T> need) and keeps one spelling everywhere.
+//! and stay the only spelling under la. `sink` is not a projected row and keeps one spelling everywhere.
 
 use crate::locale::LocalePack;
 use crate::test_support::{self, AnalyzedFixture};
@@ -48,7 +47,7 @@ fn la_program(body: &str) -> String {
 fn en_accepts_every_projected_channel_view_spelling() {
     let source = en_program(
         "    let send<string> m ← s.send<string>()\n\
-         \x20   m.da(\"ping\")\n\
+         \x20   m.sink(\"ping\")\n\
          \x20   let status out ← m.finish()\n\
          \x20   let recv<string> t ← s.recv<string>()\n\
          \x20   for from t.cursor() let frame {\n    }\n\
@@ -88,7 +87,7 @@ fn en_refuses_each_latin_channel_view_spelling() {
 fn la_keeps_the_latin_channel_view_spellings_and_refuses_the_en_ones() {
     let latin = la_program(
         "    sit meus<textus> m ← s.meus<textus>()\n\
-         \x20   m.da(\"ping\")\n\
+         \x20   m.sink(\"ping\")\n\
          \x20   sit status out ← m.fini()\n\
          \x20   sit tuus<textus> t ← s.tuus<textus>()\n\
          \x20   sit scrinium<textus> ∪ nihil got ← t.accipe()\n\
