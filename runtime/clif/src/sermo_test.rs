@@ -1,8 +1,32 @@
 //! The conversation core over the shared native leaves: clock replies, a unit
-//! reply, a leaf fault reduced to kind and path, and a route no leaf owns.
+//! reply, a leaf fault reduced to kind and path, a route no leaf owns, and the
+//! C handle table's `open` export.
 
-use super::{Conversation, Opener};
+use super::{__faber_clif_v1_sermo_open, CONVERSATIONS, Conversation, Opener, slot};
 use faber_leaf::LeafErrorKind;
+
+fn open(route: &str) -> i64 {
+    unsafe { __faber_clif_v1_sermo_open(route.as_ptr(), i64::try_from(route.len()).unwrap()) }
+}
+
+#[test]
+fn monotonic_route_opens_a_positive_handle() {
+    const ROUTE: &str = "tempus:monotonicum";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let opened = slot(&mut table, handle).expect("the handle names a slot");
+    assert_eq!(opened.conversation.route(), ROUTE);
+}
+
+#[test]
+fn unsupported_route_opens_no_handle() {
+    assert_eq!(open("tempus:ignotum"), 0);
+}
 
 #[test]
 fn clock_routes_reply_with_an_integer() {
