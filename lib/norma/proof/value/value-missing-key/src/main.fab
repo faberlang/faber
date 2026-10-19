@@ -1,0 +1,16 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for missing-key reads on norma:value (F17).
+# `get` on an absent map key and `find` on an absent dotted path both yield
+# null; neither traps. Output must match under `faber run` and a Rust binary.
+
+import from "norma:toml" toml
+import from "norma:value" value
+
+main {
+    let value doc ← toml.parse("title = \"x\"\nn = 42\nf = 1.5\nb = true\narr = [1, 2, 3]\n[server]\nport = 8080\nname = \"s\"\n[[items]]\nid = 1\n[[items]]\nid = 2\n")
+    print value.is_null(value.get(doc, "missing"))
+    print value.is_null(value.find(doc, "server.nope"))
+}
