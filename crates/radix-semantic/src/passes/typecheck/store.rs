@@ -238,6 +238,9 @@ impl TypeChecker<'_> {
             if let Some(target) = self.implicit_store_target(expr, ty, slot_ty) {
                 return self.wrap_implicit_store(expr, ty, target, site);
             }
+            if let Some(landed) = self.import_store_door(expr, ty, slot_ty, site) {
+                return landed;
+            }
             return ty;
         }
         self.check_expr(expr)
@@ -255,8 +258,43 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         match self.implicit_store_target(expr, ty, slot_ty) {
             Some(target) => self.wrap_implicit_store(expr, ty, target, site),
-            None => self.unify_expected(ty, slot_ty, expr.span),
+            None => {
+                if let Some(landed) = self.import_store_door(expr, ty, slot_ty, site) {
+                    return landed;
+                }
+                self.unify_expected(ty, slot_ty, expr.span)
+            }
         }
+    }
+
+    /// The scalar door for target-native imports: an `ignotum`
+    /// value observed at a scalar cell converts with implicit syntax but forced
+    /// semantics, so the store wraps an implicit node carrying the coercion the
+    /// emitter lowers for the target. Only values arriving through a trusted
+    /// import are admitted, and this unit opens only integer cells: a float,
+    /// text or bool cell is a later unit, an aggregate slot stays refused by the
+    /// ordinary unification.
+    fn import_store_door(
+        &mut self,
+        expr: &mut HirExpression,
+        ty: TypeId,
+        slot_ty: TypeId,
+        site: StoreSite,
+    ) -> Option<TypeId> {
+        if self.trusted_imports.is_empty() || !self.is_declared_slot(slot_ty) {
+            return None;
+        }
+        let peel = |checker: &Self, ty: TypeId| {
+            let ty = checker.peel_nominal_aliases(ty);
+            let ty = checker.types.peel_access_marker(ty).1;
+            checker.peel_nominal_aliases(ty)
+        };
+        let value = peel(self, ty);
+        if !matches!(self.types.get(value), Type::Primitive(Primitive::Ignotum)) {
+            return None;
+        }
+        let (int_ty, _) = self.store_int_slot(peel(self, slot_ty))?;
+        Some(self.wrap_implicit_store(expr, ty, int_ty, site))
     }
 
     /// The implicit store node a value of type `ty` needs to land in `slot_ty`,

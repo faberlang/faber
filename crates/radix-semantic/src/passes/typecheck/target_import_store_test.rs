@@ -25,3 +25,17 @@ incipit {
         result.diagnostics
     );
 }
+
+#[test]
+fn ignotum_into_integer_cell_converts_for_the_import_target() {
+    test_support::assert_accepts_for_target_la(
+        r#"
+importa python "math" m
+
+incipit {
+    sit numerus n ← m.count()
+}
+"#,
+        Target::HirPython,
+    );
+}
