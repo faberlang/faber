@@ -3062,7 +3062,7 @@ fn generate_air_lane_backward_with_companion<'a>(
 fn build_lossless_companion_entry<'a>(
     primal: &AirBackwardPrimal,
     selected_inputs: &'static [crate::air::AirCompanionSelectedInput],
-    backward_functions: Vec<crate::mir::MirFunction>,
+    mut backward_functions: Vec<crate::mir::MirFunction>,
     lowered: crate::mir::LoweredMirUnit<'a>,
 ) -> Result<(crate::mir::LoweredMirUnit<'a>, crate::mir::device::LosslessMirCompanionEntry), codegen::CodegenError> {
     use crate::mir::device::{
@@ -3079,6 +3079,21 @@ fn build_lossless_companion_entry<'a>(
         .collect();
     let selected_outputs: Vec<MirCompanionSelectedOutput> =
         vec![MirCompanionSelectedOutput { position: 0, ty: primal.ret_ty, upstream_gradient_ty: primal.ret_ty }];
+    // GT12 E15: a generated companion of a device-resident primal joins the
+    // same `DeviceProgram` as its primal, so it must carry the kernel launch
+    // stage the AIR-to-MIR form never states (`to_mir` installs `None`). This
+    // mirrors the S3-A2 stage-keep the primal itself gets in
+    // `replace_air_lane_mir`: ordinary dispatch keys a call on
+    // `shader_stage == Some(Compute)`, so a stage-free companion would be
+    // host-interpreted inside a device run. Host primals keep `None` — their
+    // companions stay host helpers and reference-only execution stays
+    // explicit (unannotated callee companions are unaffected; they are
+    // installed by `install_unannotated_companions`).
+    if primal.device_resident {
+        for function in &mut backward_functions {
+            function.shader_stage = Some(crate::mir::MirKernelShaderStage::Compute);
+        }
+    }
     let entry = LosslessMirCompanionEntry {
         primal: primal.primal_def_id,
         companion: primal.companion_def_id,

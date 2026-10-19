@@ -777,3 +777,79 @@ functio inner(tensor<f32, [2,2]> a, tensor<f32, [2,2]> b) → tensor<f32, [2,2]>
         "local helper companion name must resolve through the validated context; got: {names:?}"
     );
 }
+
+// ── GT12 E15: device-resident backward companions carry the launch stage ──
+
+/// One device-resident primal (`@ nucleum`) and one host primal, each with a
+/// backward annotation and the same differentiable body.
+const DEVICE_AND_HOST_BACKWARD_SOURCE: &str = r#"
+@ nucleum
+@ radix lane "air"
+@ radix backward "kernel_loss_backward"
+functio kernel_loss(tensor<f32, [4]> x) → f32 {
+    redde x.media()
+}
+
+@ radix lane "air"
+@ radix backward "host_loss_backward"
+functio host_loss(tensor<f32, [4]> x) → f32 {
+    redde x.media()
+}
+"#;
+
+#[test]
+fn device_resident_backward_companion_carries_compute_stage() {
+    use crate::mir::MirKernelShaderStage;
+
+    let session = test_session_la(Target::MirLlvm);
+    let mut analysis = analyze_source(
+        &session,
+        "device_backward_stage.fab",
+        DEVICE_AND_HOST_BACKWARD_SOURCE,
+        AnalyzeRequest::default(),
+    )
+    .expect("a device-resident primal with a backward annotation must analyze");
+
+    let bundle = expect_codegen_ok(
+        prepare_air_backward_bundle(&mut analysis),
+        "the device/host backward primals must lower to AIR and prepare a bundle",
+    )
+    .expect("AIR lanes with backward annotations must produce a bundle");
+
+    let lowered = lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
+        .expect("the backward primals should lower to MIR");
+    let lowered = expect_codegen_ok(
+        apply_air_backward_bundle(lowered, bundle, &analysis, false),
+        "the device/host backward primals must generate reverse-AD companions",
+    );
+
+    // The installed companion is looked up by its resolved annotated name, so
+    // the assertion reads the exact function the driver patched into the
+    // program rather than a name-shaped guess.
+    let companion_stage = |name: &str| {
+        lowered
+            .validated
+            .program()
+            .functions
+            .iter()
+            .find(|function| {
+                function
+                    .name
+                    .is_some_and(|symbol| lowered.interner.resolve(symbol) == name)
+            })
+            .unwrap_or_else(|| panic!("companion '{name}' must be installed in the lowered MIR"))
+            .shader_stage
+    };
+
+    assert_eq!(
+        companion_stage("kernel_loss_backward"),
+        Some(MirKernelShaderStage::Compute),
+        "a device-resident primal's companion is device-resident too and must carry the Compute \
+         launch stage, or ordinary dispatch host-interprets it instead of taking the dispatcher"
+    );
+    assert_eq!(
+        companion_stage("host_loss_backward"),
+        None,
+        "a host primal's companion stays a host helper; reference-only execution remains explicit"
+    );
+}
