@@ -1,0 +1,121 @@
++++
+term = "queue-stack"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "binding_decl", "itera_stmt", "itera_binding", "fac_stmt", "fac_block", "cape_clause", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "additive_expr", "multiplicative_expr", "primary", "literal", "vel_expr"]
+category = "collection"
+canonical = false
+summary = "Queue FIFO, stack LIFO, bounded-push recovery, elementwise arithmetic, mismatched-length abort."
+syntax = "queue<T> / stack<T> run-time receivers"
+related = ["queue", "stack", "cape"]
+locale = "en"
++++
+# =============================================================================
+# queue-stack — the run-time receivers, end to end
+# =============================================================================
+#
+# What this teaches:
+#   • FIFO vs LIFO — `remove_first()` drains a queue in insertion order; a
+#     stack drains through `remove_last()` and `for from` walks it top-first,
+#     so the same two appends come back reversed.
+#   • Empty pop is `T ∪ none` — the last `remove_first()` / `remove_last()`
+#     prints `none`; it does not trap.
+#   • Bounded push is recoverable — a third append into `queue<int, 2>` or
+#     `stack<int, 2>` reports on the `⇥` channel, so a `do`/`catch` turns it
+#     into a printed line. A push at capacity in `main` would be fatal.
+#   • Elementwise arithmetic — `+` pairs two collections by live length and
+#     broadcasts a scalar (`2 * a`); a length mismatch aborts after the
+#     positive output, which is why this run ends non-zero.
+#
+# Binding words (ruling 2026-10-15): run-time bindings are `mut T x ← e`
+# (re-pointable, writable) with the type slot always written; a loop binder is
+# `let x` with no type slot. `const` is compile-time only.
+
+fn push_bounded(queue<int, 2> q0) → void ⇥ string {
+    mut queue<int, 2> q ← copy q0
+    q.append(1)
+    q.append(2)
+    q.append(3)
+}
+
+fn push_bounded_stack(stack<int, 2> s0) → void ⇥ string {
+    mut stack<int, 2> s ← copy s0
+    s.append(1)
+    s.append(2)
+    s.append(3)
+}
+
+main {
+    # ---------------------------------------------------------------------
+    # C1 — unbounded queue: FIFO drain and insertion-order iteration
+    # ---------------------------------------------------------------------
+    mut queue<int> q ← empty
+    q.append(1)
+    q.append(2)
+    q.append(3)
+    print q.length()
+    print q
+    print q.remove_first()
+    for from q let x {
+        print x
+    }
+
+    # ---------------------------------------------------------------------
+    # C2 — unbounded stack: LIFO drain, top-first iteration, `none` on empty
+    # ---------------------------------------------------------------------
+    mut stack<string> s ← empty
+    s.append("a")
+    s.append("b")
+    print s.length()
+    print s.remove_last()
+    for from s let x {
+        print x
+    }
+    print s.remove_last()
+    print s.remove_last()
+
+    # The queue keeps draining in insertion order after the stack is spent.
+    print q.remove_first()
+    print q.remove_first()
+    print q.remove_first()
+
+    # ---------------------------------------------------------------------
+    # C3 — bounded push at capacity rides the `⇥` channel, not a panic
+    # ---------------------------------------------------------------------
+    mut queue<int, 2> bq ← empty
+    do {
+        push_bounded(bq)
+        print "no trap"
+    } catch err {
+        print "capacity reported"
+    }
+    mut stack<int, 2> bs ← empty
+    do {
+        push_bounded_stack(bs)
+    } catch err {
+        print "stack cap reported"
+    }
+
+    # ---------------------------------------------------------------------
+    # C5 — elementwise arithmetic pairs by live length, scalar broadcasts
+    # ---------------------------------------------------------------------
+    mut queue<int> a ← empty
+    a.append(1)
+    a.append(2)
+    mut queue<int> b ← empty
+    b.append(10)
+    b.append(20)
+    print a + b
+    print 2 * a
+    mut stack<int> st ← empty
+    st.append(5)
+    st.append(6)
+    print st - st
+
+    # ---------------------------------------------------------------------
+    # C5 — a length mismatch aborts the run on a trap, not a diagnostic
+    # ---------------------------------------------------------------------
+    mut queue<int> c ← empty
+    c.append(1)
+    print "before mismatch"
+    print a + c
+}
