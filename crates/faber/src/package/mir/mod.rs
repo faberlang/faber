@@ -551,7 +551,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     let AdmittedDeviceSession {
         session, backend, ..
     } = admitted;
-    let (image, omitted) = device_image_for_lowered(lowered, backend)?;
+    let (mut image, omitted) = device_image_for_lowered(lowered, backend)?;
     if image.kernels.is_empty() {
         let reasons = omitted
             .iter()
@@ -600,6 +600,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     let extents = image.extents;
     let genus_layouts = image.genus_layouts;
     let fault_sites = image.fault_sites;
+    let backward = std::mem::take(&mut image.backward);
     let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher = SessionKernelDispatcher::new(
         session,
@@ -613,6 +614,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         .borrow_mut()
         .set_scalars_by_buffer(backend == super::device::DeviceImageBackend::Cuda);
     dispatcher.borrow_mut().set_extents(extents);
+    dispatcher.borrow_mut().set_backward_functions(backward);
     super::device::install_fault_sites(&fault_sites, |entry, sites| {
         dispatcher.borrow_mut().set_fault_sites(entry, sites);
     });

@@ -1,0 +1,53 @@
++++
+term = "si"
+explains = ["si"]
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "si_stmt", "arm", "secus_clause", "assignment", "place", "comparison", "equality", "equality_tail", "additive_expr", "unary_expr", "proba_stmt", "adfirma_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "The then-statement and elif ladder forms of si, block and single-statement."
+syntax = "if <condition> then <statement> | elif … | else then …"
+aliases = ["if"]
+related = ["sin", "secus", "ergo", "ternarius"]
+locale = "en"
++++
+
+# =============================================================================
+# si — The then-statement and elif ladder forms of si, block and single-statement.
+# =============================================================================
+#
+# What this teaches:
+#   • `if <cond> then <statement>` runs one statement without a block
+#   • `elif <cond> then <statement>` chains the next test on the same ladder
+#   • `else then <statement>` is the fall-through tail of the ladder
+#   • Block bodies (`{ … }`) and single-statement `then` arms mix freely
+#
+# Common mistakes:
+#   • Using `∴` instead of `then` for a single-statement arm (PARSE026)
+#   • Writing a new `si` where `elif` continues the same ladder
+#
+# See also: sin, secus, ergo, ternarius
+# =============================================================================
+
+fn f(int n) → string {
+    if n ≺ 0 then return "neg"
+    elif n ≡ 0 then return "zero"
+    else then return "pos"
+}
+
+fn g(int n) → string {
+    if n ≺ 0 { return "neg" } elif n ≡ 0 { return "zero" } elif n ≺ 10 { return "small" } else { return "big" }
+}
+
+main {
+    print f(-1)
+    print f(0)
+    print f(1)
+    print g(-5)
+    print g(0)
+    print g(5)
+    print g(50)
+    if true then print "t"
+    if false then print "f"
+    else then print "e"
+}
