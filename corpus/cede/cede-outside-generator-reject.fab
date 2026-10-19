@@ -1,0 +1,27 @@
++++
+term = "cede"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "cede_stmt", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "async"
+summary = "Yielding needs a generator body; an ordinary function cannot emit items."
+syntax = "cede <expression>"
+related = ["cede", "cursor", "fiunt", "fient"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:cede_requires_generator"
++++
+# =============================================================================
+# cede — yielding outside a generator body is a check error
+# =============================================================================
+# `cede` (yield) emits one item from a generator callable (`fiunt` or `fient`).
+# An ordinary function has no caller consuming a sequence, so the statement is
+# refused before any code is emitted.
+
+fn f() → int {
+    yield 1
+    return 2
+}
+
+main {
+    print f()
+}
