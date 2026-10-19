@@ -1,0 +1,29 @@
++++
+term = "tensor edge shift policies"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "implendum_decl", "implendum_method_decl", "genus_decl", "genus_member", "functio_method_decl", "generic_params", "generic_param", "contract_ref", "param_list", "parameter", "return_clause", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "call_type_args", "argument_list", "argument", "member_suffix", "vel_expr", "conversio_expr", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Negative, zero, large and rank-2 shifts resolve edges under clamp, coalesce, wrap and reflect."
+related = ["tensor", "limes", "shift"]
+locale = "en"
++++
+
+main {
+    let tf32[4] base ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
+    let tf32[4] clamped ← base.shift([-1]).limes<clamp>()
+    let tf32[4] filled ← base.shift([-2]) coalesce 9.0
+    let tf32[4] wrapped ← base.shift([5]).limes<wrap>()
+    let tf32[4] reflected ← base.shift([0]).limes<reflect>()
+    print clamped.flatten()
+    print filled.flatten()
+    print wrapped.flatten()
+    print reflected.flatten()
+
+    let list<f32> source ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, 2] grid ← source ↦ tf32[2, 2]
+    let tf32[2, 2] grid_wrapped ← grid.shift([1, 0]).limes<wrap>()
+    let tf32[2, 2] grid_filled ← grid.shift([0, 1]) coalesce 0.0
+    print grid_wrapped.flatten()
+    print grid_filled.flatten()
+}

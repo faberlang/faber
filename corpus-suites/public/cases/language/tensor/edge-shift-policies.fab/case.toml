@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/edge-shift-policies.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/edge-shift-policies.fab"
+
+
+[expect]
+check_only = true
