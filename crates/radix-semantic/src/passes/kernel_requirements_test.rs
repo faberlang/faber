@@ -2,8 +2,15 @@
 
 use crate::PassConfig;
 use crate::locale::LocalePack;
-use crate::passes::kernel_requirements::{KernelRangeExpr, KernelRequirementFailure};
+use crate::passes::kernel_requirements::{
+    KernelExtentCondition, KernelNumericPolicy, KernelRangeExpr, KernelRequirementFailure,
+    KernelTargetRequirement, KernelTrappingStore, KernelValueRange, KernelWidthRequirement,
+    merge_seeded_target_report,
+};
 use crate::test_support::{analyze_source, analyze_source_with_config};
+use crate::{NumericWidth, Primitive};
+use radix_hir::DefId;
+use radix_lexer::Span;
 use radix_target::Target;
 
 fn analyze_en(source: &str) -> crate::test_support::AnalyzedFixture {
@@ -1443,5 +1450,99 @@ fn caller_frac(tensor<f32, [24]> clock) → vector<f32, 3> {
         )),
         "disagreeing sites keep the conservative row: {:?}",
         helper.failures
+    );
+}
+
+#[test]
+fn merge_seeded_target_report_intersects_failures_and_unions_requirements() {
+    let span = Span::default();
+    let exact = KernelWidthRequirement {
+        span,
+        primitive: Primitive::Numerus,
+        width: NumericWidth::I32,
+        policy: KernelNumericPolicy::Exact,
+    };
+    let wrapping = KernelWidthRequirement {
+        policy: KernelNumericPolicy::Wrapping,
+        ..exact.clone()
+    };
+    let extent = KernelExtentCondition {
+        span,
+        range: KernelValueRange {
+            minimum: KernelRangeExpr::Constant(0),
+            maximum: KernelRangeExpr::Constant(7),
+        },
+        minimum: 0,
+        maximum: 7,
+    };
+    let store = KernelTrappingStore {
+        span,
+        width: NumericWidth::I32,
+    };
+    let conservative = KernelTargetRequirement {
+        target: Target::MirWgsl,
+        admitted: true,
+        recursive: false,
+        callees: vec![DefId(11)],
+        widths: vec![exact.clone()],
+        extent_conditions: Vec::new(),
+        trapping_stores: Vec::new(),
+        failures: vec![KernelRequirementFailure::DivideByZeroPossible { span }],
+    };
+    let seed_a = KernelTargetRequirement {
+        target: Target::MirWgsl,
+        admitted: false,
+        recursive: false,
+        callees: vec![DefId(21)],
+        widths: vec![exact.clone(), wrapping.clone()],
+        extent_conditions: vec![extent.clone()],
+        trapping_stores: vec![store.clone()],
+        failures: vec![
+            KernelRequirementFailure::DivideByZeroPossible { span },
+            KernelRequirementFailure::CalleeNotAdmitted { callee: DefId(3) },
+        ],
+    };
+    let seed_b = KernelTargetRequirement {
+        target: Target::MirWgsl,
+        admitted: false,
+        recursive: false,
+        callees: Vec::new(),
+        widths: vec![exact.clone()],
+        extent_conditions: Vec::new(),
+        trapping_stores: Vec::new(),
+        failures: vec![KernelRequirementFailure::DivideByZeroPossible { span }],
+    };
+
+    let merged = merge_seeded_target_report(&conservative, &[seed_a, seed_b]);
+
+    assert_eq!(merged.target, Target::MirWgsl);
+    assert!(!merged.recursive);
+    assert_eq!(merged.failures.len(), 1, "{:?}", merged.failures);
+    assert!(matches!(
+        merged.failures.first(),
+        Some(KernelRequirementFailure::DivideByZeroPossible { .. })
+    ));
+    assert!(!merged.admitted, "a shared failure keeps the row closed");
+    assert_eq!(merged.widths.len(), 2, "{:?}", merged.widths);
+    assert!(merged.widths.contains(&exact));
+    assert!(merged.widths.contains(&wrapping));
+    assert_eq!(merged.extent_conditions, vec![extent]);
+    assert_eq!(merged.trapping_stores, vec![store]);
+    assert_eq!(merged.callees.first(), Some(&DefId(11)));
+    assert!(merged.callees.contains(&DefId(21)));
+
+    let clean = KernelTargetRequirement {
+        admitted: true,
+        failures: Vec::new(),
+        ..conservative.clone()
+    };
+    let merged_clean = merge_seeded_target_report(&conservative, &[clean.clone(), clean]);
+    assert!(merged_clean.admitted);
+    assert!(merged_clean.failures.is_empty());
+
+    assert_eq!(
+        merge_seeded_target_report(&conservative, &[]),
+        conservative,
+        "no seeded report leaves the conservative row alone"
     );
 }
