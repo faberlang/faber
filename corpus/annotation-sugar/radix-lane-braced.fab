@@ -21,7 +21,7 @@ locale = "en"
 #     identifier for the Radix compiler
 #
 # Common mistakes:
-#   • missing `@ annotatio` on a contract genus, or specifying an invalid or unsupported compiler lane name
+#   • missing `@ annotation` on a contract genus, or specifying an invalid or unsupported compiler lane name
 #
 # See also: radix, annotation-sugar
 # =============================================================================

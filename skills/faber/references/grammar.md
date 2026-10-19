@@ -562,7 +562,7 @@ Structured CLI annotations parsed into AST/HIR metadata:
 - `@ command "cmd"` — command entry (la `@ imperium`)
 - `@ option ...` — option declaration (la `@ optio`)
 - `@ operand ...` — operand declaration (la `@ operandus`)
-- `@ description`, `@ versio`, `@ alias`, `@ global`, `@ args` (la `@ descriptio`, `@ ubique`, `@ argumenta`)
+- `@ description`, `@ version`, `@ alias`, `@ global`, `@ args` (la `descriptio`, `versio`, `ubique`, `argumenta`)
 
 Canonical tour: `corpus/cli/cli.fab`.
 
