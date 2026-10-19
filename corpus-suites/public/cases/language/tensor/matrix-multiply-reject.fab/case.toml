@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/tensor/matrix-multiply-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/matrix-multiply-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "matrix_multiply_requires_glyph"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "matrix_multiply_requires_glyph"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "matrix_multiply_requires_glyph"

@@ -1,0 +1,33 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "`*` between two tensors is not a product; ⊙ is the elementwise glyph."
+syntax = "<tensor expression> * <tensor expression>"
+related = ["tensor", "⊙", "glyph-elementwise"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:tensor_multiply_requires_glyph"
++++
+
+# =============================================================================
+# tensor — `*` is a scalar operator, not a tensor product.
+# =============================================================================
+#
+# What this teaches:
+#   • `*` between two tensors is a named decline, not a silent elementwise
+#     multiply: the shape-pairing rule belongs to an explicit glyph.
+#   • `⊙` is that glyph (elementwise), and `·` is the matrix product.
+#   • `*` and `/` stay in their scalar role: scaling a tensor by a scalar.
+#
+# See also: tensor, ⊙, glyph-elementwise
+# =============================================================================
+
+# `*` over two [2] tensors: the elementwise glyph is ⊙.
+main {
+    let ti32[2] a ← [1, 2] ↦ ti32[2]
+    let ti32[2] b ← a * a
+    print b.flatten()
+}

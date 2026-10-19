@@ -1,0 +1,34 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "`*` between two vectors is not elementwise; the glyphs say which product."
+syntax = "<vector expression> * <vector expression>"
+related = ["tensor", "vector", "⊙", "·"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:vector_multiply_requires_glyph"
++++
+
+# =============================================================================
+# vector — `*` is a scalar operator, not a vector product.
+# =============================================================================
+#
+# What this teaches:
+#   • A rank-1 aggregate has two products with different answers: the
+#     elementwise `⊙` and the dot `·`.
+#   • `*` names neither, so it is refused by name instead of defaulting to
+#     one of them.
+#   • `*` and `/` stay scalar: scaling a vector by a number.
+#
+# See also: tensor, vector, ⊙, ·
+# =============================================================================
+
+# `*` over two [2] vectors: the product glyph is ⊙ or `·`.
+main {
+    let vf32[2] v ← [1.0, 2.0] ↦ vf32[2]
+    let vf32[2] w ← v * v
+    print w
+}
