@@ -1,0 +1,27 @@
++++
+term = "ad"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "annotation", "ad_handler_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "base_type", "block_stmt", "redde_stmt", "expression", "incipit_stmt", "literal"]
+category = "endpoint"
+summary = "One handler serves exactly one route; a second @ call annotation on the same function is refused."
+syntax = "@ call 'prefix:name' … @ call 'prefix:name' fn f(O o) → R { … }"
+related = ["ad", "call"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM018:ad_handler_multiple_routes"
++++
+# =============================================================================
+# ad — a handler serves one route, not two
+# =============================================================================
+# A function annotated with `@ call` is the handler for exactly one route. A
+# second `@ call` on the same function has no single route to answer.
+
+@ call 'm:a'
+@ call 'm:b'
+fn g(int n) → int {
+    return n
+}
+
+main {
+    print 1
+}
