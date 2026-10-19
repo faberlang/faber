@@ -1,0 +1,19 @@
+{
+  "targets": {
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf or bits gate runs, so no C code is produced and the text-ops proof is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
+    },
+    "clif": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "failure_kind": "stdout-mismatch",
+      "reason": "The clif-linked binary builds and runs, but the final line `text.try_to_ascii(\"é\") is none` prints `false` where the runner golden prints `true`: the clif text leaf's ascii probe reports a non-ASCII argument as ascii, so the measured oracle diverges on that line only. Re-pin this row as pass when the clif text leaves match the runner.",
+      "expect": {
+        "stdout": "stdout.expected"
+      }
+    }
+  }
+}

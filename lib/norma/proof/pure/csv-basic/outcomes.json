@@ -1,0 +1,10 @@
+{
+  "targets": {
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf or bits gate runs, so no C code is produced and the csv-basic proof is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
+    }
+  }
+}
