@@ -1,0 +1,22 @@
++++
+locale = "en"
++++
+
+# Fixture library module `zqstage:stage`: stage and IO annotation contracts.
+# The compiler core names none of these words; the library's WGSL bindings
+# manifest maps each contract route to a WGSL spelling.
+
+@ public
+@ annotation { target = fn }
+class Vertex {
+}
+
+@ public
+@ annotation { target = fn }
+class Fragment {
+}
+
+@ public
+@ annotation { target = field }
+class Position {
+}

@@ -25,6 +25,12 @@ pub(crate) struct BindingManifest {
     #[serde(default)]
     pub(crate) types: BTreeMap<String, TypeBinding>,
 
+    /// Declared annotation-contract route (`provider:module.Name`) to its
+    /// opaque target spelling (SPIKE: stage words and IO attributes for the
+    /// WGSL graphics path; the compiler core reads none of them).
+    #[serde(default)]
+    pub(crate) annotations: BTreeMap<String, TypeBinding>,
+
     /// Package-level default runtime shim.
     #[serde(default)]
     pub(crate) shim: Option<ShimBinding>,

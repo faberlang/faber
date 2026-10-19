@@ -48,6 +48,8 @@ const FAMILY_COMMUNE: &str = "commune";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnnotationAttachmentTarget {
     Functio,
+    /// SPIKE (shader-annotation-stages): a genus field.
+    Field,
 }
 
 impl AnnotationAttachmentTarget {
@@ -55,6 +57,7 @@ impl AnnotationAttachmentTarget {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Functio => "functio",
+            Self::Field => "field",
         }
     }
 
@@ -62,6 +65,7 @@ impl AnnotationAttachmentTarget {
     pub fn parse(name: &str) -> Option<Self> {
         match name {
             "functio" => Some(Self::Functio),
+            "field" => Some(Self::Field),
             _ => None,
         }
     }
@@ -805,8 +809,8 @@ fn validate_stmt_applications(
                 } else {
                     for annotation in &member.annotations {
                         let mut context = AttachmentValidationContext {
-                            site: AnnotationAttachmentTarget::Functio,
-                            site_allowed: false,
+                            site: AnnotationAttachmentTarget::Field,
+                            site_allowed: true,
                             registry,
                             resolver,
                             interner,
