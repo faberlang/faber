@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/si/then-elif-forms.fab"
+group = "language"
+input_root = "corpus"
+input = "si/then-elif-forms.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
