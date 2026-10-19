@@ -1,0 +1,72 @@
++++
+term = "bits"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "conversio"
+canonical = false
+summary = "A scalar converts to bits and back at the same width: u8↔b8, i8→b8, u32→b32, b64→u64/i64, b32→i32/u32, b8→i8."
+syntax = "n ↦ b8 | c ↦ u8"
+related = ["bits", "↦", "u8"]
+locale = "en"
++++
+# =============================================================================
+# bits — Scalar conversions at the same width
+# =============================================================================
+#
+# What this teaches:
+#   • a scalar converts to the bits type of the same width, and back
+#   • the conversion is same-width only: ↦ never changes the width
+#   • the bit pattern is preserved, so signedness decides the printed value
+#   • bN prints width-exact hex; scalars print plain decimal
+#
+# Common mistakes:
+#   • expecting a width-changing conversion — that is a rejection
+#   • expecting a negative integer to become a negative bits value
+#
+# See also: bits-literals, bits-display
+# =============================================================================
+
+# bits — scalar ↦ bits and bits ↦ scalar at one width
+#
+# EXPECTED stdout: see bits-scalar-conversion.expected
+
+main {
+    # u8 -> b8: 200 keeps its bit pattern, printed as b8 hex
+    let u8 n ← 200
+    let b8 b ← n ↦ b8
+    print b
+
+    # b8 -> u8: 0xc8 is 200 as an unsigned scalar
+    let b8 c ← 0xc8
+    let u8 m ← c ↦ u8
+    print m
+
+    # u32 -> b32: the all-ones pattern
+    let u32 k ← 4294967295
+    let b32 q ← k ↦ b32
+    print q
+
+    # b64 -> u64 and -> i64: same pattern, two readings
+    let b64 z ← 0xffffffffffffffff
+    let u64 big ← z ↦ u64
+    print big
+    let i64 si ← z ↦ i64
+    print si
+
+    # i8 -> b8: -1 is 0xff at width 8
+    let i8 s ← -1
+    let b8 neg ← s ↦ b8
+    print neg
+
+    # b32 -> i32 and -> u32: the sign bit decides
+    let b32 high ← 0x80000000
+    let i32 i ← high ↦ i32
+    print i
+    let u32 u ← high ↦ u32
+    print u
+
+    # b8 -> i8: 0x80 is the most negative i8
+    let b8 top ← 0x80
+    let i8 t ← top ↦ i8
+    print t
+}
