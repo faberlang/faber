@@ -222,3 +222,14 @@ fn tensor_bracket_range_step_accepted() {
 }",
     );
 }
+
+#[test]
+fn tensor_bracket_range_runtime_bounds_leave_shape_hole() {
+    rejects_with_issue(
+        r"functio win(tf32[4] t, numerus lo) → vacuum {
+    sit tensor<f32, _> s ← t[lo ‥ 3]
+    nota s.longitudo()
+}",
+        "cannot_infer_tensor_shape",
+    );
+}
