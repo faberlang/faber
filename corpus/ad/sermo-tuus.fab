@@ -13,18 +13,18 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Typed inbound stream — `s.tuus<T>()` creates a typed view over the
-#     incoming frames of a sermo connection
+#   • Typed inbound stream — `s.recv<T>()` (la `s.tuus`) creates a typed
+#     view over the incoming frames of a sermo connection
 #   • Cursor consumption — cursor() yields frames that can be iterated with
 #     `itera ex`
 #
 # Common mistakes:
-#   • confusing ad route syntax — accessing `tuus<T>` stream after `fini()` has been called leaves no usable data
+#   • confusing ad route syntax — accessing the `recv<T>` stream after `finish()` has been called leaves no usable data
 #
 # See also: ad, sermo, scrinium, cursor
 # =============================================================================
 
-# sermo.tuus<T>() — typed inbound frame stream
+# s.recv<T>() — typed inbound frame stream (la s.tuus)
 
 main {
     let channel s ← call 'runtime:echo' ("salve")
