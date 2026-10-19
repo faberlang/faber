@@ -62,3 +62,27 @@ fn tensor_dims_rejects_non_tensor_type() {
         Err("kernel collection op requires tensor types")
     );
 }
+
+#[test]
+fn dims_product_checked_overflow_fails_closed() {
+    assert_eq!(
+        dims_product_checked(&[Dim::Literal(4_294_967_296), Dim::Literal(4_294_967_296)]),
+        Err("kernel tensor shape element count overflows")
+    );
+}
+
+#[test]
+fn dims_product_checked_zero_dim_fails_closed() {
+    assert_eq!(
+        dims_product_checked(&[Dim::Literal(0), Dim::Literal(4)]),
+        Err("kernel tensor shape requires positive literal dimensions")
+    );
+}
+
+#[test]
+fn dims_product_checked_runtime_dim_keeps_the_literal_message() {
+    assert_eq!(
+        dims_product_checked(&[Dim::Literal(3), Dim::Runtime]),
+        Err("kernel collection op requires literal dimensions")
+    );
+}

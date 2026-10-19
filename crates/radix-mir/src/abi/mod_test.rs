@@ -2173,3 +2173,31 @@ fn stability_max_with_only_dead_copy_reader_is_dead() {
     });
     assert!(stability_max_is_dead(&function));
 }
+
+#[test]
+fn device_view_element_count_refuses_zero_and_overflow() {
+    let mut types = TypeTable::new();
+    let zero = rank2_ty(&mut types, [0, 4]);
+    let overflow = rank2_ty(&mut types, [4_294_967_296, 4_294_967_296]);
+    let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let runtime_dim = types.intern_index(IndexExpr::Runtime(
+        radix_types::RuntimeExtentId::ScalarParameter { parameter: 0 },
+    ));
+    let literal_dim = types.intern_index(IndexExpr::Literal(4));
+    let runtime_shape = types.intern_index(IndexExpr::Tuple(vec![runtime_dim, literal_dim]));
+    let runtime_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, runtime_shape)));
+    let validation = MirValidationContext::new(&types);
+
+    assert_eq!(
+        device_view_element_count(zero, &validation).map_err(|error| error.message),
+        Err("kernel tensor shape requires positive literal dimensions".to_string())
+    );
+    assert_eq!(
+        device_view_element_count(overflow, &validation).map_err(|error| error.message),
+        Err("kernel tensor shape element count overflows".to_string())
+    );
+    assert_eq!(
+        device_view_element_count_or_runtime(runtime_ty, &validation),
+        Ok(RUNTIME_SHAPED_ELEMENT_COUNT)
+    );
+}
