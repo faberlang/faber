@@ -648,6 +648,71 @@ fn seed_constant_kernel_arguments(
     }
 }
 
+/// Merges the per-specialization reports of one private kernel callee that was
+/// analyzed once per distinct constant argument tuple.
+///
+/// A failure survives only when every seeded call shape produced it: a failure
+/// avoided by one tuple is an artifact of that tuple, not a property of the
+/// callee. Requirements are the union of what any call shape needs, and the
+/// conservative row keeps its identity and call graph, extended by any callee
+/// only the specialized shapes reached.
+// The per-tuple call site lands with the seeding change that consumes it.
+#[allow(dead_code)]
+pub(super) fn merge_seeded_target_report(
+    conservative: &KernelTargetRequirement,
+    seeded: &[KernelTargetRequirement],
+) -> KernelTargetRequirement {
+    let Some(first) = seeded.first() else {
+        return conservative.clone();
+    };
+    let failures = dedupe(
+        first
+            .failures
+            .iter()
+            .filter(|failure| {
+                seeded
+                    .iter()
+                    .all(|report| report.failures.contains(failure))
+            })
+            .cloned()
+            .collect(),
+    );
+    let mut callees = conservative.callees.clone();
+    for callee in seeded
+        .iter()
+        .flat_map(|report| report.callees.iter().copied())
+    {
+        if !callees.contains(&callee) {
+            callees.push(callee);
+        }
+    }
+    KernelTargetRequirement {
+        target: conservative.target,
+        admitted: failures.is_empty(),
+        recursive: conservative.recursive,
+        callees,
+        widths: dedupe(
+            seeded
+                .iter()
+                .flat_map(|report| report.widths.iter().cloned())
+                .collect(),
+        ),
+        extent_conditions: dedupe(
+            seeded
+                .iter()
+                .flat_map(|report| report.extent_conditions.iter().cloned())
+                .collect(),
+        ),
+        trapping_stores: dedupe(
+            seeded
+                .iter()
+                .flat_map(|report| report.trapping_stores.iter().cloned())
+                .collect(),
+        ),
+        failures,
+    }
+}
+
 fn analyze_kernel(
     def_id: DefId,
     function: &HirFunction,
