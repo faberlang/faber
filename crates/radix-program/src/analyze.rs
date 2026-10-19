@@ -1075,6 +1075,9 @@ fn build_module_graph(
             let StmtKind::Import(decl) = &stmt.kind else {
                 continue;
             };
+            if decl.target.is_some() {
+                continue;
+            }
             let Some(binding) = import_binding(&file.interner, decl) else {
                 continue;
             };
@@ -1112,6 +1115,9 @@ fn package_import_identities_for_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let Some(binding) = import_binding(&file.interner, decl) else {
             continue;
         };
@@ -1276,6 +1282,9 @@ fn load_package_with_session(
             let StmtKind::Import(decl) = &stmt.kind else {
                 continue;
             };
+            if decl.target.is_some() {
+                continue;
+            }
             let import_path = loaded.interner.resolve(decl.path);
             match resolve_import(spec, library_resolver, &canonical, import_path) {
                 ImportResolution::Local(target) => {
@@ -1414,6 +1423,9 @@ fn bind_package_imports(
             let StmtKind::Import(decl) = &file.program.statements[*index].kind else {
                 continue;
             };
+            if decl.target.is_some() {
+                continue;
+            }
             if !radix_module::program::import_takes_default_name(decl) {
                 continue;
             }
@@ -1537,6 +1549,9 @@ fn visit_package_analysis_file<'a>(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let import_path = file.interner.resolve(decl.path);
         let ImportResolution::Local(target) =
             resolve_import(spec, library_resolver, &file.path, import_path)
@@ -1583,6 +1598,9 @@ fn provider_carriage_for_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let import_path = file.interner.resolve(decl.path);
         let (target_path, target_source) =
             match resolve_import(spec, library_resolver, &file.path, import_path) {
@@ -1628,6 +1646,9 @@ fn file_interfaces_for_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let Some(binding) = import_binding(&file.interner, decl) else {
             continue;
         };
@@ -1715,6 +1736,9 @@ fn install_transitive_local_interfaces(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let Some(binding) = import_binding(&target_file.interner, decl) else {
             continue;
         };
@@ -1782,6 +1806,9 @@ fn namespace_exports_for_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let Some(binding) = import_binding(&file.interner, decl) else {
             continue;
         };
@@ -1828,6 +1855,9 @@ fn namespace_seams_for_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let Some(binding) = import_binding(&file.interner, decl) else {
             continue;
         };
@@ -1861,6 +1891,9 @@ fn namespace_declarations_for_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let Some(binding) = import_binding(&file.interner, decl) else {
             continue;
         };
