@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/privata/write-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "privata/write-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "member_private_write"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "member_private_write"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "member_private_write"

@@ -1,0 +1,38 @@
++++
+term = "privata"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "assignment", "place", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Calling a `@ private` method from outside the type's own methods is a check error."
+syntax = "v.secret()"
+related = ["privata", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM063:member_private_call"
++++
+# =============================================================================
+# privata — private method call from outside the type
+#
+# A `@ private` method is callable only from the type's own methods.
+# Outside the type the call is a check error: route callers through a
+# public method instead.
+#
+# Common mistakes:
+#   • Calling a private method from outside the type (`v.secret()`).
+#
+# See also: privata, genus
+# =============================================================================
+
+class V {
+    mut int a
+    @ private
+    fn secret() → int { return 1 }
+    fn open() → int { return self.secret() }
+}
+
+main {
+    let V v ← V { a = 1 }
+    print v.open()
+    print v.secret()
+}
