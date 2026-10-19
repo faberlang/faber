@@ -1,0 +1,31 @@
++++
+term = "nota"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt", "expression", "literal"]
+category = "output"
+canonical = false
+summary = "A multi-argument print space-joins every argument, inline list literals included, on one line."
+syntax = "print 1, [2]"
+related = ["nota", "scribe"]
+locale = "en"
++++
+# =============================================================================
+# nota — Multi-argument output with inline collection literals.
+# =============================================================================
+#
+# What this teaches:
+#   • Space joining — comma-separated print arguments are space-joined into ONE line.
+#   • Collection literals — an inline list literal renders in list shape, like any other argument.
+#
+# Common mistakes:
+#   • Reaching for print(...) or a manual string join — the statement already space-joins its arguments.
+#
+# See also: nota, scribe
+# =============================================================================
+
+main {
+    print 1, [2]
+    print [1], [2]
+    print 2, [1]
+    print 1, [2], 3.5
+}
