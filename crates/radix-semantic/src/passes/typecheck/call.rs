@@ -42,6 +42,12 @@ pub(crate) const ISSUE_COPY_INTO_TYPE_MISMATCH: &str = "copy_into_type_mismatch"
 pub(crate) const ISSUE_COPY_INTO_TARGET_NOT_TENSOR: &str = "copy_into_target_not_tensor";
 /// R4/R5: a `⇇` statement has no result, so it is not a value to store.
 pub(crate) const ISSUE_COPY_INTO_VALUE_USED: &str = "copy_into_value_used";
+/// Sinking rule 8: the left side of `⇜` does not conform to `Sink<T>`.
+pub(crate) const ISSUE_SINK_INTO_RECEIVER_NOT_SINK: &str = "sink_into_receiver_not_sink";
+/// Sinking rule 3: the item is not exactly the sink's `T`.
+pub(crate) const ISSUE_SINK_INTO_ITEM_TYPE_MISMATCH: &str = "sink_into_item_type_mismatch";
+/// Sinking rule 5: a `⇜` statement has no result, so it is not a value to store.
+pub(crate) const ISSUE_SINK_INTO_VALUE_USED: &str = "sink_into_value_used";
 /// R7: the callable-sink form `sink ⇇ payload` is retired.
 // FABER-2-SUNSET: delete with the retired-word diagnostics.
 pub(crate) const ISSUE_TRANSFER_SINK_RETIRED: &str = "transfer_sink_retired";
@@ -2287,6 +2293,93 @@ impl TypeChecker<'_> {
         vacuum
     }
 
+    /// `sink ⇜ item` — the sink-into statement.
+    ///
+    /// - Rule 8: the left operand must conform to the sinking contract
+    ///   (`Sink<T>`), recognized by the contract role, never by the name.
+    ///   Tensors, vectors and matrices are not sinks (`⇇` stays their write).
+    /// - Rule 3: the item is exactly the contract's `T`. The item type is the
+    ///   contract argument, never the receiver's own type
+    ///   (`class Box implements Sink<string>` sinks strings), and there is no
+    ///   implicit conversion, so `console.out ⇜ "§"(n)`, never
+    ///   `console.out ⇜ n`.
+    ///
+    /// The statement result is `vacuum`; rule 5 (no use as a value) is
+    /// enforced where the surrounding expression asks for one.
+    pub fn check_sink_into(
+        &mut self,
+        sink: &mut HirExpression,
+        item: &mut HirExpression,
+        _span: radix_lexer::Span,
+    ) -> TypeId {
+        let sink_ty = self.check_expr(sink);
+        let resolved = self.resolve_inferred_type(sink_ty);
+
+        if resolved == self.error_type
+            || matches!(
+                self.types.get(resolved),
+                Type::Primitive(Primitive::Ignotum)
+            )
+        {
+            self.check_expr(item);
+            return self.error_type;
+        }
+
+        let Some(expected) = self.sink_contract_item(resolved) else {
+            self.check_expr(item);
+            self.invalid_operand_types(ISSUE_SINK_INTO_RECEIVER_NOT_SINK, sink.span);
+            return self.error_type;
+        };
+
+        let checked = self.check_expr(item);
+        let item_ty = self.resolve_inferred_type(checked);
+        if item_ty == self.error_type {
+            return self.error_type;
+        }
+        // Rule 3 is exact up to aliases: each type assigns to the other.
+        let exact = self.types.is_assignable(item_ty, expected)
+            && self.types.is_assignable(expected, item_ty);
+        if !exact {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_SINK_INTO_ITEM_TYPE_MISMATCH,
+                item.span,
+            );
+            return self.error_type;
+        }
+        self.vacuum_type()
+    }
+
+    /// Rule 8: the item type `resolved` accepts as a `Sink<T>`, if it is one.
+    ///
+    /// A class conformance (`implements Sink<string>`) or a generic parameter
+    /// bound (`<T implements Sink<T>>`) names the item in its contract
+    /// argument. A conformance whose argument is the receiver itself is not a
+    /// sink shape: sinking has no `Self` position.
+    fn sink_contract_item(&self, resolved: TypeId) -> Option<TypeId> {
+        let contract = self.types.sinking_contract?;
+        let item_of = |args: &[TypeId]| match args {
+            [arg] => Some(self.resolve_inferred_type(*arg)),
+            _ => None,
+        };
+        let (_, inner) = self.types.peel_access_marker(resolved);
+        match self.types.get(inner).clone() {
+            Type::Struct(def) => self
+                .implemented_contracts
+                .get(&def)?
+                .iter()
+                .find(|declared| declared.contract == contract)
+                .and_then(|declared| item_of(&declared.args)),
+            Type::Param(sym) => self
+                .current_generic_bounds
+                .get(&sym)?
+                .iter()
+                .find(|bound| bound.contract == contract)
+                .and_then(|bound| item_of(&bound.args)),
+            _ => None,
+        }
+    }
+
     /// R1 asks for the same element type, not a widening one: the tensor
     /// assignment relation is element-covariant, so an exact check follows it.
     fn require_exact_tensor_element(
@@ -2319,17 +2412,16 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// R4/R5: report a `⇇` statement used as a value (`x ← a ⇇ b`,
-    /// `sit t ← a ⇇ b`). The statement has no result to store or chain.
+    /// R4/R5: report a `⇇` or `⇜` statement used as a value (`x ← a ⇇ b`,
+    /// `sit t ← a ⇇ b`, `sit v ← s ⇜ x`). The statement has no result to store
+    /// or chain.
     pub fn reject_copy_into_value(&mut self, value: &HirExpression) -> bool {
-        if !matches!(value.kind, HirExpressionKind::CopyInto { .. }) {
-            return false;
-        }
-        self.error_issue(
-            SemanticErrorKind::TypeMismatch,
-            ISSUE_COPY_INTO_VALUE_USED,
-            value.span,
-        );
+        let issue = match &value.kind {
+            HirExpressionKind::CopyInto { .. } => ISSUE_COPY_INTO_VALUE_USED,
+            HirExpressionKind::SinkInto { .. } => ISSUE_SINK_INTO_VALUE_USED,
+            _ => return false,
+        };
+        self.error_issue(SemanticErrorKind::TypeMismatch, issue, value.span);
         true
     }
 

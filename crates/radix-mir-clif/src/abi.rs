@@ -1040,6 +1040,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     SERMO_OPEN,
     SERMO_SET_OPENER_NIL,
     SERMO_SET_OPENER_I64,
+    SERMO_MATERIALIZE_I64,
+    SERMO_FAILED,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1307,4 +1309,18 @@ pub const SERMO_SET_OPENER_I64: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_sermo_set_opener_i64",
     params: &[I64, I64],
     ret: None,
+};
+/// Materialize a conversation as a `numerus`: (handle, fallback) -> the leaf
+/// value, or `fallback` when the leaf faults or the handle is unknown.
+pub const SERMO_MATERIALIZE_I64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_materialize_i64",
+    params: &[I64, I64],
+    ret: Some(I64),
+};
+/// Whether a conversation is in a failed state: (handle) -> 1 when its slot
+/// recorded a fault or the handle is unknown, else 0.
+pub const SERMO_FAILED: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_failed",
+    params: &[I64],
+    ret: Some(I8),
 };
