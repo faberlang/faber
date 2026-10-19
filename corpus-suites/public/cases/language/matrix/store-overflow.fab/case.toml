@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/matrix/store-overflow.fab"
+group = "language"
+input_root = "corpus"
+input = "matrix/store-overflow.fab"
+
+
+[expect]
+check_only = true
