@@ -1,0 +1,45 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "publica", "named_import", "incipit_stmt", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "package"
+canonical = false
+summary = "A public import re-exports the module binding, so importing this file also exposes the module surface."
+syntax = "import from <source> public <name>"
+related = ["importa", "publica", "ut"]
+locale = "en"
++++
+# =============================================================================
+# importa — a public import re-exports the module binding
+# =============================================================================
+#
+# What this teaches:
+#   • `public` before the import name marks the binding itself as exported, so
+#     an importer of this file can reach the same module surface through it.
+#   • The exported constant `lib.K` is reachable through the re-exported
+#     binding exactly as through a plain named import.
+#
+# Common mistakes:
+#   • Expecting `public` to widen the imported module's own visibility — it
+#     re-exports the binding, it does not make the module's private members
+#     importable.
+#
+# See also: importa, publica, ut
+# =============================================================================
+
+# importa public — an import that is itself exported
+#
+# GRAMMAR:
+#   import from "./lib" public lib
+#
+# Requires module layout: public.fab imports lib.fab
+# (package or module mode).
+#
+# EXPECTED OUTPUT:
+#   7 (public.expected)
+
+import from "./lib" public lib
+
+main {
+    print lib.K
+}

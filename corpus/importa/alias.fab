@@ -1,0 +1,44 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "package"
+canonical = false
+summary = "A named import takes a local alias: `lib as mylib` binds the module under the alias the importer chooses."
+syntax = "import from <source> <name> as <alias>"
+related = ["importa", "publica", "ut"]
+locale = "en"
++++
+# =============================================================================
+# importa — a named import is bound under the importer's alias
+# =============================================================================
+#
+# What this teaches:
+#   • `lib as mylib` binds the module under the alias, so members are reached
+#     as `mylib.greet` and `mylib.K`.
+#   • An alias and the exported surface compose: a function and a constant of
+#     the same module are both reachable through it.
+#
+# Common mistakes:
+#   • Using the file name instead of the alias after renaming it — the alias,
+#     not the module name, is the local binding.
+#
+# See also: importa, publica, ut
+# =============================================================================
+
+# importa alias — one module under an importer-chosen alias
+#
+# GRAMMAR:
+#   import from "./lib" lib as mylib
+#
+# Requires module layout: alias.fab imports lib.fab
+# (package or module mode).
+#
+# EXPECTED OUTPUT:
+#   hi a! 7 (alias.expected)
+
+import from "./lib" lib as mylib
+
+main {
+    print mylib.greet("a"), mylib.K
+}
