@@ -1,0 +1,83 @@
++++
+term = "tabula"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "assignment", "place", "sort_expr", "fac_stmt", "cape_clause", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Three reads of one entry on a map: m[k] dies when the key is missing, m.get(k) gives none, m.at(k) reports on the error channel."
+syntax = "<map>[<key>] | <map>.get(<key>) | <map>.at(<key>)"
+related = ["get", "at", "⊥", "do", "catch"]
+locale = "en"
++++
+# =============================================================================
+# Three reads of one entry — bracket, get, at
+# =============================================================================
+#
+# What this teaches:
+#   • `m[k]` is the read where the programmer knows the entry is there; a
+#     missing key kills the run
+#   • `m.get(k)` returns `int ∪ none`: the value, or `none` when missing
+#   • `m.at(k)` is the failable read: a missing key reports on the error
+#     channel, so a `⊥` default or a `catch` handler takes it
+#   • map order is unspecified — sort `keys`/`values` before printing them
+#
+# Common mistakes:
+#   • using `m[k]` on a key that may be missing — it dies, it never gives
+#     `none`; choose `get` or `at` for a key that may be absent
+#   • expecting `at` to give `none` — `get` gives `none`, `at` reports
+#   • printing `m.keys()` raw — the runner shuffles map order; sort first
+#
+# See also: reads-three-ways, methodi-accessus, tabula
+# =============================================================================
+
+# The map lives in a `mut map<string, int> m ← empty` binding (type slot
+# written): put, delete and the bracket store all change it.
+# EXPECTED stdout: see reads-map.expected
+
+main {
+    mut map<string, int> m ← empty
+    m.put("b", 2)
+    m.put("a", 1)
+    m["c"] ← 3
+
+    # shape
+    print m.length()
+    print m.is_empty()
+    print m.has("a")
+    print m.has("z")
+
+    # order is unspecified: always sort before printing keys or values
+    print sort via asc from m.keys()
+    print sort via asc from m.values()
+
+    # get: the value, or none
+    print m.get("a")
+    print m.get("z")
+
+    # at: the value, or a report that a default or a handler takes
+    print m.at("a") ⊥ 0
+    print m.at("z") ⊥ -1
+
+    # bracket read: in the map only (a missing key would end the run)
+    print m["b"]
+
+    # delete reports whether the key was there
+    print m.delete("b")
+    print m.delete("b")
+    print m.length()
+
+    # put overwrites; the bracket store writes too
+    m.put("a", 10)
+    print m["a"]
+
+    do {
+        print m.at("zz")
+    }
+    catch err {
+        print "map at reported"
+    }
+
+    print "before"
+    print m["zz"]
+    print "after"
+}
