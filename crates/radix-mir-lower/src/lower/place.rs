@@ -261,6 +261,68 @@ impl FunctionBuilder<'_> {
         Some(value)
     }
 
+    /// Lower a rank-1 tensor bracket range (`t[1 ‥ 4]`, `t[0 ‥ 6 step 2]`,
+    /// `t[1 … 3]`) as the `TensorSliceNd` collection op: one axis entry per
+    /// list, `keep = true` (the range keeps its axis), inclusive flag from the
+    /// range kind. Need; the per-slot rank-N form is a later unit.
+    #[expect(
+        dead_code,
+        reason = "bracket-range call site lands with the rank-N slice unit of need"
+    )]
+    fn lower_tensor_bracket_slice(
+        &mut self,
+        object: &HirExpression,
+        index: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let HirExpressionKind::Intervallum { start, end, step, kind } = &index.kind else {
+            return self.lower_tensor_bracket_get(object, index, expr);
+        };
+        let receiver = self.lower_expr_value(object)?;
+        let start_op = self.lower_expr_value(start)?;
+        let end_op = self.lower_expr_value(end)?;
+        let step_op = match step.as_deref() {
+            Some(step) => self.lower_expr_value(step)?,
+            None => MirOperand::Constant(MirConstant::Int(1)),
+        };
+        let elem_ty = start.ty.map(MirType::semantic)?;
+        let int_list_ty = MirType::semantic(self.types.find_array(elem_ty.semantic_id())?);
+        let bool_list_ty = MirType::semantic(
+            self.types
+                .find_array(self.types.primitive(Primitive::Bivalens))?,
+        );
+        let starts = self.one_element_list(start_op, int_list_ty, index.span);
+        let ends = self.one_element_list(end_op, int_list_ty, index.span);
+        let steps = self.one_element_list(step_op, int_list_ty, index.span);
+        let keeps = self.one_element_list(MirOperand::Constant(MirConstant::Bool(true)), bool_list_ty, index.span);
+        let inclusives = self.one_element_list(
+            MirOperand::Constant(MirConstant::Bool(matches!(kind, HirRangeKind::Inclusive))),
+            bool_list_ty,
+            index.span,
+        );
+        let ty = self.expr_ty(expr)?;
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorSliceNd),
+            vec![receiver, starts, ends, steps, keeps, inclusives],
+            ty,
+            expr.span,
+        ))
+    }
+
+    /// A one-element `lista` aggregate operand (one TensorSliceNd axis entry).
+    #[expect(
+        dead_code,
+        reason = "only lower_tensor_bracket_slice calls this; that call site lands with need"
+    )]
+    fn one_element_list(&mut self, operand: MirOperand, list_ty: MirType, span: Span) -> MirOperand {
+        self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(operand)]),
+            list_ty,
+            span,
+        )
+    }
+
     /// Lower a tensor bracket index to the list operand `TensorGet` / `TensorSet`
     /// expect. A scalar integer index is wrapped into a one-element array; a
     /// list-shaped index is lowered as-is.
