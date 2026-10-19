@@ -6028,11 +6028,9 @@ fn interval_member_count(start: i64, end: i64, inclusive: bool, step: i64) -> i6
 
 /// Whether `item` lands on a stride of the interval beginning at `start`.
 /// Direction comes from the bounds, so a descending span negates the offset
-/// before the remainder test.
-#[expect(
-    clippy::float_cmp,
-    reason = "an on-step floating member is an exact remainder-zero hit, matching the carrier's arithmetic"
-)]
+/// before the remainder test. An on-step floating member is an exact
+/// remainder-zero hit, matching the carrier's arithmetic; the zero comparison
+/// is a literal, so `clippy::float_cmp` stays quiet.
 fn interval_on_step(
     start: &Value,
     item: &Value,
