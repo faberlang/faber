@@ -1,0 +1,28 @@
++++
+term = "ad"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "annotation", "functio_method_decl", "param_list", "parameter", "return_clause", "type_annotation", "base_type", "block_stmt", "redde_stmt", "expression", "incipit_stmt", "literal"]
+category = "endpoint"
+summary = "A call handler must be a top-level function; a @ call annotation on a class method is refused."
+syntax = "class C { @ call 'prefix:name' fn g(O o) → R { … } }"
+related = ["ad", "call", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM018:ad_handler_not_top_level_functio"
++++
+# =============================================================================
+# ad — a handler is a top-level function, never a class method
+# =============================================================================
+# Registering a route with `@ call` requires a top-level function. A method
+# belongs to its genus and cannot serve a program route.
+
+class C {
+    @ call 'm:a'
+    fn g(int n) → int {
+        return n
+    }
+}
+
+main {
+    print 1
+}
