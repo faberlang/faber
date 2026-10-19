@@ -13,7 +13,7 @@ use radix_hir::{DefId, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite
 use radix_lexer::{Interner, Symbol};
 use radix_syntax::TypeFormLevel;
 use radix_types::{
-    BitsWidth, CollectionKind, IndexId, MarkerFamily, Primitive, SemanticMutability,
+    BitsWidth, CollectionKind, IndexExpr, IndexId, MarkerFamily, Primitive, SemanticMutability,
     SemanticParamMode, TensorFamilyKind, Type, TypeId,
 };
 use rustc_hash::FxHashMap;
@@ -178,12 +178,21 @@ impl super::FaberCodegen<'_> {
                 surface,
             ),
 
-            Type::Intervallum(bound, _) => self.format_unary_type(
-                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
-                *bound,
-                names,
-                surface,
-            ),
+            Type::Intervallum(bound, step) => {
+                let head = surface
+                    .type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum));
+                match self.types.get_index(*step) {
+                    // Step 1 is the canonical silence: both a bare interval
+                    // and an explicit `1` re-emit as `intervallum<T>`.
+                    IndexExpr::Literal(value) if *value != 1 => format!(
+                        "{}<{}, {}>",
+                        head,
+                        self.type_to_faber(*bound, names, surface),
+                        value
+                    ),
+                    _ => self.format_unary_type(head, *bound, names, surface),
+                }
+            }
 
             // Bare width marker (`u8`, `f32`, `d64`, `inf`): valid in every
             // locale and every type position. The wrapped `numerus<u8>` /
@@ -854,11 +863,24 @@ impl super::FaberCodegen<'_> {
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic)),
                 self.single_type_form_child(form, names, surface)?
             )),
-            Type::Intervallum(..) => Ok(format!(
-                "{}<{}>",
-                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
-                self.single_type_form_child(form, names, surface)?
-            )),
+            Type::Intervallum(..) => match form.args.as_slice() {
+                [HirTypeFormArg::Type(child)] => Ok(format!(
+                    "{}<{}>",
+                    surface
+                        .type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
+                    self.type_form_to_faber(child, names, surface)?
+                )),
+                [HirTypeFormArg::Type(child), HirTypeFormArg::Size(step)] => Ok(format!(
+                    "{}<{}, {}>",
+                    surface
+                        .type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
+                    self.type_form_to_faber(child, names, surface)?,
+                    self.format_figura(*step, surface)
+                )),
+                // Never drop an authored step silently: unusual shapes take the
+                // canonical spelling, which carries the witness step.
+                _ => Ok(self.type_to_faber(form.ty, names, surface)),
+            },
             Type::BoundedArray { capacity, .. } => {
                 let elem = self.single_type_form_child(form, names, surface)?;
                 Ok(format!(

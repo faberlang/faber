@@ -37,6 +37,7 @@ impl KeywordSurface for LaSurface {
             TypeBindingKind::TensorFamily(TensorFamilyKind::Vector) => "vector",
             TypeBindingKind::TensorFamily(TensorFamilyKind::Matrix) => "matrix",
             TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa) => "sparsa",
+            TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum) => "intervallum",
             _ => "ignotum",
         }
     }
@@ -538,6 +539,46 @@ fn tensor_two_way_keeps_long_and_short_roots() {
     assert_eq!(
         render_at(&short, &declared_site(2), tensor, &LaSurface),
         "tf32[2, 3]"
+    );
+}
+
+#[test]
+fn intervallum_form_keeps_step_argument() {
+    let mut fx = fixture();
+    let numerus = fx.types.primitive(Primitive::Numerus);
+    let lit2 = fx.types.intern_index(IndexExpr::Literal(2));
+    let stepped = fx.types.intervallum_with_step(numerus, lit2);
+    let bare = fx.types.intervallum(numerus);
+
+    let long = semantic_form(
+        TypeFormLevel::LONG,
+        stepped,
+        vec![
+            type_arg(semantic_form(TypeFormLevel::LONG, numerus, Vec::new())),
+            HirTypeFormArg::Size(lit2),
+        ],
+    );
+    let one_arg = semantic_form(
+        TypeFormLevel::LONG,
+        bare,
+        vec![type_arg(semantic_form(
+            TypeFormLevel::LONG,
+            numerus,
+            Vec::new(),
+        ))],
+    );
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![(declared_site(1), long), (declared_site(2), one_arg)],
+    );
+
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), stepped, &LaSurface),
+        "intervallum<numerus, 2>"
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(2), bare, &LaSurface),
+        "intervallum<numerus>"
     );
 }
 
