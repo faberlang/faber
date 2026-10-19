@@ -5,6 +5,18 @@
       "phase": "run",
       "diagnostic_contains": "ordinary call callee is failable; use try_call",
       "reason": "The runner rejects norma:net during package instantiation: the failable caelum leaf calls inside the @ future listen_async/connect_async/accept_async bodies lower as ordinary calls, so MIR never reaches the loopback flow."
+    },
+    "clif": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "clif-subset",
+      "reason": "The clif package builder declines this case before any code is generated: the MIR capability classifier reports the `clif-subset` issue, so the async tcp loopback is never lowered. The clif lane carries no `caelum:*` port for this family yet; re-measure this row when that port lands."
+    },
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber build -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate runs, so no C code is produced and the async tcp loopback is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
     }
   }
 }
