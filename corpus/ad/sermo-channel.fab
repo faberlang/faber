@@ -37,7 +37,7 @@ fn count_items(channel s) → int {
 main {
     let channel s ← call 'runtime:echo' ("salve")
     let send<value> outbound ← s.send<value>()
-    outbound.da("ping")
+    outbound.sink("ping")
     outbound.finish()
     print count_items(s)
 
