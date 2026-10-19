@@ -961,7 +961,7 @@ impl Lowerer<'_> {
         }
 
         if name_str == "intervallum" {
-            if params.len() != 1 {
+            if params.len() != 1 && params.len() != 2 {
                 self.error("intervallum_arity");
                 return Some(self.types.intern(Type::Error));
             }
@@ -970,7 +970,21 @@ impl Lowerer<'_> {
                 self.error("intervallum_bound");
                 return Some(self.types.intern(Type::Error));
             }
-            return Some(self.types.intervallum(bound));
+            let Some(step_arg) = params.get(1) else {
+                return Some(self.types.intervallum(bound));
+            };
+            let step = match crate::passes::resolve::intervallum_step_index(step_arg, self.types) {
+                Ok(step) => step,
+                Err(issue) => {
+                    self.error(issue);
+                    return Some(self.types.intern(Type::Error));
+                }
+            };
+            if !crate::passes::resolve::is_integer_intervallum_bound(self.types, bound) {
+                self.error("intervallum_step_bound_not_integer");
+                return Some(self.types.intern(Type::Error));
+            }
+            return Some(self.types.intervallum_with_step(bound, step));
         }
 
         None
