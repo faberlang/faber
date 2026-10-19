@@ -2111,7 +2111,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "interval length arity"));
         };
         let interval = self.eval_operand(interval, span)?;
-        let (start, end, inclusive, _step) = interval_parts(&interval, span)?;
+        let (start, end, inclusive, step) = interval_parts(&interval, span)?;
         // Int-only bounds are not a hidden carrier gap: `intervallum` over an
         // unsigned-64 element type is rejected semantically, so interval
         // bounds can never surface as `UInt` here.
@@ -2121,7 +2121,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 "interval length requires numerus bounds",
             ));
         };
-        Ok(Value::Int((end - start + i64::from(inclusive)).max(0)))
+        let step = interval_step(step.as_ref(), span)?;
+        Ok(Value::Int(interval_member_count(
+            start, end, inclusive, step,
+        )))
     }
 
     fn interval_contains(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2130,13 +2133,33 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let interval = self.eval_operand(interval, span)?;
         let value = self.eval_operand(value, span)?;
-        let (start, end, inclusive, _step) = interval_parts(&interval, span)?;
-        let value = numeric_as_f64(&value, span)?;
-        let start = numeric_as_f64(&start, span)?;
-        let end = numeric_as_f64(&end, span)?;
-        Ok(Value::Bool(
-            value >= start && if inclusive { value <= end } else { value < end },
-        ))
+        let (start, end, inclusive, step) = interval_parts(&interval, span)?;
+        let step = interval_step(step.as_ref(), span)?;
+        let item = numeric_as_f64(&value, span)?;
+        let start_number = numeric_as_f64(&start, span)?;
+        let end_number = numeric_as_f64(&end, span)?;
+        let ascending = start_number <= end_number;
+        let on_window = if ascending {
+            item >= start_number
+                && if inclusive {
+                    item <= end_number
+                } else {
+                    item < end_number
+                }
+        } else {
+            item <= start_number
+                && if inclusive {
+                    item >= end_number
+                } else {
+                    item > end_number
+                }
+        };
+        if !on_window {
+            return Ok(Value::Bool(false));
+        }
+        Ok(Value::Bool(interval_on_step(
+            &start, &value, step, ascending, span,
+        )?))
     }
 
     fn interval_clamp(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2188,7 +2211,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "interval materialize arity"));
         };
         let interval = self.eval_operand(interval, span)?;
-        let (Value::Int(start), Value::Int(end), inclusive, _step) =
+        let (Value::Int(start), Value::Int(end), inclusive, step) =
             interval_parts(&interval, span)?
         else {
             return Err(RunnerError::internal(
@@ -2196,19 +2219,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 "interval materialize requires numerus bounds",
             ));
         };
-        // F-087: when end == i64::MAX and the interval is inclusive, the
-        // exclusive stop `end.saturating_add(1)` saturates back to i64::MAX,
-        // silently dropping the final element. Use checked_add to detect the
-        // overflow and fall back to an inclusive range iteration.
-        let values: Vec<Value> = if inclusive {
-            if let Some(stop) = end.checked_add(1) {
-                (start..stop).map(Value::Int).collect()
-            } else {
-                (start..=end).map(Value::Int).collect()
-            }
-        } else {
-            (start..end).map(Value::Int).collect()
-        };
+        let step = interval_step(step.as_ref(), span)?;
+        let values = interval_members(start, end, inclusive, step, span)?;
         match self.types.get(return_ty.semantic_id()) {
             Type::Array(_) => Ok(array_value(values)),
             Type::Tensor(element, _) => {
@@ -5998,6 +6010,78 @@ fn interval_step(step: Option<&Value>, span: Span) -> Result<i64, RunnerError> {
             "runner_interval_step_not_positive",
         )
     })
+}
+
+/// How many members a stepped interval holds. The span is the distance
+/// between the bounds, so it is direction-blind and never negative; the step
+/// is the stride, so an exclusive end contributes only whole strides.
+fn interval_member_count(start: i64, end: i64, inclusive: bool, step: i64) -> i64 {
+    let span = (i128::from(end) - i128::from(start)).unsigned_abs();
+    let stride = u128::try_from(step).unwrap_or(1);
+    let count = if inclusive {
+        span / stride + 1
+    } else {
+        span.div_ceil(stride)
+    };
+    i64::try_from(count).unwrap_or(i64::MAX)
+}
+
+/// Whether `item` lands on a stride of the interval beginning at `start`.
+/// Direction comes from the bounds, so a descending span negates the offset
+/// before the remainder test.
+#[expect(
+    clippy::float_cmp,
+    reason = "an on-step floating member is an exact remainder-zero hit, matching the carrier's arithmetic"
+)]
+fn interval_on_step(
+    start: &Value,
+    item: &Value,
+    step: i64,
+    ascending: bool,
+    span: Span,
+) -> Result<bool, RunnerError> {
+    if let (Value::Int(start), Value::Int(item)) = (start, item) {
+        let offset = i128::from(*item) - i128::from(*start);
+        let offset = if ascending { offset } else { -offset };
+        return Ok(offset.rem_euclid(i128::from(step)) == 0);
+    }
+    let start = numeric_as_f64(start, span)?;
+    let item = numeric_as_f64(item, span)?;
+    let offset = if ascending {
+        item - start
+    } else {
+        start - item
+    };
+    Ok(offset.rem_euclid(step as f64) == 0.0)
+}
+
+/// The members a stepped interval lists, from `start` toward `end`. The count
+/// is fixed first, so an arithmetic overflow on the stride is a length error
+/// rather than a silently dropped final member (F-087).
+fn interval_members(
+    start: i64,
+    end: i64,
+    inclusive: bool,
+    step: i64,
+    span: Span,
+) -> Result<Vec<Value>, RunnerError> {
+    let count = interval_member_count(start, end, inclusive, step);
+    let ascending = start <= end;
+    let mut members = Vec::new();
+    let mut current = start;
+    for index in 0..count {
+        members.push(Value::Int(current));
+        if index + 1 == count {
+            break;
+        }
+        current = if ascending {
+            current.checked_add(step)
+        } else {
+            current.checked_sub(step)
+        }
+        .ok_or_else(|| RunnerError::internal(span, "interval materialization length overflow"))?;
+    }
+    Ok(members)
 }
 
 /// The `(start, end, inclusive)` window of an interval index, or `None` for a
