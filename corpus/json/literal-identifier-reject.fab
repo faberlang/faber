@@ -1,0 +1,31 @@
++++
+term = "json"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "json_literal", "json_member", "json_value", "json_object", "json_string", "json_number", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "JSON values are strings, numbers, objects, arrays or the wire words true/false/null: any other identifier value rejects with PARSE002:json_unknown_identifier_value."
+syntax = "{ \"flag\": foo }"
+related = ["json"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE002:json_unknown_identifier_value"
++++
+# =============================================================================
+# json — a bare identifier is not a JSON value
+# =============================================================================
+#
+# What this teaches:
+#   • JSON values are strings, numbers, objects, arrays and the wire words
+#     `true`, `false` and `null`.
+#   • A bare identifier such as `foo` is not JSON data and is rejected while
+#     parsing the JSON literal.
+#
+# Common mistakes:
+#   • Writing `{ "flag": foo }` when a JSON boolean was meant — write `true`.
+#   • Expecting a Faber binding to be resolved inside a JSON literal.
+#
+# See also: json
+# =============================================================================
+
+main { let json a ← { "flag": foo } ; print a }
