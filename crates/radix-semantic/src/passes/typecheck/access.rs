@@ -1302,6 +1302,17 @@ impl TypeChecker<'_> {
         self.place_write = write && matches!(object.kind, HirExpressionKind::Field(..));
         let obj_ty = self.check_expr(object);
         self.place_write = false;
+        // In a program bound to a target by a target-native import, member
+        // access on an `ignotum` value is admitted unchecked: the target's own
+        // compiler or runtime judges it.
+        if !self.trusted_imports.is_empty()
+            && matches!(
+                self.types.get(self.resolve_inferred_type(obj_ty)),
+                Type::Primitive(Primitive::Ignotum)
+            )
+        {
+            return self.types.primitive(Primitive::Ignotum);
+        }
         if self
             .tensor_edge_policies
             .shifted_expressions

@@ -330,6 +330,14 @@ fn build_and_run(name: &str, program: &MirProgram, types: &TypeTable) -> Output 
     std::fs::write(&object_path, &object.bytes).expect("write object");
     let executable = dir.join("program");
 
+    // Link a snapshot of the runtime archive, never the shared
+    // `<target>/<profile>/libfaber_rt_clif.a` itself. Any concurrent `cargo`
+    // pass in this target directory can replace or momentarily remove that
+    // archive between `build_archive()` returning and `cc` opening it, which
+    // fails the link; a private copy cannot be pulled out from under `cc`.
+    let archive = dir.join("libfaber_rt_clif.a");
+    std::fs::copy(build_archive(), &archive).expect("snapshot the runtime archive");
+
     // The platform dead-strip flag is load-bearing (design review):
     // without it the same link measured 13 MB. A Rust staticlib also needs
     // the system libraries on Linux.
@@ -340,7 +348,7 @@ fn build_and_run(name: &str, program: &MirProgram, types: &TypeTable) -> Output 
     };
     let linked = Command::new("cc")
         .arg(&object_path)
-        .arg(build_archive())
+        .arg(&archive)
         .args(platform_args)
         .arg("-o")
         .arg(&executable)

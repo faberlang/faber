@@ -427,6 +427,9 @@ impl TypeChecker<'_> {
                         }
                     }
                 }
+                HirItemKind::Import(import) if import.target.is_some() => {
+                    self.collect_target_import(import, item.span);
+                }
                 HirItemKind::Import(import) => {
                     // Selective members (EOT-2M) are caller-owned value locals
                     // with interface-supplied types, not namespace receivers;
@@ -576,5 +579,43 @@ impl TypeChecker<'_> {
             self.implemented_contracts.insert(*def_id, contracts);
         }
         self.struct_implements = declared;
+    }
+}
+
+impl TypeChecker<'_> {
+    /// Collect a target-native import (`import python "math" m`).
+    ///
+    /// Every bound name is a trusted `ignotum` receiver: calls and member
+    /// access are admitted unchecked and the target's own compiler or runtime
+    /// is the judge. The program is bound to the import's target, so a
+    /// different build target is SEM017 `import_target_bound`.
+    fn collect_target_import(&mut self, import: &radix_hir::HirImport, span: radix_lexer::Span) {
+        for import_item in &import.items {
+            self.import_receivers.insert(import_item.def_id);
+            self.trusted_imports.insert(import_item.def_id);
+        }
+        let (Some(word), Some(interner)) = (import.target, self.interner) else {
+            return;
+        };
+        let word = interner.resolve(word);
+        let bound = radix_target::Target::from_import_word(word);
+        if bound.is_some_and(|bound| bound == self.target) {
+            return;
+        }
+        let specifier = interner.resolve(import.path).to_owned();
+        self.errors.push(
+            SemanticError::structured(SemanticErrorKind::UnavailableDeclaration, span)
+                .with_arg("issue", "import_target_bound")
+                .with_arg("target", word.to_owned())
+                .with_arg("specifier", specifier)
+                .with_arg(
+                    "build",
+                    if self.target == radix_target::Target::MirStepper {
+                        "runner".to_owned()
+                    } else {
+                        self.target.as_str().to_owned()
+                    },
+                ),
+        );
     }
 }

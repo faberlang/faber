@@ -386,7 +386,7 @@ magnitudines = "shape"
 nonnihil = "count_nonzero"
 ponde = "set"
 
-# tensor (33) — longitudo / magnitudines / accipe / addita / subtracta /
+# tensor (34) — longitudo / magnitudines / accipe / addita / subtracta /
 # multiplicata / nega / summa / ponde / sectio shared with earlier families.
 forma = "reshape"
 addita_bias = "added_bias"
@@ -405,6 +405,7 @@ silu = "silu"
 # K5 (rule 15): the built-in scalar math functions lifted over a tensor.
 # `absolutum` is shared with the numeric family above.
 radix = "sqrt"
+radix_cubica = "cbrt"
 exponentia = "exp"
 logarithmus = "ln"
 logarithmus_decimalis = "log10"

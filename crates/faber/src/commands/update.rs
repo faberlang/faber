@@ -19,7 +19,6 @@
 //! when an update is available.
 
 use std::cmp::Ordering;
-use std::fmt::Write as _;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -155,7 +154,13 @@ pub(crate) fn cmd_versions(args: &VersionsArgs) {
 }
 
 fn check_for_update() {
-    let current = current_version();
+    let current = match current_version() {
+        Ok(current) => current,
+        Err(message) => {
+            eprintln!("error: {message}");
+            std::process::exit(2);
+        }
+    };
     let release = match latest_release() {
         Ok(release) => release,
         Err(message) => {
@@ -180,7 +185,7 @@ fn check_for_update() {
 }
 
 fn run_update(args: &UpdateArgs) -> Result<(), String> {
-    let current = current_version();
+    let current = current_version()?;
     let target = match args.version.as_deref() {
         Some(raw) => parse_version(raw)?,
         None => latest_release()?.version,
@@ -396,11 +401,11 @@ pub(crate) fn install_release(
     fs::create_dir_all(bin_dir)
         .map_err(|err| format!("cannot create {}: {err}", bin_dir.display()))?;
     let staged = bin_dir.join(format!(".faber-{version}.tmp"));
-    let _ = fs::remove_file(&staged);
+    fs::remove_file(&staged).ok();
     extract_bin(&archive, &staged)?;
     let target = bin_dir.join(format!("faber-{version}"));
     if let Err(err) = fs::rename(&staged, &target) {
-        let _ = fs::remove_file(&staged);
+        fs::remove_file(&staged).ok();
         return Err(format!("cannot install {}: {err}", target.display()));
     }
     Ok(())
@@ -458,11 +463,11 @@ fn set_executable(_path: &Path) -> Result<(), String> {
 pub(crate) fn point_symlink(bin_dir: &Path, version: &Version) -> Result<(), String> {
     let link = bin_dir.join("faber");
     let staged = bin_dir.join(".faber.link.tmp");
-    let _ = fs::remove_file(&staged);
+    fs::remove_file(&staged).ok();
     std::os::unix::fs::symlink(format!("faber-{version}"), &staged)
         .map_err(|err| format!("cannot create the faber symlink: {err}"))?;
     if let Err(err) = fs::rename(&staged, &link) {
-        let _ = fs::remove_file(&staged);
+        fs::remove_file(&staged).ok();
         return Err(format!(
             "cannot point {} at faber-{version}: {err}",
             link.display()
@@ -543,8 +548,8 @@ fn managed_bin_dir(prefix: Option<&Path>) -> Result<PathBuf, String> {
     resolve_bin_dir(prefix, exe.as_deref())
 }
 
-fn current_version() -> Version {
-    Version::parse(env!("CARGO_PKG_VERSION")).expect("crate version is semver")
+fn current_version() -> Result<Version, String> {
+    parse_version(env!("CARGO_PKG_VERSION"))
 }
 
 fn parse_version(raw: &str) -> Result<Version, String> {
@@ -567,7 +572,7 @@ pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut text = String::with_capacity(64);
     for byte in digest {
-        write!(text, "{byte:02x}").expect("write to String");
+        text.push_str(&format!("{byte:02x}"));
     }
     text
 }
