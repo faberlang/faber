@@ -6,7 +6,7 @@ use super::kernel_dispatch::{self, DeviceToken, ElementRange, KernelDispatcher};
 use super::*;
 use crate::host::BufferHost;
 use radix_lexer::Interner;
-use radix_mir::{MirLocal, MirParam, MirParamMode};
+use radix_mir::{MirLocal, MirParam, MirParamMode, MirStatement, MirTerminator};
 use radix_types::{Primitive, TypeTable};
 
 struct Recorder {
@@ -25,24 +25,34 @@ impl KernelDispatcher for Recorder {
         // Replace the scalar `mut` argument and mutate the shared lista
         // argument in place.
         args[0] = Value::Int(42);
-        if let Value::Array(items) = &args[2] {
+        if let Some(Value::Array(items)) = args.get(2) {
             items.borrow_mut().push(Value::Int(9));
         }
         self.result.clone()
     }
 }
 
-fn kernel_program(types: &TypeTable) -> MirProgram {
+fn kernel_program(types: &mut TypeTable) -> MirProgram {
     let scalar = MirType::semantic(types.primitive(Primitive::Numerus));
+    let scalar_id = scalar.semantic_id();
+    let tuple = MirType::semantic(types.tuple(vec![scalar_id, scalar_id]));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     let span = Span::default();
-    let local = |id: u32| MirLocal {
+    // Element 0 of the local the dispatched companion's tuple binds to.
+    let tuple_element = MirPlace {
+        base: MirPlaceBase::Local(MirLocalId(3)),
+        projections: vec![MirProjection::Index(MirOperand::Constant(
+            MirConstant::Int(0),
+        ))],
+    };
+    let typed_local = |id: u32, ty: MirType| MirLocal {
         id: MirLocalId(id),
         name: None,
-        ty: scalar,
+        ty,
         mutable: true,
         span,
     };
+    let local = |id: u32| typed_local(id, scalar);
     let param = |id: u32, mode: MirParamMode| MirParam {
         local: MirLocalId(id),
         name: None,
@@ -51,15 +61,37 @@ fn kernel_program(types: &TypeTable) -> MirProgram {
         span,
     };
     let mut program = MirProgram::new();
-    // f0: the caller, with three locals holding the call's arguments.
+    // f0: the caller, with three locals holding the call's arguments and one
+    // tuple local holding the companion's returned pair.
     program.functions.push(MirFunction {
         id: MirFunctionId(0),
         source: None,
         name: None,
         params: vec![],
-        locals: vec![local(0), local(1), local(2)],
+        locals: vec![local(0), local(1), local(2), typed_local(3, tuple)],
         temps: vec![],
-        blocks: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                // The dispatched companion's tuple return binds to the
+                // destination local, exactly as a host call's value would.
+                kind: MirStatementKind::Call {
+                    destination: Some(MirPlace::local(MirLocalId(3))),
+                    callee: MirCallee::Function(MirFunctionId(2)),
+                    args: vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                    ],
+                },
+                span,
+            }],
+            // The entry returns element 0 of the bound tuple.
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(tuple_element))),
+                span,
+            },
+            span,
+        }],
         return_ty: vacuum,
         error_ty: None,
         is_async: false,
@@ -88,7 +120,32 @@ fn kernel_program(types: &TypeTable) -> MirProgram {
         shader_stage: Some(radix_mir::MirKernelShaderStage::Compute),
         span,
     });
+    // f2: the device-resident companion — compute-stage, two scalar
+    // parameters, and a tuple return. It has no blocks either: a passing call
+    // proves only that the dispatcher ran and its tuple reached the caller.
+    program.functions.push(MirFunction {
+        id: MirFunctionId(2),
+        source: None,
+        name: None,
+        params: vec![param(6, MirParamMode::Owned), param(7, MirParamMode::Owned)],
+        locals: vec![local(6), local(7)],
+        temps: vec![],
+        blocks: vec![],
+        return_ty: tuple,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(radix_mir::MirKernelShaderStage::Compute),
+        span,
+    });
     program
+}
+
+/// Seed the caller's two argument locals.
+fn seed_callsite(runner: &mut Runner<'_, BufferHost>) {
+    let frame = runner.frames.last_mut().expect("caller frame");
+    frame.seed_local(MirLocalId(0), Value::Int(3));
+    frame.seed_local(MirLocalId(1), Value::Int(5));
 }
 
 fn place_args() -> Vec<MirOperand> {
@@ -99,9 +156,9 @@ fn place_args() -> Vec<MirOperand> {
 
 #[test]
 fn kernel_dispatch_reaches_the_dispatcher_and_writes_back() {
-    let types = TypeTable::new();
+    let mut types = TypeTable::new();
     let interner = Interner::new();
-    let program = kernel_program(&types);
+    let program = kernel_program(&mut types);
     let context = MirValidationContext::new(&types);
     let mut host = BufferHost::default();
     let recorder = Rc::new(RefCell::new(Recorder {
@@ -153,9 +210,9 @@ fn kernel_dispatch_reaches_the_dispatcher_and_writes_back() {
 
 #[test]
 fn kernel_dispatch_error_keeps_the_dispatcher_issue_code() {
-    let types = TypeTable::new();
+    let mut types = TypeTable::new();
     let interner = Interner::new();
-    let program = kernel_program(&types);
+    let program = kernel_program(&mut types);
     let context = MirValidationContext::new(&types);
     let mut host = BufferHost::default();
     let recorder = Rc::new(RefCell::new(Recorder {
@@ -189,9 +246,9 @@ fn kernel_dispatch_error_keeps_the_dispatcher_issue_code() {
 /// named refusal, never the arity mismatch the missing lane argument implies.
 #[test]
 fn refused_lane_form_kernel_call_is_the_named_refusal_not_an_arity_error() {
-    let types = TypeTable::new();
+    let mut types = TypeTable::new();
     let interner = Interner::new();
-    let mut program = kernel_program(&types);
+    let mut program = kernel_program(&mut types);
     let scalar = MirType::semantic(types.primitive(Primitive::Numerus));
     let span = Span::default();
     program.functions[1].params.push(MirParam {
@@ -225,6 +282,66 @@ fn refused_lane_form_kernel_call_is_the_named_refusal_not_an_arity_error() {
     assert_eq!(error.issue, RUNNER_KERNEL_REFUSED_ISSUE);
     // The whole diagnostic (message hint included) is the refusal constructor's
     // own value; no prose is re-spelled here.
+    assert_eq!(error, kernel_refused(error.span));
+}
+
+/// GT12 done_when 1, runner half: a device-resident companion's tuple return
+/// binds at the call site, so the projection that reads element 0 sees the
+/// dispatcher's value. Under `Refuse` the same call stays explicit.
+#[test]
+fn dispatched_companion_tuple_binds_at_call_site() {
+    let mut types = TypeTable::new();
+    let program = kernel_program(&mut types);
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let recorder = Rc::new(RefCell::new(Recorder {
+        calls: Vec::new(),
+        result: Ok(Some(Value::Tuple(vec![
+            Value::Float(1.5),
+            Value::Float(2.5),
+        ]))),
+    }));
+    {
+        let mut host = BufferHost::default();
+        let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+        runner.kernel_policy = RunnerKernelPolicy::Dispatch;
+        runner.kernel_dispatcher = Some(recorder.clone() as kernel_dispatch::ResidencyHook);
+        runner.push_frame(MirFunctionId(0), MirBlockId(0));
+        seed_callsite(&mut runner);
+        runner.run_until_depth(0);
+        assert!(
+            runner.errors.is_empty(),
+            "dispatch run failed: {:?}",
+            runner.errors
+        );
+        // (b) the dispatched tuple bound at the call site: the entry's
+        // projection of element 0 is what the run returned.
+        assert_eq!(runner.return_value.take(), Some(Value::Float(1.5)));
+    }
+    // (a) the dispatcher saw the companion's id and its evaluated arguments.
+    assert_eq!(recorder.borrow().calls.len(), 1);
+    assert_eq!(recorder.borrow().calls[0].0, MirFunctionId(2));
+    assert_eq!(
+        recorder.borrow().calls[0].1,
+        vec![Value::Int(3), Value::Int(5)]
+    );
+
+    // Reference-only execution stays explicit: under `Refuse` the same call is
+    // the named refusal, never a silent host interpretation of the device body.
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    assert_eq!(runner.kernel_policy, RunnerKernelPolicy::Refuse);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    seed_callsite(&mut runner);
+    runner.run_until_depth(0);
+    let error = runner
+        .errors
+        .first()
+        .expect("refused call must fail")
+        .clone();
+    assert_eq!(error.issue, RUNNER_KERNEL_REFUSED_ISSUE);
+    // The whole diagnostic is the refusal constructor's own value; no prose is
+    // re-spelled here.
     assert_eq!(error, kernel_refused(error.span));
 }
 
