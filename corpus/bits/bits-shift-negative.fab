@@ -1,0 +1,47 @@
++++
+term = "bits"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A negative shift count is a run-time error; the run ends on it at every width."
+syntax = "a ⇐ n with n < 0 — run error"
+related = ["bits"]
+locale = "en"
++++
+# =============================================================================
+# bits — A negative shift count is a run-time error
+# =============================================================================
+#
+# What this teaches:
+#   • The shift count is checked when it is used, not wrapped or masked
+#   • A negative count ends the run with `negative shift count` (exit 1)
+#   • The program prints everything before the shift and nothing after
+#   • Width does not matter: b16, b32 and b64 die the same way as b8
+#     (audit-verified on the runner)
+#   • A *literal* negative count never reaches run time — it is the compile
+#     reject bits-shift-negative-reject
+#
+# Common mistakes:
+#   • expecting a negative count to shift back the other way
+#   • expecting the trap to be recoverable — the run ends on it
+#   • confusing it with a bN count, which is a different (compile) reject
+#
+# See also: bits-operations, bits-order
+# =============================================================================
+
+# bits-shift-negative — the count is a run-time value, and it is checked
+#
+# POLICY:
+#   A bN shift whose count is negative aborts the run with
+#   `negative shift count`. The count is not wrapped into range and the run is
+#   not silently truncated. An `int` variable is the legal shape: the reject
+#   for a literal negative count is the compile-time one
+#   (bits-shift-negative-reject), not this trap.
+
+main {
+    let b8 a ← 0xf3
+    let int n ← 0 - 1
+    print "before"
+    print a ⇐ n
+}
