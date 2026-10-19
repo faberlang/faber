@@ -2915,6 +2915,7 @@ impl FunctionLower<'_, '_> {
                             MirMathFunction::Log10 => 2,
                             MirMathFunction::Sin => 3,
                             MirMathFunction::Cos => 4,
+                            MirMathFunction::Cbrt => 6,
                             _ => 5,
                         };
                         let code = self.builder.ins().iconst(types::I32, code);

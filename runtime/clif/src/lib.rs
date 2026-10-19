@@ -2012,7 +2012,7 @@ pub unsafe extern "C" fn __faber_clif_v1_set_subset(
 }
 
 /// Scalar math the instruction set lacks: 0 exp, 1 ln, 2 log10, 3 sin,
-/// 4 cos, 5 tan (the same libm calls the runner makes).
+/// 4 cos, 5 tan, 6 cbrt (the same libm calls the runner makes).
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
     match op {
@@ -2021,6 +2021,7 @@ pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
         2 => value.log10(),
         3 => value.sin(),
         4 => value.cos(),
+        6 => value.cbrt(),
         _ => value.tan(),
     }
 }
@@ -2620,6 +2621,13 @@ pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const 
 #[cfg(test)]
 mod runtime_perf_tests {
     use super::*;
+
+    #[test]
+    fn math_f64_code_6_is_the_real_cube_root() {
+        assert_eq!(__faber_clif_v1_math_f64(6, -8.0), -2.0);
+        assert_eq!(__faber_clif_v1_math_f64(6, 8.0), 2.0);
+        assert!(__faber_clif_v1_math_f64(6, -0.0).is_sign_negative());
+    }
 
     #[test]
     fn text_concat_and_integer_text_keep_exact_bytes() {
