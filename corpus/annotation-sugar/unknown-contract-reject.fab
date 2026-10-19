@@ -1,0 +1,35 @@
++++
+term = "annotation-sugar"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "functio_decl", "param_list", "return_clause", "type_annotation", "base_type", "qualified_type", "annotation", "annotation_name", "braced_annotation", "annotation_field_list", "annotation_field", "block_stmt", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "call_expr", "call_suffix", "argument_list", "argument", "literal"]
+category = "availability"
+summary = "A braced annotation must name a compiler family or a registered contract genus."
+syntax = "@ bogus { a = 1 }"
+related = ["annotatio", "annotation-sugar"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM018:annotatio_unknown_contract"
++++
+# =============================================================================
+# annotation-sugar — an unknown braced annotation family is refused
+# =============================================================================
+#
+# What this teaches:
+#   • A braced annotation family is either compiler-owned (`@ cli`, `@ optio`,
+#     `@ futura`, …) or a genus marked `@ annotatio`
+#   • Any other name is not resolved as a contract, so the application fails
+#
+# Common mistakes:
+#   • inventing a braced family that no `@ annotatio` genus declares (SEM018)
+#
+# See also: annotatio, annotation-sugar
+# =============================================================================
+
+@ bogus { a = 1 }
+fn f() → int {
+    return 1
+}
+
+main {
+    print f()
+}

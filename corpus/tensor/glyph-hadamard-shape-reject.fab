@@ -1,0 +1,34 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Glyph ⊙ requires identical operand shapes; it never stretches to broadcast."
+syntax = "<tensor expression> ⊙ <tensor expression>"
+related = ["tensor", "⊙", "glyph-elementwise"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:glyph_hadamard_shapes_mismatch"
++++
+
+# =============================================================================
+# ⊙ — differing operand shapes are a named decline.
+# =============================================================================
+#
+# What this teaches:
+#   • `⊙` is pairwise elementwise: every lane of the left operand meets the
+#     lane at the same index on the right.
+#   • When the shapes differ there is no such lane, and no broadcast stretch is
+#     implied. Align the shapes at the source instead.
+#
+# See also: tensor, ⊙, glyph-elementwise
+# =============================================================================
+
+# ⊙ over [2] and [3]: Hadamard has no broadcast stretch.
+main {
+    let tf32[2] a ← [1.0, 2.0] ↦ tf32[2]
+    let tf32[3] b ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[2] h ← a ⊙ b
+    print h.flatten()
+}

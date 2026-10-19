@@ -1,0 +1,40 @@
++++
+term = "⇇"
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "On the host a ⇇ may target a genus (class) field of a writable root, not only a local or a parameter."
+syntax = "<writable root>.<genus field> ⇇ <tensor>"
+related = ["tensor", "⇇"]
+locale = "en"
++++
+# =============================================================================
+# ⇇ — a genus (class) field is writable tensor storage (E17).
+# =============================================================================
+#
+# What this teaches:
+#   • a field of a writable root is a legal copy-into target, the same as a
+#     `mut` local or a `mut` parameter; `b.data ⇇ s` writes into the storage
+#     the field already owns
+#   • the field is declared `mut` in the genus body — genus fields take
+#     `let` (read-only) or `mut` (writable), never the retired `var`
+#   • the field initializer keeps `=`: `Box { data = … }` is construction,
+#     not a binding
+#
+# See also: ⇇, tensor
+# =============================================================================
+
+# EXPECTED stdout:
+#   [5.0, 6.0]
+
+class Box {
+    mut tf32[2] data
+}
+
+main {
+    mut Box b ← Box { data = [1.0, 2.0] ↦ tf32[2] }
+    let tf32[2] s ← [5.0, 6.0] ↦ tf32[2]
+    b.data ⇇ s
+    print b.data.flatten()
+}

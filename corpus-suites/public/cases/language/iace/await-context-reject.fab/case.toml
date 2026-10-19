@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/iace/await-context-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "iace/await-context-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "await_bind_requires_async_context"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "await_bind_requires_async_context"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "await_bind_requires_async_context"

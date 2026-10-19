@@ -1,0 +1,33 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Glyph ⊙ and ⊘ refuse a scalar operand: scale with `*` and `/` instead."
+syntax = "<tensor expression> ⊙ <scalar expression>"
+related = ["tensor", "⊙", "⊘", "glyph-elementwise"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:glyph_scalar_operand"
++++
+
+# =============================================================================
+# ⊙ — a scalar operand is a named decline.
+# =============================================================================
+#
+# What this teaches:
+#   • `⊙` and `⊘` are elementwise operators over two shaped operands of the
+#     same shape; a scalar has no shape, so the pair is refused by name.
+#   • Scaling by a scalar keeps its own spelling: `*` and `/` on a tensor.
+#
+# See also: tensor, ⊙, ⊘, glyph-elementwise
+# =============================================================================
+
+# ⊙ with a scalar right operand: shaped-by-scalar is a named decline.
+main {
+    let list<f32> l ← [1.0, 2.0]
+    let tf32[2] a ← l ↦ tf32[2]
+    let tf32[2] scaled ← a ⊙ 2.0
+    print scaled.flatten()
+}

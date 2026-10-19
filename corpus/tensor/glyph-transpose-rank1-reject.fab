@@ -1,0 +1,32 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Postfix ᵀ refuses a rank-1 tensor: there is no row/column distinction to swap."
+syntax = "<rank-1 tensor expression>ᵀ"
+related = ["tensor", "ᵀ", "glyph-transpose"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:glyph_transpose_rank1_no_row_column_distinction"
++++
+
+# =============================================================================
+# ᵀ — rank-1 transpose is a named decline.
+# =============================================================================
+#
+# What this teaches:
+#   • `ᵀ` swaps the row and column axes of a rank-2 tensor only.
+#   • A rank-1 tensor has one axis and no row/column distinction, so the
+#     postfix refuses it by name instead of guessing an identity transpose.
+#
+# See also: tensor, ᵀ, glyph-transpose
+# =============================================================================
+
+# ᵀ on a rank-1 tensor: no row/column distinction to swap.
+main {
+    let tf32[3] a ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[3] t ← aᵀ.materialize()
+    print t.flatten()
+}
