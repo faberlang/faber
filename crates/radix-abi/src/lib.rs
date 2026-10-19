@@ -360,6 +360,7 @@ abi_string_family! {
         // semantics).
         SYMBOL_CURSOR_STREAM = "__faber_rt_v1_cursor_stream",
         SYMBOL_INTERVAL_NEW = "__faber_rt_v1_interval_new",
+        SYMBOL_INTERVAL_NEW_STEPPED = "__faber_rt_v1_interval_new_stepped",
         SYMBOL_INTERVAL_INTERSECT = "__faber_rt_v1_interval_intersect",
         SYMBOL_INTERVAL_UNION = "__faber_rt_v1_interval_union",
         SYMBOL_INTERVAL_LENGTH = "__faber_rt_v1_interval_length",
