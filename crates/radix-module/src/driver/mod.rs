@@ -5146,6 +5146,11 @@ mod rope_norm_intrinsic_tests;
 mod rope_half_intrinsic_tests;
 
 #[cfg(test)]
+#[cfg(feature = "mir-metal")]
+#[path = "rope_half_metal_reachability_test.rs"]
+mod rope_half_metal_reachability_tests;
+
+#[cfg(test)]
 #[cfg(feature = "device")]
 #[path = "causal_softmax_intrinsic_test.rs"]
 mod causal_softmax_intrinsic_tests;
