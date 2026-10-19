@@ -72,6 +72,11 @@ pub fn lint(
     locale_pack: Option<&LocalePack>,
 ) -> Vec<SemanticError> {
     let mut ctx = LintContext::new(resolver, types, interner, locale_pack);
+    // A program bound to a target by a target-native import holds foreign
+    // values as inferred `ignotum`: that is the design, not an annotation.
+    ctx.target_bound = hir.items.iter().any(|item| {
+        matches!(&item.kind, radix_hir::HirItemKind::Import(import) if import.target.is_some())
+    });
     ctx.mutating_methods = method_receiver_mutation::collect(hir, types, interner);
     ctx.collect_items(hir);
     ctx.mark_type_extent_uses();
@@ -127,6 +132,8 @@ fn value_literal_spellings(locale_pack: Option<&LocalePack>) -> FxHashSet<String
 }
 
 struct LintContext<'a> {
+    /// Whether the module has a target-native import.
+    target_bound: bool,
     resolver: &'a Resolver,
     /// Read-only semantic type facts for lints that need more than identity,
     /// such as redundant casts and explicit `ignotum` annotations.
@@ -176,6 +183,7 @@ impl<'a> LintContext<'a> {
         }
         let value_literal_spellings = value_literal_spellings(locale_pack);
         Self {
+            target_bound: false,
             resolver,
             types,
             interner,
@@ -526,7 +534,7 @@ impl<'a> LintContext<'a> {
     }
 
     fn warn_on_explicit_ignotum(&mut self, ty: crate::TypeId, span: Span) {
-        if matches!(self.types.get(ty), Type::Primitive(Primitive::Ignotum)) {
+        if !self.target_bound && matches!(self.types.get(ty), Type::Primitive(Primitive::Ignotum)) {
             self.warnings.push((
                 WarningKind::ExplicitIgnotumAnnotation,
                 ISSUE_EXPLICIT_IGNOTUM_ANNOTATION,
