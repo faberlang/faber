@@ -1,0 +1,37 @@
++++
+term = "bits"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A scalar bits conversion keeps the width: b8 ↦ b16 is refused."
+syntax = "a ↦ b16 on a b8 — rejected"
+related = ["bits", "↦"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM016:bits_conversion_width_mismatch"
++++
+# =============================================================================
+# bits — A scalar bits conversion keeps the width: b8 ↦ b16 is refused.
+# =============================================================================
+#
+# What this teaches:
+#   • a scalar bits conversion keeps the width: b8 ↦ b8, b16 ↦ b16, and so on
+#   • any other width is a compile error, refused by name before emission
+#
+# Common mistakes:
+#   • expecting `↦` to widen or narrow a bits value — it cannot; there is no
+#     width-changing bits conversion
+#
+# See also: bits-operations, bits-literals
+# =============================================================================
+
+# bits reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let b8 a ← 0xf3
+    let b16 w ← a ↦ b16
+    print w
+}
