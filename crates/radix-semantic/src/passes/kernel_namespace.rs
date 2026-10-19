@@ -26,6 +26,9 @@ pub fn validate_kernel_imports(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let path = interner.resolve(decl.path);
         if !is_kernel_import_path(path) {
             continue;
