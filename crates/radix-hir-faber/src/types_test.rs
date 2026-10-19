@@ -2543,6 +2543,114 @@ fn copy_into_glyph_is_locale_invariant() {
         code.contains("⇇"),
         "localized copy-into output must keep the U+21C7 glyph, got:\n{code}"
     );
+
+    // `⇜` is the same kind of token: sink-into keeps its glyph too.
+    let mut interner = Interner::new();
+    let program = sink_into_program(&mut interner);
+    let code = FaberCodegen::new(&types, &interner)
+        .generate(&program, &empty_presentation(), &LocaleSurface)
+        .expect("codegen")
+        .code;
+    assert!(
+        code.contains("⇜"),
+        "localized sink-into output must keep the U+21DD glyph, got:\n{code}"
+    );
+}
+
+// ── ⇜ sink-into re-emission ───────────────────────────────────────────
+
+/// One function whose body is the operator form `s ⇜ "x"`. The function is
+/// named for the sink so the re-emitted statement reads exactly as authored.
+fn sink_into_program(interner: &mut Interner) -> HirModule {
+    let s = interner.intern("s");
+    let x = interner.intern("x");
+    let transfer = HirExpression {
+        id: HirId(3),
+        ty: None,
+        kind: HirExpressionKind::SinkInto {
+            sink: Box::new(HirExpression {
+                id: HirId(1),
+                ty: None,
+                kind: HirExpressionKind::Path(DefId(radix_types::USER_DEF_ID_BASE)),
+                span: span(),
+            }),
+            item: Box::new(HirExpression {
+                id: HirId(2),
+                ty: None,
+                kind: HirExpressionKind::Literal(HirLiteral::String(x)),
+                span: span(),
+            }),
+        },
+        span: span(),
+    };
+
+    let function = HirFunction {
+        cli_args: None,
+        name: s,
+        type_params: Vec::new(),
+        params: Vec::new(),
+        ret_ty: None,
+        err_ty: None,
+        body: Some(HirBlock {
+            statements: vec![HirStatement {
+                id: HirId(5),
+                kind: HirStatementKind::Expr(transfer),
+                span: span(),
+            }],
+            expr: None,
+            span: span(),
+            ..Default::default()
+        }),
+        posture: radix_syntax::CallablePosture::SyncFinite,
+        is_async: false,
+        is_generator: false,
+        is_kernel: false,
+        nucleum_fragment: false,
+        is_vertex: false,
+        is_fragment: false,
+        test: None,
+    };
+
+    HirModule {
+        items: vec![HirItem {
+            annotations: Vec::new(),
+            id: HirId(0),
+            def_id: DefId(radix_types::USER_DEF_ID_BASE),
+            kind: HirItemKind::Function(Box::new(function)),
+            span: span(),
+        }],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+#[test]
+fn sink_into_round_trip() {
+    // `s ⇜ "x"` re-emits as the same spaced statement under both reader
+    // surfaces: the glyph is an operator token, so neither surface respells it
+    // and the formatter keeps one space on each side.
+    let mut interner = Interner::new();
+    let program = sink_into_program(&mut interner);
+    let types = TypeTable::new();
+
+    let en = FaberCodegen::new(&types, &interner)
+        .generate(&program, &empty_presentation(), &LocaleSurface)
+        .expect("codegen")
+        .code;
+    let la = FaberCodegen::new(&types, &interner)
+        .generate(&program, &empty_presentation(), &LatinSurface)
+        .expect("codegen")
+        .code;
+
+    for (surface, code) in [("en", &en), ("la", &la)] {
+        assert!(
+            code.contains(r#"s ⇜ "x""#),
+            "sink-into must re-emit one spaced `sink ⇜ item` on the {surface} surface, got:\n{code}"
+        );
+    }
+    assert_eq!(en, la, "the glyph statement is locale-invariant");
 }
 
 // ── Bounded type + marker-hole surface routing ─────────────────────────
