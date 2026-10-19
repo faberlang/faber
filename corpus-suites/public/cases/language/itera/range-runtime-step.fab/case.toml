@@ -1,0 +1,18 @@
+version = 1
+id = "corpus/itera/range-runtime-step.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/range-runtime-step.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "range step must be positive"
+check_only = false
