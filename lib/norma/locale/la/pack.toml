@@ -1535,6 +1535,44 @@ kind = "method"
 canonical = "close"
 surface = "claude"
 
+# Sinking contract. `sink` → `immerge` is the operator ruling of 2026-10-17;
+# `flush` → `elue` (eluere, to flush out) is PROPOSAL (unreviewed): a later
+# operator ruling may replace the elue rows.
+
+[[library_members]]
+provider = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "sink"
+surface = "immerge"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "sink"
+surface = "immerge"
+
+[[library_members]]
+provider = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "flush"
+surface = "elue"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "flush"
+surface = "elue"
+
 [[library_members]]
 provider = "norma"
 module_path = ["toml"]

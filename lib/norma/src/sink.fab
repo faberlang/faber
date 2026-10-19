@@ -1,0 +1,34 @@
++++
+locale = "en"
++++
+
+# sink.fab - Sinking contract
+#
+# `Sink<T>` is the one sinking contract (English name per D1.5). A type opts
+# in by naming itself: `class Box implements Sink<string>`.
+#
+# Each sink type decides what adding one item means: a list appends, a set
+# adds the item if it is absent, a stream writes it.
+#
+# The compiler recognizes this contract by the `@ radix contract "sinking"`
+# mark (never by its name) and adds what a plain contract cannot:
+# - `s ⇜ x` is the operator form of `s.sink(x)`; it dies on a failed write
+#   while `s.sink(x)` reports, so methods check and operators die;
+# - the item must be exactly the sink's `T` — there is no implicit
+#   conversion (`console.out ⇜ "§"(n)`, never `console.out ⇜ n`);
+# - a sink writes exactly what it is given: no sink adds a newline or any
+#   other framing.
+#
+# Tensors, vectors and matrices are not sinks; `⇇` stays their write.
+#
+# A channel's send view (`s.send<T>()`) implements `Sink<T>`, so
+# `m ⇜ "ping"` writes through the channel.
+
+import from "norma:fault" fault
+
+@ public
+@ radix contract "sinking"
+interface Sink<T> {
+    fn sink(T item) → void ⇥ fault.IoFault
+    fn flush() → void ⇥ fault.IoFault
+}
