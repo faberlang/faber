@@ -1354,7 +1354,7 @@ payloads and ends them with declaration-boundary heuristics rather than `NEWLINE
 Those are implementation mismatches with this specification, not alternate
 language rules.
 
-**Annotation contracts:** `@ annotatio` (optionally `@ annotatio { target = 函式 }`)
+**Annotation contracts:** `@ annotation` (la `@ annotatio`; optionally `@ annotation { target = fn }`)
 marks a top-level `類型` as a compile-time annotation contract. Ordinary genera
 are not annotation schemas. Applications use `@ ContractName { field = constant }`
 and resolve through local declarations or imported file-interface exports.
@@ -2992,7 +2992,10 @@ ordinary postfix `conversio` materializes the resulting conversation handle.
 - Types: compiler-owned `scrinium`, `status`; opaque `sermo` conversation handle.
 - English reader spellings: `sermo` is `channel`, `scrinium` is `frame`, and
   the views `meus<T>` / `tuus<T>` are `send<T>` / `recv<T>` (`s.send<T>()`,
-  `s.recv<T>()`). The Latin spellings are unchanged.
+  `s.recv<T>()`), and the view methods `fini` / `accipe` / `exhauri` are
+  `finish` / `get` / `drain` (`cursor` and `da` keep their spelling). An en file
+  uses the English spellings only; the Latin ones are `unknown_method` there, and
+  a `la` file uses the Latin ones only.
 - `sermo ↦ T` materializes inbound frames into one value of type `T` using
   the type-directed collector for `T`.
 - **`sermo<O, R>` (D6.11, D6.12).** A conversation carries its types: `O` is

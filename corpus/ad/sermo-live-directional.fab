@@ -13,11 +13,11 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Directional sermo views — `meus<T>` for outbound frames, `tuus<T>` for
-#     inbound frames on a sermo connection
+#   • Directional sermo views — `send<T>` (explain term `meus`) for outbound
+#     frames, `recv<T>` (`tuus`) for inbound frames on a sermo connection
 #   • Cursor iteration — `itera ex t.cursor()` consumes inbound frames
-#   • Accipe reception — `accipe()` pulls a single scrinium from the inbound
-#     queue
+#   • Single reception — `get()` (explain term `accipe`) pulls a single
+#     scrinium from the inbound queue
 #
 # Common mistakes:
 #   • confusing `meus` (outbound) and `tuus` (inbound) sermo directional views, or mixing accipe/cursor/exhauri without intentional ordered consumption
@@ -25,26 +25,26 @@ locale = "en"
 # See also: ad, sermo, tuus, scrinium, cursor, accipe
 # =============================================================================
 
-# Live `meus<T>` / `tuus<T>` directional views
+# Live `send<T>` / `recv<T>` directional views
 #
 # runtime:echo returns one inbound textus frame per conversation.
-# accipe, cursor, and exhauri may share one tuus queue; mix them only when
+# get, cursor, and drain may share one recv queue; mix them only when
 # ordered consumption is intentional.
 
 main {
     let channel s ← call 'runtime:echo' ("salve")
-    let send<string> m ← s.meus<string>()
+    let send<string> m ← s.send<string>()
     m.da("ping")
-    let status outbound ← m.fini()
-    let recv<string> t ← s.tuus<string>()
+    let status outbound ← m.finish()
+    let recv<string> t ← s.recv<string>()
     for from t.cursor() let frame {
         assert frame.data ≡ "salve"
     }
-    let status inbound ← t.fini()
+    let status inbound ← t.finish()
     let channel s2 ← call 'runtime:echo' ("salve")
-    let recv<string> t2 ← s2.tuus<string>()
-    let frame<string> ∪ none got ← t2.accipe()
-    let status accipe_done ← t2.fini()
+    let recv<string> t2 ← s2.recv<string>()
+    let frame<string> ∪ none got ← t2.get()
+    let status accipe_done ← t2.finish()
     print outbound
     print inbound
     print got?.data

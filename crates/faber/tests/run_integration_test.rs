@@ -1641,7 +1641,7 @@ fn run_cli_mounted_command_executes_without_cargo_or_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -1684,7 +1684,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option verbose long "verbose" type bool global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -1731,7 +1731,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ option name long "name" type string global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -1778,7 +1778,7 @@ import from "./jobs" * as jobs
 
 @ cli "tool"
 @ operand string tenant global
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -1826,7 +1826,7 @@ fn run_cli_mounted_text_operand_executes_without_cargo_or_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -1873,7 +1873,7 @@ fn run_cli_mounted_numerus_operand_executes_without_cargo_or_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -1920,7 +1920,7 @@ fn run_cli_mounted_defaulted_option_executes_without_cargo_or_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )
@@ -1967,7 +1967,7 @@ fn run_cli_mounted_alias_text_operand_executes_without_cargo_or_rust_emit() {
 import from "./jobs" * as jobs
 
 @ cli "tool"
-@ imperia "jobs" ex jobs
+@ commands "jobs" ex jobs
 main args args {}
 "#,
     )

@@ -10,6 +10,7 @@ publish = false
 radix-codegen-shared = { path = "../radix-codegen-shared" }
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
+radix-intrinsics = { path = "../radix-intrinsics" }
 radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
 radix-semantic = { path = "../radix-semantic" }
