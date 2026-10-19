@@ -5167,6 +5167,53 @@ fn tensor_view_composition_keeps_storage_until_materialize() {
 }
 
 #[test]
+fn tensor_slice_nd_dropped_axis_view_shares_storage() {
+    let base = tensor_value((0..12).map(Value::Int).collect(), vec![4, 3]);
+    let lista = |values: Vec<Value>| Value::Array(Rc::new(RefCell::new(values)));
+    let result = eval_tensor_view_op(
+        MirCollectionOp::TensorSliceNd,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+            MirOperand::Value(MirValueId(2)),
+            MirOperand::Value(MirValueId(3)),
+            MirOperand::Value(MirValueId(4)),
+            MirOperand::Value(MirValueId(5)),
+        ],
+        vec![
+            (MirValueId(0), base.clone()),
+            (MirValueId(1), lista(vec![Value::Int(1), Value::Int(1)])),
+            (MirValueId(2), lista(vec![Value::Int(4), Value::Int(1)])),
+            (MirValueId(3), lista(vec![Value::Int(1), Value::Int(1)])),
+            (
+                MirValueId(4),
+                lista(vec![Value::Bool(true), Value::Bool(false)]),
+            ),
+            (
+                MirValueId(5),
+                lista(vec![Value::Bool(false), Value::Bool(false)]),
+            ),
+        ],
+    )
+    .expect("strided nd slice view");
+    let Value::Tensor(base_cell) = &base else {
+        unreachable!();
+    };
+    let Value::Tensor(view_cell) = &result else {
+        panic!("expected tensor view");
+    };
+    let view = view_cell.borrow();
+    assert!(Arc::ptr_eq(&view.data, &base_cell.borrow().data));
+    assert_eq!(view.shape, vec![3]);
+    assert_eq!(view.strides, vec![3]);
+    assert_eq!(view.offset, 4);
+    assert_eq!(
+        view.logical_values().expect("valid tensor layout"),
+        vec![Value::Int(4), Value::Int(7), Value::Int(10)]
+    );
+}
+
+#[test]
 fn tensor_expand_uses_shared_storage_and_rightmost_exact_axis_tie() {
     let source = tensor_value(
         vec![Value::Int(10), Value::Int(20), Value::Int(30)],
