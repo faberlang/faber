@@ -1195,7 +1195,13 @@ nomen_field := 'nomen' '=' IDENTIFIER
 ut_field := 'ut' '=' IDENTIFIER
 omnia_field := 'omnia' '=' IDENTIFIER
 
-importa_sugar    := 'importa' 'ex' STRING publica? (named_import | wildcard_import | selective_import)?
+# A target-native import (`import python "math" m`) puts a target CLI name where
+# `ex` stands. The word is contextual to this slot and never translated; an
+# unknown word is `import_target_unknown` (with a did-you-mean over the target
+# names), and the binding is required (`import_target_binding_required`). The
+# string is the target's own module specifier, copied verbatim.
+importa_sugar    := 'importa' ('ex' | import_target) STRING publica? (named_import | wildcard_import | selective_import)?
+import_target    := IDENTIFIER
 publica    := 'publica'
 named_import   := IDENTIFIER ('ut' IDENTIFIER)?
 wildcard_import := '*' 'ut' IDENTIFIER

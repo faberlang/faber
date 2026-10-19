@@ -677,6 +677,28 @@ fn union_alias_annotation_survives_the_fhir_round_trip() {
 }
 
 #[test]
+fn transparent_generic_alias_annotation_survives_the_fhir_round_trip() {
+    // `type Pairs<T> = list<T>` applied as `Pairs<int>` is a transparent
+    // generic alias. The authored `Named` head keeps its type arguments while
+    // the alias-to-body fact is the witness, so the artifact must load.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/typus/generic-alias.fab");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "generic-alias.fab", source, AnalyzeRequest::default())
+        .expect("generic alias fixture analyzes");
+    let artifact = from_analyzed(&original, "generic-alias", "generic-alias.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize generic alias artifact");
+    load_fhir(&bytes).expect("generic alias artifact must load");
+}
+
+#[test]
 fn genus_union_alias_survives_the_fhir_round_trip() {
     // `type Figura = Circulus ∪ Quadratum` is a transparent alias whose
     // annotation finalizes to a union of genus types at the HIR site. The

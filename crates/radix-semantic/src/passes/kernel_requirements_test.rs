@@ -1147,3 +1147,40 @@ fn control_kernel(i32 j, i32 k) → i32 {
         control.failures
     );
 }
+
+#[test]
+fn lane_quotient_by_a_positive_size_class_parameter_is_provable() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn base_of<size H>(tensor<f32, [H]> dom, mut tensor<i32, [H]> out, i32 group) → void {
+    for from dom at [h] thread lane let e {
+        let i32 g ← group
+        let i32 b ← h / g
+        out[[h]] ← b
+    }
+}
+main {}
+",
+    );
+    let row = target_row(&fixture, "base_of", Target::MirWgsl);
+    for failure in &row.failures {
+        assert!(
+            !matches!(
+                failure,
+                KernelRequirementFailure::DivideByZeroPossible { .. }
+                    | KernelRequirementFailure::UnsupportedIntegerRange { .. }
+                    | KernelRequirementFailure::OptionFRequired { .. }
+            ),
+            "lane-coordinate quotient must be proven: {failure:?}"
+        );
+    }
+    assert!(
+        row.extent_conditions
+            .iter()
+            .any(|condition| matches!(condition.range.minimum, KernelRangeExpr::Parameter(_))),
+        "the quotient pushes a launch-contract extent condition: {:?}",
+        row.extent_conditions
+    );
+}
