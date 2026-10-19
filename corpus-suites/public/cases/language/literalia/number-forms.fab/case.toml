@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/literalia/number-forms.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/number-forms.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
