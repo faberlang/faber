@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/probandum/probandum-body-end-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "probandum/probandum-body-end-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "probandum_body_end"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "probandum_body_end"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "probandum_body_end"

@@ -1,0 +1,23 @@
++++
+term = "test count modifier"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "proba_stmt", "block_stmt", "adfirma_stmt", "literal"]
+category = "testing"
+summary = "The repetition modifiers take an integer count; the block that follows is not a count."
+syntax = "proba <name> repete { … }"
+related = ["proba", "repete", "temporis", "fragilis"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:test_modifier_integer"
++++
+
+test "t" repeat {
+    assert true
+}
+
+# =============================================================================
+# test count modifier — `repete` / `temporis` / `fragilis` take an integer
+# =============================================================================
+# The repetition modifiers are followed by a decimal count, never by the test
+# block: `test "t" repete 3 { … }`. Omitting the count leaves the block where an
+# integer belongs.

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/probandum/test-modifier-integer-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "probandum/test-modifier-integer-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "test_modifier_integer"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "test_modifier_integer"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "test_modifier_integer"

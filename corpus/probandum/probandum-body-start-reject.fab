@@ -1,0 +1,23 @@
++++
+term = "probandum body start"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "probandum_decl", "probandum_body", "proba_stmt", "block_stmt", "adfirma_stmt"]
+category = "testing"
+summary = "The suite block opens right after the suite name; a test case belongs inside it, not before the opening brace."
+syntax = "probandum <name> proba <name> { … }"
+related = ["probandum", "proba"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:probandum_body_start"
++++
+
+describe "d" test "t" {
+    assert true
+}
+
+# =============================================================================
+# probandum body start — the opening brace follows the suite name
+# =============================================================================
+# A suite is `describe "name" { … }`: the body opens immediately after the name
+# (and any suite modifiers). A test case placed before the opening brace leaves
+# the suite without its block.
