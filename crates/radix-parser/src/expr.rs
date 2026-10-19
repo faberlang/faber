@@ -935,7 +935,7 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   unary := unary-op unary | postfix
-    ///   unary-op := '-' | '¬' | `non`
+    ///   unary-op := '-' | '¬' | `non` | '√' | '∛' | '∜'
     ///
     /// EDGE: `finge` is a unary-position variant constructor, not a prefix operator.
     fn parse_unary_inner(&mut self) -> Result<Expr, ParseError> {
@@ -946,6 +946,9 @@ impl Parser {
         let op = match self.peek().kind {
             TokenKind::Minus => Some(UnOp::Neg),
             TokenKind::BitwiseNot => Some(UnOp::BitNot),
+            TokenKind::RadicalSqrt => Some(UnOp::RadicalSqrt),
+            TokenKind::RadicalCbrt => Some(UnOp::RadicalCbrt),
+            TokenKind::RadicalFourth => Some(UnOp::RadicalFourth),
             _ if self.check_keyword_ident(TokenKind::Non) => Some(UnOp::Not),
             _ => None,
         };
@@ -1049,6 +1052,9 @@ impl Parser {
                 | TokenKind::Solum
                 | TokenKind::Minus
                 | TokenKind::BitwiseNot
+                | TokenKind::RadicalSqrt
+                | TokenKind::RadicalCbrt
+                | TokenKind::RadicalFourth
                 | TokenKind::FloorOpen
                 | TokenKind::CeilOpen
                 | TokenKind::Nulla

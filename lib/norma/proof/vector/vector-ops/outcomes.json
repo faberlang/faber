@@ -5,6 +5,18 @@
       "phase": "build",
       "diagnostic_contains": "cannot add `elem` to `elem`",
       "reason": "Rust emit lowers the norma:vector generic leaves to <elem> functions with no arithmetic trait bounds, so cargo rejects the generated crate with E0369 (cannot add `elem` to `elem`). The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
+    },
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced and the `norma:vector` genus is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
+    },
+    "clif": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "clif-policy",
+      "reason": "The clif package builder declines this case before any code is generated: the MIR capability classifier reports the `clif-policy` issue, so the `norma:vector` genus is never lowered. The clif lane carries no vector port for this family yet; re-measure this row when that port lands."
     }
   }
 }
