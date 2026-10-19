@@ -1,0 +1,37 @@
++++
+term = "elige duplicate case value"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "elige_stmt", "casu_elige_clause", "ceterum_clause", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = true
+summary = "A switch case value may be claimed once; a repeat is a duplicate literal."
+syntax = "switch d { case 1 { } case 1 { } default { } }"
+related = ["elige", "casu", "ceterum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM042:duplicate_literal"
++++
+# =============================================================================
+# elige duplicate case value — one value, one arm
+# =============================================================================
+# A switch arm answers for its case value, so a value can be claimed once.
+# This switch claims 1 twice, and the check reports SEM042 with the issue
+# duplicate_literal instead of silently keeping the first arm.
+
+fn classify(int d) → string {
+    switch d {
+        case 1 {
+            return "one"
+        }
+        case 1 {
+            return "again"
+        }
+        default {
+            return "other"
+        }
+    }
+}
+
+main {
+    print classify(1)
+}
