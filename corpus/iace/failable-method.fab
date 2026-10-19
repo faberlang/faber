@@ -1,0 +1,57 @@
++++
+term = "failable method"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "comparison", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt", "genus_decl", "genus_member", "field_decl", "inline_default"]
+category = "errors"
+canonical = false
+summary = "A class method declares its own ⇥ error channel; callers recover with catch or ⊥."
+syntax = "fn <name>(<params>) → <type> ⇥ <error-type> <block>  |  <call> ⊥ <default>"
+related = ["functio", "⇥", "fac", "cape", "iace"]
+locale = "en"
++++
+# =============================================================================
+# class method — A failable method and its two recovery forms
+# =============================================================================
+#
+# What this teaches:
+#   • A method on a class declares its own `⇥` error channel exactly like a
+#     free function: `fn withdraw(int n) → int ⇥ string`.
+#   • A caller recovers in one of two ways. `do { } catch err { }` handles the
+#     failure for a whole block of calls; `⊥ default` handles one call and
+#     yields the default instead. Both leave the program running.
+#   • The method can read and store its own fields (`self.bal`), and a failure
+#     stops the method at the `throw` — the store after it never happens.
+#
+# Common mistakes:
+#   • Calling a failable method with neither `catch` nor `⊥` — that is
+#     `failable_call_requires_handler`, unless the caller itself declares `⇥`.
+#   • Assuming the default side of `⊥` runs when the call succeeds. It is the
+#     failure value only; a successful call yields its own result.
+#
+# See also: functio, ⇥, fac, cape, iace
+# =============================================================================
+
+# failable method — a class method with its own ⇥ channel, recovered with
+# catch and with ⊥.
+#
+# EXPECTED OUTPUT:
+#   failable-method.expected — one line per print.
+
+class Acct {
+    mut int bal
+    fn withdraw(int n) → int ⇥ string {
+        if n ≻ self.bal then throw "insufficient"
+        self.bal ← self.bal - n
+        return self.bal
+    }
+}
+main {
+    mut Acct a ← Acct { bal = 10 }
+    do {
+        print a.withdraw(3)
+        print a.withdraw(30)
+    }
+    catch e { print "caught §"(e) }
+    print a.withdraw(1) ⊥ -1
+    print a.withdraw(99) ⊥ -1
+}
