@@ -1553,6 +1553,8 @@ pub enum MirSermoOp {
     ViewMeus,
     ViewTuus,
     Send,
+    /// meus.flush(): push any pending outbound frames and keep the conversation open (Finish stays the close).
+    Flush,
     Finish,
     /// `s.close()` (D8.3): close the handle; `bivalens` says whether this
     /// call closed it. A failure is kept for [`Self::CloseFailed`] and
@@ -1578,6 +1580,7 @@ impl MirSermoOp {
             Self::ViewMeus => "view_meus",
             Self::ViewTuus => "view_tuus",
             Self::Send => "send",
+            Self::Flush => "flush",
             Self::Finish => "finish",
             Self::Close => "close",
             Self::CloseFailed => "close_failed",

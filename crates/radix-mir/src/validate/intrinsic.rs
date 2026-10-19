@@ -791,6 +791,7 @@ impl Validator<'_, '_> {
             MirSermoOp::Send => 2,
             MirSermoOp::ViewMeus
             | MirSermoOp::ViewTuus
+            | MirSermoOp::Flush
             | MirSermoOp::Finish
             | MirSermoOp::Close
             | MirSermoOp::CloseFailed
@@ -815,7 +816,7 @@ impl Validator<'_, '_> {
                     );
                 }
             }
-            MirSermoOp::Send => {
+            MirSermoOp::Send | MirSermoOp::Flush => {
                 self.require_exact(
                     call.return_ty,
                     self.primitive(Primitive::Vacuum),
