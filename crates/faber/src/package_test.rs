@@ -14263,6 +14263,131 @@ main {
 
 #[cfg(feature = "device")]
 #[test]
+fn package_mir_runs_local_helper_backward_through_all_fmir_images() {
+    // GT01/E06: a backward-annotated function calling an unannotated local AIR
+    // helper generates an auto-named `__backward_callee_N` companion. Its name
+    // must survive the validated-context interner into every FMIR image format
+    // (source-built, text, binary), and the saved local-helper package must
+    // print the same numerical outputs as the inline model.
+    let dir = test_temp_dir("package-mir-local-helper");
+    fs::create_dir_all(dir.join("src")).expect("create source");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"[package]
+name = "local-helper"
+version = "0.1.0"
+edition = "2026"
+[paths]
+source = "src"
+entry = "main.fab"
+[build]
+target = "fmir"
+kind = "bin"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"+++
+locale = "en"
++++
+fn nil() → void { pass }
+
+@ radix { lane = "air" }
+@ radix backward "user_linear_backward"
+fn user_linear(tensor<f32, [2, 2]> x, tensor<f32, [2, 3]> w, tensor<f32, [3]> b, tensor<f32, [2, 3]> target) → f32 {
+    let _ y ← project_layer(x, w, b)
+    let _ r ← y - target
+    return (r ⊙ r).mean()
+}
+
+main {
+    let list<f32> x_data ← [1.0, 2.0, 3.0, 4.0]
+    let tensor<f32, [2, 2]> x ← x_data ↦ tensor<f32, [2, 2]>
+    let list<f32> w_data ← [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    let tensor<f32, [2, 3]> w ← w_data ↦ tensor<f32, [2, 3]>
+    let list<f32> b_data ← [0.1, -0.2, 0.3]
+    let tensor<f32, [3]> b ← b_data ↦ tensor<f32, [3]>
+    let list<f32> target_data ← [1.0, 0.0, 1.0, 0.0, 1.0, 0.0]
+    let tensor<f32, [2, 3]> target ← target_data ↦ tensor<f32, [2, 3]>
+    print user_linear(x, w, b, target)
+    let _ gs ← user_linear_backward(x, w, b, target, nil(), 1.0)
+    print gs[1] ↦ list<f32>
+    print gs[2] ↦ list<f32>
+}
+
+@ radix { lane = "air" }
+fn project_layer(tensor<f32, [2, 2]> x, tensor<f32, [2, 3]> w, tensor<f32, [3]> b) → tensor<f32, [2, 3]> {
+    return (x · w).added_bias(b)
+}
+"#,
+    )
+    .expect("write entry");
+    let entry = dir.join("src/main.fab");
+
+    let expected = vec![
+        "3.426667".to_owned(),
+        "[2.0, 1.7333333, 3.866667, 2.6666667, 2.5333333, 5.333334]".to_owned(),
+        "[0.6666667, 0.8, 1.4666668]".to_owned(),
+    ];
+
+    // 1. Source-built image execution.
+    let config = Config::default().with_target(Target::MirFmirBinary);
+    let mut host = BufferHost::default();
+    let result = run_mir_for_faber(&config, &entry, &mut host);
+    assert!(
+        result.is_ok(),
+        "local-helper backward package should execute from source, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(host.stdout_lines, expected);
+
+    // 2. fmir-text image round-trip.
+    let image = build_fmir_text_image_for_faber(
+        &Config::default().with_target(Target::MirFmir),
+        &entry,
+        &[],
+    )
+    .expect("build fmir-text image");
+    let mut host = BufferHost::default();
+    let result = run_fmir_text_image_for_faber(&image, &mut host);
+    assert!(
+        result.is_ok(),
+        "local-helper backward package should execute from a fmir-text image, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(host.stdout_lines, expected);
+
+    // 3. Binary artifact round-trip.
+    let artifact = build_mir_artifact_for_faber(&Config::default(), &entry, &[])
+        .expect("build package MIR artifact");
+    let mut host = BufferHost::default();
+    let result = run_mir_artifact_for_faber(&Config::default(), &artifact, &mut host);
+    assert!(
+        result.is_ok(),
+        "local-helper backward package should execute from a binary image, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), diag.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(host.stdout_lines, expected);
+}
+
+#[cfg(feature = "device")]
+#[test]
 fn package_mir_two_library_imports_with_nested_import_executes() {
     // Mirrors the real gradus consumer shape: two imports, the first library
     // itself importing a sibling module.
