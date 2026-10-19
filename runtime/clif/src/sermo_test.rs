@@ -3,7 +3,8 @@
 //! C handle table's `open` export.
 
 use super::{
-    __faber_clif_v1_sermo_failed, __faber_clif_v1_sermo_materialize_i64,
+    __faber_clif_v1_sermo_failed, __faber_clif_v1_sermo_fault_kind,
+    __faber_clif_v1_sermo_fault_path, __faber_clif_v1_sermo_materialize_i64,
     __faber_clif_v1_sermo_open, __faber_clif_v1_sermo_set_opener_i64,
     __faber_clif_v1_sermo_set_opener_nil, CONVERSATIONS, Conversation, Opener, slot,
 };
@@ -11,6 +12,22 @@ use faber_leaf::LeafErrorKind;
 
 fn open(route: &str) -> i64 {
     unsafe { __faber_clif_v1_sermo_open(route.as_ptr(), i64::try_from(route.len()).unwrap()) }
+}
+
+/// The bytes one fault-field export reports for `handle`.
+///
+/// # Safety
+///
+/// The export must write its byte count through the pointer it is given.
+unsafe fn raw_field(
+    export: unsafe extern "C" fn(i64, *mut i64) -> *const u8,
+    handle: i64,
+) -> Vec<u8> {
+    let mut length = -1_i64;
+    let bytes = unsafe { export(handle, &raw mut length) };
+    assert!(!bytes.is_null(), "a raw fault field is never null");
+    let length = usize::try_from(length).expect("the export writes a byte count");
+    unsafe { std::slice::from_raw_parts(bytes, length) }.to_vec()
 }
 
 #[test]
@@ -84,6 +101,41 @@ fn monotonic_materializes_through_the_exports() {
 fn invalid_handle_materializes_the_fallback() {
     assert_eq!(__faber_clif_v1_sermo_materialize_i64(0, 7), 7);
     assert_eq!(__faber_clif_v1_sermo_failed(0), 1);
+}
+
+#[test]
+fn wrong_reply_shape_faults_and_crosses_kind_and_path_raw() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    // The route replies `nihil`, so asking for a number faults.
+    __faber_clif_v1_sermo_set_opener_i64(handle, 0);
+    assert_eq!(__faber_clif_v1_sermo_materialize_i64(handle, 7), 7);
+    assert_eq!(__faber_clif_v1_sermo_failed(handle), 1);
+
+    assert_eq!(
+        unsafe { raw_field(__faber_clif_v1_sermo_fault_kind, handle) },
+        LeafErrorKind::InvalidArgument.variant_name().as_bytes()
+    );
+    assert_eq!(
+        unsafe { raw_field(__faber_clif_v1_sermo_fault_path, handle) },
+        ROUTE.as_bytes()
+    );
+}
+
+#[test]
+fn no_fault_reports_an_empty_kind_and_path() {
+    const ROUTE: &str = "tempus:nunc";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    let nanos = __faber_clif_v1_sermo_materialize_i64(handle, 0);
+    assert!(nanos > 0, "{ROUTE} materialized {nanos}");
+    assert_eq!(__faber_clif_v1_sermo_failed(handle), 0);
+
+    assert!(unsafe { raw_field(__faber_clif_v1_sermo_fault_kind, handle) }.is_empty());
+    assert!(unsafe { raw_field(__faber_clif_v1_sermo_fault_path, handle) }.is_empty());
 }
 
 #[test]
