@@ -1417,7 +1417,7 @@ fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
 }
 
 #[test]
-fn disagreeing_call_sites_keep_the_conservative_row() {
+fn disagreeing_call_sites_merge_into_one_admitted_row() {
     let fixture = analyze_en_with_params(
         r#"
 import from "./params" params
@@ -1444,11 +1444,8 @@ fn caller_frac(tensor<f32, [24]> clock) → vector<f32, 3> {
     );
     let helper = target_row(&fixture, "helper", Target::MirWgsl);
     assert!(
-        helper.failures.iter().any(|failure| matches!(
-            failure,
-            KernelRequirementFailure::IntermediateOutOfRange { .. }
-        )),
-        "disagreeing sites keep the conservative row: {:?}",
+        helper.admitted,
+        "distinct constant tuples merge into one admitted row: {:?}",
         helper.failures
     );
 }
@@ -1545,4 +1542,34 @@ fn merge_seeded_target_report_intersects_failures_and_unions_requirements() {
         conservative,
         "no seeded report leaves the conservative row alone"
     );
+}
+
+#[test]
+fn distinct_constant_tuples_merge_into_one_admitted_callee_row() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller_om(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, 8)
+}
+
+@ kernel
+@ public
+fn caller_al(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, 11)
+}
+",
+    );
+    let helper = target_row(&fixture, "helper", Target::MirWgsl);
+    assert!(helper.admitted, "{:?}", helper.failures);
+    for caller in ["caller_om", "caller_al"] {
+        let row = target_row(&fixture, caller, Target::MirWgsl);
+        assert!(row.admitted, "{caller}: {:?}", row.failures);
+    }
 }
