@@ -1,0 +1,26 @@
++++
+term = "genus"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A construction literal naming a field the genus does not declare is a check error."
+syntax = "A { x = 1, z = 2 }"
+related = ["genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM004:unknown_field"
++++
+# =============================================================================
+# genus — a construction literal names a field the genus does not declare
+# =============================================================================
+# Every key in a construction literal must be a declared field. A key that the
+# genus does not declare — a typo, or a field from another type — is a check
+# error, so the value can never diverge from the declaration.
+
+class A { mut int x }
+
+main {
+    let A a ← A { x = 1, z = 2 }
+    print a.x
+}

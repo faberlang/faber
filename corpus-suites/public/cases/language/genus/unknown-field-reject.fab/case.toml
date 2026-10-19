@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/genus/unknown-field-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/unknown-field-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_field"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_field"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "unknown_field"
