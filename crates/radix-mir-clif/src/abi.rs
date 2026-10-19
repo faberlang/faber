@@ -1037,6 +1037,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     FORMAT_DEC,
     FORMAT_INF,
     FORMAT_INS,
+    SERMO_OPEN,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1283,4 +1284,11 @@ pub const FORMAT_INS: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_format_ins",
     params: &[Ptr, Ptr],
     ret: Some(Ptr),
+};
+/// Open a conversation on a route: (route bytes, route length) -> one-based
+/// handle, or 0 when no shared leaf owns the route.
+pub const SERMO_OPEN: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_open",
+    params: &[Ptr, I64],
+    ret: Some(I64),
 };

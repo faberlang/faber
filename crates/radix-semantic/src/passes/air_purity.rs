@@ -249,6 +249,13 @@ impl AirPurityChecker<'_> {
                 self.check_expr(target);
                 self.check_expr(value);
             }
+            // `sink ⇜ item` writes through the sink, the same mutation of a
+            // place that `←` is; reject it exactly like `⇇`.
+            HirExpressionKind::SinkInto { sink, item } => {
+                self.reject(expr.span, "assignment_mutation");
+                self.check_expr(sink);
+                self.check_expr(item);
+            }
             HirExpressionKind::Gradient {
                 call,
                 selected_arguments,

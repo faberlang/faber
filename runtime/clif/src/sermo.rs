@@ -5,13 +5,17 @@
 //! `faber_leaf::serve` runs on the first materialization only. The reply, or
 //! the fault, is therefore the one the leaf produced once.
 //!
-//! Nothing here is exported: the ABI table in `crates/radix-mir-clif` owns
-//! export identity, and its `tests/abi_symbols.rs` keeps table and export in
-//! agreement.
+//! The C surface is the `__faber_clif_v1_sermo_*` family. A handle is a
+//! one-based index into the process-global conversation table; 0 is the
+//! fail-closed "no conversation" value. The ABI table in
+//! `crates/radix-mir-clif` owns the signatures and export identity, and its
+//! `tests/abi_symbols.rs` keeps table and export in agreement.
 //!
 //! A fault carries the two facts that cross into Faber: the leaf kind (the
 //! Norma `IoFault` variant name) and the error path. The platform message
 //! never crosses.
+
+use std::sync::Mutex;
 
 use faber_leaf::{self as leaf, Arg, LeafError, LeafErrorKind, Reply};
 
@@ -218,6 +222,68 @@ impl Conversation {
             None => Err(Fault::closed(LeafErrorKind::Unavailable, &self.route)),
         }
     }
+}
+
+/// One open conversation and the fault it last produced.
+//
+// The fields are read by the accessor exports of the next unit; the tests use
+// them today.
+#[allow(dead_code)]
+struct Slot {
+    conversation: Conversation,
+    /// The materialization fault. A later unit records leaf faults here.
+    fault: Option<Fault>,
+}
+
+/// The process-global conversation table, indexed by its one-based handle.
+//
+// A slot is boxed so its address survives the table growing; every accessor
+// export takes this table shape.
+#[allow(clippy::vec_box)]
+static CONVERSATIONS: Mutex<Vec<Box<Slot>>> = Mutex::new(Vec::new());
+
+/// The slot a one-based handle names.
+///
+/// `None` for handle 0, a negative handle, or a handle past the table end.
+// Read by the accessor exports of the next unit; the tests use it today. The
+// table stays a `Vec` so the open export can append to it.
+#[allow(dead_code, clippy::ptr_arg, clippy::vec_box)]
+fn slot(table: &mut Vec<Box<Slot>>, handle: i64) -> Option<&mut Slot> {
+    let index = usize::try_from(handle).ok()?.checked_sub(1)?;
+    table.get_mut(index).map(|slot| &mut **slot)
+}
+
+/// Open a conversation on `route` and return its one-based handle.
+///
+/// 0 is the fail-closed "no conversation" value: a null pointer, a negative
+/// length, non-UTF-8 bytes, or a route no shared leaf owns.
+///
+/// # Safety
+///
+/// When it is not null, `route` must point at `route_len` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_sermo_open(route: *const u8, route_len: i64) -> i64 {
+    let Ok(length) = usize::try_from(route_len) else {
+        return 0;
+    };
+    if route.is_null() {
+        return 0;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(route, length) };
+    let Ok(route) = std::str::from_utf8(bytes) else {
+        return 0;
+    };
+    if !leaf::is_route(route) {
+        return 0;
+    }
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    table.push(Box::new(Slot {
+        conversation: Conversation::open(route),
+        fault: None,
+    }));
+    i64::try_from(table.len()).unwrap_or(0)
 }
 
 #[cfg(test)]

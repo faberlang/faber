@@ -2407,6 +2407,19 @@ pub(super) fn rewrite_expr(
                 );
             }
         }
+        HirExpressionKind::SinkInto { sink, item } => {
+            for part in [sink, item] {
+                rewrite_expr(
+                    unit_path,
+                    part,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
+        }
         HirExpressionKind::Path(_)
         | HirExpressionKind::Literal(_)
         | HirExpressionKind::Insere(_)
