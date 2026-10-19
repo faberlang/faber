@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/discerne/or-pattern.fab"
+group = "language"
+input_root = "corpus"
+input = "discerne/or-pattern.fab"
+
+
+[expect]
+check_only = true
