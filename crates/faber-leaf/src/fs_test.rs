@@ -120,6 +120,59 @@ fn route_list_matches_serve() {
 }
 
 #[test]
+fn conde_replaces_text_and_bytes_completely() {
+    let dir = temp_path("conde");
+    fs::create_dir_all(&dir).expect("create dir");
+    let path = dir.join("target.bin");
+    let path_text = path.to_string_lossy().into_owned();
+    assert!(matches!(
+        serve_ok(
+            "solum:funde",
+            &[Arg::Str(path_text.clone()), Arg::Bytes(b"old".to_vec())],
+        ),
+        Reply::Unit
+    ));
+    assert_eq!(fs::read(&path).expect("read"), b"old".as_slice());
+    assert!(matches!(
+        serve_ok(
+            "solum:conde",
+            &[
+                Arg::Str(path_text.clone()),
+                Arg::Str("new-complete".to_owned()),
+            ],
+        ),
+        Reply::Unit
+    ));
+    assert_eq!(
+        fs::read(&path).expect("read"),
+        b"new-complete".as_slice(),
+        "text replace must not leave old bytes"
+    );
+    assert!(matches!(
+        serve_ok(
+            "solum:conde",
+            &[Arg::Str(path_text), Arg::Bytes(vec![0x00, 0xff, 0x10]),],
+        ),
+        Reply::Unit
+    ));
+    assert_eq!(
+        fs::read(&path).expect("read"),
+        vec![0x00, 0xff, 0x10],
+        "bytes replace must be exact, non-UTF-8 included"
+    );
+    let names: Vec<_> = fs::read_dir(&dir)
+        .expect("read dir")
+        .map(|entry| entry.expect("entry").file_name())
+        .collect();
+    assert_eq!(
+        names,
+        vec![std::ffi::OsString::from("target.bin")],
+        "no conde temporary may survive"
+    );
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
 fn touch_updates_mtime_and_does_not_truncate() {
     let path = temp_path("touch");
     let path_text = path.to_string_lossy().into_owned();
