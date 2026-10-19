@@ -372,6 +372,7 @@ pub fn check(
                     tensor_edge_policies,
                     recursive_kernels.contains(&item.def_id),
                     None,
+                    None,
                 );
                 analyze_limes_callbacks(
                     &mut kernel,
@@ -400,6 +401,7 @@ pub fn check(
                             interner,
                             tensor_edge_policies,
                             recursive_kernels.contains(&method.def_id),
+                            None,
                             None,
                         );
                         analyze_limes_callbacks(
@@ -454,6 +456,7 @@ fn analyze_kernel(
     tensor_edge_policies: &TensorEdgePolicyTable,
     recursive: bool,
     coordinate_ranges: Option<&[AbstractRange]>,
+    constant_params: Option<&FxHashMap<DefId, i128>>,
 ) -> KernelRequirement {
     let mut base = BodyFacts {
         types,
@@ -494,8 +497,11 @@ fn analyze_kernel(
             base.ranges.insert(param.def_id, AbstractRange::unknown());
         } else {
             base.record_type(param.ty, param.span);
-            base.ranges
-                .insert(param.def_id, AbstractRange::from_type(param.ty, types));
+            let range = match constant_params.and_then(|values| values.get(&param.def_id)) {
+                Some(value) => AbstractRange::exact(*value),
+                None => AbstractRange::from_type(param.ty, types),
+            };
+            base.ranges.insert(param.def_id, range);
         }
     }
     if let Some(ret_ty) = function.ret_ty
@@ -659,6 +665,7 @@ fn analyze_limes_callbacks_inner(
                 policies,
                 recursive_kernels.contains(&callback_def),
                 coordinates,
+                None,
             );
             if let Some((_, conditions)) = &coordinate_seed {
                 for report in &mut callback_report.target_reports {
