@@ -2763,6 +2763,46 @@ main {
 }
 
 #[test]
+fn package_mir_norma_deque_to_list() {
+    let dir = test_temp_dir("package-mir-norma-deque-to-list");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+import from "norma:deque" deque
+
+main {
+  mut deque.Deque<int> d ← deque.from_list<int>([1, 2])
+  d.prepend(0)
+  mut list<int> out ← d.to_list()
+  print out.length()
+  print out.first()
+  print out.last()
+}
+"#,
+    )
+    .expect("write entry");
+
+    let mut host = BufferHost::default();
+    let result = run_mir_for_faber(&Config::default(), &entry, &mut host);
+
+    assert!(
+        result.is_ok(),
+        "expected norma:deque to_list copy-out to run, got {:?}",
+        result
+            .err()
+            .unwrap_or_default()
+            .iter()
+            .map(|diag| (diag.code, diag.issue(), format!("{diag:?}")))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        host.stdout_lines,
+        vec!["3".to_owned(), "0".to_owned(), "2".to_owned(),]
+    );
+}
+
+#[test]
 fn package_mir_bridges_norma_fs_exscribe_renomina() {
     let dir = test_temp_dir("package-mir-solum-copy-rename");
     let entry = dir.join("main.fab");
