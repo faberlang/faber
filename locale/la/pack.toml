@@ -1177,6 +1177,14 @@ help = "drop the marker, or use publica to re-export"
 message = "could not infer import name from {path}"
 help = "spell nomen or an explicit alias for {path}"
 
+[diagnostics.PARSE050.issues.import_target_unknown]
+message = "`{target}` is not a target name"
+help = "write a target name from `faber targets`; did you mean `{suggestion}`?"
+
+[diagnostics.PARSE050.issues.import_target_binding_required]
+message = "a target import names its binding; none is inferred from the specifier"
+help = "write a binding name after the specifier"
+
 [diagnostics.PARSE060]
 message = "comment is not in a legal attachment position"
 help = "place comments before a statement, declaration, or member; or immediately before a block's closing '}' or end of file"
