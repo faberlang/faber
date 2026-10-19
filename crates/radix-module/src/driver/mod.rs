@@ -5106,6 +5106,11 @@ mod device_orphan_admission_tests;
 mod nvvm_device_emit_tests;
 
 #[cfg(test)]
+#[cfg(feature = "mir-llvm")]
+#[path = "rope_nvvm_reachability_test.rs"]
+mod rope_nvvm_reachability_tests;
+
+#[cfg(test)]
 #[cfg(feature = "hir-faber")]
 #[path = "locale_fanout_test.rs"]
 mod locale_fanout_tests;
