@@ -912,7 +912,13 @@ fn train_step_function(types: &mut TypeTable, interner: &mut Interner) -> MirFun
 /// The generated backward companion: `loss_backward(x`, w, upstream) =
 /// (gx, gw) — a tuple gradient return whose slots the gradient-flow link
 /// feeds into the `train_step`.
-fn companion_function(types: &mut TypeTable, interner: &mut Interner) -> MirFunction {
+/// The compute flag selects the companion's shader stage, so post-GT12 drivers
+/// can run it as Compute.
+fn companion_function(
+    types: &mut TypeTable,
+    interner: &mut Interner,
+    compute: bool,
+) -> MirFunction {
     let r2 = rank1_tensor_ty(types, 2);
     let tuple_ty = MirType::semantic(types.tuple(vec![r2.semantic_id(), r2.semantic_id()]));
     let (construct, temp) = tuple_construct(&[3, 4], tuple_ty);
@@ -940,7 +946,7 @@ fn companion_function(types: &mut TypeTable, interner: &mut Interner) -> MirFunc
             span: span(),
         }],
         tuple_ty,
-        false,
+        compute,
     );
     function.source = Some(COMPANION_DEF);
     function
@@ -1001,7 +1007,7 @@ fn training_fixture<R>(run: impl FnOnce(&Interner, &ValidatedMir<'_>, &MirCompan
     let tensor_id = rank1_tensor_ty(&mut types, 2).semantic_id();
     let forward = forward_function(&mut types, &mut interner);
     let step = train_step_function(&mut types, &mut interner);
-    let companion = companion_function(&mut types, &mut interner);
+    let companion = companion_function(&mut types, &mut interner, false);
     let companions = training_companions(tensor_id);
     let validated = validated(&types, vec![forward, step, companion]);
     run(&interner, &validated, &companions)
