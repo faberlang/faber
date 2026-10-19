@@ -1026,6 +1026,7 @@ impl Validator<'_, '_> {
             MirCollectionOp::Approximate
             | MirCollectionOp::TensorLayerNorm
             | MirCollectionOp::TensorGather
+            | MirCollectionOp::TensorScatterAdd
             | MirCollectionOp::TensorBatchedAttention => 0,
         };
         if matches!(op, MirCollectionOp::Approximate) {
@@ -1049,6 +1050,12 @@ impl Validator<'_, '_> {
             // an optional trailing GGML type-id const.
             if !(2..=3).contains(&call.args.len()) {
                 self.error(span, "collection TensorGather expects 2 or 3 MIR arguments");
+            }
+        } else if matches!(op, MirCollectionOp::TensorScatterAdd) {
+            // Scatter-add is [ids, updates]; the destination is implicit and
+            // zero-initialized (the AIR reverse-AD Gather VJP contract).
+            if call.args.len() != 2 {
+                self.error(span, "collection TensorScatterAdd expects 2 MIR arguments");
             }
         } else if matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin) {
             // A caller-stated coalesce identity is an optional second scalar
@@ -2260,6 +2267,69 @@ impl Validator<'_, '_> {
                     span,
                     "tensor gather result is not tensor",
                 );
+            }
+            MirCollectionOp::TensorScatterAdd => {
+                // Mirror of the gather contract with the two tensor operands
+                // swapped: [ids, updates] → [V, D], V taken from the result.
+                if let Some(ids_ty) = call
+                    .args
+                    .first()
+                    .and_then(|arg| self.validate_operand(scope, arg, span))
+                {
+                    let is_u32_ids = matches!(
+                        self.type_kind(ids_ty),
+                        Type::Tensor(element, _)
+                            if matches!(
+                                self.context.types.get(*element),
+                                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+                            )
+                    );
+                    if !is_u32_ids {
+                        self.error(span, "tensor scatter-add ids is not a tensor<u32, [n]>");
+                    } else if self
+                        .static_tensor_rank(ids_ty)
+                        .is_some_and(|rank| rank != 1)
+                    {
+                        self.error(span, "tensor scatter-add ids must be a rank-1 tensor");
+                    }
+                }
+                if let Some(updates_ty) = call
+                    .args
+                    .get(1)
+                    .and_then(|arg| self.validate_operand(scope, arg, span))
+                {
+                    let updates_element = match self.type_kind(updates_ty) {
+                        Type::Tensor(element, _) => *element,
+                        _ => {
+                            self.error(span, "tensor scatter-add updates is not tensor");
+                            return;
+                        }
+                    };
+                    if self
+                        .static_tensor_rank(updates_ty)
+                        .is_some_and(|rank| rank != 2)
+                    {
+                        self.error(span, "tensor scatter-add updates must be a rank-2 tensor");
+                    }
+                    match self.type_kind(call.return_ty) {
+                        Type::Tensor(result_element, _) => {
+                            let result_element = *result_element;
+                            if self
+                                .static_tensor_rank(call.return_ty)
+                                .is_some_and(|rank| rank != 2)
+                            {
+                                self.error(
+                                    span,
+                                    "tensor scatter-add result must be a rank-2 tensor",
+                                );
+                            }
+                            if !self.context.types.equals(updates_element, result_element) {
+                                self.error(span, "tensor scatter-add result element type mismatch");
+                            }
+                        }
+                        _ => self.error(span, "tensor scatter-add result is not tensor"),
+                    }
+                }
             }
             MirCollectionOp::SparseNonzeroCount => {
                 let Some(receiver_ty) = first_arg_ty else {

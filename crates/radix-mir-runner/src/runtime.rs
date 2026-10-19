@@ -1756,6 +1756,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorRope => self.tensor_rope(args, span, false),
             MirCollectionOp::TensorRopeHalf => self.tensor_rope(args, span, true),
             MirCollectionOp::TensorGather => self.tensor_gather(args, span),
+            MirCollectionOp::TensorScatterAdd => self.tensor_scatter_add(args, return_ty, span),
             MirCollectionOp::TensorCausalMaskedSoftmax => {
                 self.tensor_causal_masked_softmax(args, span)
             }
@@ -4558,6 +4559,129 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
         let result_shape = vec![indices.len() as i64, cols as i64];
         tensor_value_kind(output, tensor_kind(&table), result_shape, span)
+    }
+
+    /// Zero-initialized row scatter-add, the AIR reverse-AD Gather VJP:
+    /// `result[ids[t]] += updates[t]` into an implicit `[V, D]` destination.
+    /// The destination row count `V` is the declared result's first extent
+    /// (the untouched slots stay zero); `D` is the updates row width.
+    fn tensor_scatter_add(
+        &mut self,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        // MIR layout: [ids, updates].
+        let [ids_arg, updates_arg] = args else {
+            return Err(RunnerError::internal(span, "tensor scatter-add arity"));
+        };
+        let ids_tensor = self.tensor_arg(ids_arg, span)?;
+        if ids_tensor.borrow().shape.len() != 1 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor scatter-add ids must be a rank-1 tensor",
+            ));
+        }
+        let updates = self.tensor_arg(updates_arg, span)?;
+        let updates_shape = updates.borrow().shape.clone();
+        if updates_shape.len() != 2 {
+            return Err(RunnerError::internal(
+                span,
+                "tensor scatter-add updates must be a rank-2 tensor",
+            ));
+        }
+        let update_rows = usize::try_from(updates_shape[0]).unwrap_or(0);
+        let cols = usize::try_from(updates_shape[1]).unwrap_or(0);
+        let destination_rows = self.scatter_add_rows(return_ty, span)?;
+        let ids = self.tensor_logical_values(&ids_tensor, span)?;
+        if ids.len() != update_rows {
+            return Err(RunnerError::internal(
+                span,
+                format!(
+                    "tensor scatter-add has {} ids for {update_rows} update rows",
+                    ids.len()
+                ),
+            ));
+        }
+        let mut indices = Vec::with_capacity(ids.len());
+        for value in &ids {
+            let Value::Int(id) = value else {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("tensor scatter-add id is not numerus: {value:?}"),
+                ));
+            };
+            if *id < 0 || *id >= destination_rows as i64 {
+                return Err(RunnerError::internal(
+                    span,
+                    format!(
+                        "tensor scatter-add id {id} is out of range for destination rows {destination_rows}"
+                    ),
+                ));
+            }
+            indices.push(usize::try_from(*id).map_err(|_| {
+                RunnerError::internal(
+                    span,
+                    format!(
+                        "tensor scatter-add id {id} is out of range for destination rows {destination_rows}"
+                    ),
+                )
+            })?);
+        }
+        let kind = tensor_kind(&updates);
+        let zero = match kind {
+            Some(DenseKind::F32 | DenseKind::F64) => Value::Float(0.0),
+            Some(DenseKind::U64) => Value::UInt(0),
+            _ => Value::Int(0),
+        };
+        let add_width = match kind {
+            Some(DenseKind::U64) => NumericWidth::U64,
+            Some(DenseKind::F32 | DenseKind::F64) => NumericWidth::F64,
+            _ => NumericWidth::I64,
+        };
+        let mut output = vec![zero; destination_rows * cols];
+        let update_values = self.tensor_logical_values(&updates, span)?;
+        for (row, index) in indices.iter().enumerate() {
+            let source = row * cols;
+            let target = index * cols;
+            for column in 0..cols {
+                output[target + column] = numeric_add(
+                    &output[target + column],
+                    &update_values[source + column],
+                    add_width,
+                    span,
+                )?;
+            }
+        }
+        let result_shape = vec![destination_rows as i64, cols as i64];
+        tensor_value_kind(output, kind, result_shape, span)
+    }
+
+    /// The `[V, D]` destination row count of a scatter-add is implicit in the
+    /// operands, so it comes from the declared result type's first extent.
+    fn scatter_add_rows(&self, ty: MirType, span: Span) -> Result<usize, RunnerError> {
+        let Type::Tensor(_, shape) = self.types.get(ty.semantic_id()) else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor scatter-add result is not a tensor",
+            ));
+        };
+        let IndexExpr::Tuple(dims) = self.types.get_index(*shape) else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor scatter-add result shape is not a rank-2 tuple",
+            ));
+        };
+        let Some(IndexExpr::Literal(rows)) = dims.first().map(|dim| self.types.get_index(*dim))
+        else {
+            return Err(RunnerError::internal(
+                span,
+                "tensor scatter-add result row count is not a static literal",
+            ));
+        };
+        usize::try_from(*rows).map_err(|_| {
+            RunnerError::internal(span, "tensor scatter-add result row count overflows usize")
+        })
     }
 
     fn tensor_transpose(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
