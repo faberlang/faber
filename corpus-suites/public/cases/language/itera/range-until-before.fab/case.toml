@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/itera/range-until-before.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/range-until-before.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -1,0 +1,86 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "itera_stmt", "itera_binding", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = true
+summary = "The four range forms: exclusive `‥`, inclusive `…`, `until` (inclusive) and `before` (exclusive); the bounds pick the direction."
+syntax = "for range <a>‥<b> let <i> { }"
+related = ["ex", "de", "ab"]
+locale = "en"
++++
+# =============================================================================
+# itera — the four range forms on one runner
+# =============================================================================
+#
+# What this teaches:
+#   • `a‥b` — the glyph range with an EXCLUSIVE end: `5‥5` is empty and its
+#     body never runs, `0‥10 step 4` yields 0, 4, 8.
+#   • `a…b` — the glyph range with an INCLUSIVE end: `5…5` yields 5 once.
+#   • `a until b` (la `usque`) — the word form with an inclusive end:
+#     `3 until 6` yields 3, 4, 5, 6.
+#   • `a before b` (la `ante`) — the word form with an exclusive end:
+#     `3 before 6` yields 3, 4, 5.
+#   • The direction lives in the bounds: the step is always a positive
+#     stride, so `10…0 step 5` counts down through 10, 5, 0.
+#   • The loop binder takes no type slot: `for range a‥b let i { }` binds
+#     each element fresh (a `mut i` binder exists for bodies that rebind).
+#
+# Common mistakes:
+#   • Expecting `5‥5` to yield 5 — an exclusive range meets its end
+#     immediately, so nothing prints.
+#   • Writing a negative step to count down — the bounds decide up or down,
+#     the step is only a stride.
+#
+# See also: ex, de, ab
+# =============================================================================
+
+# range-until-before — the four end forms, end to end
+#
+# POLICY:
+#   `‥` and `before` exclude the end bound; `…` and `until` include it.
+#   A negative bound is just a start or end like any other: `-2‥2` climbs
+#   from -2 up to (but not including) 2, and `2…-2 step 2` descends to the
+#   inclusive -2.
+
+main {
+    # exclusive glyph form: 5‥5 is empty, so this body never runs
+    for range 5‥5 let i {
+        print "never5"
+    }
+
+    # inclusive glyph form: 5…5 yields 5 once
+    for range 5…5 let i {
+        print i
+    }
+
+    # inclusive descending with a stride: the bounds pick the direction
+    for range 10…0 step 5 let i {
+        print i
+    }
+
+    # exclusive ascending with a stride: 0, 4, 8
+    for range 0‥10 step 4 let i {
+        print i
+    }
+
+    # until: the inclusive word form
+    for range 3 until 6 let i {
+        print i
+    }
+
+    # before: the exclusive word form
+    for range 3 before 6 let i {
+        print i
+    }
+
+    # a negative start with an exclusive end
+    for range -2‥2 let i {
+        print i
+    }
+
+    # an inclusive end below the start, descending by stride
+    for range 2…-2 step 2 let i {
+        print i
+    }
+}
