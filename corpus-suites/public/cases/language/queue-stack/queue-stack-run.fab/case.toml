@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/queue-stack/queue-stack-run.fab"
+group = "language"
+input_root = "corpus"
+input = "queue-stack/queue-stack-run.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "lista add length mismatch"
+check_only = false
