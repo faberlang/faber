@@ -1,9 +1,10 @@
-//! K8 foreign method calls on an `ignotum` receiver (wave-one purity rule).
+//! K8 foreign calls (wave-one purity rule).
 //!
-//! A method called on a binding that names a foreign module (here a Python
-//! import) has no Faber body to look through, so the call is an effect: it
-//! declines by name (`foreign_call_effect`) rather than as a generic
-//! `unproved_call_effect`.
+//! A call whose callee names a foreign value — a method called on a binding
+//! that names a foreign module (here a Python import), or a direct call of a
+//! selectively imported binding — has no Faber body to look through, so the
+//! call is an effect: it declines by name (`foreign_call_effect`) rather than
+//! as a generic `unproved_call_effect`.
 
 use crate::test_support::analyze_source_for_target_la;
 use radix_target::Target;
@@ -28,8 +29,8 @@ fn rejected(source: &str, reason: &str) {
     );
 }
 
-/// A Python module import, then a public kernel whose `filum` body calls a
-/// method of the imported module.
+/// A Python import, then a public kernel whose `filum` body calls one of the
+/// imported names.
 fn kernel(helpers: &str, statement: &str) -> String {
     format!(
         r#"{helpers}
@@ -50,6 +51,18 @@ fn foreign_call_on_an_imported_module_is_rejected() {
         r#"importa ex "python:math" math ut m
 "#,
         "m.sqrt(value)",
+    );
+    rejected(&source, "foreign_call_effect");
+}
+
+#[test]
+fn foreign_call_of_a_selective_import_is_rejected() {
+    // The call stands as its own statement: a selective binding is `ignotum`,
+    // and wave one admits no `ignotum` store into the f32 lane output.
+    let source = kernel(
+        r#"importa python "math" fixum sqrt, pi
+"#,
+        "sqrt(value)",
     );
     rejected(&source, "foreign_call_effect");
 }
