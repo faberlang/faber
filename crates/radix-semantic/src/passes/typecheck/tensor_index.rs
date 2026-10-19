@@ -973,7 +973,12 @@ pub(super) fn check_tensor_bracket_range_index(
             end
         };
         if let Some(output) = sectio_axis0_shape(checker, shape, start, end_eff, 1) {
-            return checker.types.tensor_with_shape(elem, output);
+            // WHY: the slice shape only says how long the window is; it does
+            // not say the window lies inside the extent, so the static
+            // out-of-range proof still runs on this path.
+            let result = checker.types.tensor_with_shape(elem, output);
+            reject_static_bounded_index_oob(checker, receiver_ty, index);
+            return result;
         }
     }
     let result = tensor_with_fresh_shape(checker, elem);
