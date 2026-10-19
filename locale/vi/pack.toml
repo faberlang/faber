@@ -1767,6 +1767,10 @@ help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
 message = "không khớp kiểu biểu thức"
 help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
 
+[diagnostics.SEM010.issues.import_conversion_required]
+message = "giá trị ngoại lai có kiểu không xác định ({found}) không thể lưu vào ô có kiểu {expected}"
+help = "buộc chuyển giao tin cậy bằng một phép chuyển đổi: `value ↦ {expected}`"
+
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "phép so sánh bằng yêu cầu các kiểu giống hệt nhau"
 help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
