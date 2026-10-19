@@ -1,0 +1,68 @@
++++
+term = "lista"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "call_expr", "call_suffix", "member_suffix", "expression", "range_expr", "range_tail", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Range index forms on a list and a text: ‥ omits the end, … keeps it, until is the inclusive word form, before the exclusive one, step strides."
+syntax = "<collection>[<start>‥<end>] | [<start>…<end>] | [<start> until <end>] | [<start> before <end>] | [<start>‥<end> step <n>]"
+related = ["methodi-accessus", "reads-three-ways", "itera"]
+locale = "en"
++++
+# =============================================================================
+# Range index forms — ‥ … until before step
+# =============================================================================
+#
+# What this teaches:
+#   • `c[a‥b]` is the half-open slice: it starts at `a` and stops before `b`
+#   • `c[a…b]` is the closed slice: it keeps the element at `b` too
+#   • `c[a until b]` is the word form of `…` — `until` includes the end
+#   • `c[a before b]` is the word form of `‥` — `before` excludes the end
+#   • `c[a‥b step n]` strides the slice, keeping every `n`-th element
+#   • an empty slice is `c[a‥a]`, not an error
+#   • the same forms hold on a text, where an index counts Unicode characters
+#
+# Common mistakes:
+#   • reading `until` as exclusive — `until` is the closed end, `before` is
+#     the open one
+#   • expecting a descending slice (`c[2‥0]`) to reverse — bounds must be
+#     monotonic, and a descending interval traps
+#
+# See also: methodi-accessus, reads-three-ways, itera
+# =============================================================================
+
+# EXPECTED stdout: see range-index.expected
+
+main {
+    let list<int> xs ← [10, 20, 30, 40, 50, 60]
+
+    # half-open: start at 1, stop before 3
+    print xs[1‥3]
+
+    # word form of … — the end is included
+    print xs[1 until 3]
+
+    # word form of ‥ — the end is excluded
+    print xs[1 before 3]
+
+    # an empty slice
+    print xs[3‥3]
+
+    # … keeps the element at the end index
+    print xs[3…3]
+
+    # a slice that reaches the last element
+    print xs[5‥6]
+
+    # step keeps every second element
+    print xs[0‥6 step 2]
+
+    let string s ← "hello world"
+    let string t ← "héllo"
+
+    print s[0‥5]
+    print s[0 until 10]
+    print s[0‥11 step 2]
+    print s[6…10]
+    print t[1‥3]
+}
