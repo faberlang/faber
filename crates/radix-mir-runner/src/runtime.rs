@@ -734,29 +734,24 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let [start, end] = bounds.try_into().map_err(|_| {
                     RunnerError::internal(span, "interval construct requires two bounds")
                 })?;
-                // F-082: reject reversed bounds (start > end) — an interval must
-                // be monotonic so every materialized element is reachable.
-                let reversed = match (&start, &end) {
-                    (Value::Int(a), Value::Int(b)) => a > b,
-                    (Value::UInt(a), Value::UInt(b)) => a > b,
-                    (Value::Float(a), Value::Float(b)) => a > b,
-                    // `inf` bounds beyond the 64-bit carriers: exact order.
-                    (Value::Magnus(_), Value::Int(_) | Value::UInt(_) | Value::Magnus(_))
-                    | (Value::Int(_) | Value::UInt(_), Value::Magnus(_)) => {
-                        super::exact_int::cmp_numeric(&start, &end)
-                            .is_some_and(std::cmp::Ordering::is_gt)
-                    }
-                    _ => false,
-                };
-                if reversed {
+                // A stored stepped range takes its direction from its bounds:
+                // `10‥0 per 2` descends (operator ruling, need). The
+                // step itself stays positive; only its presence unlocks a
+                // descending range.
+                let stepped = step.is_some();
+                let step = interval_step(step.as_ref(), span)?;
+                // F-082: reject reversed bounds (start > end) — an unstepped
+                // interval must be monotonic so every materialized element is
+                // reachable.
+                if !stepped && interval_bounds_reversed(&start, &end) {
                     return Err(RunnerError::internal(
                         span,
                         "interval bounds must be monotonic (start ≤ end)",
                     ));
                 }
                 let mut interval = interval_value(start, end, inclusive);
-                if let (Value::Tuple(parts), Some(step)) = (&mut interval, step) {
-                    parts.push(step);
+                if stepped && let Value::Tuple(parts) = &mut interval {
+                    parts.push(Value::Int(step));
                 }
                 Ok(interval)
             }
@@ -2116,7 +2111,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "interval length arity"));
         };
         let interval = self.eval_operand(interval, span)?;
-        let (start, end, inclusive) = interval_parts(&interval, span)?;
+        let (start, end, inclusive, _step) = interval_parts(&interval, span)?;
         // Int-only bounds are not a hidden carrier gap: `intervallum` over an
         // unsigned-64 element type is rejected semantically, so interval
         // bounds can never surface as `UInt` here.
@@ -2135,7 +2130,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let interval = self.eval_operand(interval, span)?;
         let value = self.eval_operand(value, span)?;
-        let (start, end, inclusive) = interval_parts(&interval, span)?;
+        let (start, end, inclusive, _step) = interval_parts(&interval, span)?;
         let value = numeric_as_f64(&value, span)?;
         let start = numeric_as_f64(&start, span)?;
         let end = numeric_as_f64(&end, span)?;
@@ -2155,7 +2150,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 RunnerError::internal(span, "interval clamp produced an empty interval")
             });
         }
-        let (start, end, inclusive) = interval_parts(&target, span)?;
+        let (start, end, inclusive, _step) = interval_parts(&target, span)?;
         match (source, start, end) {
             (Value::Int(value), Value::Int(start), Value::Int(end)) => {
                 let upper = if inclusive {
@@ -2193,7 +2188,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "interval materialize arity"));
         };
         let interval = self.eval_operand(interval, span)?;
-        let (Value::Int(start), Value::Int(end), inclusive) = interval_parts(&interval, span)?
+        let (Value::Int(start), Value::Int(end), inclusive, _step) =
+            interval_parts(&interval, span)?
         else {
             return Err(RunnerError::internal(
                 span,
@@ -5967,6 +5963,43 @@ fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {
     Value::Tuple(vec![start, end, Value::Bool(inclusive)])
 }
 
+/// F-082: whether interval bounds run backwards (`start > end`).
+fn interval_bounds_reversed(start: &Value, end: &Value) -> bool {
+    match (start, end) {
+        (Value::Int(a), Value::Int(b)) => a > b,
+        (Value::UInt(a), Value::UInt(b)) => a > b,
+        (Value::Float(a), Value::Float(b)) => a > b,
+        // `inf` bounds beyond the 64-bit carriers: exact order.
+        (Value::Magnus(_), Value::Int(_) | Value::UInt(_) | Value::Magnus(_))
+        | (Value::Int(_) | Value::UInt(_), Value::Magnus(_)) => {
+            super::exact_int::cmp_numeric(start, end).is_some_and(std::cmp::Ordering::is_gt)
+        }
+        _ => false,
+    }
+}
+
+/// The positive step of a stored interval construct: `1` when the aggregate
+/// carries no step, the stored fourth field otherwise. The direction of a
+/// stepped range comes from its bounds, so a zero or negative step dies rather
+/// than flipping the walk.
+fn interval_step(step: Option<&Value>, span: Span) -> Result<i64, RunnerError> {
+    let Some(step) = step else {
+        return Ok(1);
+    };
+    let positive = match step {
+        Value::Int(step) => Some(*step).filter(|step| *step > 0),
+        Value::UInt(step) => i64::try_from(*step).ok().filter(|step| *step > 0),
+        _ => None,
+    };
+    positive.ok_or_else(|| {
+        RunnerError::internal_with_issue(
+            span,
+            "interval step must be positive",
+            "runner_interval_step_not_positive",
+        )
+    })
+}
+
 /// The `(start, end, inclusive)` window of an interval index, or `None` for a
 /// plain element index. Tests the carrier shape directly: the fallible
 /// `interval_parts` builds (and the caller then drops) a `RunnerError` for
@@ -6049,17 +6082,27 @@ fn window_bounds(
     Ok(Some((start, end)))
 }
 
-fn interval_parts(value: &Value, span: Span) -> Result<(Value, Value, bool), RunnerError> {
+fn interval_parts(
+    value: &Value,
+    span: Span,
+) -> Result<(Value, Value, bool, Option<Value>), RunnerError> {
     let Value::Tuple(parts) = value else {
         return Err(RunnerError::internal(
             span,
             "interval value carrier mismatch",
         ));
     };
-    let [start, end, Value::Bool(inclusive)] = parts.as_slice() else {
+    let ([start, end, Value::Bool(inclusive)] | [start, end, Value::Bool(inclusive), _]) =
+        parts.as_slice()
+    else {
         return Err(RunnerError::internal(span, "interval value shape mismatch"));
     };
-    Ok((start.clone(), end.clone(), *inclusive))
+    Ok((
+        start.clone(),
+        end.clone(),
+        *inclusive,
+        parts.get(3).cloned(),
+    ))
 }
 
 #[expect(
@@ -6071,8 +6114,8 @@ fn interval_intersection(
     right: &Value,
     span: Span,
 ) -> Result<Option<Value>, RunnerError> {
-    let (left_start, left_end, left_inclusive) = interval_parts(left, span)?;
-    let (right_start, right_end, right_inclusive) = interval_parts(right, span)?;
+    let (left_start, left_end, left_inclusive, _step) = interval_parts(left, span)?;
+    let (right_start, right_end, right_inclusive, _step) = interval_parts(right, span)?;
     let left_start_number = numeric_as_f64(&left_start, span)?;
     let right_start_number = numeric_as_f64(&right_start, span)?;
     let left_end_number = numeric_as_f64(&left_end, span)?;
@@ -6102,8 +6145,8 @@ fn interval_union_value(
     right: &Value,
     span: Span,
 ) -> Result<Option<Value>, RunnerError> {
-    let (left_start, left_end, left_inclusive) = interval_parts(left, span)?;
-    let (right_start, right_end, right_inclusive) = interval_parts(right, span)?;
+    let (left_start, left_end, left_inclusive, _step) = interval_parts(left, span)?;
+    let (right_start, right_end, right_inclusive, _step) = interval_parts(right, span)?;
     let left_start_number = numeric_as_f64(&left_start, span)?;
     let right_start_number = numeric_as_f64(&right_start, span)?;
     let (start, first_end, first_inclusive, second_start, second_end, second_inclusive) =
