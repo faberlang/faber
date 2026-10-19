@@ -1,0 +1,22 @@
++++
+term = "adfirma"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "incipit_stmt", "block_stmt", "adfirma_stmt", "expression", "literal", "equality", "equality_tail"]
+category = "testing"
+summary = "The assert statement has no else clause; the panic particle names the message."
+syntax = "assert 1 ≡ 1 else \"m\""
+related = ["proba", "fac", "cape"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:adfirma_else_rejected"
++++
+# =============================================================================
+# adfirma — no else clause
+# =============================================================================
+# An assertion has no alternate branch: it either holds or it fails. The
+# failure message is introduced by the `panic` particle, so a trailing `else`
+# is rejected instead of being folded into some conditional shape.
+
+main {
+    assert 1 ≡ 1 else "m"
+}
