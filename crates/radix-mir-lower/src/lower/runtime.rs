@@ -929,6 +929,7 @@ impl FunctionBuilder<'_> {
             MirCollectionOp::Length => MirType::semantic(self.types.primitive(Primitive::Numerus)),
             MirCollectionOp::Index | MirCollectionOp::TensorGet => self
                 .checked_read_result_type(op, receiver.ty, expr_ty)
+                .or_else(|| self.index_read_result_type(receiver.ty, expr_ty))
                 .unwrap_or(expr_ty),
             _ => expr_ty,
         };
@@ -3680,6 +3681,37 @@ impl FunctionBuilder<'_> {
             _ => false,
         };
         checked.then_some(MirType::semantic(result))
+    }
+
+    /// The declared index-read carrier when the expression type kept an
+    /// unresolved inference variable inside its nullable carrier.
+    ///
+    /// WHY: expected-type narrowing on an `out.append(xs.get(i))` argument
+    /// inside a generic genus body can leave the `get` call's HIR type as an
+    /// optional carrier with an inference hole instead of the receiver's
+    /// element, and the checker's finalize pass only refuses a hole at the
+    /// carrier's head, so a nested one reaches lowering. The intrinsic's
+    /// result is not in doubt there — an index read returns the receiver's
+    /// element lifted into its nullable carrier — so fill the hole from the
+    /// receiver rather than emitting a MIR type the validator must reject.
+    /// Resolution stays immutable; a missing interned carrier keeps the old
+    /// fail-soft behavior.
+    fn index_read_result_type(&self, receiver_ty: Option<TypeId>, expr_ty: MirType) -> Option<MirType> {
+        let receiver_ty = receiver_ty?;
+        let Type::Option(inner) = self.types.get(expr_ty.semantic_id()) else {
+            return None;
+        };
+        if !matches!(self.types.get(*inner), Type::Infer(_) | Type::InferUnion(_)) {
+            return None;
+        }
+        let element = self.collection_element_ty(receiver_ty)?;
+        if matches!(self.types.get(element.semantic_id()), Type::Infer(_) | Type::InferUnion(_)) {
+            return None;
+        }
+        let option = self
+            .types
+            .find_equal(&Type::Option(element.semantic_id()))?;
+        Some(MirType::semantic(option))
     }
 
     fn declared_literal_bound(&self, ty: TypeId) -> bool {

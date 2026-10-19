@@ -1200,7 +1200,7 @@ impl FunctionBuilder<'_> {
         Some(MirOperand::Place(result))
     }
 
-    fn collection_element_ty(&self, ty: TypeId) -> Option<MirType> {
+    pub(super) fn collection_element_ty(&self, ty: TypeId) -> Option<MirType> {
         match self.normalized_type(ty) {
             Type::Array(item) | Type::BoundedArray { element: item, .. } | Type::Set(item) => {
                 Some(MirType::semantic(*item))
