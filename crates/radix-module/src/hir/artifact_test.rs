@@ -1760,6 +1760,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
                 backward: backward.map(|backward| radix_hir_fhir::RadixBackwardWire {
                     companion_name: backward.companion_name,
                     companion_def_id: backward.companion_def_id,
+                    selected_params: backward.selected_params,
                 }),
             })
             .collect(),

@@ -64,6 +64,7 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
                 backward: backward.map(|backward| RadixBackwardWire {
                     companion_name: backward.companion_name,
                     companion_def_id: backward.companion_def_id,
+                    selected_params: backward.selected_params,
                 }),
             })
             .collect(),

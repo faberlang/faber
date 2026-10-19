@@ -55,17 +55,18 @@ pub enum RadixLaneWire {
 }
 
 /// Portable lane entry, including the optional reverse-AD companion identity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RadixLaneEntryWire {
     pub def_id: DefId,
     pub lane: RadixLaneWire,
     pub backward: Option<RadixBackwardWire>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RadixBackwardWire {
     pub companion_name: Symbol,
     pub companion_def_id: DefId,
+    pub selected_params: Option<Vec<Symbol>>,
 }
 
 // ---------------------------------------------------------------------------

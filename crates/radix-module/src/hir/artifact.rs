@@ -430,6 +430,7 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
                 .map(|backward| crate::semantic::RadixBackward {
                     companion_name: backward.companion_name,
                     companion_def_id: backward.companion_def_id,
+                    selected_params: backward.selected_params,
                 });
             (entry.def_id, lane, backward)
         }));
