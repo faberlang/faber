@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/sort/nan-text-order.fab"
+group = "language"
+input_root = "corpus"
+input = "sort/nan-text-order.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
