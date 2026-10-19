@@ -27,6 +27,7 @@ use radix_mir::MirType;
 use radix_mir::{
     MirCollectionOp, MirDiagnosticKind, MirIntrinsic, MirLiftOp, MirProvider, MirRuntimeCall,
 };
+use radix_runtime_contract::tensor::ERR_ACCIPE_INVALID_INDEX;
 use radix_types::TypeId;
 use std::sync::Arc;
 
@@ -5299,6 +5300,137 @@ fn tensor_slice_nd_empty_window_is_legal() {
         view.logical_values().expect("valid tensor layout"),
         Vec::new()
     );
+}
+
+#[test]
+fn tensor_slice_nd_dies_out_of_range() {
+    let base = tensor_value((0..12).map(Value::Int).collect(), vec![4, 3]);
+    let lista = |values: Vec<Value>| Value::Array(Rc::new(RefCell::new(values)));
+    let operands = || {
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+            MirOperand::Value(MirValueId(2)),
+            MirOperand::Value(MirValueId(3)),
+            MirOperand::Value(MirValueId(4)),
+            MirOperand::Value(MirValueId(5)),
+        ]
+    };
+
+    // Axis 1: end 3 + inclusive 1 = 4 > extent 3.
+    let result = eval_tensor_view_op(
+        MirCollectionOp::TensorSliceNd,
+        operands(),
+        vec![
+            (MirValueId(0), base.clone()),
+            (MirValueId(1), lista(vec![Value::Int(0), Value::Int(2)])),
+            (MirValueId(2), lista(vec![Value::Int(4), Value::Int(3)])),
+            (MirValueId(3), lista(vec![Value::Int(1), Value::Int(1)])),
+            (
+                MirValueId(4),
+                lista(vec![Value::Bool(true), Value::Bool(true)]),
+            ),
+            (
+                MirValueId(5),
+                lista(vec![Value::Bool(false), Value::Bool(true)]),
+            ),
+        ],
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
+
+    // Dropped axis 1 starts at its extent (3 >= 3).
+    let result = eval_tensor_view_op(
+        MirCollectionOp::TensorSliceNd,
+        operands(),
+        vec![
+            (MirValueId(0), base),
+            (MirValueId(1), lista(vec![Value::Int(1), Value::Int(3)])),
+            (MirValueId(2), lista(vec![Value::Int(4), Value::Int(3)])),
+            (MirValueId(3), lista(vec![Value::Int(1), Value::Int(1)])),
+            (
+                MirValueId(4),
+                lista(vec![Value::Bool(true), Value::Bool(false)]),
+            ),
+            (
+                MirValueId(5),
+                lista(vec![Value::Bool(false), Value::Bool(false)]),
+            ),
+        ],
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
+}
+
+#[test]
+fn tensor_slice_nd_dies_on_zero_step_and_rank_mismatch() {
+    let base = tensor_value((0..12).map(Value::Int).collect(), vec![4, 3]);
+    let lista = |values: Vec<Value>| Value::Array(Rc::new(RefCell::new(values)));
+
+    // A zero step is never a legal window.
+    let result = eval_tensor_view_op(
+        MirCollectionOp::TensorSliceNd,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+            MirOperand::Value(MirValueId(2)),
+            MirOperand::Value(MirValueId(3)),
+            MirOperand::Value(MirValueId(4)),
+            MirOperand::Value(MirValueId(5)),
+        ],
+        vec![
+            (MirValueId(0), base.clone()),
+            (MirValueId(1), lista(vec![Value::Int(0), Value::Int(0)])),
+            (MirValueId(2), lista(vec![Value::Int(1), Value::Int(1)])),
+            (MirValueId(3), lista(vec![Value::Int(0), Value::Int(1)])),
+            (
+                MirValueId(4),
+                lista(vec![Value::Bool(true), Value::Bool(true)]),
+            ),
+            (
+                MirValueId(5),
+                lista(vec![Value::Bool(false), Value::Bool(false)]),
+            ),
+        ],
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
+
+    // A starts list longer than the receiver's rank is a rank mismatch.
+    let result = eval_tensor_view_op(
+        MirCollectionOp::TensorSliceNd,
+        vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+            MirOperand::Value(MirValueId(2)),
+            MirOperand::Value(MirValueId(3)),
+            MirOperand::Value(MirValueId(4)),
+            MirOperand::Value(MirValueId(5)),
+        ],
+        vec![
+            (MirValueId(0), base),
+            (
+                MirValueId(1),
+                lista(vec![Value::Int(0), Value::Int(0), Value::Int(0)]),
+            ),
+            (MirValueId(2), lista(vec![Value::Int(1), Value::Int(1)])),
+            (MirValueId(3), lista(vec![Value::Int(1), Value::Int(1)])),
+            (
+                MirValueId(4),
+                lista(vec![Value::Bool(true), Value::Bool(true)]),
+            ),
+            (
+                MirValueId(5),
+                lista(vec![Value::Bool(false), Value::Bool(false)]),
+            ),
+        ],
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
 }
 
 #[test]
