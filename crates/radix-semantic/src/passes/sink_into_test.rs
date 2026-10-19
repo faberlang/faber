@@ -193,3 +193,51 @@ main {}",
         "sink_into_receiver_not_sink",
     );
 }
+
+// =============================================================================
+// R6 `const` is deep: a sink reached through a `let` name is refused
+// =============================================================================
+
+#[test]
+fn rule6_a_sink_reached_through_a_let_name_is_rejected() {
+    assert_rejects(
+        &with_sinking(
+            r#"main {
+    let Box sink ← Box { items = [] }
+    sink ⇜ "x"
+}"#,
+        ),
+        SemanticErrorKind::ImmutableAssignment,
+        "mutating_receiver_through_const",
+    );
+}
+
+#[test]
+fn rule6_a_mut_local_is_writable() {
+    assert_accepts(&with_sinking(
+        r#"main {
+    mut Box sink ← Box { items = [] }
+    sink ⇜ "x"
+}"#,
+    ));
+}
+
+// =============================================================================
+// R7 no `⇜` into a collection the enclosing loop iterates
+// =============================================================================
+
+#[test]
+fn rule7_a_sink_into_inside_a_loop_over_the_same_name_is_rejected() {
+    assert_rejects(
+        &with_sinking(
+            r#"main {
+    mut list<string> xs ← ["a"]
+    for from xs let x {
+        xs ⇜ x
+    }
+}"#,
+        ),
+        SemanticErrorKind::OperandTypesInvalid,
+        "loop_collection_shape_change",
+    );
+}
