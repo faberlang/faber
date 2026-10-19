@@ -1,0 +1,13 @@
++++
+term = "json"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "json_literal", "json_member", "json_value", "json_object", "json_string", "json_number", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "JSON object keys must be quoted strings: a bare identifier key rejects with PARSE001:json_quoted_key."
+syntax = "{ a: 1 }"
+related = ["json"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:json_quoted_key"
++++
