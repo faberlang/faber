@@ -1,0 +1,43 @@
++++
+term = "ordo"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "unary_expr", "literal", "member_suffix", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Enum member values: implicit increment after an explicit value, gaps, and hex/binary/underscore literals."
+syntax = "enum <N> { a = 5, b }"
+related = ["ordo"]
+locale = "en"
++++
+# =============================================================================
+# enum-values — Enum member values: implicit increment, gaps, literal forms.
+# =============================================================================
+#
+# What this teaches:
+#   • A member without `= n` takes the previous member's number plus one, even
+#     after an explicit value jumps forward or back: `a = 5, b, c = 1, d`
+#     numbers a 5, b 6, c 1, d 2.
+#   • Member values accept every integer literal form: hex, binary and
+#     underscore-separated: `a = 0x10, b = 0b11, c = 1_000`.
+#   • `member ↦ int` reads the number, whether it was written or inferred.
+#
+# Common mistakes:
+#   • Expecting the members to be renumbered to stay ascending — the numbers
+#     follow the source order, so a later `c = 1` is lower than `b`.
+#   • Writing the value with `←` — a member value is compile-time and uses `=`.
+#
+# See also: ordo
+# =============================================================================
+
+enum E { a = 5, b, c = 1, d }
+enum N { a = 0x10, b = 0b11, c = 1_000 }
+
+main {
+    print E.a ↦ int
+    print E.b ↦ int
+    print E.c ↦ int
+    print E.d ↦ int
+    print N.a ↦ int
+    print N.b ↦ int
+    print N.c ↦ int
+}

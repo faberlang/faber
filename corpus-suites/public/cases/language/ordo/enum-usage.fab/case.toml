@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/ordo/enum-usage.fab"
+group = "language"
+input_root = "corpus"
+input = "ordo/enum-usage.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
