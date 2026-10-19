@@ -1,0 +1,39 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Axis reductions over an integer tensor: sums stay i32, mean(axis n) yields floats."
+syntax = "ti32.sum(axis n) | ti32.mean(axis n)"
+related = ["tensor", "fractus", "lista"]
+locale = "en"
++++
+
+# axis reductions over an INTEGER tensor: `sum(axis n)` and `sum()` stay i32,
+# `mean(axis n)` promotes to float.
+#
+# grid = [[1,2,3],[4,5,6]] (shape [2, 3], element type i32):
+#   sum(axis 0) = [5, 7, 9]    shape [3]   integer
+#   sum(axis 1) = [6, 15]      shape [2]   integer
+#   mean(axis 1) = [2.0, 5.0]  shape [2]   float: exact means, rounded at the store
+#   sum()       = 21           scalar
+#
+# EXPECTED stdout is the .expected file beside this exemplar.
+
+main {
+    let list<i32> fa ← [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+    ]
+    let ti32[2, 3] a ← fa ↦ ti32[2, 3]
+
+    print a.sum(axis 0).flatten()
+    print a.sum(axis 1).flatten()
+    print a.mean(axis 1).flatten()
+    print a.sum()
+}
