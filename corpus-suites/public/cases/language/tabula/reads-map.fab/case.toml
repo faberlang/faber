@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/tabula/reads-map.fab"
+group = "language"
+input_root = "corpus"
+input = "tabula/reads-map.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "tabula missing key"
+check_only = false
