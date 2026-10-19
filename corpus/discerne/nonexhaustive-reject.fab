@@ -1,0 +1,36 @@
++++
+term = "discerne nonexhaustive"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Decline: a discerne over a union must name every variant or carry a default arm; omitting Dot is rejected with SEM040:missing_variants."
+syntax = "discerne <Shape> { case Circle let r … case Rect let w … } — rejected; add case Dot or a default arm"
+related = ["discerne", "casu", "omnia"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM040:missing_variants"
++++
+
+# =============================================================================
+# discerne nonexhaustive — a missing union variant is a check error
+# =============================================================================
+# discerne matches a closed set: the members of a union, the variants of an
+# enum. Shape has three variants (Circle, Rect, Dot) and the arms below name
+# only two of them. The trailing `return 0` is not an arm, so Dot is never
+# matched and the discerne is rejected with SEM040:missing_variants.
+#
+# DELIBERATE: the discerne below is the rejected form, kept on purpose to pin
+# the diagnostic. The accepted spellings are `case Dot { … }` or a default arm.
+
+union Shape { Circle { int r }, Rect { int w }, Dot }
+
+fn f(Shape s) → int {
+    match s {
+        case Circle let r { return r }
+        case Rect let w { return w }
+    }
+    return 0
+}
+
+main { print 1 }
