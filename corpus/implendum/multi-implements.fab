@@ -1,0 +1,103 @@
++++
+term = "implendum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "implendum_decl", "implendum_method_decl", "genus_decl", "genus_member", "genus_field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "sit_decl", "fixum_decl", "assignment", "incipit_stmt", "itera_stmt", "itera_binding", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Implements two contracts at once and dispatches through each interface type, including a list of interface-typed values."
+syntax = "class <Name> implements <Implendum>, <Implendum> { … }"
+aliases = ["interface", "multiple interfaces"]
+related = ["implendum", "genus", "implet"]
+locale = "en"
++++
+# =============================================================================
+# implendum — One class implements several contracts
+# =============================================================================
+#
+# What this teaches:
+#   • One class may satisfy two implenda at once: `implements A, B` lists them
+#   • Dispatch is per interface type — a value passed as `A` calls `a()`, the
+#     same value passed as `B` calls `b()`
+#   • An interface type is a usable element type: `list<Shape>` holds
+#     different classes and `s.area()` dispatches per element
+#
+# Common mistakes:
+#   • calling `b()` on an `A`-typed parameter — the interface type, not the
+#     concrete class, decides the visible surface
+#   • treating `implements A, B` as inheritance — both members are contracts,
+#     and every method of each must have a body
+#
+# See also: implendum, genus, implet
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# (a) one class, two contracts, dispatch through either interface type
+# -----------------------------------------------------------------------------
+
+interface A {
+    fn a() → int
+}
+
+interface B {
+    fn b() → int
+}
+
+class C implements A, B {
+    mut int v = 3
+
+    fn a() → int {
+        return self.v
+    }
+
+    fn b() → int {
+        return self.v * 2
+    }
+}
+
+fn useA(A x) → int {
+    return x.a()
+}
+
+fn useB(B x) → int {
+    return x.b()
+}
+
+# -----------------------------------------------------------------------------
+# (b) a list of interface-typed values dispatches per element
+# -----------------------------------------------------------------------------
+
+interface Shape {
+    fn area() → int
+}
+
+class Sq implements Shape {
+    mut int s
+
+    fn area() → int {
+        return self.s * self.s
+    }
+}
+
+class Rect implements Shape {
+    mut int w
+    mut int h
+
+    fn area() → int {
+        return self.w * self.h
+    }
+}
+
+main {
+    let C c ← C {}
+    print useA(c)
+    print useB(c)
+
+    mut list<Shape> xs ← empty
+    xs.append(Sq { s = 3 })
+    xs.append(Rect { w = 2, h = 5 })
+    mut int t ← 0
+    for from xs let s {
+        t ← t + s.area()
+    }
+    print t
+}

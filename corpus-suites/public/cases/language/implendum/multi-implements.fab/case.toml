@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/implendum/multi-implements.fab"
+group = "language"
+input_root = "corpus"
+input = "implendum/multi-implements.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
