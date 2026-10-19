@@ -1041,6 +1041,18 @@ impl TypeChecker<'_> {
             return element;
         }
         let resolved = self.resolve_inferred_type(obj_ty);
+        // WHY: a bracket range on a tensor is a sliced tensor, not a list
+        // window, so it routes to the tensor range checker before the
+        // composite-key path (a range is never a tuple key) and before the
+        // window decline in `check_index_from_type`.
+        let (_, payload) = self.types.peel_access_marker(resolved);
+        if let Type::Tensor(elem, shape) = self.types.get(payload).clone()
+            && matches!(index.kind, HirExpressionKind::Intervallum { .. })
+        {
+            return super::tensor_index::check_tensor_bracket_range_index(
+                self, obj_ty, elem, shape, index,
+            );
+        }
         let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
             Some(ty) => ty,
             None => self.check_expr_allowing_direct_intervallum_step(index),
