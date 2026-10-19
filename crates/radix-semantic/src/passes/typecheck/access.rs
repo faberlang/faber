@@ -29,8 +29,9 @@ const ISSUE_INDEXING_REQUIRES_ARRAY_OR_MAP: &str = "indexing_requires_array_or_m
 const ISSUE_WINDOW_REQUIRES_LIST: &str = "window_requires_list";
 const ISSUE_MAP_INDEX_TYPE_MISMATCH: &str = "map_index_type_mismatch";
 const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_integer_elements";
-const ISSUE_TENSOR_SCALAR_INDEX_RANK: &str = "tensor_scalar_index_rank";
-const ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA: &str = "tensor_bracket_index_integer_or_lista";
+pub(super) const ISSUE_TENSOR_SCALAR_INDEX_RANK: &str = "tensor_scalar_index_rank";
+pub(super) const ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA: &str =
+    "tensor_bracket_index_integer_or_lista";
 const ISSUE_TENSOR_BRACKET_INDEX_DECIMAL: &str = "tensor_bracket_index_decimal_rejected";
 const ISSUE_INVALID_ASSIGNMENT_TARGET: &str = "invalid_assignment_target";
 
