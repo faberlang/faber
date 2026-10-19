@@ -1,0 +1,38 @@
++++
+term = "octeti"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "An octeti literal is not a callable template: applying it as |00|(id) rejects with SEM011:octeti_literal_template_application."
+syntax = "|00|(id)"
+related = ["octeti", "scriptum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:octeti_literal_template_application"
++++
+# =============================================================================
+# octeti — an octeti literal is not a callable template
+# =============================================================================
+#
+# What this teaches:
+#   • Byte-buffer literals are data, not templates — no holes, no application
+#   • `|00|(id)` parses as a call on the literal and rejects with
+#     SEM011:octeti_literal_template_application
+#
+# Common mistakes:
+#   • Writing `|…|(args)` for string-style templating — use string (scriptum)
+#     formatting instead of calling an octeti literal
+#
+# See also: octeti, scriptum
+# =============================================================================
+
+# octeti reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let _ id ← 1
+    let _ bad ← |00|(id)
+    print bad
+}
