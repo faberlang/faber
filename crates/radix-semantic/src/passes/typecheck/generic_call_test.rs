@@ -749,7 +749,7 @@ fn sermo_directional_live_methods_typecheck() {
     sit sermo s ← ad 'runtime:echo' ("salve")
     sit meus<textus> m ← s.meus<textus>()
     sit tuus<textus> t ← s.tuus<textus>()
-    m.da("salve")
+    m.sink("salve")
     sit scrinium<textus> ∪ nihil reply ← t.accipe()
     sit textus drained ← t.exhauri()
     sit status outbound ← m.fini()

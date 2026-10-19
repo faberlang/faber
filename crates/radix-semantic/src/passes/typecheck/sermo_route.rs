@@ -16,7 +16,7 @@
 //! - `s.tuus<T>()` requires `T = R` and `s.meus<T>()` requires `T = O`; an
 //!   omitted `T` is inferred.
 //! - Handlers cannot read later frames (two-way handlers are deferred), so
-//!   `meus.da` toward a Faber handler is an error; `meus.fini()` stays legal.
+//!   `meus.sink` toward a Faber handler is an error; `meus.fini()` stays legal.
 //! - `sermo<O, R>` assigns to bare `sermo`; the reverse is an error.
 //!
 //! The type arguments are compile-time only. Finalization erases them
