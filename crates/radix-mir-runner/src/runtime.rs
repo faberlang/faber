@@ -1734,9 +1734,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorFlatten => self.tensor_flatten(args, span),
             MirCollectionOp::TensorMaterialize => self.tensor_materialize(args, span),
             MirCollectionOp::TensorSlice => self.tensor_slice(args, span),
-            MirCollectionOp::TensorSliceNd => {
-                Err(RunnerError::unsupported(span, "tensor slice-nd"))
-            }
+            MirCollectionOp::TensorSliceNd => self.tensor_slice_nd(args, span),
             MirCollectionOp::TensorExpand => self.tensor_expand(args, span),
             MirCollectionOp::TensorShift => self.tensor_shift(args, span),
             MirCollectionOp::TensorCopyInto => self.tensor_copy_into(args, span),
@@ -3053,6 +3051,112 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             },
         );
         Ok(Value::Tensor(Rc::new(RefCell::new(view))))
+    }
+
+    /// `TensorSliceNd(receiver, starts, ends, steps, keeps, inclusives)`: the
+    /// ruled multi-axis strided logical view.
+    ///
+    /// Unlike `tensor_slice`, the bracket dies: no bound is clamped, so an
+    /// out-of-range window is `ERR_ACCIPE_INVALID_INDEX` rather than a silently
+    /// shortened view.
+    fn tensor_slice_nd(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver, starts, ends, steps, keeps, inclusives] = args else {
+            return Err(RunnerError::internal(span, "tensor slice-nd arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let starts = self.index_cells_arg(starts, span, ERR_ACCIPE_INVALID_INDEX)?;
+        let ends = self.index_cells_arg(ends, span, ERR_ACCIPE_INVALID_INDEX)?;
+        let steps = self.index_cells_arg(steps, span, ERR_ACCIPE_INVALID_INDEX)?;
+        let keeps = self.bivalens_arg(keeps, span)?;
+        let inclusives = self.bivalens_arg(inclusives, span)?;
+        let starts = self.index_cells_i64(&starts, span)?;
+        let ends = self.index_cells_i64(&ends, span)?;
+        let steps = self.index_cells_i64(&steps, span)?;
+        let borrow = tensor.borrow();
+        let rank = borrow.shape.len();
+        if starts.len() != rank
+            || ends.len() != rank
+            || steps.len() != rank
+            || keeps.len() != rank
+            || inclusives.len() != rank
+        {
+            return Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX));
+        }
+        let mut shape = Vec::with_capacity(rank);
+        let mut strides = Vec::with_capacity(rank);
+        let mut offset = borrow.offset;
+        for axis in 0..rank {
+            let step = steps[axis];
+            if step < 1 {
+                return Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX));
+            }
+            let end_eff = ends[axis]
+                .checked_add(i64::from(inclusives[axis]))
+                .ok_or_else(|| RunnerError::internal(span, "tensor slice-nd shape overflow"))?;
+            let start = starts[axis];
+            if start > end_eff || end_eff > borrow.shape[axis] {
+                return Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX));
+            }
+            if !keeps[axis] && start >= borrow.shape[axis] {
+                return Err(RunnerError::internal(span, ERR_ACCIPE_INVALID_INDEX));
+            }
+            let step_stride = isize::try_from(step)
+                .map_err(|_| RunnerError::internal(span, "tensor slice-nd stride overflow"))?;
+            let axis_stride = borrow.strides[axis];
+            offset = offset
+                .checked_add(
+                    isize::try_from(start)
+                        .map_err(|_| {
+                            RunnerError::internal(span, "tensor slice-nd offset overflow")
+                        })?
+                        .checked_mul(axis_stride)
+                        .ok_or_else(|| {
+                            RunnerError::internal(span, "tensor slice-nd stride overflow")
+                        })?,
+                )
+                .ok_or_else(|| RunnerError::internal(span, "tensor slice-nd offset overflow"))?;
+            if keeps[axis] {
+                let extent = usize::try_from(end_eff - start)
+                    .map_err(|_| RunnerError::internal(span, "tensor slice-nd shape overflow"))?
+                    .div_ceil(usize::try_from(step).map_err(|_| {
+                        RunnerError::internal(span, "tensor slice-nd shape overflow")
+                    })?);
+                shape.push(
+                    i64::try_from(extent).map_err(|_| {
+                        RunnerError::internal(span, "tensor slice-nd shape overflow")
+                    })?,
+                );
+                strides.push(axis_stride.checked_mul(step_stride).ok_or_else(|| {
+                    RunnerError::internal(span, "tensor slice-nd stride overflow")
+                })?);
+            }
+        }
+        // Gradient inverse maps for this op ride the deferred K6 gradient surface.
+        let view = borrow.logical_view(shape, strides, offset).ok_or_else(|| {
+            RunnerError::internal(span, "tensor slice-nd view exceeds backing storage")
+        })?;
+        Ok(Value::Tensor(Rc::new(RefCell::new(view))))
+    }
+
+    /// Evaluate one `bivalens` list operand of `tensor_slice_nd`.
+    fn bivalens_arg(&mut self, operand: &MirOperand, span: Span) -> Result<Vec<bool>, RunnerError> {
+        let value = self.eval_operand(operand, span)?;
+        let Value::Array(cell) = &value else {
+            return Err(RunnerError::internal(
+                span,
+                format!("tensor slice-nd lista argument type mismatch: {value:?}"),
+            ));
+        };
+        cell.borrow()
+            .iter()
+            .map(|element| match element {
+                Value::Bool(flag) => Ok(*flag),
+                other => Err(RunnerError::internal(
+                    span,
+                    format!("tensor slice-nd lista argument type mismatch: {other:?}"),
+                )),
+            })
+            .collect()
     }
 
     /// The arithmetic and unary operators of a numeric `lista` (or queue/stack):
@@ -4836,6 +4940,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             shape_element(element, span, negative_message)?;
         }
         Ok(cell)
+    }
+
+    /// Flatten an already validated `index_cells_arg` lista into plain `i64`s.
+    fn index_cells_i64(
+        &self,
+        cells: &Rc<RefCell<Vec<Value>>>,
+        span: Span,
+    ) -> Result<Vec<i64>, RunnerError> {
+        cells
+            .borrow()
+            .iter()
+            .map(|value| shape_element(value, span, ERR_ACCIPE_INVALID_INDEX))
+            .collect()
     }
 
     fn conversion_shape_arg(
