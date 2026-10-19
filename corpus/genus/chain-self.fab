@@ -1,0 +1,56 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "assignment", "place"]
+category = "type"
+canonical = false
+summary = "A method returning self chains: a.add(3).add(4)."
+syntax = "a.add(3).add(4)"
+related = ["genus"]
+locale = "en"
++++
+# =============================================================================
+# genus — A method returning self chains
+# =============================================================================
+#
+# What this teaches:
+#   • A method whose return type is the genus returns `self`, so the next call
+#     attaches to the value the method returned.
+#   • Chaining is plain member access on that returned value, not a special
+#     call form: `a.add(3).add(4)` is two calls in sequence.
+#   • The mutations land on the same object, so `get()` sees both of them.
+#
+# Common mistakes:
+#   • Returning nothing from a method declared to return the genus — the chain
+#     has no receiver.
+#   • Forgetting the `mut` field: a read-only field cannot be written by the
+#     method body.
+#   • Reading the result of a chain as a copy — it is the same value.
+#
+# See also: genus
+# =============================================================================
+
+# GRAMMAR:
+#   assign : place '←' expression
+#   place  : postfixExpr ('.' ident | '[' expression ']')*
+#
+# EXPECTED OUTPUT:
+#   9, 18
+
+class Acc {
+    mut int v = 0
+    fn add(int n) → Acc {
+        self.v ← self.v + n
+        return self
+    }
+    fn get() → int { return self.v }
+    fn twice() → int { return self.get() * 2 }
+}
+
+main {
+    mut Acc a ← Acc {}
+    a.add(2)
+    a.add(3).add(4)
+    print a.get()
+    print a.twice()
+}
