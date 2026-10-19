@@ -12,8 +12,9 @@ use crate::{
 };
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
-    DefId, HirArrayElement, HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction,
-    HirId, HirIncDecOp, HirItemKind, HirLocal, HirStatement, HirStatementKind, HirUnOp,
+    DefId, HirAnnotation, HirArrayElement, HirBinOp, HirBlock, HirExpression, HirExpressionKind,
+    HirFunction, HirId, HirIncDecOp, HirItemKind, HirLocal, HirStatement, HirStatementKind,
+    HirUnOp,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_target::Target;
@@ -331,14 +332,21 @@ pub fn check(
 ) -> KernelRequirementsReport {
     let facts = TypeFacts::from_hir(hir);
     let mut callables: FxHashMap<DefId, (&HirFunction, Span)> = FxHashMap::default();
+    let mut private_kernels: FxHashSet<DefId> = FxHashSet::default();
     for item in &hir.items {
         match &item.kind {
             HirItemKind::Function(function) => {
                 callables.insert(item.def_id, (function.as_ref(), item.span));
+                if function.is_kernel && !is_public_kernel(&item.annotations, interner) {
+                    private_kernels.insert(item.def_id);
+                }
             }
             HirItemKind::Struct(strukt) => {
                 for method in &strukt.methods {
                     callables.insert(method.def_id, (&method.func, method.span));
+                    if method.func.is_kernel && !is_public_kernel(&method.annotations, interner) {
+                        private_kernels.insert(method.def_id);
+                    }
                 }
             }
             _ => {}
@@ -423,6 +431,19 @@ pub fn check(
             _ => {}
         }
     }
+    seed_constant_kernel_arguments(
+        &mut kernels,
+        hir,
+        &facts,
+        &callables,
+        &private_kernels,
+        &const_values,
+        resolver,
+        types,
+        interner,
+        tensor_edge_policies,
+        recursive_kernels,
+    );
     let callback_defs: FxHashSet<DefId> = tensor_edge_policies
         .calls
         .values()
@@ -443,6 +464,170 @@ pub fn check(
         &callback_defs,
     );
     KernelRequirementsReport { kernels }
+}
+
+/// Whether a kernel declaration carries the `publica` launch marker.
+fn is_public_kernel(annotations: &[HirAnnotation], interner: &Interner) -> bool {
+    annotations
+        .iter()
+        .any(|annotation| interner.resolve(annotation.family) == "publica")
+}
+
+/// Exact integer value of a call argument used to seed an inlined private
+/// kernel callee. `resolver` is reserved for imported constant paths.
+fn kernel_constant_argument(
+    expr: &HirExpression,
+    const_values: &FxHashMap<DefId, i128>,
+    resolver: &Resolver,
+) -> Option<i128> {
+    let _ = resolver;
+    match &expr.kind {
+        HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => Some(i128::from(*value)),
+        HirExpressionKind::Literal(radix_hir::HirLiteral::BigInt(_)) => {
+            crate::passes::const_int_value(expr)
+        }
+        HirExpressionKind::Path(def_id) => const_values.get(def_id).copied(),
+        HirExpressionKind::Unary(HirUnOp::Neg, inner) => {
+            kernel_constant_argument(inner, const_values, resolver)?.checked_neg()
+        }
+        HirExpressionKind::Binary(op, lhs, rhs) => {
+            let lhs = kernel_constant_argument(lhs, const_values, resolver)?;
+            let rhs = kernel_constant_argument(rhs, const_values, resolver)?;
+            match op {
+                HirBinOp::Add => lhs.checked_add(rhs),
+                HirBinOp::Sub => lhs.checked_sub(rhs),
+                HirBinOp::Mul => lhs.checked_mul(rhs),
+                HirBinOp::Div => lhs.checked_div(rhs),
+                HirBinOp::Mod => lhs.checked_rem(rhs),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Collects the constant integer argument tuple each private kernel callee is
+/// reached with, so an inlined callee can be analyzed with concrete parameters.
+struct KernelCallCollector<'a, 'hir> {
+    callables: &'a FxHashMap<DefId, (&'hir HirFunction, Span)>,
+    const_values: &'a FxHashMap<DefId, i128>,
+    resolver: &'a Resolver,
+    types: &'a TypeTable,
+    sites: FxHashMap<DefId, Vec<Option<FxHashMap<DefId, i128>>>>,
+}
+
+impl HirVisitor for KernelCallCollector<'_, '_> {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::Call(callee, _, args, _) = &expr.kind
+            && let HirExpressionKind::Path(callee_def) = &callee.kind
+            && let Some((function, _)) = self.callables.get(callee_def)
+            && function.is_kernel
+        {
+            let mut seed = FxHashMap::default();
+            let mut complete = true;
+            for (position, param) in function.params.iter().enumerate() {
+                if integer_slot(param.ty, self.types).is_none() {
+                    continue;
+                }
+                let Some(value) = args.get(position).and_then(|arg| {
+                    kernel_constant_argument(&arg.expr, self.const_values, self.resolver)
+                }) else {
+                    complete = false;
+                    break;
+                };
+                seed.insert(param.def_id, value);
+            }
+            self.sites
+                .entry(*callee_def)
+                .or_default()
+                .push(complete.then_some(seed));
+        }
+        walk_expr(self, expr);
+    }
+}
+
+/// Rule 12.7 inlines private kernel helpers at their call sites, so a call
+/// with constant arguments proves the callee's parameter ranges. A callee is
+/// only re-analyzed when every call site agrees on the same constant tuple;
+/// otherwise its conservative row stands.
+#[allow(clippy::too_many_arguments)]
+fn seed_constant_kernel_arguments(
+    kernels: &mut [KernelRequirement],
+    hir: &radix_hir::HirModule,
+    facts: &TypeFacts,
+    callables: &FxHashMap<DefId, (&HirFunction, Span)>,
+    private_kernels: &FxHashSet<DefId>,
+    const_values: &FxHashMap<DefId, i128>,
+    resolver: &Resolver,
+    types: &TypeTable,
+    interner: &Interner,
+    tensor_edge_policies: &TensorEdgePolicyTable,
+    recursive_kernels: &FxHashSet<DefId>,
+) {
+    let mut collector = KernelCallCollector {
+        callables,
+        const_values,
+        resolver,
+        types,
+        sites: FxHashMap::default(),
+    };
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(function) if function.is_kernel => {
+                collector.visit_function(function);
+            }
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    if method.func.is_kernel {
+                        collector.visit_function(&method.func);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    for (callee, sites) in collector.sites {
+        if !private_kernels.contains(&callee) || recursive_kernels.contains(&callee) {
+            continue;
+        }
+        let Some(Some(tuple)) = sites.first() else {
+            continue;
+        };
+        if tuple.is_empty() || sites.iter().any(|site| site.as_ref() != Some(tuple)) {
+            continue;
+        }
+        let Some((function, _)) = callables.get(&callee).copied() else {
+            continue;
+        };
+        let mut seeded = analyze_kernel(
+            callee,
+            function,
+            facts,
+            const_values,
+            resolver,
+            types,
+            interner,
+            tensor_edge_policies,
+            recursive_kernels.contains(&callee),
+            None,
+            Some(tuple),
+        );
+        analyze_limes_callbacks(
+            &mut seeded,
+            function,
+            tensor_edge_policies,
+            callables,
+            types,
+            interner,
+            facts,
+            resolver,
+            const_values,
+            recursive_kernels,
+        );
+        if let Some(row) = kernels.iter_mut().find(|kernel| kernel.def_id == callee) {
+            *row = seeded;
+        }
+    }
 }
 
 fn analyze_kernel(
