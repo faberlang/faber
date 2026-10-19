@@ -46,6 +46,9 @@ pub fn apply_default_import_names(program: &mut Program, interner: &mut Interner
         let StmtKind::Import(decl) = &mut stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         if !import_takes_default_name(decl) {
             continue;
         }

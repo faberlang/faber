@@ -1089,6 +1089,9 @@ pub(crate) fn import_contract_for_parsed_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         // A selective import introduces no namespace; key its interface by
         // the import path, as the package analysis does, so the resolve pass
         // finds its members (`importa ex "norma:order" fixum Orderable`).
@@ -1235,6 +1238,9 @@ fn collect_transitive_same_package_interfaces(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let import_path = interner.resolve(decl.path);
         let is_relative = import_path.starts_with("./");
         let is_provider_form = import_path
@@ -1495,6 +1501,9 @@ fn package_identity_facts_for_parsed_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let Some(binding) = import_binding(interner, &decl.kind) else {
             continue;
         };
@@ -1616,6 +1625,9 @@ impl SnapshotContext {
             let StmtKind::Import(decl) = &stmt.kind else {
                 continue;
             };
+            if decl.target.is_some() {
+                continue;
+            }
             let Some(binding) = import_binding(interner, &decl.kind) else {
                 continue;
             };
