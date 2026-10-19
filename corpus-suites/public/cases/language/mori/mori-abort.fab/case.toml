@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/mori/mori-abort.fab"
+group = "language"
+input_root = "corpus"
+input = "mori/mori-abort.fab"
+
+
+[expect]
+check_only = true
