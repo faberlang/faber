@@ -168,17 +168,20 @@ functio truthy(textus s) → bivalens ⇥ numerus {
 }
 
 #[test]
-fn truthiness_conversio_rejects_recovery_slot() {
-    for source in [
-        "0 ↦ bivalens ⊥ verum",
-        "0.0 ↦ bivalens ⊥ verum",
-        "\"\" ↦ bivalens ⊥ verum",
-        "'no' ↦ bivalens ⊥ verum",
-    ] {
+fn numeric_truthiness_conversio_rejects_recovery_slot() {
+    for source in ["0 ↦ bivalens ⊥ verum", "0.0 ↦ bivalens ⊥ verum"] {
         test_support::assert_rejects_with_issue_la(
             &format!("incipit {{ sit _ b ← {source} }}"),
             "bivalens_recovery_unsupported",
         );
+    }
+}
+
+/// Q-B4: a text or ASCII word parse is fallible, so an inline ⊥ default is legal even though numeric truthiness has nothing to recover.
+#[test]
+fn text_truthiness_conversio_accepts_recovery_slot() {
+    for source in ["\"salve\" ↦ bivalens ⊥ falsum", "'no' ↦ bivalens ⊥ falsum"] {
+        test_support::assert_accepts_la(&format!("incipit {{ sit _ b ← {source} }}"));
     }
 }
 
