@@ -1,0 +1,37 @@
++++
+term = "bits"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A literal negative shift count is refused before the run."
+syntax = "a ⇐ -1 — rejected"
+related = ["bits"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:shift_count_negative"
++++
+# =============================================================================
+# bits — A literal negative shift count is refused before the run.
+# =============================================================================
+#
+# What this teaches:
+#   • a shift count written as a literal negative number is a compile error
+#   • the checker refuses it by name, before any emission or run
+#
+# Common mistakes:
+#   • expecting the literal to become the run-time trap — a *variable*
+#     negative count is the run-time one (bits-shift-negative); a literal is
+#     caught here
+#
+# See also: bits-shift-negative, bits-operations
+# =============================================================================
+
+# bits reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let b8 a ← 0xf3
+    print a ⇐ -1
+}
