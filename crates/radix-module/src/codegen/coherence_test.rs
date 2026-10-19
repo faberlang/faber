@@ -232,7 +232,7 @@ fn compile(target: Target) -> String {
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
     sit meus<textus> m ← s.meus<textus>()
-    m.da("ping")
+    m.sink("ping")
     m.fini()
     sit tuus<textus> t ← s.tuus<textus>()
     t.fini()

@@ -34,7 +34,7 @@ locale = "en"
 main {
     let channel s ← call 'runtime:echo' ("salve")
     let send<string> m ← s.send<string>()
-    m.da("ping")
+    m.sink("ping")
     let status outbound ← m.finish()
     let recv<string> t ← s.recv<string>()
     for from t.cursor() let frame {

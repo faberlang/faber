@@ -180,12 +180,12 @@ fn meus_close_is_legal_on_a_faber_route() {
 fn meus_send_toward_a_faber_handler_is_rejected() {
     rejects(
         TEXT_TO_NUM,
-        "sit _ s ← ad 'x:y' (\"a\")\ns.meus<textus>().da(\"b\")",
+        "sit _ s ← ad 'x:y' (\"a\")\ns.meus<textus>().sink(\"b\")",
         "ad_handler_send_closed",
     );
     rejects(
         TEXT_TO_NUM,
-        "sit _ s ← ad 'x:y' (\"a\")\nsit _ m ← s.meus<textus>()\nm.da(\"b\")",
+        "sit _ s ← ad 'x:y' (\"a\")\nsit _ m ← s.meus<textus>()\nm.sink(\"b\")",
         "ad_handler_send_closed",
     );
 }
