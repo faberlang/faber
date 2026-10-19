@@ -56,6 +56,20 @@ pub trait KernelDispatcher {
         span: Span,
     ) -> Result<Option<Value>, RunnerError>;
 
+    /// Whether this dispatcher already carries a device kernel for `function`
+    /// and therefore owns its calls.
+    ///
+    /// The shader stage alone never decides: a package-local function with no
+    /// stage annotation is still a device unit when the device image was built
+    /// with it (the generic device-update invocation seam). The dispatcher owns
+    /// that fact, so the runner asks rather than inferring from the stage.
+    /// The default `false` keeps every existing implementor and the CPU routes
+    /// unchanged: only a dispatcher that built the function as a kernel claims
+    /// it.
+    fn claims_dispatch(&mut self, _function: MirFunctionId) -> bool {
+        false
+    }
+
     /// Tag the launches of the next [`Self::dispatch`] with the innermost open
     /// handled block (`None`: no block is open). Called by the runner right
     /// before each dispatch; the tag comes back on a [`DeviceFault`].
