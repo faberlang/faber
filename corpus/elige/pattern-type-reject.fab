@@ -1,0 +1,38 @@
++++
+term = "elige pattern type mismatch"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "elige_stmt", "casu_elige_clause", "ceterum_clause", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = true
+summary = "A switch case literal must unify with the scrutinee type."
+syntax = "switch level { case 1 { } case \"high\" { } default { } }"
+related = ["elige", "casu", "ceterum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:pattern_type_mismatch"
++++
+# =============================================================================
+# elige pattern type mismatch — a case literal types against its scrutinee
+# =============================================================================
+# Every case literal is checked against the type of the scrutinee. This
+# switch is over an int, but its second arm claims a string, so the check
+# reports SEM010 with the issue pattern_type_mismatch instead of building
+# an arm that can never run.
+
+fn gate(int level) → string {
+    switch level {
+        case 1 {
+            return "low"
+        }
+        case "high" {
+            return "high"
+        }
+        default {
+            return "other"
+        }
+    }
+}
+
+main {
+    print gate(1)
+}
