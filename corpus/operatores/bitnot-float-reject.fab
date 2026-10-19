@@ -1,0 +1,23 @@
++++
+term = "¬"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Bitwise not ¬ takes an integer operand; a float is a compile error."
+syntax = "print ¬x on f64 — rejected"
+related = ["¬", "numerus", "fractus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:integer_operand_required"
++++
+# =============================================================================
+# ¬ — bitwise not wants an integer
+# =============================================================================
+# This exemplum intentionally fails to compile: a float is not an integer
+# operand.
+
+main {
+    let f64 x ← 1.0
+    print ¬x
+}
