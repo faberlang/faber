@@ -1329,3 +1329,119 @@ fn caller(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
         helper.failures
     );
 }
+
+#[test]
+fn imported_const_call_argument_seeds_a_private_kernel_callee() {
+    let fixture = analyze_en_with_params(
+        r#"
+import from "./params" params
+
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, params.CLK_T_WHOLE)
+}
+"#,
+        Some(crate::file_interface::InterfaceConstValue::Int(0)),
+        Some(crate::file_interface::InterfaceConstValue::Int(1)),
+    );
+    let helper = target_row(&fixture, "helper", Target::MirWgsl);
+    assert!(helper.admitted, "{:?}", helper.failures);
+    let caller = target_row(&fixture, "caller", Target::MirWgsl);
+    assert!(caller.admitted, "{:?}", caller.failures);
+
+    let unfolded = analyze_en_with_params(
+        r#"
+import from "./params" params
+
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, params.CLK_T_WHOLE)
+}
+"#,
+        None,
+        None,
+    );
+    let helper = target_row(&unfolded, "helper", Target::MirWgsl);
+    assert!(!helper.admitted, "{:?}", helper.failures);
+    assert!(
+        helper.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::IntermediateOutOfRange { .. }
+        )),
+        "an unfolded imported value keeps the conservative row: {:?}",
+        helper.failures
+    );
+}
+
+#[test]
+fn module_const_call_argument_seeds_a_private_kernel_callee() {
+    let fixture = analyze_en(
+        r"
+const i32 K = 4
+
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, K + 4)
+}
+",
+    );
+    let helper = target_row(&fixture, "helper", Target::MirWgsl);
+    assert!(helper.admitted, "{:?}", helper.failures);
+    let caller = target_row(&fixture, "caller", Target::MirWgsl);
+    assert!(caller.admitted, "{:?}", caller.failures);
+}
+
+#[test]
+fn disagreeing_call_sites_keep_the_conservative_row() {
+    let fixture = analyze_en_with_params(
+        r#"
+import from "./params" params
+
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller_whole(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, params.CLK_T_WHOLE)
+}
+
+@ kernel
+@ public
+fn caller_frac(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, params.CLK_T_FRAC)
+}
+"#,
+        Some(crate::file_interface::InterfaceConstValue::Int(0)),
+        Some(crate::file_interface::InterfaceConstValue::Int(1)),
+    );
+    let helper = target_row(&fixture, "helper", Target::MirWgsl);
+    assert!(
+        helper.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::IntermediateOutOfRange { .. }
+        )),
+        "disagreeing sites keep the conservative row: {:?}",
+        helper.failures
+    );
+}
