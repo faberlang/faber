@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/sponte/call-defaults.fab"
+group = "language"
+input_root = "corpus"
+input = "sponte/call-defaults.fab"
+
+
+[expect]
+check_only = true
