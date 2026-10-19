@@ -642,3 +642,166 @@ fn references_are_values_or_shared_handles() {
     assert_eq!(gaps.len(), 1, "{gaps:?}");
     assert_eq!(gaps[0].shape(), "reference value");
 }
+
+/// `sermo` is a builtin frame struct; the classifier recognizes a conversation
+/// handle by the `SermoOpen` result type, so the fixture only needs one builtin
+/// struct identity to stand in for it.
+fn sermo_handle(types: &mut TypeTable) -> MirType {
+    MirType::semantic(types.intern(Type::Struct(radix_hir::DefId(1))))
+}
+
+fn runtime_call(
+    intrinsic: MirIntrinsic,
+    args: Vec<MirOperand>,
+    return_ty: MirType,
+) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: None,
+            call: MirRuntimeCall {
+                intrinsic,
+                args,
+                return_ty,
+            },
+        },
+        span: sample_span(),
+    }
+}
+
+fn explicit_conversion(source_ty: MirType, target_ty: MirType) -> MirIntrinsic {
+    MirIntrinsic::Convert(MirConversion {
+        store: None,
+        flavor: MirConversionFlavor::Runtime,
+        source_ty,
+        target_ty,
+        params: Vec::new(),
+        recovery: None,
+        struct_defaults: Vec::new(),
+    })
+}
+
+#[test]
+fn sync_scalar_sermo_conversation_is_capable() {
+    let mut types = TypeTable::new();
+    let handle = sermo_handle(&mut types);
+    let numerus = ty(&types, Primitive::Numerus);
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, handle), local(1, numerus)],
+        temps: Vec::new(),
+        statements: vec![
+            runtime_call(
+                MirIntrinsic::SermoOpen,
+                vec![MirOperand::Constant(MirConstant::String(Symbol(21)))],
+                handle,
+            ),
+            runtime_call(
+                MirIntrinsic::SermoSetOpener,
+                vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    MirOperand::Constant(MirConstant::Int(1)),
+                ],
+                vacuum,
+            ),
+            runtime_call(
+                explicit_conversion(handle, numerus),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                numerus,
+            ),
+        ],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+
+    let verdict = classify_with_types(&program, &types);
+    assert!(
+        verdict.is_capable(),
+        "the sync scalar conversation is inside the subset: {verdict:?}"
+    );
+}
+
+#[test]
+fn sermo_ops_still_name_the_gap_in_storage_order() {
+    let mut types = TypeTable::new();
+    let handle = sermo_handle(&mut types);
+    let numerus = ty(&types, Primitive::Numerus);
+    let bivalens = ty(&types, Primitive::Bivalens);
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, handle), local(1, numerus)],
+        temps: Vec::new(),
+        statements: vec![
+            // Admitted calls do not mask the directional operations, and the
+            // gaps keep statement order.
+            runtime_call(
+                MirIntrinsic::SermoOpen,
+                vec![MirOperand::Constant(MirConstant::String(Symbol(21)))],
+                handle,
+            ),
+            runtime_call(
+                explicit_conversion(handle, numerus),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                numerus,
+            ),
+            runtime_call(MirIntrinsic::Sermo(MirSermoOp::Send), Vec::new(), vacuum),
+            runtime_call(MirIntrinsic::Sermo(MirSermoOp::Close), Vec::new(), bivalens),
+        ],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+
+    let verdict = classify_with_types(&program, &types);
+    let gaps = verdict.gaps();
+    assert_eq!(gaps.len(), 2, "two gaps expected: {gaps:?}");
+    assert_eq!(gaps[0].shape(), "runtime call Sermo(Send)");
+    assert_eq!(gaps[1].shape(), "runtime call Sermo(Close)");
+    assert_eq!(gaps[0].slug(), SLUG_CLIF_SUBSET);
+}
+
+#[test]
+fn sermo_text_materialization_is_still_declined() {
+    let mut types = TypeTable::new();
+    let handle = sermo_handle(&mut types);
+    let textus = ty(&types, Primitive::Textus);
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, handle), local(1, textus)],
+        temps: Vec::new(),
+        statements: vec![
+            runtime_call(
+                MirIntrinsic::SermoOpen,
+                vec![MirOperand::Constant(MirConstant::String(Symbol(21)))],
+                handle,
+            ),
+            runtime_call(
+                explicit_conversion(handle, textus),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                textus,
+            ),
+        ],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+
+    let verdict = classify_with_types(&program, &types);
+    let gaps = verdict.gaps();
+    assert_eq!(gaps.len(), 1, "one gap expected: {gaps:?}");
+    assert!(
+        gaps[0]
+            .shape()
+            .contains("Convert Runtime explicit Struct->Textus"),
+        "a text materialization has no CLIF symbol yet: {gaps:?}"
+    );
+}
