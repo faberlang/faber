@@ -5338,7 +5338,12 @@ fn tensor_slice_nd_dies_out_of_range() {
     );
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
+    assert_eq!(err.issue, runner_issue(ERR_ACCIPE_INVALID_INDEX));
+    assert_eq!(err.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(
+        err.args,
+        vec![("detail".to_owned(), ERR_ACCIPE_INVALID_INDEX.to_owned())]
+    );
 
     // Dropped axis 1 starts at its extent (3 >= 3).
     let result = eval_tensor_view_op(
@@ -5361,7 +5366,12 @@ fn tensor_slice_nd_dies_out_of_range() {
     );
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
+    assert_eq!(err.issue, runner_issue(ERR_ACCIPE_INVALID_INDEX));
+    assert_eq!(err.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(
+        err.args,
+        vec![("detail".to_owned(), ERR_ACCIPE_INVALID_INDEX.to_owned())]
+    );
 }
 
 #[test]
@@ -5397,7 +5407,12 @@ fn tensor_slice_nd_dies_on_zero_step_and_rank_mismatch() {
     );
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
+    assert_eq!(err.issue, runner_issue(ERR_ACCIPE_INVALID_INDEX));
+    assert_eq!(err.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(
+        err.args,
+        vec![("detail".to_owned(), ERR_ACCIPE_INVALID_INDEX.to_owned())]
+    );
 
     // A starts list longer than the receiver's rank is a rank mismatch.
     let result = eval_tensor_view_op(
@@ -5430,7 +5445,12 @@ fn tensor_slice_nd_dies_on_zero_step_and_rank_mismatch() {
     );
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert_eq!(err.message, ERR_ACCIPE_INVALID_INDEX);
+    assert_eq!(err.issue, runner_issue(ERR_ACCIPE_INVALID_INDEX));
+    assert_eq!(err.code, RUNNER_CODE_INTERNAL);
+    assert_eq!(
+        err.args,
+        vec![("detail".to_owned(), ERR_ACCIPE_INVALID_INDEX.to_owned())]
+    );
 }
 
 #[test]
