@@ -1,0 +1,22 @@
++++
+term = "-"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Arithmetic operators take numeric operands only; a text operand is a compile error."
+syntax = "textus - numerus — rejected"
+related = ["numerus", "textus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:numeric_operands_required"
++++
+# =============================================================================
+# - — arithmetic wants numbers
+# =============================================================================
+# This exemplum intentionally fails to compile: a string is not a numeric
+# operand.
+
+main {
+    print "a" - 1
+}
