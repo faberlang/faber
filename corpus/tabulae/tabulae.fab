@@ -1,0 +1,58 @@
++++
+term = "tabulae"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Insertion-ordered key/value map type."
+syntax = "tabulae<K,V>"
+aliases = ["ledger"]
+related = ["tabula", "lista", "itera"]
+locale = "en"
++++
+# =============================================================================
+# tabulae — Insertion-ordered key/value map type.
+# =============================================================================
+#
+# What this teaches:
+#   • `ledger<K,V>` keeps entries in insertion order: an update keeps the
+#     slot, a delete drops it, a re-add appends at the end
+#   • iteration (`for from l at [k] let v`), `length()`, `delete(k)` and
+#     `print l` all follow that order — unlike `map<K,V>`, whose order is
+#     unspecified
+#   • insertion order is part of a ledger's value: `≡` compares slot by
+#     slot, so the same entries added in a different order are unequal
+#
+# Common mistakes:
+#   • sorting a ledger's loop output — the order is semantic, not hash order
+#   • converting or sorting a ledger (`l ↦ list<K>`, `l.sort()`) — refused
+#     with SEM010:ledger_operation_not_implemented until the operations land
+#
+# See also: tabula, lista, itera
+# =============================================================================
+
+main {
+    mut ledger<string, int> l ← empty
+    l["z"] ← 1
+    l["a"] ← 2
+    l["z"] ← 3
+    for from l at [k] let v {
+        print "§=§"(k, v)
+    }
+    print l.length()
+    let bool remotus ← l.delete("z")
+    print remotus
+    l["z"] ← 9
+    for from l at [k] let v {
+        print k
+    }
+    mut ledger<string, int> same ← empty
+    same["a"] ← 2
+    same["z"] ← 9
+    print l ≡ same
+    mut ledger<string, int> swapped ← empty
+    swapped["z"] ← 9
+    swapped["a"] ← 2
+    print l ≡ swapped
+    print l
+}
