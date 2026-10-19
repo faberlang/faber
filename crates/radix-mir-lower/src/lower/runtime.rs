@@ -1571,8 +1571,69 @@ impl FunctionBuilder<'_> {
             return None;
         };
 
-        let argument = HirCallArg { name: None, spread: false, marker: None, expr: item.clone(), span: item.span };
-        self.lower_method_call(sink, method, &[], &[argument], None, expr)
+        // The `sink` method the receiver resolves to, when that route carries a
+        // MIR error channel. A route without one (an imported provider sink)
+        // cannot fail, so the method form is already the whole lowering.
+        let target = self
+            .genus_method_target(sink, method)
+            .map(|target| target.def_id)
+            .or_else(|| self.bound_method_target(sink, method))
+            .and_then(|def_id| {
+                self.context
+                    .function_errors
+                    .get(&def_id)
+                    .map(|err_ty| (def_id, *err_ty))
+            });
+        let Some((def_id, err_ty)) = target else {
+            let argument = HirCallArg { name: None, spread: false, marker: None, expr: item.clone(), span: item.span };
+            return self.lower_method_call(sink, method, &[], &[argument], None, expr);
+        };
+
+        // Both operands evaluate once, under the ambient error routing, before
+        // the call itself is wrapped in its die trap.
+        let receiver = self.lower_expr_value(sink)?;
+        let item = self.lower_expr_value(item)?;
+
+        let error_temp = self.push_temp(err_ty, span);
+        let fail_block = self.fresh_block(span);
+        let join = self.fresh_block(span);
+        self.capture_depth += 1;
+        self.traps.push(TrapContext {
+            destination: MirPlace::temp(error_temp),
+            join_block: fail_block,
+            error_paths: false,
+            depth: self.capture_depth,
+        });
+        let call = self.lower_definition_call(def_id, Vec::new(), vec![receiver, item], None, 1, expr);
+        let error_paths = self.traps.pop().is_some_and(|trap| trap.error_paths);
+        let call_reaches = call.is_some() && self.terminate_open_current(MirTerminatorKind::Goto(join), span);
+        if error_paths {
+            self.switch_to(fail_block);
+            self.die_on_failure(MirOperand::Temp(error_temp), span);
+        } else {
+            self.seal_unreachable(fail_block, span);
+        }
+        if call_reaches {
+            self.switch_to(join);
+        } else {
+            self.seal_unreachable(join, span);
+        }
+        call.map(|_| MirOperand::Constant(MirConstant::Unit))
+    }
+
+    /// The operator death terminal: panic on the failure payload, then
+    /// unreachable. Mirrors `mori`'s terminal, which is where a `⇜` failure
+    /// ends when the unit declares no `⇥` channel.
+    fn die_on_failure(&mut self, error: MirOperand, span: Span) {
+        let numquam = MirType::semantic(self.types.primitive(Primitive::Numquam));
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall { intrinsic: MirIntrinsic::Panic, args: vec![error], return_ty: numquam },
+            },
+            span,
+        });
+        self.terminate_current(MirTerminatorKind::Unreachable, span);
     }
 
     /// `s.close()` (D8.3): close, then route a reported error through the
