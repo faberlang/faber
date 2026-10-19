@@ -42,6 +42,30 @@ fn display_tokens_every_other_shipped_pack_gives_four_distinct_nonempty_strings(
 }
 
 #[test]
+fn null_value_and_type_words_follow_the_2026_10_17_ruling() {
+    let rows = [
+        ("ar", "غائب", "لاشيء"),
+        ("hi", "अभाव", "कुछनहीं"),
+        ("th-TH", "ขาดหาย", "ไม่มี"),
+        ("vi", "vắng", "hư_không"),
+        ("zh-Hans", "缺失", "无"),
+        ("zh-Hant", "缺失", "無"),
+    ];
+    for (id, value_word, type_word) in rows {
+        let p = pack(id);
+        assert_eq!(p.keywords["nulla"].canonical, value_word, "{id}: nulla");
+        assert_eq!(p.types["nihil"].canonical, type_word, "{id}: nihil");
+        assert_ne!(value_word, type_word, "{id}: null words collide");
+        assert_ne!(value_word, p.types["vacuum"].canonical, "{id}: nulla vs void");
+        assert_ne!(type_word, p.types["vacuum"].canonical, "{id}: nihil vs void");
+        assert_ne!(value_word, p.keywords["vacua"].canonical, "{id}: nulla vs empty");
+        assert_ne!(type_word, p.keywords["vacua"].canonical, "{id}: nihil vs empty");
+        assert_ne!(value_word, p.types["numquam"].canonical, "{id}: nulla vs never");
+        assert_ne!(type_word, p.types["numquam"].canonical, "{id}: nihil vs never");
+    }
+}
+
+#[test]
 fn display_tokens_pack_missing_a_row_falls_back_per_token_to_latin() {
     let mut en = pack("en");
     en.keywords.remove("falsum");
