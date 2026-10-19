@@ -265,6 +265,10 @@ impl FunctionBuilder<'_> {
     /// `t[1 … 3]`) as the `TensorSliceNd` collection op: one axis entry per
     /// list, `keep = true` (the range keeps its axis), inclusive flag from the
     /// range kind. Need; the per-slot rank-N form is a later unit.
+    #[expect(
+        dead_code,
+        reason = "bracket-range call site lands with the rank-N slice unit of need"
+    )]
     fn lower_tensor_bracket_slice(
         &mut self,
         object: &HirExpression,
@@ -306,6 +310,10 @@ impl FunctionBuilder<'_> {
     }
 
     /// A one-element `lista` aggregate operand (one TensorSliceNd axis entry).
+    #[expect(
+        dead_code,
+        reason = "only lower_tensor_bracket_slice calls this; that call site lands with need"
+    )]
     fn one_element_list(&mut self, operand: MirOperand, list_ty: MirType, span: Span) -> MirOperand {
         self.construct_temp(
             MirAggregateKind::Array,
