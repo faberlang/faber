@@ -1917,11 +1917,6 @@ help = "scribe latitudinem numero, ut vector<f32, 4>"
 message = "dimensiones constructionis litteras, nomina magnitudinum, et sublatas scriptas admittunt"
 help = "termini affines in constructionibus nondum sustinentur"
 
-[diagnostics.SEM008.issues.sink_into_unsupported]
-message = "forma iniectionis '⇜' nondum in HIR deducitur"
-help = "contractus iniectionis in unitate posteriori deducetur; ad tempus sententiam '⇜' tolle"
-
-
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "unknown namespace"
 help = "fix the AST construct for lowering"
@@ -2698,6 +2693,14 @@ help = "make the right side the same tensor type as the target, or convert it fi
 message = "a '⇇' statement has no value"
 help = "write the copy as its own statement; to rebind a name to a tensor, use '←' on a local binding"
 
+[diagnostics.SEM010.issues.sink_into_item_type_mismatch]
+message = "res iniectionis '⇜' eadem ac 'T' contractus esse debet"
+help = "rem explicite converte: 'console.out ⇜ \"§\"(n)', numquam 'console.out ⇜ n'"
+
+[diagnostics.SEM010.issues.sink_into_value_used]
+message = "sententia '⇜' valorem non habet"
+help = "iniectionem ut sententiam propriam scribe; '⇜' rem tradit nec quicquam reddit"
+
 [diagnostics.SEM011]
 message = "invalid operand types"
 help = "use compatible operand types"
@@ -3329,6 +3332,10 @@ help = "use an index from 0 up to one below the bound"
 [diagnostics.SEM011.issues.copy_into_target_not_tensor]
 message = "the left side of '⇇' must be tensor storage"
 help = "'⇇' copies into an existing tensor; a scalar, list, matrix, or vector is written with '←'"
+
+[diagnostics.SEM011.issues.sink_into_receiver_not_sink]
+message = "latus sinistrum '⇜' contractui iniectionis conformari debet"
+help = "'⇜' rem valori 'Sink<T>' tradit; tensores, vectores et matrices per '⇇' scribuntur"
 
 [diagnostics.SEM012]
 message = "not callable"

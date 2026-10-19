@@ -45,11 +45,6 @@ use rustc_hash::FxHashSet;
 const GLYPH_TRANSPOSE_MARKER: &str = "__faber_glyph_transpose";
 const ROUNDING_GLYPH_MARKER: &str = "__faber_glyph_round:";
 
-/// TEMPORARY (unit 0c4d3dc1-4 replaces this with the real lowering): the `⇜`
-/// sink-into form has no lowering yet, so it fails closed with a named issue
-/// instead of reaching HIR.
-const ISSUE_SINK_INTO_UNSUPPORTED: &str = "sink_into_unsupported";
-
 /// Lower one AST expression into the HIR expression contract.
 ///
 /// The entry point owns the cross-cutting guarantees for this file: assign a
@@ -133,15 +128,9 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
         ExprKind::CopyInto(copy) => lowerer.lower_copy_into(copy),
-        // `⇜` sink-into fails closed until its lowering lands: the sink/item
-        // pair is not representable in HIR yet, so the placeholder errors.
-        ExprKind::SinkInto(sink) => {
-            lowerer.error_with_args_at(
-                vec![DiagnosticArg::new("issue", ISSUE_SINK_INTO_UNSUPPORTED)],
-                sink.item.span,
-            );
-            HirExpressionKind::Error
-        }
+        // `⇜` sink-into lowers to the typed HIR node; typecheck owns the
+        // contract conformance, the exact item type, and the statement shape.
+        ExprKind::SinkInto(sink) => lowerer.lower_sink_into(sink),
         ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
         ExprKind::Trap(trap) => lower_trap(lowerer, trap),
         ExprKind::CallDefault(call_default) => lower_call_default(lowerer, call_default),
@@ -1442,6 +1431,17 @@ impl Lowerer<'_> {
         HirExpressionKind::CopyInto {
             target: Box::new(target),
             value: Box::new(value),
+        }
+    }
+
+    /// `sink ⇜ item`: both operands lower normally; the statement's typing and
+    /// access rules live in typecheck and the statement passes.
+    fn lower_sink_into(&mut self, sink: &radix_syntax::SinkIntoExpr) -> HirExpressionKind {
+        let target = lower_expr(self, &sink.sink);
+        let item = lower_expr(self, &sink.item);
+        HirExpressionKind::SinkInto {
+            sink: Box::new(target),
+            item: Box::new(item),
         }
     }
 

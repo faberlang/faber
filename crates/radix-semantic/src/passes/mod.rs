@@ -205,6 +205,10 @@ mod complexity_test;
 mod copy_into_test;
 
 #[cfg(test)]
+#[path = "sink_into_test.rs"]
+mod sink_into_test;
+
+#[cfg(test)]
 #[path = "definite_assignment_test.rs"]
 mod definite_assignment_test;
 #[cfg(test)]
