@@ -6,10 +6,11 @@ use super::*;
 use crate::host::BufferHost;
 use radix_lexer::Interner;
 use radix_mir::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId, MirOperand,
-    MirProgram, MirType, MirValidationContext, MirValueId,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
+    MirCollectionOp, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+    MirValidationContext, MirValueId,
 };
-use radix_types::{TypeId, TypeTable};
+use radix_types::{Primitive, TypeId, TypeTable};
 
 /// One empty function with no params, locals, or blocks.
 fn empty_function() -> MirFunction {
@@ -100,5 +101,159 @@ fn stepped_construct_unstepped_reversed_still_rejected() {
         error.issue.contains("monotonic"),
         "issue must mention monotonic, got: {}",
         error.issue
+    );
+}
+
+/// Evaluate one interval collection op over `args`, stored as frame values.
+/// Materialize returns a `lista<numerus>`; every other interval op returns
+/// `numerus`.
+fn eval_interval_op(op: MirCollectionOp, args: Vec<Value>) -> Result<Value, RunnerError> {
+    let mut type_table = TypeTable::new();
+    let numerus = type_table.primitive(Primitive::Numerus);
+    let return_ty = if matches!(op, MirCollectionOp::IntervalMaterialize) {
+        MirType::semantic(type_table.array(numerus))
+    } else {
+        MirType::semantic(numerus)
+    };
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(empty_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+
+    let function = program.functions.first().unwrap();
+    runner.push_frame(function.id, MirBlockId(0));
+
+    let frame = runner.frames.last_mut().unwrap();
+    let args = args
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let id = MirValueId(u32::try_from(index).expect("argument index fits a MirValueId"));
+            frame.values.insert(id, value);
+            MirOperand::Value(id)
+        })
+        .collect();
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(op),
+        args,
+        return_ty,
+    };
+    runner.eval_runtime_call(&call, Span::default())
+}
+
+/// A stepped carrier: start, end, inclusivity, and the stride.
+fn stepped_carrier(start: i64, end: i64, inclusive: bool, step: i64) -> Value {
+    Value::Tuple(vec![
+        Value::Int(start),
+        Value::Int(end),
+        Value::Bool(inclusive),
+        Value::Int(step),
+    ])
+}
+
+/// `length()` counts members, so an inclusive range contributes its final
+/// partial stride while an exclusive one does not.
+#[test]
+fn stepped_op_length_counts_members() {
+    let inclusive = stepped_carrier(0, 10, true, 2);
+    assert_eq!(
+        eval_interval_op(MirCollectionOp::IntervalLength, vec![inclusive]).unwrap(),
+        Value::Int(6)
+    );
+    let exclusive = stepped_carrier(0, 10, false, 2);
+    assert_eq!(
+        eval_interval_op(MirCollectionOp::IntervalLength, vec![exclusive]).unwrap(),
+        Value::Int(5)
+    );
+    let descending = stepped_carrier(10, 0, false, 2);
+    assert_eq!(
+        eval_interval_op(MirCollectionOp::IntervalLength, vec![descending]).unwrap(),
+        Value::Int(5)
+    );
+}
+
+/// `contains(v)` is true only for on-step members, and a descending carrier
+/// keeps its direction from the bounds.
+#[test]
+fn stepped_op_contains_on_step_membership() {
+    let ascending = stepped_carrier(0, 10, true, 2);
+    assert_eq!(
+        eval_interval_op(
+            MirCollectionOp::IntervalContains,
+            vec![ascending.clone(), Value::Int(3)],
+        )
+        .unwrap(),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        eval_interval_op(
+            MirCollectionOp::IntervalContains,
+            vec![ascending, Value::Int(4)],
+        )
+        .unwrap(),
+        Value::Bool(true)
+    );
+    let descending = stepped_carrier(10, 0, false, 2);
+    assert_eq!(
+        eval_interval_op(
+            MirCollectionOp::IntervalContains,
+            vec![descending.clone(), Value::Int(9)],
+        )
+        .unwrap(),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        eval_interval_op(
+            MirCollectionOp::IntervalContains,
+            vec![descending, Value::Int(8)],
+        )
+        .unwrap(),
+        Value::Bool(true)
+    );
+}
+
+/// Materializing lists the stepped members in the carrier's direction.
+#[test]
+fn stepped_op_materialize_lists_stepped_members() {
+    let ascending = stepped_carrier(0, 10, true, 2);
+    assert_eq!(
+        eval_interval_op(MirCollectionOp::IntervalMaterialize, vec![ascending]).unwrap(),
+        Value::Array(Rc::new(RefCell::new(vec![
+            Value::Int(0),
+            Value::Int(2),
+            Value::Int(4),
+            Value::Int(6),
+            Value::Int(8),
+            Value::Int(10),
+        ])))
+    );
+    let descending = stepped_carrier(10, 0, false, 2);
+    assert_eq!(
+        eval_interval_op(MirCollectionOp::IntervalMaterialize, vec![descending]).unwrap(),
+        Value::Array(Rc::new(RefCell::new(vec![
+            Value::Int(10),
+            Value::Int(8),
+            Value::Int(6),
+            Value::Int(4),
+            Value::Int(2),
+        ])))
+    );
+}
+
+/// An unstepped carrier still strides by one.
+#[test]
+fn stepped_op_materialize_unstepped_defaults_to_one() {
+    let unstepped = Value::Tuple(vec![Value::Int(0), Value::Int(3), Value::Bool(false)]);
+    assert_eq!(
+        eval_interval_op(MirCollectionOp::IntervalMaterialize, vec![unstepped]).unwrap(),
+        Value::Array(Rc::new(RefCell::new(vec![
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(2),
+        ])))
     );
 }
