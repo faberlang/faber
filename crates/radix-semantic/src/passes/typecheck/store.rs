@@ -271,8 +271,8 @@ impl TypeChecker<'_> {
     /// value observed at a scalar cell converts with implicit syntax but forced
     /// semantics, so the store wraps an implicit node carrying the coercion the
     /// emitter lowers for the target. Only values arriving through a trusted
-    /// import are admitted, and this unit opens only integer cells: a float,
-    /// text or bool cell is a later unit, an aggregate slot stays refused by the
+    /// import are admitted, and this unit opens integer and float cells: a text
+    /// or bool cell is a later unit, an aggregate slot stays refused by the
     /// ordinary unification.
     fn import_store_door(
         &mut self,
@@ -293,8 +293,17 @@ impl TypeChecker<'_> {
         if !matches!(self.types.get(value), Type::Primitive(Primitive::Ignotum)) {
             return None;
         }
-        let (int_ty, _) = self.store_int_slot(peel(self, slot_ty))?;
-        Some(self.wrap_implicit_store(expr, ty, int_ty, site))
+        let slot = peel(self, slot_ty);
+        if let Some((int_ty, _)) = self.store_int_slot(slot) {
+            return Some(self.wrap_implicit_store(expr, ty, int_ty, site));
+        }
+        if self
+            .numeric_shape(slot)
+            .is_some_and(|s| s.prim == Primitive::Fractus)
+        {
+            return Some(self.wrap_implicit_store(expr, ty, slot, site));
+        }
+        None
     }
 
     /// The implicit store node a value of type `ty` needs to land in `slot_ty`,
