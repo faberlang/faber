@@ -256,7 +256,7 @@ functio range_loop(tensor<f32, [8]> x, u32 n) → f32 {
     );
     crate::test_support::assert_analysis_rejects_with_issue_la(
         r"@ nucleum
-functio bad(i32 x, fractus f) → vacuum {
+functio bad(i32 x, f32 f) → vacuum {
     varia f32 acc ← 0.0
     itera ab 0‥f sit i {
         acc ← acc
