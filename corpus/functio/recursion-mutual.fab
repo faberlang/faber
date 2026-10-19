@@ -1,0 +1,54 @@
++++
+term = "functio"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "si_stmt", "arm", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt", "ternary"]
+category = "function"
+canonical = false
+summary = "Mutual recursion, deep binary recursion, and tail-shaped recursion through the value conditional."
+syntax = "fn f() → T { … f(…) … }"
+related = ["redde", "ternarius"]
+locale = "en"
++++
+# =============================================================================
+# functio — mutual, binary, and tail-shaped recursion
+#
+# This exemplar exercises calls between functions, branching recursion, and
+# recursive calls selected by the value conditional.
+# =============================================================================
+
+fn isEven(int n) → bool {
+    if n ≡ 0 { return true }
+    return isOdd(n - 1)
+}
+
+fn isOdd(int n) → bool {
+    if n ≡ 0 { return false }
+    return isEven(n - 1)
+}
+
+fn fib(int n) → int {
+    return n ≤ 1 ✓ n ✗ fib(n - 1) + fib(n - 2)
+}
+
+fn ack(int m, int n) → int {
+    if m ≡ 0 { return n + 1 }
+    if n ≡ 0 { return ack(m - 1, 1) }
+    return ack(m - 1, ack(m, n - 1))
+}
+
+fn gcd(int a, int b) → int {
+    return b ≡ 0 ✓ a ✗ gcd(b, a % b)
+}
+
+fn pow(int b, int e) → int {
+    return e ≡ 0 ✓ 1 ✗ b * pow(b, e - 1)
+}
+
+main {
+    print isEven(10)
+    print isOdd(7)
+    print fib(15)
+    print ack(2, 3)
+    print gcd(48, 18)
+    print pow(2, 62)
+}
