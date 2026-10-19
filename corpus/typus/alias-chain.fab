@@ -1,0 +1,39 @@
++++
+term = "typus"
+kind = "keyword"
+category = "type"
+canonical = false
+summary = "Alias chains, a function-type alias, and a union alias all resolve transparently."
+syntax = "type B = A"
+related = ["typus", "∪"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "function_type", "functio_decl", "param_list", "return_clause", "incipit_stmt", "fixum_decl", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+locale = "en"
++++
+
+# =============================================================================
+# typus — Alias chains resolve to the underlying type
+# =============================================================================
+#
+# What this teaches:
+#   • Alias of an alias — `B = A` and `C = list<B>` name the same type as `A`
+#   • Function-type alias — `F = (int) → int` is the type of a function value
+#   • Union alias — `U = int ∪ string` is transparent at the binding and at print
+#
+# See also: typus, ∪
+# =============================================================================
+
+type A = int
+type B = A
+type C = list<B>
+type F = (int) → int
+type U = int ∪ string
+
+fn ap(F f, B x) → int { return f(x) }
+
+main {
+    let C c ← [1, 2]
+    print c.length()
+    print ap(int x ∴ x + 1, 4)
+    let U u ← "s"
+    print u
+}

@@ -1,0 +1,28 @@
++++
+term = "typus"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "incipit_stmt", "fixum_decl", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A type alias cycle is a check error."
+syntax = "type A = B"
+related = ["typus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM007:type_alias_cycle"
++++
+
+# =============================================================================
+# typus — A type alias cycle is a check error
+# =============================================================================
+# Each alias names another alias, and the pair never reaches a concrete type.
+# An alias is transparent, so `A` must equal `B` must equal `A`: no type exists
+# to give the binding. Break the cycle by making one member name a real type.
+
+type A = B
+type B = A
+
+main {
+    let A a ← 1
+    print a
+}
