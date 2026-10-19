@@ -74,7 +74,8 @@ class Deque<T> {
             # Rebalance: reverse head into tail so the head-side elements
             # become accessible from the tail end.
             while not self.head.is_empty() {
-                self.tail.append(self.head.remove_last())
+                let T ∪ none moved ← self.head.remove_last()
+                if moved not is none then self.tail.append(moved)
             }
             return self.tail.remove_last()
         }
@@ -87,7 +88,8 @@ class Deque<T> {
             # Rebalance: reverse tail into head so the tail-side elements
             # become accessible from the head end.
             while not self.tail.is_empty() {
-                self.head.append(self.tail.remove_last())
+                let T ∪ none moved ← self.tail.remove_last()
+                if moved not is none then self.head.append(moved)
             }
             return self.head.remove_last()
         }
