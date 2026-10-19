@@ -4346,3 +4346,7 @@ mod display_tokens_test;
 #[cfg(test)]
 #[path = "round_half_even_test.rs"]
 mod round_half_even_test;
+
+#[cfg(test)]
+#[path = "stepped_interval_test.rs"]
+mod stepped_interval_test;
