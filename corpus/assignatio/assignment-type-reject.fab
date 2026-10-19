@@ -1,0 +1,36 @@
++++
+term = "←"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expr_stmt", "assignment", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "assignment"
+canonical = false
+summary = "Assigning a value of the wrong type is refused by name."
+syntax = "<place> ← <expression of another type> — rejected"
+related = ["fixum", "="]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:assignment_type_mismatch"
++++
+# =============================================================================
+# ← — Assigning a value of the wrong type is refused by name.
+# =============================================================================
+#
+# What this teaches:
+#   • the declared type of a binding is the type of every later store
+#   • `←` checks the value against the place; it does not retype the place
+#
+# Common mistakes:
+#   • storing a string into an `int` binding — `assignment_type_mismatch`
+#
+# See also: assignatio, fixum
+# =============================================================================
+
+# assignatio reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    mut int x ← 1
+    x ← "s"
+    print x
+}
