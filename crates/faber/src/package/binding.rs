@@ -100,6 +100,11 @@ pub fn load_target_bindings(
             .into_iter()
             .map(|(route, binding)| (route, binding.symbol))
             .collect(),
+        annotations: binding_manifest
+            .annotations
+            .into_iter()
+            .map(|(route, binding)| (route, binding.symbol))
+            .collect(),
     })
 }
 
@@ -353,6 +358,23 @@ fn validate_bindings(
                 path,
                 format!("type binding `{key}` does not match an exported Faber type"),
                 "binding_unknown_type",
+            ));
+        }
+    }
+
+    for (key, binding) in &manifest.annotations {
+        if binding.symbol.trim().is_empty() {
+            diagnostics.push(diagnostic(
+                path,
+                format!("annotation binding `{key}` has an empty target spelling"),
+                "binding_symbol_empty",
+            ));
+        }
+        if !declared_types.contains(key) {
+            diagnostics.push(diagnostic(
+                path,
+                format!("annotation binding `{key}` does not match an exported annotation contract"),
+                "binding_unknown_annotation",
             ));
         }
     }

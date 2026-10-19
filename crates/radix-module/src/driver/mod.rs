@@ -1252,6 +1252,20 @@ fn generate_wgsl_text_output(
 ) -> Result<crate::Output, SpannedCodegenError> {
     #[cfg(feature = "mir-wgsl")]
     {
+        // SPIKE (shader-annotation-stages): stages declared through
+        // manifest-bound annotation contracts take their own path beside the
+        // built-in `@ vertex` / `@ fragment` one.
+        let stage_bindings =
+            target_bindings::wgsl_stage_bindings(target_bindings, &analysis.hir, &analysis.resolver, &analysis.interner).map_err(|message| {
+                SpannedCodegenError {
+                    message,
+                    args: vec![DiagnosticArg::new("issue", "wgsl_annotation_binding_invalid")],
+                    span: None,
+                }
+            })?;
+        if !stage_bindings.stages.is_empty() {
+            return emit_wgsl_annotated_stage_output(analysis, &stage_bindings);
+        }
         let graphics_source = analysis.graphics_source.clone();
         let has_vertex = !graphics_source.vertex_entries.is_empty();
         let has_fragment = !graphics_source.fragment_entries.is_empty();
@@ -1283,6 +1297,43 @@ fn generate_wgsl_text_output(
             reflection: Some(output.reflection),
         }))
     }
+}
+
+/// SPIKE (shader-annotation-stages): lower with the manifest-resolved stage
+/// map, then emit the annotation-bound stages straight from the lowered
+/// functions (typed parameters in, return value out, no injected names).
+#[cfg(feature = "mir-wgsl")]
+fn emit_wgsl_annotated_stage_output(
+    analysis: &mut AnalyzedModule,
+    bindings: &target_bindings::WgslStageBindings,
+) -> Result<crate::Output, SpannedCodegenError> {
+    prepare_mir_lowering_interner(analysis);
+    let options = crate::mir::MirLoweringOptions {
+        stage_bindings: std::sync::Arc::new(bindings.stages.iter().map(|(def, stage)| (*def, *stage)).collect()),
+        ..crate::mir::MirLoweringOptions::default()
+    };
+    let mir = crate::mir::lower_analyzed_unit(analysis.application_view(), options).map_err(mir_errors_to_spanned)?;
+    let stages: Vec<crate::mir::WgslAnnotatedStage<'_>> = mir
+        .validated
+        .program()
+        .functions
+        .iter()
+        .filter_map(|function| {
+            let stage = *bindings.stages.get(&function.source?)?;
+            (function.shader_stage == Some(stage)).then_some(crate::mir::WgslAnnotatedStage { function, stage })
+        })
+        .collect();
+    if stages.len() != bindings.stages.len() {
+        return Err(wgsl_text_codegen_error(wgsl_vertex_source_error(
+            "a manifest-bound stage function did not reach MIR with its stage",
+            "mir_wgsl_annotated_stage_missing",
+        ))
+        .into());
+    }
+    let builtins: crate::mir::WgslFieldBuiltins = bindings.builtin_fields.iter().map(|(k, v)| (*k, v.clone())).collect();
+    let source = crate::mir::emit_wgsl_annotated_stages(&stages, &builtins, &mir.validated, &mir.interner)
+        .map_err(wgsl_text_codegen_error)?;
+    Ok(crate::Output::WgslText(crate::WgslTextOutput { code: source, reflection: None }))
 }
 
 #[cfg(feature = "mir-wgsl")]
@@ -5091,6 +5142,11 @@ mod wgsl_bound_params_tests;
 #[cfg(feature = "mir-wgsl")]
 #[path = "wgsl_bound_bindings_test.rs"]
 mod wgsl_bound_bindings_tests;
+
+#[cfg(test)]
+#[cfg(feature = "mir-wgsl")]
+#[path = "wgsl_stage_annotation_test.rs"]
+mod wgsl_stage_annotation_tests;
 
 #[cfg(test)]
 #[path = "codegen_analysis_test.rs"]

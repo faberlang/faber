@@ -285,7 +285,8 @@ pub use wasm_text::{MirWasmTextProbeError, emit_wasm_text_probe, emit_wasm_text_
 pub use wgsl_text::{
     BindGroupEntry, InterKernelBufferIdentity, KernelChainDescriptor, KernelDescriptor, MirWgslTextProbeError,
     MirWgslTextProbeOutput, StorageBufferDecl, WGSL_UNBOUND_CALL_ISSUE, WgslBoundCallTable, WgslCalleeKey,
-    WgslEntryContext, emit_chain_descriptor, emit_wgsl_fragment_entry_contract,
+    WgslAnnotatedStage, WgslEntryContext, WgslFieldBuiltins, emit_chain_descriptor, emit_wgsl_annotated_stages,
+    emit_wgsl_fragment_entry_contract,
     emit_wgsl_fragment_entry_contract_with_targets, emit_wgsl_text_probe_with_device_roles,
     emit_wgsl_text_probe_with_reflection_and_device_roles, emit_wgsl_vertex_entry_contract,
 };
