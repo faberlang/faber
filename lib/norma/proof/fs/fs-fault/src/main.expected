@@ -1,0 +1,2 @@
+fs-fault kind=NotFound path=missing.txt
+fs-fault kind=NotADirectory path=file.txt/child

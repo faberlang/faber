@@ -1,0 +1,79 @@
++++
+locale = "en"
++++
+
+# fs-fault: the fs read surface pins the fault KIND and the PATH it carries,
+# not stdout bytes alone. Two distinct `fault.IoFault` variants are observed on
+# paths under one pid-unique temp directory: reading a missing file faults
+# NotFound, and reading a child below a regular file faults NotADirectory.
+#
+# Each caught variant asserts that the fault carries the exact path the
+# program passed, then prints the kind word and that path relative to the
+# case's own run directory. The relative form is what the golden can pin: the
+# temp dir and the pid differ on every run, while `missing.txt` and
+# `file.txt/child` name the same crossing every time.
+#
+# Routes: solum:lege (fs.read_file) faults.
+
+import from "norma:fs" fs
+import from "norma:process" process
+import from "norma:fault" fault
+
+# The part of `path` below `base`, which is the stable name of the crossing.
+fn below(string path, string base) → string {
+    return path.slice(base.length() + 1, path.length())
+}
+
+# Local typed channel over the fs read. Declaring the concrete `⇥ fault.IoFault`
+# here gives the call-site `do/catch` a resolved error union; the imported
+# wrapper's channel alone leaves the handled block's Rust error type unresolved.
+fn read_text(string path) → string ⇥ fault.IoFault {
+    return fs.read_file<string>(path)
+}
+
+main {
+    let string dir ← fs.temp_dir()
+    let string run ← fs.join([dir, "fs-fault-§"(process.pid())])
+    fs.create_dir(run)
+
+    # (1) A path that does not exist faults NotFound and reports that path.
+    let string missing ← fs.join([run, "missing.txt"])
+    do {
+        let string text ← read_text(missing)
+        assert false panic "fs-fault: reading a missing path succeeded: §"(text)
+    }
+    catch err {
+        match err {
+            case NotFound let path {
+                assert path ≡ missing
+                print "fs-fault kind=NotFound path=§"(below(path, run))
+            }
+            default {
+                assert false panic "fs-fault: missing-path fault was not NotFound: §"(err)
+            }
+        }
+    }
+
+    # (2) A child below a regular file cannot be traversed: the leaf faults on
+    # the path it was given, which is `<file>/child`, not the parent file.
+    let string file ← fs.join([run, "file.txt"])
+    fs.write_file(file, "fs-fault")
+    let string child ← fs.join([file, "child"])
+    do {
+        let string text ← read_text(child)
+        assert false panic "fs-fault: reading below a regular file succeeded: §"(text)
+    }
+    catch err {
+        match err {
+            case NotADirectory let path {
+                assert path ≡ child
+                print "fs-fault kind=NotADirectory path=§"(below(path, run))
+            }
+            default {
+                assert false panic "fs-fault: child-of-file fault was not NotADirectory: §"(err)
+            }
+        }
+    }
+
+    fs.remove_tree(run)
+}
