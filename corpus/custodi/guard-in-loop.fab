@@ -1,0 +1,66 @@
++++
+term = "custodi"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "custodi_stmt", "si_guard_clause", "redde_stmt", "expression", "literal", "incipit_stmt", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "sit_decl", "assignment", "place", "itera_stmt", "dum_stmt", "perge_stmt", "rumpe_stmt"]
+category = "control-flow"
+canonical = false
+summary = "A guard block holding continue and break inside a loop, and early returns in a function."
+syntax = "guard { … continue|break|return … }"
+related = ["si", "redde", "perge", "rumpe"]
+locale = "en"
++++
+# =============================================================================
+# custodi — A guard block holding continue and break inside a loop.
+# =============================================================================
+#
+# What this teaches:
+#   • Guard exits — a `custodi` block may hold `redde`, `perge` and `rumpe`, not only `redde`.
+#   • Loop guards — `perge` skips one iteration and `rumpe` leaves the loop, both from inside `custodi`.
+#   • Early returns — multiple `si` checks in one `custodi` block each take their own exit path.
+#
+# Common mistakes:
+#   • Using `custodi` outside a function — guard blocks are only valid inside `functio` bodies.
+#   • Expecting `rumpe` in a guard to leave only the guard — it leaves the enclosing loop.
+#
+# See also: si, redde, perge, rumpe
+# =============================================================================
+
+# custodi — guard blocks with return, continue and break
+#
+# custodi { si <conditio> { <exitus> } }
+#
+# GRAMMAR:
+#   custodiStmt :← 'custodi' '{' stmt* '}'
+#
+# EXPECTED OUTPUT:
+#   neg
+#   empty
+#   ok
+#   8
+
+fn f(int a, string s) → string {
+    guard {
+        if a ≺ 0 { return "neg" }
+        if s.length() ≡ 0 { return "empty" }
+    }
+    return "ok"
+}
+
+fn g(int a) → int {
+    mut int t ← 0
+    for range 0‥a let i {
+        guard {
+            if i ≡ 2 { continue }
+            if i ≡ 5 { break }
+        }
+        t ← t + i
+    }
+    return t
+}
+
+main {
+    print f(-1, "x")
+    print f(1, "")
+    print f(1, "x")
+    print g(10)
+}
