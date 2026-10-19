@@ -50,6 +50,29 @@ fn mensura_prints_the_file_size() {
 }
 
 #[test]
+fn conde_writes_durably_and_leaves_no_temporary() {
+    let (dir, target) = fixture(b"previous");
+    let host = run_ok(
+        "route-conde.fab",
+        &program(&format!(
+            "    sit vacuum gestum ← ad 'solum:conde' ([\"{target}\", \"custodia integra\"]) ↦ vacuum\n    \
+             nota ad 'solum:mensura' (\"{target}\") ↦ numerus"
+        )),
+    );
+    assert_eq!(host.stdout_lines, ["16"]);
+    assert_eq!(std::fs::read(&target).expect("read the target"), b"custodia integra");
+    let entries: Vec<_> = std::fs::read_dir(dir.path())
+        .expect("read the target directory")
+        .map(|entry| entry.expect("directory entry").file_name())
+        .collect();
+    assert_eq!(
+        entries,
+        vec![std::ffi::OsString::from("artifact.bin")],
+        "the durable replace must leave only the target, no .faber-conde temporary"
+    );
+}
+
+#[test]
 fn partem_reads_the_requested_range() {
     let (_dir, path) = fixture(b"abcdefgh");
     let host = run_ok(

@@ -172,6 +172,81 @@ fn conde_replaces_text_and_bytes_completely() {
     let _ = fs::remove_dir_all(dir);
 }
 
+#[cfg(unix)]
+#[test]
+fn conde_failure_leaves_old_file_intact() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = temp_path("conde-failure");
+    fs::create_dir_all(&dir).expect("create dir");
+    let target = dir.join("target.bin");
+    fs::write(&target, b"old-complete").expect("write old");
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o500)).expect("read-only dir");
+
+    let error = serve(
+        "solum:conde",
+        &[
+            Arg::Str(target.to_string_lossy().into_owned()),
+            Arg::Str("new".to_owned()),
+        ],
+    )
+    .expect("fs route")
+    .expect_err("a read-only directory must refuse the temporary");
+    assert_eq!(error.kind(), FsErrorKind::Permission);
+
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).expect("restore dir");
+    assert_eq!(
+        fs::read(&target).expect("read target"),
+        b"old-complete".as_slice(),
+        "the failed replace must leave the old complete file"
+    );
+    let names: Vec<_> = fs::read_dir(&dir)
+        .expect("read dir")
+        .map(|entry| entry.expect("entry").file_name())
+        .collect();
+    assert_eq!(
+        names,
+        vec![std::ffi::OsString::from("target.bin")],
+        "the failed replace must not leave a temporary behind"
+    );
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn conde_directory_target_errors_and_leaves_no_temporary() {
+    let dir = temp_path("conde-directory");
+    fs::create_dir_all(&dir).expect("create dir");
+    let sibling = dir.join("sibling.bin");
+    fs::write(&sibling, b"sibling").expect("write sibling");
+    let target_dir = dir.join("target-dir");
+    fs::create_dir(&target_dir).expect("create target dir");
+
+    serve(
+        "solum:conde",
+        &[
+            Arg::Str(target_dir.to_string_lossy().into_owned()),
+            Arg::Bytes(vec![1, 2, 3]),
+        ],
+    )
+    .expect("fs route")
+    .expect_err("a file cannot replace a directory");
+
+    let mut names: Vec<_> = fs::read_dir(&dir)
+        .expect("read dir")
+        .map(|entry| entry.expect("entry").file_name())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        vec![
+            std::ffi::OsString::from("sibling.bin"),
+            std::ffi::OsString::from("target-dir"),
+        ],
+        "only the pre-existing entries may remain, and no .faber-conde temporary"
+    );
+    assert!(target_dir.is_dir(), "the directory target was not modified");
+    let _ = fs::remove_dir_all(dir);
+}
+
 #[test]
 fn touch_updates_mtime_and_does_not_truncate() {
     let path = temp_path("touch");
