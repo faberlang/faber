@@ -106,6 +106,32 @@ fn now(tensor<f32, [24]> clock) → f32 {
 }
 
 #[test]
+fn imported_const_index_folds_to_its_exact_value() {
+    let fixture = analyze_en_with_params(
+        r#"
+import from "./params" params
+
+@ kernel
+@ public
+fn now(tensor<f32, [24]> clock) → f32 {
+    return clock[params.CLK_T_WHOLE] + clock[params.CLK_T_FRAC]
+}
+"#,
+        Some(crate::file_interface::InterfaceConstValue::Int(0)),
+        Some(crate::file_interface::InterfaceConstValue::Int(1)),
+    );
+    let now = target_row(&fixture, "now", Target::MirWgsl);
+    assert!(
+        !now.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::IntermediateOutOfRange { .. }
+        )),
+        "{:?}",
+        now.failures
+    );
+}
+
+#[test]
 fn module_const_index_folds_to_its_exact_value() {
     let fixture = analyze_en(
         r"
