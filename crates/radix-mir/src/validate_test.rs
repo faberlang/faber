@@ -54,6 +54,15 @@ fn validate_with(program: &MirProgram, context: &MirValidationContext<'_>) -> Ve
     }
 }
 
+/// Run validation and return the structured errors (issue + message + span).
+fn validate_structured(program: &MirProgram, types: &TypeTable) -> Vec<MirValidationError> {
+    let context = MirValidationContext::new(types);
+    match validate_program(program, &context) {
+        Ok(()) => vec![],
+        Err(errors) => errors,
+    }
+}
+
 /// Build a one-function program whose block contains a single
 /// `TensorLayerNorm` runtime call.
 #[allow(clippy::too_many_arguments)]
@@ -6314,14 +6323,14 @@ fn tensor_slice_nd_validates_six_arg_form() {
 fn tensor_slice_nd_rejects_arity_and_length_mismatch() {
     let mut types = TypeTable::new();
     let program = tensor_slice_nd_program(&mut types, 2, 2, 2, 5);
-    let errors = validate(&program, &types);
+    let errors = validate_structured(&program, &types);
     assert_eq!(
         errors.len(),
         1,
         "five operands must report exactly one arity error, got: {errors:?}"
     );
-    assert!(
-        errors[0].contains("collection TensorSliceNd expects 6 MIR arguments"),
+    assert_eq!(
+        errors[0].issue, "mir_validation_collection_tensorslicend_expects_6_mir_arguments",
         "unexpected arity diagnostic: {errors:?}"
     );
 
