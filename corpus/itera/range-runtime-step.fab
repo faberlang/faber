@@ -1,0 +1,59 @@
++++
+term = "itera"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "itera_stmt", "itera_binding", "range_expr", "range_tail", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = true
+summary = "Range iteration is exact at the i64 edge; the step contract is checked at run time and a zero or negative step aborts."
+syntax = "for range <start>…<end> step <step> let <item> { <body> }"
+related = ["intervallum-gradus", "numerus-overflow", "itera"]
+locale = "en"
++++
+# =============================================================================
+# itera — range bounds are exact; the step contract lives at run time.
+# =============================================================================
+#
+# What this teaches:
+#   • Exact intermediates at the i64 edge — the inclusive range
+#     9223372036854775800…9223372036854775807 has eight values and the walk
+#     counts all eight. The bounds are numbers, not 64-bit containers: nothing
+#     overflows while the loop counts, and the walk prints 8.
+#   • The step contract is checked at run time — `for range 0‥5 step s` with
+#     `mut int s ← -2` is not a compile error. The run prints its earlier
+#     output, then aborts when the loop is entered with
+#     "range step must be positive"; the program exits non-zero and the body
+#     never runs.
+#
+# Common mistakes:
+#   • Expecting a negative step to walk the range backwards — the bounds pick
+#     the direction and the step stays a positive stride.
+#   • Expecting the run-time step to be validated where it is computed — the
+#     check fires at loop entry, so earlier prints are already on stdout.
+#   • Expecting the i64-edge walk to wrap — the bounds are exact without any
+#     arithmetic on the bound values.
+#
+# See also: intervallum-gradus, numerus-overflow, itera
+# =============================================================================
+
+# range-runtime-step — exact bounds, run-time step check
+#
+# POLICY:
+#   A range bound is exact; the step is a positive stride whose direction
+#   comes from the bounds. A step that is zero or negative is a run-time
+#   trap, not a compile error, so it aborts the run at loop entry.
+
+main {
+    # (a) i64 edge: eight values, counted without overflow.
+    mut int n ← 0
+    for range 9223372036854775800…9223372036854775807 let i {
+        n ← n + 1
+    }
+    print n
+
+    # (b) run-time step: a non-positive step aborts at loop entry.
+    mut int s ← -2
+    print "start"
+    for range 0‥5 step s let i {
+        print i
+    }
+}
