@@ -1204,13 +1204,12 @@ impl BodyFacts<'_> {
                 if is_integer_value_type(expr.ty, self.types) {
                     match op {
                         HirBinOp::Div | HirBinOp::Mod if !excludes_zero(&right) => {
-                            let positive = (*op == HirBinOp::Mod)
-                                .then(|| self.positive_parameter_divisor(rhs))
-                                .flatten();
+                            let positive = self.positive_parameter_divisor(rhs);
                             if let Some((parameter, divisor_max)) = positive {
                                 // The launch contract binds a positive size-class
-                                // parameter to [1, DEVICE_INTEGER_MAX], so the
-                                // remainder site needs no zero proof of its own.
+                                // parameter to [1, DEVICE_INTEGER_MAX], so neither the
+                                // quotient site nor the remainder site needs a zero
+                                // proof of its own.
                                 self.conditions.push(KernelExtentCondition {
                                     span: expr.span,
                                     range: KernelValueRange {
@@ -1248,12 +1247,46 @@ impl BodyFacts<'_> {
                 } else if let Some(ty) = modular_ty {
                     AbstractRange::from_type(ty, self.types)
                 } else if let Some(divisor_max) = assumed_divisor_max {
-                    // A floored remainder by a divisor in [1, divisor_max]
+                    // The divisor is assumed to lie in [1, divisor_max]. Floor
+                    // division by a positive divisor is monotone in both
+                    // arguments, so the endpointwise fold over those divisor
+                    // candidates is exact for the quotient; a floored remainder
                     // lies in [0, divisor_max - 1] for either numerator sign.
-                    AbstractRange(Some(KernelValueRange {
-                        minimum: KernelRangeExpr::Constant(0),
-                        maximum: KernelRangeExpr::Constant(divisor_max.saturating_sub(1)),
-                    }))
+                    match (*op, left.0) {
+                        (HirBinOp::Div, Some(lhs)) => {
+                            let divisors = [
+                                KernelRangeExpr::Constant(1),
+                                KernelRangeExpr::Constant(divisor_max),
+                            ];
+                            let candidates = [
+                                floor_divide(lhs.minimum.clone(), divisors[0].clone()),
+                                floor_divide(lhs.minimum.clone(), divisors[1].clone()),
+                                floor_divide(lhs.maximum.clone(), divisors[0].clone()),
+                                floor_divide(lhs.maximum.clone(), divisors[1].clone()),
+                            ];
+                            candidates
+                                .into_iter()
+                                .collect::<Option<Vec<_>>>()
+                                .and_then(|values| {
+                                    let mut values = values.into_iter();
+                                    let first = values.next()?;
+                                    let (minimum_value, maximum_value) =
+                                        values.fold((first.clone(), first), |(lo, hi), value| {
+                                            (minimum(lo, value.clone()), maximum(hi, value))
+                                        });
+                                    Some(AbstractRange(Some(KernelValueRange {
+                                        minimum: minimum_value,
+                                        maximum: maximum_value,
+                                    })))
+                                })
+                                .unwrap_or_else(AbstractRange::unknown)
+                        }
+                        (HirBinOp::Div, None) => AbstractRange::unknown(),
+                        _ => AbstractRange(Some(KernelValueRange {
+                            minimum: KernelRangeExpr::Constant(0),
+                            maximum: KernelRangeExpr::Constant(divisor_max.saturating_sub(1)),
+                        })),
+                    }
                 } else {
                     binary_range(*op, left, right)
                 };

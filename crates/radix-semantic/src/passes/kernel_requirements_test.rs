@@ -1101,3 +1101,49 @@ fn control_kernel(i32 j, i32 k) → i32 {
         control.failures
     );
 }
+
+#[test]
+fn division_by_a_positive_size_class_parameter_is_provable() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn div_kernel(i32 j, i32 span) → i32 {
+    let i32 hf ← span
+    return j / hf
+}
+
+@ kernel
+@ public
+fn control_kernel(i32 j, i32 k) → i32 {
+    return j / k
+}
+",
+    );
+
+    let proven = target_row(&fixture, "div_kernel", Target::MirWgsl);
+    assert!(proven.admitted, "{:?}", proven.failures);
+    assert!(proven.failures.is_empty(), "{:?}", proven.failures);
+    assert_eq!(proven.extent_conditions.len(), 1, "{proven:?}");
+    let condition = &proven.extent_conditions[0];
+    assert_eq!(condition.minimum, 1, "{condition:?}");
+    assert!(
+        matches!(condition.range.minimum, KernelRangeExpr::Parameter(_)),
+        "{condition:?}"
+    );
+    assert!(
+        matches!(condition.range.maximum, KernelRangeExpr::Parameter(_)),
+        "{condition:?}"
+    );
+
+    let control = target_row(&fixture, "control_kernel", Target::MirWgsl);
+    assert!(!control.admitted);
+    assert!(
+        control.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::DivideByZeroPossible { .. }
+        )),
+        "{:?}",
+        control.failures
+    );
+}
