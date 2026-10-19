@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/transfer/copy-into-field.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/copy-into-field.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

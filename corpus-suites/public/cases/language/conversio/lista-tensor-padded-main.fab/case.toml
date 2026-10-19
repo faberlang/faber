@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/lista-tensor-padded-main.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/lista-tensor-padded-main.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
