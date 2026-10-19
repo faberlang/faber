@@ -61,6 +61,7 @@ pub(super) fn merge_library_target_bindings(
             Ok(bindings) => {
                 merged.functions.extend(bindings.functions);
                 merged.types.extend(bindings.types);
+                merged.annotations.extend(bindings.annotations);
             }
             Err(diagnostics) => load_errors.extend(diagnostics),
         }

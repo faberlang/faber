@@ -33,6 +33,7 @@ const ROUTES: &[&str] = &[
     "solum:scribe",
     "solum:scribet",
     "solum:funde",
+    "solum:conde",
     "solum:appone",
     "solum:apponet",
     "solum:exstat",
@@ -88,6 +89,7 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, FsError>> {
         "solum:carpe" | "solum:carpiet" => read_lines(args),
         "solum:scribe" | "solum:scribet" => write_text(args),
         "solum:funde" => write_bytes(args),
+        "solum:conde" => write_durably(args),
         "solum:appone" | "solum:apponet" => append_text(args),
         "solum:exstat" | "solum:exstabit" => exists(args),
         "solum:directoriumne" => is_directory(args),
@@ -299,6 +301,74 @@ fn write_bytes(args: &[Arg]) -> Result<Reply, FsError> {
     fs::write(path, data)
         .map(|()| Reply::Unit)
         .map_err(|err| FsError::from_io(ROUTE, path, &err))
+}
+
+fn write_durably(args: &[Arg]) -> Result<Reply, FsError> {
+    const ROUTE: &str = "solum:conde";
+    let path = expect_str(ROUTE, args, 0, "path")?;
+    let data = match args.get(1) {
+        Some(Arg::Str(text)) => text.as_bytes(),
+        Some(Arg::Bytes(bytes)) => bytes.as_slice(),
+        Some(_) => {
+            return Err(FsError::invalid_argument(
+                ROUTE,
+                "data must be textus or octeti",
+            ));
+        }
+        None => return Err(FsError::invalid_argument(ROUTE, "missing data")),
+    };
+    replace_durably(ROUTE, Path::new(path), data)?;
+    Ok(Reply::Unit)
+}
+
+/// Durable whole-file replace. Transaction order: write the hidden sibling
+/// temporary, flush it, rename it over the target, then flush the directory
+/// entry where the platform supports it. The temporary lives in the target's
+/// own directory, so the rename stays on one filesystem and replaces
+/// atomically. A failure or process death before the rename leaves the
+/// previous complete file; it can orphan the hidden temporary but can never
+/// leave a partial target. This route removes its own temporary on the errors
+/// it observes.
+fn replace_durably(route: &'static str, target: &Path, data: &[u8]) -> Result<(), FsError> {
+    let parent = match target.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    let name = target
+        .file_name()
+        .ok_or_else(|| FsError::invalid_argument(route, "path has no file name"))?;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos());
+    let temp = parent.join(format!(
+        ".{}.faber-conde-{}-{}",
+        name.to_string_lossy(),
+        std::process::id(),
+        nanos
+    ));
+    let path_text = target.to_string_lossy().into_owned();
+
+    let staged = (|| -> Result<(), FsError> {
+        let mut file =
+            File::create(&temp).map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
+        file.write_all(data)
+            .map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
+        file.sync_all()
+            .map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
+        drop(file);
+        fs::rename(&temp, target)
+            .map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
+        #[cfg(unix)]
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
+        Ok(())
+    })();
+    if let Err(error) = staged {
+        let _ = fs::remove_file(&temp);
+        return Err(error);
+    }
+    Ok(())
 }
 
 fn append_text(args: &[Arg]) -> Result<Reply, FsError> {
