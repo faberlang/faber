@@ -1141,3 +1141,65 @@ fn inferred_constructor_ascription_site_is_registered() {
         "unregistered ascription site must fail as unknown_type_slot: {err:?}"
     );
 }
+
+#[test]
+fn generic_alias_body_matches_binds_params_by_name() {
+    let mut types = TypeTable::new();
+    let param_k = types.intern(Type::Param(Symbol(1)));
+    let param_v = types.intern(Type::Param(Symbol(2)));
+    let int_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let string_ty = types.primitive(Primitive::Textus);
+    let swapped_body = types.intern(Type::Map(param_v, param_k));
+    let swapped_witness = types.intern(Type::Map(string_ty, int_ty));
+    let misordered_witness = types.intern(Type::Map(int_ty, string_ty));
+    let list_body = types.array(param_k);
+    let list_int = types.array(int_ty);
+    let list_string = types.array(string_ty);
+    let snapshot = types.snapshot();
+
+    let bindings = [(Symbol(1), int_ty), (Symbol(2), string_ty)];
+    assert!(
+        super::generic_alias_body_matches(&snapshot, &bindings, swapped_body, swapped_witness),
+        "map<V, K> must bind K=int and V=string into map<string, int>"
+    );
+    assert!(
+        !super::generic_alias_body_matches(&snapshot, &bindings, swapped_body, misordered_witness),
+        "map<V, K> must not match map<int, string> for the same bindings"
+    );
+
+    let one_binding = [(Symbol(1), int_ty)];
+    assert!(
+        super::generic_alias_body_matches(&snapshot, &one_binding, list_body, list_int),
+        "list<T> must match list<int> when T is bound to int"
+    );
+    assert!(
+        !super::generic_alias_body_matches(&snapshot, &one_binding, list_body, list_string),
+        "list<T> must not match list<string> when T is bound to int"
+    );
+}
+
+#[test]
+fn generic_alias_body_matches_fails_closed() {
+    let mut types = TypeTable::new();
+    let param_t = types.intern(Type::Param(Symbol(1)));
+    let int_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let list_body = types.array(param_t);
+    let list_int = types.array(int_ty);
+    let body_alias = types.intern(Type::Alias(DefId(USER_DEF_ID_BASE + 1), list_body));
+    let witness_alias = types.intern(Type::Alias(DefId(USER_DEF_ID_BASE + 2), list_int));
+    let snapshot = types.snapshot();
+    let bindings = [(Symbol(1), int_ty)];
+
+    assert!(
+        !super::generic_alias_body_matches(&snapshot, &bindings, list_body, int_ty),
+        "list<T> must not match an unrelated primitive witness"
+    );
+    assert!(
+        !super::generic_alias_body_matches(&snapshot, &bindings, body_alias, witness_alias),
+        "aliases with different DefIds must not match"
+    );
+    assert!(
+        !super::generic_alias_body_matches(&snapshot, &bindings, int_ty, param_t),
+        "a Param on the witness side never binds"
+    );
+}

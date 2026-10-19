@@ -614,6 +614,174 @@ fn transparent_alias_body_witness(
     })
 }
 
+/// Whether a generic alias body structurally matches an authored site witness.
+///
+/// A generic alias body is parametric: the recorded `Type::Alias(def, body)`
+/// keeps its declared parameters (`map<K, V>`) while the authored site is
+/// finalized to the substitution (`map<string, int>`), so an exact-body
+/// comparison can never agree. Matching therefore binds each authored argument
+/// to the alias parameter that names it — `bindings[i]` pairs the i-th
+/// parameter name with that argument's witness — and compares the two shapes
+/// structurally. A parameter the bindings do not name, a mismatched variant, or
+/// a shape outside the recursive arms below fails closed.
+#[allow(dead_code)] // wired in by unit pumpfix-gd96b2e21-1.1.3
+fn generic_alias_body_matches(
+    types: &radix_types::TypeTableSnapshot,
+    bindings: &[(radix_lexer::Symbol, radix_types::TypeId)],
+    body: radix_types::TypeId,
+    witness: radix_types::TypeId,
+) -> bool {
+    let (Some(body_ty), Some(witness_ty)) = (
+        types.types().get(body.0 as usize),
+        types.types().get(witness.0 as usize),
+    ) else {
+        return false;
+    };
+    let recurse = |body: radix_types::TypeId, witness: radix_types::TypeId| {
+        generic_alias_body_matches(types, bindings, body, witness)
+    };
+    let same_variant = std::mem::discriminant(body_ty) == std::mem::discriminant(witness_ty);
+    match (body_ty, witness_ty) {
+        // A parameter binds by name against the authored argument witness, so a
+        // permuted body (`map<V, K>`) still matches its own substitution.
+        (radix_types::Type::Param(name), _) => bindings
+            .iter()
+            .any(|(param, arg)| param == name && *arg == witness),
+        (
+            radix_types::Type::Array(body_child)
+            | radix_types::Type::Queue(body_child)
+            | radix_types::Type::Stack(body_child)
+            | radix_types::Type::Set(body_child)
+            | radix_types::Type::Promissum(body_child)
+            | radix_types::Type::Cursor(body_child)
+            | radix_types::Type::Atomic(body_child)
+            | radix_types::Type::Option(body_child),
+            radix_types::Type::Array(witness_child)
+            | radix_types::Type::Queue(witness_child)
+            | radix_types::Type::Stack(witness_child)
+            | radix_types::Type::Set(witness_child)
+            | radix_types::Type::Promissum(witness_child)
+            | radix_types::Type::Cursor(witness_child)
+            | radix_types::Type::Atomic(witness_child)
+            | radix_types::Type::Option(witness_child),
+        ) => same_variant && recurse(*body_child, *witness_child),
+        (
+            radix_types::Type::Intervallum(body_child, body_step),
+            radix_types::Type::Intervallum(witness_child, witness_step),
+        ) => body_step == witness_step && recurse(*body_child, *witness_child),
+        (
+            radix_types::Type::Ref(body_mutability, body_child),
+            radix_types::Type::Ref(witness_mutability, witness_child),
+        ) => body_mutability == witness_mutability && recurse(*body_child, *witness_child),
+        (
+            radix_types::Type::BoundedArray {
+                element: body_child,
+                capacity: body_capacity,
+            }
+            | radix_types::Type::BoundedQueue {
+                element: body_child,
+                capacity: body_capacity,
+            }
+            | radix_types::Type::BoundedStack {
+                element: body_child,
+                capacity: body_capacity,
+            },
+            radix_types::Type::BoundedArray {
+                element: witness_child,
+                capacity: witness_capacity,
+            }
+            | radix_types::Type::BoundedQueue {
+                element: witness_child,
+                capacity: witness_capacity,
+            }
+            | radix_types::Type::BoundedStack {
+                element: witness_child,
+                capacity: witness_capacity,
+            },
+        ) => {
+            same_variant
+                && body_capacity == witness_capacity
+                && recurse(*body_child, *witness_child)
+        }
+        (
+            radix_types::Type::Tensor(body_child, body_shape)
+            | radix_types::Type::Vector(body_child, body_shape)
+            | radix_types::Type::Matrix(body_child, body_shape)
+            | radix_types::Type::Sparsa(body_child, body_shape),
+            radix_types::Type::Tensor(witness_child, witness_shape)
+            | radix_types::Type::Vector(witness_child, witness_shape)
+            | radix_types::Type::Matrix(witness_child, witness_shape)
+            | radix_types::Type::Sparsa(witness_child, witness_shape),
+        ) => same_variant && body_shape == witness_shape && recurse(*body_child, *witness_child),
+        (
+            radix_types::Type::Map(body_key, body_value)
+            | radix_types::Type::Ledger(body_key, body_value)
+            | radix_types::Type::PromissumFailable(body_key, body_value)
+            | radix_types::Type::AsyncCursor(body_key, body_value),
+            radix_types::Type::Map(witness_key, witness_value)
+            | radix_types::Type::Ledger(witness_key, witness_value)
+            | radix_types::Type::PromissumFailable(witness_key, witness_value)
+            | radix_types::Type::AsyncCursor(witness_key, witness_value),
+        ) => {
+            same_variant && recurse(*body_key, *witness_key) && recurse(*body_value, *witness_value)
+        }
+        (
+            radix_types::Type::Union(body_members)
+            | radix_types::Type::Tuple(body_members)
+            | radix_types::Type::Intersection(body_members),
+            radix_types::Type::Union(witness_members)
+            | radix_types::Type::Tuple(witness_members)
+            | radix_types::Type::Intersection(witness_members),
+        ) => {
+            same_variant
+                && body_members.len() == witness_members.len()
+                && body_members
+                    .iter()
+                    .zip(witness_members)
+                    .all(|(body, witness)| recurse(*body, *witness))
+        }
+        (
+            radix_types::Type::Alias(body_def, body_child),
+            radix_types::Type::Alias(witness_def, witness_child),
+        ) => body_def == witness_def && recurse(*body_child, *witness_child),
+        (
+            radix_types::Type::Applied(body_base, body_args),
+            radix_types::Type::Applied(witness_base, witness_args),
+        ) => {
+            recurse(*body_base, *witness_base)
+                && body_args.len() == witness_args.len()
+                && body_args
+                    .iter()
+                    .zip(witness_args)
+                    .all(|(body, witness)| match (body, witness) {
+                        (
+                            radix_types::AppliedArg::Type(body),
+                            radix_types::AppliedArg::Type(witness),
+                        ) => recurse(*body, *witness),
+                        (
+                            radix_types::AppliedArg::Size(body),
+                            radix_types::AppliedArg::Size(witness),
+                        ) => body == witness,
+                        (radix_types::AppliedArg::Type(_), radix_types::AppliedArg::Size(_))
+                        | (radix_types::AppliedArg::Size(_), radix_types::AppliedArg::Type(_)) => {
+                            false
+                        }
+                    })
+        }
+        (radix_types::Type::Record(body_fields), radix_types::Type::Record(witness_fields)) => {
+            body_fields.len() == witness_fields.len()
+                && body_fields.iter().all(|(key, body_field)| {
+                    witness_fields
+                        .get(key)
+                        .is_some_and(|witness_field| recurse(*body_field, *witness_field))
+                })
+        }
+        // Fail closed: primitives and nominals compare by identity, and an
+        // unhandled variant pair never counts as a structural match.
+        (body_ty, witness_ty) => body_ty == witness_ty,
+    }
+}
+
 fn named_witness(
     types: &radix_types::TypeTableSnapshot,
     ty: radix_types::TypeId,
