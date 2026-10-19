@@ -979,6 +979,7 @@ pub(crate) fn empty_presentation() -> HirPresentation {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         glyph_ids: Vec::new(),
+        radical_quarta_ids: Vec::new(),
         numeric_twin_ids: Vec::new(),
         empty_dense_ids: Vec::new(),
         inferred_constructor_ids: Vec::new(),

@@ -2351,6 +2351,14 @@ pub struct HirPresentation {
     #[serde(default)]
     pub glyph_ids: Vec<HirId>,
 
+    /// Ids of the outer `MethodCall` expressions lowered from an authored
+    /// `∜` fourth root. `∜ x` and authored `√ √ x` lower to the same nested
+    /// `.sqrt().sqrt()` shape, so this dedicated set is the only record that
+    /// the outer call came from the single glyph; Faber re-emission prints
+    /// `∜` for exactly these ids. Defaulted so older serialized HIR loads.
+    #[serde(default)]
+    pub radical_quarta_ids: Vec<HirId>,
+
     /// Ids of the expressions typecheck produced by desugaring a numeric
     /// twin method (`a.add(2)` means `a ← a + 2`, `x.added(y)` is `x + y`;
     /// the rewrite keeps the call's node id on the operator, the assignment,
