@@ -1,0 +1,52 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Nested mutation: a field's field, a list element's field, and an alias that shares."
+syntax = "o.inner.v ← 7"
+related = ["genus"]
+locale = "en"
++++
+# =============================================================================
+# genus — Nested mutation
+# =============================================================================
+#
+# What this teaches:
+#   • A place reaches through a field (`o.inner.v`) and through a list element
+#     (`o.items[0].v`); the write mutates the object inside.
+#   • The reassignment is `←`, the same arrow used for a plain field write.
+#   • A `let` binding of a genus value aliases the object; a write seen through
+#     the alias is seen through the original.
+#
+# Common mistakes:
+#   • Writing to a `let` field — the field must be declared `mut`.
+#   • Expecting the alias to be a copy: nothing is copied by a binding.
+#   • Indexing a list that has no element at that position.
+#
+# See also: genus
+# =============================================================================
+
+# GRAMMAR:
+#   assign : place '←' expression
+#   place  : postfixExpr ('.' ident | '[' expression ']')*
+#
+# EXPECTED OUTPUT:
+#   7, 11, 7
+
+class In { mut int v }
+class Out {
+    mut In inner
+    mut list<In> items
+}
+
+main {
+    mut Out o ← Out { inner = In { v = 1 }, items = [In { v = 10 }] }
+    o.inner.v ← 7
+    o.items[0].v ← 11
+    print o.inner.v
+    print o.items[0].v
+    let In alias ← o.inner
+    print alias.v
+}
