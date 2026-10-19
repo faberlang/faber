@@ -1,0 +1,83 @@
++++
+term = "bits"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "b16 and b32 act at their own width: ¬, shift edges (count 0, N-1, N, N+1), unsigned order, and a b64 xor chain."
+syntax = "¬ c | c ⇐ 1 | c ⇒ 15 | hi ≻ lo"
+related = ["bits", "u16", "u32"]
+locale = "en"
++++
+# =============================================================================
+# bits — b16 and b32 at their own width
+# =============================================================================
+#
+# What this teaches:
+#   • b16 and b32 are exactly 16 and 32 bits wide, not a b64 in disguise
+#   • ¬ flips every bit of the value's own width
+#   • the shift edges are the type's own: count 0 moves nothing, N-1 keeps the
+#     low bit, N and N+1 give all zeros — the count is never wrapped
+#   • bits compare by bit pattern read as unsigned, so 0x8000 is greater than
+#     0x7fff on a b16
+#   • a ⊻ chain over b64 is its own inverse: (x ⊻ k) ⊻ k is x again
+#
+# Common mistakes:
+#   • expecting ¬ on a b16 to clear only the low byte
+#   • expecting a shift count of N to wrap back to 0
+#   • reading the high bit as a sign bit
+#
+# See also: bits-operations, bits-order, bits-literals
+# =============================================================================
+
+# bits — b16 and b32 at their own width
+#
+# WHY: an operation does what its own domain expects. Bit movement expects the
+# container's edge, so bits have their width always.
+#
+# EXPECTED stdout: see bits-operations-widths.expected
+
+main {
+    let b8 a ← 0xf3
+    let int n ← 8
+    let int m ← 9
+    print a ⇐ n
+    print a ⇒ m
+    print a ⇐ 0
+    print a ⇒ 7
+
+    let b16 c ← 0x8001
+    print c ⇒ 15
+    print c ⇐ 1
+    print ¬ c
+
+    let b32 d ← 0x80000001
+    print d ⇐ 31
+    print d ⇒ 31
+    print ¬ d
+
+    let b16 hi ← 0x8000
+    let b16 lo ← 0x7fff
+    print hi ≻ lo
+    print hi ≺ lo
+
+    let b32 all ← 0xffffffff
+    let b32 one ← 0x00000001
+    print all ≻ one
+    print all ≥ one
+    print all ≤ one
+    print all ≢ one
+    print one ≡ all
+
+    let b64 x ← 0x0123456789abcdef
+    let b64 k ← 0xfedcba9876543210
+    let b64 mixed ← x ⊻ k
+    print mixed
+    let b64 back ← mixed ⊻ k
+    print back
+    let b64 eq ← (x ∧ k) ∨ (¬ x ∧ ¬ k)
+    print eq
+    print x ⇐ 63
+    print x ⇒ 63
+    print x ⇒ 0
+}
