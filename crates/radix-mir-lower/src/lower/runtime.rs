@@ -1523,6 +1523,58 @@ impl FunctionBuilder<'_> {
         Some(self.runtime_call_value(MirIntrinsic::Sermo(op), lowered_args, return_ty, expr.span))
     }
 
+    /// `sink ⇜ item` (need-5): the operator form of `sink.sink(item)`.
+    ///
+    /// A channel's send view is a sink, so `m ⇜ x` writes through the view by
+    /// the same sermo send intrinsic `m.sink(x)` lowers to. Every other sink
+    /// lowers to the sinking contract's `sink` method — the reporting method
+    /// form; the die-on-failure trap around it is unit 0c4d3dc1-5.2.
+    pub(super) fn lower_sink_into(
+        &mut self,
+        sink: &HirExpression,
+        item: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let span = expr.span;
+        let vacuum = self.expr_ty(expr)?;
+        let Some(sink_ty) = sink.ty else {
+            self.errors
+                .push(MirError::missing_type(span, "sink-into receiver"));
+            return None;
+        };
+
+        // A send view writes through the channel: `m ⇜ x` is `m.sink(x)`.
+        if self
+            .context
+            .meus_def
+            .is_some_and(|meus| self.method_receiver_struct_def(sink_ty) == Some(meus))
+        {
+            let view = self.lower_expr_value(sink)?;
+            let item = self.lower_expr_value(item)?;
+            return Some(self.runtime_call_value(
+                MirIntrinsic::Sermo(radix_mir::MirSermoOp::Send),
+                vec![view, item],
+                vacuum,
+                span,
+            ));
+        }
+
+        let Some(method) = self
+            .context
+            .interner
+            .and_then(|interner| interner.lookup(radix_semantic::radix_contract::SINKING_METHOD))
+        else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "sink-into before the sinking contract's method name is interned",
+            ));
+            return None;
+        };
+
+        let argument = HirCallArg { name: None, spread: false, marker: None, expr: item.clone(), span: item.span };
+        self.lower_method_call(sink, method, &[], &[argument], None, expr)
+    }
+
     /// `s.close()` (D8.3): close, then route a reported error through the
     /// innermost alternate exit like `iace` with a `textus` payload.
     fn lower_sermo_close(&mut self, receiver: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {

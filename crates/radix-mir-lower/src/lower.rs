@@ -5444,13 +5444,11 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         | HirExpressionKind::Reddet(_)
         | HirExpressionKind::Tacebit(_)
         | HirExpressionKind::Yield(_)
-        // CopyInto lowers through its own visitor arm; it is unreachable on
-        // the unsupported path.
+        // CopyInto and SinkInto lower through their own visitor arms; they are
+        // unreachable on the unsupported path.
         | HirExpressionKind::CopyInto { .. }
+        | HirExpressionKind::SinkInto { .. }
         | HirExpressionKind::TypeCheck { .. } => "primitive expression",
-        // SinkInto's own lowering lands with unit 0c4d3dc1-5; until then it
-        // fails closed with a named reason.
-        HirExpressionKind::SinkInto { .. } => "sink-into before sinking-contract MIR lowering",
     }
 }
 
