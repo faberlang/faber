@@ -1767,6 +1767,10 @@ help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 message = "عدم تطابق في expression type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
+[diagnostics.SEM010.issues.import_conversion_required]
+message = "لا يمكن تخزين قيمة أجنبية من نوع غير معروف ({found}) في خلية من النوع {expected}"
+help = "افرض نقل الثقة بتحويل: `value ↦ {expected}`"
+
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "equality يتطلب أنواعا متطابقة"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"

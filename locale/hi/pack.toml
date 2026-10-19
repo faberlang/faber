@@ -1779,6 +1779,10 @@ help = "अभिव्यक्ति के प्रकार को अप�
 message = "अभिव्यक्ति प्रकार असंगति"
 help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
 
+[diagnostics.SEM010.issues.import_conversion_required]
+message = "अज्ञात प्रकार का विदेशी मान ({found}) {expected} प्रकार के सेल में संग्रहीत नहीं किया जा सकता"
+help = "रूपांतरण के साथ विश्वास हस्तांतरण बाध्य करें: `value ↦ {expected}`"
+
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "equality के लिए समान प्रकार आवश्यक हैं"
 help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
