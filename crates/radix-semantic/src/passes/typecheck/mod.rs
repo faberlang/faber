@@ -149,6 +149,9 @@ mod shape_obligations_test;
 #[cfg(test)]
 #[path = "slot_lift_test.rs"]
 mod slot_lift_test;
+#[cfg(test)]
+#[path = "target_import_test.rs"]
+mod target_import_test;
 mod tensor_edge_policy_generic;
 #[cfg(test)]
 #[path = "text_get_test.rs"]
@@ -549,6 +552,11 @@ pub(crate) struct TypeChecker<'a> {
     /// Import bindings that behave like module/provider receivers.
     pub import_receivers: FxHashSet<DefId>,
 
+    /// Bindings introduced by target-native imports (`import python "math"
+    /// m`): trusted `ignotum` roots whose calls and member accesses are
+    /// admitted unchecked.
+    pub trusted_imports: FxHashSet<DefId>,
+
     /// Local free functions marked `@ nondum`, keyed by item definition.
     /// Every use is refused (SEM017 `nondum_function_for_target`) on a target
     /// the gate covers; the declaration itself is fine.
@@ -927,6 +935,7 @@ impl<'a> TypeChecker<'a> {
             axis_sugar: Vec::new(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
+            trusted_imports: FxHashSet::default(),
             unavailable_functions: FxHashMap::default(),
             unavailable_methods: FxHashMap::default(),
             target,
