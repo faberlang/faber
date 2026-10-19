@@ -22,6 +22,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -458,8 +459,44 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
     let mut expected_failures = 0;
     let mut not_applicable = 0;
     let mut failed = 0;
-    for case in &suite.cases {
-        let result = run_case(case, &faber);
+    // WHY: each case is an independent `faber run` child, so the suite is bound by
+    // the sum of its children rather than by this process. The launcher takes a
+    // small fixed share of the host: five concurrent lanes already saturate the
+    // machine, and a wider fan-out only adds contention. Rows are collected by
+    // case index and printed in suite order, so the JSONL stream stays stable.
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .min(4)
+        .min(suite.cases.len().max(1));
+    let next = AtomicUsize::new(0);
+    let mut rows = Vec::with_capacity(suite.cases.len());
+    thread::scope(|scope| {
+        let mut handles = Vec::with_capacity(workers);
+        for _ in 0..workers {
+            let next = &next;
+            let cases = &suite.cases;
+            let faber = &faber;
+            handles.push(scope.spawn(move || {
+                let mut out = Vec::new();
+                loop {
+                    let index = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(case) = cases.get(index) else {
+                        break;
+                    };
+                    out.push((index, run_case(case, faber)));
+                }
+                out
+            }));
+        }
+        for handle in handles {
+            match handle.join() {
+                Ok(found) => rows.extend(found),
+                Err(payload) => std::panic::resume_unwind(payload),
+            }
+        }
+    });
+    rows.sort_by_key(|(index, _)| *index);
+    for (_, result) in rows {
         match result["status"].as_str() {
             Some("pass") => passed += 1,
             Some("rejected") => rejected += 1,
