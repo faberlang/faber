@@ -11,3 +11,17 @@ locale = "en"
 no_expected = "rejects"
 diagnostic = "PARSE001:json_quoted_key"
 +++
+# =============================================================================
+# json unquoted key — JSON object keys must be quoted strings.
+# =============================================================================
+#
+# What this teaches:
+#   • A bare `{` in expression position enters the JSON literal grammar
+#   • JSON object keys are quoted strings: { "a": 1 }, never { a: 1 }
+#   • A bare identifier key rejects with PARSE001:json_quoted_key
+#
+# Common mistakes:
+#   • Writing { a: 1 } instead of { "a": 1 } — keys are JSON strings, not Faber names
+#
+# See also: json
+# =============================================================================
