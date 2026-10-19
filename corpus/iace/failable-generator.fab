@@ -1,0 +1,65 @@
++++
+term = "failable generator"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "comparison", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt", "callable_posture", "itera_stmt", "range_expr", "cede_stmt", "incipiet_stmt"]
+category = "errors"
+canonical = false
+summary = "A generator declares its own ⇥ error channel; a failing yield leaves through the consuming loop's handler."
+syntax = "fn <name>(<params>) generator → <type> ⇥ <error-type> <block>  |  for from <generator-call> let <x> { … }"
+related = ["functio", "⇥", "fac", "cape", "iace", "cede"]
+locale = "en"
++++
+# =============================================================================
+# generator — A failable generator and its async sibling
+# =============================================================================
+#
+# What this teaches:
+#   • A generator declares its own `⇥` error channel exactly like a free
+#     function: `fn gen(int n) generator → int ⇥ string`. The `⇥` channel
+#     belongs to the generator, not to the values it yields.
+#   • Both generator postures carry the channel the same way. `generator`
+#     and `async_generator` differ in how they are driven, not in how a
+#     failure leaves.
+#   • A failing `yield` leaves the `do { } catch e { }` around the
+#     `for from gen(…) let x { … }` loop. The loop's handler runs; iteration
+#     stops where the failure happened and nothing after it runs.
+#
+# Common mistakes:
+#   • Expecting the loop to continue after a failing `yield`. The failure
+#     leaves the loop, not just the element.
+#   • Consuming a failable generator without a handler on the loop — that is
+#     `failable_call_requires_handler`, unless the consumer itself declares `⇥`.
+#
+# See also: functio, ⇥, fac, cape, iace, cede
+# =============================================================================
+
+# generator — failing yield in a synchronous and an async generator
+#
+# EXPECTED OUTPUT:
+#   failable-generator.expected — one line per print.
+
+fn gen(int n) generator → int ⇥ string {
+    for range 0‥n let i {
+        if i ≡ 2 then throw "two"
+        yield i
+    }
+}
+
+fn agen(int n) async_generator → int ⇥ string {
+    for range 0‥n let i {
+        if i ≡ 2 then throw "two"
+        yield i
+    }
+}
+
+async_main {
+    do {
+        for from gen(5) let x { print x }
+    }
+    catch e { print "caught §"(e) }
+
+    do {
+        for from agen(5) let x { print x }
+    }
+    catch e { print "caught §"(e) }
+}
