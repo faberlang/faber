@@ -548,6 +548,23 @@ impl Lowerer<'_> {
                 self.presentation.glyph_ids.push(id);
                 return self.lower_rounding_glyph("rotunda", operand);
             }
+            radix_syntax::UnOp::RadicalSqrt => {
+                return self.lower_radical_glyph("radix", operand);
+            }
+            radix_syntax::UnOp::RadicalCbrt => {
+                return self.lower_radical_glyph("radix_cubica", operand);
+            }
+            // `∜ x` is `√ √ x`: `.sqrt().sqrt()`.
+            radix_syntax::UnOp::RadicalFourth => {
+                let span = operand.span;
+                let squared = HirExpression {
+                    id: self.next_hir_id(),
+                    kind: self.lower_radical_glyph("radix", operand),
+                    ty: None,
+                    span,
+                };
+                return self.lower_radical_glyph("radix", squared);
+            }
         };
 
         HirExpressionKind::Unary(op, Box::new(operand))
@@ -566,6 +583,19 @@ impl Lowerer<'_> {
             .interner
             .intern(&format!("{ROUNDING_GLYPH_MARKER}{canonical}"));
         HirExpressionKind::MethodCall(Box::new(operand), marker, Vec::new(), Vec::new(), None)
+    }
+
+    /// Lower a radical glyph to its canonical method twin: `√ x` is `x.sqrt()`,
+    /// `∛ x` is `x.cbrt()`, and `∜ x` is `x.sqrt().sqrt()`. The HIR shape is the
+    /// authored method call, so typecheck and codegen stay the sole owners of
+    /// legality (an integer operand is the `.sqrt()` error).
+    fn lower_radical_glyph(
+        &mut self,
+        canonical: &str,
+        operand: HirExpression,
+    ) -> HirExpressionKind {
+        let name = self.intrinsic_surface_symbol(canonical);
+        HirExpressionKind::MethodCall(Box::new(operand), name, Vec::new(), Vec::new(), None)
     }
 
     fn lower_ternary(&mut self, ternary: &radix_syntax::TernaryExpr) -> HirExpressionKind {
