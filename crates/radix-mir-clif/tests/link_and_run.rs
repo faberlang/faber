@@ -375,7 +375,12 @@ fn build_and_run(
     )
     .expect("object emission succeeds");
 
-    let dir = std::env::temp_dir().join(format!("radix-mir-clif-{name}"));
+    // The scratch directory must be private to this process. The four tests in
+    // this binary differ by `name`, but every process that runs them on the
+    // host shares the same `temp_dir()`, so a fixed path lets a concurrent
+    // `cargo` pass in another checkout overwrite `program.o`, the archive
+    // snapshot or the linked `program` between the write and the execute.
+    let dir = std::env::temp_dir().join(format!("radix-mir-clif-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("temp dir");
     let object_path = dir.join("program.o");
     std::fs::write(&object_path, &object.bytes).expect("write object");
