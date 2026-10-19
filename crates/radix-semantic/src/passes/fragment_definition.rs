@@ -228,6 +228,13 @@ impl FragmentDefinitionChecker<'_> {
                 self.check_expr(target);
                 self.check_expr(value);
             }
+            // `sink ⇜ item` writes through the sink, an effect fragments admit
+            // no more than `⇇`.
+            HirExpressionKind::SinkInto { sink, item } => {
+                self.effect(expr.span, "dynamic_function");
+                self.check_expr(sink);
+                self.check_expr(item);
+            }
             HirExpressionKind::Gradient {
                 call,
                 selected_arguments,

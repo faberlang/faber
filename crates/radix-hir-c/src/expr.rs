@@ -2297,6 +2297,7 @@ pub(crate) fn construct_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Ref(..) | HirExpressionKind::Deref(_) => "reference",
         HirExpressionKind::TypeCheck { .. } => "type test",
         HirExpressionKind::CopyInto { .. } => "copy-into statement",
+        HirExpressionKind::SinkInto { .. } => "sink-into statement",
         HirExpressionKind::Format { .. } => "format operator",
         HirExpressionKind::Marked { .. } => "value-side copy or own marker",
         HirExpressionKind::Error => "error placeholder",

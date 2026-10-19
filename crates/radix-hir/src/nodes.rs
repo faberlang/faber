@@ -1665,6 +1665,17 @@ pub enum HirExpressionKind {
         value: Box<HirExpression>,
     },
 
+    /// Sink-into: `sink ⇜ item` (U+21DC).
+    ///
+    /// The operator form of `sink.sink(item)`. A failed write dies here, while
+    /// the method form reports it. The expression is a statement with no value
+    /// (`vacuum`-shaped). Typecheck owns its rules 3 and 5-8; lowering
+    /// evaluates `sink` then `item`, the `item` exactly once.
+    SinkInto {
+        sink: Box<HirExpression>,
+        item: Box<HirExpression>,
+    },
+
     /// Format operator `value ¶ "spec"` (D2.1) → `textus`.
     ///
     /// `spec` is the literal's text. Typecheck parses and validates it against

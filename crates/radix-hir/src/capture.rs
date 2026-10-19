@@ -177,6 +177,7 @@ impl HirVisitor for CaptureCollector {
             }
             HirExpressionKind::MethodCall(receiver, ..) => self.note_content_mutation(receiver),
             HirExpressionKind::CopyInto { target, .. } => self.note_content_mutation(target),
+            HirExpressionKind::SinkInto { sink, .. } => self.note_content_mutation(sink),
             HirExpressionKind::Clausura(params, _, _, body) => {
                 self.visit_closure(params, body);
                 return;

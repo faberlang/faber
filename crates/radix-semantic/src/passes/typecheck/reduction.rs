@@ -816,6 +816,13 @@ impl ReductionBodyState {
                 self.walk_expr(checker, target);
                 self.walk_expr(checker, value);
             }
+            // `sink ⇜ item` writes through the sink, an effect a term body does
+            // not admit; keep the same rejection as `⇇`.
+            HirExpressionKind::SinkInto { sink, item } => {
+                effect(checker, expr.span, "unapproved_effect");
+                self.walk_expr(checker, sink);
+                self.walk_expr(checker, item);
+            }
             HirExpressionKind::Gradient {
                 call,
                 selected_arguments,
