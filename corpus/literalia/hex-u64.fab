@@ -1,0 +1,26 @@
++++
+term = "numerus"
+kind = "literal"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "nota_stmt"]
+category = "literal"
+canonical = false
+summary = "Radix literals into wide and policy cells: u64 max in hex and binary, a 65-bit hex literal in an inf slot, and wrapping stores."
+syntax = "let u64 a ← 0xFFFFFFFFFFFFFFFF"
+related = ["numerus", "bits", "float-fold"]
+locale = "en"
++++
+
+main {
+    let u64 a ← 0xFFFFFFFFFFFFFFFF
+    print a
+    let u64 b ← 0b1111111111111111111111111111111111111111111111111111111111111111
+    print b
+    let inf c ← 0x1FFFFFFFFFFFFFFFF
+    print c
+    let i8 d ← 0x7F
+    print d
+    let wrapping<u8> w ← 0x1FF
+    print w
+    let wrapping<i8> x ← 0xFF
+    print x
+}
