@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/tensor/glyph-scalar-operand-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/glyph-scalar-operand-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "glyph_scalar_operand"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "glyph_scalar_operand"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "glyph_scalar_operand"
