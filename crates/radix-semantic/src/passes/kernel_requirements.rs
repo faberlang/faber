@@ -474,19 +474,37 @@ fn is_public_kernel(annotations: &[HirAnnotation], interner: &Interner) -> bool 
 }
 
 /// Exact integer value of a call argument used to seed an inlined private
-/// kernel callee. `resolver` is reserved for imported constant paths.
+/// kernel callee, including an imported `module.CONST` value folded from its
+/// file interface. `resolver` supplies that imported value.
 fn kernel_constant_argument(
     expr: &HirExpression,
     const_values: &FxHashMap<DefId, i128>,
     resolver: &Resolver,
 ) -> Option<i128> {
-    let _ = resolver;
     match &expr.kind {
         HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => Some(i128::from(*value)),
         HirExpressionKind::Literal(radix_hir::HirLiteral::BigInt(_)) => {
             crate::passes::const_int_value(expr)
         }
         HirExpressionKind::Path(def_id) => const_values.get(def_id).copied(),
+        HirExpressionKind::Field(object, member) => match &object.kind {
+            HirExpressionKind::Path(module) => resolver
+                .get_symbol(*module)
+                .filter(|namespace| namespace.kind == SymbolKind::Module)
+                .and_then(|namespace| {
+                    resolver.namespace_file_const_value_canonical(namespace.name, *member)
+                })
+                .and_then(|value| match value {
+                    crate::file_interface::InterfaceConstValue::Int(value) => Some(*value),
+                    _ => None,
+                }),
+            _ => None,
+        },
+        HirExpressionKind::Conversio {
+            source,
+            implicit: Some(_),
+            ..
+        } => kernel_constant_argument(source, const_values, resolver),
         HirExpressionKind::Unary(HirUnOp::Neg, inner) => {
             kernel_constant_argument(inner, const_values, resolver)?.checked_neg()
         }
@@ -2657,6 +2675,20 @@ impl BodyFacts<'_> {
                     && receiver.ty.is_some_and(|ty| is_tensor_type(ty, self.types))
             }
             HirExpressionKind::Reduction { .. } => self.range_proven_reduction(expr),
+            // An imported module constant folds to its interface value: it is a
+            // compile-time number, not an i64 cell on the device.
+            HirExpressionKind::Field(object, member) => match &object.kind {
+                HirExpressionKind::Path(module) => self
+                    .resolver
+                    .get_symbol(*module)
+                    .filter(|namespace| namespace.kind == SymbolKind::Module)
+                    .and_then(|namespace| {
+                        self.resolver
+                            .namespace_file_const_value_canonical(namespace.name, *member)
+                    })
+                    .is_some(),
+                _ => false,
+            },
             _ => false,
         }
     }
