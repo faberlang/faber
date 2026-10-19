@@ -162,6 +162,43 @@ fn build_archive() -> PathBuf {
     archive
 }
 
+/// Copy the shared runtime archive into the private scratch directory as one
+/// atomic snapshot.
+///
+/// A plain copy straight onto the final path is torn when a `cargo` pass
+/// sharing this target directory replaces or momentarily removes
+/// `libfaber_rt_clif.a` mid-copy: `cc` then links a truncated snapshot and the
+/// program fails, or misbehaves. The copy lands in `<archive>.tmp` inside the
+/// already-private directory and is renamed into place only when complete, so
+/// the final path is either absent or a whole archive. A vanished source — the
+/// same rebuild window `wait_for_archive` covers — is retried a few times.
+fn snapshot_archive(source: &Path, archive: &Path) {
+    let partial = archive.with_file_name("libfaber_rt_clif.a.tmp");
+    let mut last_failure = None;
+    for attempt in 1..=3 {
+        if attempt > 1 {
+            std::thread::sleep(Duration::from_millis(200));
+        }
+        match std::fs::copy(source, &partial) {
+            Ok(_) => {
+                std::fs::rename(&partial, archive).expect("publish the runtime archive snapshot");
+                return;
+            }
+            Err(error) => {
+                last_failure = Some(error);
+                wait_for_archive(source);
+            }
+        }
+    }
+    panic!(
+        "snapshot the runtime archive {}: {}",
+        source.display(),
+        last_failure
+            .map(|error| error.to_string())
+            .unwrap_or_default(),
+    );
+}
+
 fn span() -> Span {
     Span::default()
 }
@@ -392,7 +429,7 @@ fn build_and_run(
     // archive between `build_archive()` returning and `cc` opening it, which
     // fails the link; a private copy cannot be pulled out from under `cc`.
     let archive = dir.join("libfaber_rt_clif.a");
-    std::fs::copy(build_archive(), &archive).expect("snapshot the runtime archive");
+    snapshot_archive(&build_archive(), &archive);
 
     // The platform dead-strip flag is load-bearing (design review):
     // without it the same link measured 13 MB. A Rust staticlib also needs
