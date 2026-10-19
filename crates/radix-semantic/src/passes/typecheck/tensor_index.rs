@@ -910,11 +910,12 @@ pub(super) fn check_tensor_bracket_range_index(
         start,
         end,
         step,
-        kind: _,
+        kind,
     } = &mut index.kind
     else {
         return tensor_with_fresh_shape(checker, elem);
     };
+    let range_kind = *kind;
     // WHY: a scalar range indexes one axis, so a statically-known rank other
     // than one is the same rank decline a scalar index reports. A bare
     // `Literal` shape is rank 1; anything else (param, runtime, hole) is an
@@ -957,6 +958,22 @@ pub(super) fn check_tensor_bracket_range_index(
                 super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
                 step_expr.span,
             );
+        }
+    }
+    // WHY: the step is not consumed yet -- the shape below assumes step 1,
+    // and a later unit consumes the step value.
+    let literal_extent = static_tensor_bounds(checker, shape).first().copied();
+    let bounds = static_numerus_literal(start).zip(static_numerus_literal(end));
+    if literal_extent.is_some()
+        && let Some((start, end)) = bounds
+    {
+        let end_eff = if range_kind == HirRangeKind::Inclusive {
+            end.saturating_add(1)
+        } else {
+            end
+        };
+        if let Some(output) = sectio_axis0_shape(checker, shape, start, end_eff, 1) {
+            return checker.types.tensor_with_shape(elem, output);
         }
     }
     let result = tensor_with_fresh_shape(checker, elem);
