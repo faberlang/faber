@@ -50,6 +50,25 @@ fn set_opener_i64_reopens_the_conversation() {
 }
 
 #[test]
+fn set_opener_nil_reopens_the_conversation() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    __faber_clif_v1_sermo_set_opener_nil(handle);
+
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let opened = slot(&mut table, handle).expect("the handle still names a slot");
+    assert_eq!(
+        opened.conversation,
+        Conversation::open(ROUTE).with_opener(&[Opener::Nil])
+    );
+    assert!(opened.fault.is_none());
+}
+
+#[test]
 fn unsupported_route_opens_no_handle() {
     assert_eq!(open("tempus:ignotum"), 0);
 }
