@@ -1,6 +1,5 @@
 +++
 term = "est"
-explains = ["est"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "si_stmt", "arm", "redde_stmt", "et_expr", "adfirma_stmt", "conversio_expr", "type_arguments", "type_argument", "equality", "equality_tail", "comparison", "array_literal", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "genus_decl", "field_decl", "itera_stmt", "sit_decl"]
 category = "logic"
