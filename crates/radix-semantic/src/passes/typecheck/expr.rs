@@ -840,15 +840,8 @@ impl TypeChecker<'_> {
             HirExpressionKind::CopyInto { target, value } => {
                 self.check_copy_into(target, value, expr.span)
             }
-            // `sink ⇜ item` typing rules (3 and 5-8) land with unit
-            // 0c4d3dc1-4.2; until then the node fails closed by name.
-            HirExpressionKind::SinkInto { .. } => {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    "sink_into_unsupported",
-                    expr.span,
-                );
-                self.error_type
+            HirExpressionKind::SinkInto { sink, item } => {
+                self.check_sink_into(sink, item, expr.span)
             }
             HirExpressionKind::Format { value, spec } => {
                 super::format::check_format_expr(self, value, *spec, expr.span)
