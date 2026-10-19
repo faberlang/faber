@@ -1,0 +1,34 @@
++++
+term = "↦"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Rejected route: via Bits is retired; a bit pattern is an explicit ↦ bN."
+syntax = "n ↦ f16 via Bits — rejected; write n ↦ b16 ↦ f16"
+related = ["↦", "via", "bits"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM016:conversio_via_bits_retired"
++++
+# =============================================================================
+# via Bits — retired spelling for a bit-pattern route
+# =============================================================================
+#
+# What this teaches:
+#   • `via Bits` is retired and refused by name (SEM016
+#     conversio_via_bits_retired). A bit pattern is an explicit `↦ bN` step,
+#     never a hint on the conversion.
+#   • Say the width: `let f16 h ← n ↦ b16 ↦ f16` reads the bits, then
+#     reinterprets them as the target type.
+#
+# Common mistakes:
+#   • copying the old `↦ f16 via Bits` spelling — drop the `via` clause and
+#     step through an explicit bit width instead.
+# =============================================================================
+
+main {
+    let u16 n ← 15360
+    let f16 h ← n ↦ f16 via Bits
+    print h
+}
