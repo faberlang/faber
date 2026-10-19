@@ -1779,6 +1779,10 @@ help = "ทำให้ชนิดของ expression ตรงกับชน
 message = "ชนิดของ expression ไม่ตรงกัน"
 help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
 
+[diagnostics.SEM010.issues.import_conversion_required]
+message = "ค่าแปลกปลอมที่ไม่ทราบชนิด ({found}) ไม่สามารถเก็บลงในเซลล์ชนิด {expected} ได้"
+help = "บังคับการถ่ายโอนความไว้วางใจด้วยการแปลง: `value ↦ {expected}`"
+
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "การเปรียบเทียบเท่ากันต้องใช้ชนิดข้อมูลเดียวกัน"
 help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"

@@ -1,0 +1,37 @@
++++
+term = "dum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "dum_stmt", "comparison", "additive_expr", "multiplicative_expr", "adfirma_stmt", "proba_stmt", "expression", "literal", "perge_stmt", "rumpe_stmt", "fac_stmt"]
+category = "control-flow"
+canonical = false
+summary = "A do-while loop that skips an iteration with continue and leaves with break."
+syntax = "do { … } while <condition>"
+related = ["rumpe", "perge", "si"]
+locale = "en"
++++
+# =============================================================================
+# dum — do-while with continue and break.
+# =============================================================================
+#
+# What this teaches:
+#   • `do { … } while <condition>` runs the body first, then tests the condition.
+#   • `continue` skips the rest of one iteration; `break` leaves the loop at once.
+#
+# Common mistakes:
+#   • Expecting `continue` to re-test the condition first — it goes to the loop's
+#     condition test, not to the top of the body.
+#   • Placing the increment after `continue` — it is skipped, so the loop can hang.
+#
+# See also: rumpe, perge, si
+# =============================================================================
+
+main {
+    mut int i ← 0
+    do {
+        i ← i + 1
+        if i ≡ 2 { continue }
+        if i ≡ 5 { break }
+        print i
+    } while i ≺ 10
+    print "end §"(i)
+}
