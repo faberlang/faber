@@ -365,7 +365,9 @@ fn replace_durably(route: &'static str, target: &Path, data: &[u8]) -> Result<()
         Ok(())
     })();
     if let Err(error) = staged {
-        let _ = fs::remove_file(&temp);
+        // WHY: staging cleanup is best-effort; the staging error is the
+        // actionable outcome and a failed removal is not.
+        drop(fs::remove_file(&temp));
         return Err(error);
     }
     Ok(())
