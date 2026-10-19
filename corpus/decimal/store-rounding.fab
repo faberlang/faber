@@ -1,0 +1,124 @@
++++
+term = "d64 store rounding"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "d64 rounds half-even once, at the store or the ¶ cell; text parses to the nearest scale-8 decimal or takes the ⊥ recovery."
+syntax = "let d64 x ← 0.00000001 * 0.5"
+related = ["numerus", "d64", "¶", "↦"]
+locale = "en"
++++
+# =============================================================================
+# d64 — rounding lands once, at the store, the ¶ cell, or the text read
+# =============================================================================
+#
+# What this teaches:
+#   • A store is the only rounding point in decimal arithmetic: `*` keeps the
+#     exact product at scale 16 (`0.00000001 * 0.5` is 0.000000005 exactly),
+#     and the receiving `d64` slot rounds that value half-even to scale 8.
+#     Ties go to the even neighbour, so 5×10⁻⁹ stores `0`, not `0.00000001`.
+#   • Half-even is not half-up: `0.00000001 * 1.5` is 1.5×10⁻⁸, whose tie
+#     goes up to 2 units (`0.00000002`), and a negative tie lands on the even
+#     neighbour too (`-5×10⁻⁹` stores `0`).
+#   • The same rule covers every receiving slot: a binder (`let d64 x ← …`),
+#     a `mut` re-assignment (`g ← …`), and a division above scale 8 (`/`
+#     rounds half-even to the larger operand scale, so `1.0 / 3.0 * 3.0`
+#     stores `0.99999999`). Rounding happens once, on the value that reaches
+#     the slot — never on each intermediate.
+#   • Display is not a rounding cell: a computed product printed directly
+#     keeps its exact digits, so `print s3 * half` is `0.000000015` while
+#     `let d64 a ← s3 * half` stores `0.00000002`.
+#   • `¶` is its own rounding cell: `.N` rounds the exact digits half-even at
+#     precision N, so `0.125 ¶ ".2"` is `0.12`, `0.135 ¶ ".2"` is `0.14`,
+#     `2.5 ¶ ".0"` is `2`, and `3.5 ¶ ".0"` is `4`.
+#   • Text reads through `↦ d64` round half-even to scale 8, so
+#     `"0.123456785"` and `"0.123456775"` both read `0.12345678` (the tie
+#     goes to the even last digit). A plain spelling is accepted — an
+#     exponent (`"1e-9"` rounds to `0`), a leading `+`, `.5`, and `5.` —
+#     while a value past ±92,233,720,368.54775807, or text that is not a
+#     decimal number at all (`"1_000"`, `" 1.5"`, `""`, `"NaN"`, `"0x10"`),
+#     takes the `⊥` recovery value instead of rounding.
+#
+# Common mistakes:
+#   • expecting half-up — `0.125 ¶ ".2"` is `0.12`, not `0.13`
+#   • expecting a printed product to be rounded — display keeps it exact,
+#     and only the receiving slot or `¶` rounds
+#   • expecting the `⊥` recovery to clamp — an out-of-range read takes the
+#     fallback, it never wraps or saturates
+#
+# See also: numerus, d64, ¶, ↦
+# =============================================================================
+
+# decimal — one rounding point per value
+#
+# WHY: pins the D11.7 scaled-carrier rounding contract — half-even at the
+# store, at the `¶` cell, and at the text read — end-to-end through the
+# runner.
+#
+# EXPECTED OUTPUT:
+#   store-rounding.expected — the rounded decimals in print order.
+
+main {
+    let d64 s ← 0.00000001
+    let d64 s3 ← 0.00000003
+    let d64 half ← 0.5
+    let d64 n ← -0.00000001
+    let d64 a ← s3 * half
+    let d64 b ← s * 1.5
+    let d64 c ← n * half
+    let d64 d ← n * 1.5
+    print a
+    print b
+    print c
+    print d
+    print s * half + s * half
+    let d64 e ← s * half + s * half
+    print e
+    let d64 f ← (s * half) * 3.0
+    print f
+    mut d64 g ← 0.0
+    g ← s * half
+    print g
+    let d64 t ← 1.0
+    let d64 th ← 3.0
+    let d64 u ← t / th * th
+    print u
+    print t / th * th
+    print s
+    let d64 x ← s * half
+    print x
+    print s3 * half
+    print s * 1.5
+    print n * half
+    print n * 1.5
+    let d64 y ← 0.12345678
+    print y
+    print y ¶ ".3"
+    print y ¶ ".0"
+    let d64 q1 ← 0.125
+    let d64 q2 ← 0.135
+    let d64 q3 ← 2.5
+    let d64 q4 ← 3.5
+    print q1 ¶ ".2"
+    print q2 ¶ ".2"
+    print q3 ¶ ".0"
+    print q4 ¶ ".0"
+    print "0.123456785" ↦ d64 ⊥ 9.0
+    print "0.123456775" ↦ d64 ⊥ 9.0
+    print "92233720368.54775807" ↦ d64 ⊥ 9.0
+    print "92233720368.54775808" ↦ d64 ⊥ 9.0
+    print "-92233720368.54775808" ↦ d64 ⊥ 9.0
+    print "1e-9" ↦ d64 ⊥ 9.0
+    print "5e-9" ↦ d64 ⊥ 9.0
+    print "1_000" ↦ d64 ⊥ 9.0
+    print " 1.5" ↦ d64 ⊥ 9.0
+    print "1.5 " ↦ d64 ⊥ 9.0
+    print "+1.5" ↦ d64 ⊥ 9.0
+    print ".5" ↦ d64 ⊥ 9.0
+    print "5." ↦ d64 ⊥ 9.0
+    print "" ↦ d64 ⊥ 9.0
+    print "NaN" ↦ d64 ⊥ 9.0
+    print "inf" ↦ d64 ⊥ 9.0
+    print "0x10" ↦ d64 ⊥ 9.0
+}

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/literalia/hex-u64.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/hex-u64.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -233,3 +233,13 @@ fn tensor_bracket_range_runtime_bounds_leave_shape_hole() {
         "cannot_infer_tensor_shape",
     );
 }
+
+#[test]
+fn tensor_bracket_range_write_refused() {
+    rejects_with_issue(
+        r"functio put(varia tf32[4] t) → vacuum {
+    t[0 ‥ 2] ← 1.0
+}",
+        "tensor_bracket_index_integer_or_lista",
+    );
+}

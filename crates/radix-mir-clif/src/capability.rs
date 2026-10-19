@@ -69,7 +69,34 @@ pub struct ClifCapability<'a> {
     /// When set, only these functions are classified (the entry's call
     /// closure); unreachable library code is never lowered, so it is never a gap.
     reachable: Option<FxHashSet<MirFunctionId>>,
+    /// Semantic types of the conversation handles this program opens. The type
+    /// table carries no `sermo` identity, so the handle is recognized by the
+    /// `SermoOpen` result type it was opened as; a materializing conversion
+    /// reads it back from the same program-wide table (a handle passed to a
+    /// helper keeps that type).
+    sermo_handles: FxHashSet<TypeId>,
     gaps: Vec<CapabilityGap>,
+}
+
+/// The semantic types conversations are opened as, across the whole program.
+///
+/// Handles enter MIR only as a `SermoOpen` result, so its `return_ty` is the
+/// handle identity available to a classifier that never sees the HIR builtin
+/// `DefId` for `sermo`.
+fn sermo_handle_types(program: &MirProgram) -> FxHashSet<TypeId> {
+    let mut handles = FxHashSet::default();
+    for function in &program.functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::RuntimeCall { call, .. } = &statement.kind
+                    && matches!(call.intrinsic, MirIntrinsic::SermoOpen)
+                {
+                    handles.insert(call.return_ty.semantic_id());
+                }
+            }
+        }
+    }
+    handles
 }
 
 /// Collects the functions a body calls directly.
@@ -141,6 +168,7 @@ impl<'a> ClifCapability<'a> {
             types,
             function_sources: FxHashSet::default(),
             reachable: None,
+            sermo_handles: FxHashSet::default(),
             gaps: Vec::new(),
         }
     }
@@ -155,6 +183,7 @@ impl<'a> ClifCapability<'a> {
             .iter()
             .filter_map(|function| function.source)
             .collect();
+        self.sermo_handles = sermo_handle_types(program);
         self.visit_program(program);
         if self.gaps.is_empty() {
             Lowerability::Capable
@@ -368,6 +397,28 @@ impl<'a> ClifCapability<'a> {
         }
     }
 
+    /// Whether `ty` is a conversation handle this program opened.
+    fn is_sermo_handle(&self, ty: MirType) -> bool {
+        let mut id = ty.semantic_id();
+        while let Type::Alias(_, inner) = self.types.get(id) {
+            id = *inner;
+        }
+        self.sermo_handles.contains(&id)
+    }
+
+    /// A conversation handle materializing into a scalar: the sync
+    /// conversation's `sermo ↦ numerus` route. Only `numerus` has a CLIF
+    /// materialize symbol (`SERMO_MATERIALIZE_I64`); `textus`, `fractus` and
+    /// `bivalens` stay declined until their symbols exist.
+    fn sermo_scalar_conversion(&self, conversion: &MirConversion) -> bool {
+        conversion.store.is_none()
+            && self.is_sermo_handle(conversion.source_ty)
+            && matches!(
+                self.types.get(conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Numerus)
+            )
+    }
+
     fn is_unknown(&self, ty: MirType) -> bool {
         matches!(
             self.types.get(ty.semantic_id()),
@@ -555,11 +606,14 @@ impl MirVisitor for ClifCapability<'_> {
             radix_mir::visit::walk_runtime_call(self, call);
             return;
         }
-        // Scalar to text rendering, interpolation, and text length.
+        // Scalar to text rendering, interpolation, and text length. A
+        // conversation handle is not a renderable scalar: `sermo ↦ textus`
+        // materializes a frame and has no CLIF symbol yet, so it stays a gap.
         let renders_text = matches!(
             &call.intrinsic,
             MirIntrinsic::Convert(conversion)
                 if conversion.store.is_none()
+                    && !self.is_sermo_handle(conversion.source_ty)
                     && self.type_gap(conversion.source_ty).is_none()
                     && matches!(
                         self.types.get(conversion.target_ty.semantic_id()),
@@ -606,6 +660,10 @@ impl MirVisitor for ClifCapability<'_> {
                     )
                     .is_some()
         );
+        let sermo_scalar = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion) if self.sermo_scalar_conversion(conversion)
+        );
         let open_data = matches!(
             &call.intrinsic,
             MirIntrinsic::Convert(conversion)
@@ -620,6 +678,7 @@ impl MirVisitor for ClifCapability<'_> {
                     )
         );
         if renders_text
+            || sermo_scalar
             || open_data
             || numeric
             || sequence
@@ -634,6 +693,8 @@ impl MirVisitor for ClifCapability<'_> {
                     | MirIntrinsic::Panic
                     | MirIntrinsic::Cede
                     | MirIntrinsic::Duplicate
+                    | MirIntrinsic::SermoOpen
+                    | MirIntrinsic::SermoSetOpener
                     | MirIntrinsic::Sermo(MirSermoOp::DrainCursor)
                     | MirIntrinsic::Collection(
                         MirCollectionOp::Length

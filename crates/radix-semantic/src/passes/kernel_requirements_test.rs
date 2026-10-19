@@ -1282,3 +1282,50 @@ main {}
         row.extent_conditions
     );
 }
+
+#[test]
+fn constant_arguments_seed_a_private_kernel_callee() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+    return helper(clock, 8)
+}
+",
+    );
+    let helper = target_row(&fixture, "helper", Target::MirWgsl);
+    assert!(helper.admitted, "{:?}", helper.failures);
+    let caller = target_row(&fixture, "caller", Target::MirWgsl);
+    assert!(caller.admitted, "{:?}", caller.failures);
+
+    let dynamic = analyze_en(
+        r"
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+}
+
+@ kernel
+@ public
+fn caller(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+    return helper(clock, base)
+}
+",
+    );
+    let helper = target_row(&dynamic, "helper", Target::MirWgsl);
+    assert!(!helper.admitted, "{:?}", helper.failures);
+    assert!(
+        helper.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::IntermediateOutOfRange { .. }
+        )),
+        "a runtime argument keeps the conservative row: {:?}",
+        helper.failures
+    );
+}

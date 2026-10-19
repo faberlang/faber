@@ -1,0 +1,12 @@
+[package]
+name = "process-status"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "rust"
+kind = "bin"
