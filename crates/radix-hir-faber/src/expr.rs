@@ -1373,6 +1373,13 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ¶ ");
                 self.write_textus_literal(*spec, writer);
             }
+            HirExpressionKind::SinkInto { sink, item } => {
+                // `sink ⇜ item` — like `⇇`, the glyph is an operator token and
+                // never a keyword. Both operands are complete ternaries.
+                self.write_expr_prec(sink, 2, names, surface, writer);
+                writer.write(" ⇜ ");
+                self.write_expr_prec(item, 3, names, surface, writer);
+            }
             HirExpressionKind::Error => writer.write(surface.contextual_keyword("nulla")),
         }
 

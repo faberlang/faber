@@ -1774,6 +1774,10 @@ fn collect_expr_defs(
             collect_expr_defs(target, registry);
             collect_expr_defs(value, registry);
         }
+        HirExpressionKind::SinkInto { sink, item } => {
+            collect_expr_defs(sink, registry);
+            collect_expr_defs(item, registry);
+        }
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             collect_expr_defs(lhs, registry);
             collect_expr_defs(rhs, registry);
@@ -2156,6 +2160,10 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
             HirExpressionKind::CopyInto { target, value } => {
                 collect_expr(target, registry);
                 collect_expr(value, registry);
+            }
+            HirExpressionKind::SinkInto { sink, item } => {
+                collect_expr(sink, registry);
+                collect_expr(item, registry);
             }
             HirExpressionKind::Gradient {
                 call,
@@ -3154,6 +3162,10 @@ pub(crate) fn validate_referential_integrity(
             HirExpressionKind::CopyInto { target, value } => {
                 validate_expr(target, checks)?;
                 validate_expr(value, checks)?;
+            }
+            HirExpressionKind::SinkInto { sink, item } => {
+                validate_expr(sink, checks)?;
+                validate_expr(item, checks)?;
             }
             HirExpressionKind::Gradient {
                 call,

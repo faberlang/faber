@@ -5437,6 +5437,9 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         // the unsupported path.
         | HirExpressionKind::CopyInto { .. }
         | HirExpressionKind::TypeCheck { .. } => "primitive expression",
+        // SinkInto's own lowering lands with unit 0c4d3dc1-5; until then it
+        // fails closed with a named reason.
+        HirExpressionKind::SinkInto { .. } => "sink-into before sinking-contract MIR lowering",
     }
 }
 
