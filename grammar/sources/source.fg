@@ -246,6 +246,13 @@ role = "transfer"
 claiming_slots = ["transfer"]
 
 [[glyphs]]
+glyph = "⇜"
+codepoint = "U+21DC"
+unicode_name = "LEFTWARDS SQUIGGLE ARROW"
+role = "sink_into"
+claiming_slots = ["sink_into"]
+
+[[glyphs]]
 glyph = "⇐"
 codepoint = "U+21D0"
 unicode_name = "LEFTWARDS DOUBLE ARROW"
@@ -1369,6 +1376,10 @@ expression := assignment
 # storage of `target`. Binds above assignment and below ternary; operands are
 # complete before the copy. One ⇇ per statement: a chain is `copy_into_chain`.
 transfer   := ternary ('⇇' ternary)?
+# Sink-into: `sink ⇜ item` delivers one item to the sink's sinking contract.
+# Binds with the copy-into suffix, above assignment and below ternary; one ⇜
+# per statement: a chain is `sink_into_chain`.
+sink_into  := transfer ('⇜' ternary)?
 # `value_marker` (operator ruling 2026-10-08): the `copy`/`own` marker sits on
 # the value at the place it is copied or given away. In a declaration it
 # duplicates or transfers the initializer (`var T b ← copy a`, `var T b ← own a`);
@@ -1377,7 +1388,7 @@ transfer   := ternary ('⇇' ternary)?
 value_marker := 'own' | 'copy'
 # `↤` takes the same `via` rounding/convert hint as `↦` (`a ↤ x via Trunc ⊥ 0`);
 # the clause binds tighter than the `⊥` default.
-assignment := transfer ('←' 'copy'? assignment | '↤' assignment via_clause? inline_default?)?
+assignment := sink_into ('←' 'copy'? assignment | '↤' assignment via_clause? inline_default?)?
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
 # `c ✓ a ✗ b` is the one value conditional (D4.5), one level only (D4.6): a
