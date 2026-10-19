@@ -187,3 +187,18 @@ fn radical_glyphs_pin_exact_scalars() {
     assert_eq!('\u{221B}', '∛');
     assert_eq!('\u{221C}', '∜');
 }
+
+#[test]
+fn radical_glyphs_are_distinct_kinds() {
+    // Each prefix radical is its own token kind, never a spelling of another.
+    assert_ne!(TokenKind::RadicalSqrt, TokenKind::RadicalCbrt); // √ vs ∛
+    assert_ne!(TokenKind::RadicalSqrt, TokenKind::RadicalFourth); // √ vs ∜
+    assert_ne!(TokenKind::RadicalCbrt, TokenKind::RadicalFourth); // ∛ vs ∜
+    // Visual similarity to negation never merges a radical with ¬ or -.
+    assert_ne!(TokenKind::RadicalSqrt, TokenKind::BitwiseNot); // √ vs ¬
+    assert_ne!(TokenKind::RadicalSqrt, TokenKind::Minus); // √ vs -
+    assert_ne!(TokenKind::RadicalCbrt, TokenKind::BitwiseNot); // ∛ vs ¬
+    assert_ne!(TokenKind::RadicalCbrt, TokenKind::Minus); // ∛ vs -
+    assert_ne!(TokenKind::RadicalFourth, TokenKind::BitwiseNot); // ∜ vs ¬
+    assert_ne!(TokenKind::RadicalFourth, TokenKind::Minus); // ∜ vs -
+}
