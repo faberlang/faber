@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/json/literal-unquoted-key-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "json/literal-unquoted-key-reject.fab"
+
+
+[expect]
+check_only = true
