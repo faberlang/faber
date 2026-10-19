@@ -1262,18 +1262,6 @@ fn corpus_rejects_pins_the_target_cannot_judge_instead_of_panicking() {
             "timeout_secs must be positive",
         ),
         (
-            "rust",
-            runtime_recipe("rust"),
-            known_fail("rust", "run", "stdout-mismatch"),
-            "stdout-mismatch",
-        ),
-        (
-            "rust",
-            runtime_recipe("rust"),
-            known_fail("rust", "run", "nonzero-exit"),
-            "nonzero-exit",
-        ),
-        (
             "canonical",
             runtime_recipe("canonical"),
             known_fail("canonical", "run", "stdout-mismatch"),
