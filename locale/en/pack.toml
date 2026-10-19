@@ -2190,11 +2190,6 @@ help = "spell the width as a number, as in vector<f32, 4>"
 message = "constructor extents admit literals, size names, and spelled size lifts"
 help = "affine extent terms in constructors are not supported yet"
 
-[diagnostics.SEM008.issues.sink_into_unsupported]
-message = "the '⇜' sink-into form has no lowering yet"
-help = "the sinking contract lowers in a later unit; remove the '⇜' statement for now"
-
-
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "unknown namespace"
 help = "fix the AST construct for lowering"
@@ -3027,6 +3022,14 @@ help = "make the right side the same tensor type as the target, or convert it fi
 message = "a '⇇' statement has no value"
 help = "write the copy as its own statement; to rebind a name to a tensor, use '←' on a local binding"
 
+[diagnostics.SEM010.issues.sink_into_item_type_mismatch]
+message = "the item of '⇜' must be exactly the sink's 'T'"
+help = "convert the item explicitly: 'console.out ⇜ \"§\"(n)', never 'console.out ⇜ n'"
+
+[diagnostics.SEM010.issues.sink_into_value_used]
+message = "a '⇜' statement has no value"
+help = "write the sink as its own statement; '⇜' delivers an item and yields nothing"
+
 [diagnostics.SEM011]
 message = "invalid operand types"
 help = "use compatible operand types"
@@ -3658,6 +3661,10 @@ help = "use an index from 0 up to one below the bound"
 [diagnostics.SEM011.issues.copy_into_target_not_tensor]
 message = "the left side of '⇇' must be tensor storage"
 help = "'⇇' copies into an existing tensor; a scalar, list, matrix, or vector is written with '←'"
+
+[diagnostics.SEM011.issues.sink_into_receiver_not_sink]
+message = "the left side of '⇜' must conform to the sinking contract"
+help = "'⇜' delivers an item to a 'Sink<T>' value; tensors, vectors and matrices are written with '⇇'"
 
 [diagnostics.SEM011.issues.failable_call_conversion_absent]
 message = "failable call has no conversion to the error type"
