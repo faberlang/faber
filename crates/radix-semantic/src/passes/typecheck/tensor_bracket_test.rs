@@ -212,3 +212,13 @@ fn tensor_bracket_range_rank2_scalar_range_rejects() {
         "tensor_scalar_index_rank",
     );
 }
+
+#[test]
+fn tensor_bracket_range_step_accepted() {
+    accepts(
+        r"functio passus(tf32[4] t) → tf32[2] {
+    sit tf32[2] s ← t[0 ‥ 4 per 2]
+    redde s
+}",
+    );
+}
