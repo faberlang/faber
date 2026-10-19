@@ -346,235 +346,237 @@ reice_stmt ::= 'ارفض' expression 'ارم' expression
 expression ::= assignment
 # [168] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [169] value_marker
+# [169] sink_into
+sink_into ::= transfer ('⇜' ternary)?
+# [170] value_marker
 value_marker ::= 'ملك' | 'نسخة'
-# [170] assignment
-assignment ::= transfer ('←' 'نسخة'? assignment | '↤' assignment via_clause? inline_default?)?
-# [171] inc_dec_stmt
+# [171] assignment
+assignment ::= sink_into ('←' 'نسخة'? assignment | '↤' assignment via_clause? inline_default?)?
+# [172] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [172] place
+# [173] place
 place ::= call_expr
-# [173] ternary
+# [174] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [174] aut_expr
+# [175] aut_expr
 aut_expr ::= et_expr (('أو') et_expr)*
-# [175] et_expr
+# [176] et_expr
 et_expr ::= equality (('و') equality)*
-# [176] equality
+# [177] equality
 equality ::= comparison equality_tail*
-# [177] equality_tail
+# [178] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('هو' | 'ليس' 'هو') type_annotation
-# [178] comparison
+# [179] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [179] format_expr
+# [180] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [180] bitwise_or_expr
+# [181] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [181] bitwise_xor_expr
+# [182] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [182] bitwise_and_expr
+# [183] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [183] shift_expr
+# [184] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [184] range_expr
+# [185] range_expr
 range_expr ::= additive_expr range_tail?
-# [185] range_tail
+# [186] range_tail
 range_tail ::= ('‥' | '…' | 'قبل' | 'حتى') additive_expr ('كل' additive_expr)?
-# [186] additive_expr
+# [187] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [187] multiplicative_expr
+# [188] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [188] vel_expr
+# [189] vel_expr
 vel_expr ::= unary_expr ('عوض' vel_rhs)*
-# [189] vel_rhs
+# [190] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [190] vel_range_tail
+# [191] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'قبل' | 'حتى') unary_expr ('كل' unary_expr)?
-# [191] unary_expr
+# [192] unary_expr
 unary_expr ::= ('-' | '¬' | 'ليس' | '√' | '∛' | '∜') unary_expr | rounding_expr | finge_expr | cast_expr
-# [192] rounding_expr
+# [193] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [193] gradient_expr
+# [194] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [194] gradient_selection
+# [195] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [195] gradient_place
+# [196] gradient_place
 gradient_place ::= expression
-# [196] cast_expr
+# [197] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [197] conversio_expr
+# [198] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [198] interval_target
+# [199] interval_target
 interval_target ::= range_expr
-# [199] via_clause
+# [200] via_clause
 via_clause ::= 'عبر' IDENTIFIER
-# [200] inline_default
+# [201] inline_default
 inline_default ::= '⊥' unary_expr
-# [201] call_expr
+# [202] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [202] call_suffix
+# [203] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [203] member_suffix
+# [204] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [204] transpose_suffix
+# [205] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [205] optional_suffix
+# [206] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [206] non_null_suffix
+# [207] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [207] argument_list
+# [208] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [208] argument
+# [209] argument
 argument ::= template_argument | (call_marker | 'محور')? 'انشر'? expression
-# [209] call_marker
+# [210] call_marker
 call_marker ::= 'عن' | 'متغير' | 'ملك' | 'نسخة'
-# [210] template_argument
+# [211] template_argument
 template_argument ::= 'انشر'? IDENTIFIER ':' expression
-# [211] literal
+# [212] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'صواب' | 'خطأ' | 'غائب' | '∞' | 'nan'
-# [212] regex_literal
+# [213] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
-# [213] primary
+# [214] primary
 primary ::= IDENTIFIER | literal | regex_literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
-# [214] ad_expr
+# [215] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
-# [215] ad_opener
+# [216] ad_opener
 ad_opener ::= '(' expression ')'
-# [216] array_literal
+# [217] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [217] array_element_list
+# [218] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [218] array_element
+# [219] array_element
 array_element ::= argument | '_'
-# [219] iuncta_expr
+# [220] iuncta_expr
 iuncta_expr ::= 'توبل' type_arguments '[' argument_list? ']'
-# [220] json_literal
+# [221] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [221] json_member
+# [222] json_member
 json_member ::= STRING ':' json_value
-# [222] typed_constructor
+# [223] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | type_annotation json_literal | hole_type json_literal | '{' field_list '}' construction_source? | type_annotation '[' array_element_list? ']'
-# [223] field_list
+# [224] field_list
 field_list ::= field_init (',' field_init)*
-# [224] field_init
+# [225] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [225] field_key
+# [226] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [226] construction_source
+# [227] construction_source
 construction_source ::= 'من' call_expr
-# [227] json_value
+# [228] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [228] json_object
+# [229] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [229] json_array
+# [230] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [230] json_string
+# [231] json_string
 json_string ::= STRING
-# [231] json_number
+# [232] json_number
 json_number ::= NUMBER
-# [232] finge_expr
+# [233] finge_expr
 finge_expr ::= 'أنشئ' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [233] qualified_ident
+# [234] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [234] praefixum_expr
+# [235] praefixum_expr
 praefixum_expr ::= 'بادئة' block_stmt
-# [235] scriptum_expr
+# [236] scriptum_expr
 scriptum_expr ::= 'حرر' '(' STRING (',' expression)* ')'
-# [236] lege_expr
+# [237] lege_expr
 lege_expr ::= 'اقرأ' 'سطرا'?
-# [237] first_match_expr
+# [238] first_match_expr
 first_match_expr ::= 'أول_مطابقة' '(' expression apud_clause? ',' 'حيث' IDENTIFIER block_stmt ')'
-# [238] reducta_expr
+# [239] reducta_expr
 reducta_expr ::= 'اختزل' 'عبر' reducta_op 'من' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [239] reducta_op
+# [240] reducta_op
 reducta_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'الأدنى' | 'فهرس_الأكبر' | 'فهرس_الأصغر' | 'الكل' | 'أي' | 'العدّ'
-# [240] reducta_group
+# [241] reducta_group
 reducta_group ::= 'حسب' expression
-# [241] reducta_body
+# [242] reducta_body
 reducta_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
-# [242] reducta_identity
+# [243] reducta_identity
 reducta_identity ::= 'عوض' expression
-# [243] sort_expr
+# [244] sort_expr
 sort_expr ::= 'رتب' 'عبر' sort_direction ('من' | 'عن') expression sort_body?
-# [244] sort_direction
+# [245] sort_direction
 sort_direction ::= 'تصاعدي' | 'تنازلي'
-# [245] sort_body
+# [246] sort_body
 sort_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
-# [246] filum_clause
+# [247] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
-# [247] capta_expr
+# [248] capta_expr
 capta_expr ::= 'فخ' block_stmt
-# [248] object_pattern
+# [249] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [249] pattern_property
+# [250] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
-# [250] array_pattern
+# [251] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [251] array_pattern_element
+# [252] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
-# [252] nota_stmt
+# [253] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
-# [253] entry_header
+# [254] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
-# [254] incipit_stmt
+# [255] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
-# [255] incipiet_stmt
+# [256] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
-# [256] probandum_decl
+# [257] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
-# [257] probandum_body
+# [258] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [258] proba_stmt
+# [259] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
-# [259] proba_modifier
+# [260] proba_modifier
 proba_modifier ::= 'توقع_الفشل' | 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NATURAL | 'قس' | 'معاد' NATURAL | 'هش' NATURAL | 'حصري' STRING
-# [260] praepara_block
+# [261] praepara_block
 praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'الكل'? block_stmt
-# [261] fac_stmt
+# [262] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [262] IDENTIFIER
+# [263] IDENTIFIER
 IDENTIFIER ::=
-# [263] NUMBER
+# [264] NUMBER
 NUMBER ::=
-# [264] NATURAL
+# [265] NATURAL
 NATURAL ::=
-# [265] STRING
+# [266] STRING
 STRING ::=
-# [266] ASCII_STRING
+# [267] ASCII_STRING
 ASCII_STRING ::=
-# [267] BACKTICK_STRING
+# [268] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [268] OCTETI_STRING
+# [269] OCTETI_STRING
 OCTETI_STRING ::=
-# [269] REGEX_TYPE_WORD
+# [270] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [270] REGEX_BODY
+# [271] REGEX_BODY
 REGEX_BODY ::=
-# [271] NEWLINE
+# [272] NEWLINE
 NEWLINE ::=
-# [272] WIDTH_MARKER
+# [273] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [273] LISTA_WIDTH_SUGAR
+# [274] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [274] TENSOR_WIDTH_SUGAR
+# [275] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [275] SPARSA_WIDTH_SUGAR
+# [276] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [276] VECTOR_WIDTH_SUGAR
+# [277] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [277] MATRIX_WIDTH_SUGAR
+# [278] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [278] FRONTMATTER_DELIMITER
+# [279] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [279] TOML_LINES
+# [280] TOML_LINES
 TOML_LINES ::=
-# [280] ANNOTATION_NAME
+# [281] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [281] ANNOTATION_FIELD_NAME
+# [282] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [282] NON_NEWLINE_TOKEN
+# [283] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [283] NO_NEWLINE
+# [284] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -772,6 +774,7 @@ NO_NEWLINE ::=
 | [`reice_stmt`](#reice-stmt) | `#ارفض-stmt` | live |
 | [`expression`](#expression) | `#expression` | live |
 | [`transfer`](#transfer) | `#transfer` | live |
+| [`sink_into`](#sink-into) | `#sink-into` | live |
 | [`value_marker`](#value-marker) | `#value-marker` | live |
 | [`assignment`](#assignment) | `#assignment` | live |
 | [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live |
