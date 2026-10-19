@@ -40,6 +40,9 @@ pub fn validate_import_paths(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
+        if decl.target.is_some() {
+            continue;
+        }
         let path = interner.resolve(decl.path);
 
         // Check 1: `..` segment anywhere in the path.
