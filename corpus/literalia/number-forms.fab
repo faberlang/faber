@@ -1,0 +1,24 @@
++++
+term = "numerus"
+kind = "literal"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "literal"
+canonical = false
+summary = "Integer and float literal spellings: digit separators, hex, binary and octal prefixes, and exponents."
+syntax = "1_000_000 | 0xff_ff | 0b1010_1010 | 0o777 | 1.5e-3"
+related = ["fractus", "numerus", "float-fold"]
+locale = "en"
++++
+
+main {
+    print 1_000_000
+    print 0xFF
+    print 0xff_ff
+    print 0b1010_1010
+    print 0o777
+    print 1_0.5_0
+    print 1e3
+    print 1.5e-3
+    print 1E3
+    print 0.5
+}
