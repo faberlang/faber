@@ -719,7 +719,7 @@ pub const SET_SUBSET: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, Ptr, I32],
     ret: Some(I8),
 };
-/// Scalar math: 0 exp, 1 ln, 2 log10, 3 sin, 4 cos, 5 tan.
+/// Scalar math: 0 exp, 1 ln, 2 log10, 3 sin, 4 cos, 5 tan, 6 cbrt.
 pub const MATH_F64: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_math_f64",
     params: &[I32, F64],
