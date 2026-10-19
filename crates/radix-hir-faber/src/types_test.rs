@@ -170,6 +170,36 @@ fn type_to_faber_renders_primitives_lista_and_option() {
 }
 
 #[test]
+fn type_to_faber_renders_intervallum_step() {
+    let mut types = TypeTable::new();
+    let names = FxHashMap::default();
+    let interner = Interner::new();
+    let surface = LatinSurface;
+
+    let numerus = types.primitive(Primitive::Numerus);
+    let step_two = types.intern_index(radix_types::IndexExpr::Literal(2));
+    let step_one = types.intern_index(radix_types::IndexExpr::Literal(1));
+    let stepped = types.intervallum_with_step(numerus, step_two);
+    let bare = types.intervallum(numerus);
+    let explicit_one = types.intervallum_with_step(numerus, step_one);
+    let codegen = FaberCodegen::new(&types, &interner);
+
+    assert_eq!(
+        codegen.type_to_faber(stepped, &names, &surface),
+        "intervallum<numerus, 2>"
+    );
+    // Step 1 is canonical silence: bare and explicit `1` share one spelling.
+    assert_eq!(
+        codegen.type_to_faber(bare, &names, &surface),
+        "intervallum<numerus>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(explicit_one, &names, &surface),
+        "intervallum<numerus>"
+    );
+}
+
+#[test]
 fn type_to_faber_emits_fn_type_param_modes() {
     use radix_types::{FuncSig, ParamType, SemanticParamMode};
     let mut types = TypeTable::new();
