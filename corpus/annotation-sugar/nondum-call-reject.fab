@@ -1,0 +1,33 @@
++++
+term = "nondum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "nondum_functio_decl", "nondum_annotation", "param_list", "parameter", "return_clause", "type_annotation", "base_type", "qualified_type", "incipit_stmt", "block_stmt", "nota_stmt", "expression", "call_expr", "call_suffix", "argument_list", "argument", "literal"]
+category = "availability"
+summary = "A function marked not yet for this target is declared but not callable."
+syntax = "@ unstable \"pending\" then a signature-only fn; calling it is refused"
+related = ["nondum", "annotation-sugar"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM017:nondum_function_for_target"
++++
+# =============================================================================
+# nondum — a call of a not-yet function is refused
+# =============================================================================
+#
+# What this teaches:
+#   • `@ nondum` without a target marks the declaration unavailable everywhere
+#   • A signature-only `fn` under `@ nondum` is declared and exported, but any
+#     use of it is refused
+#
+# Common mistakes:
+#   • calling a declaration that is still pending for the current target (SEM017)
+#
+# See also: nondum, annotation-sugar
+# =============================================================================
+
+@ unstable "pending"
+fn later(string t) → string
+
+main {
+    print later("x")
+}
