@@ -237,6 +237,12 @@ fn rendered_table_contains_capability_rows_under_full_build() {
         table.contains("leaves=fs,stdio,process,clock,entropy,tcp,http,websocket,machine"),
         "rust must declare every native effect leaf:\n{table}"
     );
+    assert!(
+        table
+            .lines()
+            .any(|line| line.starts_with("clif ") && line.contains("leaves=clock")),
+        "clif must declare the clock leaf and no other:\n{table}"
+    );
     // Capability truth under the default build: device-runtime is compiled,
     // so it reports its row.
     {
