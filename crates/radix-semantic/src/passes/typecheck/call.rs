@@ -46,6 +46,10 @@ pub(crate) const ISSUE_COPY_INTO_VALUE_USED: &str = "copy_into_value_used";
 pub(crate) const ISSUE_SINK_INTO_RECEIVER_NOT_SINK: &str = "sink_into_receiver_not_sink";
 /// Sinking rule 3: the item is not exactly the sink's `T`.
 pub(crate) const ISSUE_SINK_INTO_ITEM_TYPE_MISMATCH: &str = "sink_into_item_type_mismatch";
+/// Sinking rule 6: `⇜` into a sink reached through a `let` (const) name is a
+/// mutation of what that name reaches; it carries the same identity as the
+/// mutating-intrinsic gate.
+const ISSUE_MUTATING_RECEIVER_THROUGH_CONST: &str = "mutating_receiver_through_const";
 /// Sinking rule 5: a `⇜` statement has no result, so it is not a value to store.
 pub(crate) const ISSUE_SINK_INTO_VALUE_USED: &str = "sink_into_value_used";
 /// R7: the callable-sink form `sink ⇇ payload` is retired.
@@ -2303,6 +2307,12 @@ impl TypeChecker<'_> {
     ///   (`class Box implements Sink<string>` sinks strings), and there is no
     ///   implicit conversion, so `console.out ⇜ "§"(n)`, never
     ///   `console.out ⇜ n`.
+    /// - Rule 6: `const` is deep — a sink reached through a `let` name is
+    ///   refused, as a mutating method call there is.
+    /// - Rule 7: `⇜` into a collection an enclosing loop iterates is the same
+    ///   shape-change error `append` reports there.
+    /// - A channel's send view (`s.meus<T>()`, en `send<T>`) implements
+    ///   `Sink<T>`, so `⇜` works on any send view. A recv view does not.
     ///
     /// The statement result is `vacuum`; rule 5 (no use as a value) is
     /// enforced where the surrounding expression asks for one.
@@ -2310,8 +2320,23 @@ impl TypeChecker<'_> {
         &mut self,
         sink: &mut HirExpression,
         item: &mut HirExpression,
-        _span: radix_lexer::Span,
+        span: radix_lexer::Span,
     ) -> TypeId {
+        // Rule 7 runs before the receiver resolution so the tighter error wins
+        // (the same identity a shape-changing method call reports). The normal
+        // checks still run, so the receiver and item are typed.
+        if let HirExpressionKind::Path(def_id) = &TypeChecker::method_receiver_place(sink).kind
+            && self.loop_iterated.contains(def_id)
+        {
+            let binding = self.binding_display_name(*def_id);
+            self.error_issue_with_args(
+                SemanticErrorKind::OperandTypesInvalid,
+                super::loop_shape::ISSUE_LOOP_COLLECTION_SHAPE_CHANGE,
+                span,
+                &[("binding", binding), ("method", "sink".to_owned())],
+            );
+        }
+
         let sink_ty = self.check_expr(sink);
         let resolved = self.resolve_inferred_type(sink_ty);
 
@@ -2325,18 +2350,64 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
 
+        // The send view is a sink: `m ⇜ "ping"` on `s.meus<T>()`. A `tuus`
+        // (recv) view is not, so it falls through to rule 8.
+        if let Some((DirectionalViewKind::Meus, payload_ty)) =
+            self.directional_view_payload(resolved)
+        {
+            if self.is_closed_meus(resolved) {
+                self.check_expr(item);
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    super::sermo_route::ISSUE_AD_HANDLER_SEND_CLOSED,
+                    span,
+                );
+                return self.error_type;
+            }
+            if self.check_sink_into_item(item, payload_ty).is_none() {
+                return self.error_type;
+            }
+            return self.vacuum_type();
+        }
+
         let Some(expected) = self.sink_contract_item(resolved) else {
             self.check_expr(item);
             self.invalid_operand_types(ISSUE_SINK_INTO_RECEIVER_NOT_SINK, sink.span);
             return self.error_type;
         };
 
+        // Rule 6: `const` is deep, so a sink reached through a `let` name is
+        // refused exactly as a mutating method call on that name is.
+        if let HirExpressionKind::Path(def_id) = &sink.kind
+            && !self.path_binding_is_mutable(sink)
+        {
+            let binding = self.binding_display_name(*def_id);
+            self.error_issue_with_args(
+                SemanticErrorKind::ImmutableAssignment,
+                ISSUE_MUTATING_RECEIVER_THROUGH_CONST,
+                span,
+                &[("binding", binding), ("method", "sink".to_owned())],
+            );
+        }
+
+        if self.check_sink_into_item(item, expected).is_none() {
+            return self.error_type;
+        }
+        self.vacuum_type()
+    }
+
+    /// Rules 3 and 6: the item is exactly `expected`, up to aliases. Returns
+    /// the item type, or `None` after reporting the mismatch.
+    fn check_sink_into_item(
+        &mut self,
+        item: &mut HirExpression,
+        expected: TypeId,
+    ) -> Option<TypeId> {
         let checked = self.check_expr(item);
         let item_ty = self.resolve_inferred_type(checked);
         if item_ty == self.error_type {
-            return self.error_type;
+            return None;
         }
-        // Rule 3 is exact up to aliases: each type assigns to the other.
         let exact = self.types.is_assignable(item_ty, expected)
             && self.types.is_assignable(expected, item_ty);
         if !exact {
@@ -2345,9 +2416,19 @@ impl TypeChecker<'_> {
                 ISSUE_SINK_INTO_ITEM_TYPE_MISMATCH,
                 item.span,
             );
-            return self.error_type;
+            return None;
         }
-        self.vacuum_type()
+        Some(item_ty)
+    }
+
+    /// The source name of a value binding, for diagnostic arguments.
+    fn binding_display_name(&self, def_id: DefId) -> String {
+        self.binding_names
+            .get(&def_id)
+            .or_else(|| self.resolver.get_symbol(def_id).map(|symbol| &symbol.name))
+            .and_then(|symbol| self.interner.map(|interner| interner.resolve(*symbol)))
+            .unwrap_or("value")
+            .to_owned()
     }
 
     /// Rule 8: the item type `resolved` accepts as a `Sink<T>`, if it is one.
