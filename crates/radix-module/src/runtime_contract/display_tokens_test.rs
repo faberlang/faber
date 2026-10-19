@@ -26,6 +26,15 @@ fn display_tokens_la_pack_gives_verum_falsum_nihil_iuncta() {
 }
 
 #[test]
+fn printed_null_follows_the_type_word_in_every_translated_pack() {
+    for id in OTHER_LOCALES {
+        let p = pack(id);
+        let tokens = display_tokens_from_pack(&p);
+        assert_eq!(tokens.none, p.types["nihil"].canonical, "{id}: printed null");
+    }
+}
+
+#[test]
 fn display_tokens_every_other_shipped_pack_gives_four_distinct_nonempty_strings() {
     for id in OTHER_LOCALES {
         let tokens = display_tokens_from_pack(&pack(id));
