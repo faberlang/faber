@@ -1,0 +1,23 @@
++++
+term = "test suite body"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "probandum_decl", "probandum_body", "nota_stmt", "literal"]
+category = "testing"
+summary = "A suite body holds test cases, nested suites and setup hooks; an ordinary statement is not a suite member."
+syntax = "probandum <name> { <statement> }"
+related = ["probandum", "proba", "praepara"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:test_case_or_setup"
++++
+
+describe "d" {
+    print 1
+}
+
+# =============================================================================
+# test suite body — only tests, nested suites and setup hooks
+# =============================================================================
+# A `describe` block is a declaration container, not a statement list. Its body
+# accepts `test "case" { … }`, a nested `describe … { … }`, and the setup hooks
+# (`praepara` / `postpara`). Anything else is not a suite member.

@@ -1,0 +1,23 @@
++++
+term = "probandum body end"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "probandum_decl", "probandum_body", "proba_stmt", "block_stmt", "adfirma_stmt"]
+category = "testing"
+summary = "A suite block must close; a test case inside it does not close the suite."
+syntax = "probandum <name> { proba <name> { … }"
+related = ["probandum", "proba"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:probandum_body_end"
++++
+
+describe "d" {
+    test "t" {
+        assert true
+    }
+
+# =============================================================================
+# probandum body end — the suite block closes on its own brace
+# =============================================================================
+# The closing brace of the last test case closes that case only. The suite body
+# still needs its own `}`.
