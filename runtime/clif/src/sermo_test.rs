@@ -2,7 +2,10 @@
 //! reply, a leaf fault reduced to kind and path, a route no leaf owns, and the
 //! C handle table's `open` export.
 
-use super::{__faber_clif_v1_sermo_open, CONVERSATIONS, Conversation, Opener, slot};
+use super::{
+    __faber_clif_v1_sermo_open, __faber_clif_v1_sermo_set_opener_i64,
+    __faber_clif_v1_sermo_set_opener_nil, CONVERSATIONS, Conversation, Opener, slot,
+};
 use faber_leaf::LeafErrorKind;
 
 fn open(route: &str) -> i64 {
@@ -21,6 +24,29 @@ fn monotonic_route_opens_a_positive_handle() {
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let opened = slot(&mut table, handle).expect("the handle names a slot");
     assert_eq!(opened.conversation.route(), ROUTE);
+}
+
+#[test]
+fn set_opener_i64_reopens_the_conversation() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    // An unknown handle is a no-op, not a panic.
+    __faber_clif_v1_sermo_set_opener_nil(0);
+    __faber_clif_v1_sermo_set_opener_i64(i64::MAX, 1);
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    __faber_clif_v1_sermo_set_opener_i64(handle, 0);
+
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let opened = slot(&mut table, handle).expect("the handle names a slot");
+    assert_eq!(
+        opened.conversation,
+        Conversation::open(ROUTE).with_opener(&[Opener::Int(0)])
+    );
+    assert!(opened.fault.is_none());
 }
 
 #[test]
