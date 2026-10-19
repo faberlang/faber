@@ -179,3 +179,11 @@ fn eot_transfer_glyph_is_a_dedicated_non_keyword_token() {
     assert_ne!(TokenKind::Transfer, TokenKind::BitwiseShl); // ⇐
     assert_ne!(TokenKind::Transfer, TokenKind::BitwiseShr); // ⇒
 }
+
+#[test]
+fn radical_glyphs_pin_exact_scalars() {
+    // Visual similarity is never permission to normalize a neighbor glyph.
+    assert_eq!('\u{221A}', '√');
+    assert_eq!('\u{221B}', '∛');
+    assert_eq!('\u{221C}', '∜');
+}
