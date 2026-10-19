@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/tensor/glyph-hadamard-shape-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/glyph-hadamard-shape-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "glyph_hadamard_shapes_mismatch"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "glyph_hadamard_shapes_mismatch"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "glyph_hadamard_shapes_mismatch"

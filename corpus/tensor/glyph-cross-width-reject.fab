@@ -1,0 +1,33 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Glyph × is the 3-space cross product: both operands must carry width 3."
+syntax = "<width-3 vector expression> × <width-3 vector expression>"
+related = ["tensor", "×", "glyph-cross"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:glyph_cross_width_mismatch"
++++
+
+# =============================================================================
+# × — cross width must be 3 on both sides.
+# =============================================================================
+#
+# What this teaches:
+#   • `×` is the cross product of 3-space, so both operands carry width 3.
+#   • A width-4 operand has no cross product: the glyph is refused by name
+#     rather than falling back to an outer or elementwise product.
+#
+# See also: tensor, ×, glyph-cross
+# =============================================================================
+
+# × with a width-4 operand: cross is width-3 on both sides.
+main {
+    let vf32[3] a ← [1.0, 0.0, 0.0] ↦ vf32[3]
+    let vf32[4] b ← [0.0, 1.0, 0.0, 0.0] ↦ vf32[4]
+    let vf32[4] c ← a × b
+    print c
+}
