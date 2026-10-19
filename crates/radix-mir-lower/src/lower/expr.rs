@@ -45,6 +45,7 @@ pub trait HirExpressionLoweringVisitor {
                 self.visit_call_expr(callee, type_args, args, *conversion, expr)
             }
             HirExpressionKind::CopyInto { target, value } => self.visit_copy_into_expr(target, value, expr),
+            HirExpressionKind::SinkInto { sink, item } => self.visit_sink_into_expr(sink, item, expr),
             HirExpressionKind::MethodCall(receiver, method, generic_args, args, conversion) => {
                 self.visit_method_call_expr(receiver, *method, generic_args, args, *conversion, expr)
             }
@@ -182,6 +183,12 @@ pub trait HirExpressionLoweringVisitor {
         &mut self,
         target: &HirExpression,
         value: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
+    fn visit_sink_into_expr(
+        &mut self,
+        sink: &HirExpression,
+        item: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_method_call_expr(
@@ -459,6 +466,15 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
             vacuum,
             expr.span,
         ))
+    }
+
+    fn visit_sink_into_expr(
+        &mut self,
+        sink: &HirExpression,
+        item: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        self.lower_sink_into(sink, item, expr)
     }
 
     fn visit_method_call_expr(
