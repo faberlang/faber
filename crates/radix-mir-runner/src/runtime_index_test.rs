@@ -183,3 +183,15 @@ fn fault_code_for_display_name_rejects_unregistered_shapes() {
     assert_eq!(fault_code_for_display_name("NotFound"), None);
     assert_eq!(fault_code_for_display_name("Other.NotFound"), None);
 }
+
+/// `∛` is the real cube root, so it is defined for negatives (`∛ -8.0` is `-2.0`) and keeps
+/// the sign of a negative zero.
+#[test]
+fn cbrt_is_the_real_cube_root() {
+    assert_eq!(apply_math_function(MirMathFunction::Cbrt, -8.0), -2.0);
+    assert_eq!(apply_math_function(MirMathFunction::Cbrt, 8.0), 2.0);
+    assert!(
+        apply_math_function(MirMathFunction::Cbrt, -0.0).is_sign_negative(),
+        "cbrt(-0.0) must keep the negative sign"
+    );
+}
