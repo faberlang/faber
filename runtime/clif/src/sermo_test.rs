@@ -3,6 +3,7 @@
 //! C handle table's `open` export.
 
 use super::{
+    __faber_clif_v1_sermo_failed, __faber_clif_v1_sermo_materialize_i64,
     __faber_clif_v1_sermo_open, __faber_clif_v1_sermo_set_opener_i64,
     __faber_clif_v1_sermo_set_opener_nil, CONVERSATIONS, Conversation, Opener, slot,
 };
@@ -66,6 +67,23 @@ fn set_opener_nil_reopens_the_conversation() {
         Conversation::open(ROUTE).with_opener(&[Opener::Nil])
     );
     assert!(opened.fault.is_none());
+}
+
+#[test]
+fn monotonic_materializes_through_the_exports() {
+    const ROUTE: &str = "tempus:monotonicum";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    let nanos = __faber_clif_v1_sermo_materialize_i64(handle, 0);
+    assert!(nanos > 0, "{ROUTE} materialized {nanos}");
+    assert_eq!(__faber_clif_v1_sermo_failed(handle), 0);
+}
+
+#[test]
+fn invalid_handle_materializes_the_fallback() {
+    assert_eq!(__faber_clif_v1_sermo_materialize_i64(0, 7), 7);
+    assert_eq!(__faber_clif_v1_sermo_failed(0), 1);
 }
 
 #[test]

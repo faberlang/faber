@@ -322,6 +322,45 @@ pub extern "C" fn __faber_clif_v1_sermo_set_opener_i64(handle: i64, value: i64) 
     }
 }
 
+/// Materialize conversation `handle` as a `numerus`, or reply `fallback`.
+///
+/// `fallback` is the bottom-recovery value a caller wants when the leaf
+/// cannot produce a number. A successful call clears any recorded fault; a
+/// leaf fault is recorded on the slot so the `failed` export reports it. An
+/// unknown handle returns `fallback` and records nothing.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_sermo_materialize_i64(handle: i64, fallback: i64) -> i64 {
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let Some(open) = slot(&mut table, handle) else {
+        return fallback;
+    };
+    match open.conversation.int() {
+        Ok(value) => {
+            open.fault = None;
+            value
+        }
+        Err(fault) => {
+            open.fault = Some(fault);
+            fallback
+        }
+    }
+}
+
+/// Whether conversation `handle` is in a failed state: 1 when its slot has a
+/// recorded fault, or when the handle is unknown (fail closed), else 0.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_sermo_failed(handle: i64) -> i8 {
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match slot(&mut table, handle) {
+        Some(open) if open.fault.is_none() => 0,
+        _ => 1,
+    }
+}
+
 #[cfg(test)]
 #[path = "sermo_test.rs"]
 mod sermo_test;
