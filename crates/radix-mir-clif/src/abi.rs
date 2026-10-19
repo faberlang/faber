@@ -1042,6 +1042,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     SERMO_SET_OPENER_I64,
     SERMO_MATERIALIZE_I64,
     SERMO_FAILED,
+    SERMO_FAULT_KIND,
+    SERMO_FAULT_PATH,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1323,4 +1325,18 @@ pub const SERMO_FAILED: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_sermo_failed",
     params: &[I64],
     ret: Some(I8),
+};
+/// The recorded fault kind as raw (pointer, length) bytes: (handle, length out
+/// pointer) -> non-null pointer, length 0 when the slot recorded no fault.
+pub const SERMO_FAULT_KIND: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_fault_kind",
+    params: &[I64, Ptr],
+    ret: Some(Ptr),
+};
+/// The recorded fault path as raw (pointer, length) bytes: (handle, length out
+/// pointer) -> non-null pointer, length 0 when the slot recorded no fault.
+pub const SERMO_FAULT_PATH: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_fault_path",
+    params: &[I64, Ptr],
+    ret: Some(Ptr),
 };

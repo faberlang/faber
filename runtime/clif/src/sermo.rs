@@ -361,6 +361,65 @@ pub extern "C" fn __faber_clif_v1_sermo_failed(handle: i64) -> i8 {
     }
 }
 
+/// Fault bytes as a raw (pointer, length) pair.
+///
+/// The fault strings cross as raw bytes, not as the headered text handle the
+/// string exports use: the byte count is written through `out_len` when the
+/// caller wants one, and the pointer addresses the slot's own bytes.
+fn raw(bytes: &[u8], out_len: Option<&mut i64>) -> *const u8 {
+    if let Some(out_len) = out_len {
+        *out_len = i64::try_from(bytes.len()).unwrap_or(i64::MAX);
+    }
+    bytes.as_ptr()
+}
+
+/// The recorded fault kind of conversation `handle`, as raw bytes.
+///
+/// The kind is the Norma `IoFault` variant name. A conversation with no
+/// recorded fault, or an unknown handle, reports an empty slice: a non-null
+/// pointer with length 0.
+///
+/// # Safety
+///
+/// When it is not null, `out_len` must be writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_sermo_fault_kind(
+    handle: i64,
+    out_len: *mut i64,
+) -> *const u8 {
+    let out_len = unsafe { out_len.as_mut() };
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match slot(&mut table, handle).and_then(|open| open.fault.as_ref()) {
+        Some(fault) => raw(fault.kind_name().as_bytes(), out_len),
+        None => raw(&[], out_len),
+    }
+}
+
+/// The recorded fault path of conversation `handle`, as raw bytes.
+///
+/// A conversation with no recorded fault, or an unknown handle, reports an
+/// empty slice: a non-null pointer with length 0.
+///
+/// # Safety
+///
+/// When it is not null, `out_len` must be writable.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_sermo_fault_path(
+    handle: i64,
+    out_len: *mut i64,
+) -> *const u8 {
+    let out_len = unsafe { out_len.as_mut() };
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match slot(&mut table, handle).and_then(|open| open.fault.as_ref()) {
+        Some(fault) => raw(fault.path().as_bytes(), out_len),
+        None => raw(&[], out_len),
+    }
+}
+
 #[cfg(test)]
 #[path = "sermo_test.rs"]
 mod sermo_test;
