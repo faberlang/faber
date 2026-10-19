@@ -1,0 +1,33 @@
++++
+term = "tensor"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "`*` between two matrices is not the matrix product; `·` is."
+syntax = "<matrix expression> * <matrix expression>"
+related = ["tensor", "matrix", "·", "⊙"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:matrix_multiply_requires_glyph"
++++
+
+# =============================================================================
+# matrix — `*` is a scalar operator, not the matrix product.
+# =============================================================================
+#
+# What this teaches:
+#   • The matrix product is a glyph: `·` contracts the inner dimensions.
+#   • `*` between two matrices is therefore a named decline, so the intent
+#     (product or elementwise) is never guessed from the shapes.
+#   • Elementwise pairing is `⊙`; `*` and `/` stay scalar scaling.
+#
+# See also: tensor, matrix, ·, ⊙
+# =============================================================================
+
+# `*` over two 2×2 matrices: the product glyph is `·`.
+main {
+    let matrix<f32, [2, 2]> a ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    let matrix<f32, [2, 2]> b ← a * a
+    print b
+}
