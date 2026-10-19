@@ -2078,6 +2078,28 @@ pub fn apply_air_backward_bundle<'a>(
         }
     })?;
 
+    // GT01/E07: companion generation interns generated names (`__backward_callee_N`)
+    // into `lowered.interner` after `build_lowering_validation` cloned it into
+    // the validated context. Re-prove the token against the refreshed table so
+    // patch re-validation, FMIR image snapshots and runner name resolution
+    // resolve the generated symbols instead of indexing past the stale clone.
+    let (program, mut context) = lowered.validated.into_parts();
+    context.interner = crate::mir::MirInterner::Owned(std::sync::Arc::new(lowered.interner.clone()));
+    lowered.validated = crate::mir::ValidatedMir::new(program, context).map_err(|errors| {
+        let messages: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
+        SpannedCodegenError {
+            message: format!(
+                "MIR validation after backward companion addition failed: {}",
+                messages.join("; ")
+            ),
+            args: vec![DiagnosticArg::new(
+                "issue",
+                "mir_validation_after_companion_addition_failed",
+            )],
+            span: None,
+        }
+    })?;
+
     // Index annotated companions by primal DefId for primal matching.
     let annotated_by_primal: FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = {
         // Companions use their own DefId as `source` (not the primal's). Build an
