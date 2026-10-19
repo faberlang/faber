@@ -1,0 +1,31 @@
++++
+term = "iace"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "figendum_decl", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "errors"
+summary = "An await binder needs an async context; a synchronous body has no suspension point."
+syntax = "await_const int v ← work()"
+related = ["iace", "figendum", "async"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:await_bind_requires_async_context"
++++
+# =============================================================================
+# iace — an await binder outside an async context is a check error
+# =============================================================================
+# An await binder (`await_const` / `figendum`) suspends the callable that
+# contains it. A synchronous body has nowhere to suspend, so the binding is
+# refused before any code is emitted.
+
+fn work() async → int {
+    return 1
+}
+
+fn sync() → int {
+    await_const int v ← work()
+    return v
+}
+
+main {
+    print sync()
+}
