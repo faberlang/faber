@@ -1038,6 +1038,8 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     FORMAT_INF,
     FORMAT_INS,
     SERMO_OPEN,
+    SERMO_SET_OPENER_NIL,
+    SERMO_SET_OPENER_I64,
 ];
 
 /// A stored `d64` carrier (scale 8) -> decimal handle.
@@ -1291,4 +1293,18 @@ pub const SERMO_OPEN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_sermo_open",
     params: &[Ptr, I64],
     ret: Some(I64),
+};
+/// Reopen a conversation on `nihil` as its only opener value: (handle) -> unit.
+/// An unknown handle is a no-op.
+pub const SERMO_SET_OPENER_NIL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_set_opener_nil",
+    params: &[I64],
+    ret: None,
+};
+/// Reopen a conversation on a `numerus` opener: (handle, value) -> unit. An
+/// unknown handle is a no-op.
+pub const SERMO_SET_OPENER_I64: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_set_opener_i64",
+    params: &[I64, I64],
+    ret: None,
 };

@@ -253,6 +253,15 @@ fn slot(table: &mut Vec<Box<Slot>>, handle: i64) -> Option<&mut Slot> {
     table.get_mut(index).map(|slot| &mut **slot)
 }
 
+/// Reopen a slot on the opener values a leaf slot reads.
+///
+/// The route is unchanged, the conversation is unserved again, and the fault
+/// a previous call recorded is dropped.
+fn reopen(slot: &mut Slot, opener: &[Opener]) {
+    slot.conversation = Conversation::open(slot.conversation.route()).with_opener(opener);
+    slot.fault = None;
+}
+
 /// Open a conversation on `route` and return its one-based handle.
 ///
 /// 0 is the fail-closed "no conversation" value: a null pointer, a negative
@@ -284,6 +293,33 @@ pub unsafe extern "C" fn __faber_clif_v1_sermo_open(route: *const u8, route_len:
         fault: None,
     }));
     i64::try_from(table.len()).unwrap_or(0)
+}
+
+/// Reopen conversation `handle` with `nihil` as its only opener value.
+///
+/// An unknown handle is a no-op.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_sermo_set_opener_nil(handle: i64) {
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(open) = slot(&mut table, handle) {
+        reopen(open, &[Opener::Nil]);
+    }
+}
+
+/// Reopen conversation `handle` with the `numerus` `value` as its only opener
+/// value.
+///
+/// An unknown handle is a no-op.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_sermo_set_opener_i64(handle: i64, value: i64) {
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(open) = slot(&mut table, handle) {
+        reopen(open, &[Opener::Int(value)]);
+    }
 }
 
 #[cfg(test)]
