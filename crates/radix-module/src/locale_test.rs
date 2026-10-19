@@ -229,6 +229,11 @@ fn locale_pack_completeness_sinking_contract_row_in_la() {
 }
 
 #[test]
+fn locale_pack_completeness_import_target_bound_row_in_la() {
+    assert_issue_template(&owned_pack("la"), "SEM017", "import_target_bound");
+}
+
+#[test]
 fn latin_pack_projects_existing_registries() {
     let pack = latin_locale_pack();
 

@@ -13,9 +13,9 @@
 # in crates/radix-module/src/locale_test.rs.
 
 [budget]
-ar = 867
-hi = 861
-"th-TH" = 861
-vi = 867
-"zh-Hans" = 867
-"zh-Hant" = 875
+ar = 869
+hi = 863
+"th-TH" = 863
+vi = 869
+"zh-Hans" = 869
+"zh-Hant" = 877

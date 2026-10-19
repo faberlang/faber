@@ -4171,6 +4171,10 @@ help = "use an available declaration or change the target"
 message = "function `{function}` is marked nondum for this target{?reason|: |}"
 help = "use an available declaration or change the target"
 
+[diagnostics.SEM017.issues.import_target_bound]
+message = "this program imports {target} \"{specifier}\" and can only build for {target}; the build target is {build}"
+help = "build this program for `{target}`, or remove the target import"
+
 [diagnostics.SEM018]
 message = "invalid annotation"
 help = "fix the annotation contract before semantic lowering"
