@@ -416,7 +416,6 @@ fn collect_named_type_defs(artifact: &HirArtifact) -> FxHashSet<radix_types::Def
 /// `magnitudo` size parameters are compile-time facts that never appear as a
 /// `Type::Param` in the recorded body, so collecting them would invite
 /// bindings no structural match can consume.
-#[allow(dead_code)] // wired in by unit pumpfix-gd96b2e21-1.1.3
 fn collect_generic_alias_params(
     artifact: &HirArtifact,
 ) -> FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>> {
@@ -459,6 +458,7 @@ fn validate_type_arg(
     root_slot: &radix_hir::HirTypeSlot,
     types: &radix_types::TypeTableSnapshot,
     named_defs: &FxHashSet<radix_types::DefId>,
+    alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
     check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
     check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
     check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
@@ -476,6 +476,7 @@ fn validate_type_arg(
         root_slot,
         types,
         named_defs,
+        alias_params,
         check_symbol,
         check_def,
         check_type,
@@ -546,6 +547,7 @@ fn validate_named_form(
     site: &radix_hir::HirTypeSite,
     types: &radix_types::TypeTableSnapshot,
     named_defs: &FxHashSet<radix_types::DefId>,
+    alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
     path_def: radix_types::DefId,
     path: &[radix_lexer::Symbol],
     check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
@@ -567,8 +569,27 @@ fn validate_named_form(
 
     let (witness_def, applied_args) = match named_witness(types, form.ty) {
         Some(witness) => witness,
-        None if transparent_alias_body_witness(types, path_def, form.ty) => (path_def, Vec::new()),
-        None => return Err(type_presentation_issue("named_witness_not_named", site)),
+        None => {
+            // A generic alias records both its parametric body and the
+            // instantiated alias wrapper at the applied site. The generic
+            // fallback binds the authored arguments to the declared
+            // parameters, so it runs first; the exact-body witness applies
+            // only to an alias with no typus parameters, because its
+            // instantiated wrapper carries no argument witnesses to check.
+            if let Some(applied) =
+                transparent_generic_alias_witness(types, alias_params, path_def, form)
+            {
+                (path_def, applied)
+            } else if alias_params
+                .get(&path_def)
+                .is_none_or(|params| params.is_empty())
+                && transparent_alias_body_witness(types, path_def, form.ty)
+            {
+                (path_def, Vec::new())
+            } else {
+                return Err(type_presentation_issue("named_witness_not_named", site));
+            }
+        }
     };
     if witness_def != path_def {
         return Err(type_presentation_issue(
@@ -592,6 +613,7 @@ fn validate_named_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -652,7 +674,6 @@ fn transparent_alias_body_witness(
 /// parameter name with that argument's witness — and compares the two shapes
 /// structurally. A parameter the bindings do not name, a mismatched variant, or
 /// a shape outside the recursive arms below fails closed.
-#[allow(dead_code)] // wired in by unit pumpfix-gd96b2e21-1.1.3
 fn generic_alias_body_matches(
     types: &radix_types::TypeTableSnapshot,
     bindings: &[(radix_lexer::Symbol, radix_types::TypeId)],
@@ -821,7 +842,6 @@ fn generic_alias_body_matches(
 /// are the witnesses the matched site itself carries. An alias the artifact
 /// never declared, a body the table lost, an arity mismatch, or any
 /// non-type argument fails closed.
-#[allow(dead_code)] // wired in by unit pumpfix-gd96b2e21-1.1.3
 fn transparent_generic_alias_witness(
     types: &radix_types::TypeTableSnapshot,
     alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
@@ -882,6 +902,7 @@ fn validate_type_form(
     root_slot: &radix_hir::HirTypeSlot,
     types: &radix_types::TypeTableSnapshot,
     named_defs: &FxHashSet<radix_types::DefId>,
+    alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
     check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
     check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
     check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
@@ -920,6 +941,7 @@ fn validate_type_form(
                 site,
                 types,
                 named_defs,
+                alias_params,
                 *def_id,
                 path,
                 check_symbol,
@@ -983,6 +1005,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1005,6 +1028,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1027,6 +1051,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1070,6 +1095,7 @@ fn validate_type_form(
                             root_slot,
                             types,
                             named_defs,
+                            alias_params,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1082,6 +1108,7 @@ fn validate_type_form(
                             root_slot,
                             types,
                             named_defs,
+                            alias_params,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1108,6 +1135,7 @@ fn validate_type_form(
                             root_slot,
                             types,
                             named_defs,
+                            alias_params,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1134,6 +1162,7 @@ fn validate_type_form(
                                 root_slot,
                                 types,
                                 named_defs,
+                                alias_params,
                                 check_symbol,
                                 check_def,
                                 check_type,
@@ -1152,6 +1181,7 @@ fn validate_type_form(
                             root_slot,
                             types,
                             named_defs,
+                            alias_params,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1171,6 +1201,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1183,6 +1214,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1200,6 +1232,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1225,6 +1258,7 @@ fn validate_type_form(
                             root_slot,
                             types,
                             named_defs,
+                            alias_params,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1259,6 +1293,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1277,6 +1312,7 @@ fn validate_type_form(
                         root_slot,
                         types,
                         named_defs,
+                        alias_params,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1300,6 +1336,7 @@ fn validate_authored_type_records(
 ) -> Result<(), HirArtifactError> {
     let sites = collect_type_site_registry(artifact);
     let named_defs = collect_named_type_defs(artifact);
+    let alias_params = collect_generic_alias_params(artifact);
     let mut seen = FxHashSet::default();
     for authored in &presentation.authored_types {
         if !seen.insert(authored.site.clone()) {
@@ -1328,6 +1365,7 @@ fn validate_authored_type_records(
             &authored.site.slot,
             &artifact.types,
             &named_defs,
+            &alias_params,
             check_symbol,
             check_def,
             check_type,

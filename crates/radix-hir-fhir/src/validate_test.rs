@@ -591,6 +591,130 @@ fn zero_argument_non_u8_array_form_fails_closed() {
     }
 }
 
+/// Artifact with one generic transparent alias `type Pairs<T> = list<T>` and
+/// one declared local whose finalized witness is `list<int>`; the authored
+/// form names the alias head and carries `child` as its one type argument.
+fn generic_alias_named_form_artifact(child: Type) -> crate::artifact::HirArtifact {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let int_ty = types.primitive(Primitive::Numerus);
+    let child_ty = types.intern(child);
+    let param_symbol = Symbol(3);
+    let param_ty = types.intern(Type::Param(param_symbol));
+    let alias_body = types.array(param_ty);
+    let array_ty = types.array(int_ty);
+    let pairs_def = DefId(USER_DEF_ID_BASE + 30);
+    let param_def = DefId(USER_DEF_ID_BASE + 31);
+    let local_def = DefId(USER_DEF_ID_BASE + 32);
+    let _alias_ty = types.intern(Type::Alias(pairs_def, alias_body));
+    // The producer also records the instantiated alias wrapper at the applied
+    // site, which is why the generic fallback must run before the exact-body
+    // witness (that witness carries no argument witnesses).
+    let _instantiated_alias_ty = types.intern(Type::Alias(pairs_def, array_ty));
+
+    artifact.interner = vec![
+        "main".to_owned(),
+        "test".to_owned(),
+        "Pairs".to_owned(),
+        "T".to_owned(),
+    ];
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Local(radix_hir::HirLocal {
+                def_id: local_def,
+                name: Symbol(0),
+                ty: Some(array_ty),
+                init: None,
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: None,
+                size_decl: false,
+                size_static: false,
+            }),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    artifact.hir.items.push(radix_hir::HirItem {
+        annotations: Vec::new(),
+        id: HirId(2),
+        def_id: pairs_def,
+        kind: radix_hir::HirItemKind::TypeAlias(radix_hir::HirTypeAlias {
+            name: Symbol(2),
+            type_params: vec![radix_hir::HirTypeParam {
+                def_id: param_def,
+                kind: radix_syntax::GenericParamKind::Typus,
+                name: param_symbol,
+                span: Span::default(),
+                constraint: radix_hir::HirTypeParamConstraint::Any,
+                default: None,
+            }],
+            ty: alias_body,
+        }),
+        span: Span::default(),
+    });
+    artifact.types = types.snapshot();
+    artifact.presentation.authored_types = vec![radix_hir::HirAuthoredTypeUse {
+        site: radix_hir::HirTypeSite {
+            owner: radix_hir::HirOwnerRef::Def(local_def),
+            slot: radix_hir::HirTypeSlot::Declared,
+        },
+        form: radix_hir::HirTypeForm {
+            ty: array_ty,
+            head: radix_hir::HirTypeFormHead::Named {
+                def_id: pairs_def,
+                path: vec![Symbol(2)],
+            },
+            args: vec![radix_hir::HirTypeFormArg::Type(Box::new(
+                radix_hir::HirTypeForm {
+                    ty: child_ty,
+                    head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+                    args: Vec::new(),
+                    label: None,
+                },
+            ))],
+            label: None,
+        },
+    }];
+    artifact
+}
+
+#[test]
+fn generic_alias_named_form_annotation_loads() {
+    // `type Pairs<T> = list<T>` applied as `Pairs<int>` at a `list<int>` site:
+    // the recorded alias body is parametric, so the named form matches it only
+    // through the generic fallback's structural binding of `T`.
+    let artifact = generic_alias_named_form_artifact(Type::Primitive(Primitive::Numerus));
+    crate::decode(&crate::encode(&artifact).expect("encode generic alias artifact"))
+        .unwrap_or_else(|err| panic!("a generic transparent alias annotation must load: {err:?}"));
+}
+
+#[test]
+fn generic_alias_named_form_wrong_arg_fails_closed() {
+    // The site witness stays `list<int>` while the authored argument witnesses
+    // `string`; binding `T` to `string` cannot match `list<int>`, so the
+    // generic fallback refuses exactly like the non-generic witness path.
+    let artifact = generic_alias_named_form_artifact(Type::Primitive(Primitive::Textus));
+    let err = crate::decode(&crate::encode(&artifact).expect("encode generic alias artifact"))
+        .expect_err("a generic alias argument that contradicts the site witness must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "named_witness_not_named",
+                ..
+            }
+        ),
+        "a mis-bound generic alias argument must fail with named_witness_not_named: {err:?}"
+    );
+}
+
 #[test]
 fn authored_types_v9_round_trip_preserves_nested_forms() {
     let artifact = authored_type_artifact();
