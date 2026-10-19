@@ -548,14 +548,24 @@ impl Lowerer<'_> {
                 self.presentation.glyph_ids.push(id);
                 return self.lower_rounding_glyph("rotunda", operand);
             }
+            // The radical glyphs are sugar for the canonical method twins
+            // (`radix`, `radix_cubica`); the ordinary intrinsic checker owns
+            // legality, so an integer operand inherits the `.sqrt()` error.
+            // The node id is recorded with the glyph ids so Faber re-emission
+            // prints the authored glyph instead of the method twin.
             radix_syntax::UnOp::RadicalSqrt => {
+                self.presentation.glyph_ids.push(id);
                 return self.lower_radical_glyph("radix", operand);
             }
             radix_syntax::UnOp::RadicalCbrt => {
+                self.presentation.glyph_ids.push(id);
                 return self.lower_radical_glyph("radix_cubica", operand);
             }
-            // `∜ x` is `√ √ x`: `.sqrt().sqrt()`.
+            // `∜ x` is `√ √ x`: `.sqrt().sqrt()`. The outer id is recorded in
+            // its own set: authored `∜ x` and authored `√ x.sqrt()` lower to
+            // the same nested shape, and only the set distinguishes them.
             radix_syntax::UnOp::RadicalFourth => {
+                self.presentation.radical_quarta_ids.push(id);
                 let span = operand.span;
                 let squared = HirExpression {
                     id: self.next_hir_id(),
