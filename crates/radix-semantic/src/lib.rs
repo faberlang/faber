@@ -723,6 +723,7 @@ pub fn analyze_with_cli(
         );
         kernel_requirements = passes::kernel_requirements::check(
             &hir,
+            &resolver,
             &types,
             interner,
             &legality.recursive_kernels,

@@ -7,7 +7,7 @@
 //! requirement.
 
 use crate::{
-    NumericWidth, Primitive, ResolvedTensorEdgePolicy, SemanticError, SemanticErrorKind,
+    NumericWidth, Primitive, ResolvedTensorEdgePolicy, Resolver, SemanticError, SemanticErrorKind,
     TensorEdgePolicyTable, Type, TypeId, TypeTable,
 };
 use radix_hir::visit::{HirVisitor, walk_expr};
@@ -322,6 +322,7 @@ impl KernelRequirementsReport {
 #[must_use]
 pub fn check(
     hir: &radix_hir::HirModule,
+    resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
     recursive_kernels: &FxHashSet<DefId>,
@@ -365,6 +366,7 @@ pub fn check(
                     function,
                     &facts,
                     &const_values,
+                    resolver,
                     types,
                     interner,
                     tensor_edge_policies,
@@ -379,6 +381,7 @@ pub fn check(
                     types,
                     interner,
                     &facts,
+                    resolver,
                     &const_values,
                     recursive_kernels,
                 );
@@ -392,6 +395,7 @@ pub fn check(
                             &method.func,
                             &facts,
                             &const_values,
+                            resolver,
                             types,
                             interner,
                             tensor_edge_policies,
@@ -406,6 +410,7 @@ pub fn check(
                             types,
                             interner,
                             &facts,
+                            resolver,
                             &const_values,
                             recursive_kernels,
                         );
@@ -443,6 +448,7 @@ fn analyze_kernel(
     function: &HirFunction,
     facts: &TypeFacts,
     const_values: &FxHashMap<DefId, i128>,
+    resolver: &Resolver,
     types: &TypeTable,
     interner: &Interner,
     tensor_edge_policies: &TensorEdgePolicyTable,
@@ -455,6 +461,7 @@ fn analyze_kernel(
         interner,
         tensor_edge_policies,
         const_values,
+        resolver,
         ranges: FxHashMap::default(),
         parameter_types: FxHashMap::default(),
         parameter_aliases: FxHashMap::default(),
@@ -558,6 +565,7 @@ fn analyze_limes_callbacks(
     types: &TypeTable,
     interner: &Interner,
     facts: &TypeFacts,
+    resolver: &Resolver,
     const_values: &FxHashMap<DefId, i128>,
     recursive_kernels: &FxHashSet<DefId>,
 ) {
@@ -569,6 +577,7 @@ fn analyze_limes_callbacks(
         types,
         interner,
         facts,
+        resolver,
         const_values,
         recursive_kernels,
         &mut FxHashSet::default(),
@@ -583,6 +592,7 @@ fn analyze_limes_callbacks_inner(
     types: &TypeTable,
     interner: &Interner,
     facts: &TypeFacts,
+    resolver: &Resolver,
     const_values: &FxHashMap<DefId, i128>,
     recursive_kernels: &FxHashSet<DefId>,
     active_callbacks: &mut FxHashSet<DefId>,
@@ -643,6 +653,7 @@ fn analyze_limes_callbacks_inner(
                 callback,
                 facts,
                 const_values,
+                resolver,
                 types,
                 interner,
                 policies,
@@ -671,6 +682,7 @@ fn analyze_limes_callbacks_inner(
                 types,
                 interner,
                 facts,
+                resolver,
                 const_values,
                 recursive_kernels,
                 active_callbacks,
@@ -986,6 +998,11 @@ struct BodyFacts<'a> {
     interner: &'a Interner,
     tensor_edge_policies: &'a TensorEdgePolicyTable,
     const_values: &'a FxHashMap<DefId, i128>,
+    #[expect(
+        dead_code,
+        reason = "unused until d40af598-2.3 folds imported module.CONST ints; expect expires when read"
+    )]
+    resolver: &'a Resolver,
     ranges: FxHashMap<DefId, AbstractRange>,
     parameter_types: FxHashMap<DefId, TypeId>,
     parameter_aliases: FxHashMap<DefId, DefId>,
