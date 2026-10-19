@@ -501,6 +501,8 @@ pub enum MirMathFunction {
     Abs,
     /// `radix` (en `sqrt`): square root. `sqrt(x < 0)` is NaN.
     Sqrt,
+    /// radix_cubica (en cbrt): real cube root; cbrt(-8.0) is -2.0 (never pow(x, 1/3) NaN)
+    Cbrt,
     /// `exponentia` (en `exp`): `e^x`. Overflow is infinity.
     Exp,
     /// `logarithmus` (en `ln`): natural logarithm. `ln(0)` is `-inf`,
@@ -518,9 +520,10 @@ pub enum MirMathFunction {
 
 impl MirMathFunction {
     /// Every lifted function, in catalog order.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::Abs,
         Self::Sqrt,
+        Self::Cbrt,
         Self::Exp,
         Self::Ln,
         Self::Log10,
@@ -535,6 +538,7 @@ impl MirMathFunction {
         match self {
             Self::Abs => "abs",
             Self::Sqrt => "sqrt",
+            Self::Cbrt => "cbrt",
             Self::Exp => "exp",
             Self::Ln => "ln",
             Self::Log10 => "log10",
@@ -550,6 +554,7 @@ impl MirMathFunction {
         match self {
             Self::Abs => "absolutum",
             Self::Sqrt => "radix",
+            Self::Cbrt => "radix_cubica",
             Self::Exp => "exponentia",
             Self::Ln => "logarithmus",
             Self::Log10 => "logarithmus_decimalis",
@@ -570,8 +575,9 @@ impl MirMathFunction {
     /// The functions that are scalar float methods through
     /// [`MirCollectionOp::ScalarMath`]: everything except `Abs`, whose scalar
     /// form is the shared numeric `Absolute` op.
-    pub const SCALAR: [Self; 7] = [
+    pub const SCALAR: [Self; 8] = [
         Self::Sqrt,
+        Self::Cbrt,
         Self::Exp,
         Self::Ln,
         Self::Log10,

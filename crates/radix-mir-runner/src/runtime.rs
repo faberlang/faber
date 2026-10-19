@@ -6970,6 +6970,7 @@ fn apply_math_function(function: MirMathFunction, value: f64) -> f64 {
     match function {
         MirMathFunction::Abs => value.abs(),
         MirMathFunction::Sqrt => value.sqrt(),
+        MirMathFunction::Cbrt => value.cbrt(),
         MirMathFunction::Exp => value.exp(),
         MirMathFunction::Ln => value.ln(),
         MirMathFunction::Log10 => value.log10(),

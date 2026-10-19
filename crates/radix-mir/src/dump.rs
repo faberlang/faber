@@ -607,6 +607,7 @@ fn tensor_math_dump_name(function: radix_types::MirMathFunction) -> &'static str
     match function {
         MirMathFunction::Abs => "tensor_math_abs",
         MirMathFunction::Sqrt => "tensor_math_sqrt",
+        MirMathFunction::Cbrt => "tensor_math_cbrt",
         MirMathFunction::Exp => "tensor_math_exp",
         MirMathFunction::Ln => "tensor_math_ln",
         MirMathFunction::Log10 => "tensor_math_log10",
@@ -621,6 +622,7 @@ fn scalar_math_dump_name(function: radix_types::MirMathFunction) -> &'static str
     match function {
         MirMathFunction::Abs => "scalar_math_abs",
         MirMathFunction::Sqrt => "scalar_math_sqrt",
+        MirMathFunction::Cbrt => "scalar_math_cbrt",
         MirMathFunction::Exp => "scalar_math_exp",
         MirMathFunction::Ln => "scalar_math_ln",
         MirMathFunction::Log10 => "scalar_math_log10",
