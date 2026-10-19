@@ -1,0 +1,74 @@
++++
+term = "est"
+explains = ["est"]
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "si_stmt", "arm", "redde_stmt", "et_expr", "adfirma_stmt", "conversio_expr", "type_arguments", "type_argument", "equality", "equality_tail", "comparison", "array_literal", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "genus_decl", "field_decl", "itera_stmt", "sit_decl"]
+category = "logic"
+canonical = false
+summary = "Type tests over class unions, inline unions, a generic parameter, and narrowing inside a loop."
+syntax = "<expr> is <type> | <expr> not is <type>"
+related = ["discerne", "∪"]
+locale = "en"
++++
+# =============================================================================
+# est — Type tests over class unions, inline unions, generics, and loops.
+# =============================================================================
+#
+# What this teaches:
+#   • Class unions — `A ∪ B` in a parameter lets `is A` / `is B` select the
+#     member, and the taken branch narrows so `v.x` / `v.s` typecheck.
+#   • Inline unions — `int ∪ string` needs no declaration; `not is` is the
+#     spelled negation of a type test.
+#   • Generic parameters — `T` is erased, so `is int` tests the runtime tag.
+#   • Loops — a tested element narrows inside the loop body, and the
+#     `else then` arm covers the other member.
+#
+# Common mistakes:
+#   • Writing `is not` — the negation is `not is`.
+#   • Reaching for `var` — writable bindings are `mut T x ← e`.
+#   • Reading a union member before it is tested (`v.x` on `A ∪ B`) — the
+#     field is only reached after the narrowing test.
+#
+# See also: discerne, est, ∪
+# =============================================================================
+
+class A {
+    mut int x
+}
+
+class B {
+    mut string s
+}
+
+fn f(A ∪ B v) → string {
+    if v is A { return "A§"(v.x) }
+    return "B§"(v.s)
+}
+
+fn g(int ∪ string v) → string {
+    if v not is int { return "notint" }
+    return "int"
+}
+
+fn h<T>(T v) → string {
+    return v is int ✓ "int" ✗ "notint"
+}
+
+fn tot(list<int ∪ string> xs) → int {
+    mut int t ← 0
+    for from xs let x {
+        if x is int { t ← t + x }
+        else then t ← t + 100
+    }
+    return t
+}
+
+main {
+    print f(A { x = 1 })
+    print f(B { s = "q" })
+    print g(1)
+    print g("a")
+    print h(1)
+    print h("a")
+    print tot([1, "a", 2])
+}
