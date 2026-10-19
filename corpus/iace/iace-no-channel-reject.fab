@@ -1,0 +1,24 @@
++++
+term = "iace"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "iace_stmt", "iace_expr", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "errors"
+summary = "A throw with no error channel is rejected: give the function a ⇥ channel or wrap the throw in do/catch."
+syntax = "fn h() → int { throw <text> }"
+related = ["iace", "⇥", "cape"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:iace_requires_alternate_exit"
++++
+# iace — a throw needs an alternate exit
+#
+# h has no ⇥ error channel and no do/catch handler, so the throw has nowhere
+# to go: the checker rejects the file (SEM010 iace_requires_alternate_exit).
+
+fn h() → int {
+    throw "x"
+}
+
+main {
+    print h()
+}
