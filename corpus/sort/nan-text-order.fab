@@ -1,0 +1,21 @@
++++
+locale = "en"
+term = "sort-nan-text-order-en"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+
+# NaNs sort above every number by the IEEE total order, -0.0 before +0.0,
+# and text orders by Unicode code point; each list is bound with let.
+main {
+    let list<float> xs ← [2.0, nan, 1.0, -1.0, nan, 0.0]
+    print sort via asc from xs
+    print sort via desc from xs
+    let list<float> ys ← [0.0, -0.0]
+    print sort via asc from ys
+    let list<string> ts ← ["b", "É", "a", "B", "", "aa"]
+    print sort via asc from ts
+    print sort via desc from ts
+}

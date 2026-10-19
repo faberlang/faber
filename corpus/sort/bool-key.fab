@@ -1,0 +1,16 @@
++++
+locale = "en"
+term = "sort-bool-key-en"
+kind = "concept"
+category = "collection"
+grammar = ["sort_expr", "sort_direction", "sort_body"]
+canonical = true
++++
+
+# A body may return a bool key: ascending puts the false group first and
+# descending the true group first, ties keeping source order; the binder is let.
+main {
+    let list<int> xs ← [3, 1, 2, 4]
+    print sort via asc from xs let x { return x % 2 ≡ 0 }
+    print sort via desc from xs let x { return x % 2 ≡ 0 }
+}
