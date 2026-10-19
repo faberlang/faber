@@ -1,0 +1,61 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "cast_expr", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Empty-list answers of lista query and removal methods, and the elementwise maximum(n)/minimum(n) clamp."
+syntax = "<lista>.maximum(n) | <lista>.minimum(n)"
+related = ["metior", "summa", "maxima", "minima"]
+locale = "en"
++++
+# =============================================================================
+# lista — empty-list method answers and the elementwise extrema clamp.
+# =============================================================================
+#
+# What this teaches:
+#   • query and removal methods on an empty list — first(), last(), argmax(),
+#     remove_first(), remove_last() all answer none; sum() answers 0
+#   • mutation intrinsics grow a list from empty — append(x), reverse(), sort()
+#   • maximum(n)/minimum(n) clamp a numeric list elementwise against a scalar
+#
+# Common mistakes:
+#   • testing argmax() for -1 — the empty answer is none, never a sentinel
+#   • expecting maximum(n)/minimum(n) to return a scalar — they return a list
+#
+# See also: metior, summa, maxima, minima
+# =============================================================================
+
+main {
+    # Empty-list identities: queries and removals answer none; sum answers 0.
+    mut list<int> xs ← empty
+    let int ∪ none primus_remotus ← xs.remove_first()
+    let int ∪ none ultimus_remotus ← xs.remove_last()
+    let int ∪ none primus ← xs.first()
+    let int ∪ none ultimus ← xs.last()
+    let int ∪ none index_maximi ← xs.argmax()
+    let int summa_vacua ← xs.sum()
+    print primus_remotus, ultimus_remotus, primus, ultimus, index_maximi
+    print summa_vacua
+
+    # Mutation intrinsics still work after growing from empty.
+    xs.append(1)
+    xs.append(2)
+    xs.append(3)
+    xs.reverse()
+    print xs
+    let int ∪ none victus_primus ← xs.remove_first()
+    print victus_primus
+    let int ∪ none victus_ultimus ← xs.remove_last()
+    print victus_ultimus
+    print xs
+    xs.sort()
+    print xs
+
+    # Elementwise clamp: maximum(n) lifts low values, minimum(n) caps high ones.
+    let list<int> ys ← [5, 3, 9, 1]
+    let list<int> infimum_tectum ← ys.maximum(4)
+    let list<int> supremum_tectum ← ys.minimum(4)
+    print infimum_tectum
+    print supremum_tectum
+}
