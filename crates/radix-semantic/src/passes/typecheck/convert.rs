@@ -881,7 +881,8 @@ impl TypeChecker<'_> {
             return result_ty;
         }
 
-        if recovery.is_some() && self.is_infallible_truthiness_conversio(source_ty, target_resolved)
+        if recovery.is_some()
+            && self.is_infallible_numeric_truthiness_conversio(source_ty, target_resolved)
         {
             self.invalid_conversion(ISSUE_BIVALENS_RECOVERY_UNSUPPORTED, span);
         }
@@ -3514,7 +3515,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn is_infallible_truthiness_conversio(
+    fn is_infallible_numeric_truthiness_conversio(
         &self,
         source_ty: TypeId,
         target_resolved: TypeId,
@@ -3527,10 +3528,7 @@ impl TypeChecker<'_> {
                 self.primitive_conversio_family(target)
             ),
             (
-                PrimitiveConversioFamily::Numerus
-                    | PrimitiveConversioFamily::Fractus
-                    | PrimitiveConversioFamily::Textus
-                    | PrimitiveConversioFamily::Ascii,
+                PrimitiveConversioFamily::Numerus | PrimitiveConversioFamily::Fractus,
                 PrimitiveConversioFamily::Bivalens
             )
         )

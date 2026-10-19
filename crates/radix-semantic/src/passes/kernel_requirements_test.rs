@@ -1060,6 +1060,24 @@ main {}
 }
 
 #[test]
+fn shape_metadata_recipe_places_no_wide_integer_requirement() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn expand_mask<size C>(tensor<f32, [5, 3, 1, C]> scores, tensor<f32, [1, C]> mask, mut tensor<f32, [5, 3, 1, C]> output, u32 id) → void {
+    output ⇇ scores + mask.expanded(scores.shape())
+}
+main {}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(issue_arg(&fixture, "nucleum_wide_integer", "width").is_none());
+    let row = target_row(&fixture, "expand_mask", Target::MirMetal);
+    assert!(row.admitted, "{:?}", row.failures);
+}
+
+#[test]
 fn tensor_addressing_does_not_hide_wide_coordinate_arithmetic() {
     let fixture = analyze_en(
         r"
