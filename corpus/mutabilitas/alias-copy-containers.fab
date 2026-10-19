@@ -1,0 +1,73 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "value_marker", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "place", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "nota_stmt"]
+category = "type"
+summary = "E9: a plain bind aliases a container; copy deep-duplicates it, nested elements included."
+syntax = "mut map<string, int> n ← m; mut map<string, int> o ← copy m"
+related = ["fixum", "lista", "tabula", "copia"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — alias on bind vs deep copy (E9)
+# =============================================================================
+# A plain bind ALIASES a container: `mut map<string, int> n ← m` makes `n` and
+# `m` one value, so a store through either is seen through both. `copy` says
+# how a binding is INITIALIZED: `mut map<string, int> o ← copy m` duplicates
+# the source deeply, nested elements included — mutating a list or set inside
+# the copy never shows through the source. Each half below re-seeds its source
+# (`s ← [1]`, `q ← empty`) so the alias pair and the copy pair start equal.
+
+main {
+    # --- map: alias then copy ------------------------------------------------
+    mut map<string, int> m ← { "a": 1 }
+    mut map<string, int> n ← m
+    n["b"] ← 2
+    print m.length()
+    mut map<string, int> o ← copy m
+    o["c"] ← 3
+    print m.length()
+
+    # --- set: alias then copy ------------------------------------------------
+    mut set<int> s ← [1]
+    mut set<int> t ← s
+    t.add(2)
+    print s.length()
+    s ← [1]
+    mut set<int> u ← copy s
+    u.add(3)
+    print s.length()
+
+    # --- queue: alias then copy ----------------------------------------------
+    mut queue<int> q ← empty
+    mut queue<int> r ← q
+    r.append(1)
+    print q.length()
+    q ← empty
+    mut queue<int> w ← copy q
+    w.append(1)
+    print q.length()
+
+    # --- nested deep copy: lists inside a list -------------------------------
+    mut list<list<int>> a ← [[1], [2]]
+    mut list<list<int>> b ← copy a
+    b[0].append(99)
+    b[1][0] ← 77
+    print a
+    print b
+
+    # --- nested deep copy: a list inside a map -------------------------------
+    mut map<string, list<int>> m2 ← empty
+    m2["k"] ← [1]
+    mut map<string, list<int>> n2 ← copy m2
+    n2["k"].append(2)
+    print m2["k"]
+    print n2["k"]
+
+    # --- nested deep copy: a set inside a list -------------------------------
+    mut set<int> s2 ← [1]
+    mut list<set<int>> ls ← [s2]
+    mut list<set<int>> lc ← copy ls
+    lc[0].add(5)
+    print ls[0].length()
+}
