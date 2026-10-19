@@ -4,8 +4,10 @@
 //! analyses such a callee as if its body stood at the call site. The callee's
 //! tensor parameters take the storage of the call's arguments, its coordinate
 //! parameters take the arguments' coordinates, and its body meets the rules of
-//! the enclosing body unchanged. A call to anything else keeps the
-//! `unproved_call_effect` decline.
+//! the enclosing body unchanged. A call whose callee is itself a foreign value
+//! (a selectively imported target binding, or a method of one) is a host
+//! effect and declines as `foreign_call_effect`; a call to anything else keeps
+//! the `unproved_call_effect` decline.
 //!
 //! The inlinable callees are the module's `@ nucleum` functions and instance
 //! methods (`fragment`s and entry kernels, public or private), synchronous and
@@ -468,8 +470,9 @@ impl<'a> BodyProof<'a> {
             .collect()
     }
 
-    /// A call in a body under proof. A helper is analysed as inlined; any
-    /// other callee is an unproved effect.
+    /// A call in a body under proof. A helper is analysed as inlined; a
+    /// foreign callee is a host effect; any other callee is an unproved
+    /// effect.
     pub(super) fn call(
         &mut self,
         expr: &HirExpression,
@@ -477,6 +480,9 @@ impl<'a> BodyProof<'a> {
         args: &[HirCallArg],
     ) {
         let module = self.module;
+        if is_foreign_callee(callee.ty, self.types) {
+            return self.decline_call(expr, "foreign_call_effect");
+        }
         let helper = match &callee.kind {
             HirExpressionKind::Path(def) => module.helpers.get(def).map(|helper| (*def, helper)),
             _ => None,
