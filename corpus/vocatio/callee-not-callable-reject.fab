@@ -1,0 +1,30 @@
++++
+term = "vocatio"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "array_literal", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "expression"
+canonical = false
+summary = "Calling an integer binding is refused because it is not callable."
+syntax = "x(2) where x is an int — rejected"
+related = ["vocatio", "call_expr"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM012:callee_not_callable"
++++
+# =============================================================================
+# vocatio — calling a non-callable value is refused
+#
+# What this teaches:
+#   • A call target must be a function, closure, or callable value
+#
+# Common mistake:
+#   • calling an integer binding as if its name were a function
+#
+# See also: vocatio, call_expr
+# =============================================================================
+# This exemplum intentionally fails to compile.
+
+main {
+    let int x ← 1
+    print x(2)
+}

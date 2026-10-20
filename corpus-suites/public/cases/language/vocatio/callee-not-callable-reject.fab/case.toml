@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/vocatio/callee-not-callable-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "vocatio/callee-not-callable-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "callee_not_callable"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "callee_not_callable"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "callee_not_callable"
