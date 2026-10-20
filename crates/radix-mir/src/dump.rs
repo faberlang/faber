@@ -599,6 +599,7 @@ fn conversion_flavor(flavor: MirConversionFlavor) -> &'static str {
     match flavor {
         MirConversionFlavor::Cast => "cast",
         MirConversionFlavor::Runtime => "runtime",
+        MirConversionFlavor::Proven => "proven",
     }
 }
 

@@ -1652,6 +1652,9 @@ pub struct MirStructFieldDefaults {
 pub enum MirConversionFlavor {
     Cast,
     Runtime,
+    /// An implicit narrowing store whose value range was proven to fit at
+    /// compile time; never traps, carries no store site.
+    Proven,
 }
 
 /// Provider classification for host dispatch routing.

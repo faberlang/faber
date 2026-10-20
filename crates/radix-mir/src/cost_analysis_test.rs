@@ -338,3 +338,16 @@ fn foldable_and_uncosted_tags_ignore_amplification() {
     assert_eq!(foldable_tag().amplify(1_000), CostTag::F);
     assert_eq!(uncosted_tag().amplify(1_000), CostTag::U);
 }
+
+#[test]
+fn proven_flavor_is_c0() {
+    let mut types = TypeTable::new();
+    let i16 = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::I16));
+    let conv = conversion(
+        MirConversionFlavor::Proven,
+        prim(&types, Primitive::Numerus),
+        i16,
+    );
+    assert_eq!(conversion_family(&conv, &types), CostFamily::Cast);
+    assert_eq!(classify(&conv, &types), CostTag::Class(CostClass::C0));
+}

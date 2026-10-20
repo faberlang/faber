@@ -1008,6 +1008,33 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Some(shape) => self.eval_runtime_convert_shaped(conversion, value, shape, span),
                 None => self.eval_runtime_convert(conversion, value, span),
             },
+            MirConversionFlavor::Proven => {
+                self.eval_proven_narrow(value, &conversion.target_ty, span)
+            }
+        }
+    }
+
+    /// Evaluate a [`MirConversionFlavor::Proven`] narrowing: the value was
+    /// proven to fit at compile time, so reduce it to the target's exact
+    /// carrier without a runtime range check.
+    fn eval_proven_narrow(
+        &self,
+        value: Value,
+        target_ty: &radix_mir::MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let target = self.types.get(target_ty.semantic_id());
+        match (value, target) {
+            (Value::Int(v), Type::Primitive(Primitive::Numerus)) => Ok(Value::Int(v)),
+            (Value::Int(v), Type::SizedNumeric(Primitive::Numerus, width)) => {
+                crate::exact_int::exact_carrier(i128::from(v), *width).ok_or_else(|| {
+                    RunnerError::internal(span, "proven narrowing does not fit its target")
+                })
+            }
+            (other, target) => Err(RunnerError::internal(
+                span,
+                format!("unsupported proven narrowing from {other:?} to {target:?}"),
+            )),
         }
     }
 

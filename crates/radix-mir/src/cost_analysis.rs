@@ -220,7 +220,10 @@ pub fn classify_conversion(conversion: &MirConversion, types: &TypeTable) -> Cos
 /// and belongs to the walker via [`foldable_tag`].
 #[must_use]
 pub fn conversion_family(conversion: &MirConversion, types: &TypeTable) -> CostFamily {
-    if conversion.flavor == MirConversionFlavor::Cast {
+    if matches!(
+        conversion.flavor,
+        MirConversionFlavor::Cast | MirConversionFlavor::Proven
+    ) {
         return CostFamily::Cast;
     }
     let source = type_kind(types, conversion.source_ty);
