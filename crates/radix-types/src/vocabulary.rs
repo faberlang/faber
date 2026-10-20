@@ -312,6 +312,8 @@ pub enum MirCollectionOp {
     /// Number of extents (axes); distinct from `Length`, which is the element
     /// count on every collection (operator ruling 2026-10-15, Q-X1).
     TensorRank,
+    /// Euclidean norm sqrt(sum x^2) over the logical elements, in the receiver's element carrier (operator ruling 2026-10-15, Q-X1).
+    TensorNorm,
     TensorAdd,
     TensorSub,
     TensorMul,
