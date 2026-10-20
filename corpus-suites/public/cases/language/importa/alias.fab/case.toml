@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/importa/alias.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/alias.fab"
+
+
+[expect]
+check_only = true
