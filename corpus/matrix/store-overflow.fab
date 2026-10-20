@@ -1,0 +1,51 @@
++++
+term = "matrix"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Matrix matmul partials are exact; a finished cell that does not fit the element type traps at the store."
+syntax = "a · c"
+related = ["matrix", "numerus"]
+locale = "en"
++++
+
+# =============================================================================
+# matrix — Matrix matmul partials are exact; a finished cell that does not fit
+# the element type traps at the store.
+# =============================================================================
+#
+# What this teaches:
+#   • Exact partials — the inner product of `[100, 100]` with `[1, -1]` is
+#     100 − 100 = 0, computed exactly whatever the element width is.
+#   • Trap at the cell store — the same row against `[1, 1]` is 200, one past
+#     the largest `i8`; the finished cell does not fit its slot, so the matmul
+#     aborts with "200 does not fit in `i8`" and never wraps to -56.
+#   • The trap follows the destination — a `matrix<i8, …>` destination applies
+#     the `i8` policy at the store, not per intermediate product.
+#
+# Common mistakes:
+#   • Expecting the product to wrap because the cells are narrow.
+#   • Expecting the trap where a partial is computed — an expression is a
+#     number; the policy applies where the value lands in the cell.
+#
+# See also: matrix, numerus
+# =============================================================================
+
+# store-overflow — exact matmul partials, checked cell store
+#
+# POLICY:
+#   A matrix cell store applies the element type's policy. The inner product
+#   is exact, so a finished cell outside the element range aborts the run
+#   instead of wrapping. The first product below fits and prints; the second
+#   traps before its `print`.
+
+main {
+    let matrix<i8, [1, 2]> a ← [[100, 100]] ↦ matrix<i8, [1, 2]>
+    let matrix<i8, [2, 1]> b ← [[1], [-1]] ↦ matrix<i8, [2, 1]>
+    let matrix<i8, [1, 1]> ok ← a · b
+    print ok
+    let matrix<i8, [2, 1]> c ← [[1], [1]] ↦ matrix<i8, [2, 1]>
+    let matrix<i8, [1, 1]> d ← a · c
+    print d
+}
