@@ -7,3 +7,12 @@ input = "mori/mori-abort.fab"
 
 [expect]
 check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stdout_contains = "before\n"
+stderr_contains = "abort: boom"
+check_only = false
