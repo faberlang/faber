@@ -1220,6 +1220,65 @@ fn constructor_declares_observation_cadence_and_effective_steps() {
     });
 }
 
+/// S5A-U1 forward-set purity: a device-resident companion that carries the
+/// compute stage (the post-GT12 driver shape) is still NOT a forward kernel —
+/// it is admitted through the companion map, not a metadata row, and the
+/// per-step observation must stay the FORWARD kernel's return output, never
+/// the companion's first gradient write.
+#[test]
+fn forward_set_excludes_compute_stage_companions_from_per_step_observation() {
+    let facts = training_facts();
+
+    training_fixture(true, |interner, validated, companions| {
+        // Metadata covers the forward and step kernels only: the real driver
+        // admits the companion through the companion map, not a metadata row.
+        let declared: Vec<MirFunction> = validated
+            .program()
+            .functions
+            .iter()
+            .filter(|function| function.id != MirFunctionId(COMPANION_FN))
+            .cloned()
+            .collect();
+        let metadata = fixture_metadata(&declared);
+
+        let (program, _semantics, _) = build_device_program(
+            validated,
+            interner,
+            companions,
+            Some(&facts),
+            DeviceProgramLifetime::RepeatingStep,
+            100,
+            &metadata,
+        )
+        .expect("the training program builds with a compute-stage companion");
+
+        let per_step: Vec<_> = program
+            .results
+            .iter()
+            .filter(|result| result.cadence == ObservationCadence::PerStep)
+            .collect();
+        assert_eq!(per_step.len(), 1, "one per-step loss observation");
+        // The forward's return local (`product`, local 2) is the kernel's
+        // ABI output — `output_2` — never the companion's first gradient
+        // write (`gx`).
+        assert_eq!(
+            per_step[0].buffer.name, "output_2",
+            "the observation is the forward's return output, not the companion's `gx` write: {:?}",
+            program.results
+        );
+        let launch = program
+            .launches
+            .iter()
+            .find(|launch| launch.id == per_step[0].produced_by)
+            .expect("the observation's producing launch exists");
+        assert_eq!(
+            program.kernels[launch.kernel_index].function,
+            MirFunctionId(FORWARD_FN),
+            "the observed output is produced by the forward kernel"
+        );
+    });
+}
+
 /// The empty-device-set early return must still report the admitted
 /// training step count: the declared count is the caller's fallback only
 /// when there are no training facts at all.
