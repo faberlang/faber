@@ -2,7 +2,7 @@
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_codegen_shared::CodeWriter;
-use radix_hir::{HirExpression, HirExpressionKind};
+use radix_hir::{HirBinOp, HirExpression, HirExpressionKind};
 use radix_lexer::{Interner, Span, Symbol, TokenKind};
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
 use rustc_hash::FxHashMap;
@@ -30,6 +30,13 @@ fn expr_with_id(id: radix_hir::HirId, kind: HirExpressionKind) -> HirExpression 
         ty: None,
         span: Span::new(0, 0),
     }
+}
+
+fn and(left: HirExpression, right: HirExpression) -> HirExpression {
+    expr_with_id(
+        radix_hir::HirId(4),
+        HirExpressionKind::Binary(HirBinOp::BitAnd, Box::new(left), Box::new(right)),
+    )
 }
 
 struct Ctx {
@@ -93,6 +100,28 @@ impl Ctx {
         codegen.write_expr(expr, &self.names, &LatinSurface, &mut writer);
         writer.finish()
     }
+}
+
+#[test]
+fn radical_cbrt_prints_spaced() {
+    let mut ctx = Ctx::new();
+    let x = ctx.path("x");
+    let call = ctx.method_call(x, "radix_cubica", radix_hir::HirId(1));
+
+    assert_eq!(ctx.render(&call, &[radix_hir::HirId(1)], &[]), "∛ x");
+}
+
+#[test]
+fn radical_parenthesizes_compound_operand() {
+    let mut ctx = Ctx::new();
+    let mut a = ctx.path("a");
+    a.id = radix_hir::HirId(2);
+    let mut b = ctx.path("b");
+    b.id = radix_hir::HirId(3);
+    let receiver = and(a, b);
+    let call = ctx.method_call(receiver, "radix", radix_hir::HirId(1));
+
+    assert_eq!(ctx.render(&call, &[radix_hir::HirId(1)], &[]), "√ (a ∧ b)");
 }
 
 #[test]
