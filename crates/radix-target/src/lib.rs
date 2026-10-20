@@ -467,8 +467,9 @@ impl Target {
     /// clock 4/4, entropy 5/5, and stdio 18/18 (including `consolum:metire`).
     /// Its process module implements only 5 of 12 routes, so process remains
     /// undeclared; partial coverage is never declared as a whole leaf. Wasm
-    /// declares stdio for its closed-set WAT probe. Every other emit target
-    /// fails closed.
+    /// declares stdio for its closed-set WAT probe. Clif declares clock 4/4,
+    /// served by the native runtime's `faber-leaf` conversations; every other
+    /// leaf still fails closed.
     #[must_use]
     pub fn supported_leaves(self) -> &'static [Leaf] {
         match self {
@@ -481,6 +482,7 @@ impl Target {
             | Target::HirFhir => Leaf::ALL,
             Target::HirGo => &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy],
             Target::MirWasm => &[Leaf::Stdio],
+            Target::MirClif => &[Leaf::Clock],
             Target::HirTypeScript
             | Target::HirSwift
             | Target::HirPython
@@ -492,7 +494,6 @@ impl Target {
             | Target::HirC
             | Target::MirLlvm
             | Target::MirLlvmHost
-            | Target::MirClif
             | Target::MirAmd
             | Target::MirMetal
             | Target::MirWgsl
