@@ -1,0 +1,32 @@
++++
+term = "reice"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "reice_stmt", "equality", "equality_tail", "expression", "literal", "incipit_stmt"]
+category = "errors"
+canonical = false
+summary = "Reject always names its payload with throw; the missing particle is refused by name."
+syntax = "reject <cond>"
+related = ["reice", "requirit", "iace", "cape"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:reice_iace"
++++
+# =============================================================================
+# reice — a reject guard must name its payload
+# =============================================================================
+#
+# What this teaches:
+#   • `reice cond iace err` always carries the `iace` particle (en `throw`) and
+#     the error value to throw. The particle is mandatory, so a guard that drops
+#     it is refused by name (PARSE001 reice_iace).
+#   • `reice` is the boolean twin of `requirit`: it desugars to
+#     `si (cond) { iace err }`, failing when the condition holds. There is no
+#     recoverable failure without something to throw.
+#
+# Common mistakes:
+#   • writing the guard as a bare condition — add `iace <error>` after it.
+# =============================================================================
+
+main {
+    reject 1 ≡ 2
+}
