@@ -1,0 +1,23 @@
++++
+term = "si"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "si_stmt", "arm", "assignment", "place", "comparison", "equality", "equality_tail", "additive_expr", "unary_expr", "proba_stmt", "adfirma_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "The `else if` spelling is refused; use `elif` to continue a conditional ladder."
+syntax = "if <condition> { … } else if … — rejected"
+related = ["sin", "secus", "ergo"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:secus_si_else_if"
++++
+# =============================================================================
+# si — the `else if` spelling is refused
+#
+# Continue a conditional ladder with `elif`; `else if` is not a second spelling.
+# =============================================================================
+
+main {
+    let int n ← 5
+    if n ≺ 0 { print "a" } else if n ≺ 10 { print "b" } else { print "c" }
+}

@@ -1,0 +1,27 @@
++++
+term = "si"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "type_annotation", "owned_type", "base_type", "qualified_type", "si_stmt", "arm", "assignment", "place", "comparison", "equality", "equality_tail", "additive_expr", "unary_expr", "proba_stmt", "adfirma_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Shadowing a local name is refused in a nested block."
+syntax = "let T x in a nested block with an existing x — rejected"
+related = ["si", "let", "mut"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM055:shadowed_variable"
++++
+# =============================================================================
+# si — local variable shadowing is refused
+#
+# Give each local binding a distinct name, including inside conditional blocks.
+# =============================================================================
+
+main {
+    let int x ← 1
+    if true {
+        let int x ← 2
+        print x
+    }
+    print x
+}

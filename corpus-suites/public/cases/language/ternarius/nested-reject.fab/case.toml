@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/ternarius/nested-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "ternarius/nested-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "conditional_nested"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "conditional_nested"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "conditional_nested"
