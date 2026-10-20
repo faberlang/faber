@@ -678,7 +678,17 @@ impl super::FaberCodegen<'_> {
                     radix_hir::HirIteraMode::Ab => surface.contextual_keyword("ab"),
                 });
                 writer.write(" ");
-                self.write_expr(iter, names, surface, writer);
+                // An ordo enumeration iterable lowers to a bare type `Path`,
+                // but in value position that arm prints `ego` (the def is a
+                // self def). Print the type name here instead: the iteratee is
+                // a type, not a value, and `ego` is illegal outside a method.
+                if let radix_hir::HirExpressionKind::Path(def_id) = &iter.kind
+                    && self.ordo_enums.contains_key(def_id)
+                {
+                    writer.write(&self.name_for_def_imported(*def_id, names));
+                } else {
+                    self.write_expr(iter, names, surface, writer);
+                }
                 self.write_apud_coordinates(coordinates, surface, writer);
                 self.write_filum_clause(*filum, surface, writer);
                 writer.write(" ");
