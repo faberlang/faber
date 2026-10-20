@@ -1,0 +1,56 @@
++++
+term = "clausura"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "incipit_stmt", "fixum_decl", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "fac_block", "expr_stmt", "assignment", "itera_stmt", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "typed_constructor", "construction_source", "field_list", "field_init", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A closure that writes a field of a captured genus value mutates the enclosing binding, because capture is by reference."
+syntax = "<closure> ∴ do { <captured>.<field> ← … }"
+aliases = ["capture field write", "closure mutates captured value"]
+related = ["clausura", "genus", "∴"]
+locale = "en"
++++
+# =============================================================================
+# clausura — writing a field of a captured value
+# =============================================================================
+#
+# What this teaches:
+#   • Field stores reach the captured binding — a closure writing
+#     `c.n ← c.n + 1` mutates the value the enclosing frame holds, so the
+#     caller sees the change after the closure returns
+#   • The captured binding is shared, not copied — the closure holds the
+#     enclosing `mut Counter c`, so repeated calls accumulate on one value
+#   • `←` is the runtime store — a field write is an assignment to a place,
+#     not a construction, so the field modifier (`mut`) is what allows it
+#
+# Common mistakes:
+#   • expecting a snapshot — capturing the value is not copying it; read the
+#     field into a `let` first if a snapshot is wanted
+#   • declaring the field `let` — a `let` field cannot be stored to, and the
+#     closure write is rejected
+#   • writing `c.n = c.n + 1` — `=` is structural; a run-time field update
+#     takes `←`
+#
+# See also: clausura, genus, ∴
+# =============================================================================
+
+# clausura — capture a genus value and write its field
+#
+# EXPECTED OUTPUT:
+#   capture-field-write.expected — the two closure calls print 1 and 2, and the
+#   last line proves the enclosing binding changed too.
+
+class Counter {
+    mut int n
+}
+
+main {
+    mut Counter c ← Counter { n = 0 }
+    let () → int bump ← () → int ∴ do {
+        c.n ← c.n + 1
+        return c.n
+    }
+    print bump()
+    print bump()
+    print c.n
+}

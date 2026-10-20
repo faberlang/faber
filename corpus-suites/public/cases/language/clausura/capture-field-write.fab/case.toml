@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/clausura/capture-field-write.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/capture-field-write.fab"
+
+
+[expect]
+check_only = true
