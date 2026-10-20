@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/intervallum/range-of-value.fab"
+group = "language"
+input_root = "corpus"
+input = "intervallum/range-of-value.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

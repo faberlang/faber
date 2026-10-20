@@ -1,0 +1,46 @@
++++
+term = "intervallum"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "range"
+canonical = true
+summary = "Walk an intervallum value with `for range`: the stored interval is the walk."
+related = ["for range", "‥", "…", "intervallum"]
+locale = "en"
++++
+# =============================================================================
+# intervallum — Walk an intervallum value with `for range`
+# =============================================================================
+#
+# What this teaches:
+#   • A `for range` source may be a value whose type is `intervallum<int>`,
+#     not only a literal `lo‥hi` range expression.
+#   • The stored interval is materialized and walked in order: `2‥5` yields
+#     `2, 3, 4` (exclusive end) and `2…5` yields `2, 3, 4, 5` (inclusive end).
+#   • The loop binding is declared with `let`, and `print` is a statement.
+#
+# Common mistakes:
+#   • Confusing `‥` (exclusive end) with `…` (inclusive end) — `2‥5` is [2,5), `2…5` is [2,5]; the wrong boundary operator changes the walk.
+#   • Writing the binding inside `for range r let i` with a type slot — loop binders take no slot.
+#
+# See also: for range, ‥, …, intervallum
+# =============================================================================
+
+# for range over an intervallum value
+#
+# WHY: pins the C3 `for range` row over a stored interval instead of a literal
+# range expression. Both boundary operators walk, in ascending order.
+#
+# EXPECTED OUTPUT:
+#   range-of-value.expected — one value per print, in walk order.
+
+main {
+    let intervallum<int> r ← 2‥5
+    for range r let i {
+        print i
+    }
+    let intervallum<int> inclusive ← 2…5
+    for range inclusive let j {
+        print j
+    }
+}
