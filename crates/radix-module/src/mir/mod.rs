@@ -437,6 +437,9 @@ mod sort_expr_tests;
 #[path = "ascii_unicode_escape_test.rs"]
 mod ascii_unicode_escape_tests;
 #[cfg(test)]
+#[path = "tensor_bracket_range_test.rs"]
+mod tensor_bracket_range_tests;
+#[cfg(test)]
 #[path = "tensor_lift_test.rs"]
 mod tensor_lift_tests;
 #[cfg(test)]
