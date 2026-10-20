@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/functio/wrong-arg-count-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "functio/wrong-arg-count-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "wrong_number_of_arguments"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "wrong_number_of_arguments"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "wrong_number_of_arguments"
