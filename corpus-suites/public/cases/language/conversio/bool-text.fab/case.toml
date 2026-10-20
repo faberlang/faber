@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/bool-text.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/bool-text.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

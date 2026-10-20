@@ -1,0 +1,33 @@
++++
+term = "bool-text"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "expression", "unary_expr", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "`<textus> ↦ bool` parses only the code locale's true/false words; anything else needs a `⊥` default."
+syntax = "<textus> ↦ bool [⊥ <default>]"
+related = ["↦", "⊥", "bool"]
+locale = "en"
++++
+# =============================================================================
+# bool-text — text into `bool` is an exact word match
+# =============================================================================
+#
+# What this teaches:
+#   • `"true" ↦ bool` and `"false" ↦ bool` parse exactly the code locale's
+#     `true`/`false` words, so an `en` program prints `true` and `false`.
+#   • Any other word fails: non-empty text is no longer true, so `"salve"`
+#     needs a `⊥ false` default (operator ruling 2026-10-15, need).
+#
+# Common mistakes:
+#   • Expecting any non-empty text to be `true` — only the locale's own
+#     words parse, and everything else is a conversion failure.
+#
+# See also: ↦, ⊥, bool
+# =============================================================================
+
+main {
+    print "true" ↦ bool
+    print "false" ↦ bool
+    print "salve" ↦ bool ⊥ false
+}
