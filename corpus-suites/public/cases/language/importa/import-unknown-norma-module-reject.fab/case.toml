@@ -7,3 +7,18 @@ input = "importa/import-unknown-norma-module-reject.fab"
 
 [expect]
 check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_library_module"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_library_module"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "unknown_library_module"
