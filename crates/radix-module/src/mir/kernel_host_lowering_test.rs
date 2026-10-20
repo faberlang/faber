@@ -251,3 +251,42 @@ main {
         "expected the named tensor_crea_retired decline, got: {errors:?}"
     );
 }
+
+#[test]
+fn host_kernel_lowering_runs_a_sized_argmax_coalesce_region() {
+    // The `c4-reduce-int` shape: the reduce identity `coalesce 0` lowers
+    // through the generic coalesce under host kernel lowering, so the fallback
+    // literal is an unsized `MirConstant::Int(0)` standing for the sized `i32`
+    // cell the region stores into. Semantic analysis already range-checked it
+    // under the inner type; the validator must accept the fitting constant.
+    let source = r"
+@ kernel
+@ public
+fn amax<size N>(tensor<f32, [N]> src, mut tensor<i32, [2]> out) → void {
+    out[0] ← reduce via argmax from src at [i] thread lane let v { return v } coalesce 0
+}
+main {
+    const size N ← 6
+    mut tensor<f32, [N]> wavy ← tf32[N] {}
+    for range 0‥6 let i {
+        wavy[[i]] ← ((i * 7) % 13) ↦ f32
+    }
+    mut tensor<i32, [2]> out ← ti32[2] {}
+    amax(wavy, mut out)
+    print out[0]
+}
+";
+    assert_eq!(run_on_cpu(source), ["5"]);
+}
+
+#[test]
+fn host_kernel_coalesce_fallback_literal_fits_a_sized_list_element() {
+    let source = r"
+main {
+    let list<u8> digits ← [7, 9, 2]
+    let u8 first ← digits.get(1) coalesce 0
+    print first
+}
+";
+    assert_eq!(run_on_cpu(source), ["9"]);
+}
