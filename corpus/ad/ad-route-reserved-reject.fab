@@ -1,0 +1,19 @@
++++
+term = "ad"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "functio_decl", "param_list", "return_clause", "type_annotation", "base_type", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "endpoint"
+summary = "A served route never lives under the reserved runtime: prefix; runtime routes belong to the host."
+syntax = "@ call 'family:name' fn a() → int { … }"
+related = ["ad", "sermo", "conversio"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM018:ad_route_reserved"
++++
+@ call 'runtime:echo'
+fn a() → int {
+    return 1
+}
+main {
+    print 1
+}
