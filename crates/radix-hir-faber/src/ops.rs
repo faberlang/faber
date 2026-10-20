@@ -37,11 +37,17 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::Block(..) if self.hoisted_numeric_twin(expr).is_some() => 14,
             // An authored axis-reduction call re-emits as a postfix method
             // call, whatever the expansion node (`Reduction` for `summa`, the
-            // outer `Div` for `media`).
+            // outer `Div` for `media`). The printed form is itself postfix
+            // (`t.summa(axis 0)`), so a further postfix owner (`.flatten()`, an
+            // index) must leave it bare: grouping it would print
+            // `(t.summa(axis 0)).flatten()`, which reads as a call when it
+            // heads an output statement (`scribe (…)` is the retired
+            // `print(x)` form) and fails re-analysis. 14 is the postfix level
+            // the numeric-twin arm above uses; only a prec-13 owner changes.
             HirExpressionKind::Binary(..) | HirExpressionKind::Reduction { .. }
                 if self.axis_sugar_call(expr).is_some() =>
             {
-                13
+                14
             }
             HirExpressionKind::Assign(_, _) | HirExpressionKind::ConversioAssign { .. } => 1,
             // `⇇` sits between assignment and the ternary level: the target
