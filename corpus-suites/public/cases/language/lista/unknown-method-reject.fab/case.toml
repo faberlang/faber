@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/lista/unknown-method-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/unknown-method-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_method"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_method"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "unknown_method"
