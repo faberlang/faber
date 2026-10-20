@@ -1384,12 +1384,17 @@ impl Validator<'_, '_> {
                     self.error(span, "collection sum element is not numeric");
                     return;
                 }
-                self.require_assignable(
-                    element_ty,
-                    call.return_ty,
-                    span,
-                    "collection sum result type mismatch",
-                );
+                // A `wrapping` or `saturating` word sums exactly like its
+                // width, so a plain integer that holds the word's range is a
+                // valid result: the store applies the word's policy.
+                if !self.word_sum_widens(element_ty, call.return_ty) {
+                    self.require_assignable(
+                        element_ty,
+                        call.return_ty,
+                        span,
+                        "collection sum result type mismatch",
+                    );
+                }
             }
             MirCollectionOp::ArgMax | MirCollectionOp::ArgMin => {
                 // LSR-W0: the receiver is an array-backed collection of
@@ -3368,6 +3373,23 @@ impl Validator<'_, '_> {
                 IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
             },
             _ => None,
+        }
+    }
+
+    /// Whether `element` is a `wrapping` or `saturating` word and `result` is
+    /// a plain integer whose range holds every value of the word's width.
+    fn word_sum_widens(&self, element: MirType, result: MirType) -> bool {
+        let (Type::ModularWord(word) | Type::SaturatingWord(word)) = self.type_kind(element) else {
+            return false;
+        };
+        let result_width = match self.type_kind(result) {
+            Type::Primitive(Primitive::Numerus) => NumericWidth::I64,
+            Type::SizedNumeric(Primitive::Numerus, width) => *width,
+            _ => return false,
+        };
+        match (word.integer_range(), result_width.integer_range()) {
+            (Some((lo, hi)), Some((result_lo, result_hi))) => result_lo <= lo && hi <= result_hi,
+            _ => false,
         }
     }
 
