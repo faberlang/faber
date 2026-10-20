@@ -93,6 +93,25 @@ fn en_target_import_records_target_specifier_and_binding() {
 }
 
 #[test]
+fn en_go_target_import_resolves() {
+    let result = parse_en("import go \"math\" m");
+    assert!(result.success(), "{:?}", result.errors);
+    let [decl] = imports(&result)[..] else {
+        panic!("one import")
+    };
+    assert_eq!(target_word(&result, decl).as_deref(), Some("go"));
+    assert_eq!(result.interner.resolve(decl.path), "math");
+    assert!(matches!(
+        &decl.kind,
+        ImportKind::Named {
+            alias: None,
+            inferred: false,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn la_target_import_uses_the_same_untranslated_word() {
     let result = parse_ok_la("importa python \"numpy\" np");
     let [decl] = imports(&result)[..] else {
