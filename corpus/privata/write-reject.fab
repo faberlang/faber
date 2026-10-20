@@ -1,0 +1,38 @@
++++
+term = "privata"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "assignment", "place", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Storing to a `@ private` field from outside the type's own methods is a check error."
+syntax = "v.a ← 4"
+related = ["privata", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM063:member_private_write"
++++
+# =============================================================================
+# privata — private field store from outside the type
+#
+# A `@ private` field is writable only from the type's own methods.
+# Outside the type a store is a check error even when the binding is
+# `mut`: an exported method is the way to change private state.
+#
+# Common mistakes:
+#   • Storing to a private field from outside the type (`v.a ← 4`).
+#
+# See also: privata, genus
+# =============================================================================
+
+class V {
+    @ private
+    mut int a
+    fn set(int x) → void { self.a ← x }
+    fn get() → int { return self.a }
+}
+
+main {
+    mut V v ← V { a = 1 }
+    v.a ← 4
+    print v.get()
+}
