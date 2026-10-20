@@ -1,0 +1,37 @@
++++
+term = "fac"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "assignment", "place", "comparison", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "The handler precedes the loop condition; catch after while is refused by name."
+syntax = "do { … } while <cond> catch <err> { … } — rejected; write catch before while"
+related = ["fac", "cape", "dum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE020:fac_cape_after_dum"
++++
+# =============================================================================
+# fac — the error handler precedes the loop condition
+# =============================================================================
+#
+# What this teaches:
+#   • The field order of a fac statement is fixed: `fac <block> cape <name>
+#     <block> dum <condition>`. The handler binds before the loop condition, so
+#     a `catch` clause written after `while` has no place in the grammar and is
+#     refused by name (PARSE020 fac_cape_after_dum).
+#   • Write the handler first: `do { … } catch err { … } while <condition>`.
+#
+# Common mistakes:
+#   • spelling the loop as `do { … } while <cond> catch <err> { … }` — nothing
+#     after the condition accepts a handler; move `catch` before `while`.
+# =============================================================================
+
+main {
+    mut int i ← 0
+    do {
+        i ← i + 1
+    } while i ≺ 3 catch e {
+        print 1
+    }
+}
