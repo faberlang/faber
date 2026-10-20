@@ -1,0 +1,36 @@
++++
+term = "⇇"
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "assignment", "transfer", "expression", "ternary", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Copy-into stores through storage: t ⇇ t + t doubles the values in place, so a ← alias bound before the copy-into sees them."
+syntax = "<tensor storage> ⇇ <tensor>"
+related = ["tensor", "⇇"]
+locale = "en"
++++
+# =============================================================================
+# ⇇ — copy-into stores through the target's own storage (EBNF row [158] transfer).
+# =============================================================================
+#
+# What this teaches:
+#   • In `t ⇇ t + t` the right side READS t's storage and ⇇ writes the sum back
+#     into that SAME storage, so an `←` alias bound before the copy-into sees
+#     the doubled values — unlike corpus/transfer/copy-into-alias.fab, whose ⇇
+#     source is a different tensor
+#
+# See also: ⇇, tensor
+# =============================================================================
+
+# EXPECTED stdout:
+#   [2.0, 4.0, 6.0, 8.0]
+#   [2.0, 4.0, 6.0, 8.0]
+
+main {
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    mut tf32[2, 2] t ← flat ↦ tf32[2, 2]
+    let tf32[2, 2] alias ← t
+    t ⇇ t + t
+    print alias.flatten()
+    print t.flatten()
+}
