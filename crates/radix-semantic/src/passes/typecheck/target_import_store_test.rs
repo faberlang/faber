@@ -81,3 +81,17 @@ incipit {
         Target::HirPython,
     );
 }
+
+#[test]
+fn ignotum_bridges_into_nullable_scalar_cells() {
+    test_support::assert_accepts_for_target_la(
+        r#"
+importa python "math" m
+
+incipit {
+    sit numerus ∪ nihil forsitan ← m.opt()
+}
+"#,
+        Target::HirPython,
+    );
+}

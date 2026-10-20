@@ -271,9 +271,10 @@ impl TypeChecker<'_> {
     /// value observed at a scalar cell converts with implicit syntax but forced
     /// semantics, so the store wraps an implicit node carrying the coercion the
     /// emitter lowers for the target. Only values arriving through a trusted
-    /// import are admitted, and this unit opens integer, float, text and bool
-    /// scalar cells: the `T ∪ none` bridge is a later unit, and an aggregate
-    /// slot stays refused by the ordinary unification.
+    /// import are admitted, and this opens integer, float, text and bool
+    /// scalar cells plus a `T ∪ none` cell over one of them: the null bridges
+    /// verbatim, and an aggregate slot stays refused by the ordinary
+    /// unification.
     fn import_store_door(
         &mut self,
         expr: &mut HirExpression,
@@ -309,7 +310,47 @@ impl TypeChecker<'_> {
         if matches!(self.types.get(slot), Type::Primitive(Primitive::Bivalens)) {
             return Some(self.wrap_implicit_store(expr, ty, slot, site));
         }
+        // A `T ∪ none` cell: the foreign null bridges verbatim, so the store
+        // lands no coercion node. The emitted coercion itself raises at run
+        // time when a null reaches the non-nullable scalar cell.
+        if self.bridges_nullable_scalar_slot(slot) {
+            return Some(slot_ty);
+        }
         None
+    }
+
+    /// Whether `slot` is a `T ∪ none` cell whose single non-`nihil` member is
+    /// one of the scalar cells the door admits: only then does a foreign null
+    /// bridge into it. An aggregate member stays refused (need-3).
+    fn bridges_nullable_scalar_slot(&self, slot: TypeId) -> bool {
+        let peel = |ty: TypeId| {
+            let ty = self.peel_nominal_aliases(ty);
+            let ty = self.types.peel_access_marker(ty).1;
+            self.peel_nominal_aliases(ty)
+        };
+        let members: Vec<TypeId> = match self.types.get(slot) {
+            Type::Union(members) => members.clone(),
+            Type::Option(inner) => vec![*inner],
+            _ => return false,
+        };
+        let mut scalars = members
+            .into_iter()
+            .map(peel)
+            .filter(|member| !matches!(self.types.get(*member), Type::Primitive(Primitive::Nihil)));
+        let Some(only) = scalars.next() else {
+            return false;
+        };
+        if scalars.next().is_some() {
+            return false;
+        }
+        self.store_int_slot(only).is_some()
+            || self
+                .numeric_shape(only)
+                .is_some_and(|s| s.prim == Primitive::Fractus)
+            || matches!(
+                self.types.get(only),
+                Type::Primitive(Primitive::Textus | Primitive::Bivalens)
+            )
     }
 
     /// The implicit store node a value of type `ty` needs to land in `slot_ty`,
