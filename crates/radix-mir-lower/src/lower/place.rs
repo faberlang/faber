@@ -286,12 +286,16 @@ impl FunctionBuilder<'_> {
             Some(step) => self.lower_expr_value(step)?,
             None => MirOperand::Constant(MirConstant::Int(1)),
         };
-        let elem_ty = start.ty.map(MirType::semantic)?;
-        let int_list_ty = MirType::semantic(self.types.find_array(elem_ty.semantic_id())?);
-        let bool_list_ty = MirType::semantic(
-            self.types
-                .find_array(self.types.primitive(Primitive::Bivalens))?,
-        );
+        // WHY: a range used only as a bracket index is not typed by the check
+        // pass, so the axis entries take the counter type an ordinary `itera`
+        // range defaults to. The list types are interned by
+        // `ensure_tensor_bracket_index_array_types`.
+        let counter = self.types.primitive(Primitive::Numerus);
+        let int_list_ty =
+            MirType::semantic(self.require_array(counter, index.span, "tensor bracket range index list")?);
+        let flags = self.types.primitive(Primitive::Bivalens);
+        let bool_list_ty =
+            MirType::semantic(self.require_array(flags, index.span, "tensor bracket range flag list")?);
         let starts = self.one_element_list(start_op, int_list_ty, index.span);
         let ends = self.one_element_list(end_op, int_list_ty, index.span);
         let steps = self.one_element_list(step_op, int_list_ty, index.span);
