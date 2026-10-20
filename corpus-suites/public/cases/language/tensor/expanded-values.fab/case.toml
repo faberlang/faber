@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/tensor/expanded-values.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/expanded-values.fab"
+
+
+[expect]
+check_only = true

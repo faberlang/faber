@@ -1,0 +1,22 @@
++++
+term = "tensor expanded view values"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Expanded views pin element values in both shape-hole positions, where shape-holes.fab prints only shapes."
+related = ["tensor", "magnitudo"]
+locale = "en"
++++
+
+# The flatten hides the axis layout, so both hole positions print the same
+# values: `expanded([_, 2])` repeats each element down the new axis and
+# `expanded([2, _])` repeats it across, where shape-holes.fab prints only shapes.
+main {
+    let list<f32> l ← [1.0, 2.0]
+    let tf32[2] v ← l ↦ tf32[2]
+    let tf32[2, 2] e ← v.expanded([_, 2]).materialize()
+    print e.flatten()
+    let tf32[2, 2] f ← v.expanded([2, _]).materialize()
+    print f.flatten()
+}
