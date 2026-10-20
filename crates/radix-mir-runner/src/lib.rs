@@ -4254,6 +4254,10 @@ mod host_read_all_test;
 mod narrowing_conversio_test;
 
 #[cfg(test)]
+#[path = "conversion_flavor_test.rs"]
+mod conversion_flavor_test;
+
+#[cfg(test)]
 #[path = "ascii_conversio_test.rs"]
 mod ascii_conversio_test;
 

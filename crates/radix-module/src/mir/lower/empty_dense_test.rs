@@ -137,7 +137,7 @@ fn empty_rank_zero_tensor_keeps_its_single_default_slot() {
 
 #[test]
 fn empty_sparse_tensor_keeps_its_all_zero_shape() {
-    let out = stdout(&program("let sparsa<f32, [2, 3]> x ← empty", "    print x.shape()[1]"));
+    let out = stdout(&program("let sparse<f32, [2, 3]> x ← empty", "    print x.shape()[1]"));
     assert_eq!(out, ["3"]);
 }
 

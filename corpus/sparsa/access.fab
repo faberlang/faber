@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Sparse tensor accipe/ponde access and zero-removal semantics."
-syntax = "sparsa.get(indices) | sparsa.set(indices, value)"
+syntax = "sparse.get(indices) | sparse.set(indices, value)"
 related = ["sparsa", "accipe", "ponde"]
 locale = "en"
 +++
@@ -32,7 +32,7 @@ locale = "en"
 #   removal.
 
 main {
-    mut sparsa<f32, [2, 3]> grid ← empty
+    mut sparse<f32, [2, 3]> grid ← empty
 
     grid.set([0, 1], 4.0)
     grid.set([1, 2], 9.0)

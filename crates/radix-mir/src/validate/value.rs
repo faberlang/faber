@@ -356,13 +356,12 @@ impl Validator<'_, '_> {
 
     /// Resolve the callable signature for a `?.` chain `Call` link.
     ///
-    /// A chain call differs from a plain call in two ways. A `Value` callee
-    /// sits behind optionality: `f?(3)` on `(int) → int ∪ none` lowers to a
-    /// value callee whose operand type is `Option<Func>`, so the callable
-    /// signature comes from the nullable inner type rather than the operand
-    /// type itself. A `Definition` callee that names a genus method has its
-    /// receiver supplied by the chain base, so its self-first MIR signature
-    /// must drop that first parameter before argument checking.
+    /// A `Value` callee sits behind optionality: `f?(3)` on
+    /// `(int) → int ∪ none` lowers to a value callee whose operand type is
+    /// `Option<Func>`, so the callable signature comes from the nullable inner
+    /// type rather than the operand type itself. A `Definition` callee that
+    /// names a genus method keeps its self-first signature: lowering passes the
+    /// chain base as argument 0, so `args` carries the receiver.
     fn validate_option_chain_call_callee(
         &mut self,
         scope: &FunctionScope<'_, '_>,
@@ -378,15 +377,6 @@ impl Validator<'_, '_> {
                 });
                 if operand_ty.is_some() && sig.is_none() {
                     self.error(span, "value callee is not callable");
-                }
-                sig
-            }
-            MirCallee::Definition { source, .. } if self.context.method_defs.contains(source) => {
-                let mut sig = self.validate_callee(scope, callee, span, false);
-                if let Some(signature) = sig.as_mut()
-                    && !signature.params.is_empty()
-                {
-                    signature.params.remove(0);
                 }
                 sig
             }

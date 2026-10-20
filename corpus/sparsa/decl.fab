@@ -4,45 +4,45 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = true
-summary = "sparsa<T, Figura> declaration shell with all-zero vacua."
-syntax = "sparsa<T, Figura> | sparsa<T, []>"
+summary = "sparse<T, Figura> declaration shell with all-zero vacua."
+syntax = "sparse<T, Figura> | sparse<T, []>"
 related = ["sparsa", "tensor", "vacua"]
 locale = "en"
 +++
 
 # =============================================================================
-# sparsa — sparsa<T, Figura> declaration shell with all-zero vacua.
+# sparsa — sparse<T, Figura> declaration shell with all-zero vacua.
 # =============================================================================
 #
 # What this teaches:
-#   • Sparse tensor declaration — the `sparsa<T, Figura>` type syntax and `vacua` initializer
-#   • Identity functions — passing sparsa values through functions preserves shape and rank
+#   • Sparse tensor declaration — the `sparse<T, Figura>` type syntax and `vacua` initializer
+#   • Identity functions — passing sparse values through functions preserves shape and rank
 #
 # Common mistakes:
-#   • confusing sparsa<T, Figura> with tensor<T, Figura> — sparse tensors use the same shape syntax but different storage semantics
+#   • confusing sparse<T, Figura> with tensor<T, Figura> — sparse tensors use the same shape syntax but different storage semantics
 #
 # See also: sparsa, tensor, vacua
 # =============================================================================
 
 
-# sparsa — declaration shell for sparsa<T, Figura>
+# sparsa — declaration shell for sparse<T, Figura>
 #
-# sparsa<T, Figura> name ← vacua
-# functio f(sparsa<T, Figura> value) → sparsa<T, Figura>
+# sparse<T, Figura> name ← vacua
+# functio f(sparse<T, Figura> value) → sparse<T, Figura>
 #
 # GRAMMAR:
-#   type :← 'sparsa' '<' type ',' shape '>'
+#   type :← 'sparse' '<' type ',' shape '>'
 #
 # EXPECTED OUTPUT:
 #   Rank and stored non-zero count after round-trip identity call.
 
-fn identity(sparsa<f32, [2, 3]> value) → sparsa<f32, [2, 3]> {
+fn identity(sparse<f32, [2, 3]> value) → sparse<f32, [2, 3]> {
     return value
 }
 
 main {
-    let sparsa<f32, [2, 3]> empty ← empty
-    let sparsa<f32, [2, 3]> roundtrip ← identity(empty)
+    let sparse<f32, [2, 3]> empty ← empty
+    let sparse<f32, [2, 3]> roundtrip ← identity(empty)
 
     print roundtrip.length(), roundtrip.count_nonzero()
 }

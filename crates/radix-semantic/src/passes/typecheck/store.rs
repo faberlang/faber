@@ -363,6 +363,36 @@ impl TypeChecker<'_> {
                 radix_hir::HirUnOp::Neg | radix_hir::HirUnOp::BitNot,
                 operand,
             ) => self.word_origin(operand),
+            // A `summa` over a collection of words sums exactly like the
+            // width (`summa_result_type`); the element word is what the store
+            // reduces or clamps the total back into.
+            HirExpressionKind::MethodCall(receiver, name, _, args, _)
+                if args.is_empty() && self.is_summa_method(*name) =>
+            {
+                let element = self.collection_element_type(receiver.ty?)?;
+                let (word, slot) = self.store_int_slot(element)?;
+                matches!(slot.family, IntFamily::Saturating | IntFamily::Modular).then_some(word)
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether `name` is the canonical (post-typecheck) `summa` method symbol.
+    fn is_summa_method(&self, name: Symbol) -> bool {
+        self.interner
+            .is_some_and(|interner| interner.resolve(name) == "summa")
+    }
+
+    /// Element type of an array or tensor-family collection type.
+    fn collection_element_type(&self, ty: TypeId) -> Option<TypeId> {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(self.types.peel_access_marker(resolved).1) {
+            Type::Array(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::Tensor(inner, _)
+            | Type::Sparsa(inner, _)
+            | Type::Matrix(inner, _)
+            | Type::Vector(inner, _) => Some(*inner),
             _ => None,
         }
     }

@@ -387,6 +387,10 @@ help = "去掉 spread 引數上的標籤"
 message = "複製入運算子 `{operator}` 後需要一個值"
 help = "在 `⇇` 之後寫來源運算式"
 
+[diagnostics.PARSE001.issues.sink_into_item_expected]
+message = "sink 寫入運算子 `{operator}` 後需要一個項目"
+help = "在 `⇜` 之後寫項目運算式"
+
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "元組元素標籤 `{label}` 被使用了多次"
 help = "為每個元素取不同的標籤，或去掉標籤"
@@ -810,6 +814,10 @@ help = "檢查運算式語法"
 [diagnostics.PARSE030.issues.ceiling_floor_delimiters]
 message = "上取整的定界符是 `⌈` 和 `⌉`；`⌈x⌋` 不是取整形式"
 help = "用 `⌊x⌉` 取最近整數，平手取偶數鄰值；用 `⌈x⌉` 上取整，或用 `⌊x⌋` 下取整"
+
+[diagnostics.PARSE030.issues.sink_into_chain]
+message = "'⇜' 不能鏈式連接"
+help = "每個敘述只寫一個 'sink ⇜ item'；'⇜' 是一次寫入，沒有可供鏈式連接的結果"
 
 [diagnostics.PARSE030.issues.neq_glyph_retired]
 message = "`{glyph}` 是已廢棄的運算子；`≡` 的否定寫作 `{replacement}`"
@@ -2770,6 +2778,10 @@ help = "使用 chorda 或明確的位元組轉換輔助工具"
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
 message = "lista 不能轉換為 textus；元素型別沒有指明文字編碼"
 help = "先轉換為 lista<b8>、lista<b16> 或 lista<b32>，再 ↦ textus（UTF-8、UTF-16 或 UTF-32 解碼，可能失敗）；或用格式字串 \"§\"(xs) 顯示 lista"
+
+[diagnostics.SEM016.issues.textus_to_lista_unsupported]
+message = "textus 不能轉換為 lista；元素型別沒有指明是哪一種文字編碼"
+help = "用 ↦ lista<b8>（或 lista<b16>/lista<b32>）編碼，再從 octeti 著手；或明確建構字元的 lista"
 
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "轉換為 promissum 會跨越 async/sync 邊界；使用 `@ futura` 或 `.tum()` 進行非同步包裝"

@@ -4,14 +4,14 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Same-shape tensor ↔ sparsa representation conversio."
-syntax = "tensor<T, F> ↦ sparsa<T, F> | sparsa<T, F> ↦ tensor<T, F>"
+summary = "Same-shape tensor ↔ sparse representation conversio."
+syntax = "tensor<T, F> ↦ sparse<T, F> | sparse<T, F> ↦ tensor<T, F>"
 related = ["sparsa", "tensor", "↦"]
 locale = "en"
 +++
 
 # =============================================================================
-# sparsa — Same-shape tensor ↔ sparsa representation conversio.
+# sparsa — Same-shape tensor ↔ sparse representation conversio.
 # =============================================================================
 #
 # What this teaches:

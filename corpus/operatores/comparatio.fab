@@ -54,6 +54,6 @@ main {
     print nonMaior
     let bool nonMinor ← 10 ≥ 5
     print nonMinor
-    let bool intervallum ← 0 ≺ 5 and 5 ≺ 10
-    print intervallum
+    let bool in_range ← 0 ≺ 5 and 5 ≺ 10
+    print in_range
 }

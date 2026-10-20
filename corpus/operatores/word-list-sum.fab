@@ -1,0 +1,52 @@
++++
+term = "word-list-sum"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "array_literal", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "A list sum over wrapping or saturating words is exact; the store applies the word's policy."
+syntax = "<lista<wrapping<W>>>.sum()"
+related = ["wrapping", "saturating", "lista"]
+locale = "en"
++++
+# =============================================================================
+# word-list-sum — a list sum over words is exact until the store.
+# =============================================================================
+#
+# What this teaches:
+#   • "Math happens in the ether, and only at the store do we apply any of the
+#     boundary conditions." `sum()` over `wrapping<u8>` or `saturating<u8>`
+#     elements adds exactly, so `200 + 100` is `300` when it is printed.
+#   • The store applies the slot's policy once: a `wrapping<u8>` cell holds
+#     `300 mod 256 = 44`, a `saturating<u8>` cell holds the clamp `255`.
+#   • Nothing wraps or clamps per element or per partial sum.
+#
+# Common mistakes:
+#   • Expecting `print ws.sum()` to show `44` or `255` — the unstored total is
+#     the exact `300`.
+#   • Expecting a wrapping or saturating partial sum — the policy is applied
+#     once, at the store.
+#
+# See also: wrapping, saturating, lista
+# =============================================================================
+
+# word-list-sum — exact word sum, policy at the store
+#
+# EXPECTED OUTPUT:
+#   300
+#   44
+#   300
+#   255
+#
+# BACKEND: runner-pinned stdout (word-list-sum.expected).
+
+main {
+    let list<wrapping<u8>> ws ← [200, 100]
+    print ws.sum()
+    let wrapping<u8> wrapped ← ws.sum()
+    print wrapped
+    let list<saturating<u8>> ss ← [200, 100]
+    print ss.sum()
+    let saturating<u8> clamped ← ss.sum()
+    print clamped
+}

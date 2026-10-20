@@ -89,6 +89,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeFilumReduce,
     RuntimeDuplicate,
     RuntimeTensorLift,
+    RuntimePow,
     RuntimeVectorOp,
 }
 
@@ -220,6 +221,13 @@ impl MirRuntimeAbi {
             // reference, other lanes reject it.
             MirIntrinsic::TensorLift(_) => (
                 MirRuntimeAbiFamily::RuntimeTensorLift,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            // IEEE pow over fractus: the runner is the reference, other lanes
+            // reject it until the target carry.
+            MirIntrinsic::Pow => (
+                MirRuntimeAbiFamily::RuntimePow,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),

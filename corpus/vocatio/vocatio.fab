@@ -98,7 +98,7 @@ main {
 
     # Call with sparge
     let list<int> numeri ← [3, 7]
-    let int sparsa ← adde(spread numeri)
+    let int sparse ← adde(spread numeri)
     # 10
-    print sparsa
+    print sparse
 }

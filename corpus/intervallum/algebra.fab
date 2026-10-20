@@ -25,25 +25,25 @@ no_expected = "prints-nothing"
 
 # intervallum — range algebra (intersect, union, longitudo)
 #
-# `intersect` / `union` return `intervallum<numerus> ∪ nihil` (nihil when disjoint
+# `intersect` / `union` return `range<numerus> ∪ nihil` (nihil when disjoint
 # or non-adjacent). `longitudo` returns discrete bound-count for numerus v1.
 #
 # EXPECTED OUTPUT:
 #   none — stdout not pinned for this exemplum.
 
 main {
-    let intervallum<int> morning ← 0‥6
-    let intervallum<int> afternoon ← 4‥10
-    let intervallum<int> overlap ← morning.intersect(afternoon) coalesce 0‥0
-    let intervallum<int> early ← 0‥5
-    let intervallum<int> late ← 5‥10
-    let intervallum<int> workday ← early.union(late) coalesce 0‥0
+    let range<int> morning ← 0‥6
+    let range<int> afternoon ← 4‥10
+    let range<int> overlap ← morning.intersect(afternoon) coalesce 0‥0
+    let range<int> early ← 0‥5
+    let range<int> late ← 5‥10
+    let range<int> workday ← early.union(late) coalesce 0‥0
     let int overlap_span ← overlap.length()
     let int workday_span ← workday.length()
     assert overlap_span ≡ 2
     assert workday_span ≡ 10
-    let intervallum<int> gap_left ← 0‥3
-    let intervallum<int> gap_right ← 6‥9
-    let intervallum<int> ∪ none no_union ← gap_left.union(gap_right)
+    let range<int> gap_left ← 0‥3
+    let range<int> gap_right ← 6‥9
+    let range<int> ∪ none no_union ← gap_left.union(gap_right)
     assert no_union is none
 }

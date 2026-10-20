@@ -137,7 +137,7 @@ fn empty_refuses_scalar_context_as_before() {
 #[test]
 fn empty_keeps_rank_zero_sparse_and_collection_slots() {
     accepts("fn main() {\n    let tensor<f32, []> a ← empty\n}\n");
-    accepts("fn main() {\n    let sparsa<f32, [2, 3]> a ← empty\n}\n");
+    accepts("fn main() {\n    let sparse<f32, [2, 3]> a ← empty\n}\n");
     accepts(
         "fn main() {\n    let list<int> a ← empty\n    let map<string, int> b ← empty\n    let set<int> c ← empty\n}\n",
     );

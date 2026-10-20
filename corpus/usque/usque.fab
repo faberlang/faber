@@ -20,7 +20,7 @@ locale = "en"
 #   • Range iteration — combining `itera` with `usque` for bounded loops
 #
 # Common mistakes:
-#   • confusing usque (inclusive range bound) with dum (loop) or intervallum (range type)
+#   • confusing usque (inclusive range bound) with dum (loop) or range (range type)
 #
 # See also: ante, …
 # =============================================================================

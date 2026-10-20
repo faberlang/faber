@@ -243,6 +243,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirIntrinsic::TensorLift(op) => {
                 self.eval_tensor_lift(*op, &call.args, call.return_ty, span)
             }
+            MirIntrinsic::Pow => self.eval_float_pow(&call.args, span),
             MirIntrinsic::Duplicate => {
                 let [source] = call.args.as_slice() else {
                     return Err(RunnerError::internal(span, "duplicate runtime arity"));
@@ -1008,6 +1009,33 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Some(shape) => self.eval_runtime_convert_shaped(conversion, value, shape, span),
                 None => self.eval_runtime_convert(conversion, value, span),
             },
+            MirConversionFlavor::Proven => {
+                self.eval_proven_narrow(value, &conversion.target_ty, span)
+            }
+        }
+    }
+
+    /// Evaluate a [`MirConversionFlavor::Proven`] narrowing: the value was
+    /// proven to fit at compile time, so reduce it to the target's exact
+    /// carrier without a runtime range check.
+    fn eval_proven_narrow(
+        &self,
+        value: Value,
+        target_ty: &radix_mir::MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let target = self.types.get(target_ty.semantic_id());
+        match (value, target) {
+            (Value::Int(v), Type::Primitive(Primitive::Numerus)) => Ok(Value::Int(v)),
+            (Value::Int(v), Type::SizedNumeric(Primitive::Numerus, width)) => {
+                crate::exact_int::exact_carrier(i128::from(v), *width).ok_or_else(|| {
+                    RunnerError::internal(span, "proven narrowing does not fit its target")
+                })
+            }
+            (other, target) => Err(RunnerError::internal(
+                span,
+                format!("unsupported proven narrowing from {other:?} to {target:?}"),
+            )),
         }
     }
 
@@ -1032,6 +1060,26 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 format!("unsupported cast from {other:?} to {target:?}"),
             )),
         }
+    }
+
+    /// Evaluate [`MirIntrinsic::Pow`]: IEEE 754 pow of two fractus operands
+    /// through the host libm.
+    fn eval_float_pow(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [base, exponent] = args else {
+            return Err(RunnerError::internal(span, "pow arity"));
+        };
+        let base = self.eval_operand(base, span)?;
+        let exponent = self.eval_operand(exponent, span)?;
+        let as_float = |value: Value| match value {
+            Value::Float(v) => Ok(v),
+            Value::Int(v) => Ok(v as f64),
+            Value::UInt(v) => Ok(v as f64),
+            other => Err(RunnerError::internal(
+                span,
+                format!("pow requires float operands, got {other:?}"),
+            )),
+        };
+        Ok(Value::Float(as_float(base)?.powf(as_float(exponent)?)))
     }
 
     /// Evaluate `est <type>` / `non est <type>` against the operand's runtime

@@ -492,6 +492,45 @@ fn narrower_wrapping_store_reduces_within_its_family() {
 }
 
 #[test]
+fn word_list_sum_is_exact_and_the_store_reduces_it() {
+    // The sum adds exactly (it is not a word), so the store into a
+    // `modulus<u8>` slot carries the node that reduces the total.
+    let source = "incipit {\nsit lista<modulus<u8>> ws ← [200, 100]\nsit modulus<u8> w ← ws.summa()\nnota w\n}\n";
+    let (stores, result) = stores_of(source);
+    let declarations: Vec<_> = stores
+        .iter()
+        .filter(|store| store.site.kind == HirStoreKind::Declaration)
+        .collect();
+    assert_eq!(declarations.len(), 1);
+    assert!(matches!(
+        result.types.get(declarations[0].target),
+        Type::ModularWord(radix_types::NumericWidth::U8)
+    ));
+}
+
+#[test]
+fn saturating_word_list_sum_is_clamped_by_the_store() {
+    let source = "incipit {\nsit lista<saturatus<u8>> ss ← [200, 100]\nsit saturatus<u8> s ← ss.summa()\nnota s\n}\n";
+    let (stores, result) = stores_of(source);
+    let declarations: Vec<_> = stores
+        .iter()
+        .filter(|store| store.site.kind == HirStoreKind::Declaration)
+        .collect();
+    assert_eq!(declarations.len(), 1);
+    assert!(matches!(
+        result.types.get(declarations[0].target),
+        Type::SaturatingWord(radix_types::NumericWidth::U8)
+    ));
+}
+
+#[test]
+fn word_list_sum_still_needs_a_conversion_across_families() {
+    assert_rejected(
+        "incipit {\nsit lista<modulus<u8>> ws ← [200, 100]\nsit saturatus<u8> s ← ws.summa()\nnota s\n}\n",
+    );
+}
+
+#[test]
 fn crossing_policy_families_still_needs_a_conversion() {
     assert_rejected("incipit {\nsit numerus n ← 200\nsit saturatus<u8> w ← n\nnota w\n}\n");
     assert_rejected(

@@ -218,14 +218,15 @@ promissum = "promise"
 cursor = "iterator"
 queue = "queue"
 stack = "stack"
-# Tensor family: English keeps the Latin loanwords (D4) but owns the rows
+# Tensor family: tensor, vector, matrix and atomic keep their English spellings;
+# sparsa -> sparse and intervallum -> range (ruling 2026-10-17). The pack owns the rows
 # explicitly — no inherits = "la" substitute.
 tensor = "tensor"
 vector = "vector"
 matrix = "matrix"
-sparsa = "sparsa"
+sparsa = "sparse"
 atomic = "atomic"
-intervallum = "intervallum"
+intervallum = "range"
 # Census relational-view type names (S2-U5): `filter` is the role-separated
 # English surface for `filtrum` (design §7.3), distinct from the `filtrata`
 # method surface by syntactic position.
@@ -380,7 +381,7 @@ rotunda = "round"
 tectum = "ceiling"
 trunca = "truncate"
 
-# sparsa (6) — accipe / longitudo shared with lista above.
+# sparse (6) — accipe / longitudo shared with lista above.
 densata = "densify"
 magnitudines = "shape"
 nonnihil = "count_nonzero"
@@ -437,7 +438,7 @@ transversum = "cross"
 normalizata = "normalize"
 swizzle = "swizzle"
 
-# intervallum (5) — continet / longitudo shared with lista above.
+# range (5) — continet / longitudo shared with lista above.
 coercere = "clamp"
 inter = "intersect"
 # Identity row even though `union` is also the en `discretio` keyword
@@ -707,8 +708,8 @@ message = "tensor requires a Figura shape after element type"
 help = "add a comma and Figura shape, such as tensor<T, []>"
 
 [diagnostics.PARSE001.issues.sparsa_figura_after_element]
-message = "sparsa requires a Figura shape after element type"
-help = "add a comma and Figura shape, such as sparsa<T, []>"
+message = "sparse requires a Figura shape after element type"
+help = "add a comma and Figura shape, such as sparse<T, []>"
 
 [diagnostics.PARSE001.issues.vector_width_after_element]
 message = "vector requires a width after element type"
@@ -1891,20 +1892,20 @@ message = "instant accepts at most one precision marker"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.intervallum_arity]
-message = "intervallum takes one bound and an optional compile-time step"
-help = "write intervallum<T> or intervallum<T, S>"
+message = "range takes one bound and an optional compile-time step"
+help = "write range<T> or range<T, S>"
 
 [diagnostics.SEM008.issues.intervallum_bound]
-message = "intervallum bound type must be int or instant"
+message = "range bound type must be int or instant"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.intervallum_step_must_be_constant]
-message = "intervallum step must be a positive integer literal"
-help = "write the compile-time step as an integer literal: intervallum<int, 2>"
+message = "range step must be a positive integer literal"
+help = "write the compile-time step as an integer literal: range<int, 2>"
 
 [diagnostics.SEM008.issues.intervallum_step_bound_not_integer]
-message = "a stepped intervallum takes integer bounds only"
-help = "drop the step for instant bounds; write intervallum<instant>"
+message = "a stepped range takes integer bounds only"
+help = "drop the step for instant bounds; write range<instant>"
 
 [diagnostics.SEM008.issues.atomic_arity]
 message = "atomic requires exactly one element type; use atomic<T>"
@@ -2107,19 +2108,19 @@ message = "series cannot accept parameters"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.tensor_element_unbounded]
-message = "a tensor, vector, matrix, or sparsa element cannot be the unbounded integer `inf`"
+message = "a tensor, vector, matrix, or sparse element cannot be the unbounded integer `inf`"
 help = "use `lista<inf>`; a tensor element must have a device layout"
 
 [diagnostics.SEM008.issues.sparsa_element_non_numeric]
-message = "sparsa element type must be numeric in v1"
+message = "sparse element type must be numeric in v1"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.sparsa_incomplete]
-message = "sparsa requires element type and Figura; use sparsa<T, Figura>"
+message = "sparse requires element type and Figura; use sparse<T, Figura>"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.sparsa_missing_figura]
-message = "sparsa requires a Figura shape; use sparsa<T, []> for rank-0"
+message = "sparse requires a Figura shape; use sparse<T, []> for rank-0"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.standalone_width_internal]
@@ -2687,15 +2688,15 @@ message = "incompatible return types"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.intervallum_bound_required]
-message = "intervallum bound type must be int or instant"
+message = "range bound type must be int or instant"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
-message = "intervallum clamp operand type mismatch"
+message = "range clamp operand type mismatch"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.intra_requires_intervallum_range]
-message = "intra requires an intervallum range"
+message = "intra requires a range"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.incompatible_tensor_index]
@@ -2939,11 +2940,11 @@ message = "matrix shape must be exactly two dimensions"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.sparsa_incomplete]
-message = "sparsa requires element type and Figura; use sparsa<T, Figura>"
+message = "sparse requires element type and Figura; use sparse<T, Figura>"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.sparsa_missing_figura]
-message = "sparsa requires a Figura shape; use sparsa<T, []> for rank-0"
+message = "sparse requires a Figura shape; use sparse<T, []> for rank-0"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.scalar_text_operands_required]
@@ -3083,12 +3084,12 @@ message = "range step must be positive"
 help = "write a positive step; the range bounds pick the direction (10‥0 step 2 counts down)"
 
 [diagnostics.SEM011.issues.intervallum_bound_required]
-message = "intervallum bound type must be int or instant"
+message = "range bound type must be int or instant"
 help = "use int, float, instant, or sized scalar bounds"
 
 [diagnostics.SEM011.issues.intervallum_longitudo_bound]
-message = "intervallum longitudo requires int bounds until momentum ships"
-help = "use int intervallum bounds for longitudo today"
+message = "range longitudo requires int bounds until momentum ships"
+help = "use int range bounds for longitudo today"
 
 [diagnostics.SEM011.issues.numeric_lista_operator_law]
 message = "numeric list operator {operator} is elementwise; scalars broadcast on either side, lists must have equal length; use ↦ for explicit width conversion"
@@ -3243,8 +3244,8 @@ message = "deref requires reference"
 help = "dereference a reference value"
 
 [diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
-message = "densata requires sparsa receiver"
-help = "call densata on a sparsa value"
+message = "densata requires sparse receiver"
+help = "call densata on a sparse value"
 
 [diagnostics.SEM011.issues.ascii_literal_template_application]
 message = "ascii literals do not support template application"
@@ -3524,7 +3525,7 @@ help = "use an integer operand for this operator"
 
 [diagnostics.SEM011.issues.range_operand_must_be_numeric]
 message = "range operand must be numeric"
-help = "compare numeric values with intervallum ranges"
+help = "compare numeric values with ranges"
 
 [diagnostics.SEM011.issues.scalar_text_operands_required]
 message = "scalar text operands required"
@@ -3540,7 +3541,7 @@ help = "provide an explicit value for this object field"
 
 [diagnostics.SEM011.issues.vacua_requires_collection_type]
 message = "empty requires a collection type"
-help = "give empty a list, map, set, tensor, or sparsa context"
+help = "give empty a list, map, set, tensor, or sparse context"
 
 [diagnostics.SEM011.issues.vacua_requires_resolved_extents]
 message = "empty needs a shape with a value for every extent"
@@ -3604,7 +3605,7 @@ help = "make each bracket slot an integer or an integer range such as 0 ‥ 2"
 
 [diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
 message = "tensor arithmetic requires numeric element type"
-help = "use numeric tensor or sparsa element types"
+help = "use numeric tensor or sparse element types"
 
 [diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
 message = "{op} on a {kind} is not admitted yet"
@@ -3784,7 +3785,7 @@ help = "add an explicit type annotation"
 
 [diagnostics.SEM014.issues.cannot_infer_tensor_shape]
 message = "cannot infer tensor shape"
-help = "provide a concrete tensor or sparsa shape"
+help = "provide a concrete tensor or sparse shape"
 
 [diagnostics.SEM014.issues.cannot_infer_variable_type]
 message = "cannot infer variable type"
@@ -3823,15 +3824,15 @@ message = "invalid conversion"
 help = "use a valid conversion or provide an inline default with `⊥`"
 
 [diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
-message = "intervallum clamp conversio does not support a `⊥` default"
+message = "range clamp conversio does not support a `⊥` default"
 help = "remove the recovery arm from this range clamp"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
-message = "intervallum conversio target must be a range or intervallum value"
-help = "convert to a range or intervallum value"
+message = "range conversio target must be a range value"
+help = "convert to a range value"
 
 [diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
-message = "intervallum clamp requires matching bound types"
+message = "range clamp requires matching bound types"
 help = "make the source and target bound element types match"
 
 [diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
@@ -3839,11 +3840,11 @@ message = "sermo materialization target is not supported; expected {vacuum}, {va
 help = "choose a supported sermo materialization target"
 
 [diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
-message = "intervallum materialize requires matching {lista} element type"
+message = "range materialize requires matching {lista} element type"
 help = "make the source and target bound element types match"
 
 [diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
-message = "intervallum materialize requires matching tensor element type"
+message = "range materialize requires matching tensor element type"
 help = "make the source and target bound element types match"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
@@ -3987,15 +3988,15 @@ message = "conversion from promissum crosses the async/sync boundary; bind the r
 help = "resolve or wrap the async value explicitly"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]
-message = "sparsa conversion has no default {lista} meaning; use densata() before {lista} conversion or an explicit sparse helper"
+message = "sparse conversion has no default {lista} meaning; use densata() before {lista} conversion or an explicit sparse helper"
 help = "densify or use an explicit sparse helper"
 
 [diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
-message = "tensor and sparsa conversio requires the same element type; convert element width explicitly before changing representation"
+message = "tensor and sparse conversio requires the same element type; convert element width explicitly before changing representation"
 help = "convert element widths explicitly before changing representation"
 
 [diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
-message = "tensor and sparsa conversio requires the same Figura shape; reshape explicitly before `↦`"
+message = "tensor and sparse conversio requires the same Figura shape; reshape explicitly before `↦`"
 help = "reshape explicitly before converting"
 
 [diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
@@ -4880,7 +4881,7 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 
 [diagnostics.SEM059.issues.first_match_unbounded_source]
 message = "@ radix lane \"{lane}\" rejects this function body: the source of a first-match expression has no statically known extent, which the v1 AIR subset requires"
-help = "use a literal array, a concrete `intervallum` range, or a source with a static shape (a fully shaped tensor or matrix, or a bounded array) as the first-match source"
+help = "use a literal array, a concrete range, or a source with a static shape (a fully shaped tensor or matrix, or a bounded array) as the first-match source"
 
 [diagnostics.SEM059.issues.generator_function]
 message = "@ radix lane \"{lane}\" rejects this function body: generator functions are outside the v1 AIR subset"

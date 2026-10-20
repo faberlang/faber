@@ -3366,6 +3366,52 @@ fn sum_numeric_u8_overflow_rejects() {
     );
 }
 
+/// `MirIntrinsic::Pow` evaluates the host libm pow: `2^1023` is the largest
+/// power of two below `f64::MAX`, and `2^1024` overflows to infinity.
+#[test]
+fn pow_runtime_call_evaluates_libm_pow() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirConstant, MirIntrinsic, MirOperand, MirProgram, MirRuntimeCall, MirType,
+        MirValidationContext,
+    };
+    use radix_types::{NumericWidth, Primitive, TypeTable};
+
+    let mut type_table = TypeTable::new();
+    let f64_ty = type_table.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    let pow = |exponent: f64| MirRuntimeCall {
+        intrinsic: MirIntrinsic::Pow,
+        args: vec![
+            MirOperand::Constant(MirConstant::Float(2.0)),
+            MirOperand::Constant(MirConstant::Float(exponent)),
+        ],
+        return_ty: MirType::semantic(f64_ty),
+    };
+    assert_eq!(
+        runner
+            .eval_runtime_call(&pow(1023.0), radix_lexer::Span::default())
+            .expect("pow 2^1023"),
+        crate::Value::Float(8.98846567431158e307)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&pow(1024.0), radix_lexer::Span::default())
+            .expect("pow 2^1024"),
+        crate::Value::Float(f64::INFINITY)
+    );
+}
+
 /// A sum that stays within the declared width succeeds, and a `numerus<u64>`
 /// sum accumulates unsigned magnitudes without sign-encoding.
 #[test]

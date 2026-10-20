@@ -6110,10 +6110,11 @@ fn option_chain_call_value_callee_unwraps_option() {
     );
 }
 
-/// A method called through `?.` gets its receiver from the chain base, so the
-/// self-first MIR signature must drop the receiver before argument checking.
+/// A method called through `?.` receives the chain base as argument 0 (the
+/// runner passes `args` verbatim), so the self-first MIR signature is checked
+/// whole: receiver plus the remaining arguments.
 #[test]
-fn option_chain_call_method_callee_skips_receiver_param() {
+fn option_chain_call_method_callee_counts_receiver_argument() {
     let mut types = TypeTable::new();
     let string = types.primitive(Primitive::Textus);
     let int = types.primitive(Primitive::Numerus);
@@ -6124,7 +6125,10 @@ fn option_chain_call_method_callee_skips_receiver_param() {
         option_string,
         option_int,
         MirCallee::definition(DefId(7)),
-        vec![MirOperand::Constant(MirConstant::Int(5))],
+        vec![
+            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+            MirOperand::Constant(MirConstant::Int(5)),
+        ],
     );
     let mut context = MirValidationContext::new(&types);
     context.functions.insert(
@@ -6148,12 +6152,12 @@ fn option_chain_call_method_callee_skips_receiver_param() {
     let errors = validate_with(&program, &context);
     assert!(
         errors.is_empty(),
-        "a method called through ?. must not count the chain base as a receiver argument, got: {errors:?}"
+        "a method called through ?. must accept the chain base as its receiver argument, got: {errors:?}"
     );
 }
 
-/// The receiver exemption must not swallow arity checking: with no arguments
-/// the remaining `int` parameter is still required.
+/// Arity is still checked: with the receiver but no further argument the
+/// remaining `int` parameter is required.
 #[test]
 fn option_chain_call_method_callee_arity_still_checked() {
     let mut types = TypeTable::new();
@@ -6166,7 +6170,7 @@ fn option_chain_call_method_callee_arity_still_checked() {
         option_string,
         option_int,
         MirCallee::definition(DefId(7)),
-        vec![],
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
     );
     let mut context = MirValidationContext::new(&types);
     context.functions.insert(
