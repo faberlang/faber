@@ -1,0 +1,43 @@
++++
+term = "ᵀ"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "transpose_suffix", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+summary = "ᵀ composes as postfix sugar: aᵀ materializes, a · aᵀ contracts, and aᵀᵀ returns the original."
+syntax = "<rank-2 tensor expression>ᵀ"
+related = ["tensor", "matmul"]
+locale = "en"
++++
+
+# =============================================================================
+# ᵀ — postfix transpose suffix, used as a value.
+# =============================================================================
+#
+# What this teaches:
+#   • `aᵀ` is a value: it materializes to the transposed rank-2 tensor, so the
+#     suffix can feed a product or another suffix, not only a function body.
+#   • `a · aᵀ` contracts the inner dimension of the original with its
+#     transpose, giving the rank-2 Gram matrix [M,M].
+#   • `aᵀᵀ` stacks the suffix and returns the original shape and values.
+#
+# EXPECTED stdout:
+#   [1.0, 4.0, 2.0, 5.0, 3.0, 6.0]
+#   [14.0, 32.0, 32.0, 77.0]
+#   [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+#
+# See also: tensor, ᵀ
+# =============================================================================
+
+main {
+    let list<f32> fa ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    let tf32[2, 3] a ← fa ↦ tf32[2, 3]
+
+    let tf32[3, 2] t ← aᵀ.materialize()
+    print t.flatten()
+
+    let tf32[2, 2] g ← a · aᵀ
+    print g.flatten()
+
+    let tf32[2, 3] back ← aᵀᵀ.materialize()
+    print back.flatten()
+}
