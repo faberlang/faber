@@ -193,8 +193,9 @@ fn vec3_then_scalar_table_only() {
 
 /// The real `class Params` of acceptance/a2-flood/src/params.fab, in source
 /// order. radix-mir cannot build a type table from source, so the field list
-/// is mirrored: width, height (int), sixteen f32 (dx .. `axis_z`), then
-/// `geo_step`, `geo_w`, `geo_h` (int).
+/// is mirrored: width, height (i32), sixteen f32 (dx .. `axis_z`), then
+/// `geo_step`, `geo_w`, `geo_h` (i32). Every field is four bytes, so the genus
+/// is 21 consecutive 4-byte fields: size 84, align 4.
 const PARAMS_FIELDS: [(&str, bool); 21] = [
     ("width", true),
     ("height", true),
@@ -222,10 +223,10 @@ const PARAMS_FIELDS: [(&str, bool); 21] = [
 #[test]
 fn a2_params_layout() {
     let mut t = Types::new();
-    let (f, int) = (t.f32(), t.int());
+    let (f, i32) = (t.f32(), t.i32());
     let fields: Vec<TypeId> = PARAMS_FIELDS
         .iter()
-        .map(|(_, is_int)| if *is_int { int } else { f })
+        .map(|(_, is_int)| if *is_int { i32 } else { f })
         .collect();
     let layout = resolve(&t, &fields).expect("Params layout");
     let mut table = String::new();
@@ -242,13 +243,13 @@ fn a2_params_layout() {
         layout.fields[index].offset
     };
     assert_eq!(offset("width"), 0);
-    assert_eq!(offset("height"), 8);
-    assert_eq!(offset("dx"), 16);
-    assert_eq!(offset("axis_z"), 76);
-    assert_eq!(offset("geo_step"), 80);
-    assert_eq!(offset("geo_w"), 88);
-    assert_eq!(offset("geo_h"), 96);
-    assert_eq!((layout.size, layout.align), (104, 8));
+    assert_eq!(offset("height"), 4);
+    assert_eq!(offset("dx"), 8);
+    assert_eq!(offset("axis_z"), 68);
+    assert_eq!(offset("geo_step"), 72);
+    assert_eq!(offset("geo_w"), 76);
+    assert_eq!(offset("geo_h"), 80);
+    assert_eq!((layout.size, layout.align), (84, 4));
 }
 
 #[test]
