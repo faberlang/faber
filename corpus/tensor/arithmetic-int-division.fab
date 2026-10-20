@@ -1,0 +1,61 @@
++++
+term = "⊘"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Tensor division semantics: floored integer ⊘, / and %, exact ÷ into float, IEEE float division by zero."
+syntax = "<expression> ⊘ <expression> | <expression> ÷ <expression>"
+related = ["tensor", "arithmetic"]
+locale = "en"
++++
+
+# =============================================================================
+# Tensor division semantics — floored integer and IEEE float division.
+# =============================================================================
+#
+# What this teaches:
+#   • Integer division rounds toward negative infinity: `⊘`, `/` and `%` on a
+#     `ti32` tensor all take the floor, so -7 / 2 is -4 and -7 % 2 is 1, not
+#     the truncating -3 / -1 that C-style division would give.
+#   • `÷` is exact division: an integer tensor divided by an integer scalar or
+#     tensor widens to f64 and never truncates.
+#   • Float division by zero is bare IEEE — `x / 0.0` yields `inf`, `-inf` or
+#     `nan` rather than trapping; the glyph `⊘` and the slash agree because
+#     both lower to the same bare f32/f64 hardware division.
+#
+# EXPECTED stdout:
+#   [-4, 3, 3, -4]
+#   [-4, 3, -4, 3]
+#   [1, 1, 1, 1]
+#   [-1, -1, -1, -1]
+#   [-3.5, 3.5, -3.5, 3.5]
+#   [-3.5, 3.5, 3.5, -3.5]
+#   [inf, -inf, NaN]
+#   [inf, -inf, NaN]
+#
+# See also: tensor, arithmetic, ⊘, ÷, %
+# =============================================================================
+
+main {
+    let ti32[4] a ← [-7, 7, -7, 7] ↦ ti32[4]
+    let ti32[4] b ← [2, 2, -2, -2] ↦ ti32[4]
+    let ti32[4] floored ← a ⊘ b
+    print floored.flatten()
+    let ti32[4] by_scalar ← a / 2
+    print by_scalar.flatten()
+    let ti32[4] remainder ← a % 2
+    print remainder.flatten()
+    let ti32[4] negative_remainder ← a % -2
+    print negative_remainder.flatten()
+    let tensor<f64, [4]> exact_widened ← a ÷ 2
+    print exact_widened.flatten()
+    let tensor<f64, [4]> exact_elementwise ← a ÷ b
+    print exact_elementwise.flatten()
+    let tf32[3] edge ← [1.0, -1.0, 0.0] ↦ tf32[3]
+    let tf32[3] zeroes ← [0.0, 0.0, 0.0] ↦ tf32[3]
+    let tf32[3] glyph_edge ← edge ⊘ zeroes
+    print glyph_edge.flatten()
+    let tf32[3] scalar_edge ← edge / 0.0
+    print scalar_edge.flatten()
+}
