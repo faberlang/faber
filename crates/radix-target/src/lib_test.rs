@@ -237,6 +237,7 @@ fn import_words_name_source_languages_only() {
         Some(Target::HirTypeScript)
     );
     assert_eq!(Target::from_import_word("rs"), Some(Target::HirRust));
+    assert_eq!(Target::from_import_word("go"), Some(Target::HirGo));
     // Not languages whose modules an import can name.
     for word in [
         "faber",
@@ -250,5 +251,6 @@ fn import_words_name_source_languages_only() {
         assert_eq!(Target::from_import_word(word), None, "{word}");
     }
     assert_eq!(Target::nearest_import_word("pyton"), Some("python"));
+    assert_eq!(Target::nearest_import_word("goo"), Some("go"));
     assert_eq!(Target::nearest_import_word("zzzzzzzz"), None);
 }
