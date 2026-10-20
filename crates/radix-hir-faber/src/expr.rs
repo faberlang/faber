@@ -332,12 +332,16 @@ impl super::FaberCodegen<'_> {
                 if type_args.is_empty()
                     && args.is_empty()
                     && self.glyph_ids.contains(&expr.id)
+                    && !self.radical_quarta_ids.contains(&expr.id)
                     && self.radical_prefix(*name, surface).is_some() =>
             {
-                // Authored `√ x` / `∛ x`: typecheck rewrote the glyph marker
-                // to the radical twin and kept the node id; the prefix glyph
-                // is the authored surface. A radical binds like unary `-`, so
-                // a looser operand keeps its parentheses.
+                // Authored `√ x` / `∛ x`: lowering recorded the node id and
+                // typecheck rewrote the marker to the radical twin; the prefix
+                // glyph is the authored surface. The `radical_quarta_ids`
+                // exclusion keeps an authored `∜` (nested `.sqrt().sqrt()`
+                // under the same `radix` name) out of this arm so it never
+                // prints as `√ √`. A radical binds like unary `-`, so a looser
+                // operand keeps its parentheses.
                 if let Some(prefix) = self.radical_prefix(*name, surface) {
                     writer.write(prefix);
                     writer.write(" ");
