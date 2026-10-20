@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/discerne/payload-alias.fab"
+group = "language"
+input_root = "corpus"
+input = "discerne/payload-alias.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

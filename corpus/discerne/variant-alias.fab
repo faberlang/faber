@@ -1,0 +1,76 @@
++++
+term = "discerne"
+kind = "feature"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "ut_pattern", "redde_stmt", "sit_decl", "finge_expr", "field_list", "field_init", "field_key", "cast_expr", "incipit_stmt", "expression", "multiplicative_expr", "literal", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "control-flow"
+canonical = false
+summary = "`case A as a` aliases the whole matched variant value, not one payload field; the alias has the union type and can be passed on as such."
+syntax = "case <Variant> as <alias> { ... }"
+related = ["discerne", "casu", "discretio", "ut"]
+locale = "en"
++++
+# =============================================================================
+# discerne — Whole-variant aliases name the matched variant value.
+# =============================================================================
+#
+# What this teaches:
+#   • Whole-variant alias — `case A as a` binds the matched variant value to
+#     `a` for that arm; unlike a payload alias, `a` is the whole value, not a
+#     field.
+#   • The alias carries the union type, so it can be passed to a function that
+#     takes the union.
+#
+# Q-T3 is ruled (QUESTIONS-RULINGS.md, "case A as a" — RULED: narrow the alias
+# to the variant. The alias names the matched variant value; discerne exists
+# to discriminate). Reading a payload field through the alias is the narrowing
+# that ruling names, and it is not implemented on this tree (SEM004
+# union_member_not_common today), so this exemplum never writes `a.n`.
+#
+# See also: discretio, casu, ut
+# =============================================================================
+
+# The alias is bound per arm. Here each alias is handed to `nomen`, which takes
+# the union `T` — proof that the alias is the union value itself.
+#
+# GRAMMAR (en words beside the canonical spellings):
+#   casu_variant_clause ::= 'casu' patterns (block_stmt | ergo_joint statement)
+#   type_pattern ::= IDENTIFIER type_arguments? ut_pattern?   en: Variant as alias
+#   ut_pattern   ::= ('ut' IDENTIFIER) | ...   en: 'as' alias
+#
+# EXPECTED OUTPUT:
+#   A
+#   B
+
+union T {
+    A {
+        int n
+    },
+    B
+}
+
+fn nomen(T v) → string {
+    match v {
+        case A let n {
+            return "A"
+        }
+        case B {
+            return "B"
+        }
+    }
+}
+
+fn f(T x) → string {
+    match x {
+        case A as a {
+            return nomen(a)
+        }
+        case B as b {
+            return nomen(b)
+        }
+    }
+}
+
+main {
+    print f(variant A { n = 4 } ∷ T)
+    print f(variant B { } ∷ T)
+}

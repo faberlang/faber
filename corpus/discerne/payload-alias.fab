@@ -1,0 +1,62 @@
++++
+term = "discerne"
+kind = "feature"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "ut_pattern", "redde_stmt", "sit_decl", "finge_expr", "field_list", "field_init", "field_key", "cast_expr", "incipit_stmt", "expression", "multiplicative_expr", "literal", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "control-flow"
+canonical = false
+summary = "A casu arm can rename any payload field it binds with `as`, so the body reads that field under the local alias."
+syntax = "case <Variant> let <field> as <alias>, <field> { ... }"
+related = ["discerne", "casu", "discretio", "ut"]
+locale = "en"
++++
+# =============================================================================
+# discerne — Payload field aliases rename the fields a casu arm binds.
+# =============================================================================
+#
+# What this teaches:
+#   • Payload aliases — `case Rect let w as width, h` binds the payload field
+#     `w` as `width`; the alias exists only inside that arm's body.
+#   • Aliasing is per field — `h` keeps its own name in the same arm.
+#   • Variant payload fields are newline-separated; a comma between variant
+#     fields is PARSE002.
+#
+# Common mistakes:
+#   • Using the alias outside its arm — the alias is scoped to the arm body.
+#
+# See also: discretio, casu, ut
+# =============================================================================
+
+# A casu arm lists the payload fields it binds, and any one of them can be
+# renamed with `as`. The rename is local to the arm: the arm body reads
+# `width`, while the payload field keeps the name `w`.
+#
+# GRAMMAR (en words beside the canonical spellings):
+#   casu_variant_clause ::= 'casu' patterns (block_stmt | ergo_joint statement)
+#   ut_pattern    ::= ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)
+#                     en: 'as' alias | ('let' | 'mut') binding, binding, ...
+#   pattern_binding ::= IDENTIFIER ('ut' IDENTIFIER)?   en: field ('as' alias)?
+#
+# EXPECTED OUTPUT:
+#   12
+
+union Shape {
+    Circle {
+        int r
+    },
+    Rect {
+        int w
+        int h
+    }
+}
+
+main {
+    let Shape s ← variant Rect { w = 3, h = 4 } ∷ Shape
+    match s {
+        case Circle let r as radius {
+            print radius
+        }
+        case Rect let w as width, h {
+            print width * h
+        }
+    }
+}
