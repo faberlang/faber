@@ -1736,6 +1736,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorSlice => self.tensor_slice(args, span),
             MirCollectionOp::TensorSliceNd => self.tensor_slice_nd(args, span),
             MirCollectionOp::TensorRank => self.tensor_rank(args, span),
+            MirCollectionOp::TensorNorm => self.tensor_norm(args, span),
             MirCollectionOp::TensorExpand => self.tensor_expand(args, span),
             MirCollectionOp::TensorShift => self.tensor_shift(args, span),
             MirCollectionOp::TensorCopyInto => self.tensor_copy_into(args, span),
@@ -3502,6 +3503,30 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let tensor = self.tensor_arg(receiver, span)?;
         Ok(Value::Int(tensor.borrow().shape.len() as i64))
+    }
+
+    fn tensor_norm(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "tensor norm arity"));
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let kind = tensor_kind(&tensor);
+        let values = self.tensor_logical_values(&tensor, span)?;
+        let mut sum = 0.0;
+        for value in &values {
+            let x = numeric_as_f64(value, span)?;
+            sum += x * x;
+        }
+        let norm = sum.sqrt();
+        if matches!(kind, Some(DenseKind::F32 | DenseKind::F64))
+            || (kind.is_none() && values.iter().any(|v| matches!(v, Value::Float(_))))
+        {
+            return Ok(Value::Float(norm));
+        }
+        Ok(match kind {
+            Some(DenseKind::U64) => Value::UInt(norm as u64),
+            _ => Value::Int(norm as i64),
+        })
     }
 
     fn tensor_extremum(

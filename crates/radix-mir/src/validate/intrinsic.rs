@@ -912,6 +912,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::ArgMax
             | MirCollectionOp::ArgMin
             | MirCollectionOp::TensorRank
+            | MirCollectionOp::TensorNorm
             | MirCollectionOp::TensorShape
             | MirCollectionOp::TensorFlatten
             | MirCollectionOp::TensorMaterialize
@@ -1857,6 +1858,21 @@ impl Validator<'_, '_> {
             }
             MirCollectionOp::TensorRank => {
                 // Placeholder so this exhaustive dispatch compiles; the numerus contract lands in 2eecb23a-7.1.1.3.
+            }
+            MirCollectionOp::TensorNorm => {
+                let Some(receiver_ty) = first_arg_ty else {
+                    return;
+                };
+                self.require_tensor_type(receiver_ty, span, "tensor norm receiver is not tensor");
+                if let Type::Tensor(element, _) = self.type_kind(receiver_ty) {
+                    if !self
+                        .context
+                        .types
+                        .equals(call.return_ty.semantic_id(), *element)
+                    {
+                        self.error(span, "tensor norm result is not the element type");
+                    }
+                }
             }
             MirCollectionOp::TensorShape => {
                 let Some(receiver_ty) = first_arg_ty else {
