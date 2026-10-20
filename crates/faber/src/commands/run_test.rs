@@ -565,17 +565,70 @@ fn package_mir_run_with_selection_auto_stays_on_cpu_route() {
 // ── single-file runner ExitCode ──────────────────────────────────────────
 
 fn run_single_file(path: &Path) -> Result<ExitCode, RunSourceError> {
+    run_single_file_under(path, DeviceSelection::Auto, Vec::new()).0
+}
+
+fn run_single_file_under(
+    path: &Path,
+    selection: DeviceSelection,
+    arguments: Vec<String>,
+) -> (Result<ExitCode, RunSourceError>, Vec<String>) {
     let source = std::fs::read_to_string(path).expect("read single-file source");
     let config = script_package_config(path, None, None).expect("single-file config");
+    let config = match selection.kernel_lowering() {
+        radix::module::mir::KernelLowering::Host => config.with_host_kernels(),
+        radix::module::mir::KernelLowering::Device => config,
+    };
     let session = radix::module::driver::Session::new(config);
-    let mut host = radix::module::mir::BufferHost::default();
-    crate::script::run_with_session(
+    let mut host = radix::module::mir::BufferHost::with_argumenta(arguments);
+    let result = crate::script::run_with_session(
         &session,
         &path.display().to_string(),
         &source,
         &mut host,
-        DeviceSelection::Auto,
+        selection,
+    );
+    (result, host.stdout_lines)
+}
+
+#[test]
+fn single_file_kernel_runs_under_selection() {
+    let dir = temp_dir("single-file-kernel-selection");
+    let entry = dir.join("softmax.fab");
+    std::fs::write(
+        &entry,
+        r#"+++
+locale = "en"
++++
+
+@ kernel
+@ public
+fn sm<size R, size C>(tensor<f32, [R, C]> x) → tensor<f32, [R, C]> {
+    return x.softmax()
+}
+
+@ cli "softmax-runtime"
+@ operand int rows
+@ operand int cols
+main args args {
+    let int rows ← args.rows
+    let int cols ← args.cols
+    const size R ← rows
+    const size C ← cols
+    mut tensor<f32, [R, C]> x ← tf32[R, C] {}
+    mut tensor<f32, [R, C]> y ← sm(x)
+    print y[[0, 0]]
+}
+"#,
     )
+    .expect("write single-file kernel");
+
+    for selection in [DeviceSelection::Cpu] {
+        let (result, stdout) =
+            run_single_file_under(&entry, selection, vec!["2".to_owned(), "8".to_owned()]);
+        assert!(result.is_ok());
+        assert!(stdout.join("\n").contains("0.125"));
+    }
 }
 
 #[test]

@@ -335,7 +335,7 @@ fn interpret_path(
         &path.display().to_string(),
         &source,
         &mut host,
-        DeviceSelection::Auto,
+        selection,
     );
     exit_interpreted(result);
 }
