@@ -911,6 +911,7 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Sum
             | MirCollectionOp::ArgMax
             | MirCollectionOp::ArgMin
+            | MirCollectionOp::TensorRank
             | MirCollectionOp::TensorShape
             | MirCollectionOp::TensorFlatten
             | MirCollectionOp::TensorMaterialize
@@ -1853,6 +1854,9 @@ impl Validator<'_, '_> {
                 {
                     self.error(span, "numeric rounding receiver is not fractus");
                 }
+            }
+            MirCollectionOp::TensorRank => {
+                // Placeholder so this exhaustive dispatch compiles; the numerus contract lands in 2eecb23a-7.1.1.3.
             }
             MirCollectionOp::TensorShape => {
                 let Some(receiver_ty) = first_arg_ty else {
