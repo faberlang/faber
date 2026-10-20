@@ -38,3 +38,25 @@ main {
 "#;
     assert_eq!(run_lines(source), vec!["10", "none"]);
 }
+
+#[test]
+fn optional_chain_method_call_runs_and_short_circuits() {
+    let source = r#"+++
+locale = "en"
++++
+class Nomen {
+    mut string n
+
+    fn up() → string {
+        return self.n.uppercase()
+    }
+}
+main {
+    let Nomen ∪ none a ← Nomen { n = "ab" }
+    let Nomen ∪ none b ← null
+    print a?.up()
+    print b?.up()
+}
+"#;
+    assert_eq!(run_lines(source), vec!["AB", "none"]);
+}
