@@ -2213,6 +2213,18 @@ impl super::FaberCodegen<'_> {
         })
     }
 
+    /// The glyph prefix of a radical twin (`radix` square root, `radix_cubica`
+    /// cube root), matched by canonical or localized name.
+    fn radical_prefix(&self, name: Symbol, surface: &impl KeywordSurface) -> Option<&'static str> {
+        let spelling = self.symbol_to_string(name);
+        let glyphs = [("radix", "√"), ("radix_cubica", "∛")];
+        glyphs.into_iter().find_map(|(canonical, glyph)| {
+            let localized = surface.intrinsic_surface(canonical);
+            (spelling == canonical || localized.as_deref() == Some(spelling.as_str()))
+                .then_some(glyph)
+        })
+    }
+
     /// `receiver.method(argument)` for an authored numeric twin call, in the
     /// reader locale's surface spelling.
     fn write_twin_call(
