@@ -1,0 +1,35 @@
++++
+term = "keyword-as-ident"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "genus_decl", "field_decl", "member_suffix", "sit_decl"]
+category = "identifier"
+canonical = false
+summary = "Class fields and member reads spelled with keyword names."
+syntax = "mut int class; k.class"
+related = ["genus", "nota"]
+locale = "en"
++++
+# =============================================================================
+# keyword-as-ident — class fields named after keywords
+# =============================================================================
+#
+# What this teaches:
+#   • Class fields and member reads keep keyword names unchanged.
+#
+# See also: genus, nota, print-binding.fab
+# =============================================================================
+#
+# EXPECTED OUTPUT:
+#   field-names.expected — 10
+
+class K {
+    mut int class
+    mut int fn
+    mut int if
+    mut int return
+}
+
+main {
+    let K k ← K { class = 1, fn = 2, if = 3, return = 4 }
+    print k.class + k.fn + k.if + k.return
+}
