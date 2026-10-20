@@ -3261,6 +3261,10 @@ help = "use a scalar index only on rank-1 tensors"
 message = "tensor bracket index requires an integer or {lista}<integer>"
 help = "use an integer scalar or {lista} of integer indices"
 
+[diagnostics.SEM011.issues.tensor_bracket_slot_integer_or_range]
+message = "index tensoris in uncis numerus aut intervallum esse debet"
+help = "quemque indicem numerum aut intervallum scribe, ut 0 ‥ 2"
+
 [diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
 message = "tensor arithmetic requires numeric element type"
 help = "use numeric tensor or sparsa element types"
