@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/mutabilitas/const-mutating-receiver-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/const-mutating-receiver-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "imperativus_operator_method_requires_varia_receiver"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "imperativus_operator_method_requires_varia_receiver"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "imperativus_operator_method_requires_varia_receiver"
