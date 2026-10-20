@@ -7,3 +7,18 @@ input = "adfirma/adfirma-else-reject.fab"
 
 [expect]
 check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "adfirma_else_rejected"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "adfirma_else_rejected"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "adfirma_else_rejected"

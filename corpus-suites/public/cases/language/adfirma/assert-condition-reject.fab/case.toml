@@ -7,3 +7,18 @@ input = "adfirma/assert-condition-reject.fab"
 
 [expect]
 check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "assert_condition_type_mismatch"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "assert_condition_type_mismatch"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "assert_condition_type_mismatch"
