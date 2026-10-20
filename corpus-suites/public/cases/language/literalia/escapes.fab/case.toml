@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/literalia/escapes.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/escapes.fab"
+
+
+[expect]
+check_only = true
