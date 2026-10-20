@@ -4,8 +4,8 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "sparsa rejects non-numeric element types in v1."
-syntax = "sparsa<textus, [N]> — rejected"
+summary = "sparse rejects non-numeric element types in v1."
+syntax = "sparse<textus, [N]> — rejected"
 related = ["sparsa", "tensor"]
 locale = "en"
 no_expected = "rejects"
@@ -13,7 +13,7 @@ diagnostic = "SEM008:sparsa_element_non_numeric"
 +++
 
 # =============================================================================
-# sparsa — sparsa rejects non-numeric element types in v1.
+# sparsa — sparse rejects non-numeric element types in v1.
 # =============================================================================
 #
 # What this teaches:
@@ -21,7 +21,7 @@ diagnostic = "SEM008:sparsa_element_non_numeric"
 #   • Compile-time guarding — non-numeric declarations are caught before codegen
 #
 # Common mistakes:
-#   • assuming sparse tensors can hold any element type like dense tensors can — sparsa requires numeric elements in v1
+#   • assuming sparse tensors can hold any element type like dense tensors can — sparse requires numeric elements in v1
 #
 # See also: sparsa, tensor
 # =============================================================================
@@ -35,6 +35,6 @@ diagnostic = "SEM008:sparsa_element_non_numeric"
 # per-backend EXPECTED_FAILURES lists.
 
 main {
-    let sparsa<string, [2]> words ← empty
+    let sparse<string, [2]> words ← empty
     print words.length()
 }

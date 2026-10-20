@@ -421,7 +421,7 @@ fn en_surface_invert_shared_across_lista_and_matrix() {
 /// identity, so a member call still parses).
 #[test]
 fn en_surface_union_is_identity_row_on_intervallum() {
-    let source = "fn probe(intervallum<int> i, intervallum<int> j) → any {\n    return i.union(j)\n}\n";
+    let source = "fn probe(range<int> i, range<int> j) → any {\n    return i.union(j)\n}\n";
     let unit =
         analyze(source, Some(en_pack())).expect("en `.union(j)` on an intervallum must typecheck with the en pack");
     assert_eq!(

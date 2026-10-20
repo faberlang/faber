@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "collection"
 canonical = false
 summary = "Dense/sparse conversio rejects shape-changing representation conversion."
-syntax = "tensor<T, F> ↦ sparsa<T, G> — rejected when F != G"
+syntax = "tensor<T, F> ↦ sparse<T, G> — rejected when F != G"
 related = ["sparsa", "tensor", "↦"]
 locale = "en"
 no_expected = "rejects"
@@ -17,7 +17,7 @@ diagnostic = "SEM016:sparsa_tensor_shape_mismatch"
 # =============================================================================
 #
 # What this teaches:
-#   • Representation conversion rules — `tensor ↔ sparsa` requires matching shapes
+#   • Representation conversion rules — `tensor ↔ sparse` requires matching shapes
 #   • Compile-time rejection — shape mismatches are caught at typecheck, not runtime
 #
 # Common mistakes:
@@ -29,7 +29,7 @@ diagnostic = "SEM016:sparsa_tensor_shape_mismatch"
 
 # sparsa conversio reject case — expected compile failure
 #
-# WHY: `tensor ↔ sparsa` `↦` changes representation only. Reshape explicitly
+# WHY: `tensor ↔ sparse` `↦` changes representation only. Reshape explicitly
 # before changing dense/sparse storage.
 #
 # This exemplum intentionally fails to compile; it is registered in the

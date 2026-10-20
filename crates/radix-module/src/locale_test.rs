@@ -1497,6 +1497,19 @@ fn llm_pack_resolves_morphology_keyword_latin_keys() {
 }
 
 #[test]
+fn en_pack_spells_sparse_and_range_types() {
+    let pack = installed_pack("en");
+    assert_eq!(
+        pack.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Sparsa)),
+        "sparse"
+    );
+    assert_eq!(
+        pack.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
+        "range"
+    );
+}
+
+#[test]
 fn en_pack_empty_marker_rejects_vacua_alias() {
     // Goal en-pack-surface-fidelity V-5: en accepts only `empty` as the
     // empty-collection marker. The intrinsic row `vacua = "is_empty"` is a

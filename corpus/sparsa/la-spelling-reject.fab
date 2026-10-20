@@ -1,0 +1,39 @@
++++
+term = "sparsa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "call_expr", "call_suffix", "argument_list", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "The Latin type word sparsa in an en file is a wrong-locale error (expect parse error)."
+syntax = "let sparsa<f32, [2, 3]> grid ← empty — rejected in an en file; write sparse<f32, [2, 3]>"
+related = ["sparsa"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE040:wrong_locale_type"
++++
+
+# =============================================================================
+# sparsa — Latin sparse type word in an en file (expect parse error).
+# =============================================================================
+#
+# What this teaches:
+#   • Locale surfaces are sealed — the en spelling of the sparse tensor type is `sparse`, so the Latin `sparsa` is refused in an en file
+#   • Parse error — `PARSE040:wrong_locale_type` names the word written and the en spelling to use instead
+#
+# Common mistakes:
+#   • writing `sparsa<f32, [2, 3]>` in an en file — write `sparse<f32, [2, 3]>`
+#
+# See also: sparsa
+# =============================================================================
+
+# Latin sparse type word in an en file (expect parse error)
+#
+# WHY: en and la spellings never mix in one file; the en pack owns `sparse`.
+#
+# DELIBERATE: this exemplum keeps the Latin spelling (`sparsa`) on purpose, to
+# pin the PARSE040 `wrong_locale_type` diagnostic for the sparse tensor type.
+
+main {
+    let sparsa<f32, [2, 3]> grid ← empty
+    print grid.count_nonzero()
+}

@@ -15,7 +15,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Sugar syntax — `sf32[2, 3]` as shorthand for `sparsa<f32, [2, 3]>`
+#   • Sugar syntax — `sf32[2, 3]` as shorthand for `sparse<f32, [2, 3]>`
 #   • Naming convention — the `s` prefix distinguishes sparse from dense tensor sugar
 #
 # Common mistakes:

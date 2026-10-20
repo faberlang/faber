@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/sparsa/la-spelling-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "sparsa/la-spelling-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "PARSE040.wrong_locale_type"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "PARSE040.wrong_locale_type"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "PARSE040:wrong_locale_type"

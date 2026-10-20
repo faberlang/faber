@@ -51,12 +51,12 @@ main {
     assert closed_flat.length() ≡ 4
 
     # --- range-to-range clamp inherits target inclusivity ---
-    let intervallum<int> wide ← 0‥100
-    let intervallum<int> narrow ← wide ↦ 10…50
+    let range<int> wide ← 0‥100
+    let range<int> narrow ← wide ↦ 10…50
     assert narrow.length() ≡ 41
 
     # --- stored containment via continet (`∈` over a range tests the same containment) ---
-    let intervallum<int> fines ← 0‥10
+    let range<int> fines ← 0‥10
     let bool inside ← fines.contains(5)
     assert inside
 }

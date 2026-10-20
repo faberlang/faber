@@ -356,7 +356,7 @@ fn intervallum_intersection_method_spellings_survive_the_membership_retirement()
     accepts(&compile(latin));
     let en = |method: &str| {
         format!(
-            "+++\nlocale = \"en\"\n+++\nmain {{\n    let intervallum<int> a ← 0‥10\n    let intervallum<int> b ← 5‥15\n    let _ x ← a.{method}(b)\n    print x\n}}\n"
+            "+++\nlocale = \"en\"\n+++\nmain {{\n    let range<int> a ← 0‥10\n    let range<int> b ← 5‥15\n    let _ x ← a.{method}(b)\n    print x\n}}\n"
         )
     };
     accepts(&compile(&en("intersect")));
