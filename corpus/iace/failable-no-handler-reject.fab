@@ -1,0 +1,30 @@
++++
+term = "iace"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "si_stmt", "arm", "iace_stmt", "iace_expr", "equality", "equality_tail", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "errors"
+summary = "A call to a ⇥ function with no handler is rejected: do/catch, capta, a ⊥ default, or a ⇥ on the caller."
+syntax = "fn h() → int { return f(1) }  (f is → int ⇥ string)"
+related = ["functio", "⇥", "iace", "cape"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:failable_call_requires_handler"
++++
+# failable call — the caller must answer the ⇥ channel
+#
+# f is failable (→ int ⇥ string). h is not, and it neither wraps the call in
+# do/catch, captures it, defaults it, nor declares its own ⇥ — so the checker
+# rejects the file (SEM011 failable_call_requires_handler).
+
+fn f(int n) → int ⇥ string {
+    if n ≡ 0 then throw "zero"
+    return n
+}
+
+fn h() → int {
+    return f(1)
+}
+
+main {
+    print h()
+}
