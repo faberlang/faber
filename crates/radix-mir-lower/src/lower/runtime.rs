@@ -6173,3 +6173,7 @@ pub(super) fn matrix_cell_operand(place: &MirPlace, row: u8, column: u8) -> MirO
 #[cfg(test)]
 #[path = "octeti_tensor_size_param_test.rs"]
 mod octeti_tensor_size_param_test;
+
+#[cfg(test)]
+#[path = "sink_into_test.rs"]
+mod sink_into_test;
