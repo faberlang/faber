@@ -1,0 +1,38 @@
++++
+term = "textus"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "member_suffix", "expression", "unary_expr", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "A negative scalar text index kills the run where it is evaluated; it never counts from the end."
+syntax = "s[i]"
+related = ["textus", "numerus-overflow"]
+locale = "en"
++++
+# =============================================================================
+# textus — a negative scalar index kills the run
+# =============================================================================
+#
+# What this teaches:
+#   • `s[i]` with a negative `i` is a run-time trap: the run prints its
+#     earlier output, then aborts with "expected non-negative numerus index"
+#     and exits non-zero. A negative index never counts from the end.
+#
+# Common mistakes:
+#   • expecting `s[-1]` to yield the last character — Faber has no
+#     end-relative indexing
+#   • expecting the trap to be recoverable with `fac … cape` — an implicit
+#     index trap is not in the `⇥` channel
+#
+# See also: textus, numerus-overflow
+#
+# EXPECTED OUTPUT:
+#   index-death-negative.expected (pre-trap stdout only)
+# =============================================================================
+
+main {
+    let string s ← "abc"
+    let int i ← -1
+    print "before"
+    print s[i]
+}

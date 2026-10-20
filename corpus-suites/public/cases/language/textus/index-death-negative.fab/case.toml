@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/textus/index-death-negative.fab"
+group = "language"
+input_root = "corpus"
+input = "textus/index-death-negative.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "expected non-negative numerus index"
+check_only = false

@@ -1,0 +1,39 @@
++++
+term = "textus"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "A scalar text index past the last character kills the run where it is evaluated; it never trims or wraps."
+syntax = "s[i]"
+related = ["textus", "numerus-overflow"]
+locale = "en"
++++
+# =============================================================================
+# textus — an out-of-range scalar index kills the run
+# =============================================================================
+#
+# What this teaches:
+#   • `s[i]` with `i` past the last character is a run-time trap: the run
+#     prints its earlier output, then aborts with "text index out of bounds"
+#     and exits non-zero. The index is never trimmed to the last character
+#     and never wraps around.
+#
+# Common mistakes:
+#   • expecting `s[3]` on "abc" to yield the last character or an empty
+#     string — the index must lie inside `0‥len`
+#   • expecting the trap to be recoverable with `fac … cape` — an implicit
+#     index trap is not in the `⇥` channel
+#
+# See also: textus, numerus-overflow
+#
+# EXPECTED OUTPUT:
+#   index-death-oob.expected (pre-trap stdout only)
+# =============================================================================
+
+main {
+    let string s ← "abc"
+    let int i ← 3
+    print "before"
+    print s[i]
+}
