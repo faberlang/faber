@@ -39,12 +39,55 @@ fn nvvm_session() -> Session {
     )
 }
 
+fn diagnostic_args(result: &crate::CompileResult) -> Vec<(String, String)> {
+    result
+        .diagnostics
+        .iter()
+        .flat_map(|diagnostic| {
+            diagnostic
+                .args
+                .iter()
+                .map(|arg| (arg.name.to_owned(), arg.value.clone()))
+        })
+        .collect()
+}
+
 fn llvm_text(result: crate::CompileResult, label: &str) -> String {
     assert!(result.success(), "{label} compile failed: {:?}", result.diagnostics);
     let Some(crate::Output::LlvmText(output)) = result.output else {
         panic!("{label}: expected llvm-text output");
     };
     output.code
+}
+
+#[test]
+fn rope_half_cuda_column_is_refused_at_emit() {
+    let result = compile(
+        &nvvm_session(),
+        "rope_half_nvvm.fab",
+        &rope_kernel_source("rope_half"),
+        ModuleCompileRequest::default(),
+    );
+    assert!(
+        !result.success(),
+        "if this fires, rope_half now reaches the NVVM device module on this checkout, so pin the emitted device markers instead and report the divergence"
+    );
+
+    let error = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.is_error())
+        .unwrap_or_else(|| panic!("expected an error diagnostic, got: {:?}", result.diagnostics));
+    assert_eq!(error.code, Some("CODEGEN001"));
+    assert_eq!(error.phase, radix_diagnostics::DiagnosticPhase::Codegen);
+
+    let args = diagnostic_args(&result);
+    assert!(args.contains(&("category".to_owned(), "unsupported-mir-shape".to_owned())));
+    assert!(
+        args.iter().any(|(name, value)| {
+            name == "shape" && value.contains("TensorRopeHalf") && value.contains("rotate_half")
+        })
+    );
 }
 
 #[test]
