@@ -328,6 +328,22 @@ impl super::FaberCodegen<'_> {
                     writer.write(close);
                 }
             }
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
+                if type_args.is_empty()
+                    && args.is_empty()
+                    && self.glyph_ids.contains(&expr.id)
+                    && self.radical_prefix(*name, surface).is_some() =>
+            {
+                // Authored `√ x` / `∛ x`: typecheck rewrote the glyph marker
+                // to the radical twin and kept the node id; the prefix glyph
+                // is the authored surface. A radical binds like unary `-`, so
+                // a looser operand keeps its parentheses.
+                if let Some(prefix) = self.radical_prefix(*name, surface) {
+                    writer.write(prefix);
+                    writer.write(" ");
+                    self.write_expr_prec(receiver, 12, names, surface, writer);
+                }
+            }
             HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
                 if type_args.is_empty() && args.is_empty() && self.glyph_ids.contains(&expr.id) =>
             {
