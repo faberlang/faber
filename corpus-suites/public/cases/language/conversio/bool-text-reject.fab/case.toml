@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/conversio/bool-text-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/bool-text-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "text to bivalens conversion failed"
+check_only = false

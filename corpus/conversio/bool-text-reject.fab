@@ -1,0 +1,33 @@
++++
+term = "bool-text-reject"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "expression", "unary_expr", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "A bare `<textus> ↦ bool` with no `⊥` default aborts at run time on any word that is not the code locale's true/false spelling."
+syntax = "<textus> ↦ bool"
+related = ["↦", "bool"]
+locale = "en"
+no_expected = "traps-by-design"
+ruling = "2eecb23a"
++++
+# =============================================================================
+# bool-text-reject — a bare text ↦ bool aborts on an unknown word
+# =============================================================================
+#
+# What this teaches:
+#   • `textus ↦ bool` parses exactly the code locale's `true`/`false` words.
+#   • With no `⊥` default, any other word is a run-time failure: the run
+#     aborts with `text to bivalens conversion failed` and nothing prints
+#     (operator ruling 2026-10-15, need).
+#
+# Common mistakes:
+#   • Expecting `"salve"` to be `true` — non-empty text is not truthiness.
+#   • Omitting the `⊥` default when the input may be an arbitrary word.
+#
+# See also: ↦, bool — and the positive twin `bool-text.fab`.
+# =============================================================================
+
+main {
+    print "salve" ↦ bool
+}
