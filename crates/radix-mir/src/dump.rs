@@ -708,6 +708,7 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::TensorMaterialize => "tensor_materialize",
         MirCollectionOp::TensorSlice => "tensor_slice",
         MirCollectionOp::TensorSliceNd => "tensor_slice_nd",
+        MirCollectionOp::TensorRank => "tensor_rank",
         MirCollectionOp::TensorExpand => "tensor_expand",
         MirCollectionOp::TensorShift => "tensor_shift",
         MirCollectionOp::TensorCopyInto => "tensor_copy_into",
