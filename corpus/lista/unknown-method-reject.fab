@@ -1,0 +1,35 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Calling a method a list does not have is refused by name."
+syntax = "xs.frobnicate() on list<int> — rejected"
+related = ["lista", "methodi"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM004:unknown_method"
++++
+# =============================================================================
+# lista — Calling a method a list does not have is refused by name.
+# =============================================================================
+#
+# What this teaches:
+#   • a list has a fixed method surface; `.frobnicate()` is not on it
+#   • the checker names the unknown method instead of guessing a result type
+#
+# Common mistakes:
+#   • misspelling a stdlib method — the refusal names the method, not a type
+#
+# See also: methodi-accessus, methodi-copiae
+# =============================================================================
+
+# lista reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let list<int> xs ← [1]
+    print xs.frobnicate()
+}
