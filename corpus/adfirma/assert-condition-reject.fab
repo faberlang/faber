@@ -1,0 +1,22 @@
++++
+term = "adfirma"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "incipit_stmt", "block_stmt", "adfirma_stmt", "expression", "literal"]
+category = "testing"
+summary = "The assert condition must be boolean; an int literal is refused."
+syntax = "assert 5"
+related = ["proba", "fac", "cape"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:assert_condition_type_mismatch"
++++
+# =============================================================================
+# adfirma — the condition must be boolean
+# =============================================================================
+# `adfirma` validates an invariant, so its condition is a `bool` expression. A
+# value of any other type — here an int literal — is a check error rather than
+# an implicit truthiness test.
+
+main {
+    assert 5
+}

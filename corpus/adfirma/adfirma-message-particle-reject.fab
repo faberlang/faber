@@ -1,0 +1,22 @@
++++
+term = "adfirma"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "incipit_stmt", "block_stmt", "adfirma_stmt", "expression", "literal", "equality", "equality_tail"]
+category = "testing"
+summary = "A message on the assert line needs its panic particle."
+syntax = "assert 1 ≡ 1 \"m\""
+related = ["proba", "fac", "cape"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:adfirma_message_particle"
++++
+# =============================================================================
+# adfirma — the message needs its panic particle
+# =============================================================================
+# A string literal on the same line right after the condition reads as a
+# failure message that lost its particle. It is rejected rather than parsed as
+# a separate statement, which would silently drop the message.
+
+main {
+    assert 1 ≡ 1 "m"
+}

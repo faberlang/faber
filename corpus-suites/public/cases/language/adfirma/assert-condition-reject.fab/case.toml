@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/adfirma/assert-condition-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "adfirma/assert-condition-reject.fab"
+
+
+[expect]
+check_only = true
