@@ -465,6 +465,7 @@ fn intrinsic(value: &MirIntrinsic) -> String {
                 ))
         ),
         MirIntrinsic::Duplicate => "duplicate".to_owned(),
+        MirIntrinsic::Pow => "pow".to_owned(),
         MirIntrinsic::TensorLift(op) => format!("tensor_lift {}", op.name()),
         MirIntrinsic::VectorOp(op) => format!("vector_op {}", op.name()),
     }

@@ -531,6 +531,19 @@ impl Validator<'_, '_> {
                     self.validate_operand(scope, arg, span);
                 }
             }
+            MirIntrinsic::Pow => {
+                self.require_arg_count(call.args.len(), 2, span, "pow runtime call");
+                for arg in &call.args {
+                    if let Some(ty) = self.validate_operand(scope, arg, span)
+                        && !self.is_float_operand_type(ty)
+                    {
+                        self.error(span, "pow operand is not fractus");
+                    }
+                }
+                if !self.is_float_operand_type(call.return_ty) {
+                    self.error(span, "pow result is not fractus");
+                }
+            }
             // K4 elementwise lift: the operator's arity of operands (tensors
             // or scalars, checked by the typechecker) and a tensor result.
             MirIntrinsic::TensorLift(op) => {

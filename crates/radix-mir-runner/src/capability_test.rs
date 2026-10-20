@@ -146,7 +146,7 @@ fn every_runtime_family_has_a_runner_ledger_status() {
     // family) is a deliberate change visible in this test and in
     // docs/factory/stepper-alignment/stepper-runtime-ledger.md.
     use RunnerDispatchStatus::*;
-    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 23] = [
+    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 24] = [
         (MirRuntimeAbiFamily::RuntimeDiagnostic, Implement),
         (MirRuntimeAbiFamily::RuntimeAssert, Implement),
         (MirRuntimeAbiFamily::RuntimeFormat, Implement),
@@ -176,6 +176,8 @@ fn every_runtime_family_has_a_runner_ledger_status() {
         // K4: elementwise operator lift over tensors; the runner is the
         // reference, other lanes reject it.
         (MirRuntimeAbiFamily::RuntimeTensorLift, Implement),
+        // IEEE pow over fractus: the runner evaluates the host libm pow.
+        (MirRuntimeAbiFamily::RuntimePow, Implement),
         // A deferred vector op is expanded before any executor runs, so no lane
         // dispatches this family.
         (MirRuntimeAbiFamily::RuntimeVectorOp, IntentionalReject),
@@ -183,8 +185,8 @@ fn every_runtime_family_has_a_runner_ledger_status() {
     ];
     assert_eq!(
         expected.len(),
-        23,
-        "ledger must cover all twenty-three runtime families"
+        24,
+        "ledger must cover all twenty-four runtime families"
     );
     for (family, want) in expected {
         assert_eq!(

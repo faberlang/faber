@@ -1139,6 +1139,11 @@ pub enum MirIntrinsic {
     /// operands of `And`/`Or` and all three of `Select` are always evaluated.
     /// The MIR runner is the reference; every other executor fails closed.
     TensorLift(MirLiftOp),
+    /// IEEE 754 pow (C99 Annex F) over two fractus operands, the correctly
+    /// rounded core of fractus `potentia`/`power`. The runner evaluates the
+    /// host libm pow; other lanes reject it until the target carry (corpus
+    /// coverage F4, audit gap #11).
+    Pow,
     /// Resolve a lazy shifted tensor edge view; the single argument is the
     /// shifted receiver and the payload selects its built-in or user policy.
     TensorLimes(MirEdgePolicy),
