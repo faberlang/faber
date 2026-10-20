@@ -2753,6 +2753,44 @@ pub(crate) fn data_flow_element_ty_and_count(
     }
 }
 
+/// Resolve a data-flow buffer's kernel element type and extent, preserving a
+/// run-time-shaped tensor as the launch-time marker while keeping scalar and
+/// unsupported-layout handling identical to the literal-only reader.
+pub(crate) fn data_flow_element_ty_and_count_or_runtime(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<(MirType, u64), PlanMappingError> {
+    let layout = validation
+        .layouts
+        .layout_for_type(ty)
+        .map_err(|error| PlanMappingError::mapping(error.message))?;
+    match layout.kind {
+        MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar) => {
+            Ok((ty, 1))
+        }
+        MirLayoutKind::Scalar(scalar) => Err(PlanMappingError::mapping(format!(
+            "kernel scalar layout {}",
+            scalar.spelling()
+        ))),
+        MirLayoutKind::DeviceView(_) => {
+            let element_ty = tensor_element_ty(ty, validation)?;
+            let dims = crate::tensor_type::tensor_dims(ty, validation)
+                .map_err(PlanMappingError::mapping)?;
+            let count = match crate::tensor_type::dims_product_checked(&dims) {
+                Ok(count) => count,
+                Err(crate::tensor_type::NON_LITERAL_DIM_MESSAGE) => {
+                    crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT
+                }
+                Err(message) => return Err(PlanMappingError::mapping(message)),
+            };
+            Ok((element_ty, count))
+        }
+        _ => Err(PlanMappingError::mapping(
+            "data-flow input requires a tensor or kernel-scalar type",
+        )),
+    }
+}
+
 /// The local type of a recipe-op statement's first operand (the tensor the
 /// reduction/transpose recipe reads) — resolved from the subchain body's
 /// typed statement scan.
@@ -3811,7 +3849,7 @@ fn finish_subchain_emission_signature(
         if signature.output.source_local == Some(param.local) {
             continue;
         }
-        let (element_ty, count) = data_flow_element_ty_and_count(param.ty, validation)?;
+        let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(param.ty, validation)?;
         // S6-P1 seam repair (widened d8518267): a data-flow input that is a
         // `TensorSumAxis` result of an EARLIER subchain binds at the REDUCED
         // count the producer's seam output carries — the keep-dims local
@@ -3839,7 +3877,7 @@ fn finish_subchain_emission_signature(
     next_binding = next_binding.saturating_add(1);
     for &output in outputs.iter().skip(1) {
         let local_ty = function_local_ty(function, output)?;
-        let (element_ty, count) = data_flow_element_ty_and_count(local_ty, validation)?;
+        let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(local_ty, validation)?;
         signature.extra_outputs.push(storage_output_with_local(
             next_binding,
             element_ty,
