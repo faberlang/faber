@@ -1,0 +1,31 @@
++++
+term = "requirit"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "requirit_stmt", "equality", "equality_tail", "expression", "literal", "incipit_stmt"]
+category = "errors"
+canonical = false
+summary = "Require always names its payload with throw; the missing particle is refused by name."
+syntax = "require <cond>"
+related = ["requirit", "iace", "cape"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE001:requirit_iace"
++++
+# =============================================================================
+# requirit — a require guard must name its payload
+# =============================================================================
+#
+# What this teaches:
+#   • `requirit cond iace err` always carries the `iace` particle (en `throw`)
+#     and the error value to throw. The particle is mandatory, so a guard that
+#     drops it is refused by name (PARSE001 requirit_iace).
+#   • The statement desugars to `si non (cond) { iace err }`: there is no
+#     recoverable failure without something to throw.
+#
+# Common mistakes:
+#   • writing the guard as a bare condition — add `iace <error>` after it.
+# =============================================================================
+
+main {
+    require 1 ≡ 1
+}
