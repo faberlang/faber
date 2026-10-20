@@ -1,0 +1,28 @@
++++
+term = "functio"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "si_stmt", "arm", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A value-returning function must return on every path; a guard that leaves a fall-through path is an error."
+syntax = "fn f(int a) → int { if a ≻ 0 { return 1 } } — rejected"
+related = ["redde", "si"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM033:control_flow_fallthrough"
++++
+# =============================================================================
+# functio — every path of a value-returning function returns
+# =============================================================================
+# This exemplum intentionally fails to compile: the guard returns on one path
+# and falls off the end of the function on the other.
+
+fn f(int a) → int {
+    if a ≻ 0 {
+        return 1
+    }
+}
+
+main {
+    print f(1)
+}

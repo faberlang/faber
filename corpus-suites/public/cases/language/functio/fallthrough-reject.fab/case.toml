@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/functio/fallthrough-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "functio/fallthrough-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "control_flow_fallthrough"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "control_flow_fallthrough"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "control_flow_fallthrough"
