@@ -1001,13 +1001,17 @@ fn training_facts() -> DeviceTrainingFacts {
     }
 }
 
-fn training_fixture<R>(run: impl FnOnce(&Interner, &ValidatedMir<'_>, &MirCompanionMap) -> R) -> R {
+/// `compute_companion` selects the companion's shader stage (Compute when true).
+fn training_fixture<R>(
+    compute_companion: bool,
+    run: impl FnOnce(&Interner, &ValidatedMir<'_>, &MirCompanionMap) -> R,
+) -> R {
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
     let tensor_id = rank1_tensor_ty(&mut types, 2).semantic_id();
     let forward = forward_function(&mut types, &mut interner);
     let step = train_step_function(&mut types, &mut interner);
-    let companion = companion_function(&mut types, &mut interner, false);
+    let companion = companion_function(&mut types, &mut interner, compute_companion);
     let companions = training_companions(tensor_id);
     let validated = validated(&types, vec![forward, step, companion]);
     run(&interner, &validated, &companions)
@@ -1026,7 +1030,7 @@ fn training_fixture<R>(run: impl FnOnce(&Interner, &ValidatedMir<'_>, &MirCompan
 fn constructor_aliases_param_updates_and_gradients() {
     let facts = training_facts();
 
-    training_fixture(|interner, validated, companions| {
+    training_fixture(false, |interner, validated, companions| {
         let (program, semantics, _) = build_device_program(
             validated,
             interner,
@@ -1161,7 +1165,7 @@ fn constructor_aliases_param_updates_and_gradients() {
 fn constructor_declares_observation_cadence_and_effective_steps() {
     let facts = training_facts();
 
-    training_fixture(|interner, validated, companions| {
+    training_fixture(false, |interner, validated, companions| {
         let (program, _semantics, effective_steps) = build_device_program(
             validated,
             interner,
