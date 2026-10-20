@@ -839,6 +839,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
                 .to_owned(),
         ),
         "tensor_bracket_index_integer_or_lista" => Some("use an integer scalar or lista of integer indices".to_owned()),
+        "tensor_bracket_slot_integer_or_range" => {
+            Some("make each bracket slot an integer or an integer range such as 0 ‥ 2".to_owned())
+        }
         "tensor_arithmetic_numeric_element_required" => Some("use numeric tensor or sparsa element types".to_owned()),
         "tensor_math_float_element_required" => Some(
             "convert the integer elements first with `↦` to a float tensor; only `absolutum` takes integer elements"
