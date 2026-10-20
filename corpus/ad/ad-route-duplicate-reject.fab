@@ -1,0 +1,29 @@
++++
+term = "ad"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "functio_decl", "param_list", "return_clause", "type_annotation", "base_type", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "endpoint"
+summary = "Two handlers may not serve the same route; a route is served once per program."
+syntax = "@ call 'm:x' fn a() → int { … }"
+related = ["ad", "sermo", "conversio"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM005:ad_route_duplicate"
++++
+# =============================================================================
+# ad — a route is served once per program
+# =============================================================================
+# `@ call '<route>'` pins a handler to a route. Two handlers claiming the same
+# route would answer the same traffic, so the program is refused.
+
+@ call 'm:x'
+fn a() → int {
+    return 1
+}
+@ call 'm:x'
+fn b() → int {
+    return 2
+}
+main {
+    print 1
+}
