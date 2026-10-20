@@ -383,7 +383,7 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
     // work is spent on it.
     let admitted = admit_device_session(input, selection, registry)?;
     let receipt = admitted.receipt.clone();
-    let stats = radix::program::mir::with_interpreted_bound_package_mir(
+    let (stats, _phases) = radix::program::mir::with_interpreted_bound_package_mir(
         config,
         input,
         host,
@@ -447,7 +447,7 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
                         host,
                         collect_stats,
                     )
-                    .map(|stats| Some(DeviceSessionRun { receipt, stats }))
+                    .map(|(stats, _phases)| Some(DeviceSessionRun { receipt, stats }))
                 }),
             )
         },
@@ -533,6 +533,16 @@ fn admit_device_session(
     })
 }
 
+/// The inner phases of one admitted device session, with the dispatcher's own
+/// receipt (observed before the dispatcher `Rc` drops at return).
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+struct DeviceRunPhases {
+    image_build_ns: u64,
+    module_compile_ns: u64,
+    execution_ns: u64,
+    dispatcher: super::device::DispatcherReceipt,
+}
+
 /// Build the device image from the lowered unit and run the argument-bound
 /// entry on the MIR runner under kernel dispatch through the admitted session.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
@@ -544,14 +554,17 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     exit_code: Option<i32>,
     host: &mut H,
     collect_stats: bool,
-) -> Result<Option<radix_mir_runner::RunnerStats>, Vec<Diagnostic>> {
+) -> Result<(Option<radix_mir_runner::RunnerStats>, DeviceRunPhases), Vec<Diagnostic>> {
     use super::device::{SessionKernelDispatcher, device_image_for_lowered};
     use super::host_factory::host_error_diagnostic;
+    use std::time::Instant;
 
     let AdmittedDeviceSession {
         session, backend, ..
     } = admitted;
+    let image_start = Instant::now();
     let (mut image, omitted) = device_image_for_lowered(lowered, backend)?;
+    let image_build_ns = image_start.elapsed().as_nanos() as u64;
     if image.kernels.is_empty() {
         let reasons = omitted
             .iter()
@@ -602,6 +615,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     let fault_sites = image.fault_sites;
     let backward = std::mem::take(&mut image.backward);
     let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
+    let dispatcher_start = Instant::now();
     let dispatcher = SessionKernelDispatcher::new(
         session,
         image.artifact,
@@ -609,6 +623,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         validated.validation().types.as_table(),
     )
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
+    let module_compile_ns = dispatcher_start.elapsed().as_nanos() as u64;
     dispatcher.borrow_mut().set_omissions(omissions);
     dispatcher
         .borrow_mut()
@@ -637,11 +652,17 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     // the fallback for a vacuum entry (the same rule as the FMIR image and the
     // plain runner route). Reading the return on the unmetered arm too keeps a
     // dynamic exit from being silently dropped now that plan time admits it.
+    let execution_start = Instant::now();
     let outcome = radix_mir_runner::run_function_with_kernel_dispatcher_and_stats(
         validated, entry, host, &hook,
     )
     .map_err(runner_diagnostics)?;
+    let execution_ns = execution_start.elapsed().as_nanos() as u64;
     outcome.result.map_err(runner_diagnostics)?;
+    // WHY: taken here, before the exit handling (`host.exit` panics in tests)
+    // and while the dispatcher `Rc` is still alive; the receipt is dropped with
+    // the dispatcher at return otherwise.
+    let dispatcher_receipt = dispatcher.borrow().receipt();
     if let Some(radix_mir_runner::Value::Int(code)) = outcome.return_value {
         // WHY: a process exit status is `i32` while the Faber `numerus`
         // carrier is `i64`; truncate exactly as the trap path does.
@@ -651,7 +672,15 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     } else if let Some(code) = exit_code {
         host.exit(code);
     }
-    Ok(collect_stats.then_some(outcome.stats))
+    Ok((
+        collect_stats.then_some(outcome.stats),
+        DeviceRunPhases {
+            image_build_ns,
+            module_compile_ns,
+            execution_ns,
+            dispatcher: dispatcher_receipt,
+        },
+    ))
 }
 
 /// Whether the package lowers at least one `@ kernel` function: the `auto`
