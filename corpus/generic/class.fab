@@ -1,0 +1,81 @@
++++
+term = "generic class"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "functio_method_decl", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "typed_constructor", "field_list", "field_init", "field_key", "sit_decl", "incipit_stmt", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A generic class carries a type parameter through its field, methods, and constructor, and nests or infers in the usual way."
+syntax = "class Box<T> { mut T v; fn get() → T } | let Box<int> b ← Box { v = 6 }"
+related = ["generic", "genus", "functio"]
+locale = "en"
++++
+# =============================================================================
+# generic — generic classes
+# =============================================================================
+#
+# What this teaches:
+#   • A class declares a type parameter: `class Box<T>` and `class Pair<A, B>`
+#   • Methods read the parameter and return it: `fn get() → T`, and a method may
+#     return a re-parameterized genus: `fn swap() → Pair<B, A>`
+#   • A type parameter nests: `fn wrap<T>(T x) → Box<Box<T>>`
+#   • A constructor literal infers its type arguments from the target slot:
+#     `let Box<int> c ← Box { v = 6 }`
+#   • Fields are `mut T x` (writable) or `let T x` (read-only); a field store is
+#     `←`, and `=` only names a constructor argument
+#   • Related keywords: fn, class, let, mut, ←
+#
+# See also: generic, genus, functio
+# =============================================================================
+
+# generic class — a parameter carried through field, method, and constructor
+#
+# EXPECTED OUTPUT:
+#   4
+#   x
+#   z
+#   1
+#   3
+#   4
+#   q
+#   6
+#
+# BACKEND:
+#   The runner monomorphizes each genus instantiation; `Box<Box<T>>` nests two
+#   instantiations, and an inferred constructor literal takes its type arguments
+#   from the declared slot.
+
+class Box<T> {
+    mut T v
+    fn get() → T { return self.v }
+    fn set(T n) → void { self.v ← n }
+}
+
+class Pair<A, B> {
+    let A a
+    let B b
+    fn swap() → Pair<B, A> { return Pair<B, A> { a = self.b, b = self.a } }
+}
+
+fn wrap<T>(T x) → Box<Box<T>> { return Box<Box<T>> { v = Box<T> { v = x } } }
+
+fn mk<T>(T x) → Box<T> { return Box<T> { v = x } }
+
+main {
+    mut Box<int> b ← Box<int> { v = 3 }
+    b.set(b.get() + 1)
+    print b.get()
+    let Box<string> s ← Box<string> { v = "x" }
+    print s.get()
+    let Pair<int, string> p ← Pair<int, string> { a = 1, b = "z" }
+    let Pair<string, int> q ← p.swap()
+    print q.a
+    print q.b
+    let Box<Box<int>> n ← wrap(3)
+    print n.v.v
+    let Box<int> m ← mk(4)
+    print m.v
+    let Box<string> u ← mk("q")
+    print u.v
+    let Box<int> c ← Box { v = 6 }
+    print c.v
+}
