@@ -638,9 +638,9 @@ fn decimals_compute_exactly_and_print_shortest() {
 
 /// The public clif lane serves a native clock leaf end to end: `SermoOpen` on
 /// `tempus:monotonicum`, a materializing `numerus` conversion, then a
-/// comparison against zero. A monotonic reading is always positive, so the
-/// printed boolean is `true`; a faulted leaf or a missed route answers the
-/// recovery `0` and the comparison is honestly `false`.
+/// comparison against zero. A monotonic reading counts from the clock's first
+/// use, so it is never negative (and may be exactly 0); a faulted leaf or a
+/// missed route answers the recovery `-1` and the comparison is honestly `false`.
 #[test]
 fn sermo_clock_leaf_materializes_and_prints() {
     let (_, mut table) = fixture(vec![], vec![]);
@@ -668,7 +668,7 @@ fn sermo_clock_leaf_materializes_and_prints() {
                     source_ty: handle,
                     target_ty: numerus,
                     params: vec![],
-                    recovery: Some(MirOperand::Constant(MirConstant::Int(0))),
+                    recovery: Some(MirOperand::Constant(MirConstant::Int(-1))),
                     struct_defaults: vec![],
                 }),
                 args: vec![MirOperand::Temp(MirTempId(1))],
@@ -680,7 +680,7 @@ fn sermo_clock_leaf_materializes_and_prints() {
             10,
             bivalens,
             binary(
-                MirBinOp::Gt,
+                MirBinOp::GtEq,
                 MirOperand::Temp(MirTempId(2)),
                 MirOperand::Constant(MirConstant::Int(0)),
             ),
