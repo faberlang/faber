@@ -1,0 +1,35 @@
++++
+term = "discerne duplicate variant"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Decline: each union variant is matched at most once, so a second case for the same variant is rejected with SEM042:duplicate_variant."
+syntax = "discerne <Shape> { case Circle let r … case Circle let r … } — rejected; merge the arms"
+related = ["discerne", "casu", "union"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM042:duplicate_variant"
++++
+
+# =============================================================================
+# discerne duplicate variant — matching one variant twice is a check error
+# =============================================================================
+# discerne matches a closed set, and each member appears exactly once. Shape
+# has two variants (Circle, Dot); the first two arms both name Circle, so the
+# second one is unreachable and rejected with SEM042:duplicate_variant.
+#
+# DELIBERATE: the discerne below is the rejected form, kept on purpose to pin
+# the diagnostic. The accepted spelling merges the two Circle arms into one.
+
+union Shape { Circle { int r }, Dot }
+
+fn f(Shape s) → int {
+    match s {
+        case Circle let r { return r }
+        case Circle let r { return r + 1 }
+        case Dot { return 0 }
+    }
+}
+
+main { print 1 }
