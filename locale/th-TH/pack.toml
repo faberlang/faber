@@ -4043,3 +4043,40 @@ message = "ต้องมี '(' หลัง 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์ของ scriptum"
+
+# Package-layer rows. The PKG001 base row only holds issue rows: the renderer
+# shows a PKG001 diagnostic from the pack only when its own issue row exists.
+[diagnostics.PKG001]
+message = "สร้างแพ็กเกจไม่สำเร็จ"
+
+[diagnostics.PKG001.issues.E_LLVMHOST_UNSUPPORTED_HOST]
+message = "llvm-host ไม่รองรับโฮสต์ {arch}-{os}"
+help = "llvm-host สร้างแบบเนทีฟบน macOS และ Linux ที่เป็น aarch64 หรือ x86_64 เท่านั้น; โปรดสร้างบนโฮสต์ที่รองรับหรือเลือกเป้าหมายอื่น"
+
+[diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
+message = "llvm-host ต้องใช้ชุดเครื่องมือ LLVM ที่สอดคล้องกัน (llvm-as และ clang รุ่นเดียวกัน): {reason}"
+help = "ติดตั้ง LLVM ให้ llvm-as และ clang อยู่ใน PATH หรือตั้ง LLVM_HOME เป็นคำนำหน้าการติดตั้ง LLVM"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
+message = "ไม่พบอาร์ไคฟ์รันไทม์ faber-host-llvm ({cause}): {detail}"
+help = "ตรวจสอบว่าติดตั้ง cargo และอยู่ใน PATH (หรือตั้ง CARGO) และมีซอร์สรันไทม์อยู่ แล้วสร้างใหม่"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
+message = "อาร์ไคฟ์รันไทม์ faber-host-llvm ไม่ผ่านการตรวจสอบเอกลักษณ์: {detail}"
+help = "ลบอาร์ไคฟ์รันไทม์เก่าและใบรับรองของมันใต้ไดเรกทอรี target ของรันไทม์ แล้วสร้างใหม่"
+
+[diagnostics.PKG001.issues.llvm_host_verify_failed]
+message = "llvm-as ปฏิเสธโมดูล {path}: {detail}"
+help = "โมดูล LLVM ที่สร้างขึ้นไม่ถูกต้อง; โปรดรายงานเป็นข้อบกพร่องของคอมไพเลอร์พร้อมแนบโมดูล"
+
+[diagnostics.PKG001.issues.llvm_host_opt_failed]
+message = "opt ล้มเหลวกับโมดูล {path}: {detail}"
+help = "ตรวจสอบว่า opt มาจากการติดตั้ง LLVM เดียวกับ llvm-as และ clang"
+
+[diagnostics.PKG001.issues.llvm_host_opt_unavailable]
+message = "การสร้าง llvm-host แบบรีลีสต้องใช้เครื่องมือ opt แต่ไม่พบข้าง llvm-as หรือใน PATH"
+help = "ติดตั้ง opt ของ LLVM ไว้ข้าง llvm-as หรือใน PATH แล้วสร้างใหม่"
+
+[diagnostics.PKG001.issues.llvm_host_link_failed]
+message = "clang ลิงก์ {path} ไม่สำเร็จ: {detail}"
+help = "ตรวจสอบว่า clang ทำงานได้และอาร์ไคฟ์รันไทม์ตรงกับคอมไพเลอร์นี้; รายละเอียดคือผลลัพธ์ของ clang เอง"

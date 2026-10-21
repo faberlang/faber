@@ -4027,3 +4027,40 @@ message = "'scriptum' 後需要 '('"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "scriptum 引數後需要 ')'"
+
+# Package-layer rows. The PKG001 base row only holds issue rows: the renderer
+# shows a PKG001 diagnostic from the pack only when its own issue row exists.
+[diagnostics.PKG001]
+message = "套件建置失敗"
+
+[diagnostics.PKG001.issues.E_LLVMHOST_UNSUPPORTED_HOST]
+message = "llvm-host 不支援主機 {arch}-{os}"
+help = "llvm-host 僅在 aarch64 或 x86_64 的 macOS 與 Linux 上原生建置；請改用受支援的主機或選擇其他目標"
+
+[diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
+message = "llvm-host 需要一致的 LLVM 工具鏈（同一版本的 llvm-as 與 clang）：{reason}"
+help = "請安裝 LLVM，使 llvm-as 與 clang 位於 PATH 中，或將 LLVM_HOME 設為 LLVM 安裝前綴"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
+message = "faber-host-llvm 執行階段封存檔無法使用（{cause}）：{detail}"
+help = "請確認已安裝 cargo 且位於 PATH 中（或設定 CARGO），並且執行階段原始碼存在，然後重新建置"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
+message = "faber-host-llvm 執行階段封存檔未通過身分驗證：{detail}"
+help = "請刪除執行階段 target 目錄下過期的執行階段封存檔及其回執，然後重新建置"
+
+[diagnostics.PKG001.issues.llvm_host_verify_failed]
+message = "llvm-as 拒絕了模組 {path}：{detail}"
+help = "產生的 LLVM 模組無效；請附上該模組，將其作為編譯器缺陷回報"
+
+[diagnostics.PKG001.issues.llvm_host_opt_failed]
+message = "opt 處理模組 {path} 失敗：{detail}"
+help = "請確認 opt 與 llvm-as、clang 來自同一個 LLVM 安裝"
+
+[diagnostics.PKG001.issues.llvm_host_opt_unavailable]
+message = "發行版 llvm-host 建置需要 opt 工具，但在 llvm-as 旁和 PATH 中都找不到"
+help = "請將 LLVM 的 opt 安裝在 llvm-as 旁或 PATH 中，然後重新建置"
+
+[diagnostics.PKG001.issues.llvm_host_link_failed]
+message = "clang 連結 {path} 失敗：{detail}"
+help = "請確認 clang 可正常運作且執行階段封存檔與本編譯器相符；詳情為 clang 自身的輸出"

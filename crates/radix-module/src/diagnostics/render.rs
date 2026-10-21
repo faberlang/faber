@@ -278,6 +278,13 @@ fn diagnostic_display_text(
     diag: &Diagnostic,
     pack: Option<&LocalePack>,
 ) -> Result<Option<DiagnosticDisplayText>, DiagnosticTemplateRenderError> {
+    // PKG001 is the package-layer catch-all code: most of its issues carry no
+    // pack row (see the compact-header note below), and the `PKG001` base row
+    // exists only to hold issue rows. A PKG001 diagnostic is rendered from the
+    // pack only when its own issue row exists; every other PKG001 diagnostic
+    // keeps the pack-less behavior, so the base row never replaces an
+    // issue-less message and never adds a "missing row" note to a rowless issue.
+    let pack = pack.filter(|pack| diag.code != Some("PKG001") || pack_has_pkg001_issue_row(pack, diag));
     if let Some(pack) = pack {
         match pack.render_diagnostic_text(diag) {
             Ok(Some(rendered)) => {
@@ -323,6 +330,15 @@ fn diagnostic_display_text(
     Ok(None)
 }
 
+/// True when `pack` carries a `PKG001` issue row for the diagnostic's issue.
+fn pack_has_pkg001_issue_row(pack: &LocalePack, diag: &Diagnostic) -> bool {
+    diag.issue().is_some_and(|issue| {
+        pack.diagnostics
+            .get("PKG001")
+            .is_some_and(|template| template.issues.contains_key(issue))
+    })
+}
+
 fn report_kind(severity: Severity) -> ReportKind<'static> {
     match severity {
         Severity::Error => ReportKind::Error,
@@ -366,6 +382,9 @@ fn pretty_report_message(label: Option<&str>, message: Option<&str>) -> String {
 
 fn plain_header(severity: &str, label: Option<&str>, location: &str, message: Option<&str>) -> String {
     match (label, message) {
+        // A file-less diagnostic has no location; leave the slot out rather than
+        // printing an empty `: :` between the identity and the message.
+        (Some(label), Some(message)) if location.is_empty() => format!("{severity}[{label}]: {message}"),
         (Some(label), Some(message)) => format!("{severity}[{label}]: {location}: {message}"),
         (Some(label), None) => format!("{severity}[{label}]: {location}"),
         (None, Some(message)) => format!("{severity}: {location}: {message}"),

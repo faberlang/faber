@@ -1,4 +1,4 @@
-use super::{parse_eslint_output, write_temp_rust_project_in};
+use super::{parse_eslint_output, render_normal, write_temp_rust_project_in};
 
 /// A preplanted directory or symlink at a candidate temp-root name must be
 /// neither written through nor clobbered: the lint temp root is created
@@ -198,5 +198,59 @@ fn drop_declared_locale002_notes_suppresses_only_declared_sources() {
     assert_eq!(
         kept[0].issue().as_deref(),
         Some("source_reads_as_other_locale")
+    );
+}
+
+fn en_pack() -> radix::module::locale::LocalePack {
+    let path = radix::module::locale::workspace_locale_pack_path("en");
+    radix::module::locale::LocalePack::from_toml_path(path).expect("load en pack")
+}
+
+fn llvm_host_link_failure(detail: &str) -> radix::module::diagnostics::Diagnostic {
+    crate::package_diagnostic_error("clang link failed")
+        .with_arg("issue", "llvm_host_link_failed")
+        .with_arg("path", "out/bin")
+        .with_arg("detail", detail)
+}
+
+/// A package refusal with a pack row reaches the user through the row: the
+/// rendering differs from the compact identity and follows the `detail` arg.
+#[test]
+fn normal_mode_renders_the_pack_row_of_a_package_refusal() {
+    let pack = en_pack();
+    let diag = llvm_host_link_failure("ld: library not found");
+
+    let rendered = render_normal(&diag, Some(&pack));
+
+    assert_ne!(rendered, radix::module::diagnostics::render_plain(&diag));
+    assert_ne!(
+        rendered,
+        render_normal(
+            &llvm_host_link_failure("a different linker output"),
+            Some(&pack)
+        )
+    );
+}
+
+#[test]
+fn normal_mode_keeps_rowless_and_non_package_diagnostics_compact() {
+    let pack = en_pack();
+    let rowless =
+        crate::package_diagnostic_error("raw prose").with_arg("issue", "no_such_issue_row");
+    let other = radix::module::diagnostics::Diagnostic::error("raw prose")
+        .with_code("SEM001")
+        .with_arg("issue", "llvm_host_link_failed");
+
+    for diag in [&rowless, &other] {
+        assert_eq!(
+            render_normal(diag, Some(&pack)),
+            radix::module::diagnostics::render_plain(diag)
+        );
+    }
+    // Without a pack the package refusal also stays compact.
+    let diag = llvm_host_link_failure("x");
+    assert_eq!(
+        render_normal(&diag, None),
+        radix::module::diagnostics::render_plain(&diag)
     );
 }

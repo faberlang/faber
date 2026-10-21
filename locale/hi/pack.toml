@@ -4043,3 +4043,40 @@ message = "'scriptum' के बाद '(' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "scriptum arguments के बाद ')' अपेक्षित है"
+
+# Package-layer rows. The PKG001 base row only holds issue rows: the renderer
+# shows a PKG001 diagnostic from the pack only when its own issue row exists.
+[diagnostics.PKG001]
+message = "पैकेज बिल्ड विफल"
+
+[diagnostics.PKG001.issues.E_LLVMHOST_UNSUPPORTED_HOST]
+message = "llvm-host होस्ट {arch}-{os} को समर्थन नहीं देता"
+help = "llvm-host केवल aarch64 या x86_64 के macOS और Linux पर नेटिव रूप से बिल्ड करता है; समर्थित होस्ट पर बिल्ड करें या कोई दूसरा लक्ष्य चुनें"
+
+[diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
+message = "llvm-host को सुसंगत LLVM टूलचेन चाहिए (एक ही संस्करण के llvm-as और clang): {reason}"
+help = "LLVM इंस्टॉल करें ताकि llvm-as और clang PATH में हों, या LLVM_HOME को LLVM इंस्टॉल प्रीफ़िक्स पर सेट करें"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
+message = "faber-host-llvm रनटाइम आर्काइव उपलब्ध नहीं है ({cause}): {detail}"
+help = "सुनिश्चित करें कि cargo इंस्टॉल है और PATH में है (या CARGO सेट है) और रनटाइम स्रोत मौजूद हैं, फिर दोबारा बिल्ड करें"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
+message = "faber-host-llvm रनटाइम आर्काइव पहचान सत्यापन में विफल रहा: {detail}"
+help = "रनटाइम target निर्देशिका में पुराने रनटाइम आर्काइव और उसकी रसीद को हटाएँ, फिर दोबारा बिल्ड करें"
+
+[diagnostics.PKG001.issues.llvm_host_verify_failed]
+message = "llvm-as ने मॉड्यूल {path} अस्वीकार किया: {detail}"
+help = "उत्पन्न LLVM मॉड्यूल अमान्य है; मॉड्यूल संलग्न करके इसे कंपाइलर दोष के रूप में रिपोर्ट करें"
+
+[diagnostics.PKG001.issues.llvm_host_opt_failed]
+message = "मॉड्यूल {path} पर opt विफल रहा: {detail}"
+help = "जाँचें कि opt उसी LLVM इंस्टॉल से है जिससे llvm-as और clang आए हैं"
+
+[diagnostics.PKG001.issues.llvm_host_opt_unavailable]
+message = "रिलीज़ llvm-host बिल्ड को opt टूल चाहिए, पर वह llvm-as के पास या PATH में नहीं मिला"
+help = "LLVM का opt llvm-as के पास या PATH में इंस्टॉल करें, फिर दोबारा बिल्ड करें"
+
+[diagnostics.PKG001.issues.llvm_host_link_failed]
+message = "clang {path} को लिंक करने में विफल रहा: {detail}"
+help = "जाँचें कि clang काम करता है और रनटाइम आर्काइव इस कंपाइलर से मेल खाता है; विवरण स्वयं clang का आउटपुट है"

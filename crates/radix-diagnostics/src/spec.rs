@@ -51,3 +51,16 @@ pub fn mixed_script_identifier_spec() -> DiagnosticSpec {
         ),
     }
 }
+
+/// Return the stable diagnostic spec for package-layer refusals (`PKG001`).
+///
+/// The code is a catch-all: each refusal names itself by `issue` arg, and the
+/// reader packs hold one issue row per issue that renders its cause. The base
+/// row exists to hold those issue rows; the renderer never shows it.
+#[must_use]
+pub fn package_diagnostic_spec() -> DiagnosticSpec {
+    DiagnosticSpec {
+        code: "PKG001",
+        help: None,
+    }
+}

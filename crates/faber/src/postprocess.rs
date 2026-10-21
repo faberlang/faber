@@ -90,6 +90,24 @@ fn file_declares_locale(file: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// One diagnostic in normal mode: a compact identity, except that a package
+/// (`PKG001`) refusal renders its reader-pack row, so the cause and the next
+/// action (tool, path, tool output) reach the user instead of a bare issue
+/// name. A `PKG001` diagnostic without a row for its issue stays compact, and
+/// every other coded diagnostic keeps the compact identity.
+pub(crate) fn render_normal(
+    diag: &radix::module::diagnostics::Diagnostic,
+    pack: Option<&radix::module::locale::LocalePack>,
+) -> String {
+    if let Some(pack) = pack
+        && diag.code == Some(crate::PACKAGE_DIAGNOSTIC_CODE)
+        && let Ok(rendered) = radix::module::diagnostics::render_plain_with_pack(diag, pack)
+    {
+        return rendered;
+    }
+    radix::module::diagnostics::render_plain(diag)
+}
+
 /// Print diagnostics using Faber-owned presentation.
 pub fn print_diagnostics(
     diagnostics: &[radix::module::diagnostics::Diagnostic],
@@ -98,7 +116,7 @@ pub fn print_diagnostics(
 ) {
     if mode != DiagnosticMode::Diagnostics {
         for diag in diagnostics {
-            eprintln!("{}", radix::module::diagnostics::render_plain(diag));
+            eprintln!("{}", render_normal(diag, diagnostics_locale_pack));
         }
         return;
     }

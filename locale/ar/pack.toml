@@ -4031,3 +4031,40 @@ message = "مطلوب '(' بعد 'scriptum'"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "مطلوب ')' بعد وسائط scriptum"
+
+# Package-layer rows. The PKG001 base row only holds issue rows: the renderer
+# shows a PKG001 diagnostic from the pack only when its own issue row exists.
+[diagnostics.PKG001]
+message = "فشل بناء الحزمة"
+
+[diagnostics.PKG001.issues.E_LLVMHOST_UNSUPPORTED_HOST]
+message = "llvm-host لا يدعم المضيف {arch}-{os}"
+help = "يبني llvm-host أصلياً على macOS وLinux بمعمارية aarch64 أو x86_64 فقط؛ ابنِ على مضيف مدعوم أو اختر هدفاً آخر"
+
+[diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
+message = "يحتاج llvm-host إلى سلسلة أدوات LLVM متسقة (llvm-as وclang من الإصدار نفسه): {reason}"
+help = "ثبّت LLVM بحيث يكون llvm-as وclang في PATH، أو اضبط LLVM_HOME على بادئة تثبيت LLVM"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
+message = "أرشيف وقت التشغيل faber-host-llvm غير متاح ({cause}): {detail}"
+help = "تأكد من تثبيت cargo ووجوده في PATH (أو ضبط CARGO) ومن وجود مصادر وقت التشغيل، ثم أعد البناء"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
+message = "فشل أرشيف وقت التشغيل faber-host-llvm في التحقق من الهوية: {detail}"
+help = "احذف أرشيف وقت التشغيل القديم وإيصاله ضمن مجلد target الخاص بوقت التشغيل، ثم أعد البناء"
+
+[diagnostics.PKG001.issues.llvm_host_verify_failed]
+message = "رفض llvm-as الوحدة {path}: {detail}"
+help = "وحدة LLVM الناتجة غير صالحة؛ أبلغ عنها كعيب في المصرِّف مع إرفاق الوحدة"
+
+[diagnostics.PKG001.issues.llvm_host_opt_failed]
+message = "فشل opt على الوحدة {path}: {detail}"
+help = "تحقق من أن opt من تثبيت LLVM نفسه الذي جاء منه llvm-as وclang"
+
+[diagnostics.PKG001.issues.llvm_host_opt_unavailable]
+message = "يحتاج بناء الإصدار في llvm-host إلى الأداة opt، لكنها غير موجودة بجوار llvm-as ولا في PATH"
+help = "ثبّت opt من LLVM بجوار llvm-as أو في PATH، ثم أعد البناء"
+
+[diagnostics.PKG001.issues.llvm_host_link_failed]
+message = "فشل clang في ربط {path}: {detail}"
+help = "تحقق من أن clang يعمل وأن أرشيف وقت التشغيل يطابق هذا المصرِّف؛ التفاصيل هي مخرجات clang نفسه"

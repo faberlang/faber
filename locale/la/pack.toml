@@ -5288,3 +5288,40 @@ help = "scribe numerum integrum post '=' aut tolle '='"
 [diagnostics.PARSE001.issues.enum_member_value]
 message = "valor membri enumerationis exspectabatur"
 help = "scribe numerum integrum aut chordam post '='"
+
+# Package-layer rows. The PKG001 base row only holds issue rows: the renderer
+# shows a PKG001 diagnostic from the pack only when its own issue row exists.
+[diagnostics.PKG001]
+message = "pactum non aedificatum"
+
+[diagnostics.PKG001.issues.E_LLVMHOST_UNSUPPORTED_HOST]
+message = "llvm-host hospitem {arch}-{os} non sustinet"
+help = "llvm-host nativum tantum in aarch64 vel x86_64 macOS et Linux aedificat; aedifica in hospite sustento aut alium scopum elige"
+
+[diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
+message = "llvm-host instrumenta LLVM cohaerentia (llvm-as et clang eiusdem versionis) requirit: {reason}"
+help = "LLVM ita instrue ut llvm-as et clang in PATH sint, aut LLVM_HOME ad praefixum LLVM pone"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
+message = "archivum runtime faber-host-llvm praesto non est ({cause}): {detail}"
+help = "cura ut cargo instructum sit et in PATH (aut CARGO positum) et fontes runtime adsint, deinde iterum aedifica"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
+message = "archivum runtime faber-host-llvm identitatis verificationem non superavit: {detail}"
+help = "archivum runtime vetus et eius apocham sub directorio target runtime dele, deinde iterum aedifica"
+
+[diagnostics.PKG001.issues.llvm_host_verify_failed]
+message = "llvm-as modulum {path} reppulit: {detail}"
+help = "modulus LLVM emissus invalidus est; refer ut vitium compilatoris cum modulo adiuncto"
+
+[diagnostics.PKG001.issues.llvm_host_opt_failed]
+message = "opt in modulo {path} defecit: {detail}"
+help = "vide ut opt ex eadem LLVM institutione sit ac llvm-as et clang"
+
+[diagnostics.PKG001.issues.llvm_host_opt_unavailable]
+message = "aedificatio llvm-host emissa opt instrumentum requirit, sed iuxta llvm-as aut in PATH non inventum est"
+help = "opt LLVM iuxta llvm-as aut in PATH instrue, deinde iterum aedifica"
+
+[diagnostics.PKG001.issues.llvm_host_link_failed]
+message = "clang {path} nectere non potuit: {detail}"
+help = "vide ut clang operetur et archivum runtime cum hoc compilatore congruat; detail est exitus ipsius clang"

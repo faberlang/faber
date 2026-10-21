@@ -99,6 +99,65 @@ fn plain_render_keeps_compact_header_for_pkg001_with_issue() {
     assert!(!rendered.contains(diagnostic.message.as_str()), "{rendered}");
 }
 
+const PKG001_ROW_PACK: &str = r#"
+[pack]
+id = "la-test"
+fallback = ["la"]
+
+[diagnostics.PKG001]
+message = "package build failed"
+
+[diagnostics.PKG001.issues.with_row]
+message = "row for {thing}"
+help = "row help"
+
+[llm]
+system_prompt_snippet = "emit Latin Faber"
+exemplars = ["./exemplars/salve-munde.fab"]
+"#;
+
+#[test]
+fn pack_render_shows_pkg001_issue_row_with_args_and_help() {
+    let pack = LocalePack::from_toml_str(PKG001_ROW_PACK).expect("pack");
+    let diagnostic = Diagnostic::error("prose fallback")
+        .with_code("PKG001")
+        .with_file("foo")
+        .with_args(vec![
+            DiagnosticArg::new("issue", "with_row"),
+            DiagnosticArg::new("thing", "cargo"),
+        ]);
+
+    let rendered = render_plain_with_pack(&diagnostic, &pack).expect("render");
+
+    assert!(rendered.contains("error[PKG001:with_row]: foo: row for cargo"), "{rendered}");
+    assert!(rendered.contains("= help: row help"), "{rendered}");
+}
+
+#[test]
+fn pack_render_keeps_rowless_and_issueless_pkg001_unchanged() {
+    let pack = LocalePack::from_toml_str(PKG001_ROW_PACK).expect("pack");
+    let rowless = Diagnostic::error("prose fallback")
+        .with_code("PKG001")
+        .with_file("foo")
+        .with_args(vec![DiagnosticArg::new("issue", "no_row")]);
+    let issueless = Diagnostic::error("prose fallback")
+        .with_code("PKG001")
+        .with_file("foo");
+
+    let rowless = render_plain_with_pack(&rowless, &pack).expect("render");
+    let issueless = render_plain_with_pack(&issueless, &pack).expect("render");
+
+    assert_eq!(rowless, "error[PKG001:no_row]: foo");
+    assert_eq!(issueless, "error[PKG001]: foo: prose fallback");
+}
+
+#[test]
+fn plain_render_omits_the_empty_location_slot_of_a_file_less_diagnostic() {
+    let diagnostic = Diagnostic::error("no file here").with_code("PKG001");
+
+    assert_eq!(render_plain(&diagnostic), "error[PKG001]: no file here");
+}
+
 #[test]
 fn plain_render_wraps_embedded_source_line_in_bidi_isolation() {
     let diagnostic = Diagnostic::error("expected identifier")

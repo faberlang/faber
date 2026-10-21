@@ -5850,3 +5850,40 @@ help = "write an integer after '=' or remove the '='"
 [diagnostics.PARSE001.issues.enum_member_value]
 message = "expected an enum member value"
 help = "write an integer or a string after '='"
+
+# Package-layer rows. The PKG001 base row only holds issue rows: the renderer
+# shows a PKG001 diagnostic from the pack only when its own issue row exists.
+[diagnostics.PKG001]
+message = "package build failed"
+
+[diagnostics.PKG001.issues.E_LLVMHOST_UNSUPPORTED_HOST]
+message = "llvm-host does not support the host {arch}-{os}"
+help = "llvm-host builds natively on aarch64 or x86_64 macOS and Linux only; build on a supported host or choose another target"
+
+[diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
+message = "llvm-host needs a coherent LLVM toolchain (llvm-as and clang of one version): {reason}"
+help = "install LLVM so that llvm-as and clang are on PATH, or set LLVM_HOME to an LLVM install prefix"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
+message = "the faber-host-llvm runtime archive is unavailable ({cause}): {detail}"
+help = "make sure cargo is installed and on PATH (or set CARGO) and that the runtime sources are present, then build again"
+
+[diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
+message = "the faber-host-llvm runtime archive failed identity verification: {detail}"
+help = "delete the stale runtime archive and its receipt under the runtime target directory, then build again"
+
+[diagnostics.PKG001.issues.llvm_host_verify_failed]
+message = "llvm-as rejected the module {path}: {detail}"
+help = "the emitted LLVM module is invalid; report it as a compiler defect with the module attached"
+
+[diagnostics.PKG001.issues.llvm_host_opt_failed]
+message = "opt failed on the module {path}: {detail}"
+help = "check that opt comes from the same LLVM install as llvm-as and clang"
+
+[diagnostics.PKG001.issues.llvm_host_opt_unavailable]
+message = "a release llvm-host build needs the opt tool, but it was not found beside llvm-as or on PATH"
+help = "install LLVM's opt beside llvm-as or on PATH, then build again"
+
+[diagnostics.PKG001.issues.llvm_host_link_failed]
+message = "clang failed to link {path}: {detail}"
+help = "check that clang works and that the runtime archive matches this compiler; the detail is clang's own output"
