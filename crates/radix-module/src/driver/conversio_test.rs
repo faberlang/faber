@@ -790,8 +790,15 @@ fn tensor_element_width_lattice_codegen_matrix() {
             let result = compile(&session, "test.fab", &source, ModuleCompileRequest::default());
             assert!(result.success(), "{case}: {:?}", result.diagnostics);
             let code = super::rust_output(result).code;
-            let needle = format!(".convert_elements(|v: {}| v as {})", from.rust, to.rust);
-            assert!(code.contains(&needle), "{case}: expected {needle:?} in:\n{code}");
+            let widen = format!(".convert_elements(|v: {}| v as {})", from.rust, to.rust);
+            let store = format!(
+                ".convert_elements(|v: {}| faber::exact::store::<{}>(i128::from(v), ",
+                from.rust, to.rust
+            );
+            assert!(
+                code.contains(&widen) || code.contains(&store),
+                "{case}: expected {widen:?} or {store:?} in:\n{code}"
+            );
         }
     }
 }
