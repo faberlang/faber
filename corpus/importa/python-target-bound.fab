@@ -1,0 +1,16 @@
++++
+locale = "en"
+term = "python_target_bound"
+kind = "concept"
+category = "package"
+canonical = false
+summary = "A target-native import binds the program to that target; every other build target refuses it."
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_sugar", "import_target", "named_import", "incipit_stmt", "block_stmt", "nota_stmt", "member_suffix", "expression"]
++++
+# Target-native import: `python` names the build target, "math" the Python
+# module, `m` the bound name. The program is bound to the python target.
+import python "math" m
+
+main {
+    print m.pi
+}
