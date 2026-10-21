@@ -1,0 +1,55 @@
++++
+term = "generic union option"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "sit_decl", "hole_type", "finge_expr", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A generic union option: constructed variants matched through a generic function."
+syntax = "union Opt<T> { Some { T v }, Nada }"
+related = ["generic", "discretio", "discerne", "variant"]
+locale = "en"
++++
+# =============================================================================
+# generic union option — a generic union constructed and matched
+# =============================================================================
+#
+# What this teaches:
+#   • A union (discretio) with a type parameter carries the parameter in its
+#     payload field, and a generic function matches over its variants.
+#   • Related keywords: union, fn, match, variant
+#
+# Common mistakes:
+#   • Dropping the ascription on variant construction: the value is
+#     `variant Some { v = 4 } ∷ Opt<int>`, never a bare `variant Some { v = 4 }`.
+#
+# See also: generic, discerne, variant
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   4
+#   0
+
+union Opt<T> {
+    Some {
+        T v
+    },
+    Nada
+}
+
+fn unwrap_or<T>(Opt<T> o, T d) → T {
+    match o {
+        case Some let v {
+            return v
+        }
+        case Nada {
+            return d
+        }
+    }
+}
+
+main {
+    let Opt<int> a ← variant Some { v = 4 } ∷ Opt<int>
+    let Opt<int> b ← variant Nada { } ∷ Opt<int>
+    print unwrap_or(a, 0)
+    print unwrap_or(b, 0)
+}
