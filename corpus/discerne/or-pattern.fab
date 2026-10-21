@@ -1,0 +1,86 @@
++++
+term = "discerne"
+explains = ["discerne"]
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "ordo_decl", "enum_member", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_atom", "pattern_binding", "redde_stmt", "sit_decl", "finge_expr", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "One case arm can list several alternatives joined by or; the arm runs when the subject matches any of them."
+syntax = "case <pattern> or <pattern> { ... }"
+aliases = ["match"]
+related = ["discerne", "casu", "discretio", "ordo"]
+locale = "en"
++++
+# =============================================================================
+# or-pattern — One case arm can list several alternatives joined by `or`.
+# =============================================================================
+#
+# What this teaches:
+#   • An or-arm shares one body for several alternatives — `case A or B` runs the
+#     same block when the subject matches either alternative.
+#   • Union variants and enum members take or-arms alike — the same `or` joins
+#     discretio variants and ordo members.
+#   • The alternatives as a set must still cover every member — an or-arm is not
+#     a catch-all, so omitting a member is still non-exhaustive (SEM040).
+#
+# Common mistakes:
+#   • Binding a payload inside an or-arm — a variant payload cannot be bound when
+#     another alternative in the same arm has no payload.
+#   • Treating `or` as a catch-all — `case A or B` covers only A and B, never the
+#     remaining members.
+#
+# See also: discerne, casu, discretio, ordo
+# =============================================================================
+#
+# EXPECTED OUTPUT:
+#   ab
+#   ab
+#   c3
+#   d
+#   rg
+#   b
+
+union T {
+    A,
+    B,
+    C {
+        int n
+    },
+    D
+}
+
+fn f(T t) → string {
+    match t {
+        case A or B {
+            return "ab"
+        }
+        case C let n {
+            return "c§"(n)
+        }
+        case D {
+            return "d"
+        }
+    }
+}
+
+enum Color { red, green, blue }
+
+fn g(Color c) → string {
+    match c {
+        case red or green {
+            return "rg"
+        }
+        case blue {
+            return "b"
+        }
+    }
+}
+
+main {
+    print f(variant A { } ∷ T)
+    print f(variant B { } ∷ T)
+    print f(variant C { n = 3 } ∷ T)
+    print f(variant D { } ∷ T)
+    print g(Color.green)
+    print g(Color.blue)
+}
