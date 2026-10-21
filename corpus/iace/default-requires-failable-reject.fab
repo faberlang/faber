@@ -1,0 +1,23 @@
++++
+term = "iace"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "errors"
+summary = "A ⊥ default follows a failable call or a conversion; anything else is rejected."
+syntax = "print x ⊥ 0"
+related = ["iace", "⊥", "↦"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE030:default_requires_failable"
++++
+# =============================================================================
+# iace — a ⊥ default with no failable call or conversion before it
+# =============================================================================
+# `⊥ v` supplies the recovery value of a failable call (`f() ⊥ v`) or a
+# conversion (`x ↦ T ⊥ v`). After any other expression there is nothing to
+# recover, so the leftover `⊥` is rejected as a parse error.
+
+main {
+    let int x ← 5
+    print x ⊥ 0
+}
