@@ -2188,14 +2188,17 @@ fn device_view_element_count_refuses_zero_and_overflow() {
     let runtime_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, runtime_shape)));
     let validation = MirValidationContext::new(&types);
 
+    let zero_error = device_view_element_count(zero, &validation)
+        .expect_err("a zero literal dimension is refused");
+    let overflow_error = device_view_element_count(overflow, &validation)
+        .expect_err("an overflowing element count is refused");
+    assert_eq!(zero_error.issue, "mir_kernel_tensor_zero_extent");
     assert_eq!(
-        device_view_element_count(zero, &validation).map_err(|error| error.message),
-        Err("kernel tensor shape requires positive literal dimensions".to_string())
+        overflow_error.issue,
+        "mir_kernel_tensor_element_count_overflow"
     );
-    assert_eq!(
-        device_view_element_count(overflow, &validation).map_err(|error| error.message),
-        Err("kernel tensor shape element count overflows".to_string())
-    );
+    assert_eq!(zero_error.detail, None);
+    assert_eq!(overflow_error.detail, None);
     assert_eq!(
         device_view_element_count_or_runtime(runtime_ty, &validation),
         Ok(RUNTIME_SHAPED_ELEMENT_COUNT)

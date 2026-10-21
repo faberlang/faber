@@ -594,7 +594,7 @@ fn filum_declaration_launch_facts(
 ///
 /// # Errors
 /// Returns [`MirAbiError`] when an operand type cannot be resolved to a
-/// static device-view shape, when the reduction tensor length is zero, when
+/// static device-view shape (a zero or overflowing extent included), when
 /// matmul operands are not rank-2 with matching inner dimensions, or when
 /// transpose operands are not rank-2 with non-zero dimensions.
 pub fn collection_op_contract(
@@ -917,16 +917,9 @@ fn reduction_contract(
     else {
         return Ok(None);
     };
+    // A zero-extent source never reaches here: `device_view_element_count`
+    // refuses it as `mir_kernel_tensor_zero_extent` (no empty kernel buffer).
     let length = device_view_element_count(operand_ty, validation)?;
-    if length == 0 {
-        // Stable decline identity: tests and callers must pin this decline
-        // by issue slug, not by message prose.
-        return Err(MirAbiError::with_detail(
-            "reduction tensor length must be non-zero",
-            "mir_reduction_tensor_length_nonzero",
-            format!("{op:?} reduction over an empty source tensor"),
-        ));
-    }
     let workgroup_x = reduction_workgroup_x(length);
     let partials = length.div_ceil(u64::from(workgroup_x));
     Ok(Some(CollectionOpContract::Reduction {

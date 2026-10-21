@@ -20,6 +20,9 @@ pub(crate) enum Dim {
 /// literal one is required. The ABI count reader matches on it to keep the
 /// lane-form runtime-shaped marker.
 pub(crate) const NON_LITERAL_DIM_MESSAGE: &str = "kernel collection op requires literal dimensions";
+pub(crate) const ZERO_LITERAL_DIM_MESSAGE: &str =
+    "kernel tensor shape requires positive literal dimensions";
+pub(crate) const DIM_PRODUCT_OVERFLOW_MESSAGE: &str = "kernel tensor shape element count overflows";
 
 /// Shape dims of a tensor-typed MIR type (a flat literal is a rank-1 shape; a
 /// tuple is the dim list). A non-literal dim is [`Dim::Runtime`]; a shape with
@@ -73,12 +76,12 @@ pub(crate) fn dims_product_checked(dims: &[Dim]) -> Result<u64, &'static str> {
         match dim {
             Dim::Runtime => return Err(NON_LITERAL_DIM_MESSAGE),
             Dim::Literal(0) => {
-                return Err("kernel tensor shape requires positive literal dimensions");
+                return Err(ZERO_LITERAL_DIM_MESSAGE);
             }
             Dim::Literal(count) => {
                 product = product
                     .checked_mul(*count)
-                    .ok_or("kernel tensor shape element count overflows")?;
+                    .ok_or(DIM_PRODUCT_OVERFLOW_MESSAGE)?;
             }
         }
     }

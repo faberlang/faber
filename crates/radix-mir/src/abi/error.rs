@@ -127,6 +127,10 @@ impl MirAbiError {
 fn abi_issue(message: &str) -> &'static str {
     if message == ERR_KERNEL_BUILTIN_DUPLICATE_NAME {
         "mir_kernel_builtin_duplicate_name"
+    } else if message == crate::tensor_type::ZERO_LITERAL_DIM_MESSAGE {
+        "mir_kernel_tensor_zero_extent"
+    } else if message == crate::tensor_type::DIM_PRODUCT_OVERFLOW_MESSAGE {
+        "mir_kernel_tensor_element_count_overflow"
     } else if message == ERR_KERNEL_WORKGROUP_NONZERO {
         "mir_kernel_workgroup_nonzero"
     } else if message == ERR_KERNEL_TENSOR_STORAGE_LOCUS {
