@@ -25,3 +25,12 @@ diagnostic = "PARSE001:json_quoted_key"
 #
 # See also: json
 # =============================================================================
+
+# json unquoted-key reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let json a ← { a: 1 }
+    print a
+}
