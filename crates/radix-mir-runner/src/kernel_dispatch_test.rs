@@ -12,6 +12,8 @@ use radix_types::{Primitive, TypeTable};
 struct Recorder {
     calls: Vec<(MirFunctionId, Vec<Value>)>,
     result: Result<Option<Value>, RunnerError>,
+    /// The only function this dispatcher claims as a device kernel.
+    claimed: Option<MirFunctionId>,
 }
 
 impl KernelDispatcher for Recorder {
@@ -24,11 +26,17 @@ impl KernelDispatcher for Recorder {
         self.calls.push((function, args.to_vec()));
         // Replace the scalar `mut` argument and mutate the shared lista
         // argument in place.
-        args[0] = Value::Int(42);
+        if let Some(first) = args.first_mut() {
+            *first = Value::Int(42);
+        }
         if let Some(Value::Array(items)) = args.get(2) {
             items.borrow_mut().push(Value::Int(9));
         }
         self.result.clone()
+    }
+
+    fn claims_dispatch(&mut self, function: MirFunctionId) -> bool {
+        self.claimed == Some(function)
     }
 }
 
@@ -164,6 +172,7 @@ fn kernel_dispatch_reaches_the_dispatcher_and_writes_back() {
     let recorder = Rc::new(RefCell::new(Recorder {
         calls: Vec::new(),
         result: Ok(Some(Value::Int(7))),
+        claimed: None,
     }));
     let list = Rc::new(RefCell::new(vec![Value::Int(1)]));
     {
@@ -217,6 +226,7 @@ fn kernel_dispatch_error_keeps_the_dispatcher_issue_code() {
     let mut host = BufferHost::default();
     let recorder = Rc::new(RefCell::new(Recorder {
         calls: Vec::new(),
+        claimed: None,
         result: Err(RunnerError::internal_with_issue(
             Span::default(),
             "device lost",
@@ -296,6 +306,7 @@ fn dispatched_companion_tuple_binds_at_call_site() {
     let context = MirValidationContext::new(&types);
     let recorder = Rc::new(RefCell::new(Recorder {
         calls: Vec::new(),
+        claimed: None,
         result: Ok(Some(Value::Tuple(vec![
             Value::Float(1.5),
             Value::Float(2.5),
@@ -395,4 +406,156 @@ fn before_write_downloads_then_marks_the_device_copy_stale_once() {
     assert!(slot.before_write(3));
     assert_eq!(recorder.borrow().downloads.len(), 1);
     assert_eq!(recorder.borrow().wrote.len(), 1);
+}
+
+/// The plain, stage-less callee a device image may nonetheless carry as a
+/// kernel unit (the generic device-update invocation seam).
+const PLAIN_CALLEE: MirFunctionId = MirFunctionId(3);
+/// What the plain callee's host body computes.
+const PLAIN_BODY_VALUE: i64 = 11;
+/// What a dispatcher that owns the call returns instead.
+const DISPATCHED_VALUE: i64 = 7;
+
+/// `f0`: `let v ← f3(); v` — the entry calls a plain function with no
+/// arguments. `f3`: a plain function with a one-block body that assigns a
+/// constant to a local and returns it. Only the caller's value and the
+/// dispatch records tell a host execution from a dispatched one.
+fn plain_callee_program(types: &mut TypeTable) -> MirProgram {
+    let scalar = MirType::semantic(types.primitive(Primitive::Numerus));
+    let span = Span::default();
+    let local = |id: u32| MirLocal {
+        id: MirLocalId(id),
+        name: None,
+        ty: scalar,
+        mutable: true,
+        span,
+    };
+    let call_entry = MirStatement {
+        kind: MirStatementKind::Call {
+            destination: Some(MirPlace::local(MirLocalId(0))),
+            callee: MirCallee::Function(PLAIN_CALLEE),
+            args: vec![],
+        },
+        span,
+    };
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![local(0)],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_entry],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(0),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: scalar,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+    program.functions.push(MirFunction {
+        id: PLAIN_CALLEE,
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![local(0)],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: MirPlace::local(MirLocalId(0)),
+                    value: MirValue {
+                        id: MirValueId(0),
+                        kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(
+                            PLAIN_BODY_VALUE,
+                        ))),
+                        ty: scalar,
+                        span,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(0),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: scalar,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+    program
+}
+
+/// Run the plain-callee entry under `Dispatch` with a dispatcher that claims
+/// `claimed` (if any), and return the run's return value plus the recorded
+/// dispatch calls.
+fn run_plain_callee(claimed: Option<MirFunctionId>) -> (Option<Value>, Vec<MirFunctionId>) {
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let program = plain_callee_program(&mut types);
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let recorder = Rc::new(RefCell::new(Recorder {
+        calls: Vec::new(),
+        result: Ok(Some(Value::Int(DISPATCHED_VALUE))),
+        claimed,
+    }));
+    let return_value = {
+        let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+        runner.kernel_policy = RunnerKernelPolicy::Dispatch;
+        runner.kernel_dispatcher = Some(recorder.clone() as kernel_dispatch::ResidencyHook);
+        runner.push_frame(MirFunctionId(0), MirBlockId(0));
+        runner.run_until_depth(0);
+        assert!(
+            runner.errors.is_empty(),
+            "plain callee run failed: {:?}",
+            runner.errors
+        );
+        runner.return_value.take()
+    };
+    let callees = recorder
+        .borrow()
+        .calls
+        .iter()
+        .map(|(function, _)| *function)
+        .collect();
+    (return_value, callees)
+}
+
+/// The dispatcher owns the fact that a device kernel exists for a plain
+/// function: a claim routes the call to it even though the callee carries no
+/// shader stage, and the dispatcher's value is the call's value.
+#[test]
+fn claims_dispatch_routes_a_claimed_plain_function_to_the_dispatcher() {
+    let (return_value, callees) = run_plain_callee(Some(PLAIN_CALLEE));
+    assert_eq!(return_value, Some(Value::Int(DISPATCHED_VALUE)));
+    assert_eq!(callees, vec![PLAIN_CALLEE]);
+}
+
+/// With no claim the same plain function executes on the host: its own body
+/// computes the call's value and nothing reaches the dispatcher.
+#[test]
+fn claims_dispatch_leaves_an_unclaimed_plain_function_local() {
+    let (return_value, callees) = run_plain_callee(None);
+    assert_eq!(return_value, Some(Value::Int(PLAIN_BODY_VALUE)));
+    assert!(callees.is_empty(), "no dispatch record for a plain call");
 }

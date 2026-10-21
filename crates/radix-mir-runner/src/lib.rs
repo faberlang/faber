@@ -1790,8 +1790,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     /// Whether a call to `function_id` goes to the kernel dispatcher: the run
-    /// is under [`RunnerKernelPolicy::Dispatch`] and the callee carries the
-    /// compute shader stage.
+    /// is under [`RunnerKernelPolicy::Dispatch`] and either the callee carries
+    /// the compute shader stage or the run's dispatcher claims it.
+    ///
+    /// A dispatcher may carry a device kernel for a plain function (no shader
+    /// stage): the device image built it, so the dispatcher owns the fact and
+    /// the stage alone never decides.
     fn dispatches_kernel(
         &self,
         function_id: MirFunctionId,
@@ -1801,7 +1805,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             return Ok(false);
         }
         let function = self.function_by_id(function_id, span)?;
-        Ok(function.shader_stage == Some(MirKernelShaderStage::Compute))
+        if function.shader_stage == Some(MirKernelShaderStage::Compute) {
+            return Ok(true);
+        }
+        let Some(dispatcher) = self.kernel_dispatcher.as_ref() else {
+            return Ok(false);
+        };
+        let hook = dispatcher.clone();
+        let mut dispatcher = hook.try_borrow_mut().map_err(|_| {
+            RunnerError::internal(
+                span,
+                "kernel dispatcher is busy during the dispatch claim probe",
+            )
+        })?;
+        Ok(dispatcher.claims_dispatch(function_id))
     }
 
     /// Delivery point (the `ad` boundary): complete device work and surface
