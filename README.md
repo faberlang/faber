@@ -455,7 +455,7 @@ this repository (see Targets).
 
 Prebuilt `faber` binaries for macOS (Apple silicon) and Linux (x86-64) are
 published on the [releases page](https://github.com/faberlang/releases/releases);
-this one is [Faber 1.15.1](https://github.com/faberlang/releases/releases/tag/faber-v1.15.1).
+this one is [Faber 1.15.2](https://github.com/faberlang/releases/releases/tag/faber-v1.15.2).
 The installer downloads a release, verifies its SHA-256, installs it as
 `<prefix>/bin/faber-<version>`, and points a `faber` symlink at it:
 
@@ -468,7 +468,7 @@ or `--version` to choose another location or pin a release:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/faberlang/faber/main/install.sh \
-  | sh -s -- --version 1.15.1 --prefix "$HOME/.local"
+  | sh -s -- --version 1.15.2 --prefix "$HOME/.local"
 ```
 
 Check for and install updates with:
@@ -479,7 +479,7 @@ faber update
 ```
 
 Every released version stays in `<prefix>/bin/faber-<version>`, and `faber
-update` moves the `faber` symlink. `faber update --version 1.14.0` switches
+update` moves the `faber` symlink. `faber update --version 1.15.1` switches
 back, and `faber versions` lists what is installed. If you installed with an
 earlier faber installer, run `install.sh` once to adopt the versioned layout;
 `faber update` manages installs that have the `faber` symlink.
@@ -490,8 +490,8 @@ The tarball holds a single file, `bin/faber`. Download the archive and its
 `.sha256` file into one directory, check it, and put `faber` on your `PATH`:
 
 ```sh
-shasum -a 256 -c faber-v1.15.1-aarch64-apple-darwin.tar.gz.sha256   # Linux: sha256sum -c
-tar -xzf faber-v1.15.1-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c faber-v1.15.2-aarch64-apple-darwin.tar.gz.sha256   # Linux: sha256sum -c
+tar -xzf faber-v1.15.2-aarch64-apple-darwin.tar.gz
 sudo mv bin/faber /usr/local/bin/faber
 faber --version
 ```
