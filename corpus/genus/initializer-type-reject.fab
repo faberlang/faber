@@ -1,0 +1,26 @@
++++
+term = "genus"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A field initializer whose type does not match the declared field is a check error."
+syntax = "A { x = \"text\" }"
+related = ["genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:field_initializer_type_mismatch"
++++
+# =============================================================================
+# genus — a field initializer has the wrong type for the declared field
+# =============================================================================
+# Each field initializer in a construction literal must match the type the
+# genus declares for that field. A `text` initializer for an `int` field is a
+# check error, so a mismatched value never enters a genus.
+
+class A { mut int x }
+
+main {
+    let A a ← A { x = "text" }
+    print a.x
+}
