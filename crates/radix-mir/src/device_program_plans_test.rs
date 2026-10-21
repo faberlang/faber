@@ -4887,6 +4887,172 @@ fn matmul_contract_literal_dims_keep_the_numeric_tile_grid() {
 }
 
 #[test]
+fn data_flow_or_runtime_binds_runtime_dims_at_the_marker() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+
+    let mut types = TypeTable::new();
+    let runtime = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(4)]);
+    let literal = rank2_tensor_ty(&mut types, [3, 5]);
+    let overflow = rank2_tensor_ty(&mut types, [4_294_967_296, 4_294_967_296]);
+    let expected_element_ty = f32_ty(&mut types);
+    let validation = MirValidationContext::new(&types);
+
+    let (runtime_element_ty, runtime_count) =
+        data_flow_element_ty_and_count_or_runtime(runtime, &validation)
+            .expect("runtime-shaped data-flow tensor resolves");
+    assert_eq!(runtime_element_ty, expected_element_ty);
+    assert_eq!(runtime_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+
+    let (literal_element_ty, literal_count) =
+        data_flow_element_ty_and_count_or_runtime(literal, &validation)
+            .expect("literal data-flow tensor resolves");
+    assert_eq!(literal_element_ty, expected_element_ty);
+    assert_eq!(literal_count, 15);
+
+    assert!(data_flow_element_ty_and_count_or_runtime(overflow, &validation).is_err());
+}
+
+#[test]
+fn subchain_emission_signature_keeps_runtime_data_flow_facts() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+
+    let mut types = TypeTable::new();
+    let left = rank2_tensor_ty(&mut types, [4, 4]);
+    let right = rank2_tensor_ty(&mut types, [4, 4]);
+    let output = rank2_tensor_ty(&mut types, [4, 4]);
+    let runtime = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(4)]);
+    let mut function = matmul_function_over(left, right, output);
+    function.params.push(MirParam {
+        local: MirLocalId(3),
+        name: None,
+        ty: runtime,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    });
+    function.locals.extend([
+        MirLocal {
+            id: MirLocalId(3),
+            name: None,
+            ty: runtime,
+            mutable: false,
+            span: test_span(),
+        },
+        MirLocal {
+            id: MirLocalId(4),
+            name: None,
+            ty: runtime,
+            mutable: false,
+            span: test_span(),
+        },
+    ]);
+    let validation = MirValidationContext::new(&types);
+    let signature = subchain_signature_for_emission(
+        &function,
+        &CollectionOpContract::MatMul {
+            dispatch_x: 1,
+            dispatch_y: 1,
+        },
+        &validation,
+        &[MirLocalId(2), MirLocalId(4)],
+    )
+    .expect("runtime-shaped data-flow input and output resolve");
+
+    assert_eq!(signature.extra_inputs[1].source_local, Some(MirLocalId(3)));
+    assert_eq!(
+        signature.extra_inputs[1].element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    assert_eq!(signature.extra_outputs[0].source_local, Some(MirLocalId(4)));
+    assert_eq!(
+        signature.extra_outputs[0].element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+}
+
+#[test]
+fn literal_data_flow_sites_still_fail_closed() {
+    let mut types = TypeTable::new();
+    let runtime = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(4)]);
+
+    // RMSNorm's gamma peer remains a literal-demanding data-flow resource.
+    let mut rms = rms_norm_function(&mut types);
+    rms.params[1].ty = runtime;
+    rms.locals[1].ty = runtime;
+    let validation = MirValidationContext::new(&types);
+    let error = transformer_shape_signature(&rms, MirCollectionOp::TensorRmsNorm, &validation)
+        .expect_err("runtime gamma stays literal-demanding");
+    assert_eq!(
+        error.message,
+        "kernel collection op requires literal dimensions"
+    );
+
+    // The batched-attention operand reader also keeps its literal law.
+    let left = runtime;
+    let right = rank2_tensor_ty(&mut types, [4, 4]);
+    let output = rank2_tensor_ty(&mut types, [4, 4]);
+    let mut attention = matmul_function_over(left, right, output);
+    if let MirStatementKind::RuntimeCall { call, .. } = &mut attention.blocks[0].statements[0].kind
+    {
+        call.intrinsic = MirIntrinsic::Collection(MirCollectionOp::TensorBatchedAttention);
+        call.args.extend([
+            MirOperand::Constant(MirConstant::Int(0)),
+            MirOperand::Constant(MirConstant::Int(2)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Int(4)),
+            MirOperand::Constant(MirConstant::Int(4)),
+            MirOperand::Constant(MirConstant::Int(4)),
+        ]);
+    }
+    let validation = MirValidationContext::new(&types);
+    let contract = CollectionOpContract::BatchedAttention {
+        kind: crate::kernel_plan::BatchedAttentionKind::Scores,
+        kv_heads: 1,
+        q_per_kv: 1,
+        seq: 4,
+        head_dim: 4,
+        hidden: 4,
+        layout: None,
+        rotate_half: false,
+        scale_bits: 0,
+        output_elements: 16,
+    };
+    let error = contract_shape_signature(&attention, &contract, &validation)
+        .expect_err("runtime attention operand stays literal-demanding");
+    assert_eq!(
+        error.message,
+        "kernel collection op requires literal dimensions"
+    );
+
+    // The table-peer reader in the transformer signature keeps the same
+    // literal-only policy (this is the current call site for table resources).
+    let mut rope_types = TypeTable::new();
+    let mut rope = rope_function(&mut rope_types, 0, 64);
+    let runtime_table = rank2_tensor_ty_mixed(&mut rope_types, [Err(0), Ok(4)]);
+    rope.params[1].ty = runtime_table;
+    rope.locals[1].ty = runtime_table;
+    let validation = MirValidationContext::new(&rope_types);
+    let error = transformer_shape_signature(&rope, MirCollectionOp::TensorRope, &validation)
+        .expect_err("runtime table peer stays literal-demanding");
+    assert_eq!(
+        error.message,
+        "kernel collection op requires literal dimensions"
+    );
+
+    // The gather table's transformer shape reader must still reject runtime
+    // extents instead of inheriting the subchain-only runtime marker.
+    let mut gather_types = TypeTable::new();
+    let mut gather = gather_function(&mut gather_types);
+    let runtime_table = rank2_tensor_ty_mixed(&mut gather_types, [Err(0), Ok(4)]);
+    gather.params[0].ty = runtime_table;
+    gather.locals[0].ty = runtime_table;
+    let validation = MirValidationContext::new(&gather_types);
+    assert!(
+        transformer_shape_signature(&gather, MirCollectionOp::TensorGather, &validation).is_err()
+    );
+}
+
+#[test]
 fn matmul_contract_runtime_dims_resolve_without_a_numeric_grid() {
     let mut types = TypeTable::new();
     types.sized_numeric(Primitive::Numerus, NumericWidth::U32);

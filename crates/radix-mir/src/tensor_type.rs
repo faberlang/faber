@@ -16,6 +16,11 @@ pub(crate) enum Dim {
     Runtime,
 }
 
+/// The stable message a caller gets when a shape has a run-time extent where a
+/// literal one is required. The ABI count reader matches on it to keep the
+/// lane-form runtime-shaped marker.
+pub(crate) const NON_LITERAL_DIM_MESSAGE: &str = "kernel collection op requires literal dimensions";
+
 /// Shape dims of a tensor-typed MIR type (a flat literal is a rank-1 shape; a
 /// tuple is the dim list). A non-literal dim is [`Dim::Runtime`]; a shape with
 /// no known rank is an error.
@@ -53,9 +58,31 @@ pub(crate) fn tensor_literal_dims(
         .into_iter()
         .map(|dim| match dim {
             Dim::Literal(count) => Ok(count),
-            Dim::Runtime => Err("kernel collection op requires literal dimensions"),
+            Dim::Runtime => Err(NON_LITERAL_DIM_MESSAGE),
         })
         .collect()
+}
+
+/// Checked element count of a shape dim list. A run-time dim is a refusal, a
+/// zero literal dim is a refusal (no empty kernel buffer), and a product that
+/// overflows `u64` is a refusal — never a saturated count that downstream reads
+/// as a literal allocation size.
+pub(crate) fn dims_product_checked(dims: &[Dim]) -> Result<u64, &'static str> {
+    let mut product: u64 = 1;
+    for dim in dims {
+        match dim {
+            Dim::Runtime => return Err(NON_LITERAL_DIM_MESSAGE),
+            Dim::Literal(0) => {
+                return Err("kernel tensor shape requires positive literal dimensions");
+            }
+            Dim::Literal(count) => {
+                product = product
+                    .checked_mul(*count)
+                    .ok_or("kernel tensor shape element count overflows")?;
+            }
+        }
+    }
+    Ok(product)
 }
 
 /// Whether a scalar layout is a kernel buffer element — the only scalar

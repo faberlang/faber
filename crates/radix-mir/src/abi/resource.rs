@@ -1,3 +1,4 @@
+use crate::tensor_type::{Dim, NON_LITERAL_DIM_MESSAGE, dims_product_checked};
 use crate::{
     MirCollectionOp, MirFunction, MirKernelAxis, MirKernelBuiltin, MirLayoutKind, MirLocalId,
     MirScalarLayout, MirType, MirValidationContext, shader_contract::ShaderStageIoRole,
@@ -810,22 +811,26 @@ pub(crate) fn device_view_element_count_from_shape(
     shape: IndexId,
     validation: &MirValidationContext<'_>,
 ) -> Result<u64, MirAbiError> {
-    match validation.types.get_index(shape) {
-        IndexExpr::Literal(count) => Ok(*count),
-        IndexExpr::Tuple(dims) => {
-            let mut product: u64 = 1;
-            for &dim in dims {
-                match validation.types.get_index(dim) {
-                    IndexExpr::Literal(count) => product = product.saturating_mul(*count),
-                    _ => {
-                        return Err(MirAbiError::new(ERR_NON_LITERAL_DIMS));
-                    }
-                }
-            }
-            Ok(product)
+    let dims = match validation.types.get_index(shape) {
+        IndexExpr::Literal(count) => vec![Dim::Literal(*count)],
+        IndexExpr::Tuple(extents) => extents
+            .iter()
+            .map(|&extent| match validation.types.get_index(extent) {
+                IndexExpr::Literal(count) => Dim::Literal(*count),
+                _ => Dim::Runtime,
+            })
+            .collect(),
+        _ => return Err(MirAbiError::new(ERR_NON_LITERAL_DIMS)),
+    };
+    dims_product_checked(&dims).map_err(|message| {
+        // The lane-form signature arms match on ERR_NON_LITERAL_DIMS to bind the
+        // runtime-shaped marker, so the shared reader's message is mapped back.
+        if message == NON_LITERAL_DIM_MESSAGE {
+            MirAbiError::new(ERR_NON_LITERAL_DIMS)
+        } else {
+            MirAbiError::new(message)
         }
-        _ => Err(MirAbiError::new(ERR_NON_LITERAL_DIMS)),
-    }
+    })
 }
 
 pub(crate) fn tensor_element_type(
