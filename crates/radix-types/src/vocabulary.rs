@@ -356,6 +356,13 @@ pub enum MirCollectionOp {
     /// (out of range ⇒ zero output, never an out-of-bounds table read).
     /// Shape-transforming — not `TensorGet`/`TensorSlice`.
     TensorGather,
+    /// Zero-initialized row scatter-add, the AIR reverse-AD Gather VJP
+    /// (`radix-air/src/reverse_ad/vjp.rs`): operands `[ids, updates]` with
+    /// `ids: tensor<u32,[T]>` and `updates: tensor<f32,[T,D]>` →
+    /// `result: tensor<f32,[V,D]>`, `result[ids[t]] += updates[t]`. The
+    /// destination is implicit and starts at zero; repeated ids therefore
+    /// accumulate. Shape-transforming — not `TensorSet`.
+    TensorScatterAdd,
     /// Causal masked-row softmax (GI3-1): numerically stable row softmax
     /// over the causal attention scores with zero probability above the
     /// diagonal (`[x]` — the rank-2 causal score matrix; row `i` masks

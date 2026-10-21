@@ -4457,10 +4457,101 @@ fn tensor_gather_rejects_a_table_above_rank_two() {
         .expect_err("a rank-3 gather table must fail closed");
 }
 
+/// Zero-initialized scatter-add (the AIR reverse-AD Gather VJP): the repeated-id
+/// sums land in their destination slots, untouched slots stay zero, and an
+/// out-of-range id fails closed.
+#[test]
+fn tensor_scatter_add_accumulates_repeated_ids_and_fails_closed_on_bad_id() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
+
+    // The destination is implicit: its [V, D] shape is the declared result type.
+    let mut types = TypeTable::default();
+    let f32_ty = types.intern(Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32));
+    let rows = types.intern_index(IndexExpr::Literal(3));
+    let cols = types.intern_index(IndexExpr::Literal(2));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![rows, cols]));
+    let result_ty = types.intern(Type::Tensor(f32_ty, shape));
+
+    fn run(
+        call: &MirRuntimeCall,
+        inputs: Vec<(MirValueId, Value)>,
+        types: &TypeTable,
+    ) -> Result<Value, RunnerError> {
+        let mut host = BufferHost::default();
+        let interner = Interner::new();
+        let context = MirValidationContext::new(types);
+        let mut program = MirProgram::new();
+        program.functions.push(make_function());
+        let mut runner = Runner::new(&program, &context, types, &interner, &mut host);
+        let fn0 = program.functions.first().unwrap();
+        runner.push_frame(fn0.id, MirBlockId(0));
+        for (id, value) in inputs {
+            runner.frames.last_mut().unwrap().values.insert(id, value);
+        }
+        runner.eval_runtime_call(call, Span::default())
+    }
+
+    // ids [2, 0, 2, 1, 2] over updates rows [1,2] .. [9,10] into [3,2].
+    let ids = tensor_value(
+        vec![
+            Value::Int(2),
+            Value::Int(0),
+            Value::Int(2),
+            Value::Int(1),
+            Value::Int(2),
+        ],
+        vec![5],
+    );
+    let updates = tensor_value(
+        (1..=10)
+            .map(|value| Value::Float(f64::from(value)))
+            .collect(),
+        vec![5, 2],
+    );
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorScatterAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)), // ids
+            MirOperand::Value(MirValueId(1)), // updates
+        ],
+        return_ty: MirType::semantic(result_ty),
+    };
+    let result = run(
+        &call,
+        vec![(MirValueId(0), ids), (MirValueId(1), updates)],
+        &types,
+    )
+    .expect("scatter-add dispatch should succeed");
+    let output = match result {
+        Value::Tensor(tensor) => tensor,
+        other => panic!("expected tensor output, got {other:?}"),
+    };
+    let out = output.borrow();
+    assert_eq!(out.shape, vec![3, 2], "result shape is [V, D]");
+    assert_numeric_close(
+        &out.logical_values().expect("valid tensor layout"),
+        &[3.0, 4.0, 7.0, 8.0, 15.0, 18.0],
+        1e-9,
+    );
+
+    // Out-of-range id (>= destination rows) fails closed.
+    let bad_ids = tensor_value(vec![Value::Int(0), Value::Int(3)], vec![2]);
+    let bad_updates = tensor_value(vec![Value::Float(1.0); 4], vec![2, 2]);
+    let err = run(
+        &call,
+        vec![(MirValueId(0), bad_ids), (MirValueId(1), bad_updates)],
+        &types,
+    )
+    .expect_err("out-of-range id must fail closed");
+    assert!(err.issue.contains("out_of_range"), "got: {err:?}");
+}
+
 // ---------------------------------------------------------------------------
 // Gradient-handle round trip (S5-U1): Create → Accumulate → Read → Zero
 // ---------------------------------------------------------------------------
-
 #[test]
 fn runner_gradient_handle_create_accumulate_read_zero_round_trip() {
     use crate::Value;
