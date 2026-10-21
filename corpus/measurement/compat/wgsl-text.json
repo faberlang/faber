@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 501
+    "analyzable": 500
   },
   "terms": [
     {
@@ -199,7 +199,7 @@
       "term": "discerne",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 5
+      "analyzable": 4
     },
     {
       "term": "discretio",

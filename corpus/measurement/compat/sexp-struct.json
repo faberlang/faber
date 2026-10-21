@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 453,
-    "analyzable": 501
+    "capable": 452,
+    "analyzable": 500
   },
   "terms": [
     {
@@ -198,8 +198,8 @@
     {
       "term": "discerne",
       "rule": "keyword",
-      "capable": 5,
-      "analyzable": 5
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "discretio",
