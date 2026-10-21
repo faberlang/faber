@@ -1,0 +1,34 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A self-referential optional field: linked nodes with `?.` chains."
+syntax = "mut Node ∪ none next"
+related = ["genus", "nihil"]
+locale = "en"
++++
+# =============================================================================
+# genus — A self-referential optional field
+# =============================================================================
+#
+# A genus field may be `mut Node ∪ none next` because the non-none member is
+# a reference type (never a scalar): a `mut` node field that is sometimes
+# missing. `?.` chains read through a missing node as none.
+#
+# =============================================================================
+
+class Node {
+    mut int v
+    mut Node ∪ none next
+}
+
+main {
+    mut Node a ← Node { v = 1, next = null }
+    mut Node b ← Node { v = 2, next = a }
+    print b.next?.v
+    print a.next?.v
+    a.next ← Node { v = 9, next = null }
+    print b.next?.next?.v
+}
