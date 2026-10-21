@@ -84,6 +84,27 @@ fn supported_leaves_wasm_is_stdio_only() {
 }
 
 #[test]
+fn supported_leaves_clif_is_clock_only() {
+    assert_eq!(Target::MirClif.supported_leaves(), &[Leaf::Clock]);
+    assert!(Target::MirClif.supports_leaf(Leaf::Clock));
+    for leaf in [
+        Leaf::Fs,
+        Leaf::Stdio,
+        Leaf::Process,
+        Leaf::Entropy,
+        Leaf::Tcp,
+        Leaf::Http,
+        Leaf::Websocket,
+        Leaf::Machine,
+    ] {
+        assert!(
+            !Target::MirClif.supports_leaf(leaf),
+            "clif must refuse {leaf:?}: no native port in the runtime archive"
+        );
+    }
+}
+
+#[test]
 fn supported_leaves_other_emit_targets_refuse_every_leaf() {
     for target in Target::ALL {
         if matches!(
@@ -97,6 +118,7 @@ fn supported_leaves_other_emit_targets_refuse_every_leaf() {
                 | Target::HirFhir
                 | Target::HirGo
                 | Target::MirWasm
+                | Target::MirClif
         ) {
             continue;
         }
