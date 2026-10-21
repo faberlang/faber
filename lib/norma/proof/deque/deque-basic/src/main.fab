@@ -1,0 +1,42 @@
++++
+locale = "en"
++++
+import from "norma:deque" deque
+
+main {
+    mut deque.Deque<int> d ← deque.empty<int>()
+    print d.is_empty()
+    d.append(1)
+    d.append(2)
+    d.prepend(0)
+    print d.to_list()
+    print d.length()
+    print d.first()
+    print d.last()
+    print d.pop_front()
+    print d.pop_back()
+    print d.to_list()
+    print d.pop_back()
+    print d.pop_back()
+    print d.is_empty()
+    mut deque.Deque<string> e ← deque.from_list<string>(["a", "b", "c"])
+    print e.length()
+    e.prepend("z")
+    print e.to_list()
+    print e.pop_front()
+    print e.first()
+    mut deque.Deque<int> g ← deque.empty<int>()
+    print g.first()
+    print g.pop_front()
+    # many ops
+    for range 0‥1000 let i {
+        g.append(i)
+        g.prepend(-i)
+    }
+    print g.length()
+    for range 0‥1000 let i {
+        let int ∪ none x ← g.pop_front()
+    }
+    print g.length()
+    print g.first()
+}
