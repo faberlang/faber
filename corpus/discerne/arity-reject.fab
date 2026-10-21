@@ -1,0 +1,44 @@
++++
+term = "discerne variant arity"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Decline: a variant pattern must bind every field the variant declares; `Rect { int w; int h }` bound as `case Rect let w` leaves `h` unbound and rejects with SEM013:variant_pattern_arity_mismatch."
+syntax = "case Rect let w — rejected; bind every variant field: case Rect let w, h"
+related = ["discerne", "casu", "discretio"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM013:variant_pattern_arity_mismatch"
++++
+
+# A variant pattern is either a unit pattern (`case Dot`) or a full
+# destructuring of the variant's payload (`case Rect let w, h`). Binding a
+# prefix of the fields would silently drop state, so the partial binding is a
+# check error instead of a shorthand.
+#
+# DELIBERATE: the arm below is the rejected form, kept on purpose to pin the
+# diagnostic. The accepted spelling binds both fields: case Rect let w, h
+
+union Shape {
+    Rect {
+        int w
+        int h
+    },
+    Dot
+}
+
+fn area(Shape s) → int {
+    match s {
+        case Rect let w {
+            return w
+        }
+        case Dot {
+            return 0
+        }
+    }
+}
+
+main {
+    print 1
+}
