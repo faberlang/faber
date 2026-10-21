@@ -1,0 +1,26 @@
++++
+term = "textus"
+kind = "literal"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "literal"
+canonical = false
+summary = "Escape sequences in short strings and guillemet block strings, including the own-delimiter rule."
+syntax = "\"a\\tb\" | \"\\u{41}\" | «a\\»b»"
+related = ["string", "guillemet", "block-string"]
+locale = "en"
++++
+
+main {
+    print "a\tb"
+    print "a\nb"
+    print "q\"q"
+    print "back\\slash"
+    print "u\u{41}\u{1F600}\u{e9}"
+    print "cr[\r]x"
+    let string s ← "a\tb"
+    print s.length()
+    print «a\»b»
+    print «a\\b»
+    print «a"b'c»
+    print «\u{41}\n\t.»
+}
