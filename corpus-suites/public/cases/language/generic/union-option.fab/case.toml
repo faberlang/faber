@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/generic/union-option.fab"
+group = "language"
+input_root = "corpus"
+input = "generic/union-option.fab"
+
+
+[expect]
+check_only = true

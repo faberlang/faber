@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/elige/duplicate-case-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "elige/duplicate-case-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "duplicate_literal"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "duplicate_literal"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "duplicate_literal"
