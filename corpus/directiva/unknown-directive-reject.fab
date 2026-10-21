@@ -1,0 +1,26 @@
++++
+term = "radix"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "annotation", "annotation_name", "functio_decl", "return_clause", "type_annotation", "base_type", "redde_stmt", "incipit_stmt", "block_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "metadata"
+summary = "A @ radix directive the compiler does not know is rejected."
+syntax = "@ radix bogus \"x\""
+related = ["radix", "annotation-sugar"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM018:unknown_directive"
++++
+# =============================================================================
+# radix — an unknown directive is rejected
+# =============================================================================
+# `@ radix <directive>` accepts `lane`, `backward` and `contract` only.
+# Any other directive word is `SEM018:unknown_directive`.
+
+@ radix bogus "x"
+fn f() → int {
+    return 1
+}
+
+main {
+    print f()
+}

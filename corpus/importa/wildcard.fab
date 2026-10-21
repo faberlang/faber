@@ -1,0 +1,44 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "wildcard_import", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "package"
+canonical = false
+summary = "A wildcard import binds the whole exported surface under one local alias: `* as L` reaches `L.greet`."
+syntax = "import from <source> * as <alias>"
+related = ["importa", "publica", "ut"]
+locale = "en"
++++
+# =============================================================================
+# importa — a wildcard import binds every exported member under one alias
+# =============================================================================
+#
+# What this teaches:
+#   • `* as L` binds the module's exported surface under `L`; `L.greet` is the
+#     exported function, reached through the alias.
+#   • The alias is a namespace, not a re-export: it reaches only members the
+#     module marks `@ public`.
+#
+# Common mistakes:
+#   • Reaching a private member through the alias — an unmarked top-level
+#     declaration stays module-private (`import_module_private`).
+#
+# See also: importa, publica, ut
+# =============================================================================
+
+# importa wildcard — every exported member under one alias
+#
+# GRAMMAR:
+#   import from "./lib" * as L
+#
+# Requires module layout: wildcard.fab imports lib.fab
+# (package or module mode).
+#
+# EXPECTED OUTPUT:
+#   hi w! (wildcard.expected)
+
+import from "./lib" * as L
+
+main {
+    print L.greet("w")
+}
