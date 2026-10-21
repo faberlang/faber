@@ -1,0 +1,46 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Activation and normalization methods over a tensor: relu, gelu, silu, softmax, softmax_causal, norm_rms, norm_layer, cross_entropy."
+syntax = "tensor.relu() | tensor.gelu() | tensor.silu() | tensor.softmax() | tensor.softmax_causal() | tensor.norm_rms(axis n, eps, w) | tensor.norm_layer(axis n, eps, w) | tensor.cross_entropy(target)"
+related = ["tensor", "fractus", "lista"]
+locale = "en"
++++
+# =============================================================================
+# tensor — activation and normalization methods.
+# =============================================================================
+#
+# What this teaches:
+#   • relu, gelu and silu apply per element and keep the shape
+#   • softmax and softmax_causal normalize each row; the causal form masks ahead
+#   • norm_rms and norm_layer take an axis, an epsilon and a weight vector
+#   • cross_entropy compares a prediction row against a target row
+#
+# See also: tensor, fractus, lista
+# =============================================================================
+
+main {
+    let list<f32> src_a ← [-1.0, 0.0, 1.0, 2.0]
+    let tf32[2, 2] a ← src_a ↦ tf32[2, 2]
+    print a.relu().flatten()
+    print a.gelu().flatten()
+    print a.silu().flatten()
+    print a.softmax().flatten()
+    print a.softmax_causal().flatten()
+
+    let list<f32> src_n ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[2, 2] n ← src_n ↦ tf32[2, 2]
+    let list<f32> src_w ← [1.0, 1.0]
+    let tf32[2] w ← src_w ↦ tf32[2]
+    print n.norm_rms(axis 1, 0.00001, w).flatten()
+    print n.norm_layer(axis 1, 0.00001, w).flatten()
+
+    let list<f32> src_p ← [1.0, 2.0, 3.0, 4.0]
+    let tf32[4] p ← src_p ↦ tf32[4]
+    let list<f32> src_t ← [0.0, 0.0, 1.0, 0.0]
+    let tf32[4] tg ← src_t ↦ tf32[4]
+    print p.cross_entropy(tg)
+}
