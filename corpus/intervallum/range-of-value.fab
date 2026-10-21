@@ -35,11 +35,11 @@ locale = "en"
 #   range-of-value.expected — one value per print, in walk order.
 
 main {
-    let intervallum<int> r ← 2‥5
+    let range<int> r ← 2‥5
     for range r let i {
         print i
     }
-    let intervallum<int> inclusive ← 2…5
+    let range<int> inclusive ← 2…5
     for range inclusive let j {
         print j
     }

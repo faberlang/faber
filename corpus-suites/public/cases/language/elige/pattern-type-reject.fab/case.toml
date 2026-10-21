@@ -7,3 +7,18 @@ input = "elige/pattern-type-reject.fab"
 
 [expect]
 check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "pattern_type_mismatch"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "pattern_type_mismatch"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "pattern_type_mismatch"

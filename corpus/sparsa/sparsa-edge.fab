@@ -32,24 +32,24 @@ locale = "en"
 # =============================================================================
 
 main {
-    mut sparsa<f32, [2, 2]> g1 ← empty
+    mut sparse<f32, [2, 2]> g1 ← empty
     g1.set([0, 0], 2.0)
     g1.set([1, 1], 3.0)
     let tf32[2, 2] d1 ← g1 ↦ tf32[2, 2]
     print d1.flatten()
     print g1.count_nonzero()
 
-    mut sparsa<f32, [2, 2]> g2 ← empty
+    mut sparse<f32, [2, 2]> g2 ← empty
     g2.set([0, 1], 5.0)
     let tf32[2, 2] d2 ← g2.densify()
     print d2.flatten()
 
-    mut sparsa<f32, [3]> g3 ← empty
+    mut sparse<f32, [3]> g3 ← empty
     g3.set([0], 0.0)
     g3.set([1], -0.0)
     print g3.count_nonzero()
 
-    mut sparsa<i32, [4]> g4 ← empty
+    mut sparse<i32, [4]> g4 ← empty
     g4.set([0], 7)
     g4.set([3], -2)
     let _ a ← g4.get([0])
@@ -57,6 +57,6 @@ main {
     let _ c ← g4.get([3])
     print a, b, c, g4.count_nonzero()
 
-    mut sparsa<f32, [2, 2]> oob ← empty
+    mut sparse<f32, [2, 2]> oob ← empty
     oob.set([2, 0], 5.0)
 }

@@ -26,7 +26,7 @@ class Node {
 
 main {
     mut Node a ← Node { v = 1, next = null }
-    mut Node b ← Node { v = 2, next = a }
+    let Node b ← Node { v = 2, next = a }
     print b.next?.v
     print a.next?.v
     a.next ← Node { v = 9, next = null }

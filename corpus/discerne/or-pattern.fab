@@ -75,10 +75,10 @@ fn g(Color c) → string {
 }
 
 main {
-    print f(variant A { } ∷ T)
-    print f(variant B { } ∷ T)
-    print f(variant C { n = 3 } ∷ T)
-    print f(variant D { } ∷ T)
+    print f(variant A { })
+    print f(variant B { })
+    print f(variant C { n = 3 })
+    print f(variant D { })
     print g(Color.green)
     print g(Color.blue)
 }
