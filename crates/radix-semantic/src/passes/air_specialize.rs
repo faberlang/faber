@@ -180,12 +180,13 @@ fn specialize_with_requests(
             };
             hir.items.push(item);
             lanes.insert(instance, RadixLane::Air);
-            if let Some(backward) = lanes.backward_for(template_id).copied() {
+            if let Some(backward) = lanes.backward_for(template_id).cloned() {
                 lanes.insert_backward(
                     instance,
                     crate::RadixBackward {
                         companion_name: backward.companion_name,
                         companion_def_id: radix_hir::DefId::INVALID,
+                        selected_params: backward.selected_params.clone(),
                     },
                 );
             }

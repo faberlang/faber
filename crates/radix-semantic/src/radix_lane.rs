@@ -39,12 +39,15 @@ impl RadixLane {
 /// Records the named companion function that the generated-gradient pipeline
 /// will produce for the annotated primal. Valid only when paired with
 /// [`RadixLane::Air`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RadixBackward {
     /// User-supplied symbol name for the generated backward function.
     pub companion_name: radix_lexer::Symbol,
     /// Allocated definition identity for the companion function.
     pub companion_def_id: DefId,
+    /// Explicit trainable inputs named by the annotation; `None` selects every
+    /// tensor input.
+    pub selected_params: Option<Vec<radix_lexer::Symbol>>,
 }
 
 /// Semantic lane and backward facts keyed to function definitions.
@@ -78,7 +81,7 @@ impl RadixLaneMetadata {
         let mut entries = self
             .lanes
             .iter()
-            .map(|(&def_id, &lane)| (def_id, lane, self.backward.get(&def_id).copied()))
+            .map(|(&def_id, &lane)| (def_id, lane, self.backward.get(&def_id).cloned()))
             .collect::<Vec<_>>();
         entries.sort_by_key(|(def_id, _, _)| def_id.0);
         entries
@@ -211,6 +214,7 @@ pub fn collect(
                             RadixBackward {
                                 companion_name: b.companion_name,
                                 companion_def_id: pre_def_id,
+                                selected_params: b.selected_params.clone(),
                             }
                         } else {
                             b
@@ -613,6 +617,7 @@ fn radix_backward_statement(
         TokenKind::String(name) => Ok(RadixBackward {
             companion_name: name,
             companion_def_id: DefId::INVALID,
+            selected_params: None,
         }),
         _ => Err(radix_backward_error(value.span, "non_string_backward_name")),
     }

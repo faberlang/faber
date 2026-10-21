@@ -4323,7 +4323,7 @@ pub(crate) fn validate_referential_integrity(
     // reference only declarations and symbols present in the same artifact.
     for entry in &artifact.radix_lanes {
         checks.check_def(entry.def_id)?;
-        if let Some(backward) = entry.backward {
+        if let Some(backward) = &entry.backward {
             checks.check_symbol(backward.companion_name)?;
             checks.check_def(backward.companion_def_id)?;
         }
