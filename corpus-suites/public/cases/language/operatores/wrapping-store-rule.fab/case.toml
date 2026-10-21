@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/wrapping-store-rule.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/wrapping-store-rule.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

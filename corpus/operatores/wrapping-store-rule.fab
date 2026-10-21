@@ -1,0 +1,58 @@
++++
+term = "numerus"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "conversio_expr", "shift_expr", "unary_expr", "additive_expr", "multiplicative_expr", "comparison", "assignment", "place", "call_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "wrapping<u8> arithmetic is exact in the ether; the ring reduction happens once, at the store. A shift on a number is multiplication by 2^n, not a bit operation."
+syntax = "let wrapping<u8> avg ← (a + b) / 2"
+related = ["numerus", "wrapping", "numerus-overflow", "modular-word-u8"]
+locale = "en"
++++
+# =============================================================================
+# numerus — wrapping<u8> arithmetic is exact in the ether; the ring reduction
+# happens once, at the store. A shift on a number is multiplication by 2^n.
+# =============================================================================
+#
+# What this teaches:
+#   • Arithmetic is exact until stored — `(200 + 100) / 2` is 150 and `a + b`
+#     prints 300.
+#   • The ring reduction happens once, at the store — `let wrapping<u8> w ← a + b`
+#     gives 44.
+#   • A shift on a number is multiplication by 2^n — `200 ⇐ 1` is 400, and only
+#     the store reduces it.
+#   • `¬` on a wrapping number is the complement inside the ring.
+#
+# Common mistakes:
+#   • Expecting per-operation wrap or trap like C/Java — the check is at the
+#     store.
+#   • Expecting `⇐` on `wrapping<u8>` to drop high bits like a `bN` would —
+#     `bN` bit rules apply only to `b8`/`b16`/`b32`/`b64` types.
+#
+# See also: numerus, wrapping, numerus-overflow, modular-word-u8
+# =============================================================================
+
+main {
+    let wrapping<u8> a ← 200
+    let wrapping<u8> b ← 100
+    print 0 + (a + b) / 2
+    let wrapping<u8> avg ← (a + b) / 2
+    print avg
+    print a + b
+    print a + b ≡ 44
+    print a + b ≻ 255
+    let wrapping<u8> w ← a + b
+    print w
+    let wrapping<u8> w2 ← 200
+    print w2 ⇐ 1
+    let wrapping<u8> s ← w2 ⇐ 1
+    print s
+    print 0 + ((w2 ⇐ 1) ⇒ 1)
+    let wrapping<u8> r ← (w2 ⇐ 1) ⇒ 1
+    print r
+    let wrapping<u8> rot ← (w2 ⇐ 3) ∨ (w2 ⇒ 5)
+    print rot
+    print ¬w2
+    let wrapping<u8> nw ← ¬w2
+    print nw
+}
