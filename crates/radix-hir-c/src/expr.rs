@@ -18,6 +18,7 @@ use radix_hir::{
     DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
     HirStoreKind, HirStoreSite, HirUnOp,
 };
+use radix_types::BitsWidth;
 use std::fmt::Write as _;
 
 /// The runner's representation cap (`exact_int.rs`, ruling 17a): every integer
@@ -76,6 +77,10 @@ impl From<Ty> for Value {
             | Ty::Modular(IntWidth::U64)
             | Ty::Saturating(IntWidth::U64) => Value::Exact,
             Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => Value::Int,
+            // `b64` fills a `uint64_t`, so it reads as an exact value; a
+            // narrower raw-bits cell widens to an `int64_t` like `u8`…`u32`.
+            Ty::Bits(BitsWidth::B64) => Value::Exact,
+            Ty::Bits(_) => Value::Int,
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
@@ -1272,6 +1277,9 @@ impl Emitter<'_> {
     }
 
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
+        // A `bN` has no operator the C carrier would make right yet: `¬` at a
+        // promoted width flips bits outside the type (unit 3e80d069-1.3).
+        crate::ty::refuse_bits_operand(self.types, operand.ty, "bitwise operator on raw bits")?;
         let wide = operand
             .ty
             .is_some_and(|ty| matches!(classify(self.types, ty), Ok(Ty::Modular(_))));
@@ -1363,6 +1371,12 @@ impl Emitter<'_> {
         if matches!(op, HirBinOp::InRange | HirBinOp::NotInRange) {
             return self.range_membership(op == HirBinOp::NotInRange, left, right);
         }
+        // Every operator over a `bN` is refused by name until its own-width
+        // form lands (3e80d069-1.3/-1.4): a C signed compare or a width-blind
+        // bitwise op on the promoted carrier would be a wrong program, and
+        // `bits have their width always` (operator ruling 2026-10-10).
+        crate::ty::refuse_bits_operand(self.types, left.ty, "arithmetic on raw bits")?;
+        crate::ty::refuse_bits_operand(self.types, right.ty, "arithmetic on raw bits")?;
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         // `≈` / `≉` is tolerance equality over either family, never the C `==`

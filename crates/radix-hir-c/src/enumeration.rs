@@ -394,6 +394,7 @@ impl Emitter<'_> {
             | Ty::Decimal
             | Ty::Modular(_)
             | Ty::Saturating(_)
+            | Ty::Bits(_)
             | Ty::Func(_) => Err(unsupported(
                 "equality of a union with a payload of this class",
             )),

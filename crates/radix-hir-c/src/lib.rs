@@ -42,6 +42,8 @@ mod textops;
 mod ty;
 
 #[cfg(test)]
+mod bits_test;
+#[cfg(test)]
 mod bounded_test;
 #[cfg(test)]
 mod class_const_test;
@@ -356,7 +358,9 @@ impl Emitter<'_> {
     /// Headers a class needs wherever it is declared.
     pub(crate) fn need_class(&mut self, class: Ty) {
         match class {
-            Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => self.support.need_ints(),
+            Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) | Ty::Bits(_) => {
+                self.support.need_ints();
+            }
             Ty::Opt(inner) => self.need_class(inner.ty()),
             Ty::Bool => self.support.need_bool(),
             Ty::Float | Ty::Float32 => self.support.need(crate::helpers::Helper::Float),

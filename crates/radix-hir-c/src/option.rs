@@ -371,6 +371,11 @@ impl Emitter<'_> {
     /// How an optional prints: its value as the runner shows the payload, or
     /// the locale's none word.
     pub(crate) fn show_option(&mut self, text: &str, inner: Inner) -> Result<String, CodegenError> {
+        // The generic payload path would print a `bN` as a decimal, but bits
+        // are shown as hex at their own width (unit 3e80d069-1.4).
+        if matches!(inner, Inner::Bits(_)) {
+            return Err(unsupported("display of an optional raw-bits value"));
+        }
         let none = self.text_literal(&self.names.display_tokens().none.clone())?;
         let n = self.temps;
         self.temps += 1;

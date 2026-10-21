@@ -3,7 +3,7 @@
 use crate::error::unsupported;
 use radix_codegen_shared::CodegenError;
 use radix_types::{
-    DefId, FuncSig, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable,
+    BitsWidth, DefId, FuncSig, NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable,
 };
 
 /// The sized integer widths other than `i64`, which is [`Ty::Int`].
@@ -89,6 +89,8 @@ pub(crate) enum Inner {
     /// `wrapping<W>`: a modular word, widened on read and reduced at the
     /// store. `u64` carries its value in a `uint64_t` optional slot.
     Modular(IntWidth),
+    /// `bN`: raw bits, held in the unsigned C cell of its width.
+    Bits(BitsWidth),
     List(Elem),
     Genus(DefId),
     /// A map (`tabula`) behind a pointer, so `NULL` is none.
@@ -105,6 +107,7 @@ impl Inner {
             Inner::Float => Ty::Float,
             Inner::Float32 => Ty::Float32,
             Inner::Modular(width) => Ty::Modular(width),
+            Inner::Bits(width) => Ty::Bits(width),
             Inner::List(elem) => Ty::List(elem),
             Inner::Genus(def_id) => Ty::Genus(def_id),
             Inner::Map(k, v) => Ty::Map(k, v),
@@ -119,6 +122,7 @@ impl Inner {
             Ty::Float => Some(Inner::Float),
             Ty::Float32 => Some(Inner::Float32),
             Ty::Modular(width) => Some(Inner::Modular(width)),
+            Ty::Bits(width) => Some(Inner::Bits(width)),
             Ty::List(elem) => Some(Inner::List(elem)),
             Ty::Genus(def_id) => Some(Inner::Genus(def_id)),
             Ty::Map(k, v) => Some(Inner::Map(k, v)),
@@ -144,8 +148,8 @@ impl Inner {
     /// fits `faber_opt_i64`; `u64` needs its own unsigned slot.
     pub(crate) fn scalar_struct(self) -> Option<&'static str> {
         match self {
-            Inner::Modular(IntWidth::U64) => Some("faber_opt_u64"),
-            Inner::Int | Inner::Modular(_) => Some("faber_opt_i64"),
+            Inner::Modular(IntWidth::U64) | Inner::Bits(BitsWidth::B64) => Some("faber_opt_u64"),
+            Inner::Int | Inner::Modular(_) | Inner::Bits(_) => Some("faber_opt_i64"),
             Inner::Bool => Some("faber_opt_bool"),
             Inner::Float | Inner::Float32 => Some("faber_opt_f64"),
             Inner::Text | Inner::List(_) | Inner::Genus(_) | Inner::Map(..) => None,
@@ -173,6 +177,11 @@ pub(crate) enum Ty {
     /// `saturating<W>`: the plain C width, read widened, and written only
     /// through a store that clamps to the width's ends.
     Saturating(IntWidth),
+    /// `bN`: a raw-bits value, exactly N bits, held in the unsigned C cell of
+    /// that width (`uintN_t`). Bits are not numbers: no arithmetic, no
+    /// widening, and every operator outside the type's own domain is refused
+    /// by name rather than emitted through a promoted integer carrier.
+    Bits(BitsWidth),
     /// `string`: a NUL-terminated C string of UTF-8 bytes. Text literals
     /// containing NUL are rejected, so the terminator is never ambiguous.
     Text,
@@ -280,6 +289,8 @@ impl Ty {
             Ty::Int => Some("int64_t"),
             Ty::None => Some("int"),
             Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => Some(width.c_type()),
+            // Raw bits live in the unsigned C cell of their own width.
+            Ty::Bits(width) => Some(int_width_of_bits(width).c_type()),
             Ty::Opt(Inner::Genus(_)) => None,
             Ty::Opt(inner) => inner
                 .scalar_struct()
@@ -327,6 +338,32 @@ fn int_width(width: NumericWidth) -> Option<IntWidth> {
         NumericWidth::U64 => Some(IntWidth::U64),
         _ => None,
     }
+}
+
+/// The unsigned C cell a raw-bits width is held in: `b8`…`b64` is
+/// `uint8_t`…`uint64_t`. Bits never widen, so the mapping is exact.
+pub(crate) fn int_width_of_bits(width: BitsWidth) -> IntWidth {
+    match width {
+        BitsWidth::B8 => IntWidth::U8,
+        BitsWidth::B16 => IntWidth::U16,
+        BitsWidth::B32 => IntWidth::U32,
+        BitsWidth::B64 => IntWidth::U64,
+    }
+}
+
+/// Refuse an operator whose operand is raw bits. A `bN` is exactly N bits and
+/// has no arithmetic, so every operator this leaf would emit through the
+/// promoted integer carrier (arithmetic, C equality, width-blind bitwise) is a
+/// wrong program rather than a missing one (operator ruling 2026-10-10).
+pub(crate) fn refuse_bits_operand(
+    types: &TypeTable,
+    ty: Option<TypeId>,
+    construct: &str,
+) -> Result<(), CodegenError> {
+    if ty.is_some_and(|ty| matches!(classify(types, ty), Ok(Ty::Bits(_)))) {
+        return Err(unsupported(construct));
+    }
+    Ok(())
 }
 
 /// The element class a map key or value may carry: `int` or `text`.
@@ -377,6 +414,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Some(width) => Ok(Ty::Saturating(width)),
             None => Err(unsupported(describe(types.get(ty)))),
         },
+        Type::Bits(width) => Ok(Ty::Bits(*width)),
         Type::Primitive(Primitive::Textus) => Ok(Ty::Text),
         // `ascii` is an ASCII-only text with no capacity; `ascii<N>` and
         // `string<N>` are bounded text whose capacity the typechecker proves a
@@ -407,6 +445,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Genus(_) => Err(unsupported("list of genus")),
                 Ty::Decimal => Err(unsupported("list of decimals")),
                 Ty::Modular(width) => Ok(Ty::List(Elem::Modular(width))),
+                Ty::Bits(_) => Err(unsupported("list of raw bits")),
                 Ty::Saturating(_) => Err(unsupported("list of saturating words")),
                 Ty::None => Err(unsupported("list of none")),
                 Ty::Set(_) => Err(unsupported("list of sets")),
@@ -423,6 +462,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             Ty::Float => Ok(Ty::Set(Elem::Float)),
             Ty::Float32 => Err(unsupported("set of f32")),
             Ty::Modular(width) => Ok(Ty::Set(Elem::Modular(width))),
+            Ty::Bits(_) => Err(unsupported("set of raw bits")),
             Ty::List(_) => Err(unsupported("set of lists")),
             Ty::Set(_) => Err(unsupported("set of sets")),
             Ty::Genus(_) => Err(unsupported("set of genus")),
