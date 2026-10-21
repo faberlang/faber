@@ -1,4 +1,6 @@
-use super::build::{matmul_barrier_schedule, reduction_barrier_schedule};
+use super::build::{
+    dims_product, dims_without_axis_product, matmul_barrier_schedule, reduction_barrier_schedule,
+};
 use super::*;
 use crate::abi::{
     CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
@@ -3360,4 +3362,27 @@ fn literal_const_operand_resolves_single_assign() {
         literal_const_operand(&function, &MirOperand::Temp(temp)),
         Some(MirConstant::Float(value)) if value.to_bits() == 1.0f64.to_bits()
     ));
+}
+
+/// A literal dim product that does not fit `u64` fails closed (no plan)
+/// instead of saturating to a near-`u64::MAX` element count that the plan
+/// would carry as a real buffer size.
+#[test]
+fn dims_product_overflow_fails_closed() {
+    assert_eq!(dims_product(&[u64::MAX, 2]), None);
+    assert_eq!(dims_product(&[2u64.pow(32), 2u64.pow(32), 2]), None);
+    assert_eq!(dims_product(&[3, 5]), Some(15));
+    // Zero still flows on: the per-plan zero validators name it.
+    assert_eq!(dims_product(&[3, 0, 5]), Some(0));
+}
+
+/// The axis-removed product has the same fail-closed overflow law.
+#[test]
+fn dims_without_axis_product_overflow_fails_closed() {
+    assert_eq!(dims_without_axis_product(&[u64::MAX, 2, 1], 2), None);
+    assert_eq!(dims_without_axis_product(&[3, 5], 0), Some(5));
+    assert_eq!(dims_without_axis_product(&[3, 5], 1), Some(3));
+    assert_eq!(dims_without_axis_product(&[3, 0, 5], 2), Some(0));
+    // An out-of-range axis stays fail-closed.
+    assert_eq!(dims_without_axis_product(&[3, 5], 2), None);
 }
