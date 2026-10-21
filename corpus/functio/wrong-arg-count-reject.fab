@@ -1,0 +1,26 @@
++++
+term = "functio"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "si_stmt", "arm", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A call must pass exactly the declared number of arguments; extra arguments are an error."
+syntax = "fn f(int a) → int, called as f(1, 2) — rejected"
+related = ["functio", "argumentum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM013:wrong_number_of_arguments"
++++
+# =============================================================================
+# functio — a call passes one argument per parameter
+# =============================================================================
+# This exemplum intentionally fails to compile: `f` takes one parameter and
+# the call supplies two.
+
+fn f(int a) → int {
+    return a
+}
+
+main {
+    print f(1, 2)
+}

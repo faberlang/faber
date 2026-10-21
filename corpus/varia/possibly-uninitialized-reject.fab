@@ -1,0 +1,36 @@
++++
+term = "varia"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "hole_type", "assignment", "place", "additive_expr", "expression", "literal", "nota_stmt", "si_stmt", "arm"]
+category = "binding"
+canonical = false
+summary = "Reading a deferred mut binding assigned on only one branch is refused."
+syntax = "mut int x  /  if true { x ← 1 }  /  print x — rejected"
+related = ["varia", "si", "←"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM058:possibly_uninitialized"
++++
+# =============================================================================
+# varia — A deferred mut binding must be assigned on every path before a read.
+# =============================================================================
+#
+# What this teaches:
+#   • `mut int x` with no initializer defers the store to a later branch
+#   • definite assignment is per path, so a read outside that branch is refused
+#
+# Common mistake:
+#   • assuming `if true` is constant-folded away — both paths still count
+#
+# See also: varia, si, ←
+# =============================================================================
+
+# This exemplum intentionally fails to compile.
+
+main {
+    mut int x
+    if true {
+        x ← 1
+    }
+    print x
+}
