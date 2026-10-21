@@ -2021,6 +2021,7 @@ pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
         2 => value.log10(),
         3 => value.sin(),
         4 => value.cos(),
+        5 => value.tan(),
         6 => value.cbrt(),
         _ => value.tan(),
     }
