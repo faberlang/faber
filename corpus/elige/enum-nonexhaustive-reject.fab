@@ -1,0 +1,37 @@
++++
+term = "enum nonexhaustive switch"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "ordo_decl", "enum_member", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "elige_stmt", "casu_elige_clause", "redde_stmt", "sit_decl", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+summary = "A switch over a closed set covers every member or carries a default."
+syntax = "switch c { case red { } case green { } }"
+related = ["elige", "casu", "ordo"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM040:missing_variants"
++++
+# =============================================================================
+# enum nonexhaustive switch — a closed set is covered whole or caught
+# =============================================================================
+# An enum is a closed set: its members are every value it has. A value switch
+# over an enum must therefore name every member or carry a `default`. This one
+# skips `blue` and has no default, so the check reports SEM040 with the issue
+# `missing_variants` instead of letting a value fall through unhandled.
+
+enum Color { red, green, blue }
+
+fn f(Color c) → string {
+    switch c {
+        case red {
+            return "r"
+        }
+        case green {
+            return "g"
+        }
+    }
+    return "z"
+}
+
+main {
+    print f(Color.red)
+}

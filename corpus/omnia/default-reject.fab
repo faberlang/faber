@@ -1,0 +1,58 @@
++++
+term = "omnia"
+explains = ["omnia"]
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "ordo_decl", "enum_member", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "ceterum_clause", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "testing"
+canonical = false
+summary = "`discerne omnia` requires every variant listed explicitly; a `ceterum` catchall arm is refused."
+syntax = "discerne omnia <enum> { casu … ceterum { … } }"
+related = ["casu", "ceterum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM044:catchall_arm"
++++
+# =============================================================================
+# omnia default arm — a catchall under `discerne omnia` is a check error
+# =============================================================================
+#
+# What this teaches:
+#   • `discerne omnia` (en `match all`) promises the dispatch covers every
+#     variant of the scrutinee, so the compiler can prove the match complete.
+#   • A `ceterum` (en `default`) arm hides exactly the variants the promise
+#     says are named, so it is refused: SEM044:catchall_arm.
+#
+# Common mistakes:
+#   • Using `ceterum` with `discerne omnia` — list every variant with `casu`
+#     instead, or drop `omnia` if the catchall is really wanted.
+#
+# See also: omnia
+# =============================================================================
+
+# discerne omnia — every variant listed, no catchall
+#
+# GRAMMAR:
+#   discerneStmt :← 'discerne' 'omnia'? discriminants '{' casuVariantClause* ceterumClause? '}'
+#
+# The grammar admits a `ceterum` clause, but under `omnia` the semantic pass
+# refuses it: a catchall would defeat the exhaustiveness the keyword asserts.
+
+enum E {
+    a,
+    b
+}
+
+fn f(E e) → int {
+    match all e {
+        case a {
+            return 1
+        }
+        default {
+            return 2
+        }
+    }
+}
+
+main {
+    print f(E.a)
+}
