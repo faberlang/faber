@@ -1,0 +1,41 @@
++++
+term = "sponte"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "genus_decl", "genus_member", "field_decl", "expression", "literal", "nota_stmt", "incipit_stmt"]
+category = "declaration"
+canonical = false
+summary = "Call sites of optional parameters: bare `optional` (omitted is none) and `optional coalesce N` defaults."
+syntax = "greet(\"A\")"
+related = ["sponte", "nihil"]
+locale = "en"
++++
+# =============================================================================
+# sponte at call sites — bare `optional` and `optional coalesce N` defaults
+# =============================================================================
+#
+# What this teaches:
+#   • A bare `optional` parameter is `T ∪ none` at the call site: omitted means none
+#   • `optional coalesce N` supplies a default that the caller may override
+#   • Defaults are filled positionally, so later arguments still bind correctly
+#
+# EXPECTED OUTPUT:
+#   Mx A, Dr A, 1, 7, 31, 23, 6
+# =============================================================================
+
+fn greet(string n, string t optional) → string {
+    return t coalesce "Mx" + " " + n
+}
+
+fn pag(int p optional coalesce 1) → int { return p }
+
+fn many(int a, int b optional coalesce 10, int c optional coalesce 20) → int { return a + b + c }
+
+main {
+    print greet("A")
+    print greet("A", "Dr")
+    print pag()
+    print pag(7)
+    print many(1)
+    print many(1, 2)
+    print many(1, 2, 3)
+}
