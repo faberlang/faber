@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 433 | 437 | 99% |
-| go | 400 | 437 | 92% |
-| ts | 437 | 437 | 100% |
-| faber | 437 | 437 | 100% |
+| rust | 493 | 497 | 99% |
+| go | 453 | 497 | 91% |
+| ts | 497 | 497 | 100% |
+| faber | 497 | 497 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 395 | 441 | 90% |
-| wasm-text | 336 | 441 | 76% |
-| wasm | 336 | 441 | 76% |
-| metal-text | 5 | 441 | 1% |
-| wgsl-text | 5 | 441 | 1% |
-| sexp-struct | 407 | 441 | 92% |
-| sexp | 405 | 441 | 92% |
-| runner | 393 | 441 | 89% |
+| llvm-text | 437 | 501 | 87% |
+| wasm-text | 374 | 501 | 75% |
+| wasm | 374 | 501 | 75% |
+| metal-text | 5 | 501 | 1% |
+| wgsl-text | 5 | 501 | 1% |
+| sexp-struct | 453 | 501 | 90% |
+| sexp | 451 | 501 | 90% |
+| runner | 444 | 501 | 89% |
 
 ## Keywords — application lane
 
@@ -205,7 +205,7 @@ pages of the documentation site.
 | <a id=""></a>`←` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`→` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`↤` | ✓ | ✓ | ✓ | ✓ |
-| <a id=""></a>`↦` | ◐ | ✓ | ✓ | ✓ |
+| <a id=""></a>`↦` | ◐ | ◐ | ✓ | ✓ |
 | <a id=""></a>`⇐` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⇒` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⇥` | ✓ | ✓ | ✓ | ✓ |
@@ -245,7 +245,7 @@ pages of the documentation site.
 | <a id="cede"></a>`cede` | ✕ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ceteri"></a>`ceteri` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ceterum"></a>`ceterum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="clausura"></a>`clausura` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="clausura"></a>`clausura` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="copia"></a>`copia` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="cursor"></a>`cursor` | ✕ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="custodi"></a>`custodi` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -257,7 +257,7 @@ pages of the documentation site.
 | <a id="ego"></a>`ego` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="elige"></a>`elige` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="errata"></a>`errata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="est"></a>`est` | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="est"></a>`est` | ✕ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="ex"></a>`ex` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="exitus"></a>`exitus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="fac"></a>`fac` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -272,7 +272,7 @@ pages of the documentation site.
 | <a id="fragilis"></a>`fragilis` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="functio"></a>`functio` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="futurum"></a>`futurum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="genus"></a>`genus` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="genus"></a>`genus` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="iace"></a>`iace` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ignotum"></a>`ignotum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="immutata"></a>`immutata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
@@ -284,16 +284,16 @@ pages of the documentation site.
 | <a id="incipit"></a>`incipit` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="insere"></a>`insere` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="instans"></a>`instans` | ✓ | ✕ | ✕ | ✕ | ✕ | ◐ | ◐ | ◐ |
-| <a id="itera"></a>`itera` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="itera"></a>`itera` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="iuncta"></a>`iuncta` | ✓ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="lege"></a>`lege` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
-| <a id="lineam"></a>`lineam` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="lista"></a>`lista` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="lineam"></a>`lineam` | ✓ | ✓ | ✓ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="lista"></a>`lista` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ◐ |
 | <a id="mone"></a>`mone` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="mori"></a>`mori` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="mori"></a>`mori` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="nihil"></a>`nihil` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="non"></a>`non` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="numerus"></a>`numerus` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
+| <a id="numerus"></a>`numerus` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="numquam"></a>`numquam` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="objectum"></a>`objectum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="octeti"></a>`octeti` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -302,7 +302,7 @@ pages of the documentation site.
 | <a id="operandus"></a>`operandus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="optio"></a>`optio` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="optiones"></a>`optiones` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="ordo"></a>`ordo` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="ordo"></a>`ordo` | ◐ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="per"></a>`per` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="perge"></a>`perge` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="postpara"></a>`postpara` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
@@ -332,14 +332,14 @@ pages of the documentation site.
 | <a id="sit"></a>`sit` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="solum"></a>`solum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="solum-in"></a>`solum_in` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="sparge"></a>`sparge` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="sponte"></a>`sponte` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
+| <a id="sparge"></a>`sparge` | ✓ | ✓ | ✓ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="sponte"></a>`sponte` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="tabula"></a>`tabula` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="tacebit"></a>`tacebit` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="tacet"></a>`tacet` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="tag"></a>`tag` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="temporis"></a>`temporis` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="textus"></a>`textus` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="textus"></a>`textus` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="typus"></a>`typus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ubique"></a>`ubique` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="usque"></a>`usque` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -396,7 +396,7 @@ pages of the documentation site.
 | <a id=""></a>`≤` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≥` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⊗` | ○ | ○ | ○ | ○ | ○ | ✓ | ✓ | ✓ |
-| <a id=""></a>`⊘` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`⊘` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⊙` | ✕ | ✕ | ✕ | ○ | ○ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⊚` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⊛` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
