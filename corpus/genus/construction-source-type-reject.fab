@@ -1,0 +1,27 @@
++++
+term = "genus construction source type"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A `from` construction source of a different genus type is a check error."
+syntax = "B { x = 2 } from a"
+related = ["genus", "ex"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:construction_source_type_mismatch"
++++
+# =============================================================================
+# genus construction source type — copy-with-changes needs the same genus
+# =============================================================================
+# `B { x = 2 } from a` copies every unlisted field from the source, so the
+# source must itself be a B. A different genus type has no fields to copy.
+
+class A { mut int x }
+class B { mut int x }
+
+main {
+    let A a ← A { x = 1 }
+    let B b ← B { x = 2 } from a
+    print b.x
+}
