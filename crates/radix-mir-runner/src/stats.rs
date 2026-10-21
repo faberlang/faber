@@ -432,6 +432,7 @@ fn sermo_name(op: &MirSermoOp) -> &'static str {
         MirSermoOp::ViewMeus => "view_meus",
         MirSermoOp::ViewTuus => "view_tuus",
         MirSermoOp::Send => "send",
+        MirSermoOp::Flush => "flush",
         MirSermoOp::Finish => "finish",
         MirSermoOp::Close => "close",
         MirSermoOp::CloseFailed => "close_failed",

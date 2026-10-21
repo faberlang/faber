@@ -336,6 +336,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 sermo.borrow().with_view(SermoView::Tuus),
             )))),
             MirSermoOp::Send => Ok(Value::Unit),
+            MirSermoOp::Flush => self.sermo_flush(&sermo, span),
             MirSermoOp::Finish => {
                 let terminal = self.sermo_finish(&sermo, span)?;
                 let Type::Enum(status) = self.types.get(return_ty.semantic_id()) else {

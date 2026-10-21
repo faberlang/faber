@@ -1503,6 +1503,7 @@ impl FunctionBuilder<'_> {
         } else if Some(receiver_def) == self.context.meus_def {
             match method_name {
                 "sink" => radix_mir::MirSermoOp::Send,
+                "flush" => radix_mir::MirSermoOp::Flush,
                 "fini" => radix_mir::MirSermoOp::Finish,
                 _ => return None,
             }

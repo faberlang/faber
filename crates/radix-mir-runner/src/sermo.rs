@@ -655,6 +655,23 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .unwrap_or(Value::Nil))
     }
 
+    /// `flush` on a send view. The runner pushes each frame eagerly in `Send`
+    /// and buffers none, so the flush is the identity; only `fini`
+    /// (`sermo_finish`) closes the view.
+    pub(crate) fn sermo_flush(
+        &mut self,
+        sermo: &Rc<RefCell<SermoValue>>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        if sermo.borrow().conversation.borrow().meus_closed {
+            return Err(RunnerError::internal(
+                span,
+                "sermo flush after closed send half",
+            ));
+        }
+        Ok(Value::Unit)
+    }
+
     /// `fini` on a view. Outbound: close the direction. Inbound: a live
     /// cursor handler is cancelled; otherwise the remaining frames drain to
     /// the producer's terminal.
