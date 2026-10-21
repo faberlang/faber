@@ -1,0 +1,26 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "expr_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
+category = "binding"
+summary = "In-place collection methods rewrite the receiver, so a let binding refuses them."
+syntax = "let map<string, int> m ← { \"a\": 1 } ; m.put(\"b\", 2)"
+related = ["sit", "varia"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM020:imperativus_operator_method_requires_varia_receiver"
++++
+# =============================================================================
+# mutabilitas — mutating receiver methods need a writable binding
+# =============================================================================
+# `.put`, `.add` and `.append` rewrite the receiver in place. A `let` binding
+# is read-only, so each call below is a SEM020 reject; bind `mut` to mutate.
+
+main {
+    let map<string, int> m ← { "a": 1 }
+    m.put("b", 2)
+    let set<int> s ← empty
+    s.add(2)
+    let queue<int> q ← empty
+    q.append(1)
+}
