@@ -476,7 +476,7 @@ pub fn build_device_program(
         })
         .map(|function| function.id)
         .collect();
-    for id in companion_ids {
+    for &id in &companion_ids {
         if !ordered_ids.contains(&id) {
             ordered_ids.push(id);
         }
@@ -514,6 +514,7 @@ pub fn build_device_program(
         .filter(|function| {
             function.shader_stage == Some(crate::MirKernelShaderStage::Compute)
                 && selected_ids.contains(&function.id)
+                && !companion_ids.contains(&function.id)
         })
         .map(|function| function.id)
         .collect();
