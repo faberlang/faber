@@ -77,3 +77,30 @@ fn embedded_root_materializes_once_and_matches_in_tree_sources() {
         .expect("mtime");
     assert_eq!(before, after, "second call must not rewrite the extraction");
 }
+
+/// A materialized runtime root is not the radix workspace, so an embedded
+/// crate that inherits workspace keys (`lints.workspace = true`, `version.workspace`)
+/// fails to load there: cargo cannot find the workspace root. That broke every
+/// released llvm-host build (radix-abi). Only a crate that is its own
+/// workspace root (`[workspace]`) may inherit.
+#[test]
+fn embedded_manifests_inherit_nothing_from_the_radix_workspace() {
+    let offenders: Vec<&str> = EMBEDDED_RUNTIME
+        .iter()
+        .filter(|(relative, _)| relative.ends_with("Cargo.toml"))
+        .filter(|(_, bytes)| {
+            let text = String::from_utf8_lossy(bytes);
+            let own_root = text.lines().any(|line| line.trim() == "[workspace]");
+            let inherits = text.lines().any(|line| {
+                let line = line.split('#').next().unwrap_or("").replace(' ', "");
+                line.contains("workspace=true") || line.contains(".workspace=true")
+            });
+            inherits && !own_root
+        })
+        .map(|(relative, _)| *relative)
+        .collect();
+    assert!(
+        offenders.is_empty(),
+        "embedded manifests inherit from a workspace the materialized root lacks: {offenders:?}"
+    );
+}

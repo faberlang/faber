@@ -6,8 +6,10 @@ description = "Radix-owned host ABI contract table (runtime symbol names and lay
 license = "MIT OR Apache-2.0"
 publish = false
 
-[lints]
-workspace = true
+# Declared here, not inherited: the faber binary embeds this crate for the
+# llvm-host runtime build, and that materialized copy has no workspace root.
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
 
 
 [dev-dependencies]
