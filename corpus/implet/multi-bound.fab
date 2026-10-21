@@ -1,0 +1,55 @@
++++
+term = "implet"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "implendum_decl", "implendum_method_decl", "generic_params", "generic_param", "generic_bound", "contract_ref", "genus_decl", "genus_member", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "typed_constructor", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Bounds a type parameter by the intersection of two contracts."
+syntax = "functio <name><T implements <A> ∩ <B>>(…) | genus <name> implements <A>, <B> <block>"
+aliases = ["implements"]
+related = ["implet", "implendum", "generic"]
+locale = "en"
++++
+# =============================================================================
+# implet on an intersection bound — a type parameter bounded by two contracts
+# =============================================================================
+#
+# What this teaches:
+#   • `T implements A ∩ B` bounds a type parameter by the intersection of two
+#     contracts: inside the function, the methods of both are callable on `T`.
+#   • A class that writes `implements A, B` satisfies the intersection, so it
+#     is accepted wherever `T implements A ∩ B` is required.
+#   • The whole bound is checked at the call site: an argument type that lacks
+#     either contract is rejected at compile time.
+#
+# See also: implet, implendum, generic
+# =============================================================================
+#
+# EXPECTED OUTPUT:
+#   3
+
+interface A {
+    fn a() → int
+}
+
+interface B {
+    fn b() → int
+}
+
+class C implements A, B {
+    fn a() → int {
+        return 1
+    }
+
+    fn b() → int {
+        return 2
+    }
+}
+
+fn both<T implements A ∩ B>(T x) → int {
+    return x.a() + x.b()
+}
+
+main {
+    print both(C {})
+}
