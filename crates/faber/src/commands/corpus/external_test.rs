@@ -140,3 +140,36 @@ fn external_target_maps_recipe_names_and_rejects_unknown() {
     }
     assert_eq!(super::external_target("oracle"), None);
 }
+
+#[test]
+fn package_product_is_classified_against_the_recipe_extension() {
+    use super::{PackageProduct, classify_package_product};
+
+    let dir = tempfile::tempdir().expect("temporary package output");
+    let source = dir.path().join("main.ts");
+    let binary = dir.path().join("program");
+    std::fs::write(&source, "").expect("write source");
+    std::fs::write(&binary, "").expect("write binary");
+    assert_eq!(
+        classify_package_product(source.clone(), "ts"),
+        PackageProduct::Source(source)
+    );
+    assert_eq!(
+        classify_package_product(binary.clone(), "ts"),
+        PackageProduct::Linked(binary)
+    );
+
+    let modules = dir.path().join("wasm");
+    std::fs::create_dir(&modules).expect("module directory");
+    assert_eq!(
+        classify_package_product(modules.clone(), "wat"),
+        PackageProduct::Missing
+    );
+    std::fs::write(modules.join("001-b.wat"), "").expect("write module");
+    std::fs::write(modules.join("000-a.wat"), "").expect("write module");
+    std::fs::write(modules.join("notes.txt"), "").expect("write other file");
+    assert_eq!(
+        classify_package_product(modules.clone(), "wat"),
+        PackageProduct::Modules(vec![modules.join("000-a.wat"), modules.join("001-b.wat")])
+    );
+}

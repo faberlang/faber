@@ -439,6 +439,22 @@ fn run_case(
         );
     }
     let case_dir = workspace.join(format!("case_{index:04}"));
+    // WHY: a case dir left by an earlier run (or an earlier suite layout) can hold
+    // a built artifact the current case never produced, so a failed step would
+    // still find something to run. Every case starts from an empty workspace.
+    if let Err(error) = fs::remove_dir_all(&case_dir)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        return result(
+            case,
+            target,
+            "fail",
+            "setup",
+            Some(format!("cannot clear case workspace: {error}")),
+            None,
+            started,
+        );
+    }
     if let Err(error) = fs::create_dir_all(&case_dir) {
         return result(
             case,
@@ -476,6 +492,11 @@ fn run_case(
     // emits and links the package in one step and prints the artifact path, so the
     // file-shaped emit and the recipe build are both replaced by that command.
     let package_build = case.input.is_dir() && matches!(mode, "external" | "build");
+    // What the package build produced decides which recipe steps still apply: a
+    // linked artifact replaces them, an emitted source file or a module set goes
+    // through the same recipe build (and run) as a single-file emit.
+    let mut package_linked = false;
+    let mut package_modules: Vec<PathBuf> = Vec::new();
     let (emitted_code, emit_ms, emit_command) = if package_build {
         let build_args = vec![
             faber.display().to_string(),
@@ -517,7 +538,16 @@ fn run_case(
         } else {
             "build"
         };
-        if !output.status.success() || case.target.phase.as_deref() == Some(judged_phase) {
+        let printed =
+            printed_artifact(&output).map(|path| classify_package_product(path, extension));
+        // The package build is the whole build phase only when it links the
+        // artifact; an emitted source or module set still has the recipe build to
+        // run, so a `build` pin is judged there, not here.
+        let build_phase_done =
+            judged_phase == "emit" || matches!(printed, Some(PackageProduct::Linked(_)) | None);
+        if !output.status.success()
+            || (build_phase_done && case.target.phase.as_deref() == Some(judged_phase))
+        {
             let (status, reason) = judge_phase(case, judged_phase, &output);
             let mut row = result(
                 case,
@@ -532,15 +562,29 @@ fn run_case(
             row["timing_ms"]["emit"] = json!(emit_ms);
             return row;
         }
-        match printed_artifact(&output) {
-            Some(path) => artifact = path,
+        let mut package_code = String::new();
+        let product = printed.and_then(|product| match product {
+            PackageProduct::Source(path) => fs::read_to_string(&path).ok().map(|code| {
+                package_code = code;
+                PackageProduct::Source(path)
+            }),
+            PackageProduct::Missing => None,
+            other => Some(other),
+        });
+        match product {
+            Some(PackageProduct::Linked(path)) => {
+                artifact = path;
+                package_linked = true;
+            }
+            Some(PackageProduct::Modules(modules)) => package_modules = modules,
+            Some(_) => {}
             None => {
                 let mut row = result(
                     case,
                     target,
                     "fail",
                     "build",
-                    Some("package build printed no artifact path".to_owned()),
+                    Some("package build printed no usable artifact".to_owned()),
                     Some(&build_args),
                     started,
                 );
@@ -550,7 +594,7 @@ fn run_case(
             }
         }
         (
-            String::new(),
+            package_code,
             emit_ms,
             json!({"argv":build_args,"cwd":case_dir}),
         )
@@ -651,6 +695,24 @@ fn run_case(
         let code = String::from_utf8_lossy(&output.stdout).into_owned();
         (code, emit_ms, json!({"argv":emit_args,"cwd":case.dir}))
     };
+    if !package_modules.is_empty() {
+        return build_package_modules(
+            case,
+            target,
+            mode,
+            recipe,
+            &PackageModules {
+                suite,
+                workspace,
+                case_dir: &case_dir,
+                modules: &package_modules,
+            },
+            emit_command,
+            emit_ms,
+            started,
+            build_total_ms,
+        );
+    }
     if !matches!(mode, "external" | "build") {
         let (status, reason) = match judge_unexecuted_pin(case, "emit") {
             Some((status, reason)) => (status, Some(reason)),
@@ -674,14 +736,14 @@ fn run_case(
         source: &source,
         artifact: &artifact,
     };
-    if !package_build && let Err(error) = prepare_files(recipe, &paths, &emitted_bytes) {
+    if !package_linked && let Err(error) = prepare_files(recipe, &paths, &emitted_bytes) {
         return result(case, target, "fail", "setup", Some(error), None, started);
     }
     let mut row = result(case, target, "fail", "build", None, None, started);
     let mut stale_build_pin = false;
     row["emit_command"] = emit_command;
     row["timing_ms"]["emit"] = json!(emit_ms);
-    if package_build {
+    if package_linked {
         // The package build above already emitted and linked the artifact.
     } else if !recipe.build.is_empty() {
         let building = Instant::now();
@@ -758,7 +820,8 @@ fn run_case(
     row
 }
 
-/// The artifact path `faber build` prints on stdout for a package input.
+/// The artifact path `faber build` prints on stdout for a package input: a file
+/// (linked binary or emitted source) or a directory (a set of emitted modules).
 fn printed_artifact(output: &Output) -> Option<PathBuf> {
     String::from_utf8_lossy(&output.stdout)
         .lines()
@@ -766,7 +829,130 @@ fn printed_artifact(output: &Output) -> Option<PathBuf> {
         .map(str::trim)
         .filter(|line| !line.is_empty())
         .map(PathBuf::from)
-        .find(|path| path.is_file())
+        .find(|path| path.exists())
+}
+
+/// What a package build left behind, judged against the recipe's source extension.
+#[derive(Debug, PartialEq)]
+enum PackageProduct {
+    /// A linked artifact (native binary): it replaces the recipe build and is run.
+    Linked(PathBuf),
+    /// One emitted source file in the recipe's language: build and run it as a
+    /// single-file emit.
+    Source(PathBuf),
+    /// A directory of emitted modules in the recipe's language, one build each.
+    Modules(Vec<PathBuf>),
+    /// A printed path with nothing usable behind it.
+    Missing,
+}
+
+fn classify_package_product(path: PathBuf, extension: &str) -> PackageProduct {
+    let has_extension = |path: &Path| path.extension().is_some_and(|ext| ext == extension);
+    if path.is_dir() {
+        let mut modules = fs::read_dir(&path)
+            .map(|entries| {
+                entries
+                    .filter_map(Result::ok)
+                    .map(|entry| entry.path())
+                    .filter(|path| path.is_file() && has_extension(path))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        modules.sort();
+        return if modules.is_empty() {
+            PackageProduct::Missing
+        } else {
+            PackageProduct::Modules(modules)
+        };
+    }
+    if has_extension(&path) {
+        PackageProduct::Source(path)
+    } else {
+        PackageProduct::Linked(path)
+    }
+}
+
+struct PackageModules<'a> {
+    suite: &'a Path,
+    workspace: &'a Path,
+    case_dir: &'a Path,
+    modules: &'a [PathBuf],
+}
+
+/// Run the recipe build once per emitted module of a package. A module set has no
+/// single program to run, so only `build` mode is judged here; a recipe that
+/// would run the result has no way to run a package of modules.
+#[allow(clippy::too_many_arguments)]
+fn build_package_modules(
+    case: &Case,
+    target: &str,
+    mode: &str,
+    recipe: &SuiteTarget,
+    set: &PackageModules<'_>,
+    emit_command: Value,
+    emit_ms: f64,
+    started: Instant,
+    build_total_ms: &mut f64,
+) -> Value {
+    let mut row = result(case, target, "fail", "build", None, None, started);
+    row["emit_command"] = emit_command;
+    row["timing_ms"]["emit"] = json!(emit_ms);
+    if mode != "build" {
+        row["reason"] = json!(
+            "package build produced a directory of modules, which an executing recipe cannot run"
+        );
+        return row;
+    }
+    let mut commands = Vec::new();
+    for module in set.modules {
+        let artifact = set.case_dir.join(format!(
+            "program-{}",
+            module
+                .file_stem()
+                .map_or_else(|| "module".into(), |stem| stem.to_string_lossy())
+        ));
+        let paths = Paths {
+            suite: set.suite,
+            workspace: set.workspace,
+            runtime: recipe.runtime.as_deref(),
+            case_dir: set.case_dir,
+            source: module,
+            artifact: &artifact,
+        };
+        let building = Instant::now();
+        let build = run_command(
+            &recipe.build,
+            &paths,
+            set.case_dir,
+            None,
+            case.setup_timeout(),
+        );
+        *build_total_ms += ms(building);
+        let (argv, output) = match build {
+            Ok(item) => item,
+            Err(reason) => {
+                row["reason"] = json!(reason);
+                return row;
+            }
+        };
+        commands.push(json!({"argv":argv,"cwd":set.case_dir}));
+        if case.target.phase.as_deref() == Some("build") || !output.status.success() {
+            let (status, reason) = judge_phase(case, "build", &output);
+            row["status"] = json!(status);
+            row["reason"] = json!(reason);
+            row["exit"] = json!(output.status.code());
+            row["build_command"] = json!(commands);
+            return row;
+        }
+    }
+    row["build_command"] = json!(commands);
+    let (status, reason) = match judge_unexecuted_pin(case, "build") {
+        Some((status, reason)) => (status, json!(reason)),
+        None => ("pass", Value::Null),
+    };
+    row["status"] = json!(status);
+    row["reason"] = reason;
+    row
 }
 
 fn external_target(target: &str) -> Option<radix::module::Target> {
