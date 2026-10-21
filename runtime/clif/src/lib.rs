@@ -2578,8 +2578,7 @@ pub unsafe extern "C" fn __faber_clif_v1_record_is_named(
 ) -> i8 {
     let record = unsafe { &*record };
     i8::from(
-        record.variant == (variant != 0)
-            && unsafe { text_bytes(record.name) == text_bytes(name) },
+        record.variant == (variant != 0) && unsafe { text_bytes(record.name) == text_bytes(name) },
     )
 }
 
