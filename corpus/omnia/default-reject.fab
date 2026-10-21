@@ -1,6 +1,5 @@
 +++
-term = "omnia"
-explains = ["omnia"]
+term = "omnia default reject"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "ordo_decl", "enum_member", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "ceterum_clause", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
 category = "testing"
