@@ -26,6 +26,11 @@ fn floats_decimals_and_text_follow_the_reference_rules() {
     assert_eq!(render_float(2.5, &layout(".1"), |_| unreachable!()), "2.5");
     assert_eq!(render_decimal(1_250_000_000, 8, &layout(".1")), "12.5");
     assert_eq!(render_decimal(1_250_000_000, 8, &layout("")), "12.5");
+    assert_eq!(render_decimal(12_345, 1, &layout("e")), "1.2345e3");
+    assert_eq!(render_decimal(12_345, 1, &layout(".3e")), "1.234e3");
+    assert_eq!(render_decimal(-125, 1, &layout("e")), "-1.25e1");
+    assert_eq!(render_decimal(1, 8, &layout("e")), "1e-8");
+    assert_eq!(render_decimal(0, 8, &layout("e")), "0e0");
     assert_eq!(render_text("abcdef", &layout(">8.3")), "     abc");
 }
 

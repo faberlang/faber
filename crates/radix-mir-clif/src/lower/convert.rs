@@ -1558,11 +1558,19 @@ impl FunctionLower<'_, '_> {
         operand: &MirOperand,
     ) -> Lowered<Value> {
         let (handle, rep) = self.scalar(operand)?;
-        if !matches!(rep, Rep::Opt | Rep::Record) {
-            return Err(Decline::new("type check of a non-union"));
-        }
         let tests = member_tests(self.state.input.types, op.ty.semantic_id())
             .ok_or_else(|| Decline::new("type check target"))?;
+        if !matches!(rep, Rep::Opt | Rep::Record) {
+            // A monomorphized generic can leave a plain scalar operand: its
+            // one type is known, so the test is decided here.
+            let own = member_tests(
+                self.state.input.types,
+                self.operand_type(operand)?.semantic_id(),
+            )
+            .ok_or_else(|| Decline::new("type check of a non-union"))?;
+            let holds = own.iter().all(|test| tests.contains(test)) == op.positive;
+            return Ok(self.builder.ins().iconst(types::I8, i64::from(holds)));
+        }
         let mut found: Option<Value> = None;
         for test in tests {
             let hit = match test {
@@ -1580,7 +1588,15 @@ impl FunctionLower<'_, '_> {
                         .ok_or_else(|| Decline::new("type check of an unnamed definition"))?
                         .clone();
                     let name = self.text_literal(name.as_bytes())?;
-                    self.call_runtime(&abi::RECORD_IS_NAMED, &[handle, name])?
+                    let is_variant = self
+                        .state
+                        .input
+                        .structs
+                        .enum_variants
+                        .values()
+                        .any(|variants| variants.contains(&def));
+                    let variant = self.builder.ins().iconst(types::I32, i64::from(is_variant));
+                    self.call_runtime(&abi::RECORD_IS_NAMED, &[handle, name, variant])?
                 }
                 MemberTest::Nil => {
                     let zero = self.builder.ins().iconst(types::I64, 0);

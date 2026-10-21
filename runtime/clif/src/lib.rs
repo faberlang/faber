@@ -1783,7 +1783,47 @@ pub unsafe extern "C" fn __faber_clif_v1_list_sum_f64(list: *const List) -> f64 
         .items
         .iter()
         .map(|&(_, bits)| f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes())))
-        .sum()
+        .fold(0.0, |total, value| total + value)
+}
+
+/// A new list with every element clamped by a scalar `bound`: mode 0 is the
+/// integer minimum, 1 the integer maximum, 2 the float minimum and 3 the float
+/// maximum (the bound is then the float's bits). A float comparison with a NaN
+/// gives NaN, as the scalar form does.
+///
+/// # Safety
+///
+/// `list` is a live runtime list of integers (modes 0 and 1) or floats.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_list_extremum(
+    list: *const List,
+    bound: i64,
+    mode: i32,
+) -> *mut List {
+    let float_bound = f64::from_bits(u64::from_ne_bytes(bound.to_ne_bytes()));
+    let items = unsafe { list_ref(list) }
+        .items
+        .iter()
+        .map(|&(tag, bits)| {
+            let picked = match mode {
+                0 => bits.min(bound),
+                1 => bits.max(bound),
+                _ => {
+                    let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
+                    let picked = if value.is_nan() || float_bound.is_nan() {
+                        f64::NAN
+                    } else if mode == 2 {
+                        value.min(float_bound)
+                    } else {
+                        value.max(float_bound)
+                    };
+                    i64::from_ne_bytes(picked.to_bits().to_ne_bytes())
+                }
+            };
+            (tag, picked)
+        })
+        .collect();
+    list_new_from(items)
 }
 
 /// Abort with a text message, the runner's `abort: <message>` (D5).
@@ -2524,7 +2564,8 @@ pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(handle: *const Present, t
     i8::from(unsafe { handle.as_ref() }.is_some_and(|present| present.tag == tag))
 }
 
-/// Whether a record is a `genus` instance named `name`.
+/// Whether a record is a `genus` instance (`variant` zero) or a `discretio`
+/// variant (`variant` nonzero) named `name`.
 ///
 /// # Safety
 ///
@@ -2533,9 +2574,13 @@ pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(handle: *const Present, t
 pub unsafe extern "C" fn __faber_clif_v1_record_is_named(
     record: *const Record,
     name: *const u8,
+    variant: i32,
 ) -> i8 {
     let record = unsafe { &*record };
-    i8::from(!record.variant && unsafe { text_bytes(record.name) == text_bytes(name) })
+    i8::from(
+        record.variant == (variant != 0)
+            && unsafe { text_bytes(record.name) == text_bytes(name) },
+    )
 }
 
 /// Whether a boxed payload is a `genus` instance named `name`.

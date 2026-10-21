@@ -2301,6 +2301,30 @@ impl FunctionLower<'_, '_> {
                 };
                 (Some(picked), rep)
             }
+            (MirCollectionOp::Minimum | MirCollectionOp::Maximum, Rep::List) => {
+                let [_, bound] = args else {
+                    return Err(Decline::new("list extremum arity"));
+                };
+                let element = self.element_type(self.operand_type(receiver)?)?;
+                let element_rep = rep_of(self.state.input.types, element)?;
+                let (bound, bound_rep) = self.scalar(bound)?;
+                if bound_rep != element_rep {
+                    return Err(Decline::new("list extremum bound representation"));
+                }
+                let mode = match (element_rep, op == MirCollectionOp::Minimum) {
+                    (Rep::Int, true) => 0,
+                    (Rep::Int, false) => 1,
+                    (Rep::Float, true) => 2,
+                    (Rep::Float, false) => 3,
+                    _ => return Err(Decline::new("list extremum over a non-number list")),
+                };
+                let bound = self.element_bits(bound, element_rep);
+                let mode = self.builder.ins().iconst(types::I32, mode);
+                (
+                    self.call_runtime(&abi::LIST_EXTREMUM, &[handle, bound, mode])?,
+                    Rep::List,
+                )
+            }
             (MirCollectionOp::TextEscape, Rep::Text) => {
                 (self.call_runtime(&abi::TEXT_ESCAPE, &[handle])?, Rep::Text)
             }

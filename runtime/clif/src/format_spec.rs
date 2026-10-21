@@ -335,29 +335,34 @@ pub(crate) fn render_float(
 /// (trailing fraction zeros dropped, `12.50` is `12.5`, `3.00` is `3`). Sign,
 /// zero, fill, align and width behave as for floats. The sign is the value's
 /// sign, so a negative value that rounds to zero prints `-0.0`, as a float
-/// does. The `kind` is validated away before rendering and is ignored here.
+/// does. The kind is validated before rendering; scientific output is rendered
+/// from the exact digits.
 pub(crate) fn render_decimal(carrier: i128, scale: u32, spec: &LayoutSpec) -> String {
     let magnitude = carrier.unsigned_abs();
-    let digits = scale as usize;
-    let (whole, fraction) = match spec.precision {
-        None => {
-            let (whole, fraction) = split_fraction(magnitude, digits);
-            (whole, fraction.trim_end_matches('0').to_owned())
-        }
-        Some(p) if p >= digits => {
-            let (whole, mut fraction) = split_fraction(magnitude, digits);
-            fraction.push_str(&"0".repeat(p - digits));
-            (whole, fraction)
-        }
-        Some(p) => {
-            let rounded = round_half_even_pow10(magnitude, digits - p);
-            split_fraction(rounded, p)
-        }
-    };
-    let body = if fraction.is_empty() {
-        whole
+    let body = if spec.kind == Some(FormatKind::Scientific) {
+        scientific_decimal(magnitude, scale, spec.precision)
     } else {
-        format!("{whole}.{fraction}")
+        let digits = scale as usize;
+        let (whole, fraction) = match spec.precision {
+            None => {
+                let (whole, fraction) = split_fraction(magnitude, digits);
+                (whole, fraction.trim_end_matches('0').to_owned())
+            }
+            Some(p) if p >= digits => {
+                let (whole, mut fraction) = split_fraction(magnitude, digits);
+                fraction.push_str(&"0".repeat(p - digits));
+                (whole, fraction)
+            }
+            Some(p) => {
+                let rounded = round_half_even_pow10(magnitude, digits - p);
+                split_fraction(rounded, p)
+            }
+        };
+        if fraction.is_empty() {
+            whole
+        } else {
+            format!("{whole}.{fraction}")
+        }
     };
     finish(
         sign_of(carrier < 0, spec.plus),
@@ -392,6 +397,57 @@ fn round_half_even_pow10(magnitude: u128, shift: usize) -> u128 {
         quotient + 1
     } else {
         quotient
+    }
+}
+
+/// Render a scaled decimal in scientific notation without converting to float.
+fn scientific_decimal(magnitude: u128, mut scale: u32, precision: Option<usize>) -> String {
+    if magnitude == 0 {
+        return match precision {
+            Some(p) if p > 0 => format!("0.{}e0", "0".repeat(p)),
+            _ => "0e0".to_owned(),
+        };
+    }
+
+    let mut normalized_magnitude = magnitude;
+    let mut digits = magnitude.to_string();
+    while scale > 0 && digits.ends_with('0') {
+        digits.pop();
+        normalized_magnitude /= 10;
+        scale -= 1;
+    }
+    let mut exponent = digits.len() as i64 - 1 - scale as i64;
+
+    match precision {
+        Some(p) => {
+            let significant_digits = p + 1;
+            if digits.len() > significant_digits {
+                let dropped = digits.len() - significant_digits;
+                normalized_magnitude = round_half_even_pow10(normalized_magnitude, dropped);
+                digits = normalized_magnitude.to_string();
+                while digits.len() > significant_digits && digits.ends_with('0') {
+                    digits.pop();
+                    exponent += 1;
+                }
+            } else if digits.len() < significant_digits {
+                digits.push_str(&"0".repeat(significant_digits - digits.len()));
+            }
+
+            let mut body = digits[..1].to_owned();
+            if p > 0 {
+                body.push('.');
+                body.push_str(&digits[1..]);
+            }
+            format!("{body}e{exponent}")
+        }
+        None => {
+            let coefficient = digits.trim_end_matches('0');
+            if coefficient.len() > 1 {
+                format!("{}.{}e{exponent}", &coefficient[..1], &coefficient[1..])
+            } else {
+                format!("{coefficient}e{exponent}")
+            }
+        }
     }
 }
 

@@ -200,6 +200,14 @@ pub const LIST_SUM_F64: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(F64),
 };
+/// A new list with every element clamped by a scalar bound: mode 0 is the
+/// integer minimum, 1 the integer maximum, 2 the float minimum, 3 the float
+/// maximum (a float bound travels as its bits).
+pub const LIST_EXTREMUM: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_list_extremum",
+    params: &[Ptr, I64, I32],
+    ret: Some(Ptr),
+};
 /// Key membership.
 pub const MAP_HAS: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_map_has",
@@ -849,10 +857,11 @@ pub const UNION_HAS_TAG: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I32],
     ret: Some(I8),
 };
-/// Whether a record is a `genus` instance of the named type.
+/// Whether a record is a `genus` instance (variant flag 0) or a `discretio`
+/// variant (variant flag 1) of the named type.
 pub const RECORD_IS_NAMED: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_record_is_named",
-    params: &[Ptr, Ptr],
+    params: &[Ptr, Ptr, I32],
     ret: Some(I8),
 };
 /// Whether a boxed payload is a `genus` instance of the named type.
@@ -924,6 +933,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     LIST_GET_OPT,
     LIST_SUM_I64,
     LIST_SUM_F64,
+    LIST_EXTREMUM,
     TEXT_MAP,
     TEXT_TEST,
     TEXT_SPLIT,
