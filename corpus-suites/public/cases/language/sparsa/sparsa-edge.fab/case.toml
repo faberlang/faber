@@ -1,0 +1,18 @@
+version = 1
+id = "corpus/sparsa/sparsa-edge.fab"
+group = "language"
+input_root = "corpus"
+input = "sparsa/sparsa-edge.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "tensor ponde invalid index"
+check_only = false
