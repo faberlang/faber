@@ -309,6 +309,11 @@ pub enum MirCollectionOp {
     /// bounds and `step < 1` are runtime deaths, never clamps; the result aliases
     /// the receiver storage (a view, never a copy).
     TensorSliceNd,
+    /// Number of extents (axes); distinct from `Length`, which is the element
+    /// count on every collection (operator ruling 2026-10-15, Q-X1).
+    TensorRank,
+    /// Euclidean norm sqrt(sum x^2) over the logical elements, in the receiver's element carrier (operator ruling 2026-10-15, Q-X1).
+    TensorNorm,
     TensorAdd,
     TensorSub,
     TensorMul,
