@@ -330,8 +330,13 @@ fn interpret_path(
     };
     let session = radix::module::driver::Session::new(config);
     let mut host = StdioHost::with_argumenta(program_args.to_vec());
-    let result =
-        crate::script::run_with_session(&session, &path.display().to_string(), &source, &mut host);
+    let result = crate::script::run_with_session(
+        &session,
+        &path.display().to_string(),
+        &source,
+        &mut host,
+        DeviceSelection::Auto,
+    );
     exit_interpreted(result);
 }
 

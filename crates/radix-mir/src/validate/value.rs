@@ -308,7 +308,14 @@ impl Validator<'_, '_> {
                     }
                 }
                 if let Some(fallback_ty) = fallback_ty {
-                    self.require_assignable(
+                    // A numeric fallback literal is typed `numerus` in MIR
+                    // while the coalesce result may be a sized cell (a host
+                    // lowered reduce identity stored into an `i32` tensor, a
+                    // `list<u8>` element). Semantic analysis already
+                    // range-checked the literal under the inner type, so the
+                    // fitting-constant rule applies here too.
+                    self.require_assignable_or_fitting_constant(
+                        fallback,
                         fallback_ty,
                         result_ty,
                         span,

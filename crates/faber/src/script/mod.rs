@@ -16,6 +16,8 @@ use radix::module::driver::Session;
 #[cfg(feature = "runner")]
 use radix::module::mir::run_source as radix_run_source;
 #[cfg(feature = "runner")]
+use radix::program::mir::DeviceSelection;
+#[cfg(feature = "runner")]
 use std::panic::AssertUnwindSafe;
 #[cfg(feature = "runner")]
 use std::process::ExitCode;
@@ -60,7 +62,7 @@ pub fn run_named(
         .map_err(|diagnostic| RunSourceError::Frontend(vec![*diagnostic]))?
         .with_dev_locale_root();
     let session = Session::new(config);
-    run_with_session(&session, name, source, host)
+    run_with_session(&session, name, source, host, DeviceSelection::Auto)
 }
 
 /// Interpret source with a caller-owned [`Session`] (target and policy reuse).
@@ -70,6 +72,7 @@ pub fn run_with_session(
     name: &str,
     source: &str,
     host: &mut dyn Host,
+    selection: DeviceSelection,
 ) -> Result<ExitCode, RunSourceError> {
     let mut trap_host = trap::TrapHost { inner: host };
     let mut run_error = None::<RunSourceError>;
@@ -80,7 +83,7 @@ pub fn run_with_session(
         let result = if source_declares_non_kernel_import(name, source)
             || source_declares_cli_entry(name, source)
         {
-            run_as_package_source(session, name, source, &mut trap_host)
+            run_as_package_source(session, name, source, &mut trap_host, selection)
         } else {
             radix_run_source(session, name, source, &mut trap_host)
         };
@@ -123,12 +126,14 @@ fn run_as_package_source(
     name: &str,
     source: &str,
     host: &mut dyn Host,
+    selection: DeviceSelection,
 ) -> Result<(), RunSourceError> {
     let path = std::path::Path::new(name);
     if path.is_file() {
-        return radix::program::mir::run_package_mir(
+        return radix::program::mir::run_package_mir_with_selection(
             &session.config,
             path,
+            selection,
             &faber_cli::package::mir::faber_mir_seams(),
             host,
         )
@@ -145,9 +150,10 @@ fn run_as_package_source(
     let entry = scratch.0.join("main.fab");
     std::fs::write(&entry, source)
         .map_err(|err| RunSourceError::Frontend(vec![Diagnostic::io_error(&entry, &err)]))?;
-    radix::program::mir::run_package_mir(
+    radix::program::mir::run_package_mir_with_selection(
         &session.config,
         &entry,
+        selection,
         &faber_cli::package::mir::faber_mir_seams(),
         host,
     )
