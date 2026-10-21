@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/tensor/store-exact-intermediate.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/store-exact-intermediate.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

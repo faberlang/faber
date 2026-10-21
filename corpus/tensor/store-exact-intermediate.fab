@@ -1,0 +1,61 @@
++++
+term = "tensor"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "reducta_expr", "filum_clause", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Exact integer tensor reductions and matmul: math is unbounded in the ether, i8 boundary conditions apply only at the store."
+syntax = "reduce via sum from <ti8[n]> | t.sum() | reduce via product from <ti8[n]> | a · b"
+related = ["tensor", "summa", "numerus"]
+locale = "en"
++++
+
+# =============================================================================
+# tensor — exact i8 reductions and matmul, boundary conditions at the store
+# =============================================================================
+#
+# What this teaches:
+#   • Math happens in the ether — a reduction or a matmul accumulates at full
+#     precision; nothing clamps, wraps or traps per operation.
+#   • The store is the only boundary — the i8 width applies once, when the
+#     result is stored.
+#   • Exact intermediates fit — 100 + 100 - 100 is 100, not a wrapped value,
+#     because the intermediate 200 is never stored as i8.
+#   • Product intermediates — 100 * 2 * 0 is an exact 0; the same rule means a
+#     product that overflows the i8 range is caught at the store, not per op.
+#
+# Common mistakes:
+#   • expecting per-operation i8 overflow with sum()/product on i8 tensors
+#     (an intermediate at 200 over i8 max is exact until the store)
+#   • widening to a bigger width pre-emptively when the stored result fits
+#
+# See also: tensor, summa, numerus
+# =============================================================================
+
+main {
+    # (1) exact i8 sum — the intermediate 100 + 100 = 200 exceeds i8 max,
+    # but only the stored 100 is a boundary event, and it fits.
+    let list<i8> l ← [100, 100, -100]
+    let ti8[3] t ← l ↦ ti8[3]
+    let i8 s ← reduce via sum from t
+    print s
+
+    let i8 s2 ← t.sum()
+    print s2
+
+    # (2) exact i8 product — 100 * 2 * 0 is 0, with no per-operation i8 trap
+    # on the intermediate 200.
+    let list<i8> p ← [100, 2, 0]
+    let ti8[3] pt ← p ↦ ti8[3]
+    print reduce via product from pt
+
+    # (3) exact i8 matmul — the dot product is summed in the ether; the stored
+    # 1x1 result is 100.
+    let list<i8> flat_a ← [100, 100, -100, 0]
+    let ti8[1, 4] a ← flat_a ↦ ti8[1, 4]
+    let list<i8> flat_b ← [1, 1, 1, 1]
+    let ti8[4, 1] b ← flat_b ↦ ti8[4, 1]
+    let ti8[1, 1] c ← a · b
+
+    print c.flatten()
+}
