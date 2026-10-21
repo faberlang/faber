@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/matrix/store-overflow.fab"
+group = "language"
+input_root = "corpus"
+input = "matrix/store-overflow.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "200 does not fit in `i8`"
+check_only = false
