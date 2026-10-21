@@ -1,0 +1,20 @@
++++
+term = "importa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "package"
+summary = "Importing a norma:* module name that the embedded library does not provide is a package-graph reject."
+syntax = "import from \"norma:<unknown-module>\" <alias>"
+related = ["importa"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PKG001:unknown_library_module"
++++
+
+# This exemplum intentionally fails to compile: `norma:nonexistent` names no
+# module of the embedded Norma library, so package analysis rejects the import.
+import from "norma:nonexistent" nonexistent
+
+main {
+    print "unreachable"
+}
