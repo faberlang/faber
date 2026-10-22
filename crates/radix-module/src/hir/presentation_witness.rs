@@ -468,12 +468,34 @@ fn normalize_first_type_arg(form: &mut radix_hir::HirTypeForm, expected: TypeId,
     }
 }
 
+/// Whether `ty` is a named witness the artifact validator spells as a
+/// constructor head of its own rather than as a canonical form.
+///
+/// A `Semantic` head over one of these carries a named type inside a canonical
+/// form, which the validator rejects as `semantic_named_constructor`.
+fn is_named_witness(types: &TypeTable, ty: TypeId) -> bool {
+    matches!(
+        types.get(ty),
+        Type::Struct(_) | Type::Enum(_) | Type::Interface(_) | Type::Alias(_, _) | Type::Applied(_, _)
+    )
+}
+
 fn normalize_type_form_arg(child: &mut radix_hir::HirTypeForm, expected: TypeId, types: &TypeTable) {
     if child.ty != expected {
-        let original = child.clone();
-        child.ty = expected;
-        child.head = radix_hir::HirTypeFormHead::Semantic(radix_syntax::TypeFormLevel::LONG);
-        child.args = vec![radix_hir::HirTypeFormArg::Type(Box::new(original))];
+        if is_named_witness(types, expected) {
+            // A named witness is its own constructor head: the recorded child
+            // already names the type, so pairing it with the finalized witness
+            // needs no canonical form. The two differ only as members of the
+            // same transparent alias (an alias against its body, or one alias
+            // against another in a chain); the validator re-checks the retained
+            // head against the alias body and fails closed on a real mismatch.
+            child.ty = expected;
+        } else {
+            let original = child.clone();
+            child.ty = expected;
+            child.head = radix_hir::HirTypeFormHead::Semantic(radix_syntax::TypeFormLevel::LONG);
+            child.args = vec![radix_hir::HirTypeFormArg::Type(Box::new(original))];
+        }
     }
     normalize_type_form(child, expected, types);
 }

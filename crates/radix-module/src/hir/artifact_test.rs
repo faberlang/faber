@@ -738,6 +738,32 @@ fn transparent_generic_alias_annotation_survives_the_fhir_round_trip() {
 }
 
 #[test]
+fn alias_chain_round_trips() {
+    // `type A = int`, `type B = A`, `type C = list<B>` and `type F = (int) →
+    // int` form a chain of transparent aliases. A recorded child witness can be
+    // the other member of the same alias pair (the alias versus its body), so
+    // the boundary pairs the child with the named witness instead of wrapping
+    // it in a `Semantic` head the validator rejects as a named constructor.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typus/alias-chain.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("alias-chain fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("alias-chain fixture analyzes");
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize alias-chain artifact");
+    load_fhir(&bytes).expect("alias-chain artifact must load");
+}
+
+#[test]
 fn genus_union_alias_survives_the_fhir_round_trip() {
     // `type Figura = Circulus ∪ Quadratum` is a transparent alias whose
     // annotation finalizes to a union of genus types at the HIR site. The
