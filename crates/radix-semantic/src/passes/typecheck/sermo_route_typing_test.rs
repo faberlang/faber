@@ -169,6 +169,23 @@ fn meus_type_must_match_opener() {
 }
 
 #[test]
+fn meus_flush_is_legal_on_a_view() {
+    accepts(
+        TEXT_TO_NUM,
+        "sit _ s ← ad 'x:y' (\"a\")\nsit _ m ← s.meus<textus>()\nm.flush()",
+    );
+}
+
+#[test]
+fn tuus_flush_is_rejected() {
+    rejects(
+        TEXT_TO_NUM,
+        "sit _ s ← ad 'x:y' (\"a\")\nsit tuus<numerus> t ← s.tuus<numerus>()\nt.flush()",
+        "unknown_method",
+    );
+}
+
+#[test]
 fn meus_close_is_legal_on_a_faber_route() {
     accepts(
         TEXT_TO_NUM,
