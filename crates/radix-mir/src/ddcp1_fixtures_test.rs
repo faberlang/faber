@@ -1368,9 +1368,9 @@ fn whole_recipe_gather_row() {
     const N_EMBD: u64 = 960;
     const VOCAB: u64 = 49152;
     let plan = CollectionKernelPlan::Gather(GatherPlan {
-        table_rows: VOCAB,
-        table_cols: N_EMBD,
-        id_count: T,
+        table_rows: crate::kernel_plan::PlanDim::Literal(VOCAB),
+        table_cols: crate::kernel_plan::PlanDim::Literal(N_EMBD),
+        id_count: crate::kernel_plan::PlanDim::Literal(T),
     });
     plan.validate()
         .expect("the Gather whole-recipe plan validates");

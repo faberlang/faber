@@ -1,8 +1,8 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, DistributedSumPlan,
-    GatherPlan, GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
-    RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
-    TransposePlan, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
+    GatherPlan, GroupedMatMulPlan, MatMulPlan, PlanDim, QuantizedMatMulPlan, ReduceOp,
+    ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout,
+    SsmConv1dPlan, SsmScanPlan, TransposePlan, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
 
@@ -294,11 +294,17 @@ pub(super) fn validate_axis_reduction_plan(
 /// resolution-time typed checks
 /// ([`super::CollectionKernelPlan::from_transformer_op`]).
 pub(super) fn validate_gather_plan(plan: &GatherPlan) -> Result<(), PlanValidationError> {
-    if plan.table_rows == 0 || plan.table_cols == 0 || plan.id_count == 0 {
+    let table_rows_zero = matches!(plan.table_rows, PlanDim::Literal(0));
+    let table_cols_zero = matches!(plan.table_cols, PlanDim::Literal(0));
+    let id_count_zero = matches!(plan.id_count, PlanDim::Literal(0));
+    if table_rows_zero || table_cols_zero || id_count_zero {
+        // The public diagnostic retains its numeric arguments. Runtime axes
+        // do not trigger this check; their unavailable value is represented
+        // as zero only if another literal zero already caused this error.
         return Err(PlanValidationError::GatherZeroDimension {
-            table_rows: plan.table_rows,
-            table_cols: plan.table_cols,
-            id_count: plan.id_count,
+            table_rows: plan.table_rows.literal().unwrap_or(0),
+            table_cols: plan.table_cols.literal().unwrap_or(0),
+            id_count: plan.id_count.literal().unwrap_or(0),
         });
     }
     Ok(())

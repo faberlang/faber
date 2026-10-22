@@ -3,9 +3,9 @@ use super::plan::{
     CausalMaskedSoftmaxPlan, CollectionKernelPlan, DistributedSumPlan, F32_ELEMENT_BYTE_WIDTH,
     GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MATMUL_SHARED_A_BUFFER_NAME,
     MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulShapes, MatMulSharedMemory,
-    OobPaddingPolicy, REDUCTION_SHARED_BUFFER_NAME, ReduceOp, ReductionPlan, RmsNormalizationPlan,
-    RopePlan, RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan,
-    SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
+    OobPaddingPolicy, PlanDim, REDUCTION_SHARED_BUFFER_NAME, ReduceOp, ReductionPlan,
+    RmsNormalizationPlan, RopePlan, RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan,
+    SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
 };
 use super::validate::{
     PlanValidationError, validate_axis_reduction_plan, validate_batched_attention_plan,
@@ -541,9 +541,9 @@ impl CollectionKernelPlan {
                     return None;
                 }
                 Some(CollectionKernelPlan::Gather(GatherPlan {
-                    table_rows,
-                    table_cols,
-                    id_count,
+                    table_rows: PlanDim::Literal(table_rows),
+                    table_cols: PlanDim::Literal(table_cols),
+                    id_count: PlanDim::Literal(id_count),
                 }))
             }
             MirCollectionOp::TensorCausalMaskedSoftmax => {

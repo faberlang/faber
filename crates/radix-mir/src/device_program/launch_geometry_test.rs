@@ -276,9 +276,9 @@ fn extent_product_overflow_is_an_error() {
 fn uncovered_plan_is_a_named_error() {
     use MirKernelResourceAccess::{Read, Write};
     let plan = CollectionKernelPlan::Gather(crate::kernel_plan::GatherPlan {
-        table_rows: 0,
-        table_cols: 0,
-        id_count: 0,
+        table_rows: crate::kernel_plan::PlanDim::Literal(0),
+        table_cols: crate::kernel_plan::PlanDim::Literal(0),
+        id_count: crate::kernel_plan::PlanDim::Literal(0),
     });
     let unit = unit(
         plan,
