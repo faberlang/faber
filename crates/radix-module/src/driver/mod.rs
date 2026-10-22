@@ -2060,6 +2060,40 @@ pub fn prepare_air_backward_bundle(
         crate::air::reverse_ad::ensure_broadcast_reduction_types(function, &mut analysis.types);
     }
 
+    // Pre-intern axis-reduced tensor shapes for every interned tensor type so
+    // reduction-style VJPs (RmsNorm, Laminatio) resolve their intermediate
+    // reduced tensors during the immutable walk: `reduced_tensor_type_after_axis`
+    // can only find shapes that are already interned, and a rank-2 `rms_norm`
+    // primal otherwise fails companion generation with
+    // `reverse_ad_rms_norm_missing_reduced_type` even though the VJP is
+    // well-formed. Same invariant as the matmul/broadcast pre-interning above;
+    // the cursor runs to a fixpoint over the growing table so reduced shapes
+    // of freshly interned shapes are covered too. Rank-1 shapes reduce to the
+    // scalar element type, which is always interned, so only rank ≥ 2 needs
+    // the pass.
+    let mut cursor = 0;
+    while cursor < analysis.types.type_count() {
+        #[expect(clippy::cast_possible_truncation)]
+        let ty = radix_types::TypeId(cursor as u32);
+        cursor += 1;
+        let Type::Tensor(elem, shape) = analysis.types.get(ty) else {
+            continue;
+        };
+        let (elem, shape) = (*elem, *shape);
+        let dims = match analysis.types.get_index(shape) {
+            radix_types::IndexExpr::Tuple(dims) if dims.len() >= 2 => dims.clone(),
+            _ => continue,
+        };
+        for axis in 0..dims.len() {
+            let mut reduced = dims.clone();
+            reduced.remove(axis);
+            let reduced_shape = analysis
+                .types
+                .intern_index(radix_types::IndexExpr::Tuple(reduced));
+            analysis.types.tensor_with_shape(elem, reduced_shape);
+        }
+    }
+
     // Pre-intern types needed by the reverse AD transform: the unit type
     // (empty tuple) for the residual bundle parameter, then the gradient
     // tuple for each backward-annotated primal. `transform_reverse_ad` runs

@@ -41,6 +41,99 @@ fn parse_fractus_list(line: &str) -> Vec<f64> {
         .collect()
 }
 
+/// Pinned `[2, 8]` fixture rows (mirrors `X_ROW_MAJOR` in
+/// `rms_norm_intrinsic_test.rs`): row 0 is `[1.0..=8.0]`, row 1 is
+/// `[0.5..=7.5]`. Both rows have non-zero mean.
+const GT19_X_ROW_MAJOR: [f32; 16] = [
+    1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, //
+    0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5,
+];
+
+/// Pinned affine gamma `[8]` (mirrors `GAMMA` in `rms_norm_intrinsic_test.rs`).
+const GT19_GAMMA: [f32; 8] = [2.0, 1.0, 0.5, 1.5, 0.75, 1.25, 1.0, 0.5];
+
+/// Analytic f64 reference for the pinned primal
+/// `loss = media(x.rms_norm(axis 1, 1e-5, gamma))`. The forward mirrors
+/// `rms_norm_reference` (per-row sum-of-squares mean, `r = 1/sqrt(mean+eps)`,
+/// `y = x·r·gamma`); the chain rule through the full-tensor mean gives the
+/// uniform upstream `1/(B·D)`, and per row with `s = mean(x²)+eps`:
+///
+/// - `dL/dx_i = gamma_i·u·r − x_i·r³·(Σ_j u·gamma_j·x_j)/n`
+/// - `dL/dgamma_i = u·x_i·r`
+fn gt19_rms_norm_mean_backward_reference(rows: usize, cols: usize) -> (f64, Vec<f64>, Vec<f64>) {
+    const EPS: f64 = 1e-5;
+    let n = f64::from(cols as u32);
+    let upstream = 1.0 / f64::from(rows as u32 * cols as u32);
+    let mut loss_sum = 0.0;
+    let mut dx = vec![0.0; rows * cols];
+    let mut dgamma = vec![0.0; cols];
+    for row in 0..rows {
+        let base = row * cols;
+        let mean = GT19_X_ROW_MAJOR[base..base + cols]
+            .iter()
+            .map(|v| f64::from(*v) * f64::from(*v))
+            .sum::<f64>()
+            / n;
+        let r = 1.0 / (mean + EPS).sqrt();
+        let dot = (0..cols)
+            .map(|j| upstream * f64::from(GT19_GAMMA[j]) * f64::from(GT19_X_ROW_MAJOR[base + j]))
+            .sum::<f64>();
+        for (j, cell) in dx[base..base + cols].iter_mut().enumerate() {
+            let xi = f64::from(GT19_X_ROW_MAJOR[base + j]);
+            *cell = f64::from(GT19_GAMMA[j]) * upstream * r - xi * r * r * r * dot / n;
+            dgamma[j] += upstream * xi * r;
+            loss_sum += xi * r * f64::from(GT19_GAMMA[j]);
+        }
+    }
+    let loss = loss_sum / f64::from(rows as u32 * cols as u32);
+    (loss, dx, dgamma)
+}
+
+/// Per-element close check (`atol = rtol = 1e-4`, the numeric-policy
+/// gradient-row form used by `check_close` in `rms_norm_intrinsic_test.rs`).
+fn gt19_check_close(name: &str, observed: &[f64], expected: &[f64]) {
+    const ATOL: f64 = 1e-4;
+    const RTOL: f64 = 1e-4;
+    assert_eq!(observed.len(), expected.len(), "{name}: length mismatch");
+    for (index, (observed, expected)) in observed.iter().zip(expected).enumerate() {
+        assert!(
+            (observed - expected).abs() <= ATOL + RTOL * expected.abs(),
+            "{name}[{index}]: observed {observed} vs expected {expected}"
+        );
+    }
+}
+
+#[test]
+fn gt19_rms_norm_backward_runs_on_runner_path() {
+    let source = r#"
+functio unitas() → vacuum { tacet }
+
+@ radix lane "air"
+@ radix backward "norm_backward"
+functio norm(tf32[2, 8] x, tf32[8] gamma) → fractus {
+    redde x.rms_norm(axis 1, 1e-5, gamma).media()
+}
+
+incipit {
+    sit lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
+    sit lista<f32> gamma_flat ← [2.0, 1.0, 0.5, 1.5, 0.75, 1.25, 1.0, 0.5]
+    sit tf32[2, 8] x ← flat ↦ tf32[2, 8]
+    sit tf32[8] gamma ← gamma_flat ↦ tf32[8]
+    sit iuncta<tf32[2, 8], tf32[8]> gs ← norm_backward(x, gamma, unitas(), 1.0)
+    nota gs[0] ↦ lista<f32>
+    nota gs[1] ↦ lista<f32>
+}
+"#;
+
+    let stdout = run_gt19_la("gt19_rms_norm_backward.fab", source);
+    assert_eq!(stdout.len(), 2, "both gradients should be printed");
+    let grad_x = parse_fractus_list(&stdout[0]);
+    let grad_gamma = parse_fractus_list(&stdout[1]);
+    let (_, expected_dx, expected_dgamma) = gt19_rms_norm_mean_backward_reference(2, 8);
+    gt19_check_close("grad_x", &grad_x, &expected_dx);
+    gt19_check_close("grad_gamma", &grad_gamma, &expected_dgamma);
+}
+
 #[test]
 fn gt19_mul_mean_backward_runs_on_runner_path() {
     let source = r#"
