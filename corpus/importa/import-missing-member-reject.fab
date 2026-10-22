@@ -1,0 +1,45 @@
++++
+term = "importa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "wildcard_import", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "package"
+summary = "A wildcard alias reaches only the members its module exports; calling a member the module never exports is a typecheck reject."
+syntax = "import from <source> * as <alias>; <alias>.<missing_member>(...)"
+related = ["importa", "publica", "ut"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM004:namespace_missing_export"
++++
+# =============================================================================
+# importa - an alias reaches the module's exported surface, nothing else
+# =============================================================================
+#
+# What this teaches:
+#   - `* as L` binds the exported surface of the sibling module: `L.greet`
+#     resolves, `L.absent` names nothing the module exports.
+#   - A call through a namespace alias to a member the imported file does not
+#     export is `namespace_missing_export` (SEM004), reported at the call.
+#
+# Common mistakes:
+#   - Expecting the alias to re-export module-private names: those are
+#     `import_module_private` (SEM006), a different seam.
+#
+# See also: importa, publica, ut
+# =============================================================================
+
+# importa missing member - the alias reaches only exported members
+#
+# GRAMMAR:
+#   import from "./lib" * as L
+#
+# Requires module layout: import-missing-member-reject.fab imports lib.fab
+# (package or module mode).
+#
+# EXPECTED: SEM004:namespace_missing_export - `absent` is not on lib's
+# exported surface (lib.fab exports greet, K and Pt only).
+
+import from "./lib" * as L
+
+main {
+    print L.absent("x")
+}
