@@ -1,34 +1,41 @@
 +++
 term = "genus"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "ref_decl", "dum_stmt", "equality", "equality_tail"]
 category = "type"
 canonical = false
-summary = "A self-referential optional field: linked nodes with `?.` chains."
-syntax = "mut Node ∪ none next"
-related = ["genus", "nihil"]
+summary = "A self-referential optional genus is walked to its none tail."
+syntax = "ref Nodus ∪ none cursor ← head; while cursor not is none { … }"
+related = ["genus", "dum", "nihil"]
 locale = "en"
 +++
 # =============================================================================
-# genus — A self-referential optional field
+# genus — A recursive linked list with an optional tail
 # =============================================================================
 #
-# A genus field may be `mut Node ∪ none next` because the non-none member is
-# a reference type (never a scalar): a `mut` node field that is sometimes
-# missing. `?.` chains read through a missing node as none.
+# What this teaches:
+#   • A genus can refer to itself through `Nodus ∪ none`; the indirection is
+#     implied, so no box type or recursion keyword is needed.
+#   • Two nodes form a list whose last link is `null` (`none` in the type).
+#   • A `ref` cursor re-points along the links. `while cursor not is none`
+#     narrows it before reading the payload and stops at the absent tail.
 #
+# See also: genus, dum, nihil
 # =============================================================================
 
-class Node {
-    mut int v
-    mut Node ∪ none next
+class Nodus {
+    let int valor
+    mut Nodus ∪ none sequens
 }
 
 main {
-    mut Node a ← Node { v = 1, next = null }
-    let Node b ← Node { v = 2, next = a }
-    print b.next?.v
-    print a.next?.v
-    a.next ← Node { v = 9, next = null }
-    print b.next?.next?.v
+    let Nodus tail ← Nodus { valor = 2, sequens = null }
+    let Nodus head ← Nodus { valor = 1, sequens = tail }
+
+    ref Nodus ∪ none cursor ← head
+    while cursor not is none {
+        print cursor.valor
+        cursor ← cursor.sequens
+    }
+    print cursor
 }
