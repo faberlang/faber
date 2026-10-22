@@ -70,12 +70,14 @@ pub(crate) enum CachedImportTargetEntry {
 /// Lookup result for one import target.
 ///
 /// `Unresolved` keeps the pre-existing silent skip for absent, disallowed, or
-/// unreadable targets — surfaceless-by-design namespaces (kernel manifests,
-/// bare-driver empty contracts) live here and must not trip the fail-closed
-/// gate.
+/// unreadable non-provider targets — surfaceless-by-design namespaces (kernel
+/// manifests, bare-driver empty contracts) live here and must not trip the
+/// fail-closed gate.
 enum ImportTargetLookup {
     Parsed(Box<CachedImportTarget>),
     Unparsable(PathBuf),
+    /// A provider-qualified specifier that named no library module.
+    UnresolvedProvider(Box<crate::import_resolve::ImportResolveError>),
     Unresolved,
 }
 
@@ -410,6 +412,9 @@ pub(crate) struct ImportContract {
     /// namespace surface stays uninstalled — it stops silently matching — and
     /// the driver surfaces each fact as a named import-site `Diagnostic`.
     pub(crate) import_site_failures: Vec<ImportSiteFailure>,
+    /// Provider-qualified imports that could not resolve to a library module;
+    /// the driver turns the first fact into the package diagnostic identity.
+    pub(crate) import_resolve_failures: Vec<ImportResolveFailure>,
     /// Import path spelling → target `regio` name for default-named imports
     /// whose target declares one (D7.7). Every binding-keyed map above is
     /// keyed by the declared name; the driver rewrites its own parse to match.
@@ -425,6 +430,16 @@ pub(crate) struct ImportSiteFailure {
     pub(crate) import_path: String,
     /// Resolved target path that failed to parse.
     pub(crate) target_path: PathBuf,
+}
+
+/// One provider-qualified import that failed during library-module resolution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ImportResolveFailure {
+    pub(crate) binding: String,
+    pub(crate) import_path: String,
+    pub(crate) provider: String,
+    pub(crate) message: String,
+    pub(crate) cause_issue: &'static str,
 }
 
 /// Named import-site diagnostic for a parse-failed imported library (KPC-WIRE
@@ -443,6 +458,21 @@ fn import_site_parse_failure_diagnostic(consumer: &Path, failure: &ImportSiteFai
     .with_arg("binding", failure.binding.as_str())
     .with_arg("import_path", failure.import_path.as_str())
     .with_file(consumer.display().to_string())
+}
+
+/// Named package diagnostic for a provider-qualified import that resolved no module.
+fn import_resolve_failure_diagnostic(consumer: &Path, failure: &ImportResolveFailure) -> crate::Diagnostic {
+    crate::Diagnostic::error(format!(
+        "unknown library module `{}` for provider `{}`: {}",
+        failure.import_path, failure.provider, failure.message
+    ))
+    .with_phase(crate::diagnostics::DiagnosticPhase::Analysis)
+    .with_code("PKG001")
+    .with_file(consumer.display().to_string())
+    .with_arg("issue", "unknown_library_module")
+    .with_arg("specifier", failure.import_path.clone())
+    .with_arg("provider", failure.provider.clone())
+    .with_arg("cause_issue", failure.cause_issue)
 }
 
 impl ImportContract {
@@ -545,6 +575,9 @@ fn prepare_program_module_with_bindings(
     // first failure names the site; the contract carries every fact.
     if let Some(failure) = import.import_site_failures.first() {
         return Err(Box::new(import_site_parse_failure_diagnostic(path, failure)));
+    }
+    if let Some(failure) = import.import_resolve_failures.first() {
+        return Err(Box::new(import_resolve_failure_diagnostic(path, failure)));
     }
     let mut config = session.config.clone();
     if let Some(pack) = pack.as_ref() {
@@ -661,9 +694,9 @@ pub fn analyze_prepared_program_name(
 /// A target that resolved and read but did not parse returns
 /// [`ImportTargetLookup::Unparsable`] (KPC-WIRE, advisory D2): the parse
 /// failure is a named import-site fact for the consumer, never a silent
-/// `None`. Targets that never resolve, are disallowed, or cannot be read stay
-/// [`ImportTargetLookup::Unresolved`] — that is the surfaceless-by-design
-/// surface the fail-closed gate must not fire on.
+/// `None`. Provider-qualified resolution failures retain their structured
+/// error for the consumer's package diagnostic; unresolved relative and
+/// `§` targets stay [`ImportTargetLookup::Unresolved`].
 fn cached_import_target(
     session: &crate::driver::Session,
     from_file: &Path,
@@ -698,8 +731,15 @@ fn cached_import_target(
             return lookup;
         }
     }
-    let Ok(target_path) = resolve_namespace_import(session, from_file, import_path, templates) else {
-        return ImportTargetLookup::Unresolved;
+    let target_path = match resolve_namespace_import(session, from_file, import_path, templates) {
+        Ok(target_path) => target_path,
+        Err(error) => {
+            return if provider_segments(import_path).is_some() {
+                ImportTargetLookup::UnresolvedProvider(Box::new(error))
+            } else {
+                ImportTargetLookup::Unresolved
+            };
+        }
     };
     let raw_key = (pack_key.cloned(), target_path.clone());
     if let Some(lookup) = serve(session.memos.import_targets.borrow().get(&raw_key).cloned()) {
@@ -1134,6 +1174,18 @@ pub(crate) fn import_contract_for_parsed_file(
                 });
                 continue;
             }
+            ImportTargetLookup::UnresolvedProvider(error) => {
+                let provider =
+                    provider_segments(import_path).map_or_else(String::new, |(provider, _)| provider.to_owned());
+                contract.import_resolve_failures.push(ImportResolveFailure {
+                    binding: binding.clone(),
+                    import_path: import_path.to_owned(),
+                    provider,
+                    message: error.message.clone(),
+                    cause_issue: error.issue,
+                });
+                continue;
+            }
             ImportTargetLookup::Unresolved => continue,
         };
         contract
@@ -1271,7 +1323,9 @@ fn collect_transitive_same_package_interfaces(
         let target = if !is_package_form {
             match cached_import_target(session, from_file, import_path, pack_key, pack_ref, templates) {
                 ImportTargetLookup::Parsed(target) => Some(target),
-                ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
+                ImportTargetLookup::Unparsable(_)
+                | ImportTargetLookup::Unresolved
+                | ImportTargetLookup::UnresolvedProvider(_) => None,
             }
         } else {
             // Package-form edges do not resolve through
@@ -1293,7 +1347,9 @@ fn collect_transitive_same_package_interfaces(
                         templates,
                     ) {
                         ImportTargetLookup::Parsed(target) => Some(target),
-                        ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
+                        ImportTargetLookup::Unparsable(_)
+                        | ImportTargetLookup::Unresolved
+                        | ImportTargetLookup::UnresolvedProvider(_) => None,
                     }
                 },
             )
@@ -2906,6 +2962,11 @@ fn import_path_shape_allowed(path: &str) -> bool {
         || path.ends_with("/..")
         || path.starts_with('/')
         || path.chars().nth(1) == Some(':'))
+}
+
+fn provider_segments(path: &str) -> Option<(&str, &str)> {
+    path.split_once(':')
+        .filter(|(provider, module)| !provider.is_empty() && !module.is_empty() && !module.contains(':'))
 }
 
 fn import_contract_path_allowed(path: &str, templates: Option<&BTreeMap<String, String>>) -> bool {
