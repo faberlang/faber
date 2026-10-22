@@ -64,7 +64,9 @@ mod evaluation {
     };
     use crate::semantic::{self, SemanticError, SemanticErrorKind};
     use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_local_mut, walk_stmt};
-    use radix_hir::{DefId, HirExpression, HirId, HirItemKind, HirLocal, HirOwnerRef, HirStatement};
+    use radix_hir::{
+        DefId, HirBlock, HirExpression, HirId, HirItemKind, HirLocal, HirOwnerRef, HirSourceAnchorId, HirStatement,
+    };
     use radix_lexer::{Span, Symbol};
     use radix_mir_runner::Value;
 
@@ -294,11 +296,16 @@ mod evaluation {
     struct DeadNodes {
         hirs: rustc_hash::FxHashSet<HirId>,
         defs: rustc_hash::FxHashSet<DefId>,
+        block_ends: rustc_hash::FxHashSet<HirSourceAnchorId>,
     }
 
     impl DeadNodes {
         fn of(body: &HirExpression) -> DeadNodes {
-            let mut dead = DeadNodes { hirs: rustc_hash::FxHashSet::default(), defs: rustc_hash::FxHashSet::default() };
+            let mut dead = DeadNodes {
+                hirs: rustc_hash::FxHashSet::default(),
+                defs: rustc_hash::FxHashSet::default(),
+                block_ends: rustc_hash::FxHashSet::default(),
+            };
             dead.visit_expr(body);
             dead
         }
@@ -307,6 +314,12 @@ mod evaluation {
     impl radix_hir::visit::HirVisitor for DeadNodes {
         fn visit_def(&mut self, def_id: DefId, _name: Symbol) {
             self.defs.insert(def_id);
+        }
+        fn visit_block(&mut self, block: &HirBlock) {
+            if let Some(end) = &block.end {
+                self.block_ends.insert(end.id.clone());
+            }
+            radix_hir::visit::walk_block(self, block);
         }
         fn visit_stmt(&mut self, stmt: &HirStatement) {
             self.hirs.insert(stmt.id);
@@ -336,9 +349,29 @@ mod evaluation {
         let Some(authored) = with_initializer_mut(unit, def_id, |init| std::mem::replace(init, literal)) else {
             return Err(invalid("praefixum_unsupported", span));
         };
-        // The authored body left the live HIR: drop presentation records its
-        // dead Defs/Hirs own, or FHIR validation dangles on them at load.
+        // The authored body left the live HIR: drop presentation and
+        // resolution records its dead Defs/Hirs/anchors own, or FHIR
+        // validation dangles on them at load.
         let dead = DeadNodes::of(&authored);
+        unit.presentation
+            .owners
+            .retain(|owner| match &owner.semantic {
+                Some(HirOwnerRef::Hir(id)) => !dead.hirs.contains(id),
+                Some(HirOwnerRef::Def(id)) => !dead.defs.contains(id),
+                None => owner.kind != radix_hir::HirTriviaOwnerKind::BlockEnd || !dead.block_ends.contains(&owner.id),
+            });
+        let live_anchors: rustc_hash::FxHashSet<_> = unit
+            .presentation
+            .owners
+            .iter()
+            .map(|owner| owner.id.clone())
+            .collect();
+        unit.presentation
+            .attachments
+            .retain(|attachment| live_anchors.contains(&attachment.anchor));
+        unit.presentation
+            .block_ends
+            .retain(|end| !dead.block_ends.contains(&end.id));
         unit.presentation
             .authored_types
             .retain(|record| match &record.site.owner {
@@ -348,6 +381,24 @@ mod evaluation {
         unit.presentation
             .compile_time_locals
             .retain(|def_id| !dead.defs.contains(def_id));
+        // Resolved-use facts recorded for the same body name locals that just
+        // left the live HIR; a stale record fails `check_def` at FHIR load.
+        let uses: Vec<semantic::ResolvedUse> = unit
+            .resolved_uses
+            .to_snapshot()
+            .into_iter()
+            .filter(|use_site| {
+                let local = use_site.local.or(match &use_site.key {
+                    semantic::ResolvedUseKey::Local(def_id) => Some(*def_id),
+                    semantic::ResolvedUseKey::Portable(_) => None,
+                });
+                !local.is_some_and(|def_id| dead.defs.contains(&def_id))
+                    && !use_site
+                        .enclosing
+                        .is_some_and(|def_id| dead.defs.contains(&def_id))
+            })
+            .collect();
+        unit.resolved_uses = semantic::ResolvedUseIndex::from_snapshot(uses);
         // Faber re-emission prints the authored body, not the value.
         for item in &mut unit.hir.items {
             if let HirItemKind::Constant(konst) = &mut item.kind

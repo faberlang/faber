@@ -490,10 +490,10 @@ fn load_error_for(source: &str) -> Result<(), HirArtifactError> {
 
 #[test]
 fn dangling_defid_repro_comptime_module_local() {
-    // A referenced local binding inside a *module-level* constant initializer
-    // (`const int N = comptime { const int t = 3; return t }`) is the smallest
-    // source that yields `DanglingIndex { kind: "DefId" }`. Printed once:
-    // index 1000000, arena size 1.
+    // A local binding referenced inside a *module-level* constant initializer
+    // (`const int N = comptime { const int t = 3; return t }`) survives folding
+    // in `HirStatic::authored`; the loader must register its defs so the
+    // artifact loads.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "const int N = comptime {\n",
@@ -502,18 +502,13 @@ fn dangling_defid_repro_comptime_module_local() {
         "}\n",
     );
     let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
-    );
+    assert!(result.is_ok(), "authored comptime module-local must load, got {result:?}");
 }
 
 #[test]
 fn dangling_defid_repro_comptime_block_local() {
     // The same referenced local inside a *block-level* constant initializer
-    // (`const int x = comptime { … }` in `main`) also yields
-    // `DanglingIndex { kind: "DefId" }`. Printed once: index 1000001,
-    // arena size 1.
+    // (`const int x = comptime { … }` in `main`) must load as well.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "main {\n",
@@ -525,18 +520,14 @@ fn dangling_defid_repro_comptime_block_local() {
         "}\n",
     );
     let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
-    );
+    assert!(result.is_ok(), "authored comptime block-local must load, got {result:?}");
 }
 
 #[test]
 fn dangling_defid_repro_comptime_class_static_local() {
     // A class `const` member initialized by `comptime` with a referenced
     // local (`const int X = comptime { const int t = 3; return t }`) read as
-    // `Tab.X` from `main` also yields `DanglingIndex { kind: "DefId" }`.
-    // Printed once: index 1000000, arena size 2.
+    // `Tab.X` from `main` must load as well.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "class Tab {\n",
@@ -550,10 +541,32 @@ fn dangling_defid_repro_comptime_class_static_local() {
         "}\n",
     );
     let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
+    assert!(result.is_ok(), "authored comptime class-local must load, got {result:?}");
+}
+
+#[test]
+fn insere_local_static_loads() {
+    // `insere-local.fab` carries a module-level `const string SUMMA = comptime
+    // { return embed "nuntius.txt" }`. The authored body survives folding in
+    // `HirStatic::authored` and holds HirIds (the `embed` site) that the loader
+    // must keep resolvable; this pins the dangling `HirId` case.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/insere/insere-local.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("insere-local fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
     );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("insere-local fixture analyzes");
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize insere-local artifact");
+    load_fhir(&bytes).expect("insere-local artifact must load");
 }
 
 #[test]
