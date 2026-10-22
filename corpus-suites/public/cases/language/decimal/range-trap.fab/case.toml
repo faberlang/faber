@@ -1,0 +1,18 @@
+version = 1
+id = "corpus/decimal/range-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/range-trap.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "does not fit in `d64`"
+check_only = false
