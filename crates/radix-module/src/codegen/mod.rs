@@ -707,6 +707,7 @@ fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) ->
     let mut r#gen = go::GoCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
+    r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
     r#gen.set_library_registry(analysis.libraries());
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
     r#gen.set_imported_generators(go_imported_generators(analysis, hir));
