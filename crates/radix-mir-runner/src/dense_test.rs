@@ -2,7 +2,7 @@
 // Test fixtures: exact float expectations and small, known-in-range numeric casts.
 #![allow(clippy::float_cmp, clippy::cast_possible_truncation)]
 
-use crate::dense::{DenseCell, DenseKind, DenseStorage};
+use crate::dense::{DenseCell, DenseElement, DenseKind, DenseStorage};
 use crate::value::Value;
 use std::cell::RefCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -218,6 +218,97 @@ fn le_bytes_borrow_without_copy_on_little_endian_hosts() {
     let cell = DenseCell::zeros(DenseKind::F32, 4);
     let borrowed = cell.with_le_bytes(0..4, |bytes| matches!(bytes, std::borrow::Cow::Borrowed(_)));
     assert_eq!(borrowed, Some(cfg!(target_endian = "little")));
+}
+
+fn assert_byte_pointer_matches_elements<T: DenseElement>(cell: &DenseCell) {
+    let byte_pointer = cell
+        .with_byte_slice(0..2, |bytes| bytes.as_ptr())
+        .expect("typed byte slice");
+    let element_pointer = cell
+        .with_slice::<T, _>(|items| items.as_ptr().cast::<u8>())
+        .expect("matching typed slice");
+    assert_eq!(byte_pointer, element_pointer);
+}
+
+#[test]
+fn byte_slice_matches_as_le_bytes_for_every_kind() {
+    for kind in ALL_KINDS {
+        let cell = DenseCell::zeros(kind, 2);
+        assert!(cell.set(0, &sample(kind)), "{kind:?}");
+        let expected = expected_bytes(kind);
+        assert_eq!(
+            cell.with_byte_slice(0..2, <[u8]>::to_vec),
+            cell.as_le_bytes(0..2),
+            "{kind:?} full slice"
+        );
+        assert_eq!(
+            cell.with_byte_slice(1..2, <[u8]>::to_vec),
+            Some(expected[kind.width()..].to_vec()),
+            "{kind:?} second element"
+        );
+        assert!(cell.with_byte_slice(0..3, <[u8]>::to_vec).is_none());
+
+        if cfg!(target_endian = "little") {
+            match kind {
+                DenseKind::F32 => assert_byte_pointer_matches_elements::<f32>(&cell),
+                DenseKind::F64 => assert_byte_pointer_matches_elements::<f64>(&cell),
+                DenseKind::I32 => assert_byte_pointer_matches_elements::<i32>(&cell),
+                DenseKind::I64 => assert_byte_pointer_matches_elements::<i64>(&cell),
+                DenseKind::U8 => assert_byte_pointer_matches_elements::<u8>(&cell),
+                DenseKind::U32 => assert_byte_pointer_matches_elements::<u32>(&cell),
+                DenseKind::U64 => assert_byte_pointer_matches_elements::<u64>(&cell),
+                DenseKind::Bool => assert_byte_pointer_matches_elements::<bool>(&cell),
+            }
+        }
+    }
+
+    let values = DenseCell::new(DenseStorage::Values(vec![Value::Nil]));
+    assert!(values.with_byte_slice(0..1, <[u8]>::to_vec).is_none());
+}
+
+#[test]
+fn zero_length_byte_slice_is_empty_and_not_none() {
+    for cell in [
+        DenseCell::zeros(DenseKind::U32, 2),
+        DenseCell::zeros(DenseKind::U32, 0),
+    ] {
+        let before = cell.as_le_bytes(0..cell.len()).expect("typed bytes");
+        assert_eq!(cell.with_byte_slice(0..0, <[u8]>::len), Some(0));
+        assert!(cell.write_le_bytes(0..0, &[]));
+        assert_eq!(cell.as_le_bytes(0..cell.len()), Some(before));
+    }
+}
+
+#[test]
+fn transport_counters_track_boxing_and_element_stores() {
+    let typed = DenseCell::from_values(
+        vec![sample(DenseKind::I32), Value::Int(12)],
+        Some(DenseKind::I32),
+    );
+    let len = typed.len();
+    let _ = typed.to_values();
+    let _ = typed.to_values();
+    assert_eq!(
+        typed.boxed_elements(),
+        2 * u64::try_from(len).expect("small test length")
+    );
+    assert_eq!(typed.element_stores(), 0);
+    assert_eq!(typed.values_prefix(1), vec![Value::Int(-7)]);
+    assert_eq!(
+        typed.boxed_elements(),
+        2 * u64::try_from(len).expect("small test length") + 1
+    );
+
+    assert!(typed.set(0, &Value::Int(5)));
+    assert_eq!(typed.element_stores(), 1);
+    let before = typed.boxed_elements();
+    let _ = typed.with_byte_slice(0..len, <[u8]>::len);
+    assert_eq!(typed.boxed_elements(), before);
+    assert_eq!(typed.element_stores(), 1);
+
+    let values = DenseCell::new(DenseStorage::Values(vec![Value::Int(3), Value::Int(4)]));
+    let _ = values.to_values();
+    assert_eq!(values.boxed_elements(), 0);
 }
 
 #[test]

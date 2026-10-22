@@ -18,6 +18,7 @@ use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 use std::borrow::Cow;
 use std::cell::{Cell, UnsafeCell};
 use std::ops::Range;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Element type of a typed dense array.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -377,6 +378,13 @@ impl DenseStorage {
         }
     }
 
+    /// Run `f` over the little-endian bytes of the element `range`, borrowing
+    /// the element array's bytes on little-endian hosts and using an encoded
+    /// copy elsewhere. `None` for `Values` or a range outside the array.
+    pub fn with_byte_slice<R>(&self, range: Range<usize>, f: impl FnOnce(&[u8]) -> R) -> Option<R> {
+        self.with_le_bytes(range, |bytes| f(&bytes))
+    }
+
     /// Overwrite the element `range` from little-endian `bytes`. `false`
     /// (storage unchanged) for `Values`, a range outside the array, a byte
     /// length other than `range.len() * width`, or a non-`0`/`1` bool byte.
@@ -469,6 +477,10 @@ pub struct DenseCell {
     /// `> 0`: that many shared borrows; `-1`: one exclusive borrow. Only
     /// maintained when `debug_assertions` is on.
     borrow: Cell<isize>,
+    /// Number of typed elements converted into boxed `Value`s.
+    boxed: AtomicU64,
+    /// Number of calls to `set`.
+    stored: AtomicU64,
 }
 
 // SAFETY: see the type documentation.
@@ -500,6 +512,8 @@ impl DenseCell {
         Self {
             inner: UnsafeCell::new(storage),
             borrow: Cell::new(0),
+            boxed: AtomicU64::new(0),
+            stored: AtomicU64::new(0),
         }
     }
 
@@ -568,13 +582,40 @@ impl DenseCell {
         self.read(|storage| storage.get(index))
     }
 
-    /// See [`DenseStorage::set`].
+    /// See [`DenseStorage::set`]; increments the element-store counter once per call.
     pub fn set(&self, index: usize, value: &Value) -> bool {
-        self.write(|storage| storage.set(index, value))
+        self.write(|storage| {
+            let stored = storage.set(index, value);
+            self.stored.fetch_add(1, Ordering::Relaxed);
+            stored
+        })
     }
 
+    /// Every element boxed, as today's `Vec<Value>` storage holds them.
     pub fn to_values(&self) -> Vec<Value> {
-        self.read(DenseStorage::to_values)
+        self.read(|storage| {
+            let values = storage.to_values();
+            if storage.kind().is_some() {
+                self.boxed.fetch_add(
+                    u64::try_from(storage.len()).unwrap_or(u64::MAX),
+                    Ordering::Relaxed,
+                );
+            }
+            values
+        })
+    }
+
+    /// Number of typed elements boxed by calls to [`DenseCell::to_values`] and
+    /// [`DenseCell::values_prefix`]. `Values` storage is not counted.
+    #[must_use]
+    pub fn boxed_elements(&self) -> u64 {
+        self.boxed.load(Ordering::Relaxed)
+    }
+
+    /// Number of calls to [`DenseCell::set`].
+    #[must_use]
+    pub fn element_stores(&self) -> u64 {
+        self.stored.load(Ordering::Relaxed)
     }
 
     /// Run `f` over the boxed elements when the storage is `Values`; `None`
@@ -593,7 +634,14 @@ impl DenseCell {
 
     /// The first `count` elements boxed; `count` must not exceed `len()`.
     pub fn values_prefix(&self, count: usize) -> Vec<Value> {
-        self.read(|storage| storage.values_prefix(count))
+        self.read(|storage| {
+            let values = storage.values_prefix(count);
+            if storage.kind().is_some() {
+                self.boxed
+                    .fetch_add(u64::try_from(count).unwrap_or(u64::MAX), Ordering::Relaxed);
+            }
+            values
+        })
     }
 
     /// Typed shared slice for the duration of `f`; `None` on a kind mismatch.
@@ -613,6 +661,13 @@ impl DenseCell {
         f: impl FnOnce(Cow<'_, [u8]>) -> R,
     ) -> Option<R> {
         self.read(|storage| storage.with_le_bytes(range, f))
+    }
+
+    /// Run `f` over the little-endian bytes of the element `range`, borrowing
+    /// the element array's bytes on little-endian hosts and using an encoded
+    /// copy elsewhere. `None` for `Values` or a range outside the array.
+    pub fn with_byte_slice<R>(&self, range: Range<usize>, f: impl FnOnce(&[u8]) -> R) -> Option<R> {
+        self.read(|storage| storage.with_byte_slice(range, f))
     }
 
     /// Owned copy of the little-endian bytes of the element `range`.
