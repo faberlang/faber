@@ -1,0 +1,33 @@
++++
+term = "store rule"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "The assignment half of the store rule: a widened tensor intermediate that does not fit the declared element aborts at the assignment store."
+syntax = "s ← a + a — traps when the sum is outside the declared element range"
+related = ["tensor", "store-rule-midexpr", "lift-arith"]
+locale = "en"
+no_expected = "traps-by-design"
++++
+
+# =============================================================================
+# store rule — Q-X3: the assignment half of the store rule. The declaration twin
+# is `store-rule-narrow-trap.fab`; here the store that aborts is an assignment
+# into an already-declared tensor.
+#
+# `a + a` over `ti8` is a `ti16` intermediate typed by the scalar range rule, so
+# 100 + 100 = 200 is carried exactly and the expression itself never traps. The
+# declared element width applies once, at the store into `s`: 200 does not fit
+# `i8`, so the assignment aborts (`implicit_store_out_of_range`) and
+# `print s.flatten()` never runs. A wrapping regression would print and is caught
+# by the unexpected-pass ratchet.
+# =============================================================================
+
+main {
+    let list<i8> flat ← [100, 100]
+    let ti8[2] a ← flat ↦ ti8[2]
+    mut ti8[2] s ← [0, 0] ↦ ti8[2]
+    s ← a + a
+    print s.flatten()
+}
