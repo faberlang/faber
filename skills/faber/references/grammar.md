@@ -494,7 +494,7 @@ Prefer posture keywords over the old annotations:
 - `{ "key": constant }` — JSON document (`json`); values are JSON constants only
 - `Type { field = expr }` — class / variant construction
 - `∞` — positive infinity; the named NaN literal is `nan` in every shipped pack except the Latin (`la`) pack, where it is `nonnumerus`. Both are contextual floating-point literals: a surrounding `f32` or `f64` supplies the width, bare `float` remains unsized, and neither form has a width suffix. `-∞` is unary negation of `∞`, not a separate literal. An `int` context rejects either form (fail-closed); neither maps to an integer.
-- `"pattern" ↦ regex` — compiled regex; slash-delimited regex literals are not grammar
+- `"pattern" ↦ regex` — compiled regex from dynamic text, failable at run time; `regex /pattern/` and `_ /pattern/` — inline regex literal (the locale regex type word or `_`, then a raw slash-delimited body; `\/` is the only escape and a slash inside a character class needs it too, so write `[\/]`; no suffix flags, use the inline `(?i)` form)
 
 Anonymous `{ key = expr }` objects are retired.
 
@@ -538,7 +538,7 @@ Grounded in `EBNF.md` and probes against the built binary.
 - Value-side markers: `mut b ← copy a` duplicates, `mut b ← own a` takes over, an unmarked `b ← c` shares; read-only is deep, so a `let` (or `ref`, or unmarked-parameter) container or class into a `mut` cell is `SEM065 const_shared_into_var`; `ref`/`mut` may hold `T ∪ none` for a reference type, never a scalar (`corpus/mutabilitas/ref-optional-cursor.fab`) (`corpus/mutabilitas/copy-bind-deep.fab`, `const-share-into-var-reject.fab`). A method that changes the shape of the collection a loop walks is `SEM011 loop_collection_shape_change`; a bracket store that grows a map in its own loop traps `map changed size during iteration`.
 - Retired: `sum from …`, `max from …`, and `min from …` (la `summa ex …`, `maxima ex …`, and `minima ex …`) report `PARSE010`; use `reduce via <op> from …` (la `reducta via <op> ex …`).
 - Admitted but **not** accepted by the parser today: `do all` (la `fac omnia`), `for … thread` (la `itera … filum`),
-  superscript powers (`x²`), slash regex literals, run-time capacities/extents, `trapping`/`saturating` float
+  superscript powers (`x²`), run-time capacities/extents, `trapping`/`saturating` float
   cells. See "Admitted, Not Shipped" in `grammar/EBNF.md`.
 
 ## Capability Calls
