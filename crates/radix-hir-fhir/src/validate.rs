@@ -660,8 +660,84 @@ fn transparent_alias_body_witness(
         let radix_types::Type::Alias(def, alias_body) = ty else {
             return false;
         };
-        *def == path_def && *alias_body == body
+        *def == path_def && alias_body_matches(types, *alias_body, body)
     })
+}
+
+/// Whether a recorded alias body names `target`, directly or through a chain of
+/// further transparent aliases.
+///
+/// `type B = A` records `Alias(B, Alias(A, int))` while the site it annotates is
+/// finalized to `int`, so the chain — not just the immediate body — is the
+/// alias-to-body fact. The body can also nest that chain inside a container
+/// (`type C = list<B>` records `Array(Alias(B, …))` while the site carries
+/// `Array(int)`), so the comparison strips aliases at every level. Any shape
+/// this does not pair exactly fails closed.
+fn alias_body_matches(
+    types: &radix_types::TypeTableSnapshot,
+    body: radix_types::TypeId,
+    target: radix_types::TypeId,
+) -> bool {
+    let body = strip_transparent_aliases(types, body);
+    let target = strip_transparent_aliases(types, target);
+    if body == target {
+        return true;
+    }
+    let pair = |left: radix_types::TypeId, right: radix_types::TypeId| {
+        alias_body_matches(types, left, right)
+    };
+    match (
+        types.types().get(body.0 as usize),
+        types.types().get(target.0 as usize),
+    ) {
+        (Some(radix_types::Type::Array(left)), Some(radix_types::Type::Array(right)))
+        | (Some(radix_types::Type::Queue(left)), Some(radix_types::Type::Queue(right)))
+        | (Some(radix_types::Type::Stack(left)), Some(radix_types::Type::Stack(right)))
+        | (Some(radix_types::Type::Set(left)), Some(radix_types::Type::Set(right)))
+        | (Some(radix_types::Type::Promissum(left)), Some(radix_types::Type::Promissum(right)))
+        | (Some(radix_types::Type::Cursor(left)), Some(radix_types::Type::Cursor(right)))
+        | (Some(radix_types::Type::Atomic(left)), Some(radix_types::Type::Atomic(right)))
+        | (Some(radix_types::Type::Option(left)), Some(radix_types::Type::Option(right)))
+        | (Some(radix_types::Type::Ref(_, left)), Some(radix_types::Type::Ref(_, right))) => {
+            pair(*left, *right)
+        }
+        (
+            Some(radix_types::Type::Map(left_key, left_value)),
+            Some(radix_types::Type::Map(right_key, right_value)),
+        )
+        | (
+            Some(radix_types::Type::PromissumFailable(left_key, left_value)),
+            Some(radix_types::Type::PromissumFailable(right_key, right_value)),
+        )
+        | (
+            Some(radix_types::Type::AsyncCursor(left_key, left_value)),
+            Some(radix_types::Type::AsyncCursor(right_key, right_value)),
+        ) => pair(*left_key, *right_key) && pair(*left_value, *right_value),
+        (Some(radix_types::Type::Tuple(left)), Some(radix_types::Type::Tuple(right))) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(left, right)| pair(*left, *right))
+        }
+        _ => false,
+    }
+}
+
+/// Follow a chain of transparent aliases to the type it ends at.
+fn strip_transparent_aliases(
+    types: &radix_types::TypeTableSnapshot,
+    ty: radix_types::TypeId,
+) -> radix_types::TypeId {
+    let mut current = ty;
+    let mut seen = FxHashSet::default();
+    while seen.insert(current) {
+        match types.types().get(current.0 as usize) {
+            Some(radix_types::Type::Alias(_, inner)) => current = *inner,
+            _ => return current,
+        }
+    }
+    current
 }
 
 /// Whether a generic alias body structurally matches an authored site witness.
