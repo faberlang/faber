@@ -64,11 +64,63 @@ fn intervallum_zero_length_accepts() {
 }
 
 #[test]
-fn intervallum_value_step_rejects() {
+fn intervallum_value_step_in_a_binding_accepts() {
+    // A stored range carries its step in the type (operator ruling: the step
+    // is a compile-time constant).
     let source = r"incipit {
-  sit _ fines ← 0‥10 per 2
+  sit intervallum<numerus, 2> fines ← 0‥10 per 2
+}";
+    accepts(&compile(source));
+}
+
+#[test]
+fn intervallum_runtime_step_in_a_binding_rejects() {
+    // A step known only at run time stays inline-only: it is refused, never
+    // silently dropped to step 1.
+    let source = r"incipit {
+  varia numerus k ← 2
+  sit _ fines ← 0‥10 per k
 }";
     rejects_with_issue(&compile(source), "intervallum_value_step_unsupported");
+}
+
+#[test]
+fn intervallum_step_binding_literal_mismatch_rejects() {
+    // A literal step must match the declared `S` either way; it is a type
+    // error, never a silent conversion.
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10 per 3
+}";
+    rejects_with_issue(&compile(source), "initializer_annotation_mismatch");
+}
+
+#[test]
+fn intervallum_step_binding_missing_step_rejects() {
+    // A step-less value is `intervallum<T, 1>`: declaring step 2 mismatches.
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10
+}";
+    rejects_with_issue(&compile(source), "initializer_annotation_mismatch");
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn intervallum_step_binding_emits_the_stride() {
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10 per 2
+  sit intervallum<numerus> fines ← 0‥10
+}";
+    let result = compile(source);
+    accepts(&result);
+    let code = rust_code(result);
+    assert!(
+        code.contains("faber::Intervallum::exclusive_per(0, 10, 2)"),
+        "stepped binding should carry its stride: {code}"
+    );
+    assert!(
+        code.contains("faber::Intervallum::exclusive(0, 10)"),
+        "a step-less binding keeps the step-one constructor: {code}"
+    );
 }
 
 #[cfg(feature = "hir-rust")]
@@ -453,12 +505,11 @@ fn intervallum_step_arity_still_rejects_three_args() {
 }
 
 #[test]
-fn intervallum_step_binding_initializer_still_rejects() {
-    // Intermediate state: the type accepts a step, the value-level stopgap
-    // does not store one yet (unit 3061f86f-11 switches stored steps on);
-    // step 1 initializer vs declared step 2 is a type mismatch (infer.rs).
+fn intervallum_step_binding_initializer_accepts() {
+    // The stored step is part of the value's type, so a literal step that
+    // matches the declared `S` compiles.
     let source = r"incipit {
-  sit intervallum<numerus, 2> evens ← 0‥10
+  sit intervallum<numerus, 2> evens ← 0‥10 per 2
 }";
-    assert!(!compile(source).success());
+    accepts(&compile(source));
 }

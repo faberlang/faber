@@ -4,9 +4,11 @@
 //! COMPILER PHASE: Semantic typecheck
 //! INPUT: HIR `Intervallum` expressions (start, end, optional step) and range-membership
 //! operands with resolved bound and step types
-//! OUTPUT: Checked `intervallum<T>` expressions with validated numeric bound
-//! types; diagnostics for non-numeric steps, unsupported bound types, range
-//! operand mismatches, and `longitudo` bound restrictions
+//! OUTPUT: Checked `intervallum<T>` / `intervallum<T, S>` expressions with
+//! validated numeric bound types; a stored stepped range carries its literal
+//! step in the type (`intervallum<T, S>`), while a run-time step stays
+//! inline-only; diagnostics for non-numeric steps, unsupported bound types,
+//! range operand mismatches, and `longitudo` bound restrictions
 
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
@@ -68,13 +70,6 @@ impl TypeChecker<'_> {
                     step_expr.span,
                 );
             }
-            if !self.allow_intervallum_step {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED,
-                    step_expr.span,
-                );
-            }
         }
 
         self.require_intervallum_bound(start_ty, start.span);
@@ -89,7 +84,56 @@ impl TypeChecker<'_> {
         if bound == self.error_type {
             return self.error_type;
         }
+        if let Some(step) = self.stored_intervallum_step(step.as_deref(), bound) {
+            return self.types.intervallum_with_step(bound, step);
+        }
         self.types.intervallum(bound)
+    }
+
+    /// The type of a *stored* stepped range carries its step: in a value
+    /// position (`let`/`sit` initializer, call argument, return value) nothing
+    /// consumes the step, so the range type itself records it.
+    ///
+    /// The step is a compile-time constant (operator ruling): only a positive
+    /// integer literal interns a stepped type. A run-time step (`0‥10 per k`)
+    /// or a step over a non-integer bound stays inline-only and is refused
+    /// here rather than silently dropped. Positions that consume the step on
+    /// the spot (`for range` headers, bracket windows) are unchanged.
+    fn stored_intervallum_step(
+        &mut self,
+        step: Option<&HirExpression>,
+        bound: TypeId,
+    ) -> Option<radix_types::IndexId> {
+        use radix_hir::HirLiteral;
+        if self.allow_intervallum_step {
+            return None;
+        }
+        let step = step?;
+        let resolved_bound = self.resolve_inferred_type(bound);
+        let stride = match &step.kind {
+            HirExpressionKind::Literal(HirLiteral::Int(value))
+                if *value > 0
+                    && crate::passes::resolve::is_integer_intervallum_bound(
+                        self.types,
+                        resolved_bound,
+                    ) =>
+            {
+                Some(*value)
+            }
+            _ => None,
+        };
+        if let Some(stride) = stride {
+            return Some(
+                self.types
+                    .intern_index(radix_types::IndexExpr::Literal(stride)),
+            );
+        }
+        self.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED,
+            step.span,
+        );
+        None
     }
 
     pub fn require_intervallum_bound(&mut self, ty: TypeId, span: radix_lexer::Span) {
