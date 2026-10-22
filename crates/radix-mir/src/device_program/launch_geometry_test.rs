@@ -275,18 +275,49 @@ fn extent_product_overflow_is_an_error() {
 #[test]
 fn uncovered_plan_is_a_named_error() {
     use MirKernelResourceAccess::{Read, Write};
-    let plan = CollectionKernelPlan::Gather(crate::kernel_plan::GatherPlan {
-        table_rows: crate::kernel_plan::PlanDim::Literal(0),
-        table_cols: crate::kernel_plan::PlanDim::Literal(0),
-        id_count: crate::kernel_plan::PlanDim::Literal(0),
-    });
+    let plan =
+        CollectionKernelPlan::LayerNormalization(crate::kernel_plan::LayerNormalizationPlan {
+            axis: 0,
+        });
     let unit = unit(
         plan,
         vec![resource(0, Read, None), resource(1, Write, None)],
     );
     assert_eq!(
         geometry_for_call(&unit, &[vec![4], vec![4]]),
-        Err(error(GEOMETRY_PLAN_NOT_COVERED, &[("plan", "Gather")]))
+        Err(error(
+            GEOMETRY_PLAN_NOT_COVERED,
+            &[("plan", "LayerNormalization")]
+        ))
+    );
+}
+
+#[test]
+fn gather_geometry_uses_the_output_element_count() {
+    use MirKernelResourceAccess::{Read, Write};
+    // The plan carries no literal extents: the launch is derived from the
+    // call-site output shape `[5, 4]` (20 elements), not from `T` or `D`.
+    let plan = CollectionKernelPlan::Gather(crate::kernel_plan::GatherPlan {
+        table_rows: crate::kernel_plan::PlanDim::Runtime,
+        table_cols: crate::kernel_plan::PlanDim::Runtime,
+        id_count: crate::kernel_plan::PlanDim::Runtime,
+    });
+    let unit = unit(
+        plan,
+        vec![
+            resource(0, Read, None),
+            resource(1, Read, None),
+            resource(2, Write, None),
+        ],
+    );
+    let got = geometry_for_call(&unit, &[vec![4, 4], vec![5], vec![5, 4]])
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(
+        got,
+        CallGeometry {
+            grid: [20, 1, 1],
+            block: [1, 1, 1],
+        }
     );
 }
 

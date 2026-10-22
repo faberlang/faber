@@ -17,6 +17,7 @@
 //! | plan | geometry |
 //! | --- | --- |
 //! | `Elementwise`, unbatched `RowSoftmax` | generic 1-D over the output element count |
+//! | `Gather` | generic 1-D over the output element count |
 //! | `TiledMatMul` (rank-2, unbatched) | tile grid `(ceil(N/tile), ceil(M/tile))`, verbatim |
 //! | `LaneGrid` | generic 1-D over the element count of the source resource's call-site shape |
 //! | `Transpose` | `plan.workgroup_x` lanes over the input element count |
@@ -95,6 +96,10 @@ pub fn geometry_for_call(
     let counts = element_counts(unit, shapes)?;
     match &unit.plan {
         CollectionKernelPlan::Elementwise => generic_1d(unit, output_count(unit, &counts)?),
+        // The gather body is one thread per output row element, so its launch
+        // is the output element count from the call-site shape. The plan's own
+        // `T`/`D` facts may be runtime and are not read here.
+        CollectionKernelPlan::Gather(_) => generic_1d(unit, output_count(unit, &counts)?),
         CollectionKernelPlan::RowSoftmax(softmax) if softmax.batched.is_none() => {
             generic_1d(unit, output_count(unit, &counts)?)
         }
@@ -339,11 +344,16 @@ fn generic_1d(unit: &KernelUnit, elements: u64) -> Result<CallGeometry, Geometry
         z: 1,
     };
     let signature = default_signature(unit, dispatch);
-    // Every caller (Elementwise, unbatched RowSoftmax, LaneGrid) takes the
-    // generic one-dimensional rule; `None` names that rule directly, so a
-    // plan not admitted by `is_generic_1d_plan` (LaneGrid, ruling P2) still
-    // routes here without widening the admission list.
-    let workgroup = generic_1d_workgroup(&signature, None);
+    // A thread-per-output recipe the wide-workgroup policy has measured
+    // (`Elementwise`, unbatched `RowSoftmax`) widens its block; an unmeasured
+    // recipe (`Gather`) keeps the signature workgroup. `LaneGrid` is not in
+    // `is_generic_1d_plan` yet widens by ruling P2, so it keeps naming the
+    // rule directly with `None`.
+    let plan = match &unit.plan {
+        CollectionKernelPlan::LaneGrid { .. } => None,
+        plan => Some(plan),
+    };
+    let workgroup = generic_1d_workgroup(&signature, plan);
     finish(dispatch, workgroup)
 }
 
