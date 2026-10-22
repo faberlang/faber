@@ -209,6 +209,62 @@ fn schema_round_trip_pins_binding_fields_and_intrinsic_surface() {
 }
 
 #[test]
+fn device_stats_artifact_round_trips_counters_phases_and_entries() {
+    let mut artifact = fixture_artifact();
+    assert_eq!(artifact.device, None);
+    let fixture_encoded = run_stats::encode(&artifact).expect("encode legacy fixture");
+    let fixture_value: Value = serde_json::from_str(&fixture_encoded).expect("legacy JSON");
+    assert!(fixture_value.get("device").is_none());
+
+    artifact.device = Some(run_stats::DeviceMetadata {
+        admit_ns: 11,
+        prepare_ns: 12,
+        image_build_ns: 13,
+        module_compile_ns: 14,
+        execution_ns: 15,
+        gpu_timing: "per-launch".to_owned(),
+        timed_launches: 3,
+        untimed_launches: 1,
+        host_encode_ns: 16,
+        uploads: 2,
+        downloads: 1,
+        uploaded_bytes: 64,
+        downloaded_bytes: 32,
+        runtime: run_stats::DeviceRuntimeMetadata {
+            launch_count: 4,
+            command_submit_count: 5,
+            blocking_wait_count: 6,
+            blocking_wait_ns: 17,
+            live_modules: 7,
+            live_buffers: 8,
+            allocated_bytes: 128,
+            peak_allocated_bytes: 256,
+            host_to_device_bytes: 64,
+            device_to_host_bytes: 32,
+        },
+        entries: vec![
+            run_stats::DeviceEntryMetadata {
+                entry: "quadratum".to_owned(),
+                launches: 2,
+                gpu_us: 19,
+            },
+            run_stats::DeviceEntryMetadata {
+                entry: "cubus".to_owned(),
+                launches: 1,
+                gpu_us: 23,
+            },
+        ],
+    });
+
+    let encoded = run_stats::encode(&artifact).expect("encode device artifact");
+    let value: Value = serde_json::from_str(&encoded).expect("device artifact JSON");
+    assert!(value["device"].is_object());
+    assert_eq!(value["device"]["entries"][0]["entry"], "quadratum");
+    let decoded: RunStatsArtifact = serde_json::from_str(&encoded).expect("device schema");
+    assert_eq!(decoded, artifact);
+}
+
+#[test]
 fn schema_conversion_sorts_function_and_intrinsic_arrays_deterministically() {
     let artifact = RunStatsArtifact::with_generated_at(
         PackageMetadata {

@@ -34,6 +34,51 @@ pub(crate) struct RunStatsArtifact {
     pub(crate) meter: MeterMetadata,
     pub(crate) functions: Vec<FunctionMetadata>,
     pub(crate) intrinsics: Vec<IntrinsicMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) device: Option<DeviceMetadata>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceMetadata {
+    pub(crate) admit_ns: u64,
+    pub(crate) prepare_ns: u64,
+    pub(crate) image_build_ns: u64,
+    pub(crate) module_compile_ns: u64,
+    pub(crate) execution_ns: u64,
+    pub(crate) gpu_timing: String,
+    pub(crate) timed_launches: u64,
+    pub(crate) untimed_launches: u64,
+    pub(crate) host_encode_ns: u64,
+    pub(crate) uploads: u64,
+    pub(crate) downloads: u64,
+    pub(crate) uploaded_bytes: u64,
+    pub(crate) downloaded_bytes: u64,
+    pub(crate) runtime: DeviceRuntimeMetadata,
+    pub(crate) entries: Vec<DeviceEntryMetadata>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceRuntimeMetadata {
+    pub(crate) launch_count: u64,
+    pub(crate) command_submit_count: u64,
+    pub(crate) blocking_wait_count: u64,
+    pub(crate) blocking_wait_ns: u64,
+    pub(crate) live_modules: u64,
+    pub(crate) live_buffers: u64,
+    pub(crate) allocated_bytes: u64,
+    pub(crate) peak_allocated_bytes: u64,
+    pub(crate) host_to_device_bytes: u64,
+    pub(crate) device_to_host_bytes: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceEntryMetadata {
+    pub(crate) entry: String,
+    pub(crate) launches: u64,
+    pub(crate) gpu_us: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -155,6 +200,50 @@ impl RunStatsArtifact {
             },
             functions,
             intrinsics,
+            device: None,
+        }
+    }
+}
+
+#[cfg(feature = "device-runtime")]
+impl DeviceMetadata {
+    pub(crate) fn from_receipt(receipt: &faber_cli::package::mir::DeviceRunReceipt) -> Self {
+        let runtime = &receipt.runtime;
+        Self {
+            admit_ns: receipt.admit_ns,
+            prepare_ns: receipt.prepare_ns,
+            image_build_ns: receipt.image_build_ns,
+            module_compile_ns: receipt.module_compile_ns,
+            execution_ns: receipt.execution_ns,
+            gpu_timing: receipt.gpu_timing.clone().as_str().to_owned(),
+            timed_launches: runtime.timed_launch_count,
+            untimed_launches: runtime.untimed_launch_count,
+            host_encode_ns: receipt.host_encode_ns,
+            uploads: receipt.uploads,
+            downloads: receipt.downloads,
+            uploaded_bytes: receipt.uploaded_bytes,
+            downloaded_bytes: receipt.downloaded_bytes,
+            runtime: DeviceRuntimeMetadata {
+                launch_count: runtime.launch_count,
+                command_submit_count: runtime.command_submit_count,
+                blocking_wait_count: runtime.blocking_wait_count,
+                blocking_wait_ns: runtime.blocking_wait_ns,
+                live_modules: runtime.live_modules,
+                live_buffers: runtime.live_buffers,
+                allocated_bytes: runtime.allocated_bytes,
+                peak_allocated_bytes: runtime.peak_allocated_bytes,
+                host_to_device_bytes: runtime.host_to_device_bytes,
+                device_to_host_bytes: runtime.device_to_host_bytes,
+            },
+            entries: runtime
+                .entry_gpu
+                .iter()
+                .map(|entry| DeviceEntryMetadata {
+                    entry: entry.entry.clone(),
+                    launches: entry.launches,
+                    gpu_us: entry.gpu_us,
+                })
+                .collect(),
         }
     }
 }

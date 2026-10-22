@@ -317,8 +317,8 @@ fn run_rejects_the_retired_backend_flag() {
 
 #[test]
 fn route_selection_allows_stats_with_explicit_device() {
-    // gpu-reset C2-U6c (D4): a dispatching run reports host rows only, so the
-    // stats request no longer refuses at route resolution.
+    // gpu-reset C2-U6c (D4): a dispatching run reports host rows and device
+    // receipt data, so the stats request no longer refuses at route resolution.
     let dir = temp_dir("stats-device-allowed");
     std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
     write_manifest(&dir, Some("metal"));
@@ -474,7 +474,7 @@ fn assert_no_stats_artifact(output: &std::process::Output, stats_file: &Path) {
 
 /// D4 (gpu-reset C2): stats with an explicit device are no longer refused for
 /// being stats. The binary either dispatches (hosts with an admitted device;
-/// host rows plus the `device: dispatched (not measured)` marker) or fails
+/// host rows plus the `device: dispatched (measured)` marker) or fails
 /// closed for the device (no admitted device, or a build without
 /// `device-runtime`); it never emits the retired stats refusal.
 fn assert_stats_device_run_follows_d4(output: &std::process::Output, stats_file: &Path) {
@@ -487,7 +487,7 @@ fn assert_stats_device_run_follows_d4(output: &std::process::Output, stats_file:
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
-            stdout.contains("device: dispatched (not measured)") || stats_file.exists(),
+            stdout.contains("device: dispatched (measured)") || stats_file.exists(),
             "a dispatching stats run must report the D4 marker: {stdout}"
         );
     } else {
