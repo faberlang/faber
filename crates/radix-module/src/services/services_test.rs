@@ -2073,6 +2073,23 @@ fn mir_output_for_source_returns_error_for_invalid_syntax() {
 }
 
 #[test]
+fn mir_output_reports_unknown_library_module_for_unresolved_norma_import() {
+    let (_td, path) = temp_fab(
+        "mir-unknown-norma-module",
+        "importa ex \"norma:nonexistent\" nonexistent\n\nincipit {\n    nota \"unreachable\"\n}\n",
+    );
+    let source = std::fs::read_to_string(&path).expect("read temp fab");
+
+    let errors = mir_output_for_source(&path, &source).expect_err("unresolved norma import should be rejected");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.contains("PKG001:unknown_library_module")),
+        "mir output should name the diagnostic identity, got {errors:?}"
+    );
+}
+
+#[test]
 fn mir_output_for_control_flow_source_returns_deterministic_text() {
     let output = mir_output_for_source(
         "main.fab",
