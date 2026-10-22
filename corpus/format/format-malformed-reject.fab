@@ -1,0 +1,40 @@
++++
+term = "¶"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "A format spec must follow [fill][align][sign][0][width][.precision][kind]; printf syntax does not parse."
+syntax = "<value> ¶ \"%.2f\" — rejected"
+aliases = ["format"]
+related = ["scriptum", "textus", "instans"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:format_spec_malformed"
++++
+# =============================================================================
+# ¶ — an unparseable format spec
+# =============================================================================
+#
+# What this teaches:
+#   • One spec pattern covers every subject: `[fill][align][sign][0][width]
+#     [.precision][kind]` — e.g. `".2"`, `"08x"`, `"*>10"`.
+#   • The spec is read left to right against that pattern; text that does not
+#     fit it is a compile error before any value is rendered.
+#
+# Common mistakes:
+#   • bringing printf habits — `%.2f` mixes a stray `%` and a C kind letter;
+#     the Faber spelling is `".2"`.
+#   • a trailing or stray part the pattern has no place for, such as `"5f"`.
+#
+# See also: format, textus, scriptum
+# =============================================================================
+
+# format reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let int n ← 42
+    print n ¶ "%.2f"
+}
