@@ -336,9 +336,68 @@ mod evaluation {
         let Some(authored) = with_initializer_mut(unit, def_id, |init| std::mem::replace(init, literal)) else {
             return Err(invalid("praefixum_unsupported", span));
         };
-        // The authored body left the live HIR: drop presentation records its
-        // dead Defs/Hirs own, or FHIR validation dangles on them at load.
+        // The authored body leaves live HIR; prune side records that point
+        // into it. Module constants retain it separately for source re-emission.
         let dead = DeadNodes::of(&authored);
+        unit.resolved_uses.retain(|use_| {
+            !matches!(&use_.key, crate::semantic::ResolvedUseKey::Local(def) if dead.defs.contains(def))
+                && !use_.local.is_some_and(|def| dead.defs.contains(&def))
+                && !use_.enclosing.is_some_and(|def| dead.defs.contains(&def))
+        });
+        unit.presentation
+            .guard_si_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .elige_expr_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .glyph_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .radical_quarta_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .numeric_twin_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .empty_dense_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .inferred_constructor_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .axis_sugar
+            .retain(|record| !dead.hirs.contains(&record.id));
+        unit.presentation
+            .discard_binding_stmts
+            .retain(|record| !dead.hirs.contains(&record.expr_id));
+        unit.presentation
+            .tuple_label_accesses
+            .retain(|record| !dead.hirs.contains(&record.expr_id));
+        unit.presentation
+            .insere_exprs
+            .retain(|record| !dead.hirs.contains(&record.expr));
+        unit.presentation
+            .destructure_bindings
+            .retain(|record| !record.stmt_ids.iter().any(|id| dead.hirs.contains(id)));
+        unit.presentation
+            .await_assignment_bindings
+            .retain(|def| !dead.defs.contains(def));
+        unit.presentation
+            .function_modifier_bindings
+            .retain(|record| !dead.defs.contains(&record.local));
+        for owner in &mut unit.presentation.owners {
+            if owner
+                .semantic
+                .as_ref()
+                .is_some_and(|semantic| match semantic {
+                    HirOwnerRef::Hir(id) => dead.hirs.contains(id),
+                    HirOwnerRef::Def(def) => dead.defs.contains(def),
+                })
+            {
+                owner.semantic = None;
+            }
+        }
         unit.presentation
             .authored_types
             .retain(|record| match &record.site.owner {
