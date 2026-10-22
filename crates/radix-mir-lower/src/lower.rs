@@ -611,6 +611,12 @@ fn portable_tensor_edge_shape_identity(types: &TypeTable, shape: IndexId) -> Opt
 
 pub use radix_types::KernelLowering;
 
+#[derive(Debug, Clone)]
+pub struct ImportedCallableParam {
+    pub optional: bool,
+    pub default: Option<HirExpression>,
+}
+
 #[derive(Default)]
 pub struct MirLoweringOptions {
     /// How `@ kernel` functions lower; see [`KernelLowering`].
@@ -632,6 +638,10 @@ pub struct MirLoweringOptions {
     /// when the function carries no built-in stage flag, so the compiler core
     /// reads no stage word for these functions.
     pub stage_bindings: Arc<FxHashMap<DefId, MirKernelShaderStage>>,
+    /// Optional/default parameters for package-linked callees, whose synthetic
+    /// DefIds are absent from this unit's `function_params`; the package seam
+    /// supplies their metadata here.
+    pub imported_function_params: Arc<FxHashMap<DefId, Vec<ImportedCallableParam>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1964,6 +1974,7 @@ impl<'a> MirLowerer<'a> {
             Arc::clone(&body_ctx.struct_fields),
             Arc::clone(&body_ctx.struct_field_types),
             Arc::clone(&body_ctx.function_params),
+            Arc::clone(&self.options.imported_function_params),
             Arc::clone(&self.options.cli_parsed_record_fields_by_type),
             Arc::clone(&self.options.cli_record_fields_by_type),
             self.options.cli_adapter_active,
@@ -2513,6 +2524,7 @@ pub struct FunctionBuilderContext<'a> {
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
     function_params: Arc<FxHashMap<DefId, Vec<context::CallableParamMeta<'a>>>>,
+    imported_function_params: Arc<FxHashMap<DefId, Vec<ImportedCallableParam>>>,
     tensor_edge_policies: Arc<radix_hir::TensorEdgePolicyTable>,
     pending_tensor_limes: Arc<Mutex<Vec<PendingTensorLimes>>>,
     shape_calls: Arc<FxHashMap<radix_hir::HirId, Vec<ShapeRelation>>>,
@@ -2611,6 +2623,7 @@ impl<'a> FunctionBuilderContext<'a> {
             function_async: Arc::new(FxHashMap::default()),
             function_generator: Arc::new(FxHashMap::default()),
             function_params: Arc::new(FxHashMap::default()),
+            imported_function_params: Arc::new(FxHashMap::default()),
             tensor_edge_policies: Arc::new(radix_hir::TensorEdgePolicyTable::default()),
             pending_tensor_limes: Arc::new(Mutex::new(Vec::new())),
             shape_calls: Arc::new(FxHashMap::default()),
