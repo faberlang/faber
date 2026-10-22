@@ -9,12 +9,14 @@ input = "importa/import-unknown-norma-module-reject.fab"
 check_only = true
 
 [targets.mir]
-outcome = "not-applicable"
-reason = "This target's emit path does not resolve package imports, so the unknown norma module is accepted (only the unused-import warning appears); check, run and the Rust-family emit paths reject it."
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_library_module"
 
 [targets.roundtrip]
-outcome = "not-applicable"
-reason = "This target's emit path does not resolve package imports, so the unknown norma module is accepted (only the unused-import warning appears); check, run and the Rust-family emit paths reject it."
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_library_module"
 
 [targets.runner]
 outcome = "rejects"
