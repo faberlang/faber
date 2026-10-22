@@ -448,6 +448,9 @@ struct PackageMirLinks {
     air_calls: HashMap<(PathBuf, u32, u32, DefId), DefId>,
     namespaces: NamespaceExports,
     sources: SourceRewrites,
+    /// Optional/default parameter metadata for each linked function source,
+    /// keyed by the synthetic definition id assigned by the package linker.
+    imported_function_params: HashMap<DefId, link::ImportedFunctionParams>,
     /// Next free synthetic def id; the library-lowering pass continues from
     /// here so auto-generated sub-companion sources cannot collide with the
     /// linker's allocations.
