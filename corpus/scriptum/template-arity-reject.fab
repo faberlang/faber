@@ -1,0 +1,37 @@
++++
+term = "scriptum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "A template needs one actual per value slot; too few arguments are refused by name."
+syntax = "\"<template with two slots>\"(<one argument>) — rejected"
+related = ["lege", "lineam"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:template_application_arity_mismatch"
++++
+# =============================================================================
+# scriptum — one actual per value slot
+# =============================================================================
+#
+# What this teaches:
+#   • A template application is checked against its slot count before it is
+#     lowered: `"§ §"` has two value slots, so it needs two actuals.
+#   • The arity defect is reported as `template_application_arity_mismatch`
+#     and lowering stops instead of producing a template with unfilled slots.
+#
+# Common mistakes:
+#   • Supplying one argument for a template with two `§` slots.
+#
+# See also: lege, lineam — and the positive twin `scriptum.fab`.
+# =============================================================================
+
+# scriptum arity reject — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let string out ← "§ §"("x")
+    print out
+}

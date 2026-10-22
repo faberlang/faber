@@ -1,0 +1,39 @@
++++
+term = "scriptum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "Numbered holes address positions; a gap in the numbering is refused even when the count matches."
+syntax = "\"§0 … §2\"(<three arguments>) — rejected"
+related = ["lege", "lineam"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:template_hole_index_gap"
++++
+# =============================================================================
+# scriptum — numbered holes must be contiguous
+# =============================================================================
+#
+# What this teaches:
+#   • `§N` addresses argument N, so `"§0 and §2"` names positions 0 and 2 and
+#     leaves position 1 unread.
+#   • A gap in the numbering is a gap, not an arity defect: the count may
+#     happen to match while a position is still unfilled, and the call is
+#     refused as `template_hole_index_gap`.
+#
+# Common mistakes:
+#   • Skipping a number in a numbered template and passing one argument per
+#     printed hole, expecting the positions to close up.
+#
+# See also: lege, lineam — and the positive twin `scriptum.fab`.
+# =============================================================================
+
+# scriptum numbered-hole gap reject — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let string out ← "§0 and §2"("a", "b", "c")
+    print out
+}

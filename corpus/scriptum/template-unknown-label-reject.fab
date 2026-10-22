@@ -1,0 +1,40 @@
++++
+term = "scriptum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "template_argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "A labeled actual must name a declared hole; an undeclared label is refused by name."
+syntax = "\"§{label} …\"(other: value) — rejected"
+related = ["lege", "lineam"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:unknown_template_hole_label"
++++
+# =============================================================================
+# scriptum — a labeled actual must name a declared hole
+# =============================================================================
+#
+# What this teaches:
+#   • `§{label}` declares a named hole; a labeled actual `label: value` fills
+#     exactly that hole.
+#   • An actual whose label names no declared hole is reported as
+#     `unknown_template_hole_label` and lowering stops.
+#   • The same call also leaves `greet` unfilled, which reports
+#     `unfillable_template_hole` alongside; this exemplum pins the unknown
+#     label.
+#
+# Common mistakes:
+#   • Passing `other: …` to a template that declares `§{greet}`.
+#
+# See also: lege, lineam — and the positive twin `scriptum.fab`.
+# =============================================================================
+
+# scriptum unknown-label reject — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let string out ← "§{greet} world"(other: "salve")
+    print out
+}
