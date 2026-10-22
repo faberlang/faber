@@ -5,7 +5,8 @@ use crate::capability::{SLUG_CLIF_POLICY, SLUG_CLIF_SUBSET, classify_with_types}
 use radix_lexer::{Span, Symbol};
 use radix_mir::*;
 use radix_types::Type;
-use radix_types::{Primitive, SemanticMutability, TypeTable};
+use radix_types::vocabulary::Lowerability;
+use radix_types::{InstansPrecision, Primitive, SemanticMutability, TypeTable};
 
 fn sample_span() -> Span {
     Span::default()
@@ -680,6 +681,31 @@ fn explicit_conversion(source_ty: MirType, target_ty: MirType) -> MirIntrinsic {
     })
 }
 
+fn sermo_materialization_program(handle: MirType, target: MirType, vacuum: MirType) -> MirProgram {
+    single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, handle), local(1, target)],
+        temps: Vec::new(),
+        statements: vec![
+            runtime_call(
+                MirIntrinsic::SermoOpen,
+                vec![MirOperand::Constant(MirConstant::String(Symbol(21)))],
+                handle,
+            ),
+            runtime_call(
+                explicit_conversion(handle, target),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                target,
+            ),
+        ],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    })
+}
+
 #[test]
 fn sync_scalar_sermo_conversation_is_capable() {
     let mut types = TypeTable::new();
@@ -722,6 +748,33 @@ fn sync_scalar_sermo_conversation_is_capable() {
         verdict.is_capable(),
         "the sync scalar conversation is inside the subset: {verdict:?}"
     );
+}
+
+#[test]
+fn sermo_void_materialization_is_capable() {
+    let mut types = TypeTable::new();
+    let handle = sermo_handle(&mut types);
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let program = sermo_materialization_program(handle, vacuum, vacuum);
+
+    assert_eq!(classify_with_types(&program, &types), Lowerability::Capable);
+}
+
+#[test]
+fn sermo_instant_materialization_is_capable() {
+    let mut types = TypeTable::new();
+    let handle = sermo_handle(&mut types);
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let instant = types.primitive(Primitive::Instans);
+    let sized_instant = types.sized_instans(InstansPrecision::Nanos);
+    let instant_alias = types.intern(Type::Alias(radix_hir::DefId(22), sized_instant));
+    let nested_instant_alias = types.intern(Type::Alias(radix_hir::DefId(23), instant_alias));
+
+    for target in [instant, sized_instant, instant_alias, nested_instant_alias] {
+        let target = MirType::semantic(target);
+        let program = sermo_materialization_program(handle, target, vacuum);
+        assert_eq!(classify_with_types(&program, &types), Lowerability::Capable);
+    }
 }
 
 #[test]
