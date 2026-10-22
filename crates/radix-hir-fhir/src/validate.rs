@@ -1576,6 +1576,14 @@ fn collect_item_defs(items: &[radix_hir::HirItem], registry: &mut FxHashSet<radi
             }
             HirItemKind::Constant(c) => {
                 collect_expr_defs(&c.value, registry);
+                // A `comptime { … }` initializer keeps its authored body in
+                // `statica.authored` after folding replaced `value`; that body
+                // is still on the wire, so its defs must be registered too.
+                if let Some(statica) = &c.statica
+                    && let Some(authored) = &statica.authored
+                {
+                    collect_expr_defs(authored, registry);
+                }
             }
             HirItemKind::Import(imp) => {
                 for ii in &imp.items {
@@ -2468,6 +2476,13 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
             }
             radix_hir::HirItemKind::Constant(c) => {
                 collect_expr(&c.value, &mut registry);
+                // The authored `comptime { … }` body survives folding in
+                // `statica.authored`; walk it so its HirIds stay resolvable.
+                if let Some(statica) = &c.statica
+                    && let Some(authored) = &statica.authored
+                {
+                    collect_expr(authored, &mut registry);
+                }
             }
             _ => {}
         }
