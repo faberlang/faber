@@ -129,12 +129,14 @@ const SHAPE_TRY_CALL: &str = "try_call";
 const SHAPE_RETURN_ERROR_DEVICE_TERMINATOR: &str = "return_error device terminator";
 
 /// EXEC02-PC1: name the collection op that hit the wildcard runtime-call
-/// reject (e.g. `TensorBatchedAttention`). Non-collection intrinsics keep
-/// the bare shape — their stable diagnostics (e.g. the Scribe reject in
-/// radix-module `device_test`) already identify the statement.
+/// reject (e.g. `TensorBatchedAttention`). Runtime conversions are outside
+/// the kernel subset and are named `conversio`; other non-collection
+/// intrinsics keep the bare shape where their stable diagnostics identify
+/// the statement.
 fn runtime_call_op_name(intrinsic: &MirIntrinsic) -> String {
     match intrinsic {
         MirIntrinsic::Collection(op) => format!("{op:?}"),
+        MirIntrinsic::Convert(_) => "conversio".to_owned(),
         _ => String::new(),
     }
 }
