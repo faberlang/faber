@@ -35,6 +35,7 @@ use radix_types::numeric_range::IntRange;
 
 const STORE_CONSTANT_OUT_OF_RANGE: &str = "store_constant_out_of_range";
 const OPTIONAL_INTO_PLAIN_CELL: &str = "optional_into_plain_cell";
+const IMPORT_CONVERSION_REQUIRED: &str = "import_conversion_required";
 
 /// One store position of the d11-6 table (ruling 21) as the checker sees it.
 #[derive(Clone, Copy)]
@@ -316,7 +317,59 @@ impl TypeChecker<'_> {
         if self.bridges_nullable_scalar_slot(slot) {
             return Some(slot_ty);
         }
+        // An aggregate cell has no scalar conversion: a foreign value may only
+        // land there through an authored `↦` conversion, so the store is
+        // refused by name instead of by the ordinary unification.
+        if self.is_aggregate_slot(slot) {
+            let found = self.format_type_for_diagnostic(ty);
+            let expected = self.format_type_for_diagnostic(slot_ty);
+            self.error_issue_with_args(
+                SemanticErrorKind::TypeMismatch,
+                IMPORT_CONVERSION_REQUIRED,
+                expr.span,
+                &[("found", found), ("expected", expected)],
+            );
+            return Some(slot_ty);
+        }
         None
+    }
+
+    /// Whether `slot` is an aggregate cell, either directly or as the single
+    /// non-`nihil` member of a `T ∪ none` cell. Only an authored `↦`
+    /// conversion transfers trust into one of these (need-3).
+    fn is_aggregate_slot(&self, slot: TypeId) -> bool {
+        let peel = |ty: TypeId| {
+            let ty = self.peel_nominal_aliases(ty);
+            let ty = self.types.peel_access_marker(ty).1;
+            self.peel_nominal_aliases(ty)
+        };
+        let members: Vec<TypeId> = match self.types.get(slot) {
+            Type::Union(members) => members.clone(),
+            Type::Option(inner) => vec![*inner],
+            _ => vec![slot],
+        };
+        let mut aggregates = members
+            .into_iter()
+            .map(peel)
+            .filter(|member| !matches!(self.types.get(*member), Type::Primitive(Primitive::Nihil)));
+        let Some(only) = aggregates.next() else {
+            return false;
+        };
+        if aggregates.next().is_some() {
+            return false;
+        }
+        matches!(
+            self.types.get(only),
+            Type::Array(_)
+                | Type::BoundedArray { .. }
+                | Type::Set(_)
+                | Type::Map(..)
+                | Type::Tensor(..)
+                | Type::Vector(..)
+                | Type::Matrix(..)
+                | Type::Sparsa(..)
+                | Type::Tuple(_)
+        )
     }
 
     /// Whether `slot` is a `T ∪ none` cell whose single non-`nihil` member is
