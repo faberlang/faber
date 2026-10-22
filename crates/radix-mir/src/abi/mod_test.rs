@@ -2186,6 +2186,10 @@ fn device_view_element_count_refuses_zero_and_overflow() {
     let literal_dim = types.intern_index(IndexExpr::Literal(4));
     let runtime_shape = types.intern_index(IndexExpr::Tuple(vec![runtime_dim, literal_dim]));
     let runtime_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, runtime_shape)));
+    let runtime_zero_dim = types.intern_index(IndexExpr::Literal(0));
+    let runtime_zero_shape =
+        types.intern_index(IndexExpr::Tuple(vec![runtime_dim, runtime_zero_dim]));
+    let runtime_zero_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, runtime_zero_shape)));
     let validation = MirValidationContext::new(&types);
 
     let zero_error = device_view_element_count(zero, &validation)
@@ -2203,4 +2207,7 @@ fn device_view_element_count_refuses_zero_and_overflow() {
         device_view_element_count_or_runtime(runtime_ty, &validation),
         Ok(RUNTIME_SHAPED_ELEMENT_COUNT)
     );
+    let runtime_zero_error = device_view_element_count_or_runtime(runtime_zero_ty, &validation)
+        .expect_err("a zero literal extent is refused even when another extent is runtime");
+    assert_eq!(runtime_zero_error.issue, "mir_kernel_tensor_zero_extent");
 }

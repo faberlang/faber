@@ -72,9 +72,10 @@ pub(crate) fn tensor_literal_dims(
 /// as a literal allocation size.
 pub(crate) fn dims_product_checked(dims: &[Dim]) -> Result<u64, &'static str> {
     let mut product: u64 = 1;
+    let mut has_runtime_dim = false;
     for dim in dims {
         match dim {
-            Dim::Runtime => return Err(NON_LITERAL_DIM_MESSAGE),
+            Dim::Runtime => has_runtime_dim = true,
             Dim::Literal(0) => {
                 return Err(ZERO_LITERAL_DIM_MESSAGE);
             }
@@ -85,7 +86,11 @@ pub(crate) fn dims_product_checked(dims: &[Dim]) -> Result<u64, &'static str> {
             }
         }
     }
-    Ok(product)
+    if has_runtime_dim {
+        Err(NON_LITERAL_DIM_MESSAGE)
+    } else {
+        Ok(product)
+    }
 }
 
 /// Whether a scalar layout is a kernel buffer element — the only scalar
