@@ -1675,6 +1675,21 @@ impl TypeChecker<'_> {
         rhs: &mut HirExpression,
     ) -> TypeId {
         let (lhs_ty, rhs_ty) = self.check_littera_operands(lhs, rhs, true);
+        let lhs_carrier = self.peel_nominal_aliases(lhs_ty);
+        let lhs_carrier = self.types.peel_access_marker(lhs_carrier).1;
+        let lhs_carrier = self.peel_nominal_aliases(lhs_carrier);
+        let rhs_carrier = self.peel_nominal_aliases(rhs_ty);
+        let rhs_carrier = self.types.peel_access_marker(rhs_carrier).1;
+        let rhs_carrier = self.peel_nominal_aliases(rhs_carrier);
+        if matches!(
+            self.types.get(lhs_carrier),
+            Type::Primitive(Primitive::Ignotum)
+        ) || matches!(
+            self.types.get(rhs_carrier),
+            Type::Primitive(Primitive::Ignotum)
+        ) {
+            return self.types.primitive(Primitive::Ignotum);
+        }
         if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
             return result;
         }

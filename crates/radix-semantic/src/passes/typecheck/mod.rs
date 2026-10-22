@@ -150,6 +150,9 @@ mod shape_obligations_test;
 #[path = "slot_lift_test.rs"]
 mod slot_lift_test;
 #[cfg(test)]
+#[path = "target_import_ordering_test.rs"]
+mod target_import_ordering_test;
+#[cfg(test)]
 #[path = "target_import_store_test.rs"]
 mod target_import_store_test;
 #[cfg(test)]
