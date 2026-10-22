@@ -16,9 +16,11 @@ use radix_lexer::textus_literal::try_decode_textus_literal;
 /// interner payload.
 ///
 /// Handles the escapes a Rust string literal accepts (`\\`, `\"`, `\'`,
-/// `\n`, `\t`, `\r`) plus `\u{H…}` (a NUL byte is written `\u{0}`); unknown
-/// escape pairs and a malformed `\u` are preserved verbatim so a payload that
-/// is not a working fab-to-Rust string still emits faithfully.
+/// `\n`, `\t`, `\r`) plus `\u{H…}` (a NUL byte is written `\u{0}`), and also
+/// decodes a literal's own delimiter: `\»` in a `«…»` block, ``\` `` in a
+/// backtick template, matching `radix_lexer::textus_literal::decode_textus_literal`.
+/// Unknown escape pairs and a malformed `\u` are preserved verbatim so a
+/// payload that is not a working fab-to-Rust string still emits faithfully.
 #[must_use]
 pub fn unescape_faber_text(raw: &str) -> String {
     let mut decoded = String::new();
@@ -36,6 +38,8 @@ pub fn unescape_faber_text(raw: &str) -> String {
             '\\' => decoded.push('\\'),
             '"' => decoded.push('"'),
             '\'' => decoded.push('\''),
+            '»' => decoded.push('»'),
+            '`' => decoded.push('`'),
             'n' => decoded.push('\n'),
             't' => decoded.push('\t'),
             'r' => decoded.push('\r'),

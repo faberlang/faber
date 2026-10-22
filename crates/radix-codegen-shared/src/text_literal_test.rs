@@ -30,3 +30,13 @@ fn unescape_is_idempotent_on_real_newlines() {
     // a Rust-side fixture) must pass through unchanged.
     assert_eq!(unescape_faber_text("a\n\"\\\u{00e9}"), "a\n\"\\\u{00e9}");
 }
+
+#[test]
+fn unescapes_own_delimiter_escapes() {
+    // A block `«…»` escapes its own closing delimiter, and a backtick
+    // template escapes its own backtick; both decode to the bare character.
+    assert_eq!(unescape_faber_text("a\\»b"), "a»b");
+    assert_eq!(unescape_faber_text("a\\`b"), "a`b");
+    // An escaped backslash before the delimiter stays a backslash.
+    assert_eq!(unescape_faber_text("a\\\\»b"), "a\\»b");
+}
