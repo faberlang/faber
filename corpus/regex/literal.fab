@@ -39,8 +39,9 @@ locale = "en"
 #
 # EXPECTED OUTPUT:
 #   The match text of the inline literal, the match text of the inferred
-#   literal under `(?i)`, that the escaped-slash literal matches "a/b", and
-#   that the text form built at run time matches "42".
+#   literal under `(?i)`, that the escaped-slash literal matches "a/b",
+#   that the class-slash literal matches "a/b", and that the text form
+#   built at run time matches "42".
 
 main {
     # the inline literal: the type word, then the raw body
@@ -60,4 +61,8 @@ main {
     # the text form still exists: build the pattern at run time
     let regex dynamic ← "\\d+" ↦ regex
     print dynamic.matches("42")
+
+    # a slash inside a character class needs escaping too: write `[\/]`
+    let regex slash_class ← regex /[\/]+/
+    print slash_class.matches("a/b")
 }
