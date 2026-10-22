@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/lista/index-numerus-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/index-numerus-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "array_index_must_be_numerus"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "array_index_must_be_numerus"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "array_index_must_be_numerus"

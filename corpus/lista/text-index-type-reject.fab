@@ -1,0 +1,22 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A text index must be an integer or an integer range, never a text."
+syntax = "s[\"x\"] on string — rejected"
+related = ["lista", "textus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:textus_index_must_be_numerus_or_range"
++++
+# lista reject case — a text index on a string is refused.
+# A string is addressed by an integer position or an integer window,
+# never by text. The checker names `textus_index_must_be_numerus_or_range`.
+# This exemplum intentionally fails to check.
+
+main {
+    let string s ← "abc"
+    print s["x"]
+}
