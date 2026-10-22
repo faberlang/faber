@@ -1,0 +1,23 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "List `*` list is refused by name: the elementwise product is ⊙."
+syntax = "a * b on two list<int> — rejected"
+related = ["lista", "⊙"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:lista_multiply_requires_glyph"
++++
+# Multiplying two lists with `*` is refused by name.
+# The operator does not select elementwise multiplication.
+# The elementwise product has a dedicated operator.
+# This is a semantic rejection, not a parser limitation.
+
+main {
+    let list<int> a ← [1, 2, 3]
+    let list<int> b ← [4, 5, 6]
+    print a * b
+}

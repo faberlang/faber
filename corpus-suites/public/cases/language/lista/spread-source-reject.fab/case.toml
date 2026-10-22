@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/lista/spread-source-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/spread-source-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "array_spread_requires_lista"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "array_spread_requires_lista"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "array_spread_requires_lista"

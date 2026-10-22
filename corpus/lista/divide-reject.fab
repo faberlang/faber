@@ -1,0 +1,23 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "List `/` list is refused by name: the elementwise divisions are ⊘ and ÷."
+syntax = "a / b on two list<int> — rejected"
+related = ["lista", "⊘", "÷"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:lista_divide_requires_glyph"
++++
+# Dividing two lists with `/` is refused by name.
+# The operator does not select elementwise division.
+# The elementwise division forms have dedicated operators.
+# This is a semantic rejection, not a parser limitation.
+
+main {
+    let list<int> a ← [4, 6, 8]
+    let list<int> b ← [2, 3, 4]
+    print a / b
+}
