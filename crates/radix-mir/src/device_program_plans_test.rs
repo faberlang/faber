@@ -4969,6 +4969,118 @@ fn subchain_emission_signature_keeps_runtime_data_flow_facts() {
     );
 }
 
+/// The elementwise-only subchain emission signature binds a runtime-shaped
+/// intermediate at the [`crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT`] marker:
+/// params in declaration order (first at binding 0, the rest as extra
+/// inputs), then the outputs — and the predicate agrees the surface carries
+/// a run-time shape.
+#[test]
+fn elementwise_subchain_signature_binds_runtime_markers() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+
+    let mut types = TypeTable::new();
+    let runtime = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let mut function = matmul_function_over(runtime, runtime, runtime);
+    // The matmul destination local (2) must be declared for the output local
+    // type resolution, exactly as a decomposed subchain declares it.
+    function.locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: runtime,
+        mutable: false,
+        span: test_span(),
+    });
+    let validation = MirValidationContext::new(&types);
+    assert!(subchain_has_runtime_shaped_buffer(
+        &function,
+        &[MirLocalId(2)],
+        &validation
+    ));
+
+    let signature =
+        elementwise_subchain_signature_for_emission(&function, &validation, &[MirLocalId(2)])
+            .expect("runtime-shaped elementwise subchain resolves");
+
+    // Params bind in declaration order: a at binding 0, bias at binding 1.
+    assert_eq!(signature.input.binding, 0);
+    assert_eq!(signature.input.source_local, Some(MirLocalId(0)));
+    assert_eq!(signature.input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(signature.extra_inputs.len(), 1);
+    assert_eq!(signature.extra_inputs[0].binding, 1);
+    assert_eq!(signature.extra_inputs[0].source_local, Some(MirLocalId(1)));
+    assert_eq!(
+        signature.extra_inputs[0].element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    // The primary output binds at the next binding (2).
+    assert_eq!(signature.output.binding, 2);
+    assert_eq!(signature.output.source_local, Some(MirLocalId(2)));
+    assert_eq!(signature.output.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    // The launch geometry of a runtime-shaped kernel is a per-call fact.
+    assert_eq!(signature.workgroup, MirWorkgroupSize { x: 1, y: 1, z: 1 });
+    assert_eq!(
+        signature.dispatch_size,
+        MirKernelDispatchSize { x: 1, y: 1, z: 1 }
+    );
+}
+
+/// The elementwise subchain signature keeps the literal ABI counts (no
+/// runtime marker), the predicate reads the literal surface as false, and a
+/// kernel-scalar param binds as a 1-element input at its own type.
+#[test]
+fn elementwise_subchain_signature_keeps_literal_counts() {
+    let mut types = TypeTable::new();
+    let left = rank2_tensor_ty(&mut types, [3, 5]);
+    let right = rank2_tensor_ty(&mut types, [3, 5]);
+    let out = rank2_tensor_ty(&mut types, [3, 5]);
+    let scalar = f32_ty(&mut types);
+    let mut function = matmul_function_over(left, right, out);
+    function.locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: out,
+        mutable: false,
+        span: test_span(),
+    });
+    // A kernel-scalar data-flow param (the elementwise scalar seed) binds at
+    // count 1, mirroring the ABI kernel scalar surface.
+    function.params.push(MirParam {
+        local: MirLocalId(3),
+        name: None,
+        ty: scalar,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    });
+    function.locals.push(MirLocal {
+        id: MirLocalId(3),
+        name: None,
+        ty: scalar,
+        mutable: false,
+        span: test_span(),
+    });
+    let validation = MirValidationContext::new(&types);
+    assert!(!subchain_has_runtime_shaped_buffer(
+        &function,
+        &[MirLocalId(2)],
+        &validation
+    ));
+
+    let signature =
+        elementwise_subchain_signature_for_emission(&function, &validation, &[MirLocalId(2)])
+            .expect("literal elementwise subchain resolves");
+
+    assert_eq!(signature.input.binding, 0);
+    assert_eq!(signature.input.element_count, 15);
+    assert_eq!(signature.extra_inputs.len(), 2);
+    assert_eq!(signature.extra_inputs[0].binding, 1);
+    assert_eq!(signature.extra_inputs[0].element_count, 15);
+    assert_eq!(signature.extra_inputs[1].binding, 2);
+    assert_eq!(signature.extra_inputs[1].element_count, 1);
+    assert_eq!(signature.extra_inputs[1].element_ty, scalar);
+    assert_eq!(signature.output.binding, 3);
+    assert_eq!(signature.output.element_count, 15);
+}
+
 #[test]
 fn literal_data_flow_sites_still_fail_closed() {
     let mut types = TypeTable::new();

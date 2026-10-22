@@ -3642,6 +3642,105 @@ pub fn subchain_signature_for_emission_with_source(
     Ok(signature)
 }
 
+/// Whether a subchain's data-flow surface carries a run-time-shaped buffer:
+/// any non-vacuum param type or any outputs local type whose tensor shape has
+/// a run-time extent ([`crate::tensor_type::Dim::Runtime`]). Callers use this
+/// to pick the runtime-aware [`elementwise_subchain_signature_for_emission`]
+/// over the literal-only ABI synthesis, whose buffer element counts cannot
+/// carry a run-time extent. A param/local type that is not a tensor (e.g. a
+/// kernel scalar) has no shape axes and never reads as runtime-shaped here —
+/// the signature builders stay the fail-closed authority on such types.
+pub fn subchain_has_runtime_shaped_buffer(
+    function: &MirFunction,
+    outputs: &[MirLocalId],
+    validation: &MirValidationContext<'_>,
+) -> bool {
+    fn shape_has_runtime_dim(ty: MirType, validation: &MirValidationContext<'_>) -> bool {
+        crate::tensor_type::tensor_dims(ty, validation).is_ok_and(|dims| {
+            dims.iter()
+                .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime))
+        })
+    }
+    function.params.iter().any(|param| {
+        !crate::abi::is_vacuum(param.ty, validation) && shape_has_runtime_dim(param.ty, validation)
+    }) || outputs.iter().any(|&local| {
+        function_local_ty(function, local).is_ok_and(|ty| shape_has_runtime_dim(ty, validation))
+    })
+}
+
+/// The emission signature for a decomposed ELEMENTWISE-ONLY subchain: every
+/// non-vacuum param binds as a read storage-buffer input in declaration order
+/// (the first at binding 0, the rest as extra inputs at the following
+/// bindings), then the outputs bind — the primary as the signature output,
+/// each additional consumed output as an extra output — all sized by
+/// [`data_flow_element_ty_and_count_or_runtime`] so a run-time-shaped tensor
+/// binds at the [`crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT`] marker instead
+/// of failing the literal-dimension law.
+///
+/// Why not [`MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry`]:
+/// the whole-function ABI synthesis sizes every buffer with the literal-only
+/// `device_view_element_count`, so an elementwise subchain carrying a
+/// run-time-shaped intermediate is refused before emission. This builder is
+/// the runtime-aware path: the launch geometry (workgroup and dispatch) is a
+/// per-call fact for a runtime-shaped kernel — one thread-block of one lane,
+/// like the `MatMulRuntime` signature — never a literal extent product.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when `outputs` is empty, or a param/local
+/// type is neither a tensor nor a kernel scalar (the same fail-closed law the
+/// literal data-flow reader applies).
+pub fn elementwise_subchain_signature_for_emission(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    outputs: &[MirLocalId],
+) -> Result<MirKernelSignature, PlanMappingError> {
+    if outputs.is_empty() {
+        return Err(PlanMappingError::mapping(
+            "elementwise subchain signature requires at least one output local",
+        ));
+    }
+    let mut signature = MirKernelSignature {
+        function: function.id,
+        input: storage_input(0, MirType::semantic(TypeId(0)), 0),
+        extra_inputs: Vec::new(),
+        output: storage_output(0, MirType::semantic(TypeId(0)), 0),
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: crate::abi::called_builtins_for_function(function),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize { x: 1, y: 1, z: 1 },
+    };
+    let mut next_binding = 0u32;
+    let mut bound_primary_input = false;
+    for param in &function.params {
+        if crate::abi::is_vacuum(param.ty, validation) {
+            continue;
+        }
+        let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(param.ty, validation)?;
+        let resource = storage_input_with_local(next_binding, element_ty, count, param.local);
+        if bound_primary_input {
+            signature.extra_inputs.push(resource);
+        } else {
+            signature.input = resource;
+            bound_primary_input = true;
+        }
+        next_binding = next_binding.saturating_add(1);
+    }
+    for (index, &local) in outputs.iter().enumerate() {
+        let local_ty = function_local_ty(function, local)?;
+        let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(local_ty, validation)?;
+        let resource = storage_output_with_local(next_binding, element_ty, count, local);
+        if index == 0 {
+            signature.output = resource;
+        } else {
+            signature.extra_outputs.push(resource);
+        }
+        next_binding = next_binding.saturating_add(1);
+    }
+    Ok(signature)
+}
+
 /// The emission signature for a decomposition subchain kernel carrying a
 /// S6-P1 transformer recipe (S6-P1 seam): the transformer-shaped recipe
 /// resources plus the subchain's data-flow inputs, with the recipe
