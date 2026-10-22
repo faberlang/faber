@@ -10,6 +10,16 @@ use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
+/// One diagnostic as the corpus lanes report it: `code:issue` identity first,
+/// then the message, so a `rejects` row pinned on `diagnostic_contains` can
+/// match the diagnostic identity the API and roundtrip lanes surface.
+pub(super) fn emit_diagnostic_summary(diagnostic: &radix::Diagnostic) -> String {
+    match diagnostic.lookup_key() {
+        Some(label) => format!("{label}: {}", diagnostic.message),
+        None => diagnostic.message.clone(),
+    }
+}
+
 struct Paths<'a> {
     suite: &'a Path,
     workspace: &'a Path,
@@ -212,7 +222,7 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                         first
                             .diagnostics
                             .iter()
-                            .map(|item| item.message.as_str())
+                            .map(emit_diagnostic_summary)
                             .collect::<Vec<_>>()
                             .join(" | ")
                     )),
@@ -230,7 +240,7 @@ fn execute_roundtrip(cases: &[Case], target: &str, discover_ms: f64, started: In
                                 second
                                     .diagnostics
                                     .iter()
-                                    .map(|item| item.message.as_str())
+                                    .map(emit_diagnostic_summary)
                                     .collect::<Vec<_>>()
                                     .join(" | ")
                             )),
@@ -604,10 +614,7 @@ fn run_case(
         let diagnostics = compilation
             .diagnostics
             .iter()
-            .map(|item| match item.code {
-                Some(code) => format!("{code}: {}", item.message),
-                None => item.message.clone(),
-            })
+            .map(emit_diagnostic_summary)
             .collect::<Vec<_>>()
             .join(" | ");
         let emitted_code = match compilation.output {
