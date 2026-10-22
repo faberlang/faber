@@ -756,7 +756,10 @@ impl<'a> Lexer<'a> {
     /// consumes the following character so `\/` does not terminate and stays
     /// in the payload as authored. Newline or EOF before the closing slash
     /// reports `unterminated_regex_literal`; an immediate closing slash reports
-    /// `empty_regex_literal` and emits [`TokenKind::Error`].
+    /// `empty_regex_literal` and emits [`TokenKind::Error`]. A slash inside a
+    /// character class still ends the body because the scanner does not parse
+    /// classes, so `regex /[\/]/` is the escaped form and `regex /[/]/` stops
+    /// the body at the bracket.
     fn scan_regex_body(&mut self, start: u32) {
         if self.cursor.peek() == Some('/') {
             self.cursor.advance();
