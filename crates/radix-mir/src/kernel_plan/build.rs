@@ -16,6 +16,7 @@ use super::validate::{
     validate_transpose_plan,
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
+use crate::tensor_type::{Dim, tensor_dims};
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirKernelResourceAccess, MirKernelResourceRole,
     MirLayoutKind, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
@@ -530,20 +531,46 @@ impl CollectionKernelPlan {
                 {
                     super::packed_layout_from_operand(operand).ok()?;
                 }
-                let input_count = table_rows.saturating_mul(table_cols);
-                let output_count = id_count.saturating_mul(table_cols);
-                if !signature_matches_transformer_counts(signature, input_count, output_count) {
-                    return None;
-                }
-                if signature.extra_inputs.len() != 1
-                    || signature.extra_inputs[0].element_count != id_count
-                {
-                    return None;
+                let literal = table_rows
+                    .literal()
+                    .zip(table_cols.literal())
+                    .zip(id_count.literal());
+                match literal {
+                    Some(((table_rows, table_cols), id_count)) => {
+                        let input_count = table_rows.saturating_mul(table_cols);
+                        let output_count = id_count.saturating_mul(table_cols);
+                        if !signature_matches_transformer_counts(
+                            signature,
+                            input_count,
+                            output_count,
+                        ) {
+                            return None;
+                        }
+                        if signature.extra_inputs.len() != 1
+                            || signature.extra_inputs[0].element_count != id_count
+                        {
+                            return None;
+                        }
+                    }
+                    // A run-time extent is a launch fact (rule 11), so the
+                    // ABI carries no count to cross-check: every gather
+                    // resource must instead carry the runtime-shaped marker.
+                    // The ranks and the paired extents were already checked
+                    // by [`gather_recipe_facts`].
+                    None => {
+                        if signature.extra_inputs.len() != 1
+                            || !signature.input.is_runtime_shaped()
+                            || !signature.output.is_runtime_shaped()
+                            || !signature.extra_inputs[0].is_runtime_shaped()
+                        {
+                            return None;
+                        }
+                    }
                 }
                 Some(CollectionKernelPlan::Gather(GatherPlan {
-                    table_rows: PlanDim::Literal(table_rows),
-                    table_cols: PlanDim::Literal(table_cols),
-                    id_count: PlanDim::Literal(id_count),
+                    table_rows,
+                    table_cols,
+                    id_count,
                 }))
             }
             MirCollectionOp::TensorCausalMaskedSoftmax => {
@@ -1639,51 +1666,80 @@ fn const_non_negative(operand: &MirOperand) -> Option<u64> {
     }
 }
 
-/// The `TensorGather` recipe facts (GI3-1): the rank-2 `[V, D]` table dims
+/// The `TensorGather` recipe facts (GI3-1): the rank-2 `[V, D]` table extents
 /// and the id-vector length `T`. `T` resolves from the gather statement's
 /// return-type dims (`[T, D]`, the shape-transforming result of the CCI-1
 /// source contract) divided by the table row width — the CCI-1 contract
 /// validated the ids' *literal* values only, so the plan carries the count
 /// as a typed fact, never inferred from text (A3); the emitted body
 /// bounds-checks the runtime token against the table row count (SEC-G1).
-/// `None` when the table is not rank-2, the return shape is not `[T, D]`,
-/// or the width does not divide evenly.
+///
+/// An extent the source wrote as a number is [`PlanDim::Literal`]; an extent
+/// bound at launch is [`PlanDim::Runtime`] (rule 11: a glyph takes run-time
+/// sizes). `None` when the table is not rank-2, a literal extent is zero, the
+/// return shape is not `[T, D]`, or a paired extent is not
+/// [Dim-compatible](dims_agree) (a size mismatch is a recoverable error,
+/// never a silent reshape).
 fn gather_recipe_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
-) -> Option<(u64, u64, u64)> {
+) -> Option<(PlanDim, PlanDim, PlanDim)> {
     let args = transformer_statement_args(function, MirCollectionOp::TensorGather)?;
-    let dims = transformer_operand_dims(function, &args[0], validation)?;
-    if dims.len() != 2 {
+    let dims = transformer_operand_dims_typed(function, &args[0], validation)?;
+    if dims.len() != 2 || dims.contains(&Dim::Literal(0)) {
         return None;
     }
-    let table_rows = dims[0];
     let table_cols = dims[1];
-    if table_rows == 0 || table_cols == 0 {
-        return None;
-    }
-    let return_dims =
-        transformer_statement_return_dims(function, MirCollectionOp::TensorGather, validation)?;
-    if return_dims.len() != 2 || return_dims[1] != table_cols {
+    let return_dims = transformer_statement_return_dims_typed(
+        function,
+        MirCollectionOp::TensorGather,
+        validation,
+    )?;
+    if return_dims.len() != 2 || !dims_agree(return_dims[1], table_cols) {
         return None;
     }
     // K7c: the ids are a `tensor<u32, [n]>` whose own extent is the row
     // count, so it must agree with the return rows (the extent travels with
     // the value); a disagreeing pair fails closed.
-    let ids_dims = transformer_operand_dims(function, &args[1], validation)?;
-    if ids_dims != [return_dims[0]] {
+    let ids_dims = transformer_operand_dims_typed(function, &args[1], validation)?;
+    if ids_dims.len() != 1 || !dims_agree(ids_dims[0], return_dims[0]) {
         return None;
     }
-    Some((table_rows, table_cols, return_dims[0]))
+    Some((
+        plan_dim(dims[0]),
+        plan_dim(table_cols),
+        plan_dim(return_dims[0]),
+    ))
 }
 
-/// The literal dims of the first statement carrying `op`'s return type (the
+/// Carry a shape extent onto the plan: a literal number stays a
+/// [`PlanDim::Literal`], a launch-bound extent becomes [`PlanDim::Runtime`].
+fn plan_dim(dim: Dim) -> PlanDim {
+    match dim {
+        Dim::Literal(value) => PlanDim::Literal(value),
+        Dim::Runtime => PlanDim::Runtime,
+    }
+}
+
+/// Whether two paired extents agree: both literal and equal, or both bound at
+/// run time. A literal-vs-runtime pair cannot be proven from the source, so it
+/// fails closed (rule 11: a size mismatch is a recoverable error, never a
+/// silent reshape).
+fn dims_agree(left: Dim, right: Dim) -> bool {
+    match (left, right) {
+        (Dim::Literal(left), Dim::Literal(right)) => left == right,
+        (Dim::Runtime, Dim::Runtime) => true,
+        (Dim::Literal(_), Dim::Runtime) | (Dim::Runtime, Dim::Literal(_)) => false,
+    }
+}
+
+/// The typed dims of the first statement carrying `op`'s return type (the
 /// shape-transforming result the gather recipe sizes its output from).
-fn transformer_statement_return_dims(
+fn transformer_statement_return_dims_typed(
     function: &MirFunction,
     op: MirCollectionOp,
     validation: &MirValidationContext<'_>,
-) -> Option<Vec<u64>> {
+) -> Option<Vec<Dim>> {
     for block in &function.blocks {
         for statement in &block.statements {
             if crate::collection_ops::statement_collection_op(statement) != Some(op) {
@@ -1696,7 +1752,7 @@ fn transformer_statement_return_dims(
             else {
                 continue;
             };
-            return crate::tensor_type::tensor_literal_dims(*return_ty, validation).ok();
+            return tensor_dims(*return_ty, validation).ok();
         }
     }
     None
@@ -1727,12 +1783,29 @@ fn transformer_statement_args(
 }
 
 /// The literal dims of a transformer recipe operand (the tensor the recipe
-/// reads).
+/// reads); a run-time extent yields `None`. See
+/// [`transformer_operand_dims_typed`] for the typed sibling.
 fn transformer_operand_dims(
     function: &MirFunction,
     operand: &MirOperand,
     validation: &MirValidationContext<'_>,
 ) -> Option<Vec<u64>> {
+    transformer_operand_dims_typed(function, operand, validation)?
+        .into_iter()
+        .map(|dim| match dim {
+            Dim::Literal(value) => Some(value),
+            Dim::Runtime => None,
+        })
+        .collect()
+}
+
+/// The typed dims of a transformer recipe operand (the tensor the recipe
+/// reads): a literal extent or a run-time one, never a refusal.
+fn transformer_operand_dims_typed(
+    function: &MirFunction,
+    operand: &MirOperand,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<Dim>> {
     // PGC-R5: the additive-idiom softmax reads an elementwise TEMP
     // (`(x + mask)` — the GEA2-U5e surface); its type lives in the temps
     // table, which the local-only `operand_local_ty` cannot read (the same
@@ -1752,7 +1825,7 @@ fn transformer_operand_dims(
             .find(|entry| entry.id == temp)
             .map(|entry| entry.ty)
     })?;
-    crate::tensor_type::tensor_literal_dims(ty, validation).ok()
+    tensor_dims(ty, validation).ok()
 }
 
 /// The flattened element count of the literal dims. A product that does not
