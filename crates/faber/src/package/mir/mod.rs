@@ -489,14 +489,14 @@ fn admit_device_session(
     use super::device::DeviceImageBackend;
     use super::host_factory::{discovery_receipt, host_error_diagnostic, open_device_selection};
     use radix_device_core::backend::{DeviceBackend, DeviceClass};
-    use radix_device_core::partition::MemoryBudget;
+    use radix_device_core::policy::BudgetRequest;
     use radix_device_core::session::DeviceSession;
 
     let opened = open_device_selection(
         registry,
         selection,
         true,
-        MemoryBudget::new(DEVICE_RUN_MEMORY_BUDGET_BYTES),
+        BudgetRequest::Declared(DEVICE_RUN_MEMORY_BUDGET_BYTES),
     )
     .map_err(|diagnostic| vec![diagnostic])?
     .ok_or_else(|| {
