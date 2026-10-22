@@ -842,6 +842,29 @@ pub(super) fn lower_package_units<'a>(
             return Err(diagnostics);
         }
     }
+    // Transplant defaults into each sibling caller before lowering begins.
+    // The lowered units retain borrows into their map nodes until package
+    // merging, so keep those owners in `others` while doing this id-driven
+    // remove/inspect/reinsert pass.
+    let sibling_ids: Vec<ModuleId> = others.keys().cloned().collect();
+    let mut sibling_imported_function_params = HashMap::new();
+    for id in sibling_ids {
+        let Some((_, mut unit)) = others.remove_entry(&id) else {
+            continue;
+        };
+        let unit_path = unit.path.clone();
+        let imported_function_params = imported_function_params_for_caller(
+            &unit_path,
+            &mut unit.analysis,
+            std::iter::once(&*entry).chain(others.values()),
+            links,
+            library_resolver,
+            library_cache,
+        )?;
+        others.insert(id, unit);
+        sibling_imported_function_params.insert(unit_path, imported_function_params);
+    }
+
     let mut pending = Vec::new();
     let mut extra_validation = RemappedValidation::default();
     let mut shared_nominals: HashMap<(InterfaceNominalKind, String), TypeId> = HashMap::new();
@@ -863,6 +886,10 @@ pub(super) fn lower_package_units<'a>(
 
     for unit in others.values_mut() {
         let unit_path = unit.path.clone();
+        let imported_function_params = sibling_imported_function_params
+            .get(&unit_path)
+            .cloned()
+            .unwrap_or_else(|| std::sync::Arc::new(HashMap::new()));
         let source_exports = exported_nominal_names(&unit.file_interface);
         // S1 U2 nominal identity: build the canonical nominal remap while the
         // source analysis is freely borrowable (lowering mutates it below).
@@ -931,7 +958,7 @@ pub(super) fn lower_package_units<'a>(
             &cli_plan.entry_records,
             no_fuse,
             kernel_lowering,
-            &std::sync::Arc::new(HashMap::new()),
+            &imported_function_params,
         )?;
         // Remap from the post-lowering table: lowering appends runtime and
         // diagnostic text (format templates, the lockstep length-mismatch
@@ -1117,7 +1144,7 @@ pub(super) fn lower_package_units<'a>(
             &library.import,
             library_resolver,
             library_cache,
-            |analysis, _| {
+            |analysis, cache| {
                 if let Err(errors) = rewrite_analysis_namespace_calls(
                     &library.path,
                     analysis,
@@ -1187,10 +1214,30 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
+                let imported_function_params = match imported_function_params_for_caller(
+                    &library.path,
+                    analysis,
+                    std::iter::empty::<&AnalyzedProgramNode>(),
+                    links,
+                    library_resolver,
+                    cache,
+                ) {
+                    Ok(parameters) => parameters,
+                    Err(errors) => {
+                        diagnostics.extend(errors);
+                        return Ok(());
+                    }
+                };
                 let mut lowered = match lower_analyzed_unit(
                     analysis.application_view(),
                     radix_mir_lower::lower::MirLoweringOptions {
                         kernel_lowering,
+                        imported_function_params: std::sync::Arc::new(
+                            imported_function_params
+                                .iter()
+                                .map(|(def, params)| (*def, params.clone()))
+                                .collect(),
+                        ),
                         ..Default::default()
                     },
                 ) {
