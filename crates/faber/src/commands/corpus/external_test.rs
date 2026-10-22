@@ -142,6 +142,57 @@ fn external_target_maps_recipe_names_and_rejects_unknown() {
 }
 
 #[test]
+fn api_emit_failure_judges_a_rejects_row_on_diagnostic_identity() {
+    let diagnostic = radix::Diagnostic::error("unknown library module `norma:nonexistent`")
+        .with_code("PKG001")
+        .with_arg("issue", "unknown_library_module");
+    let summary = super::emit_diagnostic_summary(&diagnostic);
+    assert!(
+        summary.contains("PKG001:unknown_library_module"),
+        "{summary}"
+    );
+
+    // `load_case` rewrites Rejects to KnownFail and sets the flag.
+    let mut rejects = case(Outcome::KnownFail, Some("emit"));
+    rejects.target.rejects = true;
+    rejects.target.diagnostic_contains = Some("PKG001:unknown_library_module".to_owned());
+    let (status, reason) = super::judge_api_emit_failure(&rejects, &summary);
+    assert_eq!(status, "expected-fail");
+    assert_eq!(reason, None);
+    assert_eq!(rejects.relabel_expected_fail(status), "rejected");
+
+    let mut unpinned = case(Outcome::KnownFail, Some("emit"));
+    unpinned.target.rejects = true;
+    unpinned.target.diagnostic_contains = Some("some_other_issue".to_owned());
+    assert_eq!(super::judge_api_emit_failure(&unpinned, &summary).0, "fail");
+
+    let uncoded = radix::Diagnostic::error("plain message");
+    assert_eq!(super::emit_diagnostic_summary(&uncoded), "plain message");
+}
+
+#[test]
+fn emit_diagnostic_summary_reports_code_and_issue() {
+    let coded = radix::Diagnostic::error("unknown library module `norma:nonexistent`")
+        .with_code("PKG001")
+        .with_arg("issue", "unknown_library_module");
+    let summary = super::emit_diagnostic_summary(&coded);
+    assert!(
+        summary.contains("PKG001:unknown_library_module"),
+        "{summary}"
+    );
+    assert!(summary.contains("unknown library module"), "{summary}");
+
+    let code_only = radix::Diagnostic::error("message").with_code("TYP001");
+    assert_eq!(
+        super::emit_diagnostic_summary(&code_only),
+        "TYP001: message"
+    );
+
+    let bare = radix::Diagnostic::error("plain message");
+    assert_eq!(super::emit_diagnostic_summary(&bare), "plain message");
+}
+
+#[test]
 fn package_product_is_classified_against_the_recipe_extension() {
     use super::{PackageProduct, classify_package_product};
 

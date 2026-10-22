@@ -380,9 +380,12 @@ fn format_mir_frontend_diagnostics(
         .into_iter()
         .map(|diagnostic| {
             let prefix = if diagnostic.is_error() { "error" } else { "warning" };
+            let label = diagnostic
+                .lookup_key()
+                .map(|key| format!("[{key}]"))
+                .unwrap_or_default();
             format!(
-                "{}: {}: {}",
-                prefix,
+                "{prefix}{label}: {}: {}",
                 format_optional_location(source_file, diagnostic.span),
                 diagnostic.message
             )

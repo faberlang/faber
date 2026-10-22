@@ -4025,3 +4025,60 @@ fn library_bindings_route_reports_missing_source_read() {
     assert!(result.output.is_none(), "a missing source must not produce output");
     crate::test_support::assert_has_error_issue(&result.diagnostics, "IO001", "source_read_failed");
 }
+
+#[test]
+fn unresolved_norma_import_is_unknown_library_module_before_emit() {
+    let (_td, home) = temp_dir("unknown-norma-module");
+    let app = home.join("main.fab");
+    fs::write(
+        &app,
+        "+++\nlocale = \"en\"\n+++\n\nimport from \"norma:nonexistent\" nonexistent\n\nmain {\n    print \"unreachable\"\n}\n",
+    )
+    .expect("write app");
+
+    for target in [crate::codegen::Target::HirGo, crate::codegen::Target::MirSexp] {
+        let result = crate::program::compile_cli_path(&app, false, target);
+        assert!(result.output.is_none(), "unknown provider import must not emit for {target:?}");
+        assert!(
+            result.diagnostics.iter().any(|diagnostic| {
+                diagnostic.issue() == Some("unknown_library_module")
+                    && diagnostic.code == Some("PKG001")
+                    && diagnostic
+                        .args
+                        .iter()
+                        .any(|arg| arg.name == "specifier" && arg.value == "norma:nonexistent")
+            }),
+            "expected PKG001 unknown_library_module for {target:?}, got {:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.code, diagnostic.issue(), diagnostic.args.clone()))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn resolvable_norma_import_is_not_unknown_library_module() {
+    let (_td, home) = temp_dir("known-norma-module");
+    let app = home.join("main.fab");
+    fs::write(&app, "importa ex \"norma:text\" text\n\nincipit {\n    nota \"ok\"\n}\n").expect("write app");
+
+    let result = crate::program::compile_cli_path(&app, false, crate::codegen::Target::HirGo);
+    assert!(
+        result.success(),
+        "resolvable Norma import should compile: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue(), diagnostic.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("unknown_library_module")),
+        "resolvable Norma module must not be reported as unknown"
+    );
+}
