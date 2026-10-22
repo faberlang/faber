@@ -3,7 +3,7 @@
 //! C handle table's `open` export.
 
 use super::{
-    __faber_clif_v1_sermo_failed, __faber_clif_v1_sermo_fault_kind,
+    __faber_clif_v1_sermo_drain, __faber_clif_v1_sermo_failed, __faber_clif_v1_sermo_fault_kind,
     __faber_clif_v1_sermo_fault_path, __faber_clif_v1_sermo_materialize_i64,
     __faber_clif_v1_sermo_open, __faber_clif_v1_sermo_set_opener_i64,
     __faber_clif_v1_sermo_set_opener_nil, CONVERSATIONS, Conversation, Opener, slot,
@@ -150,6 +150,36 @@ fn clock_routes_reply_with_an_integer() {
         let nanos = conversation.int().expect("a clock route replies numerus");
         assert!(nanos >= 0, "{route} replied {nanos}");
     }
+}
+
+#[test]
+fn drain_serves_a_unit_route_and_clears_the_fault() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    __faber_clif_v1_sermo_set_opener_i64(handle, 0);
+    __faber_clif_v1_sermo_drain(handle);
+    assert_eq!(__faber_clif_v1_sermo_failed(handle), 0);
+}
+
+#[test]
+fn drain_records_an_invalid_argument_fault() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    __faber_clif_v1_sermo_set_opener_i64(handle, -1);
+    __faber_clif_v1_sermo_drain(handle);
+    assert_eq!(__faber_clif_v1_sermo_failed(handle), 1);
+    assert_eq!(
+        unsafe { raw_field(__faber_clif_v1_sermo_fault_kind, handle) },
+        LeafErrorKind::InvalidArgument.variant_name().as_bytes()
+    );
+    assert_eq!(
+        unsafe { raw_field(__faber_clif_v1_sermo_fault_path, handle) },
+        ROUTE.as_bytes()
+    );
 }
 
 #[test]
