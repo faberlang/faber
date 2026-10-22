@@ -1046,12 +1046,17 @@ impl TypeChecker<'_> {
         // composite-key path (a range is never a tuple key) and before the
         // window decline in `check_index_from_type`.
         let (_, payload) = self.types.peel_access_marker(resolved);
-        if let Type::Tensor(elem, shape) = self.types.get(payload).clone()
-            && matches!(index.kind, HirExpressionKind::Intervallum { .. })
-        {
-            return super::tensor_index::check_tensor_bracket_range_index(
-                self, obj_ty, elem, shape, index,
-            );
+        if let Type::Tensor(elem, shape) = self.types.get(payload).clone() {
+            if matches!(index.kind, HirExpressionKind::Intervallum { .. }) {
+                return super::tensor_index::check_tensor_bracket_range_index(
+                    self, obj_ty, elem, shape, index,
+                );
+            }
+            if matches!(index.kind, HirExpressionKind::Array(_)) {
+                return super::tensor_index::check_tensor_bracket_slot_list_index(
+                    self, obj_ty, elem, shape, index,
+                );
+            }
         }
         let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
             Some(ty) => ty,
