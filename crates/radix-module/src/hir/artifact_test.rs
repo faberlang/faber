@@ -570,6 +570,31 @@ fn insere_local_static_loads() {
 }
 
 #[test]
+fn serve_typed_round_trips() {
+    // `ad/serve-typed.fab` authors `channel<O, R>` (`sermo<O, R>`) bindings.
+    // The conversation type is a builtin named constructor whose finalized
+    // witness is the bare carrier, so both authored heads and witnesses must
+    // survive the artifact round trip.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/ad/serve-typed.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("serve-typed fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("serve-typed fixture analyzes");
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize serve-typed artifact");
+    load_fhir(&bytes).expect("serve-typed artifact must load");
+}
+
+#[test]
 fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
     // `octeti` is authored as a zero-argument primitive spelling, but its
     // finalized semantic witness is the byte-list array type. The FHIR

@@ -217,6 +217,49 @@ fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
 }
 
 #[test]
+fn sermo_authored_head_is_named() {
+    // The conversation word is a builtin authored head: `sermo<O, R>` names
+    // the frame definition, and finalize erases the applied witness to the
+    // bare carrier `sermo`, so the recorded form keeps no child arguments.
+    let source = concat!(
+        "@ call 'salutatio:greeting'\n",
+        "fn greeting() → string {\n",
+        "    return \"salve\"\n",
+        "}\n",
+        "\n",
+        "main {\n",
+        "    let channel<none, string> g ← call 'salutatio:greeting'\n",
+        "}\n",
+    );
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("installed en pack should load"),
+    );
+    let fixture = crate::test_support::analyze_source_with_config(source, config);
+    assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
+
+    let sermo_def = crate::builtins::frame_types::sermo_def_id(&fixture.result.resolver)
+        .expect("sermo builtin is registered");
+    let (form, local_ty) = first_declared_form(&fixture, "g");
+    let HirTypeFormHead::Named { def_id, path } = &form.head else {
+        panic!("expected named head, got {:?}", form.head);
+    };
+    assert_eq!(*def_id, sermo_def, "named head names the sermo definition");
+    assert!(!path.is_empty(), "named head keeps the authored spelling");
+    assert!(
+        form.args.is_empty(),
+        "the erased witness has no applied arguments, got {:?}",
+        form.args
+    );
+    assert_eq!(Some(form.ty), local_ty, "witness equals HIR type");
+    assert!(
+        matches!(fixture.result.types.get(form.ty), Type::Struct(def) if *def == sermo_def),
+        "finalized witness is the bare sermo carrier"
+    );
+}
+
+#[test]
 fn witness_canonicalization_survives_inference_solving() {
     let fixture = analyze_ok("functio probe() {\n    sit u32 bare ← 1\n}");
     let (form, local_ty) = first_declared_form(&fixture, "bare");
