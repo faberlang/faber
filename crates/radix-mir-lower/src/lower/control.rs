@@ -1320,11 +1320,11 @@ impl FunctionBuilder<'_> {
         );
         let boolean = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let accumulator_ty = match op {
-            Op::Sum if group.is_some() => match self.normalized_type(expr.ty?) {
+            Op::Sum | Op::Product if group.is_some() => match self.normalized_type(expr.ty?) {
                 Type::Tensor(element, _) => MirType::semantic(*element),
                 _ => return None,
             },
-            Op::Sum => result_ty,
+            Op::Sum | Op::Product => result_ty,
             Op::Count => integer,
             Op::All | Op::Any => boolean,
             _ => term_ty,

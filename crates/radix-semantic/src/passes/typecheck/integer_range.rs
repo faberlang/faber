@@ -1254,12 +1254,13 @@ impl TypeChecker<'_> {
         Some(self.join_range_type(joined, span))
     }
 
-    /// Type of a `summa` reduction over integer terms: the element count is
-    /// unbounded, so the sum sits at the 64-bit cap and keeps the term
-    /// range's sign (ruling 21). A `wrapping` or `saturating` word term sums
-    /// exactly like its width: the policy reduces or clamps only where the
-    /// total is stored into a slot, so the sum itself is a 64-bit-cap integer.
-    /// Other term types keep their own type.
+    /// Type of an integer total over reduction terms — a `summa` or a
+    /// `factum`: the element count is unbounded, so the total sits at the
+    /// 64-bit cap and keeps the term range's sign (ruling 21). A `wrapping`
+    /// or `saturating` word term totals exactly like its width: the policy
+    /// reduces or clamps only where the total is stored into a slot, so the
+    /// total itself is a 64-bit-cap integer. Non-integer terms keep their own
+    /// type.
     pub(super) fn summa_result_type(&mut self, elem: TypeId) -> TypeId {
         if self.current_device_function {
             return elem;
