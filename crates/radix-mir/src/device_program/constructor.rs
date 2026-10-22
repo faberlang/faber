@@ -20,7 +20,8 @@ use crate::abi::{
 use crate::device::{MirCompanionMap, MirDeviceFunctionMetadataMap};
 use crate::device_plan_compiler::LibraryOperation;
 use crate::device_program_plans::{
-    is_transformer_recipe_op, kernel_plan_for_function,
+    elementwise_subchain_signature_for_emission, is_transformer_recipe_op,
+    kernel_plan_for_function, subchain_has_runtime_shaped_buffer,
     subchain_signature_for_emission_with_source,
     transformer_subchain_signature_for_emission_with_source,
 };
@@ -1028,7 +1029,9 @@ impl<'a> KernelBuilder<'a> {
                     // variant — its signature dispatches through the P1 seam
                     // (the transformer-shaped recipe resources plus the
                     // subchain's data-flow inputs). Elementwise-only
-                    // subchains keep the full ABI synthesis. The SOURCE
+                    // subchains take the full ABI synthesis on a literal-dim
+                    // surface and the runtime-aware elementwise emission
+                    // signature on a run-time-shaped one. The SOURCE
                     // function rides both seam calls so cross-kernel
                     // unification sees one shape per local.
                     if let Some(op) = transformer_recipe_op(&synthetic) {
@@ -1046,21 +1049,42 @@ impl<'a> KernelBuilder<'a> {
                             }
                         })?
                     } else {
-                        // Elementwise-only subchain: the full-ABI synthesis.
+                        // Elementwise-only subchain: a literal-dim surface
+                        // takes the full-ABI synthesis. A run-time-shaped
+                        // surface cannot (the ABI sizes every buffer with
+                        // the literal-only device-view element count), so it
+                        // takes the runtime-aware elementwise emission
+                        // signature, which binds the
+                        // `RUNTIME_SHAPED_ELEMENT_COUNT` marker instead.
                         // The SOURCE function rides both seam calls so
                         // cross-kernel unification sees one shape per local.
-                        let mut signature =
-                            MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                        let mut signature = if subchain_has_runtime_shaped_buffer(
+                            &synthetic,
+                            &subchain.outputs,
+                            &subchain_validation,
+                        ) {
+                            elementwise_subchain_signature_for_emission(
                                 &synthetic,
                                 &subchain_validation,
-                                self.interner,
+                                &subchain.outputs,
                             )
                             .map_err(|error| {
                                 DeviceProgramBuildError::KernelAbi {
                                     function: function.id,
                                     detail: error.message,
                                 }
-                            })?;
+                            })?
+                        } else {
+                            MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                                &synthetic,
+                                &subchain_validation,
+                                self.interner,
+                            )
+                            .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                                function: function.id,
+                                detail: error.message,
+                            })?
+                        };
                         // A plain return carries no param identity, so the
                         // ABI leaves the output slot's source local unset —
                         // stamp the subchain's declared output local so the
