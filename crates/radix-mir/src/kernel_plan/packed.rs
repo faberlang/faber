@@ -14,7 +14,7 @@ use super::build::matmul_barrier_schedule;
 use super::plan::{
     CollectionKernelPlan, F32_ELEMENT_BYTE_WIDTH, GatherPlan, MATMUL_SHARED_A_BUFFER_NAME,
     MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulShapes, MatMulSharedMemory,
-    OobPaddingPolicy, QuantizedMatMulPlan, SharedMemoryLayout,
+    OobPaddingPolicy, PlanDim, QuantizedMatMulPlan, SharedMemoryLayout,
 };
 use crate::abi::PackedStorageLayout;
 use crate::{
@@ -207,9 +207,9 @@ pub fn admit_quantized_gather(
 ) -> AdmittedGather {
     match layout {
         PackedStorageLayout::F32 => AdmittedGather::Dense(GatherPlan {
-            table_rows,
-            table_cols,
-            id_count,
+            table_rows: PlanDim::Literal(table_rows),
+            table_cols: PlanDim::Literal(table_cols),
+            id_count: PlanDim::Literal(id_count),
         }),
         packed => AdmittedGather::Quantized(QuantizedGatherPlan {
             table_rows,

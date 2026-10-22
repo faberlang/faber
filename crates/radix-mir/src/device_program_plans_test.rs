@@ -3719,22 +3719,25 @@ fn gather_function_resolves_gather_plan() {
         panic!("gather body must derive a gather plan, got {derived:?}");
     };
     assert_eq!(
-        plan.table_rows, 960,
+        plan.table_rows,
+        crate::kernel_plan::PlanDim::Literal(960),
         "table rows V come from the operand dims"
     );
     assert_eq!(
-        plan.table_cols, 49_152,
+        plan.table_cols,
+        crate::kernel_plan::PlanDim::Literal(49_152),
         "table cols D come from the operand dims"
     );
     assert_eq!(
-        plan.id_count, 9,
+        plan.id_count,
+        crate::kernel_plan::PlanDim::Literal(9),
         "id count T comes from the return-type dims"
     );
     derived.validate().expect("the derived plan validates");
     let carried = CollectionKernelPlan::Gather(crate::kernel_plan::GatherPlan {
-        table_rows: 960,
-        table_cols: 49_152,
-        id_count: 9,
+        table_rows: crate::kernel_plan::PlanDim::Literal(960),
+        table_cols: crate::kernel_plan::PlanDim::Literal(49_152),
+        id_count: crate::kernel_plan::PlanDim::Literal(9),
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
@@ -3806,9 +3809,9 @@ fn inference_recipe_kinds_are_typed() {
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::Gather(
             crate::kernel_plan::GatherPlan {
-                table_rows: 960,
-                table_cols: 49_152,
-                id_count: 9,
+                table_rows: crate::kernel_plan::PlanDim::Literal(960),
+                table_cols: crate::kernel_plan::PlanDim::Literal(49_152),
+                id_count: crate::kernel_plan::PlanDim::Literal(9),
             }
         )),
         RecipeKind::Gather

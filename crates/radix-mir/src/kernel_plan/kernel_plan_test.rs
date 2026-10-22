@@ -2418,6 +2418,20 @@ fn admit_quantized_gather_resolves_packed_embedding_tables() {
 }
 
 #[test]
+fn gather_plan_dim_carries_runtime_extents() {
+    assert!(PlanDim::Runtime.is_runtime());
+    assert_eq!(PlanDim::Literal(7).literal(), Some(7));
+
+    let plan = CollectionKernelPlan::Gather(GatherPlan {
+        table_rows: PlanDim::Runtime,
+        table_cols: PlanDim::Literal(64),
+        id_count: PlanDim::Runtime,
+    });
+    plan.validate()
+        .expect("runtime gather extents are not zero dimensions");
+}
+
+#[test]
 fn from_contract_f32_quantized_matmul_falls_back_to_tiled() {
     use crate::abi::PackedStorageLayout;
     let signature = quantized_matmul_signature(8, 16, 16);
