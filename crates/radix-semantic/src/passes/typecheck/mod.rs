@@ -153,6 +153,9 @@ mod slot_lift_test;
 #[path = "target_import_store_test.rs"]
 mod target_import_store_test;
 #[cfg(test)]
+#[path = "target_import_structural_test.rs"]
+mod target_import_structural_test;
+#[cfg(test)]
 #[path = "target_import_test.rs"]
 mod target_import_test;
 mod tensor_edge_policy_generic;
