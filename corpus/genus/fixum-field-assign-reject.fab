@@ -1,0 +1,27 @@
++++
+term = "genus fixum field assignment"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "assignment", "place"]
+category = "type"
+canonical = false
+summary = "A `let` genus field cannot be assigned after its construction literal."
+syntax = "p.x ← 5"
+related = ["genus", "let"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM020:assignment_to_fixum_field"
++++
+# =============================================================================
+# genus fixum field assignment — set once in construction
+# =============================================================================
+# A `let` field is initialized by the construction literal. Even when the
+# containing genus binding is writable, that field cannot be assigned again.
+
+class Point {
+    let int x
+}
+
+main {
+    mut Point p ← Point { x = 1 }
+    p.x ← 5
+}
