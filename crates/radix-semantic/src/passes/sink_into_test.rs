@@ -7,8 +7,9 @@
 //!
 //! - R3 the item is exactly the sink's `T`, with no implicit conversion
 //! - R5 the statement has no value: it cannot initialize or assign a binding
-//! - R8 the left operand conforms to the sinking contract; tensors, vectors,
-//!   matrices and lists are not sinks (`⇇` stays the tensor write)
+//! - R8 the left operand conforms to the sinking contract; lists, bounded lists
+//!   and sets sink their elements, while tensors/vectors/matrices are not sinks
+//!   (`⇇` stays the tensor write)
 //!
 //! Rules 6 (the access rules) and 7 (no chains) live with their own units.
 
@@ -181,16 +182,46 @@ main {}"#,
 }
 
 #[test]
-fn rule8_a_list_receiver_is_not_a_sink() {
+fn rule8_a_list_receiver_sinks_its_element() {
+    assert_accepts(&with_sinking(
+        r#"fn write(mut list<string> xs) → void {
+    xs ⇜ "x"
+}
+main {}"#,
+    ));
+}
+
+#[test]
+fn rule8_a_set_receiver_sinks_its_element() {
+    assert_accepts(&with_sinking(
+        r#"fn write(mut set<string> xs) → void {
+    xs ⇜ "x"
+}
+main {}"#,
+    ));
+}
+
+#[test]
+fn rule8_a_bounded_list_receiver_sinks_its_element() {
+    assert_accepts(&with_sinking(
+        r#"fn write(mut list<string, 4> xs) → void {
+    xs ⇜ "x"
+}
+main {}"#,
+    ));
+}
+
+#[test]
+fn rule8_a_list_receiver_rejects_a_wider_item() {
     assert_rejects(
         &with_sinking(
-            r"fn write(mut list<string> xs) → void {
+            r#"fn write(mut list<string> xs) → void {
     xs ⇜ 1
 }
-main {}",
+main {}"#,
         ),
-        SemanticErrorKind::OperandTypesInvalid,
-        "sink_into_receiver_not_sink",
+        SemanticErrorKind::TypeMismatch,
+        "sink_into_item_type_mismatch",
     );
 }
 
