@@ -3,7 +3,13 @@
 
 use super::convert::{MemberTest, Num, Seq, member_tests, numeric_conversion, sequence_conversion};
 use super::rep_of;
-use radix_mir::MirType;
+use crate::{StructMeta, emit_program};
+use radix_lexer::{Interner, Span};
+use radix_mir::{
+    MirBlock, MirBlockId, MirConstant, MirConversion, MirConversionFlavor, MirFunction,
+    MirFunctionId, MirIntrinsic, MirLocal, MirLocalId, MirOperand, MirPlace, MirProgram,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
+};
 use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId, TypeTable};
 
 struct Fixture {
@@ -333,4 +339,95 @@ fn open_data_and_unbounded_integers_convert_by_tag_and_range() {
     // A 64-bit unsigned cell reaches beyond the carrier.
     assert!(!f.supported(inf, u64_));
     assert!(!f.supported(valor, u64_));
+}
+
+fn ty(types: &TypeTable, primitive: Primitive) -> MirType {
+    MirType::semantic(types.primitive(primitive))
+}
+
+/// A bare `<textus> ↦ bool` parses the code locale's words; it is not a
+/// non-empty length test.
+#[test]
+fn text_bivalens_lowers_to_the_word_parse_row() {
+    let types = TypeTable::new();
+    let text = ty(&types, Primitive::Textus);
+    let boolean = ty(&types, Primitive::Bivalens);
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let mut interner = Interner::new();
+    let word = interner.intern("true");
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: vec![MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: boolean,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(0))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Convert(MirConversion {
+                                store: None,
+                                flavor: MirConversionFlavor::Runtime,
+                                source_ty: text,
+                                target_ty: boolean,
+                                params: Vec::new(),
+                                // The `⊥` default keeps the raise path out of the
+                                // object; that path names the text length for its trap.
+                                recovery: Some(MirOperand::Constant(MirConstant::Bool(false))),
+                                struct_defaults: Vec::new(),
+                            }),
+                            args: vec![MirOperand::Constant(MirConstant::String(word))],
+                            return_ty: boolean,
+                        },
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let object = emit_program(
+        &program,
+        &types,
+        &interner,
+        Some(MirFunctionId(0)),
+        ["true", "false", "none", "tuple"].map(str::to_owned),
+        &StructMeta::default(),
+    )
+    .expect("the text-to-bivalens conversion lowers");
+
+    let names = |name: &str| {
+        object
+            .bytes
+            .windows(name.len())
+            .any(|window| window == name.as_bytes())
+    };
+    assert!(
+        names("__faber_clif_v1_text_parse_bool"),
+        "the object names the word parse"
+    );
+    assert!(
+        !names("__faber_clif_v1_text_len"),
+        "the object does not test the text length"
+    );
 }
