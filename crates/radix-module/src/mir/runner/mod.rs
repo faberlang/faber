@@ -144,12 +144,22 @@ pub fn run_analyzed_with_kernel_lowering<H: Host + ?Sized>(
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
     let options = crate::mir::MirLoweringOptions { kernel_lowering, ..Default::default() };
+    #[cfg(feature = "device")]
+    let bundle = crate::driver::prepare_air_backward_bundle(unit)
+        .map_err(|error| vec![RunnerError::internal(error.span.unwrap_or_default(), error.message)])?;
     let lowered = lower_analyzed_unit(unit.application_view(), options).map_err(|errors| {
         errors
             .into_iter()
             .map(|error| RunnerError::internal(error.span, error.message))
             .collect::<Vec<_>>()
     })?;
+    #[cfg(feature = "device")]
+    let lowered = if let Some(bundle) = bundle {
+        crate::driver::apply_air_backward_bundle(lowered, bundle, unit, false)
+            .map_err(|error| vec![RunnerError::internal(error.span.unwrap_or_default(), error.message)])?
+    } else {
+        lowered
+    };
     let policy = match kernel_lowering {
         KernelLowering::Device => RunnerKernelPolicy::Refuse,
         KernelLowering::Host => RunnerKernelPolicy::Execute,
