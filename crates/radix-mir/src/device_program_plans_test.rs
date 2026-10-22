@@ -5150,6 +5150,65 @@ fn matmul_runtime_tensor_extent_resources_literal_output_when_only_k_is_runtime(
     assert_eq!(signature.output.element_count, 20);
 }
 
+/// The run-time matmul output count comes from the checked dims reader on the
+/// DECLARED result: a zero literal axis is a refusal (never the runtime
+/// marker), an overflowing literal product is a refusal (never a saturated
+/// count), and a run-time result axis stays the runtime marker.
+#[test]
+fn matmul_runtime_output_count_uses_the_checked_reader() {
+    use crate::tensor_type::{DIM_PRODUCT_OVERFLOW_MESSAGE, ZERO_LITERAL_DIM_MESSAGE};
+
+    // a [?0, ?1] x b [?1, 5] -> o [?0, 0]: a zero literal result axis.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Ok(5)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(0)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("run-time matmul resolves")
+        .expect("run-time matmul has a contract");
+    let error = contract_shape_signature(&function, &contract, &validation)
+        .expect_err("a zero literal result axis is refused");
+    assert_eq!(error.message, ZERO_LITERAL_DIM_MESSAGE);
+
+    // a [2^32, ?1] x b [?1, 2^32] -> o [2^32, 2^32]: the literal product
+    // leaves u64, so the count is refused instead of saturated.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = rank2_tensor_ty_mixed(&mut types, [Ok(4_294_967_296), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Ok(4_294_967_296)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Ok(4_294_967_296), Ok(4_294_967_296)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("run-time matmul resolves")
+        .expect("run-time matmul has a contract");
+    let error = contract_shape_signature(&function, &contract, &validation)
+        .expect_err("an overflowing literal result count is refused");
+    assert_eq!(error.message, DIM_PRODUCT_OVERFLOW_MESSAGE);
+
+    // a [?0, ?1] x b [?1, 33] -> o [?0, 33]: a run-time result axis is the
+    // runtime marker, not a literal count.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Ok(33)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(33)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("run-time matmul resolves")
+        .expect("run-time matmul has a contract");
+    let signature = contract_shape_signature(&function, &contract, &validation)
+        .expect("run-time matmul signature resolves");
+    assert_eq!(
+        signature.output.element_count,
+        crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+}
+
 #[test]
 fn matmul_contract_mixed_dims_with_equal_literal_inner_is_runtime() {
     let mut types = TypeTable::new();
