@@ -1,0 +1,34 @@
++++
+term = "scriptum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "scriptum_expr", "call_expr", "call_suffix", "call_type_args", "call_type_arg", "argument_list", "argument", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "Template application carries no explicit type arguments after the literal."
+syntax = "\"§\"<string>(\"x\")"
+related = ["scriptum", "named-holes", "forma"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:template_type_args"
++++
+# =============================================================================
+# scriptum — type arguments on a template application
+# =============================================================================
+#
+# What this teaches:
+#   • A string-template application is not a generic call: a turbofish between
+#     the literal and its argument list is parsed and then refused in lowering.
+#
+# Common mistakes:
+#   • Annotating the result through `<string>` instead of writing the type slot
+#     on the binding (`let string s ← "§"("x")`).
+#
+# See also: scriptum, named-holes, forma
+#
+# This exemplum intentionally fails to compile.
+# =============================================================================
+
+main {
+    let string s ← "§"<string>("x")
+    print s
+}
