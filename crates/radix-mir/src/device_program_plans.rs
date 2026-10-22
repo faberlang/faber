@@ -2970,29 +2970,17 @@ pub fn contract_shape_signature(
             // grid comes from the call-site shapes at launch, so
             // `dispatch_size` is left untouched.
             let (left_ty, right_ty) = matmul_operand_tys(function)?;
+            let return_ty = matmul_return_ty(function)?;
             let element_ty = tensor_element_ty(left_ty, validation)?;
             let left_dims = crate::tensor_type::tensor_dims(left_ty, validation)
                 .map_err(PlanMappingError::mapping)?;
             let right_dims = crate::tensor_type::tensor_dims(right_ty, validation)
                 .map_err(PlanMappingError::mapping)?;
-            let runtime = |dim: Option<&crate::tensor_type::Dim>| {
-                matches!(dim, Some(crate::tensor_type::Dim::Runtime))
-            };
-            // Output is [M, N] (N = 1 for a rank-1 right operand): runtime
-            // when M or N is, literal M*N otherwise (only K is runtime).
-            let output_count = match (left_dims.first(), right_dims.get(1)) {
-                (
-                    Some(crate::tensor_type::Dim::Literal(m)),
-                    Some(crate::tensor_type::Dim::Literal(n)),
-                ) => m.saturating_mul(*n),
-                (Some(crate::tensor_type::Dim::Literal(m)), None) => *m,
-                (m, n) if runtime(m) || runtime(n) => crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT,
-                _ => {
-                    return Err(PlanMappingError::mapping(
-                        "matmul with run-time extents requires rank-2 left and rank-1 or rank-2 right tensors",
-                    ));
-                }
-            };
+            // Output is the DECLARED result [M, N]: the checked dims reader
+            // binds a run-time axis as the runtime marker, and refuses a zero
+            // literal axis or an overflowing literal product instead of
+            // storing a saturated count. The contract resolver already
+            // enforces rank-2 left / rank-1-or-2 right.
             signature.input = storage_input(
                 0,
                 element_ty,
@@ -3003,7 +2991,11 @@ pub fn contract_shape_signature(
                 element_ty,
                 device_view_element_count_or_runtime(right_ty, validation)?,
             ));
-            signature.output = storage_output(2, element_ty, output_count);
+            signature.output = storage_output(
+                2,
+                element_ty,
+                device_view_element_count_or_runtime(return_ty, validation)?,
+            );
             signature.output.source_local =
                 recipe_destination_local_for(function, MirCollectionOp::TensorMatMul);
             signature.workgroup = MirWorkgroupSize {
@@ -4396,6 +4388,20 @@ fn matmul_operand_tys(function: &MirFunction) -> Result<(MirType, MirType), Plan
     let right_ty = crate::local_ty::operand_ty(function, &call.args[1])
         .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
     Ok((left_ty, right_ty))
+}
+
+/// The declared result type of the body's `TensorMatMul` statement — the
+/// `MirRuntimeCall.return_ty` the checked dims reader sizes the output buffer
+/// from, so a zero literal axis or an overflowing literal product in the
+/// result is a refusal rather than a saturated count.
+fn matmul_return_ty(function: &MirFunction) -> Result<MirType, PlanMappingError> {
+    let Some((call, _)) = first_collection_call(function, |op| op == MirCollectionOp::TensorMatMul)
+    else {
+        return Err(PlanMappingError::mapping(
+            "matmul subchain has no TensorMatMul statement",
+        ));
+    };
+    Ok(call.return_ty)
 }
 
 #[cfg(test)]
