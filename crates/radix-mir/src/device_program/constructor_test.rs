@@ -79,6 +79,22 @@ fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
     MirType::semantic(types.intern(Type::Tensor(f32_id, shape)))
 }
 
+/// A rank-2 `f32` tensor whose axes are bound at run time: each entry is the
+/// scalar-parameter id of a `RuntimeExtentId::ScalarParameter` extent.
+fn rank2_tensor_ty_runtime(types: &mut TypeTable, dims: [u32; 2]) -> MirType {
+    let f32_id = f32(types).semantic_id();
+    let dim_ids = dims
+        .iter()
+        .map(|&parameter| {
+            types.intern_index(IndexExpr::Runtime(
+                radix_types::RuntimeExtentId::ScalarParameter { parameter },
+            ))
+        })
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32_id, shape)))
+}
+
 fn span() -> Span {
     Span::default()
 }
@@ -665,6 +681,124 @@ fn constructor_decomposes_multi_recipe_body_into_subchain_kernels() {
             .iter()
             .any(|&(binding, count)| binding == 1 && count == 4),
         "the primary output binds at 1 with the [2,2] count: {element_counts:?}"
+    );
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the decomposed program passes the shared semantic gate");
+}
+
+/// A runtime-shaped elementwise tail: two matmuls (`m = a · b`, `n = a · c`)
+/// write run-time-shaped locals, and the elementwise join `out = m + n`
+/// writes the run-time-shaped mut out param. The whole-function ABI refuses
+/// the run-time dims, so the body decomposes at the recipe boundaries; the
+/// join subchain is elementwise-only and must take the runtime-aware
+/// elementwise emission signature instead of the literal-only ABI synthesis
+/// (which cannot size a run-time-shaped buffer).
+#[test]
+fn constructor_decomposes_a_runtime_shaped_elementwise_tail() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+    use crate::kernel_plan::MatMulDims;
+
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    // The run-time-extent ABI binds each consumed axis as a `u32` extent
+    // resource, so the fixture's type table carries that width.
+    let _extent = u32_ty(&mut types);
+    let a = rank2_tensor_ty_runtime(&mut types, [0, 1]);
+    let b = rank2_tensor_ty_runtime(&mut types, [1, 2]);
+    let out = rank2_tensor_ty_runtime(&mut types, [0, 2]);
+    let mut function = device_function(
+        1,
+        &mut interner,
+        "mlp",
+        &[
+            (0, "a", a),
+            (1, "b", b),
+            (2, "c", b),
+            (3, "out", out),
+            (4, "m", out),
+            (5, "n", out),
+        ],
+        &[0, 1, 2, 3],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 4, out),
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 2], 5, out),
+            collection_statement(MirCollectionOp::TensorAdd, &[4, 5], 3, out),
+        ],
+        Some(MirOperand::Place(MirPlace::local(MirLocalId(3)))),
+        Vec::new(),
+        out,
+        true,
+    );
+    // `out` is the written destination (the MLP's mut out param).
+    function.params[3].mode = MirParamMode::MutRef;
+    let validated = validated(&types, vec![function]);
+
+    let (program, semantics, _) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("the runtime-shaped tail decomposes instead of failing closed");
+
+    assert_eq!(
+        program.kernels.len(),
+        3,
+        "two matmul subchain kernels plus the elementwise tail: {:?}",
+        program
+            .kernels
+            .iter()
+            .map(|kernel| (kernel.entry.as_str(), kernel.plan.clone()))
+            .collect::<Vec<_>>()
+    );
+    let matmul_kernel = program
+        .kernels
+        .iter()
+        .find(|kernel| matches!(kernel.plan, CollectionKernelPlan::TiledMatMul(_)))
+        .expect("the matmul subchain kernel exists");
+    let CollectionKernelPlan::TiledMatMul(plan) = &matmul_kernel.plan else {
+        panic!("the matmul subchain carries the tiled matmul plan");
+    };
+    assert!(
+        matches!(plan.dims, MatMulDims::Runtime { .. }),
+        "the run-time dims survive into the matmul plan: {:?}",
+        plan.dims
+    );
+    assert!(
+        matmul_kernel
+            .resources
+            .iter()
+            .any(|resource| resource.version.element_count == RUNTIME_SHAPED_ELEMENT_COUNT),
+        "the matmul resources carry the runtime marker"
+    );
+
+    let tail = program
+        .kernels
+        .iter()
+        .find(|kernel| kernel.entry == "k1__2")
+        .expect("the elementwise tail subchain kernel exists");
+    assert_eq!(tail.plan, CollectionKernelPlan::Elementwise);
+    assert!(
+        !tail.resources.is_empty()
+            && tail
+                .resources
+                .iter()
+                .all(|resource| resource.version.element_count == RUNTIME_SHAPED_ELEMENT_COUNT),
+        "every tail resource binds the runtime marker: {:?}",
+        tail.resources
+            .iter()
+            .map(|resource| resource.version.element_count)
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        tail.resources
+            .iter()
+            .all(|resource| resource.version.shape.is_none()),
+        "a run-time-shaped buffer carries no literal shape"
     );
     program
         .validate_with_semantics(&semantics)
