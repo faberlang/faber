@@ -1135,11 +1135,17 @@ impl FunctionLower<'_, '_> {
                 )
             }
             (Num::Text, Num::Bool) => {
-                let length = self
-                    .call_runtime(&abi::TEXT_LEN, &[value])?
-                    .ok_or_else(|| Decline::new("text length result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                (self.builder.ins().icmp(IntCC::NotEqual, length, zero), None)
+                let parsed = self
+                    .call_runtime(&abi::TEXT_PARSE_BOOL, &[value])?
+                    .ok_or_else(|| Decline::new("text parse result"))?;
+                let zero = self.builder.ins().iconst(types::I8, 0);
+                (
+                    self.builder.ins().icmp(IntCC::NotEqual, parsed, zero),
+                    Some((
+                        self.builder.ins().icmp(IntCC::SignedLessThan, parsed, zero),
+                        Failure::Static("text to bivalens conversion failed"),
+                    )),
+                )
             }
             (Num::Int(_), Num::Bits(width)) => (self.mask_pattern(value, width), None),
             (Num::Bits(width), Num::Int(to)) => {

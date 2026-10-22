@@ -1496,6 +1496,29 @@ pub unsafe extern "C" fn __faber_clif_v1_text_len(handle: *const u8) -> i64 {
     i64::try_from(count).unwrap_or(i64::MAX)
 }
 
+/// Parse a text as a boolean: 1 for the true word, 0 for the false word, -1
+/// for any other text.
+///
+/// The match is exact against the program's installed display words
+/// ([`tokens`]), not truthiness (operator ruling 2026-10-15), and this row
+/// never aborts: the caller raises the conversion fault or applies its `⊥`.
+///
+/// # Safety
+///
+/// `handle` addresses a well-formed text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_text_parse_bool(handle: *const u8) -> i8 {
+    let text = text_str(unsafe { text_bytes(handle) });
+    let words = tokens();
+    if text == words.true_.as_str() {
+        1
+    } else if text == words.false_.as_str() {
+        0
+    } else {
+        -1
+    }
+}
+
 /// The character at `index`; an index out of range ends the run.
 ///
 /// # Safety
@@ -2827,5 +2850,24 @@ mod runtime_perf_tests {
         let other_set = unsafe { __faber_clif_v1_list_to_set(ordered_other) };
         assert_eq!(unsafe { __faber_clif_v1_set_subset(set, other_set, 0) }, 1);
         assert_eq!(unsafe { __faber_clif_v1_set_subset(other_set, set, 0) }, 1);
+    }
+}
+
+#[cfg(test)]
+mod text_convert_tests {
+    use super::*;
+
+    #[test]
+    fn text_parse_bool_returns_one_zero_and_minus_one() {
+        // The installed words, not the Latin defaults: an installed token set
+        // must not make this test flaky.
+        let words = tokens();
+        let yes = text_new(words.true_.as_bytes());
+        let no = text_new(words.false_.as_bytes());
+        let unknown = text_new(b"neither word");
+
+        assert_eq!(unsafe { __faber_clif_v1_text_parse_bool(yes) }, 1);
+        assert_eq!(unsafe { __faber_clif_v1_text_parse_bool(no) }, 0);
+        assert_eq!(unsafe { __faber_clif_v1_text_parse_bool(unknown) }, -1);
     }
 }
