@@ -774,6 +774,10 @@ mod namespace_type_arg_link_tests;
 mod imported_failable_call_tests;
 
 #[cfg(test)]
+#[path = "imported_optional_default_test.rs"]
+mod imported_optional_default_tests;
+
+#[cfg(test)]
 #[path = "generic_size_forwarding_test.rs"]
 mod generic_size_forwarding_tests;
 
