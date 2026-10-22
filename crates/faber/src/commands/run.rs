@@ -831,3 +831,7 @@ mod tests;
 #[cfg(all(test, feature = "device-runtime", target_os = "macos"))]
 #[path = "run_device_test.rs"]
 mod run_device_tests;
+
+#[cfg(all(test, feature = "device-runtime", target_os = "macos"))]
+#[path = "run_device_hw_test.rs"]
+mod run_device_hw_tests;
