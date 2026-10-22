@@ -459,6 +459,13 @@ pub const TEXT_LEN: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr],
     ret: Some(I64),
 };
+/// Parse a text as a boolean by exact word match against the program's
+/// display words: 1 true word, 0 false word, -1 any other text.
+pub const TEXT_PARSE_BOOL: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_text_parse_bool",
+    params: &[Ptr],
+    ret: Some(I8),
+};
 /// Abort with a text message (`abort: <message>` on stderr, exit 1). Never
 /// returns.
 pub const ABORT_TEXT: RuntimeSymbol = RuntimeSymbol {
@@ -977,6 +984,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     TEXT_EQ,
     TEXT_CMP,
     TEXT_LEN,
+    TEXT_PARSE_BOOL,
     TEXT_INDEX,
     ABORT_TEXT,
     TRAP,
