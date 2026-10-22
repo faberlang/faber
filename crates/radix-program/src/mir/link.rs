@@ -345,6 +345,7 @@ struct PackageMirLinkAccumulator {
     data_members: Vec<DataMemberLink>,
     namespaces: NamespaceExports,
     source_rewrites: SourceRewrites,
+    imported_function_params: HashMap<DefId, ImportedFunctionParams>,
     next_synthetic: u32,
     diagnostics: Vec<Diagnostic>,
     libraries: Vec<LibraryLinkTarget>,
@@ -363,6 +364,7 @@ impl Default for PackageMirLinkAccumulator {
             data_members: Vec::new(),
             namespaces: HashMap::new(),
             source_rewrites: HashMap::new(),
+            imported_function_params: HashMap::new(),
             next_synthetic: PACKAGE_MIR_SYNTHETIC_DEF_BASE,
             diagnostics: Vec::new(),
             libraries: Vec::new(),
@@ -421,6 +423,7 @@ pub(super) fn local_namespace_call_targets(
         data_members: links.data_members,
         namespaces: links.namespaces,
         sources: links.source_rewrites,
+        imported_function_params: links.imported_function_params,
         next_synthetic: links.next_synthetic,
         libraries: links.libraries,
         method_targets: links.method_targets,
@@ -672,6 +675,13 @@ fn link_sibling_import_item(
                 links.next_synthetic += 1;
                 def_id
             });
+        links
+            .imported_function_params
+            .entry(synthetic)
+            .or_insert_with(|| ImportedFunctionParams {
+                source_path: sibling.path.clone(),
+                params: function.params.clone(),
+            });
         if let Some(contract) =
             sibling
                 .file_interface
@@ -779,6 +789,13 @@ fn link_library_import_site(
                     links.next_synthetic += 1;
                     def_id
                 });
+            links
+                .imported_function_params
+                .entry(synthetic)
+                .or_insert_with(|| ImportedFunctionParams {
+                    source_path: library_path.clone(),
+                    params: function.params.clone(),
+                });
             if let Some(contract) =
                 interface
                     .exports
@@ -853,6 +870,14 @@ fn collect_library_functions(
             Some(TopLevelFunction {
                 name: analysis.interner.resolve(function.name).to_owned(),
                 def_id: item.def_id,
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| ImportedParamMeta {
+                        optional: param.optional,
+                        default: param.default.clone(),
+                    })
+                    .collect(),
             })
         })
         .collect::<Vec<_>>();
@@ -880,6 +905,7 @@ fn collect_library_functions(
         functions.push(TopLevelFunction {
             name,
             def_id: backward.companion_def_id,
+            params: Vec::new(),
         });
     }
     functions
@@ -1219,6 +1245,7 @@ pub(super) fn push_companion_unresolved(
 pub(super) struct TopLevelFunction {
     name: String,
     def_id: DefId,
+    params: Vec<ImportedParamMeta>,
 }
 
 pub(super) fn top_level_functions(unit: &AnalyzedProgramNode) -> Vec<TopLevelFunction> {
@@ -1234,9 +1261,29 @@ pub(super) fn top_level_functions(unit: &AnalyzedProgramNode) -> Vec<TopLevelFun
             Some(TopLevelFunction {
                 name,
                 def_id: item.def_id,
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| ImportedParamMeta {
+                        optional: param.optional,
+                        default: param.default.clone(),
+                    })
+                    .collect(),
             })
         })
         .collect()
+}
+
+#[derive(Clone)]
+pub(super) struct ImportedParamMeta {
+    pub optional: bool,
+    pub default: Option<HirExpression>,
+}
+
+#[derive(Clone)]
+pub(super) struct ImportedFunctionParams {
+    pub source_path: PathBuf,
+    pub params: Vec<ImportedParamMeta>,
 }
 
 pub(super) struct TopLevelConst {
