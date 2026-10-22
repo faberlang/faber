@@ -146,11 +146,18 @@ fn api_emit_failure_judges_a_rejects_row_on_diagnostic_identity() {
     let diagnostic = radix::Diagnostic::error("unknown library module `norma:nonexistent`")
         .with_code("PKG001")
         .with_arg("issue", "unknown_library_module");
+    assert_eq!(diagnostic.code, Some("PKG001"));
+    assert_eq!(diagnostic.issue(), Some("unknown_library_module"));
     let summary = super::emit_diagnostic_summary(&diagnostic);
-    assert!(
-        summary.contains("PKG001:unknown_library_module"),
-        "{summary}"
+    let expected_summary = format!(
+        "{}: {}",
+        diagnostic
+            .lookup_key()
+            .as_deref()
+            .expect("diagnostic lookup key"),
+        diagnostic.message
     );
+    assert_eq!(summary, expected_summary);
 
     // `load_case` rewrites Rejects to KnownFail and sets the flag.
     let mut rejects = case(Outcome::KnownFail, Some("emit"));
@@ -175,12 +182,18 @@ fn emit_diagnostic_summary_reports_code_and_issue() {
     let coded = radix::Diagnostic::error("unknown library module `norma:nonexistent`")
         .with_code("PKG001")
         .with_arg("issue", "unknown_library_module");
+    assert_eq!(coded.code, Some("PKG001"));
+    assert_eq!(coded.issue(), Some("unknown_library_module"));
     let summary = super::emit_diagnostic_summary(&coded);
-    assert!(
-        summary.contains("PKG001:unknown_library_module"),
-        "{summary}"
+    let expected_summary = format!(
+        "{}: {}",
+        coded
+            .lookup_key()
+            .as_deref()
+            .expect("diagnostic lookup key"),
+        coded.message
     );
-    assert!(summary.contains("unknown library module"), "{summary}");
+    assert_eq!(summary, expected_summary);
 
     let code_only = radix::Diagnostic::error("message").with_code("TYP001");
     assert_eq!(
