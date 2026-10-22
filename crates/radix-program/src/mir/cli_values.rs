@@ -30,6 +30,7 @@ pub(super) fn plan_cli_command_records(
         &operands,
         &parsed.positionals,
         diagnostics,
+        MissingOperandPolicy::Reject,
     )?);
     let Some(_args_binding) = &command.args_binding else {
         if !fields.is_empty() {
@@ -54,11 +55,24 @@ pub(super) fn plan_cli_command_records(
     Some(Some(HashMap::from([(record_ty, fields)])))
 }
 
+/// How [`cli_operand_record_fields`] handles an operand that has neither a
+/// parsed argument nor a `vel` default.
+#[derive(Clone, Copy)]
+pub(super) enum MissingOperandPolicy {
+    /// Argumenta are being parsed: a missing required operand refuses the
+    /// surface with `package_mir_cli_surface_unsupported`.
+    Reject,
+    /// `faber check --lower` has no argv, so a typed placeholder stands in for
+    /// the value the runner will supply.
+    Check,
+}
+
 pub(super) fn cli_operand_record_fields(
     unit: &mut AnalyzedProgramNode,
     operands: &[PlannedCliOperand<'_>],
     argumenta: &[String],
     diagnostics: &mut Vec<Diagnostic>,
+    missing: MissingOperandPolicy,
 ) -> Option<Vec<MirRuntimeRecordField>> {
     let mut index = 0;
     let mut fields = Vec::new();
@@ -86,6 +100,8 @@ pub(super) fn cli_operand_record_fields(
                 default,
                 diagnostics,
             )?)
+        } else if matches!(missing, MissingOperandPolicy::Check) {
+            cli_operand_placeholder_record_value(unit, operand)?
         } else {
             push_cli_operand_missing_diagnostic(unit, operand, diagnostics);
             return None;
@@ -107,6 +123,49 @@ pub(super) fn cli_operand_record_fields(
 
 pub(super) fn cli_operand_consumes_many(operand: &CliOperand) -> bool {
     operand.rest || matches!(operand.ty, CliType::ListaTextus | CliType::ListaNumerus)
+}
+
+/// Typed stand-in for an operand whose argv value only exists at run time.
+///
+/// Mirrors the fmir-text runtime placeholders: a text-shaped scalar takes the
+/// `__fmir_runtime_arg__` sentinel, a numeric or boolean scalar takes its zero
+/// value, and a rest/list/`octeti` operand takes an empty array of its record
+/// type.
+pub(super) fn cli_operand_placeholder_record_value(
+    unit: &mut AnalyzedProgramNode,
+    operand: &PlannedCliOperand<'_>,
+) -> Option<MirRuntimeRecordValue> {
+    let list = if operand.operand.rest
+        || matches!(
+            operand.operand.ty,
+            CliType::ListaTextus | CliType::ListaNumerus | CliType::Octeti
+        ) {
+        cli_record_type(
+            &mut unit.analysis.types,
+            &operand.operand.ty,
+            operand.operand.rest,
+        )
+    } else {
+        None
+    };
+    if let Some(list_ty) = list {
+        return Some(MirRuntimeRecordValue::Array {
+            ty: MirType::semantic(list_ty),
+            items: Vec::new(),
+        });
+    }
+    let constant = match operand.operand.ty {
+        CliType::Textus | CliType::Ignotum => {
+            MirConstant::String(unit.analysis.interner.intern("__fmir_runtime_arg__"))
+        }
+        CliType::Numerus => MirConstant::Int(0),
+        CliType::Fractus => MirConstant::Float(0.0),
+        CliType::Bivalens => MirConstant::Bool(false),
+        CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus => return None,
+    };
+    Some(MirRuntimeRecordValue::Operand(MirOperand::Constant(
+        constant,
+    )))
 }
 
 pub(super) fn cli_operand_value(

@@ -8,13 +8,14 @@ use super::{
     CliRecordFieldsByType, CliRecordTypeRewrite, CliType, DefId, Diagnostic, FmirTextCliOperand,
     FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, HashMap, HirItemKind,
     HirStatementKind, IndexExpr, InterfaceLibraryIdentity, InterfaceNominalKind, Interner,
-    MirConstant, MirOperand, MirRuntimeRecordField, MirRuntimeRecordValue, MirType, ModuleId,
-    PlannedCliOperand, PlannedCliOption, Resolver, Symbol, SymbolKind, Type, TypeId, TypeTable,
-    cli_default_value, cli_operand_consumes_many, cli_operand_record_fields,
-    cli_option_is_nullable, cli_option_value, cli_record_type, command_has_unsupported_options,
-    command_in_unit, command_unit_id, has_unsupported_package_mir_operands,
-    is_package_mir_supported_option, matching_cli_command, package_mir_cli_exit_code,
-    plan_cli_command_records, push_cli_option_default_diagnostic, unsupported_cli_diagnostic,
+    MirConstant, MirOperand, MirRuntimeRecordField, MirRuntimeRecordValue, MirType,
+    MissingOperandPolicy, ModuleId, PlannedCliOperand, PlannedCliOption, Resolver, Symbol,
+    SymbolKind, Type, TypeId, TypeTable, cli_default_value, cli_operand_consumes_many,
+    cli_operand_record_fields, cli_option_is_nullable, cli_option_value, cli_record_type,
+    command_has_unsupported_options, command_in_unit, command_unit_id,
+    has_unsupported_package_mir_operands, is_package_mir_supported_option, matching_cli_command,
+    package_mir_cli_exit_code, plan_cli_command_records, push_cli_option_default_diagnostic,
+    unsupported_cli_diagnostic,
 };
 use radix_module::driver::AnalyzedModule;
 use radix_module::file_interface::{FileExportKind, FileInterface};
@@ -88,11 +89,16 @@ pub(super) fn plan_cli_package(
                     plan.entry_records.insert(entry_node.path.clone(), records);
                     plan.fmir_text_cli = Some(cli_section);
                 }
-            } else if let Some((records, exit_code)) =
-                plan_cli_root_entry(entry_node, &cli_program, argumenta, &mut diagnostics)
-            {
-                plan.exit_code = exit_code;
-                plan.entry_records.insert(entry_node.path.clone(), records);
+            } else {
+                let planned = if mode == CliPlanningMode::Check {
+                    plan_cli_root_entry_check(entry_node, &cli_program, &mut diagnostics)
+                } else {
+                    plan_cli_root_entry(entry_node, &cli_program, argumenta, &mut diagnostics)
+                };
+                if let Some((records, exit_code)) = planned {
+                    plan.exit_code = exit_code;
+                    plan.entry_records.insert(entry_node.path.clone(), records);
+                }
             }
         }
         CliMode::Subcommand => {
@@ -361,7 +367,82 @@ pub(super) fn plan_cli_root_entry(
         &operands,
         &parsed.positionals,
         diagnostics,
+        MissingOperandPolicy::Reject,
     )?);
+    finish_cli_root_entry(unit, cli_program, fields, diagnostics)
+}
+
+/// `faber check --lower` planning for a single-command root entry.
+///
+/// The argv is a runtime question, so this path keeps every surface rejection
+/// of [`plan_cli_root_entry`] but never parses arguments: options take their
+/// declared defaults and operands take their `vel` default or a typed
+/// placeholder for the value the runner will supply.
+pub(super) fn plan_cli_root_entry_check(
+    unit: &mut AnalyzedProgramNode,
+    cli_program: &CliProgram,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<(CliRecordFieldsByType, Option<i32>)> {
+    let diagnostic_count = diagnostics.len();
+    if !cli_program.commands.is_empty() {
+        diagnostics.push(unsupported_cli_diagnostic(
+            &unit.path,
+            "CLI subcommand dispatch",
+        ));
+    }
+    if cli_program
+        .global_options
+        .iter()
+        .chain(&cli_program.options)
+        .any(|option| !is_package_mir_supported_option(option))
+    {
+        diagnostics.push(unsupported_cli_diagnostic(
+            &unit.path,
+            "CLI options beyond root boolean flags and scalar values",
+        ));
+    }
+    let declared_operands = cli_program
+        .global_operands
+        .iter()
+        .chain(&cli_program.operands)
+        .collect::<Vec<_>>();
+    if has_unsupported_package_mir_operands(declared_operands.iter().copied()) {
+        diagnostics.push(unsupported_cli_diagnostic(
+            &unit.path,
+            "CLI operands beyond supported positional values",
+        ));
+    }
+    if diagnostics.len() != diagnostic_count {
+        return None;
+    }
+    let options = planned_cli_options(
+        &unit.analysis.interner,
+        cli_program
+            .global_options
+            .iter()
+            .chain(&cli_program.options),
+    );
+    let mut fields = options
+        .iter()
+        .map(|option| cli_option_default_field(unit, option, diagnostics))
+        .collect::<Option<Vec<_>>>()?;
+    let operands = planned_cli_operands(&unit.analysis.interner, declared_operands.into_iter());
+    fields.extend(cli_operand_record_fields(
+        unit,
+        &operands,
+        &[],
+        diagnostics,
+        MissingOperandPolicy::Check,
+    )?);
+    finish_cli_root_entry(unit, cli_program, fields, diagnostics)
+}
+
+fn finish_cli_root_entry(
+    unit: &mut AnalyzedProgramNode,
+    cli_program: &CliProgram,
+    fields: Vec<MirRuntimeRecordField>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<(CliRecordFieldsByType, Option<i32>)> {
     let args_name = unit.analysis.hir.entry_args_name;
     let Some(record_ty) = entry_cli_args_type(unit) else {
         if !fields.is_empty() {
@@ -663,6 +744,7 @@ pub(super) fn plan_cli_subcommand(
             &global_operands,
             &command_args[..global_operand_args_len],
             diagnostics,
+            MissingOperandPolicy::Reject,
         )?);
         if !entry_fields.is_empty() {
             entry_records
