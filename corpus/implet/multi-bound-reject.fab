@@ -1,0 +1,51 @@
++++
+term = "implet generic type arg bound"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "implendum_decl", "implendum_method_decl", "generic_params", "generic_param", "generic_bound", "contract_ref", "genus_decl", "genus_member", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "typed_constructor", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A type argument must satisfy every conjunct of an intersection bound."
+syntax = "both(OnlyA {}) — rejected when `T implements A ∩ B` requires a witness of both A and B"
+related = ["implet", "implendum", "generic"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:generic_type_arg_bound"
++++
+# =============================================================================
+# implet on an intersection bound — a type argument misses one conjunct
+# =============================================================================
+#
+# What this teaches:
+#   • `T implements A ∩ B` bounds a type parameter by the intersection of two
+#     contracts: every type argument must satisfy both conjuncts.
+#   • `OnlyA` witnesses `A` but not `B`, so the call `both(OnlyA {})` is the
+#     rejected form: the whole bound is checked at the call site and the type
+#     argument fails the `B` conjunct (`SEM011:generic_type_arg_bound`).
+#
+# DELIBERATE: the accepted spelling passes a type implementing both contracts,
+# as `corpus/implet/multi-bound.fab` does with `class C implements A, B`.
+#
+# See also: implet, implendum, generic
+# =============================================================================
+
+interface A {
+    fn a() → int
+}
+
+interface B {
+    fn b() → int
+}
+
+class OnlyA implements A {
+    fn a() → int {
+        return 1
+    }
+}
+
+fn both<T implements A ∩ B>(T x) → int {
+    return x.a() + x.b()
+}
+
+main {
+    print both(OnlyA {})
+}

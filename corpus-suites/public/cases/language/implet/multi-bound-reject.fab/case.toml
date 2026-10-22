@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/implet/multi-bound-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "implet/multi-bound-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "generic_type_arg_bound"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "generic_type_arg_bound"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "generic_type_arg_bound"
