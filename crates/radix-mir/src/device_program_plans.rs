@@ -12,9 +12,9 @@
 //! [`crate::kernel_decomposition::decompose_kernel_function`].
 
 use crate::abi::{
-    CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MirAbiError, MirKernelResource,
-    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
-    PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
+    CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MatMulDispatch, MirAbiError,
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
+    MirKernelSignature, PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
     device_view_element_count, device_view_element_count_or_runtime, storage_buffer_limit_error,
 };
 use crate::device_plan_compiler::LibraryOperation;
@@ -279,9 +279,15 @@ pub fn kernel_plan_for_function_with_limit(
     // recipe op; elementwise-only bodies resolve no contract. Matmul shapes
     // are resolved once from the body's matmul statement scan.
     let contract = collection_op_contract(function, validation)?;
-    // Run-time extents (`MatMulRuntime`) carry no literal shapes: the plan is
-    // built from the signature alone and the dims are read at launch.
-    let matmul_shapes = if matches!(contract, Some(CollectionOpContract::MatMulRuntime)) {
+    // Run-time extents (`MatMulDispatch::Runtime`) carry no literal shapes:
+    // the plan is built from the signature alone and the dims are read at
+    // launch.
+    let matmul_shapes = if matches!(
+        contract,
+        Some(CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime
+        })
+    ) {
         None
     } else {
         kernel_matmul_shapes(function, validation)?
@@ -2922,8 +2928,11 @@ pub fn contract_shape_signature(
             };
         }
         CollectionOpContract::MatMul {
-            dispatch_x,
-            dispatch_y,
+            dispatch:
+                MatMulDispatch::Literal {
+                    dispatch_x,
+                    dispatch_y,
+                },
         } => {
             let shapes = kernel_matmul_shapes(function, validation)?.ok_or_else(|| {
                 PlanMappingError::mapping("matmul subchain has no operand shapes")
@@ -2963,7 +2972,9 @@ pub fn contract_shape_signature(
                 z: 1,
             };
         }
-        CollectionOpContract::MatMulRuntime => {
+        CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        } => {
             // Run-time extents (design note item 4): operand and output
             // buffers are runtime-shaped; M, K and N travel as
             // `TensorAxisExtent` resources appended after the output. The
@@ -3683,7 +3694,7 @@ pub fn subchain_has_runtime_shaped_buffer(
 /// run-time-shaped intermediate is refused before emission. This builder is
 /// the runtime-aware path: the launch geometry (workgroup and dispatch) is a
 /// per-call fact for a runtime-shaped kernel — one thread-block of one lane,
-/// like the `MatMulRuntime` signature — never a literal extent product.
+/// like the `MatMulDispatch::Runtime` signature — never a literal extent product.
 ///
 /// # Errors
 /// Returns [`PlanMappingError`] when `outputs` is empty, or a param/local
@@ -4343,9 +4354,10 @@ pub fn resolve_subchain_plan(
         ))
     })?;
     let signature = contract_shape_signature(function, &contract, validation)?;
-    let shapes = if recipe_op == MirCollectionOp::TensorMatMul
-        && contract != CollectionOpContract::MatMulRuntime
-    {
+    let runtime_matmul = CollectionOpContract::MatMul {
+        dispatch: MatMulDispatch::Runtime,
+    };
+    let shapes = if recipe_op == MirCollectionOp::TensorMatMul && contract != runtime_matmul {
         kernel_matmul_shapes(function, validation)?
     } else {
         None
@@ -4385,8 +4397,8 @@ fn kernel_matmul_shapes(
         .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime))
     {
         // The contract resolver accepts rank-2 run-time extents
-        // (`MatMulRuntime`); `MatMulShapes` carries literal dims only, so no
-        // plan is built from them until the plan arm lands.
+        // (`MatMulDispatch::Runtime`); `MatMulShapes` carries literal dims
+        // only, so no plan is built from them until the plan arm lands.
         return Err(PlanMappingError::mapping(
             "matmul with run-time extents has no kernel plan yet",
         ));
