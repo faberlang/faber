@@ -368,6 +368,9 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], OptionInner, collection Index),
     intrinsic!(Lista, "addita", 1, &[IntrinsicParamKind::Inner], ArrayInner, collection AppendImmutable),
     intrinsic!(Lista, "appende", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
+    // The sinking contract's method form: `xs.sink(v)` is one
+    // identity with the `⇜` operator twin, and it lowers to the same append.
+    intrinsic!(Lista, "immerge", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
     // need: the `at` read (la `apud`). `c[i]` dies, `c.get(i)` is
     // `T ∪ none`, `c.at(i)` reports an out-of-range index / missing key on `⇥`
     // (default form `⊥`). The error payload is the runtime failure text, the
@@ -511,6 +514,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Tabula, "valores", 0, &[], ArrayValue, collection Values),
     // copia
     intrinsic!(Copia, "adde", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
+    intrinsic!(Copia, "immerge", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
     intrinsic!(Copia, "dele", 1, &[IntrinsicParamKind::Inner], Bool, collection Delete),
     intrinsic!(Copia, "differentia", 1, &[IntrinsicParamKind::SetInner], SetInner, collection Difference),
     intrinsic!(

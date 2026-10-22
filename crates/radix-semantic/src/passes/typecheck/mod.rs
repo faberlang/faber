@@ -1680,3 +1680,7 @@ mod pin_store_test;
 #[cfg(test)]
 #[path = "valor_map_key_test.rs"]
 mod valor_map_key_test;
+
+#[cfg(test)]
+#[path = "sink_method_test.rs"]
+mod sink_method_test;
