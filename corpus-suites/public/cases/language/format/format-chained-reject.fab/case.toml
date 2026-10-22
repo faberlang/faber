@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/format/format-chained-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "format/format-chained-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "format_chained"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "format_chained"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "format_chained"
