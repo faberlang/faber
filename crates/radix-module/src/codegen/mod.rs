@@ -825,6 +825,7 @@ fn generate_swift_from_analyzed(
 ) -> Result<crate::Output, CodegenError> {
     let mut r#gen = swift::SwiftCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
+    r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
     r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
     r#gen.set_output_mode(
         match output_mode {
