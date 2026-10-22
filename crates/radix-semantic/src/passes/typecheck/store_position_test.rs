@@ -9,8 +9,11 @@
 
 use super::test_support;
 use crate::types::Type;
+use crate::{NumericWidth, Primitive};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
-use radix_hir::{HirConversioTarget, HirExpression, HirExpressionKind, HirStoreKind, HirStoreSite};
+use radix_hir::{
+    HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirStoreKind, HirStoreSite,
+};
 use radix_types::TypeId;
 
 /// One implicit store node found in the analyzed HIR.
@@ -22,10 +25,14 @@ struct Store {
 #[derive(Default)]
 struct Collector {
     stores: Vec<Store>,
+    binary_ops: Vec<(HirBinOp, Option<TypeId>)>,
 }
 
 impl HirVisitor for Collector {
     fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::Binary(op, ..) = &expr.kind {
+            self.binary_ops.push((*op, expr.ty));
+        }
         if let HirExpressionKind::Conversio {
             target: HirConversioTarget::Type(target),
             implicit: Some(site),
@@ -71,6 +78,70 @@ fn assert_rejected(source: &str) {
 
 fn assert_issue(source: &str, issue: &str) {
     test_support::assert_rejects_with_issue_la(source, issue);
+}
+
+#[test]
+fn word_ring_skips_the_read_left_operand_of_division_and_right_shift() {
+    let division = "incipit {\nsit modulus<u8> a ← 200\nsit modulus<u8> b ← 100\nsit modulus<u8> avg ← (a + b) / 2\nnota avg\n}\n";
+    let result = test_support::analyze_ok_la(division);
+    let hir = result.hir.as_ref().expect("hir");
+    let mut collector = Collector::default();
+    walk_program(&mut collector, hir);
+    let division_ty = collector
+        .binary_ops
+        .iter()
+        .find_map(|(op, ty)| (*op == HirBinOp::Div).then_some(*ty).flatten())
+        .expect("division has a type");
+    // Exact range typing widens the sum of two u8 operands before division.
+    assert!(matches!(
+        result.types.get(division_ty),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
+    ));
+    assert!(!matches!(
+        result.types.get(division_ty),
+        Type::ModularWord(_)
+    ));
+
+    let shift =
+        "incipit {\nsit modulus<u8> w2 ← 200\nsit modulus<u8> r ← (w2 ⇐ 1) ⇒ 1\nnota r\n}\n";
+    let result = test_support::analyze_ok_la(shift);
+    let hir = result.hir.as_ref().expect("hir");
+    let mut collector = Collector::default();
+    walk_program(&mut collector, hir);
+    let shift_ty = collector
+        .binary_ops
+        .iter()
+        .find_map(|(op, ty)| (*op == HirBinOp::Shr).then_some(*ty).flatten())
+        .expect("right shift has a type");
+    assert!(matches!(
+        result.types.get(shift_ty),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
+    ));
+    assert!(!matches!(result.types.get(shift_ty), Type::ModularWord(_)));
+    let left_shift_ty = collector
+        .binary_ops
+        .iter()
+        .find_map(|(op, ty)| (*op == HirBinOp::Shl).then_some(*ty).flatten())
+        .expect("left shift has a type");
+    assert!(matches!(
+        result.types.get(left_shift_ty),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
+    ));
+
+    let multiplication = "incipit {\nsit modulus<u8> a ← 200\nsit modulus<u8> b ← 100\nsit modulus<u8> rot ← (a + b) * 3\nnota rot\n}\n";
+    let result = test_support::analyze_ok_la(multiplication);
+    let hir = result.hir.as_ref().expect("hir");
+    let mut collector = Collector::default();
+    walk_program(&mut collector, hir);
+    let multiplication_ty = collector
+        .binary_ops
+        .iter()
+        .find_map(|(op, ty)| (*op == HirBinOp::Mul).then_some(*ty).flatten())
+        .expect("multiplication has a type");
+    assert!(matches!(
+        result.types.get(multiplication_ty),
+        Type::ModularWord(NumericWidth::U8)
+    ));
 }
 
 // ---------------------------------------------------------------------------

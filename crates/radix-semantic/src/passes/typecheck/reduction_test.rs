@@ -521,3 +521,56 @@ functio bad(tensor<textus, [2, 3]> g) → tensor<f32, [2]> { redde g.media(axis 
         "axis_reduction_mean_requires_float",
     );
 }
+
+#[test]
+fn product_reduction_terms_are_wide() {
+    use crate::test_support::analyze_ok;
+    use radix_hir::visit::{HirVisitor, walk_expr};
+    use radix_hir::{HirExpression, HirExpressionKind, HirReductionOp};
+    use radix_types::{NumericWidth, Primitive, Type};
+
+    struct ProductTypes(Vec<crate::TypeId>);
+
+    impl HirVisitor for ProductTypes {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if matches!(
+                expr.kind,
+                HirExpressionKind::Reduction {
+                    op: HirReductionOp::Product,
+                    ..
+                }
+            ) && let Some(ty) = expr.ty
+            {
+                self.0.push(ty);
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let result = analyze_ok(
+        r"
+incipit {
+    sit lista<i8> p ← [100, 2, 0]
+    sit ti8[3] pt ← p ↦ ti8[3]
+    nota reducta via factum ex pt
+    sit lista<u8> q ← [100, 2, 0]
+    sit tu8[3] qt ← q ↦ tu8[3]
+    nota reducta via factum ex qt
+}
+",
+    );
+    let mut collector = ProductTypes(Vec::new());
+    collector.visit_program(result.hir.as_ref().expect("hir"));
+    assert_eq!(collector.0.len(), 2, "both product reductions are typed");
+    let ty = |id: crate::TypeId| result.types.get(id).clone();
+    assert_eq!(
+        ty(collector.0[0]),
+        Type::Primitive(Primitive::Numerus),
+        "a signed product total sits at the 64-bit cap"
+    );
+    assert_eq!(
+        ty(collector.0[1]),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64),
+        "an unsigned product total sits at the 64-bit cap"
+    );
+}

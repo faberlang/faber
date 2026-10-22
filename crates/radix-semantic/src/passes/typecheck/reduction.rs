@@ -603,7 +603,7 @@ pub(super) fn check_reduction_expr(
             checker.types.tuple(vec![integer; rank])
         }
         HirReductionOp::ArgMax | HirReductionOp::ArgMin => integer,
-        HirReductionOp::Sum => checker.summa_result_type(term_ty),
+        HirReductionOp::Sum | HirReductionOp::Product => checker.summa_result_type(term_ty),
         _ => term_ty,
     };
     let extremum = matches!(

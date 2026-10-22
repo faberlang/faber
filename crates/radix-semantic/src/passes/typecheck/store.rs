@@ -571,23 +571,21 @@ impl TypeChecker<'_> {
     fn mark_word_ring_node(&mut self, expr: &HirExpression, word: TypeId) {
         use radix_hir::{HirBinOp, HirUnOp};
         match &expr.kind {
-            HirExpressionKind::Binary(op, lhs, rhs) => {
-                self.word_ring.insert(lhs.id, word);
-                match op {
-                    HirBinOp::Add
-                    | HirBinOp::Sub
-                    | HirBinOp::Mul
-                    | HirBinOp::BitAnd
-                    | HirBinOp::BitOr
-                    | HirBinOp::BitXor
-                    | HirBinOp::Shl => {
-                        self.mark_word_ring_node(lhs, word);
-                        self.mark_word_ring_node(rhs, word);
-                    }
-                    HirBinOp::Shr => self.mark_word_ring_node(rhs, word),
-                    _ => {}
+            HirExpressionKind::Binary(op, lhs, rhs) => match op {
+                HirBinOp::Add
+                | HirBinOp::Sub
+                | HirBinOp::Mul
+                | HirBinOp::BitAnd
+                | HirBinOp::BitOr
+                | HirBinOp::BitXor
+                | HirBinOp::Shl => {
+                    self.word_ring.insert(lhs.id, word);
+                    self.mark_word_ring_node(lhs, word);
+                    self.mark_word_ring_node(rhs, word);
                 }
-            }
+                HirBinOp::Shr => self.mark_word_ring_node(rhs, word),
+                _ => {}
+            },
             HirExpressionKind::Unary(HirUnOp::Neg | HirUnOp::BitNot, operand) => {
                 self.word_ring.insert(operand.id, word);
                 self.mark_word_ring_node(operand, word);
