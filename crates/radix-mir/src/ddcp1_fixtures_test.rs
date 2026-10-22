@@ -12,9 +12,9 @@
 //! mutations fail at the oracle, never at the schema).
 
 use crate::abi::{
-    CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
-    MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirKernelWorkgroupCount,
-    MirWorkgroupSize,
+    CollectionOpContract, MatMulDispatch, MirKernelDispatchSize, MirKernelResource,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+    MirKernelWorkgroupCount, MirWorkgroupSize,
 };
 use crate::device::MirCompanionDerivativeKind;
 use crate::device_program::{
@@ -1423,8 +1423,10 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
     let decomposed = CollectionKernelPlan::from_contract(
         &signature,
         &CollectionOpContract::MatMul {
-            dispatch_x,
-            dispatch_y,
+            dispatch: MatMulDispatch::Literal {
+                dispatch_x,
+                dispatch_y,
+            },
         },
         MirCollectionOp::TensorMatMul,
         Some(MatMulShapes {

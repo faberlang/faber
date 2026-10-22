@@ -3,9 +3,9 @@ use super::build::{
 };
 use super::*;
 use crate::abi::{
-    CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
-    MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
-    ReducedProjection,
+    CollectionOpContract, MatMulDispatch, MirKernelDispatchSize, MirKernelResource,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+    MirWorkgroupSize, ReducedProjection,
 };
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
@@ -410,8 +410,10 @@ fn matmul_plan_is_fully_populated() {
     let shapes = matmul_fixture_shapes();
     let signature = matmul_signature(shapes, 5, 3);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 5,
-        dispatch_y: 3,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 5,
+            dispatch_y: 3,
+        },
     };
     let plan = CollectionKernelPlan::from_contract(
         &signature,
@@ -475,7 +477,9 @@ fn matmul_runtime_contract_builds_a_runtime_plan_from_the_marker() {
     signature.extra_inputs.push(extent);
     let plan = CollectionKernelPlan::from_contract(
         &signature,
-        &CollectionOpContract::MatMulRuntime,
+        &CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        },
         MirCollectionOp::TensorMatMul,
         None,
     )
@@ -501,7 +505,9 @@ fn matmul_runtime_contract_builds_a_runtime_plan_from_the_marker() {
     assert!(
         CollectionKernelPlan::from_contract(
             &signature,
-            &CollectionOpContract::MatMulRuntime,
+            &CollectionOpContract::MatMul {
+                dispatch: MatMulDispatch::Runtime
+            },
             MirCollectionOp::TensorMatMul,
             None,
         )
@@ -512,7 +518,9 @@ fn matmul_runtime_contract_builds_a_runtime_plan_from_the_marker() {
     assert!(
         CollectionKernelPlan::from_contract(
             &signature,
-            &CollectionOpContract::MatMulRuntime,
+            &CollectionOpContract::MatMul {
+                dispatch: MatMulDispatch::Runtime
+            },
             MirCollectionOp::Sum,
             None,
         )
@@ -531,8 +539,10 @@ fn matmul_contract_without_shapes_returns_none() {
     };
     let signature = matmul_signature(shapes, 4, 2);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 4,
-        dispatch_y: 2,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        },
     };
     assert!(
         CollectionKernelPlan::from_contract(
@@ -562,8 +572,10 @@ fn matmul_plan_shapes_not_matching_dispatch_returns_none() {
         2,
     );
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 4,
-        dispatch_y: 2,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        },
     };
     assert!(
         CollectionKernelPlan::from_contract(
@@ -597,8 +609,10 @@ fn matmul_contract_with_non_matmul_op_returns_none() {
         2,
     );
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 4,
-        dispatch_y: 2,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        },
     };
     assert!(
         CollectionKernelPlan::from_contract(
@@ -1046,8 +1060,10 @@ fn matmul_signature_not_carrying_contract_returns_none() {
     );
     signature.output.element_count = 1;
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 4,
-        dispatch_y: 2,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        },
     };
     assert!(
         CollectionKernelPlan::from_contract(
@@ -2731,8 +2747,10 @@ fn batched_matmul_decode_shape_selects_batched_plan() {
     // dispatch_x = ceil(76/8) = 10; dispatch_y = 15 · ceil(1/8) = 15.
     let signature = batched_matmul_signature(shapes, 15, 5, 10, 15);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 10,
-        dispatch_y: 15,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 10,
+            dispatch_y: 15,
+        },
     };
     let plan = CollectionKernelPlan::from_contract(
         &signature,
@@ -2772,8 +2790,10 @@ fn batched_matmul_prefill_shape_selects_batched_plan() {
     };
     let signature = batched_matmul_signature(shapes, 15, 5, 5, 75);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 5,
-        dispatch_y: 75,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 5,
+            dispatch_y: 75,
+        },
     };
     let plan = CollectionKernelPlan::from_contract(
         &signature,
@@ -2805,8 +2825,10 @@ fn batched_matmul_count_contradiction_returns_none() {
     let mut signature = batched_matmul_signature(shapes, 15, 5, 10, 15);
     signature.output.element_count += 1;
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 10,
-        dispatch_y: 15,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 10,
+            dispatch_y: 15,
+        },
     };
     assert!(
         CollectionKernelPlan::from_contract(
@@ -2833,8 +2855,10 @@ fn batched_matmul_dispatch_without_batch_fold_returns_none() {
     };
     let signature = batched_matmul_signature(shapes, 15, 5, 5, 5);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 5,
-        dispatch_y: 5,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 5,
+            dispatch_y: 5,
+        },
     };
     assert!(
         CollectionKernelPlan::from_contract(

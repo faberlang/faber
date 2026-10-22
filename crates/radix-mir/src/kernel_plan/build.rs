@@ -15,7 +15,7 @@ use super::validate::{
     validate_row_softmax_plan, validate_ssm_conv1d_plan, validate_ssm_scan_plan,
     validate_transpose_plan,
 };
-use crate::abi::{CollectionOpContract, MirKernelSignature};
+use crate::abi::{CollectionOpContract, MatMulDispatch, MirKernelSignature};
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirKernelResourceAccess, MirKernelResourceRole,
     MirLayoutKind, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
@@ -142,8 +142,11 @@ impl CollectionKernelPlan {
                 }))
             }
             CollectionOpContract::MatMul {
-                dispatch_x,
-                dispatch_y,
+                dispatch:
+                    MatMulDispatch::Literal {
+                        dispatch_x,
+                        dispatch_y,
+                    },
             } => {
                 if op != MirCollectionOp::TensorMatMul {
                     return None;
@@ -194,7 +197,9 @@ impl CollectionKernelPlan {
             // `Tiled` (its guards express the M, N and K tails); item 7
             // substitutes the launch-selected class on a copy of this plan.
             // The literal `m`/`k`/`n` fields are unused (zero) in this arm.
-            CollectionOpContract::MatMulRuntime => {
+            CollectionOpContract::MatMul {
+                dispatch: MatMulDispatch::Runtime,
+            } => {
                 if op != MirCollectionOp::TensorMatMul {
                     return None;
                 }
