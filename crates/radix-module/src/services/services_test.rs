@@ -2081,12 +2081,12 @@ fn mir_output_reports_unknown_library_module_for_unresolved_norma_import() {
     let source = std::fs::read_to_string(&path).expect("read temp fab");
 
     let errors = mir_output_for_source(&path, &source).expect_err("unresolved norma import should be rejected");
-    assert!(
-        errors
-            .iter()
-            .any(|error| error.contains("PKG001:unknown_library_module")),
-        "mir output should name the diagnostic identity, got {errors:?}"
-    );
+    let identity = errors
+        .iter()
+        .find_map(|error| error.strip_prefix("error[")?.split_once(']'))
+        .map(|(identity, _)| identity)
+        .expect("error output should have a diagnostic identity header");
+    assert_eq!(identity, "PKG001:unknown_library_module");
 }
 
 #[test]
