@@ -419,6 +419,7 @@ pub fn generate_from_analyzed_with_options(
                 r#gen.set_library_registry(&analysis.libraries);
                 r#gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
                 r#gen.set_intrinsic_surface(&ts_surface);
+                r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
                 register_cross_file_defids(&mut r#gen, hir, &analysis.resolver, &analysis.libraries);
                 let output = r#gen.generate(hir, &analysis.types, &module_interner)?;
                 Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
