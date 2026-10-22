@@ -226,6 +226,12 @@ impl<'a> LintContext<'a> {
                         .annotations
                         .iter()
                         .any(|annotation| annotation.ad_route(self.interner).is_some()) => {}
+                // WHY: Reader-locale `public`/`publica` spellings normalize to family `publica`,
+                // as in `is_public_entry`; an export is a use this per-module lint cannot observe.
+                HirItemKind::Function(_)
+                    if item.annotations.iter().any(|annotation| {
+                        self.interner.resolve(annotation.family) == "publica"
+                    }) => {}
                 // An `@ nondum` function is declared to be unavailable; the
                 // semantic pass refuses every use, so "unused" is the point.
                 HirItemKind::Function(_)
