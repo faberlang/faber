@@ -352,15 +352,81 @@ pub fn run_package_on_device_session<H: radix_mir_runner::Host + ?Sized>(
         .map(|run| run.receipt)
 }
 
+/// How much of a device run's GPU time the runtime could measure.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeviceGpuTiming {
+    /// Every launch carried a measured GPU duration.
+    PerLaunch,
+    /// Some launches carried a measured GPU duration and some did not.
+    Partial,
+    /// No launch carried a measured GPU duration.
+    Unavailable,
+}
+
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+impl DeviceGpuTiming {
+    /// The spelling a stats artifact prints.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PerLaunch => "per-launch",
+            Self::Partial => "partial",
+            Self::Unavailable => "unavailable",
+        }
+    }
+}
+
+/// One device run's phase receipt: the wall time of each phase the run
+/// passes (admission, preparation, image build, module compile, execution),
+/// the session runtime counters, the host-side transfer traffic and the host
+/// clock spent encoding launches.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceRunReceipt {
+    /// Time spent opening and admitting the device session, in nanoseconds.
+    pub admit_ns: u64,
+    /// Time spent analysing and lowering the package before the device work,
+    /// in nanoseconds.
+    pub prepare_ns: u64,
+    /// Time spent building the per-kernel device image, in nanoseconds.
+    pub image_build_ns: u64,
+    /// Time spent compiling the image's modules onto the session, in
+    /// nanoseconds.
+    pub module_compile_ns: u64,
+    /// Time spent running the entry under kernel dispatch, in nanoseconds.
+    pub execution_ns: u64,
+    /// The session's runtime counters.
+    pub runtime: radix_device_core::runtime::RuntimeStats,
+    /// Host-to-device buffer writes (first uploads and re-uploads).
+    pub uploads: u64,
+    /// Device-to-host range reads.
+    pub downloads: u64,
+    /// Bytes host-to-device across every upload.
+    pub uploaded_bytes: u64,
+    /// Bytes device-to-host across every read.
+    pub downloaded_bytes: u64,
+    /// Host time spent encoding launches, in nanoseconds.
+    pub host_encode_ns: u64,
+    /// How much of the launch time the runtime could measure.
+    pub gpu_timing: DeviceGpuTiming,
+}
+
 /// The result of an in-process device run: the discovery receipt line that was
-/// printed, and the host-side meter when one was requested.
+/// printed, the host-side meter when one was requested, and the run's phase
+/// receipt (device time and traffic at each phase boundary).
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 #[derive(Debug)]
 pub struct DeviceSessionRun {
     pub receipt: String,
-    /// Host rows only. Kernel dispatches run on the device and are not
-    /// measured (gpu-reset C2-U6c, D4).
+    /// Host rows only. Kernel dispatches run on the device, so their time is
+    /// reported by [`device`](Self::device) rather than as host runner rows
+    /// (gpu-reset C2-U6c, D4).
     pub stats: Option<radix_mir_runner::RunnerStats>,
+    /// The per-phase device receipt: admission, preparation, image build,
+    /// module compile and execution clocks, runtime counters and transfer
+    /// traffic.
+    pub device: DeviceRunReceipt,
 }
 
 /// [`run_package_on_device_session`] with the opt-in host meter
@@ -383,12 +449,16 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
     // work is spent on it.
     let admitted = admit_device_session(input, selection, registry)?;
     let receipt = admitted.receipt.clone();
-    let (stats, _phases) = radix::program::mir::with_interpreted_bound_package_mir(
+    // WHY: taken here, before the preparation call, so the closure can read
+    // the analysis/lowering time before any device work starts.
+    let route_start = std::time::Instant::now();
+    let (stats, phases) = radix::program::mir::with_interpreted_bound_package_mir(
         config,
         input,
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
+            let prepare_ns = route_start.elapsed().as_nanos() as u64;
             run_admitted_device_session(
                 input,
                 admitted,
@@ -397,10 +467,15 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
                 exit_code,
                 host,
                 collect_stats,
+                prepare_ns,
             )
         },
     )?;
-    Ok(DeviceSessionRun { receipt, stats })
+    Ok(DeviceSessionRun {
+        receipt,
+        stats,
+        device: phases.into_receipt(),
+    })
 }
 
 /// [`run_package_on_device_session_with_stats`] for the `auto` selection: the
@@ -426,12 +501,16 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
     host: &mut H,
     collect_stats: bool,
 ) -> Result<Option<DeviceSessionRun>, Vec<Diagnostic>> {
+    // WHY: taken here, before the preparation call, so the closure can read
+    // the analysis/lowering time before any device work starts.
+    let route_start = std::time::Instant::now();
     let prepared = radix::program::mir::with_interpreted_bound_package_mir(
         config,
         input,
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
+            let prepare_ns = route_start.elapsed().as_nanos() as u64;
             if !lowered_declares_kernels(lowered) {
                 return Ok(Ok(None));
             }
@@ -446,8 +525,15 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
                         exit_code,
                         host,
                         collect_stats,
+                        prepare_ns,
                     )
-                    .map(|(stats, _phases)| Some(DeviceSessionRun { receipt, stats }))
+                    .map(|(stats, phases)| {
+                        Some(DeviceSessionRun {
+                            receipt,
+                            stats,
+                            device: phases.into_receipt(),
+                        })
+                    })
                 }),
             )
         },
@@ -476,6 +562,8 @@ struct AdmittedDeviceSession {
     session: radix_device_core::session::DeviceSession,
     backend: super::device::DeviceImageBackend,
     receipt: String,
+    /// Time spent opening and admitting the session, in nanoseconds.
+    admit_ns: u64,
 }
 
 /// Open the selected device, print the discovery receipt, and pick the
@@ -491,7 +579,9 @@ fn admit_device_session(
     use radix_device_core::backend::{DeviceBackend, DeviceClass};
     use radix_device_core::partition::MemoryBudget;
     use radix_device_core::session::DeviceSession;
+    use std::time::Instant;
 
+    let admit_start = Instant::now();
     let opened = open_device_selection(
         registry,
         selection,
@@ -525,11 +615,13 @@ fn admit_device_session(
     };
     let session =
         DeviceSession::from_opened(opened).map_err(|error| vec![host_error_diagnostic(&error)])?;
+    let admit_ns = admit_start.elapsed().as_nanos() as u64;
     receipt.print();
     Ok(AdmittedDeviceSession {
         session,
         backend,
         receipt: receipt.render(),
+        admit_ns,
     })
 }
 
@@ -537,10 +629,42 @@ fn admit_device_session(
 /// receipt (observed before the dispatcher `Rc` drops at return).
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 struct DeviceRunPhases {
+    admit_ns: u64,
+    prepare_ns: u64,
     image_build_ns: u64,
     module_compile_ns: u64,
     execution_ns: u64,
     dispatcher: super::device::DispatcherReceipt,
+}
+
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+impl DeviceRunPhases {
+    /// The public phase receipt for this run.
+    fn into_receipt(self) -> DeviceRunReceipt {
+        let dispatcher = self.dispatcher;
+        let runtime = dispatcher.runtime;
+        let gpu_timing = if runtime.timed_launch_count == 0 {
+            DeviceGpuTiming::Unavailable
+        } else if runtime.untimed_launch_count == 0 {
+            DeviceGpuTiming::PerLaunch
+        } else {
+            DeviceGpuTiming::Partial
+        };
+        DeviceRunReceipt {
+            admit_ns: self.admit_ns,
+            prepare_ns: self.prepare_ns,
+            image_build_ns: self.image_build_ns,
+            module_compile_ns: self.module_compile_ns,
+            execution_ns: self.execution_ns,
+            runtime,
+            uploads: dispatcher.transfers.uploads,
+            downloads: dispatcher.transfers.downloads,
+            uploaded_bytes: dispatcher.transfers.uploaded_bytes,
+            downloaded_bytes: dispatcher.transfers.downloaded_bytes,
+            host_encode_ns: dispatcher.host_encode_ns,
+            gpu_timing,
+        }
+    }
 }
 
 /// Build the device image from the lowered unit and run the argument-bound
@@ -554,13 +678,17 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     exit_code: Option<i32>,
     host: &mut H,
     collect_stats: bool,
+    prepare_ns: u64,
 ) -> Result<(Option<radix_mir_runner::RunnerStats>, DeviceRunPhases), Vec<Diagnostic>> {
     use super::device::{SessionKernelDispatcher, device_image_for_lowered};
     use super::host_factory::host_error_diagnostic;
     use std::time::Instant;
 
     let AdmittedDeviceSession {
-        session, backend, ..
+        session,
+        backend,
+        admit_ns,
+        ..
     } = admitted;
     let image_start = Instant::now();
     let (mut image, omitted) = device_image_for_lowered(lowered, backend)?;
@@ -675,6 +803,8 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     Ok((
         collect_stats.then_some(outcome.stats),
         DeviceRunPhases {
+            admit_ns,
+            prepare_ns,
             image_build_ns,
             module_compile_ns,
             execution_ns,
