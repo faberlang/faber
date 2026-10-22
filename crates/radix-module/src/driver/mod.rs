@@ -5137,6 +5137,11 @@ mod gather_intrinsic_tests;
 
 #[cfg(test)]
 #[cfg(feature = "device")]
+#[path = "gt19_ad_acceptance_test.rs"]
+mod gt19_ad_acceptance_tests;
+
+#[cfg(test)]
+#[cfg(feature = "device")]
 #[path = "rms_norm_intrinsic_test.rs"]
 mod rms_norm_intrinsic_tests;
 
