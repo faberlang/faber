@@ -466,6 +466,7 @@ impl FunctionBuilder<'_> {
             fault_delivery: context.fault_delivery,
             function_errors: Arc::clone(&context.function_errors),
             function_params: Arc::clone(&context.function_params),
+            imported_function_params: Arc::clone(&context.imported_function_params),
             tensor_edge_policies: Arc::clone(&context.tensor_edge_policies),
             pending_tensor_limes: Arc::clone(&context.pending_tensor_limes),
             shape_calls: Arc::clone(&context.shape_calls),

@@ -1008,6 +1008,33 @@ incipit {
     );
 }
 
+#[test]
+fn publica_function_is_not_unused_function() {
+    let result =
+        crate::test_support::analyze_source("@ publica\nfunctio servata() → numerus { redde 1 }");
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("unused_function")),
+        "a public function is an exported use: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn plain_unused_function_still_warns() {
+    let result = crate::test_support::analyze_source("functio servata() → numerus { redde 1 }");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("unused_function")),
+        "a private unused function should still warn: {:?}",
+        result.diagnostics
+    );
+}
+
 const SORT_PERSONA: &str = "genus Persona {\n    varia textus nomen\n    varia numerus aetas\n}\n";
 
 fn unnecessary_varia_count(source: &str) -> usize {

@@ -766,6 +766,14 @@ pub(super) fn lower_package_units<'a>(
         library_resolver,
         library_cache,
     )?;
+    let entry_imported_function_params = imported_function_params_for_caller(
+        &entry.path,
+        &mut entry.analysis,
+        others.values(),
+        links,
+        library_resolver,
+        library_cache,
+    )?;
     let entry_path = entry.path.clone();
     // The same rewrite also fires inside SIBLING units: a reader unit's
     // function body referencing another unit's exported const
@@ -834,6 +842,29 @@ pub(super) fn lower_package_units<'a>(
             return Err(diagnostics);
         }
     }
+    // Transplant defaults into each sibling caller before lowering begins.
+    // The lowered units retain borrows into their map nodes until package
+    // merging, so keep those owners in `others` while doing this id-driven
+    // remove/inspect/reinsert pass.
+    let sibling_ids: Vec<ModuleId> = others.keys().cloned().collect();
+    let mut sibling_imported_function_params = HashMap::new();
+    for id in sibling_ids {
+        let Some((_, mut unit)) = others.remove_entry(&id) else {
+            continue;
+        };
+        let unit_path = unit.path.clone();
+        let imported_function_params = imported_function_params_for_caller(
+            &unit_path,
+            &mut unit.analysis,
+            std::iter::once(&*entry).chain(others.values()),
+            links,
+            library_resolver,
+            library_cache,
+        )?;
+        others.insert(id, unit);
+        sibling_imported_function_params.insert(unit_path, imported_function_params);
+    }
+
     let mut pending = Vec::new();
     let mut extra_validation = RemappedValidation::default();
     let mut shared_nominals: HashMap<(InterfaceNominalKind, String), TypeId> = HashMap::new();
@@ -855,6 +886,10 @@ pub(super) fn lower_package_units<'a>(
 
     for unit in others.values_mut() {
         let unit_path = unit.path.clone();
+        let imported_function_params = sibling_imported_function_params
+            .get(&unit_path)
+            .cloned()
+            .unwrap_or_else(|| std::sync::Arc::new(HashMap::new()));
         let source_exports = exported_nominal_names(&unit.file_interface);
         // S1 U2 nominal identity: build the canonical nominal remap while the
         // source analysis is freely borrowable (lowering mutates it below).
@@ -918,7 +953,13 @@ pub(super) fn lower_package_units<'a>(
             &unit_path,
             &links.method_targets,
         ));
-        let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse, kernel_lowering)?;
+        let mut lowered = lower_unit(
+            unit,
+            &cli_plan.entry_records,
+            no_fuse,
+            kernel_lowering,
+            &imported_function_params,
+        )?;
         // Remap from the post-lowering table: lowering appends runtime and
         // diagnostic text (format templates, the lockstep length-mismatch
         // message, …) that the pre-lowering analysis interner never held
@@ -1103,7 +1144,7 @@ pub(super) fn lower_package_units<'a>(
             &library.import,
             library_resolver,
             library_cache,
-            |analysis, _| {
+            |analysis, cache| {
                 if let Err(errors) = rewrite_analysis_namespace_calls(
                     &library.path,
                     analysis,
@@ -1173,10 +1214,30 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
+                let imported_function_params = match imported_function_params_for_caller(
+                    &library.path,
+                    analysis,
+                    std::iter::empty::<&AnalyzedProgramNode>(),
+                    links,
+                    library_resolver,
+                    cache,
+                ) {
+                    Ok(parameters) => parameters,
+                    Err(errors) => {
+                        diagnostics.extend(errors);
+                        return Ok(());
+                    }
+                };
                 let mut lowered = match lower_analyzed_unit(
                     analysis.application_view(),
                     radix_mir_lower::lower::MirLoweringOptions {
                         kernel_lowering,
+                        imported_function_params: std::sync::Arc::new(
+                            imported_function_params
+                                .iter()
+                                .map(|(def, params)| (*def, params.clone()))
+                                .collect(),
+                        ),
                         ..Default::default()
                     },
                 ) {
@@ -1430,7 +1491,13 @@ pub(super) fn lower_package_units<'a>(
         imported_method_source_rewrites(&entry.analysis, &entry_path, &links.method_targets)
             .into_iter()
             .collect();
-    let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse, kernel_lowering)?;
+    let mut merged = lower_unit(
+        entry,
+        &cli_plan.entry_records,
+        no_fuse,
+        kernel_lowering,
+        &entry_imported_function_params,
+    )?;
     if !entry_method_rewrites.is_empty() {
         merged = rewrite_lowered_program_sources(
             merged,
@@ -1735,6 +1802,192 @@ fn inject_package_data_members<'a>(
     }
     if diagnostics.is_empty() {
         Ok(())
+    } else {
+        Err(diagnostics)
+    }
+}
+
+/// Collect the optional/default parameter metadata of every function linked
+/// into this caller's namespace imports, with each param's default expression
+/// transplanted into the caller analysis.
+///
+/// Package-linked callees carry synthetic definition ids that are absent from
+/// the caller's own parameter map. `lower_direct_call_args` fills omitted
+/// arguments from [`MirLoweringOptions::imported_function_params`], so the
+/// entry (and, in a later unit, sibling/library callers) must receive the
+/// linked callees' metadata here. The default expressions originate in the
+/// source unit's interner and type table, so they go through the same
+/// transplant seam as linked const initializers.
+fn imported_function_params_for_caller<'a>(
+    caller_path: &Path,
+    caller: &mut AnalyzedModule,
+    others: impl IntoIterator<Item = &'a AnalyzedProgramNode>,
+    links: &PackageMirLinks,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<
+    std::sync::Arc<HashMap<DefId, Vec<radix_mir_lower::lower::ImportedCallableParam>>>,
+    Vec<Diagnostic>,
+> {
+    let others = others.into_iter().collect::<Vec<_>>();
+    // Never walk the std `HashMap` directly: each transplanted default interns
+    // symbols/types into the caller, so the visit order fixes the emitted ids.
+    let mut targets = links
+        .calls
+        .iter()
+        .filter(|((path, _, _), _)| path == caller_path)
+        .collect::<Vec<_>>();
+    if targets.is_empty() {
+        return Ok(std::sync::Arc::new(HashMap::new()));
+    }
+    targets.sort_by(|((_, lhs_def, lhs_name), _), ((_, rhs_def, rhs_name), _)| {
+        (lhs_def.0, lhs_name).cmp(&(rhs_def.0, rhs_name))
+    });
+    let const_members: HashSet<DefId> = links
+        .data_members
+        .iter()
+        .map(|member| member.synthetic)
+        .collect();
+    let mut const_path_rewrites: HashMap<&PathBuf, HashMap<DefId, DefId>> = HashMap::new();
+    for ((source_path, def_id), synthetic) in &links.sources {
+        if const_members.contains(synthetic) {
+            const_path_rewrites
+                .entry(source_path)
+                .or_default()
+                .insert(*def_id, *synthetic);
+        }
+    }
+    let no_rewrites = HashMap::new();
+    let mut parameters = HashMap::new();
+    let mut diagnostics = Vec::new();
+    for (_, synthetic) in targets {
+        let Some(imported) = links.imported_function_params.get(synthetic) else {
+            continue;
+        };
+        // The source analysis is borrowed from the sibling nodes (disjoint
+        // from `caller`) or the library cache; only the interner needs cloning
+        // (the caller borrow must not conflict with the package-unit borrow).
+        let source = others
+            .iter()
+            .copied()
+            .find(|unit| unit.path == imported.source_path)
+            .map(|unit| {
+                (
+                    unit.analysis.interner.clone(),
+                    &unit.analysis.types,
+                    &unit.analysis.resolver,
+                    unit.file_interface.clone(),
+                )
+            })
+            .or_else(|| {
+                let library = links
+                    .libraries
+                    .iter()
+                    .find(|library| library.path == imported.source_path)?;
+                let interface =
+                    library_cached_file_interface(&library.import, library_resolver, library_cache)
+                        .ok()?;
+                let analysis =
+                    library_cached_analysis(&library.import, library_resolver, library_cache)
+                        .ok()?;
+                Some((
+                    analysis.interner.clone(),
+                    &analysis.types,
+                    &analysis.resolver,
+                    interface,
+                ))
+            });
+        let Some((source_interner, source_types, source_resolver, source_interface)) = source
+        else {
+            diagnostics.push(mir_issue_diag(
+                caller_path,
+                "package_mir_imported_default_unsupported",
+                format!(
+                    "package MIR could not find callable source unit `{}`",
+                    imported.source_path.display()
+                ),
+            ));
+            continue;
+        };
+        let source_exports = exported_nominal_names(&source_interface);
+        let nominal_map = match build_nominal_remap(
+            source_types,
+            &source_interner,
+            source_resolver,
+            source_interface.identity.as_ref(),
+            &source_exports,
+            caller,
+            &HashMap::new(),
+        ) {
+            Ok(map) => map,
+            Err(message) => {
+                diagnostics.push(mir_issue_diag(
+                    caller_path,
+                    "package_mir_imported_default_unsupported",
+                    message,
+                ));
+                continue;
+            }
+        };
+        let empty_def_remap = HashMap::new();
+        let empty_source_names = HashMap::new();
+        let empty_shared_nominals = HashMap::new();
+        let param_symbols =
+            super::intern_param_symbols(source_types, &source_interner, &mut caller.interner);
+        let record_field_symbols = super::intern_record_field_symbols(
+            source_types,
+            &source_interner,
+            &mut caller.interner,
+        );
+        let nominal = NominalImportContext {
+            nominal_map: &nominal_map,
+            def_remap: &empty_def_remap,
+            source_names: &empty_source_names,
+            shared_nominals: &empty_shared_nominals,
+            param_symbols: &param_symbols,
+            record_field_symbols: &record_field_symbols,
+        };
+        let mut imported_types = HashMap::new();
+        let mut params = Vec::with_capacity(imported.params.len());
+        let mut failed = false;
+        for param in &imported.params {
+            let default = match &param.default {
+                Some(default) => match transplant_expr(
+                    default,
+                    &source_interner,
+                    source_types,
+                    &mut caller.interner,
+                    &mut caller.types,
+                    &mut imported_types,
+                    Some(&nominal),
+                    const_path_rewrites
+                        .get(&imported.source_path)
+                        .unwrap_or(&no_rewrites),
+                ) {
+                    Ok(expression) => Some(expression),
+                    Err(message) => {
+                        diagnostics.push(mir_issue_diag(
+                            caller_path,
+                            "package_mir_imported_default_unsupported",
+                            message,
+                        ));
+                        failed = true;
+                        break;
+                    }
+                },
+                None => None,
+            };
+            params.push(radix_mir_lower::lower::ImportedCallableParam {
+                optional: param.optional,
+                default,
+            });
+        }
+        if !failed {
+            parameters.insert(*synthetic, params);
+        }
+    }
+    if diagnostics.is_empty() {
+        Ok(std::sync::Arc::new(parameters))
     } else {
         Err(diagnostics)
     }
@@ -3463,6 +3716,9 @@ pub(super) fn lower_unit<'a>(
     cli_entry_records: &CliEntryRecords,
     no_fuse: bool,
     kernel_lowering: KernelLowering,
+    imported_function_params: &std::sync::Arc<
+        HashMap<DefId, Vec<radix_mir_lower::lower::ImportedCallableParam>>,
+    >,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     let bundle = super::air_backward::prepare(&mut unit.analysis)
         .map_err(|message| vec![mir_lowering_diag(&unit.path, message)])?;
@@ -3477,6 +3733,12 @@ pub(super) fn lower_unit<'a>(
             radix_mir_lower::lower::MirLoweringOptions {
                 cli_parsed_record_fields_by_type: std::sync::Arc::new(fields.into_iter().collect()),
                 kernel_lowering,
+                imported_function_params: std::sync::Arc::new(
+                    imported_function_params
+                        .iter()
+                        .map(|(def, params)| (*def, params.clone()))
+                        .collect(),
+                ),
                 ..Default::default()
             },
         )
@@ -3485,6 +3747,12 @@ pub(super) fn lower_unit<'a>(
             unit.analysis.application_view(),
             radix_mir_lower::lower::MirLoweringOptions {
                 kernel_lowering,
+                imported_function_params: std::sync::Arc::new(
+                    imported_function_params
+                        .iter()
+                        .map(|(def, params)| (*def, params.clone()))
+                        .collect(),
+                ),
                 ..Default::default()
             },
         )

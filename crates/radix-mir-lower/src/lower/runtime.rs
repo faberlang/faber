@@ -3086,6 +3086,29 @@ impl FunctionBuilder<'_> {
             return Some(lowered);
         }
 
+        // Linked callees receive their DefIds after analysis, so their parameter
+        // metadata travels through options (like the synthetic-callee fallbacks
+        // for `function_generator` and `function_errors` in `lower_call`).
+        if let Some(params) = self.context.imported_function_params.get(&callee).cloned() {
+            let mut lowered = Vec::with_capacity(params.len());
+            for (index, param) in params.iter().enumerate() {
+                if let Some(arg) = args.get(index) {
+                    lowered.push(self.lower_call_arg_value(&arg.expr)?);
+                } else if let Some(default) = &param.default {
+                    lowered.push(self.lower_call_arg_value(default)?);
+                } else if param.optional {
+                    lowered.push(self.omitted_optional_operand(span));
+                } else {
+                    self.errors.push(MirError::unsupported(
+                        span,
+                        "call missing required argument before MIR lowering completed",
+                    ));
+                    return None;
+                }
+            }
+            return Some(lowered);
+        }
+
         let mut lowered = Vec::with_capacity(args.len());
         for arg in args {
             lowered.push(self.lower_call_arg_value(&arg.expr)?);
@@ -6178,3 +6201,7 @@ mod octeti_tensor_size_param_test;
 #[cfg(test)]
 #[path = "sink_into_test.rs"]
 mod sink_into_test;
+
+#[cfg(test)]
+#[path = "imported_default_test.rs"]
+mod imported_default_test;
