@@ -3089,7 +3089,12 @@ impl FunctionBuilder<'_> {
         // Linked callees receive their DefIds after analysis, so their parameter
         // metadata travels through options (like the synthetic-callee fallbacks
         // for `function_generator` and `function_errors` in `lower_call`).
-        if let Some(params) = self.context.imported_function_params.get(&callee).cloned() {
+        // Metadata is only authoritative when it can account for the provided
+        // arguments; shorter metadata falls through to the generic branch rather
+        // than silently dropping arguments past `params.len()`.
+        if let Some(params) = self.context.imported_function_params.get(&callee).cloned()
+            && params.len() >= args.len()
+        {
             let mut lowered = Vec::with_capacity(params.len());
             for (index, param) in params.iter().enumerate() {
                 if let Some(arg) = args.get(index) {

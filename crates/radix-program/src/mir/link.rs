@@ -789,13 +789,20 @@ fn link_library_import_site(
                     links.next_synthetic += 1;
                     def_id
                 });
-            links
-                .imported_function_params
-                .entry(synthetic)
-                .or_insert_with(|| ImportedFunctionParams {
-                    source_path: library_path.clone(),
-                    params: function.params.clone(),
-                });
+            // Only a function that actually carries parameter metadata gets an
+            // entry. Compiler-generated companions have no HIR item and so no
+            // params; an empty entry is not "zero-parameter function", it is
+            // "nothing to transplant", and treating it as authoritative would
+            // drop every provided argument at the call site.
+            if !function.params.is_empty() {
+                links
+                    .imported_function_params
+                    .entry(synthetic)
+                    .or_insert_with(|| ImportedFunctionParams {
+                        source_path: library_path.clone(),
+                        params: function.params.clone(),
+                    });
+            }
             if let Some(contract) =
                 interface
                     .exports
