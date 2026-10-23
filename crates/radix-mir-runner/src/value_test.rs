@@ -967,6 +967,37 @@ fn wrap(op: MirBinOp, left: i64, right: i64, width: NumericWidth) -> Value {
 }
 
 #[test]
+fn modular_origin_zero_divisor_reports_the_modular_issue_before_exact_dispatch() {
+    // Range-based typing can give `a / b` on two `modulus<W>` operands a plain
+    // integer result, so the modular result carrier is absent. The divisor's
+    // zero is still modular, identified by `issue` rather than prose.
+    let span = Span::default();
+    for op in [MirBinOp::Div, MirBinOp::Mod] {
+        for zero in [Value::Int(0), Value::UInt(0)] {
+            let error = modular_zero_divisor(op, &zero, true, span)
+                .expect("a modular-origin zero divisor traps");
+            assert_eq!(error.issue, "modular_division_by_zero");
+            assert_eq!(error.span, span);
+        }
+    }
+}
+
+#[test]
+fn modular_origin_nonzero_divisor_stays_on_the_exact_integer_path() {
+    let span = Span::default();
+    // A nonzero divisor is not this guard's business: the exact value is kept
+    // and only the store boundary reduces it (300 / 2 stays 150, not 22).
+    for op in [MirBinOp::Div, MirBinOp::Mod] {
+        assert!(modular_zero_divisor(op, &Value::Int(2), true, span).is_none());
+        assert!(modular_zero_divisor(op, &Value::UInt(2), true, span).is_none());
+    }
+    // Non-modular origins keep the checked `numerus` diagnostic, and operators
+    // other than `/` and `%` never consult this guard.
+    assert!(modular_zero_divisor(MirBinOp::Div, &Value::Int(0), false, span).is_none());
+    assert!(modular_zero_divisor(MirBinOp::Add, &Value::Int(0), true, span).is_none());
+}
+
+#[test]
 fn signed_wrapping_words_are_the_ring_with_signed_representatives() {
     // D11.8: wrapping<i8> is Z/2^8 with representatives in [-128, 127].
     assert!(values_equal(

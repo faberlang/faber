@@ -2315,6 +2315,43 @@ fn floor_div_rem(left: i128, right: i128) -> Option<(i128, i128)> {
     }
 }
 
+/// The single construction of a `wrapping<W>` division-or-remainder failure:
+/// a word division by zero traps as a modular failure, never as the checked
+/// `numerus` one.
+pub(crate) fn modular_division_by_zero(span: Span) -> RunnerError {
+    RunnerError::internal_with_issue(span, "modulus division failed", "modular_division_by_zero")
+}
+
+/// Zero-divisor guard for a modular-origin `/` or `%` whose *result* type is a
+/// plain integer. Range-based typing can give arithmetic on `wrapping<W>`
+/// operands an exact integer result, so the modular carrier no longer selects
+/// [`modular_word_numeric_binop`] and the operation would otherwise reach the
+/// checked `numerus` dispatch, reporting `runner_numerus_division_failed`. The
+/// divisor's zero is still a modular failure.
+///
+/// A nonzero divisor returns `None`: the operation stays exact and reduces only
+/// at the store boundary, never through per-operation wrapping.
+pub(crate) fn modular_zero_divisor(
+    op: MirBinOp,
+    divisor: &Value,
+    modular_origin: bool,
+    span: Span,
+) -> Option<RunnerError> {
+    if !modular_origin || !matches!(op, MirBinOp::Div | MirBinOp::Mod) {
+        return None;
+    }
+    let zero = match divisor {
+        Value::Int(value) => *value == 0,
+        Value::UInt(value) => *value == 0,
+        _ => false,
+    };
+    if zero {
+        Some(modular_division_by_zero(span))
+    } else {
+        None
+    }
+}
+
 /// Execute one `wrapping<W>` arithmetic operation. Conversion at this boundary
 /// keeps modular wraparound separate from checked `numerus` math.
 pub fn modular_word_numeric_binop(
@@ -2326,13 +2363,7 @@ pub fn modular_word_numeric_binop(
 ) -> Result<Value, RunnerError> {
     let left = modular_operand(left, span, "modulus operand mismatch")?;
     let right = modular_operand(right, span, "modulus operand mismatch")?;
-    let by_zero = || {
-        RunnerError::internal_with_issue(
-            span,
-            "modulus division failed",
-            "modular_division_by_zero",
-        )
-    };
+    let by_zero = || modular_division_by_zero(span);
     let value = match op {
         // Representatives fit 64 bits, so sums and products fit i128 exactly
         // and reduction is exact.

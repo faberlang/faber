@@ -67,8 +67,8 @@ use std::time::Instant;
 use value::{
     GradientStorage, add_values, compare_values, decimal_numeric_binop, decimal_scale_factor,
     effective_width, int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
-    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
-    round_float, values_equal,
+    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop,
+    modular_zero_divisor, numeric_binop, round_float, values_equal,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -3542,6 +3542,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Whether an operand's *static* type is a `wrapping<W>` word. Range-based
+    /// typing can give arithmetic on such operands a plain integer result, so
+    /// the result type alone cannot decide whether `/` is modular.
+    fn operand_is_modular_word(&self, operand: &MirOperand) -> bool {
+        self.operand_static_type(operand)
+            .is_some_and(|ty| matches!(self.types.get(ty), Type::ModularWord(_)))
+    }
+
     #[expect(
         clippy::cast_precision_loss,
         reason = "sqrt/exp/ln promote Int/UInt operands to f64 for computation, deliberately accepting f64 mantissa precision for large integer magnitudes"
@@ -3845,6 +3853,15 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 | MirBinOp::Shr => modular_word_bitwise_binop(left, right, op, modular, span),
                 _ => Err(RunnerError::internal(span, "invalid modulus operator")),
             };
+        }
+        // A modular-origin `/` or `%` that range-based typing gave a plain
+        // integer result still traps a zero divisor as a modular failure, before
+        // the checked `numerus` dispatch below reports its own division issue.
+        // A nonzero divisor runs the exact integer math and reduces at the
+        // store, exactly as any other wrapping intermediate does.
+        let modular_origin = self.operand_is_modular_word(lhs) || self.operand_is_modular_word(rhs);
+        if let Some(error) = modular_zero_divisor(op, &right, modular_origin, span) {
+            return Err(error);
         }
         match op {
             MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod
