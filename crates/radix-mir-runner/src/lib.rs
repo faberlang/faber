@@ -4,7 +4,7 @@
 //! WHY: Wasm already executes MIR end-to-end; this module dispatches the same
 //! intrinsics directly without emit/instantiate.
 
-#![allow(clippy::match_same_arms, clippy::too_many_lines, clippy::map_unwrap_or)]
+#![allow(clippy::too_many_lines)]
 
 pub mod capability;
 mod conversio;
