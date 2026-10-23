@@ -6,4 +6,5 @@ input = "format/integer-extremes.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
