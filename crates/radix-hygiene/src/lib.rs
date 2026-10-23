@@ -185,6 +185,218 @@ pub fn scan_command_new(files: &[SourceFile]) -> Vec<CommandSpawn> {
     spawns
 }
 
+/// One `std::env::var` / `std::env::var_os` read of a `FABER_*` or `RADIX_*`
+/// variable found in a production file.
+///
+/// Operator ruling 2026-10-14: a `FABER_*` / `RADIX_*` environment variable
+/// may only be read by the internal test harness. Compiler and product
+/// behavior is CLI flags or `faber.toml`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnvRead {
+    pub path: PathBuf,
+    /// 1-based line of the `env::var(…)` / `env::var_os(…)` call.
+    pub line: usize,
+    /// The `FABER_*` / `RADIX_*` variable name the read resolves to.
+    pub name: String,
+}
+
+/// True when `path` is internal test-harness code, which operator ruling
+/// 2026-10-14 exempts from the `FABER_*` / `RADIX_*` environment-read ban.
+///
+/// Exempt: any path with a `tests` or `test_support` component, a `*_test.rs`
+/// or `test_support.rs` file, a `golden.rs` file, and the `crates/exempla`
+/// corpus e2e harness. Production sources such as
+/// `crates/faber/src/package/mod.rs` are not exempt.
+#[must_use]
+pub fn is_env_harness_path(path: &Path) -> bool {
+    let components: Vec<String> = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let Some(file_name) = components.last() else {
+        return false;
+    };
+    if file_name.ends_with("_test.rs") || file_name == "test_support.rs" || file_name == "golden.rs"
+    {
+        return true;
+    }
+    if components
+        .iter()
+        .any(|component| component == "tests" || component == "test_support")
+    {
+        return true;
+    }
+    components
+        .windows(2)
+        .any(|pair| pair[0] == "crates" && pair[1] == "exempla")
+}
+
+const ENV_READ_NEEDLES: [&str; 2] = ["env::var(", "env::var_os("];
+
+/// Scan production files for `std::env::var` / `std::env::var_os` reads of
+/// `FABER_*` or `RADIX_*` variables.
+///
+/// Operator ruling 2026-10-14: those reads are banned outside the internal
+/// test harness (`is_env_harness_path`); product behavior is CLI flags or
+/// `faber.toml`.
+///
+/// Detection runs on the scrubbed source, so a comment or a string literal
+/// that merely spells the call is not a hit, and a hit must start at an
+/// identifier boundary — `myenv::var(…)` and `proto_env::var(…)` are not
+/// hits. The name is resolved from the real content: a quoted literal counts
+/// only when it starts with `FABER_` or `RADIX_`, so platform variables such
+/// as `PATH`, `HOME` or `XDG_CACHE_HOME` do not, and a bare identifier is
+/// chased back to the `FABER_*` / `RADIX_*` literal bound to it (the
+/// `let name = "FABER_LIBRARY_HOME"; std::env::var_os(name)` shape).
+#[must_use]
+pub fn scan_tool_env_reads(files: &[SourceFile]) -> Vec<EnvRead> {
+    let mut reads = Vec::new();
+    for file in files {
+        if is_env_harness_path(&file.path) {
+            continue;
+        }
+        let content_lines: Vec<&str> = file.content.lines().collect();
+        for (index, line) in file.scrubbed.lines().enumerate() {
+            for (char_offset, needle) in env_read_calls(line) {
+                let Some(name) = resolve_env_name(file, &content_lines, index, char_offset, needle)
+                else {
+                    continue;
+                };
+                reads.push(EnvRead {
+                    path: file.path.clone(),
+                    line: index + 1,
+                    name,
+                });
+            }
+        }
+    }
+    reads
+}
+
+/// `env::var(` / `env::var_os(` occurrences on one scrubbed line, as a char
+/// offset plus the matched needle, in source order.
+fn env_read_calls(line: &str) -> Vec<(usize, &'static str)> {
+    let mut calls = Vec::new();
+    for needle in ENV_READ_NEEDLES {
+        for (byte_offset, _matched) in line.match_indices(needle) {
+            let preceded_by_identifier = line[..byte_offset]
+                .chars()
+                .next_back()
+                .is_some_and(is_ident_continue);
+            if !preceded_by_identifier {
+                calls.push((line[..byte_offset].chars().count(), needle));
+            }
+        }
+    }
+    calls.sort_by_key(|(offset, _)| *offset);
+    calls
+}
+
+/// Resolve the variable name of one call from the real (unscrubbed) content:
+/// the call line plus at most the two following lines, so a multi-line call
+/// resolves too.
+fn resolve_env_name(
+    file: &SourceFile,
+    content_lines: &[&str],
+    index: usize,
+    char_offset: usize,
+    needle: &str,
+) -> Option<String> {
+    let window = content_window(content_lines, index, char_offset);
+    let rest = window.strip_prefix(needle)?.trim_start();
+    if let Some(literal) = quoted_literal(rest) {
+        return is_tool_env_name(&literal).then_some(literal);
+    }
+    let identifier = leading_identifier(rest)?;
+    chase_bound_literal(&file.content, identifier)
+}
+
+/// The content of the call line from `char_offset` onward plus at most the two
+/// following lines, joined by newlines.
+fn content_window(content_lines: &[&str], index: usize, char_offset: usize) -> String {
+    let mut window = String::new();
+    for (offset, line) in content_lines.iter().enumerate().skip(index).take(3) {
+        if offset == index {
+            window.extend(line.chars().skip(char_offset));
+        } else {
+            window.push_str(line);
+        }
+        window.push('\n');
+    }
+    window
+}
+
+/// The literal body of a leading `"…"` argument, if the argument is a quoted
+/// literal.
+fn quoted_literal(text: &str) -> Option<String> {
+    let mut chars = text.strip_prefix('"')?.chars();
+    let mut literal = String::new();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\\' => {
+                literal.push('\\');
+                literal.push(chars.next()?);
+            }
+            '"' => return Some(literal),
+            other => literal.push(other),
+        }
+    }
+    None
+}
+
+/// The leading bare identifier of an argument, if any.
+fn leading_identifier(rest: &str) -> Option<&str> {
+    if !is_ident_start(rest.chars().next()?) {
+        return None;
+    }
+    let mut end = 0;
+    for ch in rest.chars() {
+        if !is_ident_continue(ch) {
+            break;
+        }
+        end += ch.len_utf8();
+    }
+    Some(&rest[..end])
+}
+
+/// Chase `identifier` through the whole file content to the quoted
+/// `FABER_*` / `RADIX_*` literal it is bound to (the indirect-name shape).
+fn chase_bound_literal(content: &str, identifier: &str) -> Option<String> {
+    for line in content.lines() {
+        let mut offset = 0;
+        while let Some(relative) = line[offset..].find(identifier) {
+            let start = offset + relative;
+            let end = start + identifier.len();
+            offset = end;
+            let bounded_before = line[..start]
+                .chars()
+                .next_back()
+                .is_none_or(|ch| !is_ident_continue(ch));
+            let bounded_after = line[end..]
+                .chars()
+                .next()
+                .is_none_or(|ch| !is_ident_continue(ch));
+            if !bounded_before || !bounded_after {
+                continue;
+            }
+            let Some(rest) = line[end..].trim_start().strip_prefix('=') else {
+                continue;
+            };
+            let Some(literal) = quoted_literal(rest.trim_start()) else {
+                continue;
+            };
+            if is_tool_env_name(&literal) {
+                return Some(literal);
+            }
+        }
+    }
+    None
+}
+
+fn is_tool_env_name(name: &str) -> bool {
+    name.starts_with("FABER_") || name.starts_with("RADIX_")
+}
+
 /// Assert each production file that has a companion `*_test.rs` embeds the
 /// repo `#[cfg(test)]` + `#[path = …]` module wiring.
 ///
