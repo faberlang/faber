@@ -6,7 +6,8 @@ use super::{
     __faber_clif_v1_sermo_drain, __faber_clif_v1_sermo_failed, __faber_clif_v1_sermo_fault_kind,
     __faber_clif_v1_sermo_fault_path, __faber_clif_v1_sermo_materialize_i64,
     __faber_clif_v1_sermo_open, __faber_clif_v1_sermo_set_opener_i64,
-    __faber_clif_v1_sermo_set_opener_nil, CONVERSATIONS, Conversation, Opener, slot,
+    __faber_clif_v1_sermo_set_opener_nil, __faber_clif_v1_sermo_set_opener_valor, CONVERSATIONS,
+    Conversation, Opener, slot,
 };
 use faber_leaf::LeafErrorKind;
 
@@ -65,6 +66,53 @@ fn set_opener_i64_reopens_the_conversation() {
         Conversation::open(ROUTE).with_opener(&[Opener::Int(0)])
     );
     assert!(opened.fault.is_none());
+}
+
+#[test]
+fn valor_opener_reopens_a_numerus_conversation() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    let boxed = crate::__faber_clif_v1_opt_some(crate::TAG_INT, 7);
+    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, boxed) };
+
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let opened = slot(&mut table, handle).expect("the handle names a slot");
+    assert_eq!(opened.conversation.opener, [faber_leaf::Arg::Int(7)]);
+}
+
+#[test]
+fn a_null_valor_opener_is_nihil() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, std::ptr::null()) };
+
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let opened = slot(&mut table, handle).expect("the handle names a slot");
+    assert_eq!(opened.conversation.opener, [faber_leaf::Arg::Nil]);
+}
+
+#[test]
+fn an_unsupported_tag_reopens_on_nihil() {
+    const ROUTE: &str = "tempus:dormiet";
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    let boxed = crate::__faber_clif_v1_opt_some(crate::TAG_FLOAT, 0);
+    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, boxed) };
+
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let opened = slot(&mut table, handle).expect("the handle names a slot");
+    assert_eq!(opened.conversation.opener, [faber_leaf::Arg::Nil]);
 }
 
 #[test]
