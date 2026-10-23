@@ -84,6 +84,21 @@ fn is_structurizable_lane_form(function: &MirFunction) -> bool {
         && crate::structurize::structurize(function).is_ok()
 }
 
+/// A single-lane kernel (no `thread lane` loop, one `mut` tensor — the shared
+/// ABI law [`crate::MirKernelSignature::is_single_lane_form`]) is emitted by
+/// the same lane emitters as one sequential lane, so its control flow and
+/// scalar conversions take the lane-form admissions. Its sequential body
+/// routinely re-joins branch tails inside a loop, which the Metal lane
+/// emitter structurizes by duplicating the tails, so the CFG is judged by
+/// that same structurizer. The genus admissions stay lane-form only.
+fn is_structurizable_single_lane(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> bool {
+    crate::MirKernelSignature::is_single_lane_form(function, validation)
+        && crate::structurize::structurize_duplicating_tails(function).is_ok()
+}
+
 /// C4-8 U5: the functions a whole-grid reduction names as its term (the
 /// `MirConstant::Function` last operand of a function-term `FilumReduce`
 /// node). A term function runs inside the lane region, so it has the lane
@@ -173,6 +188,9 @@ struct DeviceSafeClassifier<'a> {
     /// The function under check is a structurizable lane-form kernel, whose
     /// `int` coordinate binders are admitted as 64-bit locals (C4-2e).
     in_lane_form_function: bool,
+    /// The function under check is a structurizable single-lane kernel: its
+    /// control flow and scalar conversions are admitted like a lane form's.
+    in_single_lane_function: bool,
     /// The reduction term functions of the program (see
     /// [`reduction_term_functions`]).
     reduction_terms: rustc_hash::FxHashSet<crate::MirFunctionId>,
@@ -254,6 +272,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             device,
             in_device_function: false,
             in_lane_form_function: false,
+            in_single_lane_function: false,
             reduction_terms: rustc_hash::FxHashSet::default(),
             genus_params: FxHashMap::default(),
             record_view_params: FxHashMap::default(),
@@ -312,6 +331,27 @@ impl<'a> DeviceSafeClassifier<'a> {
             shape: shape.into(),
             slug: SLUG_POLICY,
         });
+    }
+
+    /// Whether `call` is a `Convert` between two numeric scalar types with no
+    /// store site and no recovery operand.
+    fn is_plain_scalar_conversion(&self, call: &MirRuntimeCall) -> bool {
+        let MirIntrinsic::Convert(conversion) = &call.intrinsic else {
+            return false;
+        };
+        let is_scalar = |ty: MirType| {
+            matches!(
+                self.types.get(ty.semantic_id()),
+                Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                    | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+            )
+        };
+        conversion.store.is_none()
+            && conversion.recovery.is_none()
+            && conversion.params.is_empty()
+            && call.args.len() == 1
+            && is_scalar(conversion.source_ty)
+            && is_scalar(conversion.target_ty)
     }
 
     fn check_device_type(&mut self, ty: MirType) {
@@ -419,7 +459,8 @@ impl<'a> DeviceSafeClassifier<'a> {
                 )
                 | MirLayoutKind::Void
                 | MirLayoutKind::Never => {}
-                MirLayoutKind::Scalar(MirScalarLayout::I64) if self.in_lane_form_function => {}
+                MirLayoutKind::Scalar(MirScalarLayout::I64)
+                    if self.in_lane_form_function || self.in_single_lane_function => {}
                 // Every other scalar is rejected by name — including `Magnus`
                 // (the unbounded `inf`, ruling 39(d)): "kernel scalar layout magnus".
                 MirLayoutKind::Scalar(scalar) => {
@@ -996,6 +1037,18 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             } => {
                 crate::visit::walk_stmt(self, stmt);
             }
+            // A lane-form kernel's plain numeric scalar conversion (no
+            // implicit-store site, no recovery) is a per-lane cast the lane
+            // emitters lower (`lane conversion`); the operand layouts are
+            // still walked and checked. Every other conversion stays a named
+            // reject below, and a lane emitter that has no cast for the
+            // pair fails closed in its own emit gate.
+            MirStatementKind::RuntimeCall { call, .. }
+                if (self.in_lane_form_function || self.in_single_lane_function)
+                    && self.is_plain_scalar_conversion(call) =>
+            {
+                crate::visit::walk_stmt(self, stmt);
+            }
             // EXEC02-PC1: the wildcard runtime-call reject names the
             // offending collection op — the first CUDA dense run died
             // unnamed; a diagnostic must not be vaguer than the fact.
@@ -1020,7 +1073,15 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // C4-2e: a structurizable lane-form kernel's acyclic Goto/Branch
             // edges are expressed by its region tree.
             MirTerminatorKind::Goto(_) | MirTerminatorKind::Branch { .. }
-                if self.in_lane_form_function =>
+                if self.in_lane_form_function || self.in_single_lane_function =>
+            {
+                crate::visit::walk_terminator(self, terminator);
+            }
+            // A structurizable lane-form kernel has no reachable `Unreachable`
+            // terminator (the structurizer refuses one), so any it carries
+            // sits on a dead block the region tree never visits.
+            MirTerminatorKind::Unreachable
+                if self.in_lane_form_function || self.in_single_lane_function =>
             {
                 crate::visit::walk_terminator(self, terminator);
             }
@@ -1281,6 +1342,8 @@ fn classify_structured_allowances(
     classifier: &mut DeviceSafeClassifier<'_>,
     function: &MirFunction,
 ) {
+    classifier.in_single_lane_function =
+        is_structurizable_single_lane(function, classifier.validation);
     classifier.in_lane_form_function = is_structurizable_lane_form(function)
         || (classifier.reduction_terms.contains(&function.id)
             && crate::structurize::structurize_duplicating_tails(function).is_ok());
@@ -1359,6 +1422,7 @@ fn classify_structured_allowances(
         && !allows_structured_nested_indexed_write_loop_break
         && !allows_structured_nested_indexed_write_loop_continue
         && !classifier.in_lane_form_function
+        && !classifier.in_single_lane_function
     {
         classifier.record_policy(SHAPE_DEVICE_MULTI_BLOCK_CFG);
     }
