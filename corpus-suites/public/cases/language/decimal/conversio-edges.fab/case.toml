@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/decimal/conversio-edges.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/conversio-edges.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
