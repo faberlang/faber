@@ -21,6 +21,11 @@ locale = "en"
 #   • `c[a‥b step n]` strides the slice, keeping every `n`-th element
 #   • an empty slice is `c[a‥a]`, not an error
 #   • the same forms hold on a text, where an index counts Unicode characters
+#   • a list window is a new list containing the selected elements (a shallow
+#     copy), not a view into the source list's slots
+#   • a mutable window of reference elements has independent list slots but
+#     shares the referenced objects with its mutable source; a let source
+#     remains read-only when its reference-element window is bound into mut
 #
 # Common mistakes:
 #   • reading `until` as exclusive — `until` is the closed end, `before` is
@@ -32,6 +37,8 @@ locale = "en"
 # =============================================================================
 
 # EXPECTED stdout: see range-index.expected
+
+class Cell { mut int value }
 
 main {
     let list<int> xs ← [10, 20, 30, 40, 50, 60]
@@ -47,6 +54,9 @@ main {
 
     # an empty slice
     print xs[3‥3]
+
+    # an empty slice at the end boundary is valid too
+    print xs[6‥6]
 
     # … keeps the element at the end index
     print xs[3…3]
@@ -65,4 +75,15 @@ main {
     print s[0‥11 step 2]
     print s[6…10]
     print t[1‥3]
+
+    # The window gets a new list of references to the same Cell objects.
+    # Mutating an object through that window is visible through the source;
+    # replacing a window slot does not replace the source slot.
+    mut list<Cell> cells ← [Cell { value = 70 }, Cell { value = 90 }]
+    mut list<Cell> cell_window ← cells[0‥1]
+    cell_window[0].value ← 80
+    print cells[0].value
+    cell_window[0] ← Cell { value = 110 }
+    print cells[0].value
+    print cell_window[0].value
 }
