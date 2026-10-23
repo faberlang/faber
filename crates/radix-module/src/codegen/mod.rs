@@ -419,6 +419,7 @@ pub fn generate_from_analyzed_with_options(
                 r#gen.set_library_registry(&analysis.libraries);
                 r#gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
                 r#gen.set_intrinsic_surface(&ts_surface);
+                r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
                 register_cross_file_defids(&mut r#gen, hir, &analysis.resolver, &analysis.libraries);
                 let output = r#gen.generate(hir, &analysis.types, &module_interner)?;
                 Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
@@ -707,6 +708,7 @@ fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) ->
     let mut r#gen = go::GoCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
+    r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
     r#gen.set_library_registry(analysis.libraries());
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
     r#gen.set_imported_generators(go_imported_generators(analysis, hir));
@@ -825,6 +827,7 @@ fn generate_swift_from_analyzed(
 ) -> Result<crate::Output, CodegenError> {
     let mut r#gen = swift::SwiftCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
+    r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
     r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
     r#gen.set_output_mode(
         match output_mode {
@@ -855,6 +858,7 @@ fn generate_python_from_analyzed(
     let mut r#gen = python::PythonCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
+    r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
 }
