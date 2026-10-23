@@ -512,11 +512,13 @@ fn is_octeti_byte_element(
 ) -> bool {
     matches!(
         types.types().get(element.0 as usize),
-        Some(radix_types::Type::Bits(radix_types::BitsWidth::B8))
-            | Some(radix_types::Type::SizedNumeric(
-                radix_types::Primitive::Numerus,
-                radix_types::NumericWidth::U8
-            ))
+        Some(
+            radix_types::Type::Bits(radix_types::BitsWidth::B8)
+                | radix_types::Type::SizedNumeric(
+                    radix_types::Primitive::Numerus,
+                    radix_types::NumericWidth::U8,
+                ),
+        )
     )
 }
 
@@ -580,9 +582,7 @@ fn validate_named_form(
                 transparent_generic_alias_witness(types, alias_params, path_def, form)
             {
                 (path_def, applied)
-            } else if alias_params
-                .get(&path_def)
-                .is_none_or(|params| params.is_empty())
+            } else if alias_params.get(&path_def).is_none_or(Vec::is_empty)
                 && transparent_alias_body_witness(types, path_def, form.ty)
             {
                 (path_def, Vec::new())
@@ -2670,7 +2670,7 @@ fn validate_resolved_tensor_edge_policy(
 }
 
 fn validate_tensor_shift_context(
-    context: &crate::artifact::TensorShiftContextWire,
+    context: crate::artifact::TensorShiftContextWire,
     checks: &IntegrityChecks<'_>,
 ) -> Result<(), HirArtifactError> {
     checks.check_index(context.source_shape)?;
@@ -2690,18 +2690,18 @@ fn validate_tensor_edge_policy_ids(
     }
     for (expression, context) in &table.shifted_view_expressions {
         checks.check_hir(*expression)?;
-        validate_tensor_shift_context(context, checks)?;
+        validate_tensor_shift_context(*context, checks)?;
     }
     for binding in &table.shifted_bindings {
         checks.check_def(*binding)?;
     }
     for (binding, context) in &table.shifted_view_bindings {
         checks.check_def(*binding)?;
-        validate_tensor_shift_context(context, checks)?;
+        validate_tensor_shift_context(*context, checks)?;
     }
     for (call, context) in &table.limes_contexts {
         checks.check_hir(*call)?;
-        validate_tensor_shift_context(context, checks)?;
+        validate_tensor_shift_context(*context, checks)?;
     }
     for row in &table.function_requirements {
         checks.check_def(row.function)?;
@@ -4289,7 +4289,7 @@ pub(crate) fn validate_referential_integrity(
     let mut shifted_view_expressions = FxHashSet::default();
     for (expression, context) in &edge_policies.shifted_view_expressions {
         checks.check_hir(*expression)?;
-        validate_tensor_shift_context(context, &checks)?;
+        validate_tensor_shift_context(*context, &checks)?;
         if !shifted_view_expressions.insert(*expression) {
             return Err(HirArtifactError::MalformedSnapshot {
                 kind: "tensor edge policies",
@@ -4320,7 +4320,7 @@ pub(crate) fn validate_referential_integrity(
     let mut shifted_view_bindings = FxHashSet::default();
     for (binding, context) in &edge_policies.shifted_view_bindings {
         checks.check_def(*binding)?;
-        validate_tensor_shift_context(context, &checks)?;
+        validate_tensor_shift_context(*context, &checks)?;
         if !shifted_view_bindings.insert(*binding) {
             return Err(HirArtifactError::MalformedSnapshot {
                 kind: "tensor edge policies",
@@ -4331,7 +4331,7 @@ pub(crate) fn validate_referential_integrity(
     let mut limes_contexts = FxHashSet::default();
     for (call, context) in &edge_policies.limes_contexts {
         checks.check_hir(*call)?;
-        validate_tensor_shift_context(context, &checks)?;
+        validate_tensor_shift_context(*context, &checks)?;
         if !limes_contexts.insert(*call) {
             return Err(HirArtifactError::MalformedSnapshot {
                 kind: "tensor edge policies",
