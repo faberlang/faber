@@ -704,6 +704,34 @@ pub enum MatMulClass {
     Tiled,
 }
 
+/// How a row operation plan (row softmax, layer norm, RMS norm, causal
+/// softmax) knows its extents: literal numbers, or run-time extents selected
+/// by shape class. The row-op twin of [`MatMulDims`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowOpDims {
+    /// Compile-time extents. `rows` is the product of the leading axes (`1`
+    /// at rank 1) and `width` the last axis.
+    Literal { rows: u64, width: u64 },
+    /// Extents bound at run time. The literal numbers are zero and `class` is
+    /// the plan-time placeholder ([`RowOpClass::Generic1D`]) until the launch
+    /// selects the real class from the call-site shape.
+    Runtime { class: RowOpClass },
+}
+
+/// The row-op body a run-time-extent plan selects (one per body the literal
+/// form chooses by value). The class follows from the call-site
+/// `[rows, width]` at launch: row reduction for `width >= 32 && width % 4 ==
+/// 0`, row-mapped for the wide flat shapes, generic 1D otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowOpClass {
+    /// Flat one-thread-per-element body.
+    Generic1D,
+    /// One workgroup per row tree reduction.
+    RowReduction,
+    /// Row-mapped flat body (guards `if o < rows`).
+    RowMapped,
+}
+
 /// The two shared-memory operand tiles of the tiled-matmul recipe.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MatMulSharedMemory {

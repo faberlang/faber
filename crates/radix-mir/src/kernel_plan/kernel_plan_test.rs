@@ -3410,3 +3410,26 @@ fn dims_without_axis_product_overflow_fails_closed() {
     // An out-of-range axis stays fail-closed.
     assert_eq!(dims_without_axis_product(&[3, 5], 2), None);
 }
+
+/// The literal and run-time row-op extent forms are distinct values, and the
+/// run-time form is distinct per class. A copy of either compares equal to
+/// its source, so a plan can be cloned without changing its identity.
+#[test]
+fn rowop_dims_literal_and_runtime_are_distinct() {
+    let literal = RowOpDims::Literal { rows: 2, width: 5 };
+    let generic = RowOpDims::Runtime {
+        class: RowOpClass::Generic1D,
+    };
+    let mapped = RowOpDims::Runtime {
+        class: RowOpClass::RowMapped,
+    };
+    assert_ne!(literal, generic);
+    assert_ne!(generic, mapped);
+
+    let literal_copy = literal;
+    let generic_copy = generic;
+    let mapped_copy = mapped;
+    assert_eq!(literal, literal_copy);
+    assert_eq!(generic, generic_copy);
+    assert_eq!(mapped, mapped_copy);
+}
