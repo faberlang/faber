@@ -1058,6 +1058,23 @@ impl TypeChecker<'_> {
                 );
             }
         }
+        if let Type::Matrix(elem, shape) = self.types.get(payload).clone()
+            && let HirExpressionKind::Array(elements) = &index.kind
+            && elements.iter().any(|element| {
+                matches!(
+                    element,
+                    HirArrayElement::Spread(_) | HirArrayElement::Infer(_)
+                ) || matches!(
+                    element,
+                    HirArrayElement::Expr(expr)
+                        if matches!(expr.kind, HirExpressionKind::Intervallum { .. })
+                )
+            })
+        {
+            return super::tensor_index::check_matrix_bracket_slot_list_index(
+                self, obj_ty, elem, shape, index,
+            );
+        }
         // WHY: `v[lo ‥ hi]` on a register vector is a vector slice whose width
         // is computed at compile time from literal bounds (operator ruling
         // 2026-10-17: a slice stays in its family), not a `lista` window, so it

@@ -355,3 +355,61 @@ fn vector_bracket_range_runtime_bounds_rejects() {
         "bracket_range_static_bounds_required",
     );
 }
+
+#[test]
+fn matrix_bracket_slot_range_row_is_vector() {
+    accepts(
+        r"functio row(matrix<f32, [2, 3]> m) → vector<f32, 3> {
+    sit vector<f32, 3> r ← m[[1, 0 ‥ 3]]
+    redde r
+}",
+    );
+}
+
+#[test]
+fn matrix_bracket_slot_range_column_is_vector() {
+    accepts(
+        r"functio column(matrix<f32, [2, 3]> m) → vector<f32, 2> {
+    redde m[[0 ‥ 2, 1]]
+}",
+    );
+}
+
+#[test]
+fn matrix_bracket_slot_range_block_is_matrix() {
+    accepts(
+        r"functio block(matrix<f32, [2, 3]> m) → matrix<f32, [1, 2]> {
+    redde m[[0 … 0, 1 ‥ 3]]
+}",
+    );
+}
+
+#[test]
+fn matrix_bracket_slot_float_rejects() {
+    rejects_with_issue(
+        r"functio bad(matrix<f32, [2, 3]> m) → vector<f32, 2> {
+    redde m[[0, 0.5 ‥ 2]]
+}",
+        "tensor_bracket_slot_integer_or_range",
+    );
+}
+
+#[test]
+fn matrix_bracket_slot_runtime_bounds_rejects() {
+    rejects_with_issue(
+        r"functio bad(matrix<f32, [2, 3]> m, numerus lo) → vector<f32, 2> {
+    redde m[[0, lo ‥ 3]]
+}",
+        "bracket_range_static_bounds_required",
+    );
+}
+
+#[test]
+fn matrix_bracket_slot_out_of_range_rejects() {
+    rejects_with_issue(
+        r"functio bad(matrix<f32, [2, 3]> m) → vector<f32, 2> {
+    redde m[[0, 1 ‥ 5]]
+}",
+        "index_provably_out_of_bounds",
+    );
+}
