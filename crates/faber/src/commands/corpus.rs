@@ -596,13 +596,6 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     if suite.version != 1 {
         return Err(format!("unsupported corpus.toml version {}", suite.version));
     }
-    if suite.embedded_only {
-        if let Some(name) = package::checkout_runtime_override() {
-            return Err(format!(
-                "embedded_only suite refuses {name}: the embedded runtime is used instead of the checkout"
-            ));
-        }
-    }
     let roots = resolve_suite_roots(root, suite.roots)?;
     let cases_root = relative_path(root, &suite.cases_dir)?;
     if !cases_root.is_dir() {

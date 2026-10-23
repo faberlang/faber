@@ -145,16 +145,6 @@ pub fn embedded_runtime_root() -> Option<PathBuf> {
     embedded_runtime::embedded_runtime_root()
 }
 
-/// The environment variable set that forces a checkout runtime over the
-/// embedded one, if any. Consumed by `faber corpus` embedded-only suites.
-#[must_use]
-pub fn checkout_runtime_override() -> Option<&'static str> {
-    let name = "FABER_LIBRARY_HOME";
-    std::env::var_os(name)
-        .is_some_and(|value| !value.is_empty())
-        .then_some(name)
-}
-
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 routing).
 /// BUG-F585D081: all manifest-backed routes share the manifest's target,
 /// including its implicit default; caller defaults apply only without a manifest.
@@ -447,8 +437,9 @@ pub(crate) fn library_resolver_from_config(
 ) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
     // independent of the language-pack root (`locale/<id>/pack.toml`).
-    // Precedence: an explicit `library_home` on Config; otherwise
-    // `FABER_LIBRARY_HOME` and the workspace probe locate provider repos.
+    // Precedence: an explicit `library_home` on Config (`--library-home` or
+    // `[paths] library_home`); otherwise the workspace probe locates provider
+    // repos.
     // The ambient probe is faber-owned (CTO memo); `radix-program`
     // receives the resolved home as an explicit input.
     if let Some(path) = config.library_home.as_ref() {
@@ -542,7 +533,7 @@ pub fn library_resolver_for_package(
 // RP3: multi-unit analysis lives in `radix-program` (`analyze.rs`). These
 // adapters supply the faber product-orchestration seams — reader-locale pack
 // loading, strict product-view manifest validation (FBR-P1-001), and
-// `FABER_LIBRARY_HOME` / workspace probing — while keeping the faber-internal
+// workspace probing — while keeping the faber-internal
 // entry signatures.
 pub fn faber_analysis_seams() -> radix::program::analyze::AnalysisSeams {
     radix::program::analyze::AnalysisSeams {
