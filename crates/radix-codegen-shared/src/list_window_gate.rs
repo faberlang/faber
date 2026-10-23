@@ -6,10 +6,13 @@
 //! `Index(list, interval)` in HIR and `Collection(Index)` with an interval
 //! argument in MIR), so no exhaustive match forces an emitter to refuse it, and
 //! a backend would print a scalar element read or fail with an unnamed error.
-//! Only the Faber source emitter (which prints the window back) and the MIR
-//! runner (which executes it) implement the form. This gate rejects any module
-//! that takes one before an emitter runs, naming the target, until a target's
-//! own emission lands and adds itself to [`target_admits_list_window`]. The
+//! The Faber source emitter (which prints the window back), the MIR runner
+//! (which executes it), the clif backend and the Go, TypeScript, Swift and
+//! Python emitters (which copy the range behind a checked helper) implement the
+//! form, as does the Rust emitter (which is checked in [`is_list_window`]).
+//! This gate rejects any module that takes one before an emitter runs, naming
+//! the target, until a target's own emission lands and adds itself to
+//! [`target_admits_list_window`]. The
 //! octeti window, plain or under an endian conversion `buf[lo‥hi] ↦ W via Be`,
 //! indexes a byte receiver (`lista<b8>`, the word `octeti`), not a list, and is
 //! untouched.
@@ -25,11 +28,19 @@ const ISSUE: &str = "list_window_unsupported_on_target";
 
 /// Targets that carry a list window faithfully. The Faber re-emitter keeps the
 /// authored index; the MIR runner executes it and does not reach codegen; the
-/// clif backend lowers it to a runtime slice.
+/// clif backend lowers it to a runtime slice; the Go, TypeScript, Swift and
+/// Python emitters copy the range, striding by an optional step. LLVM, sexp and
+/// wasm still refuse it.
 fn target_admits_list_window(target: Target) -> bool {
     matches!(
         target,
-        Target::HirFaber | Target::MirStepper | Target::MirClif
+        Target::HirFaber
+            | Target::MirStepper
+            | Target::MirClif
+            | Target::HirGo
+            | Target::HirTypeScript
+            | Target::HirSwift
+            | Target::HirPython
     )
 }
 
