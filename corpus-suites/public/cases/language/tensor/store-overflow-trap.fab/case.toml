@@ -1,0 +1,17 @@
+version = 1
+id = "corpus/tensor/store-overflow-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/store-overflow-trap.fab"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stderr_contains = "does not fit in `i8`"
+check_only = false
