@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/iace/failable-operand-positions.fab"
+group = "language"
+input_root = "corpus"
+input = "iace/failable-operand-positions.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

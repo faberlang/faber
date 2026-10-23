@@ -1,0 +1,94 @@
++++
+term = "failable operand positions"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "dum_stmt", "fac_stmt", "cape_clause", "genus_decl", "genus_member", "genus_field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "assignment", "ternary", "aut_expr", "et_expr", "equality", "comparison", "format_expr", "additive_expr", "place", "call_expr", "call_suffix", "argument_list", "argument", "primary", "typed_constructor", "field_list", "field_init", "scriptum_expr", "literal", "nota_stmt"]
+category = "errors"
+canonical = false
+summary = "Failable calls leave an enclosing handler from short-circuit operands, a ternary, a loop condition, a struct initializer, or a template argument; statements after a catch still run."
+syntax = "risky() in a short-circuit operand | ternary | loop condition | struct initializer | template argument | do/catch"
+related = ["functio", "⇥", "fac", "cape", "iace"]
+locale = "en"
++++
+# =============================================================================
+# Failable calls in operand positions
+# =============================================================================
+#
+# One failable function makes evaluation order and short-circuiting visible.
+# Each call is protected by its own handler: a failure leaves that block, and
+# subsequent expressions in the block do not run. The statement after a catch
+# does run; there is no `finally` block.
+
+fn risky(int n) → int ⇥ string {
+    print "call §"(n)
+    if n ≻ 5 {
+        throw "too big"
+    }
+    return n
+}
+
+class Holder {
+    mut int value
+}
+
+main {
+    # 1. A failed left operand prevents evaluation of the right operand.
+    do {
+        if risky(9) ≻ 0 and risky(1) ≻ 0 {
+            print "1 both"
+        }
+        print "unreached"
+    }
+    catch e {
+        print "1 caught"
+    }
+
+    # 2. The condition of a ternary can fail before print begins.
+    do {
+        print risky(9) ≻ 0 ✓ "positive" ✗ "nonpositive"
+        print "unreached"
+    }
+    catch e {
+        print "2 caught"
+    }
+
+    # 3. A failed loop condition exits the loop and reaches its handler.
+    mut int i ← 0
+    do {
+        while risky(i) ≺ 100 {
+            i ← i + 1
+            print i
+        }
+        print "unreached"
+    }
+    catch e {
+        print "3 caught"
+    }
+
+    # 4. A field initializer is an operand position too.
+    do {
+        let Holder h ← Holder { value = risky(9) }
+        print "unreached"
+    }
+    catch e {
+        print "4 caught"
+    }
+
+    # 5. A template hole does not print if its argument fails.
+    do {
+        print "value §"(risky(9))
+        print "unreached"
+    }
+    catch e {
+        print "5 caught"
+    }
+
+    # 6. The handler runs, then ordinary statements continue after it.
+    do {
+        risky(9)
+        print "unreached"
+    }
+    catch e {
+        print "6 caught"
+    }
+    print "6 after"
+}
