@@ -1,0 +1,35 @@
++++
+term = "¶"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "incipit_stmt", "block_stmt", "fixum_decl", "figendum_decl", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+summary = "A named preset belongs to instants; an int subject takes a layout, so \"iso\" is refused."
+syntax = "<int> ¶ \"iso\""
+aliases = ["format"]
+related = ["scriptum", "textus", "instans"]
+locale = "en"
+canonical = false
+no_expected = "rejects"
+diagnostic = "SEM011:format_spec_preset_not_allowed"
++++
+# =============================================================================
+# ¶ — a named preset is for instants only
+# =============================================================================
+#
+# What this teaches:
+#   • The presets `iso`, `date`, and `time` render instants; numbers format
+#     through a layout instead.
+#   • Asking an int for the `"iso"` preset has no meaning, so the program is
+#     refused at check time rather than at run time.
+#
+# Common mistakes:
+#   • applying an instant preset to a number (SEM011)
+#
+# See also: scriptum, textus, instans
+# =============================================================================
+
+# This exemplum intentionally fails to compile: `"iso"` is a preset, not a layout.
+main {
+    let int n ← 7
+    print n ¶ "iso"
+}

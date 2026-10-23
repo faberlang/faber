@@ -1,0 +1,43 @@
++++
+term = "¶"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "functio_decl", "param_list", "parameter", "type_annotation", "return_clause", "block_stmt", "redde_stmt", "incipit_stmt", "fixum_decl", "figendum_decl", "fac_block", "cape_clause", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+summary = "An instant takes only the named presets iso, date, or time; a layout spec is refused."
+syntax = "<instant> ¶ \"10\""
+aliases = ["format"]
+related = ["scriptum", "textus", "instans"]
+locale = "en"
+canonical = false
+no_expected = "rejects"
+diagnostic = "SEM011:format_spec_preset_required"
++++
+# =============================================================================
+# ¶ — an instant takes a named preset, not a layout
+# =============================================================================
+#
+# What this teaches:
+#   • Instants format through the named presets `iso`, `date`, and `time` only.
+#   • A numeric layout spec — here `"10"` — has no meaning for an instant, so
+#     the program is refused at check time rather than at run time.
+#
+# Common mistakes:
+#   • writing a width/precision layout for an instant instead of a preset (SEM011)
+#
+# See also: scriptum, textus, instans
+# =============================================================================
+
+fn formo(instant t) → string {
+    return t ¶ "10"
+}
+
+# This exemplum intentionally fails to compile: `"10"` is a layout, not a preset.
+main {
+    do {
+        let instant t ← "1979-05-27T07:32:00Z" ↦ instant
+        print formo(t)
+    }
+    catch err {
+        panic err
+    }
+}

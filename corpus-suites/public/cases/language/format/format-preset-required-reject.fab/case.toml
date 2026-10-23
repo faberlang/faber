@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/format/format-preset-required-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "format/format-preset-required-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "format_spec_preset_required"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "format_spec_preset_required"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "format_spec_preset_required"

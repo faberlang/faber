@@ -1,0 +1,35 @@
++++
+term = "¶"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "incipit_stmt", "block_stmt", "fixum_decl", "figendum_decl", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+summary = "The format operator does not chain; a second ¶ in one expression is a parse error."
+syntax = "<value> ¶ \"x\" ¶ \"b\""
+aliases = ["format"]
+related = ["scriptum", "textus", "instans"]
+locale = "en"
+canonical = false
+no_expected = "rejects"
+diagnostic = "PARSE030:format_chained"
++++
+# =============================================================================
+# ¶ — the format operator does not chain
+# =============================================================================
+#
+# What this teaches:
+#   • `value ¶ "spec"` is one format tier; the result is `string` and is not
+#     itself a format subject.
+#   • A second `¶` in the same expression has no reading, so it is a parse error.
+#
+# Common mistakes:
+#   • re-formatting a formatted value in one expression; format the value once,
+#     or bind the first result and format that (PARSE030)
+#
+# See also: scriptum, textus, instans
+# =============================================================================
+
+# This exemplum intentionally fails to compile: the second `¶` has no reading.
+main {
+    let int n ← 255
+    print n ¶ "x" ¶ "b"
+}
