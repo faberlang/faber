@@ -513,3 +513,53 @@ fn intervallum_step_binding_initializer_accepts() {
 }";
     accepts(&compile(source));
 }
+
+/// A value clamped into a stepped range has no ruled meaning (the stride
+/// cannot survive as a `T` result), so it is refused by name.
+#[test]
+fn intervallum_clamp_stepped_target_rejects() {
+    let source = r"incipit {
+  sit numerus x ← 15 ↦ 0…10 per 2
+}";
+    rejects_with_issue(&compile(source), "intervallum_value_step_unsupported");
+}
+
+#[test]
+fn intervallum_stepped_receiver_coercere_rejects() {
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10 per 2
+  sit _ clamped ← evens.coercere(3)
+}";
+    rejects_with_issue(&compile(source), "intervallum_value_step_unsupported");
+}
+
+#[test]
+fn intervallum_stepped_receiver_inter_rejects() {
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10 per 2
+  sit _ hit ← evens.inter(evens)
+}";
+    rejects_with_issue(&compile(source), "intervallum_value_step_unsupported");
+}
+
+#[test]
+fn intervallum_stepped_receiver_union_rejects() {
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10 per 2
+  sit _ merged ← evens.union(evens)
+}";
+    rejects_with_issue(&compile(source), "intervallum_value_step_unsupported");
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn intervallum_stepped_receiver_query_accepts() {
+    // `longitudo` and `continet` read the stride, so a stepped receiver stays
+    // valid for both.
+    let source = r"incipit {
+  sit intervallum<numerus, 2> evens ← 0‥10 per 2
+  sit _ span ← evens.longitudo()
+  sit _ has ← evens.continet(4)
+}";
+    accepts(&compile(source));
+}
