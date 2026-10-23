@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/word-never-fails.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/word-never-fails.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
