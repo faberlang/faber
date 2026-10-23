@@ -3068,13 +3068,13 @@ impl FunctionBuilder<'_> {
 
         if let Some(params) = self.context.callable_param_lower_meta(callee) {
             let mut lowered = Vec::with_capacity(params.len());
-            for (index, (optional, default)) in params.iter().enumerate() {
+            for (index, param) in params.iter().enumerate() {
                 if let Some(arg) = args.get(index) {
                     lowered.push(self.lower_call_arg_value(&arg.expr)?);
-                } else if let Some(default) = default {
+                } else if let Some(default) = param.default {
                     lowered.push(self.lower_call_arg_value(default)?);
-                } else if *optional {
-                    lowered.push(self.omitted_optional_operand(span));
+                } else if param.optional {
+                    lowered.push(self.omitted_optional_operand(param.ty, span));
                 } else {
                     self.errors.push(MirError::unsupported(
                         span,
@@ -3102,7 +3102,7 @@ impl FunctionBuilder<'_> {
                 } else if let Some(default) = &param.default {
                     lowered.push(self.lower_call_arg_value(default)?);
                 } else if param.optional {
-                    lowered.push(self.omitted_optional_operand(span));
+                    lowered.push(self.omitted_optional_operand(None, span));
                 } else {
                     self.errors.push(MirError::unsupported(
                         span,
@@ -6210,3 +6210,7 @@ mod sink_into_test;
 #[cfg(test)]
 #[path = "imported_default_test.rs"]
 mod imported_default_test;
+
+#[cfg(test)]
+#[path = "omitted_optional_test.rs"]
+mod omitted_optional_test;

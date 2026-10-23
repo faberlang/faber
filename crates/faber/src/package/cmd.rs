@@ -975,8 +975,9 @@ pub const CHECKS_BUT_DOES_NOT_LOWER: &str = "checks but does not lower";
 
 /// The `--lower` step of `faber check`: lower the checked package to MIR and
 /// run the MIR validator through the same package-MIR driver `faber run` and
-/// `faber build -t fmir` use, without executing anything. Failures print as
-/// located diagnostics and exit 1.
+/// `faber build -t fmir` use, without executing anything. This lane plans the
+/// CLI surface without a runtime argument vector. Failures print as located
+/// diagnostics and exit 1.
 ///
 /// A package with no entry unit (a library such as Norma) has nothing to
 /// start from, so each of its modules is lowered on its own, as if it were
@@ -990,8 +991,7 @@ fn lower_checked_package(
 ) {
     let mut diagnostics = Vec::new();
     for unit in lowering_units(config, input_path) {
-        if let Err(errors) = super::mir::with_interpreted_lowered_package_mir(config, &unit, |_| ())
-        {
+        if let Err(errors) = super::mir::with_check_lowered_package_mir(config, &unit, |_| ()) {
             diagnostics.extend(errors);
         }
     }

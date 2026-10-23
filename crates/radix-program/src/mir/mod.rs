@@ -416,6 +416,9 @@ struct CliPackagePlan {
 enum CliPlanningMode {
     Parsed,
     FmirTextRuntime,
+    /// `faber check --lower`: plan a single-command root entry without
+    /// argumenta, since the argv is a runtime question.
+    Check,
 }
 
 struct CliDispatchPlan {
@@ -598,7 +601,7 @@ use cli_plan::{
     planned_cli_options, push_type_rewrite, record_shared_nominals, source_nominal_names,
 };
 use cli_values::{
-    cli_default_value, cli_operand_consumes_many, cli_operand_record_fields,
+    MissingOperandPolicy, cli_default_value, cli_operand_consumes_many, cli_operand_record_fields,
     cli_option_is_nullable, cli_option_value, cli_record_type, command_has_unsupported_options,
     command_in_unit, command_unit_id, has_unsupported_package_mir_operands,
     is_package_mir_supported_option, matching_cli_command, package_mir_cli_exit_code,
@@ -639,6 +642,8 @@ pub use manifest::{escape_toml_basic_string, relative_or_display};
 
 // The LLVM package-emission lane (package/llvm.rs) canonicalizes direct
 // definition callees before the host-partition boundary-ABI gate.
+/// CLI-checking interpreted probe used by `faber check --lower`.
+pub use driver::with_check_lowered_package_mir;
 /// Test-facing interpreted-consumer probe (the `faber run` consumer). Faber's
 /// device tests and the radix-program mir tests use it; exposed as a normal
 /// entry so dependency crates can reach it.

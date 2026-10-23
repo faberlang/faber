@@ -681,7 +681,9 @@ impl FunctionBuilder<'_> {
                         if let Some(init) = &field.init {
                             self.lower_expr_value(init)?
                         } else if field.sponte {
-                            self.omitted_optional_operand(span)
+                            // The field's own optional flag rides the aggregate
+                            // metadata, so the bare nil needs no typed slot here.
+                            self.omitted_optional_operand(None, span)
                         } else {
                             continue;
                         }
