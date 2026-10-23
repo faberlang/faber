@@ -2355,11 +2355,8 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
         let source_resolved = self.resolve_inferred_type(source_ty);
-        let Some((source_elem, target_elem, source_extents, target_extents)) =
-            self.collection_family_bridge_pair(source_resolved, target_resolved)
-        else {
-            return None;
-        };
+        let (source_elem, target_elem, source_extents, target_extents) =
+            self.collection_family_bridge_pair(source_resolved, target_resolved)?;
         if source_extents != target_extents {
             self.invalid_conversion(ISSUE_TENSOR_SHAPE_MISMATCH, span);
             return Some(self.error_type);
