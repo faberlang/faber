@@ -49,6 +49,81 @@
 __extension__ typedef __int128 faber_i128;
 __extension__ typedef unsigned __int128 faber_u128;
 
+/* Same-width scalar views of raw bits use object-representation copies. In
+ * particular, reading a high-bit unsigned pattern as a signed value avoids
+ * C's implementation-defined unsigned-to-signed conversion. */
+static inline int8_t faber_bits_read_i8(uint8_t bits) {
+    int8_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline int16_t faber_bits_read_i16(uint16_t bits) {
+    int16_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline int32_t faber_bits_read_i32(uint32_t bits) {
+    int32_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline int64_t faber_bits_read_i64(uint64_t bits) {
+    int64_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint8_t faber_bits_read_u8(uint8_t bits) {
+    uint8_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint16_t faber_bits_read_u16(uint16_t bits) {
+    uint16_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint32_t faber_bits_read_u32(uint32_t bits) {
+    uint32_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint64_t faber_bits_read_u64(uint64_t bits) {
+    uint64_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint32_t faber_bits_of_f32(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof bits);
+    return bits;
+}
+
+static inline uint64_t faber_bits_of_f64(double value) {
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof bits);
+    return bits;
+}
+
+static inline float faber_f32_of_bits(uint32_t bits) {
+    float value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline double faber_f64_of_bits(uint64_t bits) {
+    double value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
 /* A text value: a NUL-terminated C string of UTF-8 bytes. Text containing
  * NUL never reaches the runtime; the emitter rejects such literals. */
 typedef const char *faber_text;

@@ -39,6 +39,62 @@ impl Kind {
     }
 }
 
+fn int_width_for_class(class: Ty) -> Option<u8> {
+    match class {
+        Ty::Int => Some(64),
+        Ty::Sized(IntWidth::I8 | IntWidth::U8) => Some(8),
+        Ty::Sized(IntWidth::I16 | IntWidth::U16) => Some(16),
+        Ty::Sized(IntWidth::I32 | IntWidth::U32) => Some(32),
+        Ty::Sized(IntWidth::U64) => Some(64),
+        _ => None,
+    }
+}
+
+fn bits_width(width: radix_types::BitsWidth) -> u8 {
+    match width {
+        radix_types::BitsWidth::B8 => 8,
+        radix_types::BitsWidth::B16 => 16,
+        radix_types::BitsWidth::B32 => 32,
+        radix_types::BitsWidth::B64 => 64,
+    }
+}
+
+/// Return the target refusal name for a cross-width scalar bits conversion.
+pub(crate) fn bits_conversion_width_mismatch(
+    source: Option<Ty>,
+    target: Ty,
+) -> Option<&'static str> {
+    let source = source?;
+    match (source, target) {
+        (Ty::Bits(from), Ty::Bits(to)) if from != to => {
+            Some("raw bits conversion at a different width")
+        }
+        (Ty::Bits(from), Ty::Int | Ty::Sized(_))
+            if int_width_for_class(target) != Some(bits_width(from)) =>
+        {
+            Some("raw bits to integer conversion at a different width")
+        }
+        (Ty::Int | Ty::Sized(_), Ty::Bits(to))
+            if int_width_for_class(source) != Some(bits_width(to)) =>
+        {
+            Some("integer to raw bits conversion at a different width")
+        }
+        (Ty::Bits(from), Ty::Float32) if bits_width(from) != 32 => {
+            Some("raw bits to float conversion at a different width")
+        }
+        (Ty::Bits(from), Ty::Float) if bits_width(from) != 64 => {
+            Some("raw bits to float conversion at a different width")
+        }
+        (Ty::Float32, Ty::Bits(to)) if bits_width(to) != 32 => {
+            Some("float to raw bits conversion at a different width")
+        }
+        (Ty::Float, Ty::Bits(to)) if bits_width(to) != 64 => {
+            Some("float to raw bits conversion at a different width")
+        }
+        _ => None,
+    }
+}
+
 /// The range an integer class holds, and its value form once converted.
 fn int_target(class: Ty) -> Option<(i128, i128, bool)> {
     match class {
@@ -94,11 +150,69 @@ impl Emitter<'_> {
         }
         let class = classify(self.types, target)?;
         let value = self.expr(source)?;
+        let source_class = source.ty.map(|ty| classify(self.types, ty)).transpose()?;
+        if let Some(construct) = bits_conversion_width_mismatch(source_class, class) {
+            return Err(unsupported(construct));
+        }
         let integer = matches!(value.value, Value::Int | Value::Exact);
         let effect = value.effect;
         // Conversions that cannot fail ignore a recovery (typecheck allows
         // one only where the conversion can fail).
         let operand = match (value.value, class) {
+            // Raw bits are a same-width view of an integer's low-width
+            // pattern. C's conversion to an unsigned cell is defined modulo
+            // 2^N, including negative signed sources.
+            (Value::Int | Value::Exact, Ty::Bits(width))
+                if source_class.and_then(int_width_for_class) == Some(bits_width(width)) =>
+            {
+                let c_type = crate::ty::int_width_of_bits(width).c_type();
+                Operand::new(format!("(({c_type})({}))", value.text), Value::from(class))
+            }
+            // A bN-to-bN conversion preserves the already unsigned carrier.
+            (Value::Int | Value::Exact, Ty::Bits(width))
+                if source_class == Some(Ty::Bits(width)) =>
+            {
+                value
+            }
+            // Reading raw bits into an integer must copy the representation:
+            // an out-of-range unsigned-to-signed C cast is implementation-defined.
+            (Value::Int | Value::Exact, Ty::Int)
+                if source_class == Some(Ty::Bits(radix_types::BitsWidth::B64)) =>
+            {
+                Operand::new(format!("faber_bits_read_i64({})", value.text), Value::Int)
+            }
+            (Value::Int | Value::Exact, Ty::Sized(width)) if matches!(source_class, Some(Ty::Bits(bits)) if int_width_for_class(Ty::Sized(width)) == Some(bits_width(bits))) => {
+                Operand::new(
+                    format!("faber_bits_read_{}({})", width.marker(), value.text),
+                    Value::from(class),
+                )
+            }
+            (Value::Float32, Ty::Bits(radix_types::BitsWidth::B32))
+                if source_class == Some(Ty::Float32) =>
+            {
+                Operand::new(
+                    format!("faber_bits_of_f32({})", value.text),
+                    Value::from(class),
+                )
+            }
+            (Value::Float, Ty::Bits(radix_types::BitsWidth::B64))
+                if source_class == Some(Ty::Float) =>
+            {
+                Operand::new(
+                    format!("faber_bits_of_f64({})", value.text),
+                    Value::from(class),
+                )
+            }
+            (Value::Int | Value::Exact, Ty::Float32)
+                if source_class == Some(Ty::Bits(radix_types::BitsWidth::B32)) =>
+            {
+                Operand::new(format!("faber_f32_of_bits({})", value.text), Value::Float32)
+            }
+            (Value::Int | Value::Exact, Ty::Float)
+                if source_class == Some(Ty::Bits(radix_types::BitsWidth::B64)) =>
+            {
+                Operand::new(format!("faber_f64_of_bits({})", value.text), Value::Float)
+            }
             // A conversion into a float class is the C cast: `int ↦ float`
             // widens, `float ↦ f32` narrows, and `f32 ↦ float` widens the
             // already-binary32 value.

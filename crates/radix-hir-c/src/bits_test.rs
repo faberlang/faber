@@ -4,8 +4,9 @@
 //! carrier, which would be a wrong program (operator ruling 2026-10-10:
 //! `bits have their width always`).
 
-use crate::error::UNSUPPORTED_ISSUE;
-use crate::test_support::{inline, rejected_construct};
+use crate::conversio::bits_conversion_width_mismatch;
+use crate::error::{UNSUPPORTED_ISSUE, unsupported};
+use crate::test_support::{emitted, inline, rejected_construct};
 use crate::ty::{Ty, int_width_of_bits, refuse_bits_operand};
 use radix_codegen_shared::CodegenError;
 use radix_types::{BitsWidth, TypeTable};
@@ -28,11 +29,52 @@ fn construct_of(error: &CodegenError) -> String {
     arg("construct")
 }
 
-/// A raw-bits operand refuses every operator by name. Authored `bN` cannot
-/// reach this leaf yet (the module gate keeps target c out until unit
-/// 3e80d069-1.1, and the front end refuses bits arithmetic first with SEM011
-/// `bits_arithmetic_refused`), so the leaf's guard is pinned at the class it
-/// reads: an operand whose type classifies to `Ty::Bits`.
+/// Same-width scalar conversions in the corpus reinterpret one cell rather
+/// than range-checking or converting through a wider signed value.
+#[test]
+fn bits_scalar_conversion_reads_the_pattern() {
+    let corpus = include_str!("../../../corpus/bits/bits-scalar-conversion.fab");
+    let body = corpus
+        .split_once("\n+++\n")
+        .expect("corpus frontmatter closes")
+        .1;
+    let code = emitted(body);
+    assert!(code.contains("faber_bits_read_i8"), "{code}");
+    assert!(code.contains("((uint8_t)("), "{code}");
+}
+
+/// Floating-point bit conversions preserve the declared IEEE width in both
+/// directions instead of casting through an integer value.
+#[test]
+fn bits_float_conversion_copies_the_pattern() {
+    let code = emitted(
+        "main {\n    let f32 single ← 1.5\n    let b32 single_bits ← single ↦ b32\n    let f32 single_back ← single_bits ↦ f32\n    let f64 double ← 1.5\n    let b64 double_bits ← double ↦ b64\n    let f64 double_back ← double_bits ↦ f64\n}",
+    );
+    assert!(code.contains("faber_bits_of_f32"), "{code}");
+    assert!(code.contains("faber_f32_of_bits"), "{code}");
+    assert!(code.contains("faber_bits_of_f64"), "{code}");
+    assert!(code.contains("faber_f64_of_bits"), "{code}");
+}
+
+/// Even though semantic analysis normally diagnoses this width change first,
+/// the C boundary independently refuses `b8 ↦ b16` as a named unsupported
+/// construct if mismatched HIR reaches it.
+#[test]
+fn bits_conversion_mixing_is_still_refused() {
+    let construct =
+        bits_conversion_width_mismatch(Some(Ty::Bits(BitsWidth::B8)), Ty::Bits(BitsWidth::B16))
+            .expect("cross-width bits conversion must be named");
+    let error = unsupported(construct);
+    assert_eq!(
+        construct_of(&error),
+        "raw bits conversion at a different width"
+    );
+}
+
+/// A raw-bits operand refuses every operator by name. Authored `bN` reaches
+/// this leaf now that the C target carries it, but the front end refuses bits
+/// arithmetic first with SEM011 `bits_arithmetic_refused`. Pin the target guard
+/// at the class it reads: an operand whose type classifies to `Ty::Bits`.
 #[test]
 fn bits_arithmetic_refused_by_name() {
     let mut types = TypeTable::new();
