@@ -1995,9 +1995,11 @@ fn additive_mask_softmax_resolves_row_reduction_contract() {
 // the generic storage/locus row, with a stable issue.
 #[test]
 fn kernel_admission_rejects_sparse_storage_by_name() {
+    let types = TypeTable::new();
+    let validation = MirValidationContext::new(&types);
     let sparse = crate::MirDeviceViewLayout::sparse_row_major(crate::MirScalarLayout::F32, 2);
     for allow_host_owned in [false, true] {
-        let err = require_kernel_device_view(sparse, allow_host_owned)
+        let err = require_kernel_device_view(sparse, &validation, allow_host_owned)
             .expect_err("sparse storage must not be admitted to kernels");
         assert_eq!(err.issue, "mir_kernel_sparse_storage_unsupported");
     }
@@ -2005,17 +2007,22 @@ fn kernel_admission_rejects_sparse_storage_by_name() {
 
 #[test]
 fn kernel_admission_adds_rank_three_and_four_with_rank_five_closed() {
+    let types = TypeTable::new();
+    let validation = MirValidationContext::new(&types);
     let rank3 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 3);
-    require_kernel_device_view(rank3, false).expect("contiguous rank-3 device view is admitted");
+    require_kernel_device_view(rank3, &validation, false)
+        .expect("contiguous rank-3 device view is admitted");
 
     // U1 head-axis: the batched matmul route binds the rank-4 Q operand
     // (`[kv_heads, q_per_kv, query_seq, head_dim]`); rank 5 stays
     // fail-closed.
     let rank4 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 4);
-    require_kernel_device_view(rank4, false).expect("contiguous rank-4 device view is admitted");
+    require_kernel_device_view(rank4, &validation, false)
+        .expect("contiguous rank-4 device view is admitted");
 
     let rank5 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 5);
-    let error = require_kernel_device_view(rank5, false).expect_err("rank 5 stays fail-closed");
+    let error = require_kernel_device_view(rank5, &validation, false)
+        .expect_err("rank 5 stays fail-closed");
     assert_eq!(error.issue, "mir_kernel_device_view_rank_unsupported");
 }
 

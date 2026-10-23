@@ -506,6 +506,13 @@ impl<'a> DeviceSafeClassifier<'a> {
                 vector.width,
                 vector.element.spelling()
             ));
+        } else if let MirDeviceViewElement::Record(record_ty) = view.element
+            && let Err(refusal) =
+                resolve_struct_layout(MirType::semantic(record_ty), self.validation)
+        {
+            // WHY: a resolved record element is admitted here; a refused one
+            // is reported by the layout resolver's own reason.
+            self.record_layout(format!("kernel device view element: {}", refusal.reason()));
         }
     }
 

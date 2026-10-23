@@ -89,23 +89,29 @@ pub struct MirAggregateLayout {
     pub capacity: Option<u64>,
 }
 
-/// Element of a device view: a scalar cell, or one packed vector per cell
-/// (`tensor<vector<f32, 4>, [H, W]>`). The vector arm admits only widths whose
-/// size equals their alignment (2 and 4); width 3 fails closed at layout time
-/// because MSL `float3` has a 16-byte stride.
+/// Element of a device view: a scalar cell, one packed vector per cell
+/// (`tensor<vector<f32, 4>, [H, W]>`), or a genus record per cell. The vector
+/// arm admits only widths whose size equals their alignment (2 and 4); width 3
+/// fails closed at layout time because MSL `float3` has a 16-byte stride.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirDeviceViewElement {
     Scalar(MirScalarLayout),
     Vector(MirDeviceVectorLayout),
+    /// The element is a genus record; its byte size, alignment and field
+    /// offsets come only from `resolve_struct_layout`. Device byte order is
+    /// little-endian. The layout table is built from the `TypeTable` alone and
+    /// cannot see struct fields, so the variant carries the element type id and
+    /// consumers resolve it with the validation context.
+    Record(TypeId),
 }
 
 impl MirDeviceViewElement {
-    /// The scalar element, or `None` for a vector element.
+    /// The scalar element, or `None` for a vector or record element.
     #[must_use]
     pub fn scalar(self) -> Option<MirScalarLayout> {
         match self {
             Self::Scalar(scalar) => Some(scalar),
-            Self::Vector(_) => None,
+            Self::Vector(_) | Self::Record(_) => None,
         }
     }
 }
@@ -875,6 +881,7 @@ fn tensor_layout_kind(
     memo: &mut FxHashMap<TypeId, LayoutResolution>,
     visiting: &mut FxHashSet<TypeId>,
 ) -> LayoutResolution {
+    let element_ty = element;
     layout_kind_for_type(types, element, memo, visiting).then(|element| {
         let element = match element {
             MirLayoutKind::Scalar(scalar) => MirDeviceViewElement::Scalar(scalar),
@@ -896,6 +903,15 @@ fn tensor_layout_kind(
                     );
                 }
                 MirDeviceViewElement::Vector(vector)
+            }
+            // The layout table cannot resolve a genus record's fields, so the
+            // element carries its type id; consumers resolve the byte size,
+            // alignment and field offsets with the validation context.
+            MirLayoutKind::Aggregate(aggregate)
+                if aggregate.family == MirAggregateFamily::Struct
+                    && aggregate.carrier == MirAggregateCarrier::PhysicalValue =>
+            {
+                MirDeviceViewElement::Record(element_ty)
             }
             _ => {
                 return LayoutResolution::Resolved(opaque_aggregate(

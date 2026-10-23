@@ -546,8 +546,19 @@ impl Validator<'_, '_> {
                     return;
                 };
                 let expected = match view.element {
-                    MirDeviceViewElement::Scalar(scalar) => MirLayoutKind::Scalar(scalar),
-                    MirDeviceViewElement::Vector(vector) => MirLayoutKind::DeviceVector(vector),
+                    MirDeviceViewElement::Scalar(scalar) => Some(MirLayoutKind::Scalar(scalar)),
+                    MirDeviceViewElement::Vector(vector) => {
+                        Some(MirLayoutKind::DeviceVector(vector))
+                    }
+                    // WHY: a record element's byte facts come from
+                    // `resolve_struct_layout`, not the layout table; the index
+                    // projection is admitted by element type identity.
+                    MirDeviceViewElement::Record(record_ty) => {
+                        if result_ty.semantic_id() != record_ty {
+                            self.error(span, "device view projection element layout mismatch");
+                        }
+                        None
+                    }
                 };
                 // `octeti<N>[lo‥hi]` is an `octeti` window: the static byte
                 // buffer projects to the opaque unbounded carrier, not to its
@@ -562,7 +573,8 @@ impl Validator<'_, '_> {
                         self.type_kind(result_ty),
                         Type::Primitive(Primitive::Octeti)
                     );
-                if result_layout.kind != expected && !octeti_window {
+                if expected.is_some_and(|expected| result_layout.kind != expected) && !octeti_window
+                {
                     self.error(span, "device view projection element layout mismatch");
                 }
             }
