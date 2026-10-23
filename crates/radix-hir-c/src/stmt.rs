@@ -4,7 +4,7 @@ use crate::error::unsupported;
 use crate::expr::{Operand, Value, construct_name};
 use crate::helpers::{Helper, ListOp};
 use crate::items::Returns;
-use crate::ty::{Ty, classify};
+use crate::ty::{Ty, classify, int_width_of_bits};
 use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
@@ -1209,7 +1209,7 @@ impl Emitter<'_> {
                 self.support.need_ints();
                 (
                     bits_display_spec(width),
-                    format!("(uint64_t){}", value.text),
+                    format!("({}){}", int_width_of_bits(width).c_type(), value.text),
                 )
             } else {
                 match value.value {

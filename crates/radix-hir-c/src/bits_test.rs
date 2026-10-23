@@ -153,7 +153,8 @@ fn bits_store_is_the_unsigned_width_cell() {
 }
 
 /// Raw-bits printing uses the width-specific hexadecimal conversion macro and
-/// passes its unsigned cell through the variadic-call carrier.
+/// passes an argument of the matching unsigned C cell, so the variadic call's
+/// format and argument types agree under strict `-Wformat`.
 #[test]
 fn bits_print_is_hex_at_full_width() {
     let code = crate::test_support::emitted(
@@ -163,8 +164,13 @@ fn bits_print_is_hex_at_full_width() {
     assert!(code.contains("0x%04\" PRIx16"), "{code}");
     assert!(code.contains("0x%08\" PRIx32"), "{code}");
     assert!(code.contains("0x%016\" PRIx64"), "{code}");
-    assert!(code.contains("(uint64_t)l_one8"), "{code}");
+    assert!(code.contains("(uint8_t)l_one8"), "{code}");
+    assert!(code.contains("(uint16_t)l_one16"), "{code}");
+    assert!(code.contains("(uint32_t)l_one32"), "{code}");
     assert!(code.contains("(uint64_t)l_one64"), "{code}");
+    assert!(!code.contains("(uint64_t)l_one8"), "{code}");
+    assert!(!code.contains("(uint64_t)l_one16"), "{code}");
+    assert!(!code.contains("(uint64_t)l_one32"), "{code}");
 }
 
 /// `lista<b8> ↦ string` is the UTF-8 decode and `string ↦ lista<b8>` the
