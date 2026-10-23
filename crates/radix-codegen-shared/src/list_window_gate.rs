@@ -12,7 +12,11 @@
 //! form, as does the Rust emitter (which is checked in [`is_list_window`]).
 //! This gate rejects any module that takes one before an emitter runs, naming
 //! the target, until a target's own emission lands and adds itself to
-//! [`target_admits_list_window`]. The
+//! [`target_admits_list_window`]. LLVM text, LLVM host, Wasm text and sexp remain
+//! intentionally fail-closed; their durable per-target follow-up references
+//! (`7797c432-list-window-llvm-text`, `7797c432-list-window-llvm-host`,
+//! `7797c432-list-window-wasm-text`, `7797c432-list-window-sexp`) are recorded
+//! beside the admission list. The
 //! octeti window, plain or under an endian conversion `buf[lo‥hi] ↦ W via Be`,
 //! indexes a byte receiver (`lista<b8>`, the word `octeti`), not a list, and is
 //! untouched.
@@ -30,7 +34,12 @@ const ISSUE: &str = "list_window_unsupported_on_target";
 /// authored index; the MIR runner executes it and does not reach codegen; the
 /// clif backend lowers it to a runtime slice; the Go, TypeScript, Swift and
 /// Python emitters copy the range, striding by an optional step. LLVM, sexp and
-/// wasm still refuse it.
+/// wasm still refuse it. These fail-closed residuals have durable per-target
+/// follow-up references under need: `7797c432-list-window-llvm-text`
+/// (`MirLlvm`), `7797c432-list-window-llvm-host` (`MirLlvmHost`),
+/// `7797c432-list-window-wasm-text` (`MirWasm`), and
+/// `7797c432-list-window-sexp` (`MirSexp`). Keep each target refused here until
+/// its own emission and target-specific proof are complete.
 fn target_admits_list_window(target: Target) -> bool {
     matches!(
         target,
