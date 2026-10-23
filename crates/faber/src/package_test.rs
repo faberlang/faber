@@ -1097,6 +1097,7 @@ main {
 
 #[cfg(feature = "hir-rust")]
 #[test]
+#[ignore = "requires a rustfmt binary on PATH; manual formatting proof"]
 fn package_emits_rustfmt_clean_generated_main_for_multifile_package() {
     let dir = test_temp_dir("rustfmt-clean-multifile-package");
     let entry = dir.join("main.fab");
@@ -1139,21 +1140,6 @@ fn label() → string {
     let layout = discover_build_layout(&entry).expect("layout");
     emit_generated_crate(&layout, &output.code, None).expect("emit generated crate");
 
-    // rustfmt must be a working toolchain where this proof is mandatory — a
-    // rustup shim with no configured default toolchain fails `--version`. The
-    // emission assertions above are toolchain-free.
-    if !Command::new("rustfmt")
-        .arg("--version")
-        .output()
-        .is_ok_and(|output| output.status.success())
-    {
-        missing_tool(
-            "rustfmt",
-            "package_emits_rustfmt_clean_generated_main_for_multifile_package",
-            "rustfmt is required by this proof (was: expect(\"rustfmt\"))",
-        );
-        return;
-    }
     let rustfmt = Command::new("rustfmt")
         .args(["--edition", "2021", "--check"])
         .arg(&layout.generated_rust_entry)
@@ -2402,12 +2388,14 @@ main {
 
 #[cfg(feature = "mir-llvm")]
 #[test]
+#[ignore = "assembles the emitted package IR with an external llvm-as; manual verifier proof"]
 fn package_mir_json_corpus_emits_verifier_valid_llvm() {
     assert_package_corpus_llvm_smoke("json/json.fab", "package-json-corpus");
 }
 
 #[cfg(feature = "mir-llvm")]
 #[test]
+#[ignore = "assembles the emitted package IR with an external llvm-as; manual verifier proof"]
 fn package_mir_stage4b_instans_emits_verifier_valid_llvm() {
     assert_package_corpus_llvm_smoke("instans/instans.fab", "package-stage4b-instans");
 }
@@ -2432,26 +2420,20 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
     .expect("corpus package lowers to MIR")
     .expect("corpus package emits LLVM");
 
-    if Command::new("llvm-as")
-        .arg("--version")
+    let dir = test_temp_dir(label);
+    let llvm_path = dir.join("module.ll");
+    fs::write(&llvm_path, emitted).expect("write package corpus LLVM");
+    let output = Command::new("llvm-as")
+        .arg(&llvm_path)
+        .arg("-o")
+        .arg(llvm_path.with_extension("bc"))
         .output()
-        .is_ok_and(|output| output.status.success())
-    {
-        let dir = test_temp_dir(label);
-        let llvm_path = dir.join("module.ll");
-        fs::write(&llvm_path, emitted).expect("write package corpus LLVM");
-        let output = Command::new("llvm-as")
-            .arg(&llvm_path)
-            .arg("-o")
-            .arg(llvm_path.with_extension("bc"))
-            .output()
-            .expect("run llvm-as");
-        assert!(
-            output.status.success(),
-            "llvm-as rejected package corpus {relative}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+        .expect("run llvm-as");
+    assert!(
+        output.status.success(),
+        "llvm-as rejected package corpus {relative}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
