@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/conversio/word-recovery-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/word-recovery-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "word_conversio_recovery_unsupported"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "word_conversio_recovery_unsupported"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "word_conversio_recovery_unsupported"

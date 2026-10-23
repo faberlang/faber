@@ -1,0 +1,26 @@
++++
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM016:numeric_ascription_requires_conversion"
+term = "∷"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "cast_expr", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "A numeric type ascription cannot narrow a value or lose precision; write a conversion instead."
+syntax = "300 ∷ u8 — rejected; write 300 ↦ u8"
+related = ["∷", "↦"]
+locale = "en"
++++
+# =============================================================================
+# Numeric ascription — a narrowing claim is a conversion, not a fact.
+# =============================================================================
+#
+# What this teaches:
+#   • `∷` only states a fact the target width already holds. Narrowing or
+#     losing precision is a conversion and is refused by name.
+#   • `300 ↦ u8` is the conversion spelling; `let u8 ok ← 200 ∷ u8` would
+#     be fine because the value fits.
+#
+main {
+    let u8 narrow ← 300 ∷ u8
+}

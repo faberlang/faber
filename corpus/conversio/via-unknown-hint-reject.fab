@@ -1,0 +1,26 @@
++++
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM016:conversio_via_unknown_hint"
+term = "via"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "conversio_expr", "inline_default", "via_clause", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "A conversion hint must be one of the fixed supported words; unknown hint names are refused."
+syntax = "\"ff\" ↦ i32 via Base16 — rejected; write via Hex"
+related = ["↦", "via"]
+locale = "en"
++++
+# =============================================================================
+# Unknown conversion hint — a name is refused, never silently reinterpreted.
+# =============================================================================
+#
+# What this teaches:
+#   • Conversion hints are the fixed set Hex, Bin, Oct, Be, Le and Code.
+#     An unknown word is refused by name instead of falling back.
+#   • `via Hex` is the spelling that works; a hint on a target that takes
+#     none is refused too.
+#
+main {
+    let i32 parsed ← "ff" ↦ i32 via Base16
+}
