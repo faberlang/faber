@@ -459,6 +459,7 @@ fn validate_type_arg(
     types: &radix_types::TypeTableSnapshot,
     named_defs: &FxHashSet<radix_types::DefId>,
     alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
+    conversation: Option<radix_types::DefId>,
     check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
     check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
     check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
@@ -477,6 +478,7 @@ fn validate_type_arg(
         types,
         named_defs,
         alias_params,
+        conversation,
         check_symbol,
         check_def,
         check_type,
@@ -548,6 +550,7 @@ fn validate_named_form(
     types: &radix_types::TypeTableSnapshot,
     named_defs: &FxHashSet<radix_types::DefId>,
     alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
+    conversation: Option<radix_types::DefId>,
     path_def: radix_types::DefId,
     path: &[radix_lexer::Symbol],
     check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
@@ -598,7 +601,33 @@ fn validate_named_form(
         ));
     }
     if applied_args.len() != form.args.len() {
-        return Err(type_presentation_issue("named_argument_arity", site));
+        // The conversation builtin finalizes `sermo<O, R>` to its bare carrier
+        // struct, so its witness carries no argument list even though the
+        // author spelled two type arguments. Exactly the compiler-designated
+        // constructor pairs that way, and only with two authored `Type`
+        // children; every other named type keeps the strict arity rule.
+        if !is_conversation_bare_carrier(types, conversation, path_def, &applied_args, form) {
+            return Err(type_presentation_issue("named_argument_arity", site));
+        }
+        for arg in &form.args {
+            let radix_hir::HirTypeFormArg::Type(child) = arg else {
+                return Err(type_presentation_issue("conversation_argument_kind", site));
+            };
+            validate_type_form(
+                child,
+                site,
+                root_slot,
+                types,
+                named_defs,
+                alias_params,
+                conversation,
+                check_symbol,
+                check_def,
+                check_type,
+                check_index,
+            )?;
+        }
+        return Ok(());
     }
     for (arg, expected) in form.args.iter().zip(applied_args) {
         match expected {
@@ -614,6 +643,7 @@ fn validate_named_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -640,6 +670,59 @@ fn validate_named_form(
                 validate_size_arg(arg, expected, site, check_index)?;
             }
         }
+    }
+    Ok(())
+}
+
+/// Whether a `Named` form is the designated conversation constructor's bare
+/// carrier pairing.
+///
+/// `sermo<O, R>` is finalized to its bare `Type::Struct` carrier, so the site
+/// witness holds no `Applied` argument list while the author spelled the
+/// conversation's two type arguments. Only the compiler-owned constructor
+/// recorded on the artifact takes that shape; any other definition, any other
+/// witness shape, and any other authored arity keeps the strict rule.
+fn is_conversation_bare_carrier(
+    types: &radix_types::TypeTableSnapshot,
+    conversation: Option<radix_types::DefId>,
+    path_def: radix_types::DefId,
+    applied_args: &[radix_types::AppliedArg],
+    form: &radix_hir::HirTypeForm,
+) -> bool {
+    conversation == Some(path_def)
+        && applied_args.is_empty()
+        && form.args.len() == 2
+        && matches!(
+            types.types().get(form.ty.0 as usize),
+            Some(radix_types::Type::Struct(def)) if *def == path_def
+        )
+}
+
+/// Validate the artifact's recorded conversation-constructor identity.
+///
+/// The metadata is the compiler's own `sermo` definition
+/// (`Resolver::builtin_sermo_def_id`), so its `DefId` must resolve against the
+/// artifact and the type table must carry that definition's bare struct — the
+/// carrier shape the authored-form validator pairs an authored `sermo<O, R>`
+/// with. A stale or unrelated identity fails closed.
+fn validate_conversation_constructor(
+    artifact: &HirArtifact,
+    check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
+) -> Result<(), HirArtifactError> {
+    let Some(def_id) = artifact.conversation_constructor else {
+        return Ok(());
+    };
+    check_def(def_id)?;
+    let carrier = artifact
+        .types
+        .types()
+        .iter()
+        .any(|ty| matches!(ty, radix_types::Type::Struct(def) if *def == def_id));
+    if !carrier {
+        return Err(HirArtifactError::InvalidPresentation {
+            issue: "conversation_constructor_not_carrier",
+            anchor: def_id.0,
+        });
     }
     Ok(())
 }
@@ -979,6 +1062,7 @@ fn validate_type_form(
     types: &radix_types::TypeTableSnapshot,
     named_defs: &FxHashSet<radix_types::DefId>,
     alias_params: &FxHashMap<radix_types::DefId, Vec<radix_lexer::Symbol>>,
+    conversation: Option<radix_types::DefId>,
     check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
     check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
     check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
@@ -1018,6 +1102,7 @@ fn validate_type_form(
                 types,
                 named_defs,
                 alias_params,
+                conversation,
                 *def_id,
                 path,
                 check_symbol,
@@ -1094,6 +1179,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1117,6 +1203,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1140,6 +1227,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1184,6 +1272,7 @@ fn validate_type_form(
                             types,
                             named_defs,
                             alias_params,
+                            conversation,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1197,6 +1286,7 @@ fn validate_type_form(
                             types,
                             named_defs,
                             alias_params,
+                            conversation,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1224,6 +1314,7 @@ fn validate_type_form(
                             types,
                             named_defs,
                             alias_params,
+                            conversation,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1251,6 +1342,7 @@ fn validate_type_form(
                                 types,
                                 named_defs,
                                 alias_params,
+                                conversation,
                                 check_symbol,
                                 check_def,
                                 check_type,
@@ -1270,6 +1362,7 @@ fn validate_type_form(
                             types,
                             named_defs,
                             alias_params,
+                            conversation,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1290,6 +1383,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1303,6 +1397,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1321,6 +1416,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1347,6 +1443,7 @@ fn validate_type_form(
                             types,
                             named_defs,
                             alias_params,
+                            conversation,
                             check_symbol,
                             check_def,
                             check_type,
@@ -1382,6 +1479,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1401,6 +1499,7 @@ fn validate_type_form(
                         types,
                         named_defs,
                         alias_params,
+                        conversation,
                         check_symbol,
                         check_def,
                         check_type,
@@ -1425,6 +1524,7 @@ fn validate_authored_type_records(
     let sites = collect_type_site_registry(artifact);
     let named_defs = collect_named_type_defs(artifact);
     let alias_params = collect_generic_alias_params(artifact);
+    let conversation = artifact.conversation_constructor;
     let mut seen = FxHashSet::default();
     for authored in &presentation.authored_types {
         if !seen.insert(authored.site.clone()) {
@@ -1454,6 +1554,7 @@ fn validate_authored_type_records(
             &artifact.types,
             &named_defs,
             &alias_params,
+            conversation,
             check_symbol,
             check_def,
             check_type,
@@ -3765,6 +3866,7 @@ pub(crate) fn validate_referential_integrity(
             &check_type,
             &check_index,
         )?;
+        validate_conversation_constructor(artifact, &check_def)?;
 
         // Each by-label `iuncta` read annotates exactly one rewritten index
         // node. A dangling or duplicated id is a producer defect: emission

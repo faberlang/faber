@@ -202,8 +202,11 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // schema 44 carries the unit's program display tokens (`true`, `false`,
     // `none`, `tuple`) so a loaded unit prints the author's code-locale words;
     // schema 45 adds `HirPresentation::axis_sugar` (the authored
-    // `t.sum(axis n)` / `t.mean(axis n)` calls typecheck expanded).
-    assert_eq!(SCHEMA_VERSION, 45);
+    // `t.sum(axis n)` / `t.mean(axis n)` calls typecheck expanded);
+    // schema 46 carries `HirArtifact::conversation_constructor` (the
+    // compiler-owned `sermo` definition the authored-form validator pairs a
+    // bare carrier with).
+    assert_eq!(SCHEMA_VERSION, 46);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

@@ -1263,6 +1263,7 @@ struct HirArtifactDto {
     kernel_requirements: KernelRequirementsWire,
     tensor_edge_policies: TensorEdgePolicyTableWire,
     display_tokens: DisplayTokensWire,
+    conversation_constructor: Option<DefId>,
 }
 
 impl From<HirArtifact> for HirArtifactDto {
@@ -1304,6 +1305,7 @@ impl From<HirArtifact> for HirArtifactDto {
             kernel_requirements: artifact.kernel_requirements,
             tensor_edge_policies: artifact.tensor_edge_policies,
             display_tokens: artifact.display_tokens,
+            conversation_constructor: artifact.conversation_constructor,
         }
     }
 }
@@ -1350,6 +1352,7 @@ impl From<&HirArtifact> for HirArtifactDto {
             kernel_requirements: artifact.kernel_requirements.clone(),
             tensor_edge_policies: artifact.tensor_edge_policies.clone(),
             display_tokens: artifact.display_tokens.clone(),
+            conversation_constructor: artifact.conversation_constructor,
         }
     }
 }
@@ -1390,6 +1393,7 @@ impl From<HirArtifactDto> for HirArtifact {
             kernel_requirements: dto.kernel_requirements,
             tensor_edge_policies: dto.tensor_edge_policies,
             display_tokens: dto.display_tokens,
+            conversation_constructor: dto.conversation_constructor,
         }
     }
 }
