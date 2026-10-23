@@ -6,4 +6,5 @@ input = "generic/union-option.fab"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
