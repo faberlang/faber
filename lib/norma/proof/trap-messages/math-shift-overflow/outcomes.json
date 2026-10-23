@@ -27,6 +27,12 @@
       "phase": "emit",
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs. This case uses no leaf route, so it should pass at emit once the C package path exists; re-measure this row then."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "undefined: math",
+      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:math` module this proof imports, so the generated `main.go` calls `math.*` with no such package-level identifier and `go build` stops with `undefined: math`. Re-measure this row when the Go package emitter lowers that module binding."
     }
   }
 }
