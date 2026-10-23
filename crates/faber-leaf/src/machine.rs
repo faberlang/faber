@@ -297,9 +297,8 @@ fn interval_procs(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalProc
                     .find(|previous_proc| previous_proc.pid == proc_row.pid)
             });
             let cpu_ns = previous.map_or(0, |previous_proc| {
-                i64::try_from(proc_row.cpu_ns)
+                i64::try_from(proc_row.cpu_ns.saturating_sub(previous_proc.cpu_ns))
                     .unwrap_or(i64::MAX)
-                    .saturating_sub(i64::try_from(previous_proc.cpu_ns).unwrap_or(i64::MAX))
             });
             IntervalProc {
                 pid: proc_row.pid,
