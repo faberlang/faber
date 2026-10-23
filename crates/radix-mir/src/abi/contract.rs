@@ -719,7 +719,8 @@ pub fn collection_op_contract(
 }
 
 /// Matmul contract for the current `TensorMatMul`: the run-time-extent
-/// rank-2 contraction, the rank-2 literal grid, or the batched fold.
+/// contraction (rank-2, or the batched rank-2..4 form), the rank-2 literal
+/// grid, or the batched fold.
 fn matmul_contract(
     function: &MirFunction,
     args: &[MirOperand],
@@ -746,15 +747,43 @@ fn matmul_contract(
         .chain(&right_all)
         .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime));
     if runtime {
-        // Only the rank-2 contraction takes run-time extents;
-        // batched stays literal-only (named refusal).
-        if left_all.len() != 2 || !(1..=2).contains(&right_all.len()) {
+        // The batched dense run-time form takes the literal arm's shape law,
+        // applied to `Dim` values instead of `u64`s: a rank-2..=4 left
+        // tensor, a rank-1 right only with a rank-2 left, and for a rank-3/4
+        // left a right rank of 2..=left rank whose leading batch dims are a
+        // prefix of the left's (the GQA share). Flattening is row-major over
+        // the left's leading axes; the contraction is the left's last axis
+        // against the right's len-2 axis. An axis is compared only when BOTH
+        // sides are literal — a run-time axis is bound by the call-site
+        // shape at launch, never guessed here.
+        let left_rank = left_all.len();
+        let right_rank = right_all.len();
+        let admitted_ranks = if left_rank == 2 {
+            (1..=2).contains(&right_rank)
+        } else {
+            (2..=left_rank).contains(&right_rank)
+        };
+        if !(2..=4).contains(&left_rank) || !admitted_ranks {
             return Err(MirAbiError::new(
-                "matmul with run-time extents requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
+                "matmul with run-time extents requires a rank-2..4 left tensor and a rank-1 or rank-2 right tensor (rank 2 through the left rank for a batched left)",
             ));
         }
+        let batch_axis_count = right_rank.saturating_sub(2);
+        for axis in 0..batch_axis_count {
+            if let (
+                crate::tensor_type::Dim::Literal(left_batch),
+                crate::tensor_type::Dim::Literal(right_batch),
+            ) = (left_all[axis], right_all[axis])
+                && left_batch != right_batch
+            {
+                return Err(MirAbiError::new(
+                    "batched matmul requires the right operand's leading batch dims to be a prefix of the left operand's batch dims",
+                ));
+            }
+        }
+        let right_contraction = right_rank.saturating_sub(2);
         if let (crate::tensor_type::Dim::Literal(left_k), crate::tensor_type::Dim::Literal(right_k)) =
-            (left_all[1], right_all[0])
+            (left_all[left_rank - 1], right_all[right_contraction])
             && left_k != right_k
         {
             return Err(MirAbiError::new("matmul inner dimensions must match"));

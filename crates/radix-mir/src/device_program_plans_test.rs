@@ -366,6 +366,27 @@ fn rank2_tensor_ty_mixed(types: &mut TypeTable, dims: [Result<u64, u32>; 2]) -> 
     MirType::semantic(types.intern(Type::Tensor(f32_ty, shape)))
 }
 
+/// A rank-`N` `f32` tensor type whose listed axes are run-time extents
+/// (`Err(parameter)`) and whose other axes are literal — the batched matmul
+/// operand shapes (`[B, M, K]`, `[B, K, N]`, `[B, M, N]`).
+fn batched_tensor_ty_mixed<const N: usize>(
+    types: &mut TypeTable,
+    dims: [Result<u64, u32>; N],
+) -> MirType {
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| match dim {
+            Ok(count) => types.intern_index(IndexExpr::Literal(count)),
+            Err(parameter) => types.intern_index(IndexExpr::Runtime(
+                radix_types::RuntimeExtentId::ScalarParameter { parameter },
+            )),
+        })
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32_ty, shape)))
+}
+
 fn matmul_function_over(left: MirType, right: MirType, out: MirType) -> MirFunction {
     MirFunction {
         id: MirFunctionId(0),
@@ -5383,4 +5404,102 @@ fn matmul_contract_runtime_dims_still_reject_literal_inner_mismatch() {
         "{}",
         error.message
     );
+}
+
+/// The batched dense run-time form takes the literal arm's shape law:
+/// `[?, ?, ?] · [?, ?]` resolves as the run-time contraction, and a right
+/// operand of rank greater than the left's is still refused.
+#[test]
+fn matmul_contract_batched_runtime_dims_resolve() {
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = batched_tensor_ty_mixed(&mut types, [Err(0), Err(1), Err(2)]);
+    let right = batched_tensor_ty_mixed(&mut types, [Err(0), Err(2)]);
+    let out = batched_tensor_ty_mixed(&mut types, [Err(0), Err(1), Err(3)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    assert_eq!(
+        collection_op_contract(&function, &validation).expect("batched run-time matmul resolves"),
+        Some(CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        })
+    );
+
+    // A right operand of rank greater than the left's is not a batched
+    // contraction, whatever the extents are.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = batched_tensor_ty_mixed(&mut types, [Err(0), Err(1), Err(2)]);
+    let right = batched_tensor_ty_mixed(&mut types, [Err(0), Err(0), Err(2), Err(3)]);
+    let out = batched_tensor_ty_mixed(&mut types, [Err(0), Err(1), Err(3)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        collection_op_contract(&function, &validation).is_err(),
+        "a right rank greater than the left's stays refused"
+    );
+}
+
+/// The batched run-time signature binds the operands' full extents and puts
+/// one `TensorAxisExtent` resource per run-time operand axis after the
+/// output. Only-K run-time keeps the literal full output product.
+#[test]
+fn matmul_runtime_batched_signature_extents_follow_the_operands() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    // a [?0, ?1, ?2] x b [?0, ?2] -> o [?0, ?1, ?3]: every axis run-time.
+    let left = batched_tensor_ty_mixed(&mut types, [Err(0), Err(1), Err(2)]);
+    let right = batched_tensor_ty_mixed(&mut types, [Err(0), Err(2)]);
+    let out = batched_tensor_ty_mixed(&mut types, [Err(0), Err(1), Err(3)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let signature = contract_shape_signature(
+        &function,
+        &CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        },
+        &validation,
+    )
+    .expect("batched run-time matmul signature resolves");
+    assert_eq!(signature.output.binding, 2);
+    assert_eq!(signature.output.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    let extents: Vec<_> = signature
+        .extra_inputs
+        .iter()
+        .filter_map(|resource| match resource.kind {
+            MirKernelResourceKind::TensorAxisExtent {
+                tensor_binding,
+                axis,
+            } => {
+                assert_eq!(resource.element_count, 1);
+                Some((resource.binding, tensor_binding, axis))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        extents,
+        vec![(3, 0, 0), (4, 0, 1), (5, 0, 2), (6, 1, 0), (7, 1, 1)]
+    );
+    assert_eq!(signature.workgroup, MirWorkgroupSize { x: 8, y: 8, z: 1 });
+
+    // Only K runtime: a [5, 3, ?] x b [5, ?, 7] -> o [5, 3, 7], so the
+    // output extent is the literal full product 5 * 3 * 7.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = batched_tensor_ty_mixed(&mut types, [Ok(5), Ok(3), Err(0)]);
+    let right = batched_tensor_ty_mixed(&mut types, [Ok(5), Err(0), Ok(7)]);
+    let out = batched_tensor_ty_mixed(&mut types, [Ok(5), Ok(3), Ok(7)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let signature = contract_shape_signature(
+        &function,
+        &CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        },
+        &validation,
+    )
+    .expect("only-K run-time batched matmul signature resolves");
+    assert_eq!(signature.output.element_count, 105);
 }

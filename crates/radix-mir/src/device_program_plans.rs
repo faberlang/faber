@@ -2987,11 +2987,15 @@ pub fn contract_shape_signature(
                 .map_err(PlanMappingError::mapping)?;
             let right_dims = crate::tensor_type::tensor_dims(right_ty, validation)
                 .map_err(PlanMappingError::mapping)?;
-            // Output is the DECLARED result [M, N]: the checked dims reader
-            // binds a run-time axis as the runtime marker, and refuses a zero
-            // literal axis or an overflowing literal product instead of
-            // storing a saturated count. The contract resolver already
-            // enforces rank-2 left / rank-1-or-2 right.
+            // Output is the full output tensor extent read from the DECLARED
+            // result: every left axis but the last, times the right's last
+            // axis — `[B, M, N]` for a batched left, `[M, N]` (or `[M]`) for a
+            // rank-2 left. A run-time axis anywhere in that product binds at
+            // launch, so the buffer takes the runtime marker; a zero literal
+            // axis or an overflowing literal product is refused instead of
+            // storing a saturated count. The contract resolver enforces the
+            // same ranks and prefix law (rank-2 left, or the batched
+            // rank-2..4 form).
             signature.input = storage_input(
                 0,
                 element_ty,
