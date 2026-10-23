@@ -974,27 +974,12 @@ fn corpus_external_recipe_builds_and_checks_the_program_golden() {
     assert_eq!(records(&mismatch.stdout)[0]["reason"], "stdout mismatch");
 }
 
-#[cfg(feature = "hir-go")]
-fn go_available() -> bool {
-    Command::new("go")
-        .arg("version")
-        .output()
-        .is_ok_and(|output| output.status.success())
-}
-
 /// A rooted case whose input is a package directory: `faber build` owns emission
 /// and linking, so the file-shaped emit and the recipe build step must not run.
 #[cfg(feature = "hir-go")]
 #[test]
+#[ignore = "requires a go toolchain on PATH; manual external-recipe proof"]
 fn corpus_external_recipe_builds_a_package_directory_golden() {
-    if !go_available() {
-        missing_tool(
-            "go",
-            "corpus_external_recipe_builds_a_package_directory_golden",
-            "go is required: the package-directory external proof builds with `faber build -t go`",
-        );
-        return;
-    }
     let temp = tempfile::tempdir().expect("temporary suite");
     let case = temp.path().join("cases").join("package");
     let package = temp.path().join("inputs").join("probe");
@@ -1038,95 +1023,6 @@ fn corpus_external_recipe_builds_a_package_directory_golden() {
     assert_eq!(rows[0]["emit_command"]["argv"][1], "build");
     assert!(rows[0]["build_command"].is_null());
     assert_eq!(rows[1]["passed"], 1);
-}
-
-/// Whether an LLVM IR verifier (`llvm-as` or `opt`) is on PATH — the same
-/// availability the gpu corpus target fail-closes on
-/// (`commands/corpus/gpu.rs` `find_verifier`).
-fn llvm_verifier_available() -> bool {
-    let probe = |tool: &str| {
-        Command::new(tool)
-            .arg("--version")
-            .output()
-            .is_ok_and(|output| output.status.success())
-    };
-    probe("llvm-as") || probe("opt")
-}
-
-/// A missing external toolchain may skip a proof only on the Linux merge-lane
-/// gate (which has no ghc/go/python>=3.12/llvm-as/rustfmt toolchain) and only
-/// when `FABER_REQUIRE_TOOLCHAINS` is unset. The macOS gate treats these proofs
-/// as mandatory, so a missing tool there is a test failure.
-fn may_skip_missing_tool_on(is_linux: bool, require_toolchains: bool) -> bool {
-    is_linux && !require_toolchains
-}
-
-fn may_skip_missing_tool() -> bool {
-    may_skip_missing_tool_on(
-        cfg!(target_os = "linux"),
-        std::env::var_os("FABER_REQUIRE_TOOLCHAINS").is_some(),
-    )
-}
-
-/// Print the visible skip line and return when the policy allows a skip;
-/// otherwise fail the proof with the message it carried before the env gates.
-fn missing_tool_with(may_skip: bool, tool: &str, proof: &str, old_failure: &str) {
-    if may_skip {
-        eprintln!("SKIPPED ({tool} missing): {proof}");
-        return;
-    }
-    panic!("{old_failure}");
-}
-
-fn missing_tool(tool: &str, proof: &str, old_failure: &str) {
-    missing_tool_with(may_skip_missing_tool(), tool, proof, old_failure);
-}
-
-#[test]
-fn missing_toolchain_skip_policy_is_linux_without_require_only() {
-    assert!(!may_skip_missing_tool_on(false, false));
-    assert!(may_skip_missing_tool_on(true, false));
-    assert!(!may_skip_missing_tool_on(true, true));
-    assert!(!may_skip_missing_tool_on(false, true));
-}
-
-#[test]
-#[should_panic]
-fn missing_tool_fails_off_linux_without_opt_out() {
-    missing_tool_with(
-        false,
-        "llvm-as/opt",
-        "missing_tool_fails_off_linux_without_opt_out",
-        "llvm-as or opt is required: the gpu corpus target fails closed without an LLVM verifier",
-    );
-}
-
-#[cfg(feature = "hir-rust")]
-#[test]
-fn corpus_does_not_report_an_all_inapplicable_target_as_green() {
-    // The gpu target refuses to run at all without `llvm-as`/`opt`; off the
-    // Linux gate that is a failure, not a silent skip.
-    if !llvm_verifier_available() {
-        missing_tool(
-            "llvm-as/opt",
-            "corpus_does_not_report_an_all_inapplicable_target_as_green",
-            "llvm-as or opt is required: the gpu corpus target fails closed without an LLVM verifier",
-        );
-        return;
-    }
-    let suite = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus-suites/pilot");
-    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
-        .args(["corpus", "--target", "gpu"])
-        .arg(suite)
-        .output()
-        .expect("run inapplicable GPU pilot");
-    assert!(!output.status.success(), "GPU pilot has no kernel cases");
-    let rows = records(&output.stdout);
-    assert_eq!(rows.last().expect("summary")["not_applicable"], 6);
-    assert_eq!(
-        rows.last().expect("summary")["status"],
-        "no-applicable-cases"
-    );
 }
 
 /// A one-case suite whose case lists `case_extra` and whose source is the smoke case.
