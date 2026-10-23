@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/transfer/sink-into-rule-5-value-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/sink-into-rule-5-value-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "sink_into_value_used"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "sink_into_value_used"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "sink_into_value_used"

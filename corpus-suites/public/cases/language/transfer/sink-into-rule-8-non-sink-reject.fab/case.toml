@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/transfer/sink-into-rule-8-non-sink-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/sink-into-rule-8-non-sink-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "sink_into_receiver_not_sink"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "sink_into_receiver_not_sink"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "sink_into_receiver_not_sink"

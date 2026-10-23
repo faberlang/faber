@@ -1,0 +1,37 @@
++++
+term = "⇜"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "sink_into", "transfer", "assignment", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Rule 6 rejects writing through a Sink<T> reached through a let binding."
+syntax = "let Sink<T> sink ← ...; sink ⇜ item"
+related = ["⇜", "Sink", "let", "mut"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM020:mutating_receiver_through_const"
++++
+# Rule 6: a sink reached through `let` is read-only, just like a mutating
+# method receiver reached through that binding.
+
+@ radix contract "sinking"
+interface Sink<T> {
+    fn sink(T item) → void ⇥ string
+    fn flush() → void ⇥ string
+}
+
+class TextSink implements Sink<string> {
+    mut list<string> items = empty
+
+    fn sink(string item) → void ⇥ string {
+        self.items.append(item)
+    }
+
+    fn flush() → void ⇥ string {
+    }
+}
+
+main {
+    let TextSink sink ← TextSink { items = [] }
+    sink ⇜ "item"
+}

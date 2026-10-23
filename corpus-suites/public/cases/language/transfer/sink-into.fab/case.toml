@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/transfer/sink-into.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/sink-into.fab"
+
+args = ["sink"]
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
