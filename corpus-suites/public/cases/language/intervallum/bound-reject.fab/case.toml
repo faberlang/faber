@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/intervallum/bound-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "intervallum/bound-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "intervallum_bound"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "intervallum_bound"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "intervallum_bound"

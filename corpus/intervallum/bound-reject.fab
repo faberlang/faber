@@ -1,0 +1,24 @@
++++
+term = "intervallum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
+category = "range"
+canonical = false
+summary = "A range bound must be a numeric type: text bounds are refused."
+syntax = "range<string> — rejected"
+related = ["intervallum", "range"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:intervallum_bound"
++++
+
+# A range walks numeric bounds, so its bound type parameter must be a numeric
+# type. A text bound has no ordered walk to offer, so the type is refused
+# instead of being lowered to a value the targets cannot step.
+#
+# DELIBERATE: the declaration below is the rejected form, kept on purpose to
+# pin SEM008 intervallum_bound. The accepted spelling is range<int>.
+
+main {
+    let range<string> bad ← 0‥10
+}

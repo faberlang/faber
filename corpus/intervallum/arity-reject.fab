@@ -1,0 +1,24 @@
++++
+term = "intervallum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
+category = "range"
+canonical = false
+summary = "The range type takes one bound and at most one step, never three parameters."
+syntax = "range<int, 2, 3> — rejected"
+related = ["intervallum", "range"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:intervallum_arity"
++++
+
+# The range type accepts one bound type and at most one step type. Writing a
+# third type argument is refused rather than silently dropped, because the
+# extra argument has no position the range type could store it in.
+#
+# DELIBERATE: the declaration below is the rejected form, kept on purpose to
+# pin SEM008 intervallum_arity. The accepted spelling is range<int, 2>.
+
+main {
+    let range<int, 2, 3> bad ← 0‥10
+}
