@@ -180,6 +180,35 @@ fn bits_bytes_decode_and_encode() {
     assert!(code.contains("faber_try_bytes_text(faber_a,"), "{code}");
 }
 
+/// Width-changing b8 list conversions pass through the byte-view helpers,
+/// preserving the requested endian order for both decode and encode paths.
+#[test]
+fn via_le_and_be_decode_the_byte_order() {
+    let code = crate::test_support::program(
+        "bits_bulk_le.fab",
+        include_str!("../tests/fixtures/run/bits_bulk_le.fab"),
+    );
+    assert!(code.contains("faber_bits_to_bytes(faber_a,"), "{code}");
+    assert!(
+        code.contains("faber_bytes_to_u16(faber_a, faber_bits_to_bytes("),
+        "{code}"
+    );
+    let u16_decodes: Vec<_> = code
+        .lines()
+        .filter(|line| line.contains("faber_bytes_to_u16(faber_a,"))
+        .collect();
+    assert!(
+        u16_decodes.iter().any(|line| line.contains(", true)")),
+        "{code}"
+    );
+    assert!(
+        u16_decodes.iter().any(|line| line.contains(", false)")),
+        "{code}"
+    );
+    assert!(code.contains("faber_bits_from_bytes(faber_a,"), "{code}");
+    assert!(code.contains("faber_bytes_to_b16(faber_a,"), "{code}");
+}
+
 /// The 16- and 32-bit text pairs stay refused by name: the C leaf carries the
 /// UTF-8 pair only, and a UTF-16 or UTF-32 unit list printed as a list would
 /// be a wrong program, not a missing one.

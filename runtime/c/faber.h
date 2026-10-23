@@ -2038,6 +2038,80 @@ FABER_LIST_FAMILY(u16, uint16_t)
 FABER_LIST_FAMILY(u32, uint32_t)
 FABER_LIST_FAMILY(u64, uint64_t)
 
+/* A list of raw b8 cells is a byte view of a list at another fixed width.
+ * `faber_bits_to_bytes` copies the elements in their host memory order;
+ * `faber_bits_from_bytes` writes each multi-byte element in the requested
+ * wire order. */
+static inline faber_list_b8 *faber_bits_to_bytes(faber_arena *arena, const void *items,
+                                                 int64_t len, size_t elem_bytes) {
+    faber_list_b8 *bytes;
+    int64_t count;
+    if (len < 0 || elem_bytes == 0 ||
+        (len > 0 && (uint64_t)elem_bytes > (uint64_t)INT64_MAX / (uint64_t)len)) {
+        faber_trap("collection capacity overflow");
+    }
+    count = len == 0 ? 0 : len * (int64_t)elem_bytes;
+    bytes = faber_list_b8_new(arena, count);
+    if (count > 0) {
+        memcpy(bytes->items, items, (size_t)count);
+    }
+    bytes->len = count;
+    return bytes;
+}
+
+static inline faber_list_b8 *faber_bits_from_bytes(faber_arena *arena, const void *items,
+                                                   int64_t len, size_t elem_bytes, bool be) {
+    faber_list_b8 *bytes = faber_bits_to_bytes(arena, items, len, elem_bytes);
+    const uint16_t one = 1;
+    const bool host_little = *(const unsigned char *)&one == 1;
+    if (be == host_little) {
+        int64_t at;
+        for (at = 0; at < len; ++at) {
+            size_t left = (size_t)at * elem_bytes;
+            size_t right = left + elem_bytes - 1;
+            while (left < right) {
+                uint8_t byte = bytes->items[left];
+                bytes->items[left++] = bytes->items[right];
+                bytes->items[right--] = byte;
+            }
+        }
+    }
+    return bytes;
+}
+
+#define FABER_BYTES_DECODE(NAME, TYPE, WIDTH)                                           \
+    static inline faber_list_##NAME *faber_bytes_to_##NAME(                            \
+        faber_arena *arena, const faber_list_b8 *bytes, bool be) {                      \
+        int64_t count;                                                                  \
+        int64_t at;                                                                     \
+        faber_list_##NAME *values;                                                      \
+        if (bytes->len % (WIDTH) != 0) {                                                \
+            faber_trap("bits list length mismatch");                                  \
+        }                                                                               \
+        count = bytes->len / (WIDTH);                                                   \
+        values = faber_list_##NAME##_new(arena, count);                                \
+        for (at = 0; at < count; ++at) {                                               \
+            uint64_t value = 0;                                                        \
+            size_t byte;                                                               \
+            for (byte = 0; byte < (WIDTH); ++byte) {                                   \
+                size_t shift = be ? (size_t)((WIDTH) - 1 - byte) : byte;               \
+                value |= (uint64_t)bytes->items[(size_t)at * (WIDTH) + byte]           \
+                         << (shift * 8);                                                \
+            }                                                                           \
+            values->items[at] = (TYPE)value;                                           \
+        }                                                                               \
+        values->len = count;                                                           \
+        return values;                                                                 \
+    }
+
+FABER_BYTES_DECODE(u16, uint16_t, 2)
+FABER_BYTES_DECODE(u32, uint32_t, 4)
+FABER_BYTES_DECODE(u64, uint64_t, 8)
+FABER_BYTES_DECODE(b16, uint16_t, 2)
+FABER_BYTES_DECODE(b32, uint32_t, 4)
+FABER_BYTES_DECODE(b64, uint64_t, 8)
+#undef FABER_BYTES_DECODE
+
 /* How a list shows, as the runner prints it: `[1, 2]`, `["a", "b"]`,
  * `[true, false]` in the module's display tokens. */
 /* `main args xs`: the arguments after the program name. The strings are the
