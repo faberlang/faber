@@ -226,6 +226,18 @@ int main(int argc, char **argv) {
         check_int("text map has deleted", faber_map_text_i64_has(map, "alpha"), 0);
     }
 
+    /* The fault wire contract: a registered pair names its stable code, an
+     * unknown pair is unregistered, and a fault carries kind + path. */
+    check_text("fault code not found", faber_fault_code("IoFault", "NotFound"), "ERR001");
+    check_text("fault code cancelled", faber_fault_code("IoFault", "Cancelled"), "ERR015");
+    check_int("fault code unknown variant", faber_fault_code("IoFault", "NoSuch") == NULL, 1);
+    check_int("fault code unknown family", faber_fault_code("NoSuchFault", "NotFound") == NULL, 1);
+    {
+        faber_fault fault = faber_fault_of(faber_fault_code("IoFault", "NotFound"), "a.txt");
+        check_text("fault kind", fault.kind, "ERR001");
+        check_text("fault path", fault.path, "a.txt");
+    }
+
     /* An interleaved delete/has stress over a size that forces index growth:
      * after every delete, a survivor must stay findable and the deleted key
      * must not be (a stale slot would answer wrong). */
