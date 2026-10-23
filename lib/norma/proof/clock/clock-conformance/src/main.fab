@@ -2,15 +2,12 @@
 locale = "en"
 +++
 
-# N3 clock leaf: sleep and monotonic. Output must match under `faber run`
-# and a `faber build` Rust binary.
-
-import from "norma:time" time
+# Clock conformance through the direct tempus route boundary.
 
 main {
-    time.sleep(0)
-    let int before ← time.monotonic()
-    let int after ← time.monotonic()
+    let void _ ← call 'tempus:dormiet' (0) ↦ void
+    let int before ← call 'tempus:monotonicum' ↦ int
+    let int after ← call 'tempus:monotonicum' ↦ int
     assert after ≥ before
     print "clock-ok"
 }

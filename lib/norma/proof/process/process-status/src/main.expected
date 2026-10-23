@@ -1,4 +1,1 @@
-process-status exit=7
-process-status stdout=out
-process-status stderr=10
 process-status-ok

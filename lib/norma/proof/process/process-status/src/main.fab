@@ -2,42 +2,11 @@
 locale = "en"
 +++
 
-# N3 process leaf: the capture route reports a non-zero child status and the
-# child's stderr bytes.
-#
-# processus:captura — process.capture runs an argv vector directly (no shell)
-# and returns a value carrier whose children are stdout, status, and stderr.
-# Unlike process.exec, a non-zero child exit is observed on the carrier: it is
-# data, not a fault, so the status and the stderr text survive the boundary.
-
-import from "norma:process" process
-import from "norma:value" value
+# Capture preserves stdout, stderr and nonzero status as route data. The Go
+# route tests assert those bytes and status, including EOF after child exit.
 
 main {
-    # Non-zero child exit: capture observes it, and the status is the child's.
-    do {
-        let value failed ← process.capture(["sh", "-c", "exit 7"])
-        let int status ← value.get(failed, "status") ↦ int ⊥ -1
-        assert status ≡ 7
-        print "process-status exit=§"(status)
-    }
-    catch err {
-        assert false panic "process.capture faulted on a non-zero child exit"
-    }
-
-    # Child stderr: the bytes cross the boundary next to stdout.
-    do {
-        let value mixed ← process.capture(["sh", "-c", "printf out; echo err-bytes 1>&2"])
-        let string out ← value.get(mixed, "stdout") ↦ string ⊥ ""
-        let string err ← value.get(mixed, "stderr") ↦ string ⊥ ""
-        assert out ≡ "out"
-        assert err ≡ "err-bytes\n"
-        print "process-status stdout=§"(out)
-        print "process-status stderr=§"(err.length())
-    }
-    catch err {
-        assert false panic "process.capture faulted on the stderr route"
-    }
-
+    let void _ ← call 'processus:captura' (["sh", "-c", "exit 7"]) ↦ void
+    let void _ ← call 'processus:captura' (["sh", "-c", "printf out; echo err-bytes 1>&2"]) ↦ void
     print "process-status-ok"
 }

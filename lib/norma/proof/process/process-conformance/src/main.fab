@@ -2,14 +2,14 @@
 locale = "en"
 +++
 
-# N3 process leaf: pid, cwd, exec. Output must match under `faber run`
-# and a `faber build` Rust binary.
-
-import from "norma:process" process
+# Direct processus route conformance for generated and runner targets.
 
 main {
-    assert process.pid() ≻ 0
-    assert process.cwd().length() ≻ 0
-    assert process.exec("printf process-ok") ≡ "process-ok"
+    let int pid ← call 'processus:identitas' ↦ int
+    assert pid ≻ 0
+    let string cwd ← call 'processus:sedes' ↦ string
+    assert cwd.length() ≻ 0
+    let string output ← call 'processus:exsequi' ("printf process-ok") ↦ string
+    assert output ≡ "process-ok"
     print "process-ok"
 }

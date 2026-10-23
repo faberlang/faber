@@ -2,18 +2,16 @@
 locale = "en"
 +++
 
-# N3 entropy leaf: seed, random_int, uuid. Output must match under
-# `faber run` and a `faber build` Rust binary.
-
-import from "norma:random" random
+# Seed, integer, UUID and OS-byte routes execute through the native leaf seam.
 
 main {
-    random.seed(7)
-    let int first ← random.random_int(1, 9)
-    random.seed(7)
-    let int second ← random.random_int(1, 9)
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int first ← call 'aleator:sortire' ([1, 9]) ↦ int
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int second ← call 'aleator:sortire' ([1, 9]) ↦ int
     assert first ≡ second
-    let string id ← random.uuid()
+    let void _ ← call 'aleator:octetos' (16) ↦ void
+    let string id ← call 'aleator:uuid' ↦ string
     assert id.length() ≡ 36
     print "entropy-ok"
 }

@@ -2,21 +2,24 @@
 locale = "en"
 +++
 
-# Same assertions as leaves-roundtrip/src/main.proba, as a generated Rust binary.
-
-import from "norma:process" process
-import from "norma:time" time
-import from "norma:random" random
+# Same core leaf routes as the runner/Go combined conformance package.
 
 main {
-    time.sleep(0)
-    let int before ← time.monotonic()
-    let int after ← time.monotonic()
+    let void _ ← call 'tempus:dormiet' (0) ↦ void
+    let int before ← call 'tempus:monotonicum' ↦ int
+    let int after ← call 'tempus:monotonicum' ↦ int
     assert after ≥ before
-    random.seed(7)
-    let int first ← random.random_int(1, 9)
-    random.seed(7)
-    assert random.random_int(1, 9) ≡ first
-    assert process.exec("printf proba-ok") ≡ "proba-ok"
+
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int first ← call 'aleator:sortire' ([1, 9]) ↦ int
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int replay ← call 'aleator:sortire' ([1, 9]) ↦ int
+    assert replay ≡ first
+    let void _ ← call 'aleator:octetos' (16) ↦ void
+
+    let int pid ← call 'processus:identitas' ↦ int
+    assert pid ≻ 0
+    let string output ← call 'processus:exsequi' ("printf proba-ok") ↦ string
+    assert output ≡ "proba-ok"
     print "proba-ok"
 }

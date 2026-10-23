@@ -11,12 +11,6 @@
       "phase": "emit",
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced and the process leaf (`processus`) is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
-    },
-    "go": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "undefined: process",
-      "reason": "The Go lane does not yet provide the Norma process leaf bindings used by this status case."
     }
   }
 }

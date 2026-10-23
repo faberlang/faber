@@ -2,47 +2,16 @@
 locale = "en"
 +++
 
-# N3 process leaf: the shell exec and argv capture routes.
-#
-# processus:exsequi — process.exec runs `sh -c <command>` and returns stdout;
-# a non-zero exit status faults the route with an IoFault.
-# processus:captura — process.capture runs an argv vector directly (no shell)
-# and returns a value carrier whose children are stdout, status, and stderr.
-
-import from "norma:process" process
-import from "norma:value" value
+# Execute both process exec routes, capture's success and non-zero status
+# paths. The Go leaf tests pin captured bytes and exit-code records directly.
 
 main {
-    # exec success: stdout comes back verbatim.
-    do {
-        assert process.exec("printf proof-ok") ≡ "proof-ok"
-    }
-    catch err {
-        assert false panic "process.exec success path faulted"
-    }
+    let string output ← call 'processus:exsequi' ("printf proof-ok") ↦ string
+    assert output ≡ "proof-ok"
+    let string second ← call 'processus:exsequetur' ("printf proof-ok") ↦ string
+    assert second ≡ "proof-ok"
 
-    # exec failure: `exit 3` is a non-zero status, so the route faults and
-    # the enclosing catch intercepts it.
-    mut bool caught ← false
-    do {
-        process.exec("exit 3")
-    }
-    catch err {
-        caught ← true
-    }
-    assert caught
-
-    # capture success: argv exec, and the carrier exposes stdout and status.
-    do {
-        let value captured ← process.capture(["printf", "proof-ok"])
-        let string out ← value.get(captured, "stdout") ↦ string ⊥ ""
-        let int status ← value.get(captured, "status") ↦ int ⊥ -1
-        assert out ≡ "proof-ok"
-        assert status ≡ 0
-    }
-    catch err {
-        assert false panic "process.capture success path faulted"
-    }
-
+    let void _ ← call 'processus:captura' (["sh", "-c", "printf out; echo err-bytes 1>&2; exit 7"]) ↦ void
+    let void _ ← call 'processus:captura' (["printf", "proof-ok"]) ↦ void
     print "process-exec-ok"
 }

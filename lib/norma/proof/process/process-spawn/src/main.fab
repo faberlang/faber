@@ -2,21 +2,19 @@
 locale = "en"
 +++
 
-# Process leaf lifecycle: spawn+wait, kill+wait, detach.
-# Output must match under `faber run` and a `faber build` Rust binary.
-
-import from "norma:process" process
+# Spawn/wait, kill/wait, and detach through native processus routes.
 
 main {
-    let process.Subprocess exited ← process.spawn(["sh", "-c", "exit 3"])
-    assert process.wait(exited) ≡ 3
+    let int exited ← call 'processus:genera' (["sh", "-c", "exit 3"]) ↦ int
+    let int exitStatus ← call 'processus:exspecta' (exited) ↦ int
+    assert exitStatus ≡ 3
 
-    let process.Subprocess sleeper ← process.spawn(["sleep", "30"])
-    process.kill(sleeper)
-    assert process.wait(sleeper) ≢ 0
+    let int sleeper ← call 'processus:genera' (["sleep", "30"]) ↦ int
+    let void _ ← call 'processus:neca' (sleeper) ↦ void
+    let int killed ← call 'processus:exspecta' (sleeper) ↦ int
+    assert killed ≢ 0
 
-    let int dismissed ← process.detach(["sleep", "0"])
+    let int dismissed ← call 'processus:dimitte' (["sleep", "0"]) ↦ int
     assert dismissed ≻ 0
-
     print "process-spawn-ok"
 }

@@ -1,11 +1,5 @@
 {
   "targets": {
-    "runner": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "destination type mismatch",
-      "reason": "The runner rejects the async sleep_async wrapper during MIR lowering: awaiting the tempus:dormiet future fails to type its destination, the same runner gap pinned for corpus/ad/async-tempus-dormiet.fab."
-    },
     "clif": {
       "outcome": "known-fail",
       "phase": "emit",
