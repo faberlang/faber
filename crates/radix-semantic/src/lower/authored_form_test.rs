@@ -219,8 +219,9 @@ fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
 #[test]
 fn sermo_authored_head_is_named() {
     // The conversation word is a builtin authored head: `sermo<O, R>` names
-    // the frame definition, and finalize erases the applied witness to the
-    // bare carrier `sermo`, so the recorded form keeps no child arguments.
+    // the frame definition. Finalize erases the applied witness to the bare
+    // carrier `sermo` (D6.11), but the authored form retains the lowered
+    // argument forms for fidelity during re-emission.
     let source = concat!(
         "@ call 'salutatio:greeting'\n",
         "fn greeting() → string {\n",
@@ -247,11 +248,23 @@ fn sermo_authored_head_is_named() {
     };
     assert_eq!(*def_id, sermo_def, "named head names the sermo definition");
     assert!(!path.is_empty(), "named head keeps the authored spelling");
-    assert!(
-        form.args.is_empty(),
-        "the erased witness has no applied arguments, got {:?}",
+    assert_eq!(
+        form.args.len(),
+        2,
+        "the authored form keeps its applied argument forms, got {:?}",
         form.args
     );
+    for arg in &form.args {
+        let HirTypeFormArg::Type(child) = arg else {
+            panic!("expected type children, got {:?}", form.args);
+        };
+        assert_eq!(
+            child.head,
+            HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+            "kept argument forms carry their authored spelling"
+        );
+        assert!(child.args.is_empty(), "argument forms carry no children");
+    }
     assert_eq!(Some(form.ty), local_ty, "witness equals HIR type");
     assert!(
         matches!(fixture.result.types.get(form.ty), Type::Struct(def) if *def == sermo_def),
