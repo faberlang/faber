@@ -182,33 +182,33 @@ main {}"#,
 }
 
 #[test]
-fn rule8_a_list_receiver_sinks_its_element() {
-    assert_accepts(&with_sinking(
-        r#"fn write(mut list<string> xs) → void {
+fn rule8_a_list_receiver_sinks_its_element_without_a_contract_declaration() {
+    assert_accepts(
+        r#"main {
+    mut list<string> xs ← []
     xs ⇜ "x"
-}
-main {}"#,
-    ));
+}"#,
+    );
 }
 
 #[test]
-fn rule8_a_set_receiver_sinks_its_element() {
-    assert_accepts(&with_sinking(
-        r#"fn write(mut set<string> xs) → void {
+fn rule8_a_set_receiver_sinks_its_element_without_a_contract_declaration() {
+    assert_accepts(
+        r#"main {
+    mut set<string> xs ← []
     xs ⇜ "x"
-}
-main {}"#,
-    ));
+}"#,
+    );
 }
 
 #[test]
-fn rule8_a_bounded_list_receiver_sinks_its_element() {
-    assert_accepts(&with_sinking(
-        r#"fn write(mut list<string, 4> xs) → void {
+fn rule8_a_bounded_list_receiver_sinks_its_element_without_a_contract_declaration() {
+    assert_accepts(
+        r#"main {
+    mut list<string, 4> xs ← []
     xs ⇜ "x"
-}
-main {}"#,
-    ));
+}"#,
+    );
 }
 
 #[test]

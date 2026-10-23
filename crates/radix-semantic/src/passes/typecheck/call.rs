@@ -2437,27 +2437,31 @@ impl TypeChecker<'_> {
     /// A class conformance (`implements Sink<string>`) or a generic parameter
     /// bound (`<T implements Sink<T>>`) names the item in its contract
     /// argument. A conformance whose argument is the receiver itself is not a
-    /// sink shape: sinking has no `Self` position.
+    /// sink shape: sinking has no `Self` position. Built-in collection sinks
+    /// use their element type directly and do not depend on a declared role.
     fn sink_contract_item(&self, resolved: TypeId) -> Option<TypeId> {
-        let contract = self.types.sinking_contract?;
         let item_of = |args: &[TypeId]| match args {
             [arg] => Some(self.resolve_inferred_type(*arg)),
             _ => None,
         };
         let (_, inner) = self.types.peel_access_marker(resolved);
         match self.types.get(inner).clone() {
-            Type::Struct(def) => self
-                .implemented_contracts
-                .get(&def)?
-                .iter()
-                .find(|declared| declared.contract == contract)
-                .and_then(|declared| item_of(&declared.args)),
-            Type::Param(sym) => self
-                .current_generic_bounds
-                .get(&sym)?
-                .iter()
-                .find(|bound| bound.contract == contract)
-                .and_then(|bound| item_of(&bound.args)),
+            Type::Struct(def) => {
+                let contract = self.types.sinking_contract?;
+                self.implemented_contracts
+                    .get(&def)?
+                    .iter()
+                    .find(|declared| declared.contract == contract)
+                    .and_then(|declared| item_of(&declared.args))
+            }
+            Type::Param(sym) => {
+                let contract = self.types.sinking_contract?;
+                self.current_generic_bounds
+                    .get(&sym)?
+                    .iter()
+                    .find(|bound| bound.contract == contract)
+                    .and_then(|bound| item_of(&bound.args))
+            }
             Type::Array(elem) | Type::Set(elem) => Some(self.resolve_inferred_type(elem)),
             Type::BoundedArray { element, .. } => Some(self.resolve_inferred_type(element)),
             _ => None,
