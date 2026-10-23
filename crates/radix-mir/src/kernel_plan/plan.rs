@@ -426,6 +426,8 @@ fn row_reduction_admission(rows: u64, width: u64) -> Option<RowReductionFacts> {
 /// before the numerically stable row softmax.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CausalMaskedSoftmaxPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Row (query) extent.
     pub rows: u64,
     /// Column (key) extent.

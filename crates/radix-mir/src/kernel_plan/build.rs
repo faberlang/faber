@@ -569,6 +569,10 @@ impl CollectionKernelPlan {
                 }
                 Some(CollectionKernelPlan::CausalMaskedSoftmax(
                     CausalMaskedSoftmaxPlan {
+                        dims: RowOpDims::Literal {
+                            rows: dims[0],
+                            width: dims[1],
+                        },
                         rows: dims[0],
                         cols: dims[1],
                     },
