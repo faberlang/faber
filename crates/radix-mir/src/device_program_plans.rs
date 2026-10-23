@@ -3786,6 +3786,39 @@ pub fn transformer_subchain_signature_for_emission_with_source(
         &bound,
         source,
     )?;
+    // Rule 11: a run-time row-gather reads its table's and its ids vector's
+    // launch-bound extents from `TensorAxisExtent` resources. The
+    // whole-function ABI appends those slots; a subchain emission signature
+    // must carry the same ones, or the emitted body reads an extent buffer
+    // the header never declares.
+    if op == MirCollectionOp::TensorGather {
+        let table_local = signature.input.source_local.ok_or_else(|| {
+            PlanMappingError::mapping("TensorGather table has no local in the emission signature")
+        })?;
+        let table_ty = function_local_ty(function, table_local)?;
+        let table_dims = crate::tensor_type::tensor_dims(table_ty, validation)
+            .map_err(PlanMappingError::mapping)?;
+        let ids_local = gather_ids_local(function).ok_or_else(|| {
+            PlanMappingError::mapping("row-gather ids operand has no local in the subchain body")
+        })?;
+        let ids_ty = function_local_ty(function, ids_local)?;
+        let ids_dims = crate::tensor_type::tensor_dims(ids_ty, validation)
+            .map_err(PlanMappingError::mapping)?;
+        let table_binding = signature.input.binding;
+        let ids_binding = signature
+            .extra_inputs
+            .first()
+            .map(|resource| resource.binding)
+            .ok_or_else(|| PlanMappingError::mapping("row-gather ids binding is missing"))?;
+        crate::abi::append_gather_axis_extent_resources(
+            &mut signature,
+            &table_dims,
+            &ids_dims,
+            table_binding,
+            ids_binding,
+            validation,
+        )?;
+    }
     // The transformer dispatch must cover EVERY output's extent — the union
     // (max) over the recipe output and the folded elementwise tail's
     // additional consumed outputs (the keep-dims SumAxis shape: a REDUCED
