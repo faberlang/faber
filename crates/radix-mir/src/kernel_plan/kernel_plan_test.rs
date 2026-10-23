@@ -1707,6 +1707,103 @@ fn layer_norm_resolves_layer_normalization_plan() {
     plan.validate().expect("the resolved plan validates");
 }
 
+/// A rank-2 RMSNorm fixture with the mandatory rank-1 affine gamma peer:
+/// `t = rmsnorm(x, 1, 1e-5, gamma)` over `[dims]` (the fourth operand is the
+/// gamma local the plan resolution cross-checks against the last axis).
+fn rms_norm_transformer_function(types: &mut TypeTable, dims: [u64; 2]) -> MirFunction {
+    let mut function = transformer_function(
+        types,
+        dims,
+        MirCollectionOp::TensorRmsNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+        ],
+    );
+    let gamma = rank1_tensor_ty(types, dims[1]);
+    function.params.push(MirParam {
+        local: MirLocalId(1),
+        name: None,
+        ty: gamma,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    });
+    function.locals.push(MirLocal {
+        id: MirLocalId(1),
+        name: None,
+        ty: gamma,
+        mutable: false,
+        span: test_span(),
+    });
+    function
+}
+
+#[test]
+fn layer_norm_and_rms_plan_carry_literal_dims() {
+    // Both normalization recipes carry the operand's literal extents: the
+    // `[4,4]` fixtures resolve `dims == Literal { rows: 4, width: 4 }`.
+    let mut types = TypeTable::new();
+    let layer_function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+        ],
+    );
+    let rms_function = rms_norm_transformer_function(&mut types, [4, 4]);
+    let validation = MirValidationContext::new(&types);
+
+    let layer_signature = transformer_signature(16, 16);
+    let layer = CollectionKernelPlan::from_transformer_op(
+        &layer_signature,
+        &layer_function,
+        &validation,
+        MirCollectionOp::TensorLayerNorm,
+    )
+    .expect("layer-norm typed facts resolve a plan");
+    let CollectionKernelPlan::LayerNormalization(layer_plan) = &layer else {
+        panic!("layer-norm must map to a layer-normalization plan, got {layer:?}");
+    };
+    assert_eq!(
+        layer_plan.dims,
+        RowOpDims::Literal { rows: 4, width: 4 },
+        "the layer-norm plan carries the operand's literal extents"
+    );
+
+    let mut rms_signature = transformer_signature(16, 16);
+    let element_ty = rms_signature.input.element_ty;
+    rms_signature.extra_inputs.push(MirKernelResource {
+        group: 0,
+        binding: 1,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty,
+        element_count: 4,
+        source_local: Some(MirLocalId(1)),
+        source_name: None,
+        reduced_projection: None,
+    });
+    let rms = CollectionKernelPlan::from_transformer_op(
+        &rms_signature,
+        &rms_function,
+        &validation,
+        MirCollectionOp::TensorRmsNorm,
+    )
+    .expect("rms-norm typed facts resolve a plan");
+    let CollectionKernelPlan::RmsNormalization(rms_plan) = &rms else {
+        panic!("rms-norm must map to an RMS-normalization plan, got {rms:?}");
+    };
+    assert_eq!(
+        rms_plan.dims,
+        RowOpDims::Literal { rows: 4, width: 4 },
+        "the RMS-norm plan carries the operand's literal extents"
+    );
+}
+
 #[test]
 fn layer_norm_affine_operands_resolve_the_plan() {
     // The optional affine pair (gamma, beta) does not change the carried
@@ -1921,9 +2018,12 @@ fn transformer_plans_validate() {
     })
     .validate()
     .expect("row-softmax plan validates");
-    CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: 1 })
-        .validate()
-        .expect("layer-normalization plan validates");
+    CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
+        dims: RowOpDims::Literal { rows: 1, width: 1 },
+        axis: 1,
+    })
+    .validate()
+    .expect("layer-normalization plan validates");
     CollectionKernelPlan::AxisReduction(AxisReductionPlan {
         op: ReduceOp::Sum,
         axis: 1,

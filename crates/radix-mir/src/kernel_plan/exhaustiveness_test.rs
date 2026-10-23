@@ -136,6 +136,7 @@ fn dummy_gather() -> GatherPlan {
 
 fn dummy_rms() -> RmsNormalizationPlan {
     RmsNormalizationPlan {
+        dims: RowOpDims::Literal { rows: 1, width: 1 },
         axis: 0,
         epsilon_bits: 1,
         width: 1,
@@ -213,7 +214,10 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
             axis: 0,
             batched: None,
         }),
-        CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: 0 }),
+        CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
+            dims: RowOpDims::Literal { rows: 1, width: 1 },
+            axis: 0,
+        }),
         CollectionKernelPlan::Gather(dummy_gather()),
         CollectionKernelPlan::RmsNormalization(dummy_rms()),
         CollectionKernelPlan::Rope(dummy_rope()),

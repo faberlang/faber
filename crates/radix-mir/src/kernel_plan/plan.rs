@@ -290,6 +290,8 @@ pub struct RowSoftmaxMask {
 /// (epsilon, affine) is resolved by P1 from the const operands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LayerNormalizationPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Normalization axis (from the trailing const operand).
     pub axis: u64,
 }
@@ -318,6 +320,8 @@ pub struct GatherPlan {
 /// peer's width cross-checked against the normalization dimension.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RmsNormalizationPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Normalization axis (from the trailing const operand; the last axis
     /// in v1).
     pub axis: u64,

@@ -517,7 +517,13 @@ impl CollectionKernelPlan {
                         batched: None,
                     })
                 } else {
-                    CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis })
+                    CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
+                        dims: RowOpDims::Literal {
+                            rows: count.checked_div(dims[axis as usize])?,
+                            width: dims[axis as usize],
+                        },
+                        axis,
+                    })
                 };
                 Some(plan)
             }
@@ -769,6 +775,10 @@ fn rms_norm_plan(
     }
     Some(CollectionKernelPlan::RmsNormalization(
         RmsNormalizationPlan {
+            dims: RowOpDims::Literal {
+                rows: count.checked_div(width)?,
+                width,
+            },
             axis,
             epsilon_bits,
             width,
