@@ -217,6 +217,7 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
         CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
             dims: RowOpDims::Literal { rows: 1, width: 1 },
             axis: 0,
+            epsilon_bits: 0,
         }),
         CollectionKernelPlan::Gather(dummy_gather()),
         CollectionKernelPlan::RmsNormalization(dummy_rms()),

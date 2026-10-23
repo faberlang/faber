@@ -294,6 +294,9 @@ pub struct LayerNormalizationPlan {
     pub dims: RowOpDims,
     /// Normalization axis (from the trailing const operand).
     pub axis: u64,
+    /// Epsilon as f32 bits. A zero value is reserved for a dynamic epsilon
+    /// operand, which remains explicit in the MIR call and kernel signature.
+    pub epsilon_bits: u32,
 }
 
 /// Row-gather recipe plan (GI3-1: name frozen in this unit, S6-N1
