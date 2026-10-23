@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/store-sites.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/store-sites.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
