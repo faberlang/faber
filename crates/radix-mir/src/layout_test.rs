@@ -889,3 +889,27 @@ fn scalar_element_tensor_layout_is_unchanged() {
         ))
     );
 }
+
+// A record element carries only the element type id: the layout table is built
+// from the `TypeTable` alone and cannot see struct fields, so consumers resolve
+// the byte size, alignment and field offsets with the validation context.
+
+#[test]
+fn record_element_tensor_resolves_device_view_with_record_element() {
+    let mut types = TypeTable::new();
+    let struct_ty = types.intern(Type::Struct(radix_types::DefId(7)));
+    let dim = types.intern_index(IndexExpr::Literal(8));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim]));
+    let tensor = types.tensor_with_shape(struct_ty, shape);
+    let table = MirLayoutTable::from_types(&types);
+
+    let layout = table
+        .layout_for_type(MirType::semantic(tensor))
+        .expect("tensor<Struct, [8]> layout fact");
+    let MirLayoutKind::DeviceView(view) = layout.kind else {
+        panic!("expected DeviceView, got {:?}", layout.kind);
+    };
+    assert_eq!(view.element, MirDeviceViewElement::Record(struct_ty));
+    assert_eq!(view.element.scalar(), None);
+    assert_eq!(view.rank, 1);
+}

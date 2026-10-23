@@ -7,8 +7,9 @@ use crate::{
     MirValueKind,
 };
 use radix_hir::DefId;
-use radix_lexer::Span;
+use radix_lexer::{Span, Symbol};
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use rustc_hash::FxHashMap;
 
 fn family_marker_function(op: Option<MirCollectionOp>) -> MirFunction {
     let ty = MirType::semantic(TypeId(0));
@@ -1995,9 +1996,11 @@ fn additive_mask_softmax_resolves_row_reduction_contract() {
 // the generic storage/locus row, with a stable issue.
 #[test]
 fn kernel_admission_rejects_sparse_storage_by_name() {
+    let types = TypeTable::new();
+    let validation = MirValidationContext::new(&types);
     let sparse = crate::MirDeviceViewLayout::sparse_row_major(crate::MirScalarLayout::F32, 2);
     for allow_host_owned in [false, true] {
-        let err = require_kernel_device_view(sparse, allow_host_owned)
+        let err = require_kernel_device_view(sparse, &validation, allow_host_owned)
             .expect_err("sparse storage must not be admitted to kernels");
         assert_eq!(err.issue, "mir_kernel_sparse_storage_unsupported");
     }
@@ -2005,17 +2008,22 @@ fn kernel_admission_rejects_sparse_storage_by_name() {
 
 #[test]
 fn kernel_admission_adds_rank_three_and_four_with_rank_five_closed() {
+    let types = TypeTable::new();
+    let validation = MirValidationContext::new(&types);
     let rank3 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 3);
-    require_kernel_device_view(rank3, false).expect("contiguous rank-3 device view is admitted");
+    require_kernel_device_view(rank3, &validation, false)
+        .expect("contiguous rank-3 device view is admitted");
 
     // U1 head-axis: the batched matmul route binds the rank-4 Q operand
     // (`[kv_heads, q_per_kv, query_seq, head_dim]`); rank 5 stays
     // fail-closed.
     let rank4 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 4);
-    require_kernel_device_view(rank4, false).expect("contiguous rank-4 device view is admitted");
+    require_kernel_device_view(rank4, &validation, false)
+        .expect("contiguous rank-4 device view is admitted");
 
     let rank5 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 5);
-    let error = require_kernel_device_view(rank5, false).expect_err("rank 5 stays fail-closed");
+    let error = require_kernel_device_view(rank5, &validation, false)
+        .expect_err("rank 5 stays fail-closed");
     assert_eq!(error.issue, "mir_kernel_device_view_rank_unsupported");
 }
 
@@ -2203,4 +2211,77 @@ fn device_view_element_count_refuses_zero_and_overflow() {
         device_view_element_count_or_runtime(runtime_ty, &validation),
         Ok(RUNTIME_SHAPED_ELEMENT_COUNT)
     );
+}
+
+const RECORD: DefId = DefId(7);
+
+/// A record element (`f16 scale`, `i8[32] data` = Q8_0's 34 bytes) reflects
+/// as one raw-byte cell of the resolved struct size; an `f64` field stays
+/// refused by name.
+#[test]
+fn record_element_reflects_struct_size_as_byte_width() {
+    let scale = Symbol(100_000);
+    let data = Symbol(99_999);
+
+    let mut types = TypeTable::new();
+    let record = types.intern(Type::Struct(RECORD));
+    let f16 = types.sized_numeric(Primitive::Fractus, NumericWidth::F16);
+    let i8 = types.sized_numeric(Primitive::Numerus, NumericWidth::I8);
+    let capacity = types.intern_index(IndexExpr::Literal(32));
+    let packed = types.bounded_array(i8, capacity);
+    let mut validation = MirValidationContext::new(&types);
+    validation.struct_fields.insert(
+        RECORD,
+        FxHashMap::from_iter([
+            (scale, MirType::semantic(f16)),
+            (data, MirType::semantic(packed)),
+        ]),
+    );
+    validation
+        .struct_field_order
+        .insert(RECORD, vec![scale, data]);
+    let reflection =
+        reflect_kernel_resource(&record_resource(MirType::semantic(record)), &validation)
+            .expect("a record element reflects its struct size");
+    assert_eq!(reflection.element_byte_width, 34);
+    assert_eq!(reflection.buffer_byte_len, 68);
+    assert_eq!(reflection.element_layout, MirScalarLayout::U8);
+
+    let mut types = TypeTable::new();
+    let record = types.intern(Type::Struct(RECORD));
+    let f16 = types.sized_numeric(Primitive::Fractus, NumericWidth::F16);
+    let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let mut validation = MirValidationContext::new(&types);
+    validation.struct_fields.insert(
+        RECORD,
+        FxHashMap::from_iter([
+            (scale, MirType::semantic(f16)),
+            (data, MirType::semantic(f64)),
+        ]),
+    );
+    validation
+        .struct_field_order
+        .insert(RECORD, vec![scale, data]);
+    let error = reflect_kernel_resource(&record_resource(MirType::semantic(record)), &validation)
+        .expect_err("an f64 field is refused");
+    assert!(
+        error.message.contains("f64 field"),
+        "refusal names the field: {}",
+        error.message
+    );
+}
+
+fn record_resource(element_ty: MirType) -> MirKernelResource {
+    MirKernelResource {
+        group: 0,
+        binding: 0,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty,
+        element_count: 2,
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    }
 }

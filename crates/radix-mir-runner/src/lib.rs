@@ -4227,6 +4227,10 @@ mod textus_bracket_test;
 mod collection_index_plain_test;
 
 #[cfg(test)]
+#[path = "record_element_test.rs"]
+mod record_element_test;
+
+#[cfg(test)]
 #[path = "tensor_get_direct_test.rs"]
 mod tensor_get_direct_test;
 

@@ -1,7 +1,8 @@
 use crate::tensor_type::{Dim, NON_LITERAL_DIM_MESSAGE, dims_product_checked};
 use crate::{
-    MirCollectionOp, MirFunction, MirKernelAxis, MirKernelBuiltin, MirLayoutKind, MirLocalId,
-    MirScalarLayout, MirType, MirValidationContext, shader_contract::ShaderStageIoRole,
+    MirAggregateCarrier, MirAggregateFamily, MirCollectionOp, MirFunction, MirKernelAxis,
+    MirKernelBuiltin, MirLayoutKind, MirLocalId, MirScalarLayout, MirType, MirValidationContext,
+    shader_contract::ShaderStageIoRole,
 };
 use radix_types::{IndexExpr, IndexId, Primitive, Type};
 use serde::{Deserialize, Serialize};
@@ -379,11 +380,30 @@ pub(crate) fn reflect_kernel_resource(
     // G15-3: a vector-element tensor reflects its LANE scalar; the cell is
     // `width` lanes wide (packed, width 2 or 4).
     let mut lanes_per_cell = 1u16;
+    // A record element's byte width is the resolved struct size, not a scalar
+    // width; `element_layout` is the raw-byte placeholder (`U8`), as for a
+    // genus parameter. A consumer that needs a scalar element must test
+    // `element_ty` first and refuse.
+    let mut record_byte_width = None;
     let element_layout = match layout.kind {
         MirLayoutKind::Scalar(element_layout) => element_layout,
         MirLayoutKind::DeviceVector(vector) if matches!(vector.width, 2 | 4) => {
             lanes_per_cell = u16::from(vector.width);
             vector.element
+        }
+        MirLayoutKind::Aggregate(aggregate)
+            if aggregate.family == MirAggregateFamily::Struct
+                && aggregate.carrier == MirAggregateCarrier::PhysicalValue =>
+        {
+            let struct_layout = crate::resolve_struct_layout(resource.element_ty, validation)
+                .map_err(|refusal| {
+                    MirAbiError::new(format!("kernel device view element: {}", refusal.reason()))
+                })?;
+            record_byte_width = Some(
+                u16::try_from(struct_layout.size)
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_REFLECTION_BYTE_OVERFLOW))?,
+            );
+            MirScalarLayout::U8
         }
         MirLayoutKind::Atomic(atomic) => {
             return Err(MirAbiError::new(kernel_atomic_reflection_error(
@@ -392,7 +412,10 @@ pub(crate) fn reflect_kernel_resource(
         }
         _ => return Err(MirAbiError::new(ERR_KERNEL_REFLECTION_SCALAR_ELEMENT)),
     };
-    let element_byte_width = kernel_element_byte_width(element_layout)? * lanes_per_cell;
+    let element_byte_width = match record_byte_width {
+        Some(width) => width,
+        None => kernel_element_byte_width(element_layout)? * lanes_per_cell,
+    };
     // A runtime-shaped resource has no static byte length: reflection records 0
     // ("no ABI minimum"); the host sizes the binding from the argument.
     let buffer_byte_len = if resource.is_runtime_shaped() {
@@ -604,7 +627,7 @@ pub(crate) fn buffer_element_type(
             scalar.spelling(),
         )),
         MirLayoutKind::DeviceView(view) => {
-            require_kernel_device_view(view, allow_host_owned_tensor_entry)?;
+            require_kernel_device_view(view, validation, allow_host_owned_tensor_entry)?;
             tensor_element_type(ty, validation)
                 .ok_or_else(|| MirAbiError::new(ERR_KERNEL_DEVICE_VIEW_ELEMENT))
         }
@@ -634,7 +657,7 @@ pub(crate) fn device_view_element_type(
         .map_err(|error| MirAbiError::new(error.message))?;
     match layout.kind {
         MirLayoutKind::DeviceView(view) => {
-            require_kernel_device_view(view, allow_host_owned_tensor_entry)?;
+            require_kernel_device_view(view, validation, allow_host_owned_tensor_entry)?;
             tensor_element_type(ty, validation)
                 .ok_or_else(|| MirAbiError::new(ERR_KERNEL_DEVICE_VIEW_ELEMENT))
         }
@@ -644,6 +667,7 @@ pub(crate) fn device_view_element_type(
 
 pub(crate) fn require_kernel_device_view(
     view: crate::MirDeviceViewLayout,
+    validation: &MirValidationContext<'_>,
     allow_host_owned_tensor_entry: bool,
 ) -> Result<(), MirAbiError> {
     // MLC-4: sparse storage is rejected by name, before the generic
@@ -678,9 +702,23 @@ pub(crate) fn require_kernel_device_view(
     }
     // G15-3: a packed vector element (width 2 or 4; layout time already
     // declined width 3) is admitted when its lane element is a kernel element.
+    // A genus record element is admitted only when its field layout resolves;
+    // its byte width lands in the reflection row.
     let element = match view.element {
         crate::MirDeviceViewElement::Scalar(scalar) => scalar,
         crate::MirDeviceViewElement::Vector(vector) => vector.element,
+        crate::MirDeviceViewElement::Record(record_ty) => {
+            let layout = crate::resolve_struct_layout(MirType::semantic(record_ty), validation)
+                .map_err(|refusal| {
+                    MirAbiError::new(format!("kernel device view element: {}", refusal.reason()))
+                })?;
+            // A record cell widens to a u16 byte width in the reflection row;
+            // an empty or oversized struct has no legal ABI width.
+            if layout.size == 0 || u16::try_from(layout.size).is_err() {
+                return Err(MirAbiError::new(ERR_KERNEL_REFLECTION_BYTE_OVERFLOW));
+            }
+            return Ok(());
+        }
     };
     if !crate::tensor_type::is_kernel_element_layout(element) {
         return Err(MirAbiError::with_detail(
