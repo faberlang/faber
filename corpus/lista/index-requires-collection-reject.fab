@@ -1,0 +1,22 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Bracket indexing needs a list or a map; an integer cannot be indexed."
+syntax = "n[0] on int — rejected"
+related = ["lista", "tabula"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:indexing_requires_array_or_map"
++++
+# Bracket indexing is refused for an integer because it is not a collection.
+# Lists and maps support indexing; integers do not.
+# The expression `n[0]` therefore fails during semantic checking.
+# This exemplum intentionally demonstrates that rejection.
+
+main {
+    let int n ← 1
+    print n[0]
+}

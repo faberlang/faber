@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/lista/index-requires-collection-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/index-requires-collection-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "indexing_requires_array_or_map"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "indexing_requires_array_or_map"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "indexing_requires_array_or_map"
