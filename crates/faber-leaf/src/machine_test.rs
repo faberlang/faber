@@ -8,6 +8,80 @@ fn field<'a>(fields: &'a [(String, Reply)], key: &str) -> &'a Reply {
         .expect("field")
 }
 
+fn core_rows(reply: &Reply) -> Vec<(String, i64, i64)> {
+    let Reply::Map(fields) = reply else {
+        panic!("expected snapshot map");
+    };
+    let Reply::List(rows) = field(fields, "cores") else {
+        panic!("expected cores list");
+    };
+    rows.iter()
+        .map(|row| {
+            let Reply::Map(fields) = row else {
+                panic!("expected core map");
+            };
+            let Reply::Str(name) = field(fields, "name") else {
+                panic!("expected core name");
+            };
+            let Reply::Int(busy_ns) = field(fields, "busy_ns") else {
+                panic!("expected busy_ns");
+            };
+            let Reply::Int(total_ns) = field(fields, "total_ns") else {
+                panic!("expected total_ns");
+            };
+            (name.clone(), *busy_ns, *total_ns)
+        })
+        .collect()
+}
+
+fn proc_rows(reply: &Reply) -> Vec<(i64, String, i64, i64)> {
+    let Reply::Map(fields) = reply else {
+        panic!("expected snapshot map");
+    };
+    let Reply::List(rows) = field(fields, "procs") else {
+        panic!("expected procs list");
+    };
+    rows.iter()
+        .map(|row| {
+            let Reply::Map(fields) = row else {
+                panic!("expected process map");
+            };
+            let Reply::Int(pid) = field(fields, "pid") else {
+                panic!("expected process pid");
+            };
+            let Reply::Str(command) = field(fields, "command") else {
+                panic!("expected process command");
+            };
+            let Reply::Int(cpu_ns) = field(fields, "cpu_ns") else {
+                panic!("expected process cpu_ns");
+            };
+            let Reply::Int(mem_bytes) = field(fields, "mem_bytes") else {
+                panic!("expected process mem_bytes");
+            };
+            (*pid, command.clone(), *cpu_ns, *mem_bytes)
+        })
+        .collect()
+}
+
+fn proc_ticks(pid: i64, cpu_ns: u64, mem_bytes: u64) -> super::ProcTicks {
+    super::ProcTicks {
+        pid,
+        command: format!("proc{pid}"),
+        cpu_ns,
+        mem_bytes,
+    }
+}
+
+fn collected_procs(procs: Vec<super::ProcTicks>) -> super::Collected {
+    super::Collected {
+        taken_at: std::time::Instant::now(),
+        cores: Vec::new(),
+        used_bytes: 0,
+        total_bytes: 0,
+        procs,
+    }
+}
+
 #[test]
 fn route_list_matches_serve() {
     for route in super::ROUTES {
@@ -65,7 +139,13 @@ fn fresh_snapshot_reports_memory() {
     };
     assert_eq!(field(fields, "stale"), &Reply::Bool(false));
     assert_eq!(field(fields, "age_ms"), &Reply::Int(0));
-    assert_eq!(field(fields, "cores"), &Reply::List(Vec::new()));
+    let cores = core_rows(&reply);
+    assert!(!cores.is_empty());
+    assert!(
+        cores
+            .iter()
+            .all(|(_, busy_ns, total_ns)| total_ns >= busy_ns)
+    );
     let Reply::Map(memory) = field(fields, "memory") else {
         panic!("expected memory map");
     };
@@ -77,6 +157,282 @@ fn fresh_snapshot_reports_memory() {
     };
     assert!(*total > 0, "host total memory must be positive");
     assert!(*used <= *total, "used memory cannot exceed total");
+}
+
+#[test]
+fn interval_cores_differences_by_name() {
+    let old = super::make_previous(
+        1,
+        super::Collected {
+            taken_at: std::time::Instant::now(),
+            cores: vec![
+                super::CoreTicks {
+                    name: "cpu0".to_owned(),
+                    busy_ns: 100,
+                    total_ns: 400,
+                },
+                super::CoreTicks {
+                    name: "cpu1".to_owned(),
+                    busy_ns: 50,
+                    total_ns: 200,
+                },
+                super::CoreTicks {
+                    name: "cpu9".to_owned(),
+                    busy_ns: 1,
+                    total_ns: 2,
+                },
+            ],
+            used_bytes: 0,
+            total_bytes: 0,
+            procs: Vec::new(),
+        },
+        None,
+    );
+    let fresh = super::Collected {
+        taken_at: old.taken_at + std::time::Duration::from_nanos(1),
+        cores: vec![
+            super::CoreTicks {
+                name: "cpu1".to_owned(),
+                busy_ns: 80,
+                total_ns: 260,
+            },
+            super::CoreTicks {
+                name: "cpu0".to_owned(),
+                busy_ns: 160,
+                total_ns: 500,
+            },
+        ],
+        used_bytes: 0,
+        total_bytes: 0,
+        procs: Vec::new(),
+    };
+
+    let rows = super::interval_cores(Some(&old), &fresh);
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.name.as_str(), row.busy_ns, row.total_ns))
+            .collect::<Vec<_>>(),
+        vec![("cpu1", 30, 60), ("cpu0", 60, 100)]
+    );
+}
+
+#[test]
+fn interval_cores_first_snapshot_is_zero() {
+    let fresh = super::Collected {
+        taken_at: std::time::Instant::now(),
+        cores: vec![
+            super::CoreTicks {
+                name: "cpu1".to_owned(),
+                busy_ns: 80,
+                total_ns: 260,
+            },
+            super::CoreTicks {
+                name: "cpu0".to_owned(),
+                busy_ns: 160,
+                total_ns: 500,
+            },
+        ],
+        used_bytes: 0,
+        total_bytes: 0,
+        procs: Vec::new(),
+    };
+
+    let rows = super::interval_cores(None, &fresh);
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.name.as_str(), row.busy_ns, row.total_ns))
+            .collect::<Vec<_>>(),
+        vec![("cpu1", 0, 0), ("cpu0", 0, 0)]
+    );
+}
+
+#[test]
+fn interval_procs_differences_by_pid() {
+    let old = super::make_previous(
+        1,
+        collected_procs(vec![proc_ticks(1, 0, 100), proc_ticks(2, 500, 200)]),
+        None,
+    );
+    let fresh = collected_procs(vec![
+        proc_ticks(2, 900, 220),
+        proc_ticks(1, 300, 150),
+        proc_ticks(3, 7, 50),
+    ]);
+
+    let rows = super::interval_procs(Some(&old), &fresh);
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.pid, row.cpu_ns, row.mem_bytes))
+            .collect::<Vec<_>>(),
+        vec![(2, 400, 220), (1, 300, 150), (3, 0, 50)]
+    );
+}
+
+#[test]
+fn interval_procs_drops_exited_pid() {
+    let old = super::make_previous(
+        1,
+        collected_procs(vec![proc_ticks(1, 100, 100), proc_ticks(2, 200, 200)]),
+        None,
+    );
+    let fresh = collected_procs(vec![proc_ticks(1, 150, 120)]);
+
+    let rows = super::interval_procs(Some(&old), &fresh);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        (rows[0].pid, rows[0].cpu_ns, rows[0].mem_bytes),
+        (1, 50, 120)
+    );
+}
+
+#[test]
+fn interval_procs_caps_at_max_procs() {
+    let old = super::make_previous(
+        1,
+        collected_procs((1_i64..=80).map(|pid| proc_ticks(pid, 0, 0)).collect()),
+        None,
+    );
+    let fresh = collected_procs(
+        (1_i64..=80)
+            .map(|pid| proc_ticks(pid, u64::try_from(pid * 1000).expect("cpu counter"), 1))
+            .collect(),
+    );
+
+    let rows = super::interval_procs(Some(&old), &fresh);
+    assert_eq!(rows.len(), super::MAX_PROCS);
+    assert_eq!((rows[0].pid, rows[0].cpu_ns), (80, 80_000));
+    assert_eq!(
+        (
+            rows[super::MAX_PROCS - 1].pid,
+            rows[super::MAX_PROCS - 1].cpu_ns
+        ),
+        (17, 17_000)
+    );
+}
+
+#[test]
+fn interval_procs_first_snapshot_is_zero_cpu() {
+    let fresh = collected_procs(vec![
+        proc_ticks(3, 700, 30),
+        proc_ticks(1, 100, 10),
+        proc_ticks(2, 400, 20),
+    ]);
+
+    let rows = super::interval_procs(None, &fresh);
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.pid, row.cpu_ns, row.mem_bytes))
+            .collect::<Vec<_>>(),
+        vec![(1, 0, 10), (2, 0, 20), (3, 0, 30)]
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn scale_mach_ticks() {
+    assert_eq!(super::scale_mach_ticks(1000, 1, 1), 1000);
+    assert_eq!(super::scale_mach_ticks(1000, 125, 3), 41666);
+    assert_eq!(super::scale_mach_ticks(5, 1, 0), 0);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn ticks_to_ns() {
+    assert_eq!(super::ticks_to_ns(100, 100), 1_000_000_000);
+    assert_eq!(super::ticks_to_ns(0, 100), 0);
+    assert_eq!(super::ticks_to_ns(5, 0), 0);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn collect_sees_own_process() {
+    let collected = super::collect().expect("host collection");
+    let own_pid = i64::from(std::process::id());
+    let own_process = collected
+        .procs
+        .iter()
+        .find(|proc_row| proc_row.pid == own_pid)
+        .expect("own process row");
+    assert!(!own_process.command.is_empty());
+    assert!(own_process.mem_bytes > 0);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn fresh_snapshot_reports_processes() {
+    let _guard = crate::test_support::handle_table_guard();
+    super::reset_previous();
+    let _warm = serve("machina:specimen", &[Arg::Int(5000)])
+        .expect("route")
+        .expect("specimen");
+    let fresh = serve("machina:specimen", &[Arg::Int(5000)])
+        .expect("route")
+        .expect("specimen");
+    let replay = serve("machina:specimen", &[Arg::Int(0)])
+        .expect("route")
+        .expect("specimen");
+
+    let fresh_rows = proc_rows(&fresh);
+    let replay_rows = proc_rows(&replay);
+    assert!(!fresh_rows.is_empty());
+    assert!(!replay_rows.is_empty());
+    assert!(fresh_rows.len() <= super::MAX_PROCS);
+    assert!(replay_rows.len() <= super::MAX_PROCS);
+    assert_eq!(
+        fresh_rows.iter().map(|row| row.0).collect::<Vec<_>>(),
+        replay_rows.iter().map(|row| row.0).collect::<Vec<_>>()
+    );
+    for rows in [&fresh_rows, &replay_rows] {
+        assert!(rows.iter().all(|row| !row.1.is_empty()));
+        assert!(rows.windows(2).all(|pair| pair[0].2 >= pair[1].2));
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn collect_reports_every_core() {
+    let collected = super::collect().expect("host collection");
+    assert!(!collected.cores.is_empty());
+    for (index, core) in collected.cores.iter().enumerate() {
+        assert_eq!(core.name, format!("cpu{index}"));
+        assert!(core.total_ns >= core.busy_ns);
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn fresh_snapshot_reports_per_core_cpu() {
+    let _guard = crate::test_support::handle_table_guard();
+    super::reset_previous();
+    let first = serve("machina:specimen", &[Arg::Int(5000)])
+        .expect("route")
+        .expect("specimen");
+    let second = serve("machina:specimen", &[Arg::Int(5000)])
+        .expect("route")
+        .expect("specimen");
+    let replay = serve("machina:specimen", &[Arg::Int(0)])
+        .expect("route")
+        .expect("specimen");
+
+    let first_rows = core_rows(&first);
+    let second_rows = core_rows(&second);
+    let replay_rows = core_rows(&replay);
+    assert!(!first_rows.is_empty());
+    assert_eq!(second_rows.len(), first_rows.len());
+    assert_eq!(replay_rows.len(), first_rows.len());
+    let names = |rows: &[(String, i64, i64)]| {
+        rows.iter()
+            .map(|(name, _, _)| name.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(names(&second_rows), names(&first_rows));
+    assert_eq!(names(&replay_rows), names(&first_rows));
+    for rows in [&first_rows, &second_rows, &replay_rows] {
+        assert!(
+            rows.iter()
+                .all(|(_, busy_ns, total_ns)| total_ns >= busy_ns && *busy_ns >= 0)
+        );
+    }
 }
 
 #[test]

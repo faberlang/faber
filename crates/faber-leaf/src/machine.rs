@@ -5,9 +5,8 @@
 //! finishes.
 //!
 //! Serves Latin `machina:specimen`: one host snapshot. This cut reports
-//! memory; per-core CPU and the process table land in c1de1950-2 and -3.
-//! A deadline of 0 means never wait: answer from the previous slot without
-//! spawning a read.
+//! memory, per-core CPU and the process table. A deadline of 0 means never
+//! wait: answer from the previous slot without spawning a read.
 
 #[cfg(test)]
 #[path = "machine_test.rs"]
@@ -28,8 +27,6 @@ const ROUTES: &[&str] = &["machina:specimen"];
 pub const MAX_PROCS: usize = 64;
 
 /// One core's absolute CPU tick counters from one host sample.
-// TARGET: c1de1950-2 differences these into `IntervalCore` rows.
-#[allow(dead_code)]
 struct CoreTicks {
     name: String,
     busy_ns: u64,
@@ -37,8 +34,6 @@ struct CoreTicks {
 }
 
 /// One process row's absolute CPU and resident-memory figures.
-// TARGET: c1de1950-3 differences these into `IntervalProc` rows.
-#[allow(dead_code)]
 struct ProcTicks {
     pid: i64,
     command: String,
@@ -56,8 +51,6 @@ pub(crate) struct Collected {
 }
 
 /// One core's busy/total nanoseconds across the sampling interval.
-// TARGET: c1de1950-2 constructs these.
-#[allow(dead_code)]
 struct IntervalCore {
     name: String,
     busy_ns: i64,
@@ -65,8 +58,6 @@ struct IntervalCore {
 }
 
 /// One process row's CPU and memory across the sampling interval.
-// TARGET: c1de1950-3 constructs these.
-#[allow(dead_code)]
 struct IntervalProc {
     pid: i64,
     command: String,
@@ -83,8 +74,6 @@ struct Rendered {
 }
 
 /// The last completed sample: absolutes for differencing, render for replay.
-// TARGET: c1de1950-2/-3 read the absolute tick vectors.
-#[allow(dead_code)]
 struct Previous {
     /// Issue order of the read that produced this snapshot. A straggler whose
     /// generation is older than the slot's is rejected on arrival.
@@ -246,17 +235,67 @@ fn render_intervals(old: Option<&Previous>, fresh: &Collected) -> Rendered {
 }
 
 fn interval_cores(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalCore> {
-    // TARGET: c1de1950-2 differences each core by name against the previous
-    // slot's absolutes. This unit ships the slot and the rendered shape.
     debug_assert!(old.is_none_or(|previous| previous.taken_at <= fresh.taken_at));
-    Vec::new()
+    fresh
+        .cores
+        .iter()
+        .map(|core| {
+            let previous = old.and_then(|previous| {
+                previous
+                    .cores_ticks
+                    .iter()
+                    .find(|previous_core| previous_core.name == core.name)
+            });
+            let (busy_ns, total_ns) = previous.map_or((0, 0), |previous_core| {
+                (
+                    i64::try_from(core.busy_ns.saturating_sub(previous_core.busy_ns))
+                        .unwrap_or(i64::MAX),
+                    i64::try_from(core.total_ns.saturating_sub(previous_core.total_ns))
+                        .unwrap_or(i64::MAX),
+                )
+            });
+            IntervalCore {
+                name: core.name.clone(),
+                busy_ns,
+                total_ns,
+            }
+        })
+        .collect()
 }
 
 fn interval_procs(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalProc> {
-    // TARGET: c1de1950-3 differences the process table against the previous
-    // slot's absolutes, capped at `MAX_PROCS`.
     debug_assert!(old.is_none_or(|previous| previous.taken_at <= fresh.taken_at));
-    Vec::new()
+    let mut rows = fresh
+        .procs
+        .iter()
+        .map(|proc_row| {
+            let previous = old.and_then(|previous| {
+                previous
+                    .proc_ticks
+                    .iter()
+                    .find(|previous_proc| previous_proc.pid == proc_row.pid)
+            });
+            let cpu_ns = previous.map_or(0, |previous_proc| {
+                i64::try_from(proc_row.cpu_ns)
+                    .unwrap_or(i64::MAX)
+                    .saturating_sub(i64::try_from(previous_proc.cpu_ns).unwrap_or(i64::MAX))
+            });
+            IntervalProc {
+                pid: proc_row.pid,
+                command: proc_row.command.clone(),
+                cpu_ns,
+                mem_bytes: i64::try_from(proc_row.mem_bytes).unwrap_or(i64::MAX),
+            }
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| {
+        right
+            .cpu_ns
+            .cmp(&left.cpu_ns)
+            .then_with(|| left.pid.cmp(&right.pid))
+    });
+    rows.truncate(MAX_PROCS);
+    rows
 }
 
 fn previous_reply() -> Reply {
@@ -344,11 +383,257 @@ fn collect() -> Result<Collected, LeafError> {
     let used_bytes = used_memory()?;
     Ok(Collected {
         taken_at: Instant::now(),
-        cores: Vec::new(),
+        cores: collect_cores()?,
         used_bytes,
         total_bytes,
-        procs: Vec::new(),
+        procs: collect_procs()?,
     })
+}
+
+#[cfg(target_os = "macos")]
+#[allow(deprecated)]
+fn mach_timebase() -> (u32, u32) {
+    let mut info = std::mem::MaybeUninit::<libc::mach_timebase_info>::zeroed();
+    // SAFETY: `mach_timebase_info` writes one timebase struct to `info`.
+    let status = unsafe { libc::mach_timebase_info(info.as_mut_ptr()) };
+    if status != 0 {
+        return (1, 1);
+    }
+    // SAFETY: a successful call initialized the full timebase struct.
+    let info = unsafe { info.assume_init() };
+    if info.denom == 0 {
+        (1, 1)
+    } else {
+        (info.numer, info.denom)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn scale_mach_ticks(ticks: u64, numer: u32, denom: u32) -> u64 {
+    if denom == 0 {
+        0
+    } else {
+        ticks * u64::from(numer) / u64::from(denom)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn collect_procs() -> Result<Vec<ProcTicks>, LeafError> {
+    // `PROC_ALL_PIDS` is defined by libproc.h but is not exported by libc.
+    const PROC_ALL_PIDS: u32 = 1;
+
+    // SAFETY: a null buffer with size zero asks libproc for the required size.
+    let initial_size = unsafe { libc::proc_listpids(PROC_ALL_PIDS, 0, std::ptr::null_mut(), 0) };
+    if initial_size < 0 {
+        return Ok(Vec::new());
+    }
+    let pid_size = std::mem::size_of::<u32>();
+    let initial_pids = usize::try_from(initial_size).unwrap_or(0) / pid_size;
+    let mut pids = vec![0_u32; initial_pids.saturating_add(64)];
+    let mut retries = 0;
+    let pid_count = loop {
+        let buffer_bytes = pids.len().saturating_mul(pid_size);
+        let buffer_size = i32::try_from(buffer_bytes).unwrap_or(i32::MAX);
+        // SAFETY: `pids` is writable for `buffer_size` bytes.
+        let listed =
+            unsafe { libc::proc_listpids(PROC_ALL_PIDS, 0, pids.as_mut_ptr().cast(), buffer_size) };
+        if listed < 0 {
+            return Ok(Vec::new());
+        }
+        let listed_bytes = usize::try_from(listed).unwrap_or(usize::MAX);
+        if listed_bytes < usize::try_from(buffer_size).unwrap_or(0) {
+            break (listed_bytes / pid_size).min(pids.len());
+        }
+        if retries == 3 {
+            break pids.len();
+        }
+        retries += 1;
+        let required_pids = listed_bytes / pid_size;
+        pids.resize(required_pids.saturating_add(64), 0);
+    };
+
+    let (numer, denom) = mach_timebase();
+    let info_size =
+        i32::try_from(std::mem::size_of::<libc::proc_taskallinfo>()).unwrap_or(i32::MAX);
+    let mut procs = Vec::with_capacity(pid_count);
+    for &pid in &pids[..pid_count] {
+        let mut info = std::mem::MaybeUninit::<libc::proc_taskallinfo>::zeroed();
+        // SAFETY: `info` is writable for the exact task-all-info structure size.
+        let read = unsafe {
+            libc::proc_pidinfo(
+                pid as libc::c_int,
+                libc::PROC_PIDTASKALLINFO,
+                0,
+                info.as_mut_ptr().cast(),
+                info_size,
+            )
+        };
+        if read != info_size {
+            continue;
+        }
+        // SAFETY: `proc_pidinfo` returned the exact structure size.
+        let info = unsafe { info.assume_init() };
+        let name = if info.pbsd.pbi_name[0] != 0 {
+            &info.pbsd.pbi_name[..]
+        } else {
+            &info.pbsd.pbi_comm[..]
+        };
+        let command_bytes = name
+            .iter()
+            .take_while(|&&byte| byte != 0)
+            .map(|&byte| byte.to_ne_bytes()[0])
+            .collect::<Vec<_>>();
+        procs.push(ProcTicks {
+            pid: i64::from(pid),
+            command: String::from_utf8_lossy(&command_bytes).into_owned(),
+            cpu_ns: scale_mach_ticks(
+                info.ptinfo.pti_total_user + info.ptinfo.pti_total_system,
+                numer,
+                denom,
+            ),
+            mem_bytes: info.ptinfo.pti_resident_size,
+        });
+    }
+    Ok(procs)
+}
+
+/// Convert host processor counters, whose unit is one scheduling tick, to ns.
+#[cfg(target_os = "macos")]
+fn tick_hz() -> u64 {
+    // SAFETY: `sysconf` takes a scalar selector and writes no output buffer.
+    // This is the sole source for the scheduling-tick scale of host counters.
+    let hz = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+    if hz <= 0 {
+        100
+    } else {
+        u64::try_from(hz).unwrap_or(100)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn ticks_to_ns(ticks: u32, hz: u64) -> u64 {
+    // `checked_div` yields `None` exactly when `hz` is zero, so the zero-tick
+    // scale falls through to the same `0` the explicit guard produced.
+    u64::from(ticks)
+        .checked_mul(1_000_000_000)
+        .and_then(|scaled| scaled.checked_div(hz))
+        .unwrap_or(0)
+}
+
+#[cfg(target_os = "macos")]
+fn wide_ticks_to_ns(ticks: u64, hz: u64) -> u64 {
+    if hz == 0 {
+        0
+    } else if let Ok(ticks) = u32::try_from(ticks) {
+        ticks_to_ns(ticks, hz)
+    } else {
+        ticks.saturating_mul(1_000_000_000) / hz
+    }
+}
+
+// WHY: libc deprecates `mach_host_self` in favour of the `mach2` crate; adding
+// a dependency is outside this leaf's cut, and the call is the same Mach port.
+#[cfg(target_os = "macos")]
+#[allow(deprecated)]
+fn collect_cores() -> Result<Vec<CoreTicks>, LeafError> {
+    let mut count: libc::natural_t = 0;
+    let mut info: libc::processor_info_array_t = std::ptr::null_mut();
+    let mut info_count: libc::mach_msg_type_number_t = 0;
+    // SAFETY: `count` and `info_count` each point to one output integer of
+    // their declared type, and `info` points to one output array pointer; on
+    // success the kernel fills the array whose length is `info_count` words.
+    let status = unsafe {
+        libc::host_processor_info(
+            libc::mach_host_self(),
+            libc::PROCESSOR_CPU_LOAD_INFO,
+            std::ptr::from_mut(&mut count),
+            std::ptr::from_mut(&mut info),
+            std::ptr::from_mut(&mut info_count),
+        )
+    };
+    if status != libc::KERN_SUCCESS {
+        if !info.is_null() {
+            // SAFETY: if the failed call returned an allocated `info` array,
+            // `info_count` gives its length in integer_t words.
+            let _ = unsafe {
+                libc::vm_deallocate(
+                    libc::mach_task_self(),
+                    info as libc::vm_address_t,
+                    usize::try_from(info_count)
+                        .unwrap_or(usize::MAX)
+                        .saturating_mul(std::mem::size_of::<libc::integer_t>()),
+                )
+            };
+        }
+        return Err(LeafError::unavailable(
+            ROUTE,
+            format!("host_processor_info failed ({status})"),
+        ));
+    }
+
+    let cores = (|| {
+        let processor_count = usize::try_from(count).unwrap_or(usize::MAX);
+        let info_words = usize::try_from(info_count).unwrap_or(usize::MAX);
+        let words_per_record = std::mem::size_of::<libc::processor_cpu_load_info>()
+            / std::mem::size_of::<libc::integer_t>();
+        let Some(required_words) = processor_count.checked_mul(words_per_record) else {
+            return Err(LeafError::unavailable(
+                ROUTE,
+                "host_processor_info returned an invalid CPU array",
+            ));
+        };
+        if (processor_count > 0 && info.is_null()) || required_words > info_words {
+            return Err(LeafError::unavailable(
+                ROUTE,
+                "host_processor_info returned an invalid CPU array",
+            ));
+        }
+
+        let records: &[libc::processor_cpu_load_info] = if processor_count == 0 {
+            &[]
+        } else {
+            // SAFETY: successful `host_processor_info` returned `count`
+            // records, and the validated `info_count` covers their full size.
+            unsafe { std::slice::from_raw_parts(info.cast(), processor_count) }
+        };
+        let hz = tick_hz();
+        let user_index = usize::try_from(libc::CPU_STATE_USER).unwrap_or(0);
+        let system_index = usize::try_from(libc::CPU_STATE_SYSTEM).unwrap_or(0);
+        let idle_index = usize::try_from(libc::CPU_STATE_IDLE).unwrap_or(0);
+        let nice_index = usize::try_from(libc::CPU_STATE_NICE).unwrap_or(0);
+        Ok(records
+            .iter()
+            .enumerate()
+            .map(|(index, record)| {
+                let user = u64::from(record.cpu_ticks[user_index]);
+                let system = u64::from(record.cpu_ticks[system_index]);
+                let idle = u64::from(record.cpu_ticks[idle_index]);
+                let nice = u64::from(record.cpu_ticks[nice_index]);
+                let busy_ticks = user + system + nice;
+                let total_ticks = busy_ticks + idle;
+                CoreTicks {
+                    name: format!("cpu{index}"),
+                    busy_ns: wide_ticks_to_ns(busy_ticks, hz),
+                    total_ns: wide_ticks_to_ns(total_ticks, hz),
+                }
+            })
+            .collect())
+    })();
+
+    if !info.is_null() {
+        // SAFETY: `info` is the kernel-allocated array returned above, and
+        // `info_count` gives its length in integer_t words.
+        let _ = unsafe {
+            libc::vm_deallocate(
+                libc::mach_task_self(),
+                info as libc::vm_address_t,
+                usize::try_from(info_count)
+                    .unwrap_or(usize::MAX)
+                    .saturating_mul(std::mem::size_of::<libc::integer_t>()),
+            )
+        };
+    }
+    cores
 }
 
 #[cfg(target_os = "macos")]
