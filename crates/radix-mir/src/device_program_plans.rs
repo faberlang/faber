@@ -3789,6 +3789,69 @@ pub fn elementwise_subchain_signature_for_emission(
     Ok(signature)
 }
 
+/// Append the runtime-extent count channel (U2/L7) to a run-time-shaped
+/// elementwise emission signature.
+///
+/// [`elementwise_subchain_signature_for_emission`] sizes a run-time-shaped
+/// buffer at the [`crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT`] marker and
+/// keeps the one-lane placeholder dispatch, because the real extent is a
+/// per-call launch fact. An emitter whose OOB guard compares the dispatch
+/// index against a static limit therefore has no honest limit to use: the
+/// placeholder `dispatch_size.x == 1` would cull every invocation past the
+/// first element and leave the rest of a multi-element output unwritten.
+/// The count channel is the fix — the host binds the written output's whole
+/// element count at this slot before dispatch and the guard reads it.
+///
+/// Returns `true` when the resource was appended. A hand-built type table
+/// without `numerus<u32>` (unit fixtures) keeps the signature untouched; the
+/// production registry interns it for every kernel program.
+pub fn append_runtime_extent_count_channel(
+    signature: &mut MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> bool {
+    if !signature
+        .resources()
+        .any(MirKernelResource::is_runtime_shaped)
+    {
+        return false;
+    }
+    let Some(extent_ty) = validation
+        .types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+    else {
+        return false;
+    };
+    let binding = signature
+        .resources()
+        .map(|resource| resource.binding)
+        .max()
+        .map_or(0, |binding| binding.saturating_add(1));
+    signature.extra_inputs.push(runtime_extent_count_resource(
+        binding,
+        MirType::semantic(extent_ty),
+    ));
+    true
+}
+
+/// The runtime-extent count resource a run-time-shaped emission signature
+/// carries: a count-one `u32` read input the host populates with the written
+/// output's whole element count before dispatch (the same channel the
+/// whole-function ABI appends for a scalar-shaped kernel).
+fn runtime_extent_count_resource(binding: u32, element_ty: MirType) -> MirKernelResource {
+    MirKernelResource {
+        group: 0,
+        binding,
+        kind: MirKernelResourceKind::RuntimeExtent,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty,
+        element_count: 1,
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    }
+}
+
 /// The emission signature for a decomposition subchain kernel carrying a
 /// S6-P1 transformer recipe (S6-P1 seam): the transformer-shaped recipe
 /// resources plus the subchain's data-flow inputs, with the recipe
