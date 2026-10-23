@@ -1,0 +1,60 @@
++++
+term = "failable async function"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "figendum_decl", "type_annotation", "owned_type", "base_type", "comparison", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt", "callable_posture", "itera_stmt", "range_expr", "cede_stmt", "incipiet_stmt"]
+category = "errors"
+canonical = false
+summary = "An async function can declare its own ⇥ channel; failures leave at the await and can propagate through another async ⇥ function."
+syntax = "fn <name>(<params>) async → <type> ⇥ <error-type> <block>  |  await_const <type> <name> ← <async-call>"
+related = ["functio", "⇥", "fiet", "figendum", "fac", "cape", "iace"]
+locale = "en"
++++
+# =============================================================================
+# failable async function — a ⇥ failure leaves at await
+# =============================================================================
+#
+# What this teaches:
+#   • An async finite function can declare its own `⇥` channel.
+#   • The call creates an async result; the failure leaves when the caller
+#     awaits it, so the handler surrounds the await rather than the call.
+#   • An async function with the same `⇥` channel can await and propagate the
+#     failure to its own caller.
+#
+# EXPECTED OUTPUT:
+#   failable-async.expected — one line per print.
+
+fn compute(int n) async → int ⇥ string {
+    if n ≻ 3 then throw "too big"
+    return n * 2
+}
+
+fn relay(int n) async → int ⇥ string {
+    await_const int v ← compute(n)
+    return v + 1
+}
+
+async_main {
+    do {
+        await_const int v ← compute(2)
+        print v
+    }
+    catch e { print "compute caught: §"(e) }
+
+    do {
+        await_const int v ← compute(5)
+        print v
+    }
+    catch e { print "compute caught: §"(e) }
+
+    do {
+        await_const int v ← relay(2)
+        print v
+    }
+    catch e { print "relay caught: §"(e) }
+
+    do {
+        await_const int v ← relay(5)
+        print v
+    }
+    catch e { print "relay caught: §"(e) }
+}
