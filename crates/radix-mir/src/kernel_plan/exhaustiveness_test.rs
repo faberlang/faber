@@ -217,7 +217,11 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
         CollectionKernelPlan::Gather(dummy_gather()),
         CollectionKernelPlan::RmsNormalization(dummy_rms()),
         CollectionKernelPlan::Rope(dummy_rope()),
-        CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan { rows: 1, cols: 1 }),
+        CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan {
+            dims: RowOpDims::Literal { rows: 1, width: 1 },
+            rows: 1,
+            cols: 1,
+        }),
         CollectionKernelPlan::QuantizedMatMul(dummy_quantized_matmul()),
         CollectionKernelPlan::GroupedMatMul(dummy_grouped_matmul()),
         CollectionKernelPlan::BatchedAttention(dummy_batched_attention()),

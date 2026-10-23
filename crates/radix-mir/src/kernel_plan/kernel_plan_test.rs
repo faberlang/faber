@@ -1649,6 +1649,35 @@ fn row_softmax_plan_carries_literal_row_and_width() {
 }
 
 #[test]
+fn causal_masked_softmax_plan_carries_literal_dims() {
+    // The causal masked-softmax plan carries the operand's literal extents:
+    // `[8,8]` resolves dims `rows: 8, width: 8` alongside the typed
+    // `rows`/`cols` fields.
+    let mut types = TypeTable::new();
+    let function = transformer_function(
+        &mut types,
+        [8, 8],
+        MirCollectionOp::TensorCausalMaskedSoftmax,
+        vec![],
+    );
+    let signature = transformer_signature(64, 64);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorCausalMaskedSoftmax,
+    )
+    .expect("causal masked-softmax typed facts resolve a plan");
+    let CollectionKernelPlan::CausalMaskedSoftmax(causal) = &plan else {
+        panic!("causal masked softmax must map to its plan, got {plan:?}");
+    };
+    assert_eq!(causal.dims, RowOpDims::Literal { rows: 8, width: 8 });
+    assert_eq!(causal.rows, 8, "the row (query) extent");
+    assert_eq!(causal.cols, 8, "the column (key) extent");
+}
+
+#[test]
 fn layer_norm_resolves_layer_normalization_plan() {
     // S6-P1 admission: `t = layernorm(x, 1, 1e-5)` over `[4,4]` resolves the
     // LayerNormalization recipe with the axis from the const operand.

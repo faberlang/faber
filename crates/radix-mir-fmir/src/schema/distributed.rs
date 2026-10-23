@@ -604,6 +604,13 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         }),
         WireCollectionKernelPlan::CausalMaskedSoftmax(plan) => {
             CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan {
+                // The wire mirror carries both extents; the decoded dims are
+                // their literal form (matching the wire `MatMulPlan`
+                // reconstruction).
+                dims: RowOpDims::Literal {
+                    rows: plan.rows,
+                    width: plan.cols,
+                },
                 rows: plan.rows,
                 cols: plan.cols,
             })

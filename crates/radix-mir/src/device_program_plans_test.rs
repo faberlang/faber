@@ -3810,6 +3810,7 @@ fn causal_masked_softmax_function_resolves_causal_masked_softmax_plan() {
     derived.validate().expect("the derived plan validates");
     let carried =
         CollectionKernelPlan::CausalMaskedSoftmax(crate::kernel_plan::CausalMaskedSoftmaxPlan {
+            dims: crate::kernel_plan::RowOpDims::Literal { rows: 9, width: 9 },
             rows: 9,
             cols: 9,
         });
@@ -3851,7 +3852,11 @@ fn inference_recipe_kinds_are_typed() {
     );
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::CausalMaskedSoftmax(
-            crate::kernel_plan::CausalMaskedSoftmaxPlan { rows: 9, cols: 9 }
+            crate::kernel_plan::CausalMaskedSoftmaxPlan {
+                dims: crate::kernel_plan::RowOpDims::Literal { rows: 9, width: 9 },
+                rows: 9,
+                cols: 9
+            }
         )),
         RecipeKind::CausalMaskedSoftmax
     );

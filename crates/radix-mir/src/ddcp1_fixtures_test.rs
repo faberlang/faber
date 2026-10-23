@@ -1402,8 +1402,11 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
     const HEAD_DIM: u64 = 64;
 
     // W — the whole causal masked-row softmax over the [T×T] score matrix.
-    let whole =
-        CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan { rows: T, cols: T });
+    let whole = CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan {
+        dims: crate::kernel_plan::RowOpDims::Literal { rows: T, width: T },
+        rows: T,
+        cols: T,
+    });
     whole
         .validate()
         .expect("the CausalMaskedSoftmax whole-recipe plan validates");
