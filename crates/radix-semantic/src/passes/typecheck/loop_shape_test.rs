@@ -159,3 +159,64 @@ fn shape_method_after_the_loop_is_accepted() {
         "incipit {\n    varia lista<numerus> xs ← [1, 2, 3]\n    itera ex xs sit x {\n        nota x\n    }\n    xs.appende(4)\n}",
     );
 }
+
+// The sinking contract's method form is surfaced as `sink` in English and
+// canonical `immerge` in Latin; both lower to the same registry row, so the
+// loop shape rule must see the append no matter which word the source uses.
+fn analyze_en(source: &str) -> test_support::AnalyzedFixture {
+    let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
+    );
+    test_support::analyze_source_with_config(source, config)
+}
+
+fn rejects_en(source: &str) {
+    let result = analyze_en(source);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && test_support::issue(d) == Some(ISSUE)),
+        "expected {ISSUE:?}, got: {:?}",
+        result.diagnostics
+    );
+}
+
+fn accepts_en(source: &str) {
+    let result = analyze_en(source);
+    assert!(
+        !result.diagnostics.iter().any(|d| d.is_error()),
+        "expected no error, got: {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn sink_method_in_loop_over_same_list_is_rejected() {
+    rejects_en(
+        "main {\n    mut list<int> xs ← [1, 2, 3]\n    for from xs let x {\n        xs.sink(x)\n    }\n}",
+    );
+}
+
+#[test]
+fn sink_method_in_loop_over_same_set_is_rejected() {
+    rejects_en(
+        "main {\n    mut set<int> ys ← []\n    for from ys let x {\n        ys.sink(x)\n    }\n}",
+    );
+}
+
+#[test]
+fn bounded_lista_sink_in_loop_over_same_list_is_rejected() {
+    rejects(
+        "functio grow() → vacuum ⇥ textus {\n    varia lista<numerus, 8> xs ← vacua\n    itera ex xs sit x {\n        xs.immerge(x)\n    }\n}",
+    );
+}
+
+#[test]
+fn sink_method_on_a_different_collection_in_loop_is_accepted() {
+    accepts_en(
+        "main {\n    mut list<int> xs ← [1, 2, 3]\n    mut list<int> ys ← []\n    for from xs let x {\n        ys.sink(x)\n    }\n}",
+    );
+}
