@@ -269,6 +269,31 @@ fn interval_procs_differences_by_pid() {
 }
 
 #[test]
+fn interval_procs_subtracts_unsigned_counters_before_conversion() {
+    let above_i64_max = u64::try_from(i64::MAX).expect("i64 max") + 1;
+    let old = super::make_previous(
+        1,
+        collected_procs(vec![
+            proc_ticks(1, 500, 0),
+            proc_ticks(2, above_i64_max + 100, 0),
+        ]),
+        None,
+    );
+    let fresh = collected_procs(vec![
+        proc_ticks(1, 100, 0),
+        proc_ticks(2, above_i64_max + 500, 0),
+    ]);
+
+    let rows = super::interval_procs(Some(&old), &fresh);
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.pid, row.cpu_ns))
+            .collect::<Vec<_>>(),
+        vec![(2, 400), (1, 0)]
+    );
+}
+
+#[test]
 fn interval_procs_drops_exited_pid() {
     let old = super::make_previous(
         1,
