@@ -7878,3 +7878,76 @@ fn fault_text_channel_receives_text() {
         "without fault facts, a textus channel still receives the text"
     );
 }
+
+/// A modular division's result type is the plain range rule
+/// (`modulus<u32> / modulus<u32>` is a `numerus`), so the runner must read the
+/// operands' static types to keep the modular zero-divisor issue rather than
+/// the generic exact-integer one.
+#[test]
+fn modular_operand_division_by_zero_keeps_the_modular_issue() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{MirLocal, MirTerminator, MirTerminatorKind};
+    use radix_types::{Primitive, Type};
+
+    let mut types = TypeTable::new();
+    let scalar = MirType::semantic(types.primitive(Primitive::Numerus));
+    let modular = MirType::semantic(types.intern(Type::ModularWord(NumericWidth::U32)));
+    let span = Span::default();
+    let interner = Interner::new();
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: modular,
+                mutable: false,
+                span,
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: modular,
+                mutable: false,
+                span,
+            },
+        ],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: scalar,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    });
+    let context = MirValidationContext::new(&types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let frame = runner.frames.last_mut().expect("modular frame");
+    frame.seed_local(MirLocalId(0), Value::UInt(1));
+    frame.seed_local(MirLocalId(1), Value::UInt(0));
+
+    let lhs = MirOperand::Place(MirPlace::local(MirLocalId(0)));
+    let rhs = MirOperand::Place(MirPlace::local(MirLocalId(1)));
+    for op in [MirBinOp::Div, MirBinOp::Mod] {
+        let error = runner
+            .eval_binop(op, &lhs, &rhs, scalar, span)
+            .expect_err("a modular zero divisor fails");
+        assert_eq!(error.issue, "modular_division_by_zero");
+    }
+}

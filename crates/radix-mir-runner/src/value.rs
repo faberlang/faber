@@ -2315,10 +2315,10 @@ fn floor_div_rem(left: i128, right: i128) -> Option<(i128, i128)> {
     }
 }
 
-/// The structured issue for a zero divisor in the modular ring. Shared with the
-/// runner's exact-intermediate dispatch, which keeps a modular operand's ring
-/// identity even when the lowered result type is the plain integer carrier.
-pub fn modular_word_division_by_zero(span: Span) -> RunnerError {
+/// The zero-divisor failure of `modulus<W>` division and remainder: the ring
+/// has no defined quotient, so the diagnostic stays modular-family even when
+/// the result type is a plain range rule (`modulus<u32> / modulus<u32>`).
+pub(crate) fn modular_word_division_by_zero(span: Span) -> RunnerError {
     RunnerError::internal_with_issue(span, "modulus division failed", "modular_division_by_zero")
 }
 

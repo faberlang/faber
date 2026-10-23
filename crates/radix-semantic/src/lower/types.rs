@@ -1013,9 +1013,10 @@ impl Lowerer<'_> {
             let opener = self.lower_generic_type_arg(opener);
             let reply = self.lower_generic_type_arg(reply);
             // Authored-form capture: the conversation word names the builtin
-            // definition. Finalize erases `sermo<O, R>` to the bare carrier
-            // (D6.11), but the authored head retains the two child forms so
-            // source emission can preserve the written arguments.
+            // definition and keeps both authored child forms. Finalize erases
+            // `sermo<O, R>` to the bare carrier (D6.11), which canonicalizes
+            // the children's witnesses without dropping the authored
+            // arguments, so re-emission can print `sermo<numerus, numerus>`.
             if let Some(frame) = self.form_frames.last_mut() {
                 frame.named = Some((def_id, vec![name.name]));
             }

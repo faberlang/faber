@@ -67,8 +67,8 @@ use std::time::Instant;
 use value::{
     GradientStorage, add_values, compare_values, decimal_numeric_binop, decimal_scale_factor,
     effective_width, int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
-    modular_word_compare_values, modular_word_division_by_zero, modular_word_neg,
-    modular_word_numeric_binop, numeric_binop, round_float, values_equal,
+    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
+    round_float, values_equal,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -2747,6 +2747,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             .is_some_and(|ty| holds_interval(ty, self.types, 0))
     }
 
+    /// Width when an operand's static semantic type is a `modulus<W>` word.
+    /// A ring operation can carry a plain range-rule result type, so arithmetic
+    /// dispatch reads the operand types to keep modular-family diagnostics.
+    fn operand_modular_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
+        match self.types.get(self.operand_static_type(operand)?) {
+            Type::ModularWord(width) => Some(*width),
+            _ => None,
+        }
+    }
+
     /// Static semantic type of an operand, resolving field and element
     /// projections through declared types.
     fn operand_static_type(&self, operand: &MirOperand) -> Option<TypeId> {
@@ -3542,13 +3552,6 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// Width of the `modulus<W>` an operand statically carries, if any.
-    /// Modular arithmetic lowers to the plain integer carrier with the wrap at
-    /// the store, so the operand type is the remaining ring identity.
-    fn operand_modular_word_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
-        self.modular_word_width(MirType::semantic(self.operand_static_type(operand)?))
-    }
-
     #[expect(
         clippy::cast_precision_loss,
         reason = "sqrt/exp/ln promote Int/UInt operands to f64 for computation, deliberately accepting f64 mantissa precision for large integer magnitudes"
@@ -3853,16 +3856,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 _ => Err(RunnerError::internal(span, "invalid modulus operator")),
             };
         }
-        // A modular operand keeps its ring identity even when the lowered
-        // result type is the exact integer carrier (the store applies the one
-        // wrap). A zero divisor therefore reports the modular issue; nonzero
-        // arithmetic stays exact rather than reducing an intermediate.
+        // WHY: a modular operation keeps the plain range-rule result type
+        // (`modulus<u32> / modulus<u32>` is a `numerus`), so the result type
+        // alone cannot identify ring division. The operands' static types keep
+        // the modular-family zero-divisor diagnostic ahead of the generic
+        // exact path's plain numerus failure.
         if matches!(op, MirBinOp::Div | MirBinOp::Mod)
-            && exact_int::int_value(&right) == Some(0)
-            && (self.operand_modular_word_width(lhs).is_some()
-                || self.operand_modular_word_width(rhs).is_some())
+            && matches!(right, Value::Int(0) | Value::UInt(0))
+            && (self.operand_modular_width(lhs).is_some()
+                || self.operand_modular_width(rhs).is_some())
         {
-            return Err(modular_word_division_by_zero(span));
+            return Err(value::modular_word_division_by_zero(span));
         }
         match op {
             MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod

@@ -129,6 +129,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Insere(insere) => lowerer.lower_insere(insere, id, span),
         ExprKind::Ego(span) => lowerer.lower_ego(*span),
         // Parentheses carry no HIR node; the early return above lowers them.
+        // Reaching this arm means that invariant was violated after id allocation.
         ExprKind::Paren(_) => {
             lowerer.error_with_args(issue_args("unknown_lowering_error"));
             HirExpressionKind::Error
