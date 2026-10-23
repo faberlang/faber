@@ -589,19 +589,14 @@ fn admit_device_session(
     registry: &mut radix_device_core::registry::DeviceRegistry,
 ) -> Result<AdmittedDeviceSession, Vec<Diagnostic>> {
     use super::device::DeviceImageBackend;
-    use super::host_factory::{
-        DEVICE_MEMORY_BUDGET_ENV, budget_request_from_override, discovery_receipt,
-        host_error_diagnostic, open_device_selection,
-    };
+    use super::host_factory::{discovery_receipt, host_error_diagnostic, open_device_selection};
     use radix_device_core::backend::{DeviceBackend, DeviceClass};
+    use radix_device_core::policy::BudgetRequest;
     use radix_device_core::session::DeviceSession;
     use std::time::Instant;
 
     let admit_start = Instant::now();
-    let request =
-        budget_request_from_override(std::env::var(DEVICE_MEMORY_BUDGET_ENV).ok().as_deref())
-            .map_err(|diagnostic| vec![diagnostic])?;
-    let opened = open_device_selection(registry, selection, true, request)
+    let opened = open_device_selection(registry, selection, true, BudgetRequest::Derived)
         .map_err(|diagnostic| vec![diagnostic])?
         .ok_or_else(|| {
             vec![mir_diag(
