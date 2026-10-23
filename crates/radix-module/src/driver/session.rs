@@ -81,9 +81,8 @@ pub struct Config {
 
     /// Optional library-home override (provider repos such as `norma/`).
     ///
-    /// Independent of [`Config::locale_root`]. Package-mode resolution and
-    /// `FABER_LIBRARY_HOME` own the richer story; this slot is the test and
-    /// custom-layout override.
+    /// Independent of [`Config::locale_root`]. Package-mode resolution owns the
+    /// richer story; this slot is the test and custom-layout override.
     pub library_home: Option<PathBuf>,
 
     /// Warning-promotion policy applied at the compilation boundary.

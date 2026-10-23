@@ -11,9 +11,9 @@
 //!
 //! Product orchestration stays faber-side and enters here through explicit
 //! [`AnalysisSeams`] (the `RP2c` `LocaleLoader` posture): reader-locale pack
-//! loading, strict product-view manifest validation, `FABER_LIBRARY_HOME` /
-//! workspace probing, and the G4 linked-crate map from faber's artifact plan.
-//! Nothing here reads the ambient environment.
+//! loading, strict product-view manifest validation, `--library-home` /
+//! `[paths] library_home` and workspace probing, and the G4 linked-crate map
+//! from faber's artifact plan. Nothing here reads the ambient environment.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -239,9 +239,9 @@ pub struct AnalyzedProgramNode {
 /// policy; the loader receives the validator instead of duplicating it.
 pub type ManifestValidator = fn(&PackageSpec) -> Result<(), Box<Diagnostic>>;
 
-/// Package library-resolver construction seam. `FABER_LIBRARY_HOME` env
-/// reading and the workspace-ancestor probe stay faber-side; analysis receives
-/// the resolved resolver.
+/// Package library-resolver construction seam. `--library-home` /
+/// `[paths] library_home` resolution and the workspace-ancestor probe stay
+/// faber-side; analysis receives the resolved resolver.
 pub type LibraryResolverForPackage = fn(&Config, &Path) -> Result<LibraryResolver, Vec<Diagnostic>>;
 
 /// Faber-supplied package-orchestration seams for multi-unit analysis (RP3).
@@ -1844,7 +1844,7 @@ fn namespace_exports_for_file(
 /// Per-binding same-package flags from the already-resolved import graph.
 ///
 /// Local package files are same-package. Library bindings are cross-package.
-/// This does not walk `faber.toml` or `FABER_LIBRARY_HOME`.
+/// This does not walk `faber.toml` or resolve a library home.
 fn namespace_seams_for_file(
     spec: &PackageSpec,
     file: &PackageFile,

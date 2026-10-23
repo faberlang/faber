@@ -39,7 +39,7 @@ fn temp_dir(label: &str) -> (tempfile::TempDir, PathBuf) {
 }
 
 /// Thread-local library home override: isolates provider-import tests
-/// without mutating the process-global `FABER_LIBRARY_HOME` env var,
+/// without mutating a process-global library home,
 /// so parallel vertex-source tests never see a transient temp path.
 struct LibraryHomeGuard {
     previous: Option<PathBuf>,

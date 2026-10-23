@@ -37,8 +37,8 @@
 //! the installed library layout changes during a compilation session, so
 //! production never invalidates them (override/clearing is test-only):
 //!
-//! - `LIBRARY_HOME_CACHE`: `FABER_LIBRARY_HOME` env var plus the workspace
-//!   ancestor walk → the library home path.
+//! - `LIBRARY_HOME_CACHE`: the workspace probe and the caller-supplied library
+//!   home → the library home path.
 //! - `PROVIDER_NAME_MEMO`: library home path → provider segment → provider
 //!   repo directory.
 //!
