@@ -40,23 +40,6 @@ fn assert_cli_accepts(source: &str) {
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
 
-fn assert_cli_rejects_with_issue(source: &str, expected: &str) {
-    let result = analyze_cli(source);
-    assert!(
-        !result.is_ok(),
-        "expected failure, got: {:?}",
-        result.diagnostics
-    );
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|err| err.is_error() && test_support::issue(err) == Some(expected)),
-        "expected diagnostic issue {expected:?}, got: {:?}",
-        result.diagnostics
-    );
-}
-
 #[test]
 fn ratio_annotation_and_construction_round_trip() {
     test_support::assert_accepts_la(
@@ -242,35 +225,55 @@ incipit {
 }
 
 #[test]
-fn ratio_to_genus_conversio_rejects() {
-    test_support::assert_rejects_with_issue_la(
+fn ratio_to_genus_conversio_accepts_same_fields() {
+    test_support::assert_accepts_la(
         r"
 genus P {
-    varia f32 g
+    varia f64 g
+    varia numerus w
 }
 
 incipit {
-    sit ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }
+    sit ratio<w: numerus, g: f64> r ← ratio<w: numerus, g: f64> { w = 2, g = 1.0 }
     sit P p ← r ↦ P
     nota p.g
 }
 ",
-        "record_conversion_requires_reconstruction",
     );
 }
 
 #[test]
-fn genus_to_ratio_conversio_rejects() {
-    test_support::assert_rejects_with_issue_la(
+fn genus_to_ratio_conversio_accepts_same_fields() {
+    test_support::assert_accepts_la(
         r"
 genus P {
-    varia f32 g
+    varia f64 g
+    varia numerus w
 }
 
 incipit {
-    sit P p ← P { g = 1.0 }
-    sit ratio<g: f32> r ← p ↦ ratio<g: f32>
-    nota r.g
+    sit P p ← P { g = 1.0, w = 2 }
+    sit ratio<w: numerus, g: f64> r ← p ↦ ratio<w: numerus, g: f64>
+    nota r.w
+}
+",
+    );
+}
+
+#[test]
+fn ratio_to_genus_different_fields_rejects() {
+    test_support::assert_rejects_with_issue_la(
+        r"
+genus Q {
+    varia f64 g
+    varia numerus w
+    varia numerus extra
+}
+
+incipit {
+    sit ratio<g: f64, w: numerus> r ← ratio<g: f64, w: numerus> { g = 1.0, w = 2 }
+    sit Q q ← r ↦ Q
+    nota q.g
 }
 ",
         "record_conversion_requires_reconstruction",
@@ -303,10 +306,11 @@ incipit {
     );
 }
 
-/// Row G: CLI record → genus conversio is the ruling's fence hole.
+/// A CLI surface record converts to a genus field by field, like any record
+/// with the same fields and exact types (operator ruling 2026-10-14).
 #[test]
-fn args_to_genus_conversio_rejects_with_reconstruction_issue() {
-    assert_cli_rejects_with_issue(
+fn args_to_genus_conversio_accepts_same_fields() {
+    assert_cli_accepts(
         r#"
 genus P {
     varia bivalens verbose
@@ -319,7 +323,6 @@ incipit argumenta args {
     nota p.verbose
 }
 "#,
-        "record_conversion_requires_reconstruction",
     );
 }
 

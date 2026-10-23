@@ -971,6 +971,12 @@ impl TypeChecker<'_> {
         }
 
         if self.record_conversion_requires_reconstruction(source_ty, target_resolved) {
+            // A record and a genus with exactly the same fields convert field
+            // by field in either direction; the lowerers dispatch on the pair.
+            if self.record_genus_conversion_is_structural(source_ty, target_resolved) {
+                self.settle_conversio_result(recovery, source_ty, target_resolved, span);
+                return target_resolved;
+            }
             self.invalid_conversion(ISSUE_RECORD_CONVERSION_REQUIRES_RECONSTRUCTION, span);
             return self.error_type;
         }
@@ -3129,8 +3135,10 @@ impl TypeChecker<'_> {
 
     /// Non-identity conversio involving `Type::Record` must reconstruct.
     ///
-    /// Identical Record↔Record `↦` stays (equals). Ratio↔genus, genus↔ratio,
-    /// and mismatched Record↔Record have no structural conversion path.
+    /// Identical Record↔Record `↦` stays (equals). Ratio↔genus and
+    /// genus↔ratio take the structural path only when
+    /// [`Self::record_genus_conversion_is_structural`] proves the field sets
+    /// match; mismatched Record↔genus and Record↔Record reconstruct.
     fn record_conversion_requires_reconstruction(
         &self,
         source_ty: TypeId,
@@ -3141,6 +3149,37 @@ impl TypeChecker<'_> {
             return false;
         }
         self.is_record_type(source) || self.is_record_type(target_resolved)
+    }
+
+    /// Operator ruling 2026-10-14: `r ↦ Point` and `p ↦ record<…>` are
+    /// explicit field-by-field conversions when both sides carry exactly the
+    /// same field symbols and exact field types — field order ignored, no
+    /// width subtyping. Returns `true` for a structurally matching
+    /// Record↔genus pair in either direction.
+    fn record_genus_conversion_is_structural(
+        &self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+    ) -> bool {
+        let source = self.resolve_inferred_type(source_ty);
+        let target = self.resolve_inferred_type(target_resolved);
+        let (record_fields, struct_def) = match (self.types.get(source), self.types.get(target)) {
+            (Type::Record(fields), Type::Struct(def))
+            | (Type::Struct(def), Type::Record(fields)) => (fields.clone(), *def),
+            _ => return false,
+        };
+        let Some(info) = self.structs.get(&struct_def) else {
+            return false;
+        };
+        record_fields.len() == info.fields.len()
+            && record_fields.iter().all(|(name, record_field_ty)| {
+                info.fields.get(name).is_some_and(|field| {
+                    self.types.equals(
+                        self.resolve_inferred_type(*record_field_ty),
+                        self.resolve_inferred_type(field.ty),
+                    )
+                })
+            })
     }
 
     /// Bare failable `↦` propagates through the active alternate-exit channel.
