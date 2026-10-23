@@ -33,6 +33,12 @@ const SHAPE_CHANGING_METHODS: &[(IntrinsicReceiver, &str)] = &[
     // tabula: put (even when it would only update), delete.
     (IntrinsicReceiver::Tabula, "pone"),
     (IntrinsicReceiver::Tabula, "dele"),
+    // queue: append, remove first.
+    (IntrinsicReceiver::Queue, "appende"),
+    (IntrinsicReceiver::Queue, "decapita"),
+    // stack: append, remove last.
+    (IntrinsicReceiver::Stack, "appende"),
+    (IntrinsicReceiver::Stack, "detrahe"),
 ];
 
 fn changes_shape(entry: &MethodIntrinsic) -> bool {

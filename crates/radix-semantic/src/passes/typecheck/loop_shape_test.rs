@@ -98,6 +98,41 @@ fn lista_appende_in_nested_block_of_the_loop_is_rejected() {
 }
 
 #[test]
+fn queue_appende_in_loop_over_same_queue_is_rejected() {
+    rejects(
+        "functio f(varia queue<numerus> q) → vacuum {\n    itera ex q sit x {\n        q.appende(x)\n    }\n}",
+    );
+}
+
+#[test]
+fn queue_decapita_in_loop_over_same_queue_is_rejected() {
+    rejects(
+        "functio f(varia queue<numerus> q) → vacuum {\n    itera ex q sit x {\n        q.decapita()\n    }\n}",
+    );
+}
+
+#[test]
+fn stack_appende_in_loop_over_same_stack_is_rejected() {
+    rejects(
+        "functio f(varia stack<numerus> s) → vacuum {\n    itera ex s sit x {\n        s.appende(x)\n    }\n}",
+    );
+}
+
+#[test]
+fn stack_detrahe_in_loop_over_same_stack_is_rejected() {
+    rejects(
+        "functio f(varia stack<numerus> s) → vacuum {\n    itera ex s sit x {\n        s.detrahe()\n    }\n}",
+    );
+}
+
+#[test]
+fn queue_appende_in_loop_over_a_different_queue_is_accepted() {
+    test_support::assert_accepts(
+        "functio f(varia queue<numerus> a, varia queue<numerus> b) → vacuum {\n    itera ex a sit x {\n        b.appende(x)\n    }\n}",
+    );
+}
+
+#[test]
 fn bracket_store_on_list_in_loop_is_accepted() {
     test_support::assert_accepts(
         "incipit {\n    varia lista<numerus> xs ← [1, 2, 3]\n    itera ex xs sit x {\n        xs[0] ← x\n    }\n}",
