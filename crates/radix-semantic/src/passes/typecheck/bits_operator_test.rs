@@ -219,6 +219,30 @@ fn oversized_literal_beside_a_bits_operand_is_refused() {
 }
 
 #[test]
+fn coalesce_fallback_literal_takes_the_bits_option_width() {
+    // `vel` hands a written integer fallback the option's bN width.
+    accepts("functio f(b8 ∪ nihil x) → b8 { redde x vel 0x00 }");
+    accepts("functio f(b16 ∪ nihil x) → b16 { redde x vel 0x00 }");
+
+    // The refused literal still takes the option's cell type, so it has no
+    // fallback mismatch cascade.
+    let source = "functio f(b8 ∪ nihil x) → b8 { redde x vel 0x1ff }";
+    rejects(source, "bits_literal_out_of_range");
+    let issues: Vec<String> = test_support::analyze_source_la(source)
+        .diagnostics
+        .iter()
+        .filter(|d| d.is_error())
+        .filter_map(|d| {
+            d.args
+                .iter()
+                .find(|arg| arg.name == "issue")
+                .map(|arg| arg.value.clone())
+        })
+        .collect();
+    assert_eq!(issues, vec!["bits_literal_out_of_range".to_string()]);
+}
+
+#[test]
 fn number_expression_in_a_bits_slot_is_refused() {
     // `3 ⇐ 2` is a number shift; only a written literal takes the cell type.
     rejects_any("incipit { sit b8 y ← 3 ⇐ 2 }");
