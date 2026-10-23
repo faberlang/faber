@@ -95,6 +95,10 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
             none: unit.display_tokens.none.clone(),
             tuple: unit.display_tokens.tuple.clone(),
         },
+        // The conversation builtin is compiler-owned: record its definition so
+        // the artifact validator can pair an authored `sermo<O, R>` with the
+        // bare carrier witness analysis finalizes it to.
+        conversation_constructor: unit.resolver.builtin_sermo_def_id(),
     }
 }
 

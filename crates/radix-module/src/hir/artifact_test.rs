@@ -155,6 +155,7 @@ fn minimal_test_artifact() -> HirArtifact {
             none: "none".to_string(),
             tuple: "tuple".to_string(),
         },
+        conversation_constructor: None,
     }
 }
 
@@ -661,7 +662,18 @@ fn serve_typed_round_trips() {
     let original =
         analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("serve-typed fixture analyzes");
     let artifact = from_analyzed(&original, &name, &name);
+    // The conversation constructor is compiler-owned, and the artifact records
+    // it explicitly so the validator can pair the authored `sermo<O, R>`
+    // children with the bare carrier witness analysis finalizes them to.
+    let conversation = original.resolver.builtin_sermo_def_id();
+    assert!(conversation.is_some(), "serve-typed registers the conversation builtin");
+    assert_eq!(artifact.conversation_constructor, conversation);
     let bytes = postcard::to_allocvec(&artifact).expect("serialize serve-typed artifact");
+    let decoded = radix_hir_fhir::decode(&bytes).expect("serve-typed artifact must load");
+    assert_eq!(
+        decoded.conversation_constructor, conversation,
+        "the recorded conversation constructor must survive the wire"
+    );
     load_fhir(&bytes).expect("serve-typed artifact must load");
 }
 
@@ -1921,6 +1933,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
         kernel_requirements: crate::hir::serialize::from_analyzed(unit, "x", "x").kernel_requirements,
         tensor_edge_policies: crate::hir::serialize::from_analyzed(unit, "x", "x").tensor_edge_policies,
         display_tokens: crate::hir::serialize::from_analyzed(unit, "x", "x").display_tokens,
+        conversation_constructor: crate::hir::serialize::from_analyzed(unit, "x", "x").conversation_constructor,
     }
 }
 
