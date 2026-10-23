@@ -1,0 +1,70 @@
++++
+term = "↦"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "The rounding word decides the tie and the carrier edge; a value the integer cannot hold takes the explicit ⊥ default instead of clamping or trapping."
+syntax = "<float|d64> ↦ <integer> via Floor|Ceil|HalfEven|Trunc ⊥ <default>"
+related = ["↦", "via", "⊥", "fractus", "d64"]
+locale = "en"
++++
+# =============================================================================
+# float to integer — rounding words and ⊥ at the edges
+# =============================================================================
+#
+# What this teaches:
+#   • The `via` word alone decides the integer at a tie: `1.5` and `-1.5`
+#     differ at each of Floor, Ceil, HalfEven and Trunc, and the tie at `2.5`
+#     / `-2.5` shows HalfEven choosing the even neighbour.
+#   • The same four words reach the d64 carrier edge: Trunc and Floor keep
+#     92233720368, Ceil and HalfEven reach 92233720369.
+#   • A value the integer cannot hold takes the `⊥` default. An explicit `↦`
+#     is recoverable; a store trap is not. Nothing clamps and nothing traps.
+#   • The bare `x ↦ int` (no `via`) stays a compile error
+#     (SEM016 float_to_integer_requires_rounding) — see
+#     float-to-int-reject.fab.
+#
+# See also: ↦, via, ⊥, fractus, d64
+# =============================================================================
+
+main {
+    let float p15 ← 1.5
+    let float p25 ← 2.5
+    let float n15 ← -1.5
+    let float n25 ← -2.5
+
+    print p15 ↦ int via Floor
+    print p25 ↦ int via Floor
+    print n15 ↦ int via Floor
+    print n25 ↦ int via Floor
+
+    print p15 ↦ int via Ceil
+    print p25 ↦ int via Ceil
+    print n15 ↦ int via Ceil
+    print n25 ↦ int via Ceil
+
+    print p15 ↦ int via HalfEven
+    print p25 ↦ int via HalfEven
+    print n15 ↦ int via HalfEven
+    print n25 ↦ int via HalfEven
+
+    print p15 ↦ int via Trunc
+    print p25 ↦ int via Trunc
+    print n15 ↦ int via Trunc
+    print n25 ↦ int via Trunc
+
+    let d64 top ← 92233720368.54775807
+    print top ↦ i64 via Trunc
+    print top ↦ i64 via Floor
+    print top ↦ i64 via Ceil
+    print top ↦ i64 via HalfEven
+
+    let float huge ← 1e300
+    print huge ↦ i64 via Trunc ⊥ -1
+    print huge ↦ i64 via HalfEven ⊥ -1
+
+    let float tiny ← -1e300
+    print tiny ↦ i64 via Trunc ⊥ -1
+    print tiny ↦ i64 via HalfEven ⊥ -1
+}

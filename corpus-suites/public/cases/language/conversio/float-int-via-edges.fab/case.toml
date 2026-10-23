@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/float-int-via-edges.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/float-int-via-edges.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
