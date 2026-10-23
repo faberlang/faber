@@ -36,6 +36,16 @@ pub(crate) struct RunStatsArtifact {
     pub(crate) intrinsics: Vec<IntrinsicMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) device: Option<DeviceMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) cold_start: Option<ColdStartMetadata>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ColdStartMetadata {
+    pub(crate) image_build_ns: u64,
+    pub(crate) module_compile_ns: u64,
+    pub(crate) execution_ns: u64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -201,7 +211,13 @@ impl RunStatsArtifact {
             functions,
             intrinsics,
             device: None,
+            cold_start: None,
         }
+    }
+
+    pub(crate) fn with_cold_start(mut self, cold_start: ColdStartMetadata) -> Self {
+        self.cold_start = Some(cold_start);
+        self
     }
 }
 
