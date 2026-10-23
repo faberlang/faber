@@ -53,6 +53,15 @@ const ROUNDING_GLYPH_MARKER: &str = "__faber_glyph_round:";
 /// diagnostic. Nested expression lowerers return only the kind so this wrapper
 /// remains the single place that stamps identity onto expression nodes.
 pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
+    // Parentheses are not HIR nodes. Lower the inner expression under its own
+    // identity so the presentation records keyed to it (an authored `∷`
+    // ascription's `AscriptionTarget` site, for example) still name a node in
+    // the finalized HIR. The authored paren extent stays the node's span.
+    if let ExprKind::Paren(inner) = &expr.kind {
+        let mut lowered = lower_expr(lowerer, inner);
+        lowered.span = expr.span;
+        return lowered;
+    }
     let id = lowerer.next_hir_id();
     let span = expr.span;
     lowerer.current_span = span;
@@ -119,7 +128,8 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         // is legal only inside a compile-time initializer tree (st1 R5).
         ExprKind::Insere(insere) => lowerer.lower_insere(insere, id, span),
         ExprKind::Ego(span) => lowerer.lower_ego(*span),
-        ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
+        // Parentheses carry no HIR node; the early return above lowers them.
+        ExprKind::Paren(_) => unreachable!("parens lower before id allocation"),
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
         ExprKind::Construct(ty) => lowerer.lower_construct(ty, id, expr.span),
