@@ -642,6 +642,8 @@ pub use manifest::{escape_toml_basic_string, relative_or_display};
 
 // The LLVM package-emission lane (package/llvm.rs) canonicalizes direct
 // definition callees before the host-partition boundary-ABI gate.
+/// CLI-checking interpreted probe used by `faber check --lower`.
+pub use driver::with_check_lowered_package_mir;
 /// Test-facing interpreted-consumer probe (the `faber run` consumer). Faber's
 /// device tests and the radix-program mir tests use it; exposed as a normal
 /// entry so dependency crates can reach it.

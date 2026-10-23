@@ -100,6 +100,27 @@ pub fn with_interpreted_lowered_package_mir<R>(
     )
 }
 
+/// Analyze and lower a package for `check --lower`: plan the CLI surface
+/// without supplying a runtime argument vector, using interpreted linking.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
+pub fn with_check_lowered_package_mir<R>(
+    config: &Config,
+    input: &Path,
+    seams: &MirSeams,
+    run: impl for<'a> FnOnce(&LoweredMirUnit<'a>) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    with_prepared_package_mir_with_cli_mode_and_consumer(
+        config,
+        input,
+        &[],
+        CliPlanningMode::Check,
+        PackageMirConsumer::Interpreted,
+        seams,
+        |_, lowered| Ok(run(lowered)),
+    )
+}
+
 /// Link an already-analyzed package's explicit test roots into one validated
 /// MIR program.
 ///
