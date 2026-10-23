@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+fn risky(int n) → int ⇥ string {
+    if n ≻ 3 { throw "too big" }
+    return n + 1
+}
+main {
+    do { print risky(5) } catch err { print "caught: §"(err) }
+    do { print risky(2) } catch err { print "caught: §"(err) }
+}
