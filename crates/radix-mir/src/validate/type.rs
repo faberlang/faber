@@ -606,6 +606,64 @@ impl Validator<'_, '_> {
                     self.error(span, "bounded array projection element layout mismatch");
                 }
             }
+            // A genus (struct) value's field read: the field's byte facts and
+            // element come from `resolve_struct_layout`, which the layout table
+            // cannot see. The result must be that field's own element — a
+            // scalar, a device vector, or the physical fixed-array aggregate
+            // (`list<T, N>`, validated at its own index projection below).
+            MirLayoutKind::Aggregate(layout)
+                if layout.carrier == MirAggregateCarrier::PhysicalValue
+                    && layout.family == MirAggregateFamily::Struct =>
+            {
+                let MirProjection::Field(name) = projection else {
+                    self.error(span, "genus value projection must be a field read");
+                    return;
+                };
+                let struct_layout = match crate::resolve_struct_layout(base_ty, self.context) {
+                    Ok(layout) => layout,
+                    Err(refusal) => {
+                        self.error(span, refusal.reason());
+                        return;
+                    }
+                };
+                let Some(field) = struct_layout
+                    .fields
+                    .iter()
+                    .find(|field| field.name == *name)
+                else {
+                    self.error(
+                        span,
+                        "genus field projection references an undeclared field",
+                    );
+                    return;
+                };
+                let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
+                    self.error(span, "genus field projection result has no layout");
+                    return;
+                };
+                if matches!(self.type_kind(result_ty), Type::BoundedArray { .. }) {
+                    let physical_array = matches!(
+                        result_layout.kind,
+                        MirLayoutKind::Aggregate(array)
+                            if array.family == MirAggregateFamily::BoundedArray
+                                && array.carrier == MirAggregateCarrier::PhysicalValue
+                    );
+                    if !physical_array {
+                        self.error(span, "genus field projection element layout mismatch");
+                    }
+                    return;
+                }
+                let expected = match field.element {
+                    MirDeviceViewElement::Scalar(scalar) => Some(MirLayoutKind::Scalar(scalar)),
+                    MirDeviceViewElement::Vector(vector) => {
+                        Some(MirLayoutKind::DeviceVector(vector))
+                    }
+                    MirDeviceViewElement::Record(_) => None,
+                };
+                if expected.is_some_and(|expected| result_layout.kind != expected) {
+                    self.error(span, "genus field projection element layout mismatch");
+                }
+            }
             MirLayoutKind::Aggregate(layout)
                 if layout.carrier == MirAggregateCarrier::PhysicalValue
                     && layout.family != MirAggregateFamily::Tuple =>
