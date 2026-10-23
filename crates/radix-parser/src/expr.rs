@@ -183,7 +183,7 @@ impl Parser {
     /// below assignment, above ternary.
     ///
     /// GRAMMAR:
-    ///   sink_into := ternary ('⇜' ternary)?
+    ///   `sink_into` := ternary ('⇜' ternary)?
     ///
     /// WHY: `sink ⇜ item` delivers one `item` to the sinking contract of
     /// `sink`. The sink is the complete expression already parsed (calls,
