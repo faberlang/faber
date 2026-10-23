@@ -596,7 +596,7 @@ universe is data, never control flow inside the predicate.
 
 ```fab
     # Pre-LN
-    let _ ln1 ← x.layer_norm(1, 0.00001, ln1_s, ln1_o)
+    let _ ln1 ← x.norm_layer(axis 1, 0.00001, ln1_s, ln1_o)
 
     # Q/K/V projections (per-channel [8] biases)
     let _ q ← ln1 · wq
@@ -606,7 +606,7 @@ universe is data, never control flow inside the predicate.
 
 ```fab
     # --- pre-LN -----------------------------------------------------------
-    let _ ln1 ← x.layer_norm(1, 0.00001, ln1_s, ln1_o)
+    let _ ln1 ← x.norm_layer(axis 1, 0.00001, ln1_s, ln1_o)
 
     # --- Q/K/V projections (per-channel [8] biases) -----------------------
     let _ q ← ln1 · wq
