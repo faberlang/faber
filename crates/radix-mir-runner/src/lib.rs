@@ -17,6 +17,9 @@ mod host;
 pub mod inf;
 pub mod kernel_dispatch;
 pub mod kernel_lanes;
+pub mod kernel_trace;
+#[cfg(test)]
+mod kernel_trace_test;
 #[cfg(test)]
 mod regex_literal_raw_test;
 mod regex_program;
