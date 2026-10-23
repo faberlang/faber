@@ -209,6 +209,7 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
         }),
         CollectionKernelPlan::AxisReduction(dummy_axis_reduction()),
         CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+            dims: RowOpDims::Literal { rows: 1, width: 1 },
             axis: 0,
             batched: None,
         }),

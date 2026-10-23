@@ -1989,6 +1989,7 @@ fn softmax_function_resolves_row_softmax_plan() {
     derived.validate().expect("the derived plan validates");
     // A carried plan built from the same typed facts agrees exactly.
     let carried = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+        dims: crate::kernel_plan::RowOpDims::Literal { rows: 4, width: 4 },
         axis: 1,
         batched: None,
     });
@@ -2309,6 +2310,7 @@ fn transformer_recipe_kinds_are_typed() {
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::RowSoftmax(
             crate::kernel_plan::RowSoftmaxPlan {
+                dims: crate::kernel_plan::RowOpDims::Literal { rows: 1, width: 1 },
                 axis: 1,
                 batched: None
             }
@@ -2337,6 +2339,7 @@ fn transformer_plans_report_zero_shared_memory() {
         entry: "softmaxa".to_owned(),
         library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+            dims: crate::kernel_plan::RowOpDims::Literal { rows: 4, width: 4 },
             axis: 1,
             batched: None,
         }),

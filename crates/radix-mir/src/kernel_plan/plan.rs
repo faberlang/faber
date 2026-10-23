@@ -247,6 +247,8 @@ pub struct AxisReductionPlan {
 /// axis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowSoftmaxPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Row axis (the last axis in v1).
     pub axis: u64,
     /// U2 head-axis batch facts; `None` is the ordinary rank-1/2 image
