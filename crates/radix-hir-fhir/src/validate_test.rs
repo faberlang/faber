@@ -1604,3 +1604,315 @@ fn transparent_generic_alias_witness_binds_authored_args() {
         "an alias the artifact never declared must fail closed"
     );
 }
+
+// ―─ Conversation constructor (`sermo`) authored-form pairing ─────────────
+
+/// The compiler-owned conversation constructor these artifacts record as their
+/// metadata. Analysis finalizes `sermo<O, R>` to this definition's bare
+/// `Type::Struct` carrier, so the authored `sermo<O, R>` children have no
+/// `Applied` witness argument list.
+const CONVERSATION: DefId = DefId(USER_DEF_ID_BASE + 40);
+
+/// A resolvable definition the artifact never records as a carrier type, used
+/// to prove the metadata's carrier identity is checked.
+const CARRIERLESS: DefId = DefId(USER_DEF_ID_BASE + 41);
+
+/// Build an artifact whose single declared local carries one authored named
+/// form headed by [`CONVERSATION`], with `metadata` as the artifact's recorded
+/// conversation constructor. `build` supplies the site witness and the authored
+/// children against the artifact's own type table.
+fn conversation_artifact(
+    metadata: Option<DefId>,
+    build: impl FnOnce(&mut TypeTable) -> (Type, Vec<radix_hir::HirTypeFormArg>),
+) -> crate::artifact::HirArtifact {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let (witness, args) = build(&mut types);
+    let witness_ty = types.intern(witness);
+    let local_def = DefId(USER_DEF_ID_BASE + 42);
+    artifact.interner = vec!["main".to_owned(), "test".to_owned(), "sermo".to_owned()];
+    stub_function(&mut artifact).body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Local(radix_hir::HirLocal {
+                def_id: local_def,
+                name: Symbol(0),
+                ty: Some(witness_ty),
+                init: None,
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: None,
+                size_decl: false,
+                size_static: false,
+            }),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    for (id, def_id) in [(2, CONVERSATION), (3, CARRIERLESS)] {
+        artifact.hir.items.push(radix_hir::HirItem {
+            annotations: Vec::new(),
+            id: HirId(id),
+            def_id,
+            kind: HirItemKind::Struct(radix_hir::HirStruct {
+                name: Symbol(2),
+                type_params: Vec::new(),
+                fields: Vec::new(),
+                methods: Vec::new(),
+                implements: Vec::new(),
+            }),
+            span: Span::default(),
+        });
+    }
+    artifact.types = types.snapshot();
+    artifact.conversation_constructor = metadata;
+    artifact.presentation.authored_types = vec![radix_hir::HirAuthoredTypeUse {
+        site: radix_hir::HirTypeSite {
+            owner: radix_hir::HirOwnerRef::Def(local_def),
+            slot: radix_hir::HirTypeSlot::Declared,
+        },
+        form: radix_hir::HirTypeForm {
+            ty: witness_ty,
+            head: radix_hir::HirTypeFormHead::Named {
+                def_id: CONVERSATION,
+                path: vec![Symbol(2)],
+            },
+            args,
+            label: None,
+        },
+    }];
+    artifact
+}
+
+/// One authored `Type` child witnessing `ty`, spelled as a semantic head.
+fn typed_child(ty: TypeId) -> radix_hir::HirTypeFormArg {
+    radix_hir::HirTypeFormArg::Type(Box::new(radix_hir::HirTypeForm {
+        ty,
+        head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+        args: Vec::new(),
+        label: None,
+    }))
+}
+
+/// Load one conversation artifact, surfacing the loader error.
+fn load_conversation(
+    artifact: crate::artifact::HirArtifact,
+) -> Result<(), crate::error::HirArtifactError> {
+    decode(&encode(&artifact).expect("encode conversation artifact")).map(|_| ())
+}
+
+#[test]
+fn conversation_typed_form_pairs_the_bare_carrier() {
+    // `sermo<none, string>`: the witness is the bare carrier struct while the
+    // author spelled two type arguments. Only the recorded conversation
+    // constructor may pair that way.
+    let artifact = conversation_artifact(Some(CONVERSATION), |types| {
+        let opener = types.primitive(Primitive::Nihil);
+        let reply = types.primitive(Primitive::Textus);
+        (
+            Type::Struct(CONVERSATION),
+            vec![typed_child(opener), typed_child(reply)],
+        )
+    });
+    load_conversation(artifact).expect("a typed conversation form must validate");
+}
+
+#[test]
+fn conversation_bare_form_pairs_the_bare_carrier() {
+    // A loose `sermo` binding authors no argument at all; the bare carrier
+    // witness is its exact pair.
+    let artifact = conversation_artifact(Some(CONVERSATION), |_| {
+        (Type::Struct(CONVERSATION), Vec::new())
+    });
+    load_conversation(artifact).expect("a bare conversation form must validate");
+}
+
+#[test]
+fn conversation_form_with_wrong_arity_fails_closed() {
+    for arity in [1usize, 3] {
+        let artifact = conversation_artifact(Some(CONVERSATION), move |types| {
+            let int = types.primitive(Primitive::Numerus);
+            (Type::Struct(CONVERSATION), vec![typed_child(int); arity])
+        });
+        let err =
+            load_conversation(artifact).expect_err("a wrong conversation arity must fail closed");
+        assert!(
+            matches!(
+                err,
+                crate::error::HirArtifactError::InvalidPresentation {
+                    issue: "named_argument_arity",
+                    ..
+                }
+            ),
+            "a {arity}-argument conversation form must fail with named_argument_arity: {err:?}"
+        );
+    }
+}
+
+#[test]
+fn conversation_form_with_non_type_child_fails_closed() {
+    let artifact = conversation_artifact(Some(CONVERSATION), |types| {
+        let int = types.primitive(Primitive::Numerus);
+        let size = types.intern_index(IndexExpr::Literal(2));
+        (
+            Type::Struct(CONVERSATION),
+            vec![typed_child(int), radix_hir::HirTypeFormArg::Size(size)],
+        )
+    });
+    let err =
+        load_conversation(artifact).expect_err("a non-type conversation argument must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "conversation_argument_kind",
+                ..
+            }
+        ),
+        "a size argument on a conversation form must fail with conversation_argument_kind: {err:?}"
+    );
+}
+
+#[test]
+fn conversation_form_with_dangling_child_fails_closed() {
+    let artifact = conversation_artifact(Some(CONVERSATION), |types| {
+        let int = types.primitive(Primitive::Numerus);
+        (
+            Type::Struct(CONVERSATION),
+            vec![typed_child(int), typed_child(TypeId(u32::MAX))],
+        )
+    });
+    let err =
+        load_conversation(artifact).expect_err("a dangling conversation child must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "TypeId", .. }
+        ),
+        "a dangling conversation child type must fail with a TypeId DanglingIndex: {err:?}"
+    );
+}
+
+#[test]
+fn conversation_form_under_another_constructor_fails_closed() {
+    // The bare carrier pairing is reserved for the recorded constructor: an
+    // artifact that records a different (or no) constructor keeps the strict
+    // argument-arity rule even though the witness is a bare struct.
+    for metadata in [None, Some(CARRIERLESS)] {
+        let artifact = conversation_artifact(metadata, |types| {
+            let int = types.primitive(Primitive::Numerus);
+            (
+                Type::Struct(CONVERSATION),
+                vec![typed_child(int), typed_child(int)],
+            )
+        });
+        let err = load_conversation(artifact)
+            .expect_err("an unrecorded conversation constructor must fail closed");
+        assert!(
+            matches!(
+                err,
+                crate::error::HirArtifactError::InvalidPresentation {
+                    issue: "named_argument_arity",
+                    ..
+                }
+            ),
+            "a bare carrier under {metadata:?} must fail with named_argument_arity: {err:?}"
+        );
+    }
+}
+
+#[test]
+fn conversation_form_with_a_non_carrier_witness_fails_closed() {
+    // An alias witness names the recorded constructor but is not its bare
+    // carrier struct, so the pairing must not admit it.
+    let artifact = conversation_artifact(Some(CONVERSATION), |types| {
+        let int = types.primitive(Primitive::Numerus);
+        (
+            Type::Alias(CONVERSATION, int),
+            vec![typed_child(int), typed_child(int)],
+        )
+    });
+    let err = load_conversation(artifact)
+        .expect_err("a non-carrier conversation witness must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "named_argument_arity",
+                ..
+            }
+        ),
+        "an alias conversation witness must fail with named_argument_arity: {err:?}"
+    );
+}
+
+#[test]
+fn conversation_metadata_without_a_carrier_fails_closed() {
+    // The recorded constructor must be the definition whose bare struct the
+    // artifact's type table carries.
+    let artifact = conversation_artifact(Some(CARRIERLESS), |_| {
+        (Type::Struct(CONVERSATION), Vec::new())
+    });
+    let err = load_conversation(artifact)
+        .expect_err("carrierless conversation metadata must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "conversation_constructor_not_carrier",
+                ..
+            }
+        ),
+        "recorded metadata without a carrier struct must fail with \
+         conversation_constructor_not_carrier: {err:?}"
+    );
+}
+
+#[test]
+fn conversation_metadata_with_a_dangling_definition_fails_closed() {
+    let unregistered = DefId(USER_DEF_ID_BASE + 43);
+    let artifact = conversation_artifact(Some(unregistered), |_| {
+        (Type::Struct(CONVERSATION), Vec::new())
+    });
+    let err =
+        load_conversation(artifact).expect_err("dangling conversation metadata must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+        ),
+        "an unregistered conversation constructor must fail with a DefId DanglingIndex: {err:?}"
+    );
+}
+
+#[test]
+fn unrelated_named_type_with_extra_arguments_fails_closed() {
+    // Ordinary named types keep the strict arity rule: a user struct's bare
+    // witness never pairs with authored arguments, even when the artifact
+    // records a conversation constructor.
+    let mut artifact = conversation_artifact(Some(CONVERSATION), |types| {
+        let int = types.primitive(Primitive::Numerus);
+        (
+            Type::Struct(CARRIERLESS),
+            vec![typed_child(int), typed_child(int)],
+        )
+    });
+    artifact.presentation.authored_types[0].form.head = radix_hir::HirTypeFormHead::Named {
+        def_id: CARRIERLESS,
+        path: vec![Symbol(2)],
+    };
+    let err =
+        load_conversation(artifact).expect_err("extra arguments on a named type must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "named_argument_arity",
+                ..
+            }
+        ),
+        "extra arguments on an unrelated named type must fail with named_argument_arity: {err:?}"
+    );
+}

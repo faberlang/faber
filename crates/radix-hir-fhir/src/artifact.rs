@@ -628,7 +628,11 @@ pub struct FunctionProvenanceTableWire {
 /// Version 45 adds `HirPresentation::axis_sugar` (which nodes typecheck
 /// expanded from an authored `t.sum(axis n)` / `t.mean(axis n)`, so the Faber
 /// re-emitter prints the call again); schema-v44 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 45;
+/// Version 46 carries `HirArtifact::conversation_constructor`, the
+/// compiler-owned `sermo` definition the authored-form validator needs to pair
+/// a bare carrier witness with the authored `sermo<O, R>` type children;
+/// schema-v45 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 46;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1067,6 +1071,17 @@ pub struct HirArtifact {
 
     /// Program display tokens of the unit's code locale (schema v44).
     pub display_tokens: DisplayTokensWire,
+
+    /// Compiler-owned conversation constructor of this unit (schema v46).
+    ///
+    /// `sermo<O, R>` is finalized to its bare `Type::Struct` carrier, so the
+    /// authored `sermo<O, R>` children have no `Applied` witness argument list
+    /// to pair with. The compiler owns the constructor identity
+    /// (`Resolver::builtin_sermo_def_id`), and recording it explicitly lets the
+    /// artifact validator admit the bare carrier for exactly that definition.
+    /// `None` means the unit registered no conversation builtin, and then no
+    /// bare carrier may pair with authored arguments.
+    pub conversation_constructor: Option<DefId>,
 }
 
 // ---------------------------------------------------------------------------

@@ -120,6 +120,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
             none: "none".to_string(),
             tuple: "tuple".to_string(),
         },
+        conversation_constructor: None,
     }
 }
 

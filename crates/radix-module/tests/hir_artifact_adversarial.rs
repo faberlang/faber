@@ -127,6 +127,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
             none: "none".to_string(),
             tuple: "tuple".to_string(),
         },
+        conversation_constructor: None,
     }
 }
 
