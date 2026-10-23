@@ -361,32 +361,32 @@ runner's; a construct a target cannot express yet is rejected by name
 (`unsupported on target <t>: <construct>`), never approximated.
 
 <!-- target-maturity:begin -->
-How mature each target is, measured on the corpus (757 programs the suite runs, each with expected output; 220 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell have no corpus lane: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
+How mature each target is, measured on the corpus (777 programs the suite runs, each with expected output; 269 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell have no corpus lane: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
 
 | Target | `-t` | Output | Evidence | Source |
 | --- | --- | --- | --- | --- |
 | **Reference** | | | | |
-| MIR runner | (`faber run`) | executes the program; the oracle | suite 754 / 757 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
-| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 734 / 740 | public |
+| MIR runner | (`faber run`) | executes the program; the oracle | suite 774 / 777 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
+| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 753 / 760 | public |
 | FMIR / FHIR | `fmir`, `fhir` | serialized MIR and analyzed HIR artifacts | no corpus lane (exercised by the package build and run tests) | public |
 | **Application languages** | | | | |
-| Rust | `rust` | Rust source, or a full Cargo project | suite 725 / 749 | official binary |
-| Go | `go` | Go source | suite 625 / 756 | official binary |
-| TypeScript | `ts` | TypeScript source | suite 689 / 757 | official binary |
-| Swift | `swift` | Swift source | suite 389 / 758 | official binary |
-| Python | `python` | self-contained Python | suite 559 / 742 | official binary |
-| Haskell | `haskell` | Haskell source | 83 of 684 single-file programs emit; 32 of those match the runner | official binary |
+| Rust | `rust` | Rust source, or a full Cargo project | suite 750 / 769 | official binary |
+| Go | `go` | Go source | suite 646 / 776 | official binary |
+| TypeScript | `ts` | TypeScript source | suite 710 / 777 | official binary |
+| Swift | `swift` | Swift source | suite 408 / 777 | official binary |
+| Python | `python` | self-contained Python | suite 575 / 762 | official binary |
+| Haskell | `haskell` | Haskell source | 85 of 704 single-file programs emit; 34 of those match the runner | official binary |
 | **Systems and native** | | | | |
-| C | `c` | C11 with a header-only runtime | preview: 309 of 684 single-file programs emit; 308 of those match the runner | public |
-| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 581 / 757 | official binary |
-| WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 528 / 757 assemble (no host runtime yet) | official binary |
-| Cranelift | `clif` | native objects with no external toolchain | preview: suite 560 / 740 | public |
+| C | `c` | C11 with a header-only runtime | preview: 342 of 704 single-file programs emit; 338 of those match the runner | public |
+| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 598 / 777 | official binary |
+| WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 536 / 777 assemble (no host runtime yet) | official binary |
+| Cranelift | `clif` | native objects with no external toolchain | preview: suite 570 / 760 | public |
 | **GPU kernels** (kernel functions only) | | | | |
 | Metal | `metal-text` | Metal Shading Language | kernel programs only | official binary |
 | WGSL | `wgsl-text` | WebGPU compute shaders | kernel programs only | official binary |
 | CUDA | (`--device cuda`) | PTX built at run time from NVVM IR (needs `clang` with the NVPTX target) | kernel programs only: `faber run --device cuda` runs whole-tensor kernels on NVIDIA GPUs; lane-form kernels are not lowered yet and fail closed | official binary |
 | **Validation** | | | | |
-| Racket | `sexp` | Racket s-expressions (a validation target) | suite 595 / 757 | official binary |
+| Racket | `sexp` | Racket s-expressions (a validation target) | suite 606 / 767 | official binary |
 | **Experimental** (not in the released `faber`) | | | | |
 | Fortran, COBOL, Pascal, Odin, BASIC | `fortran`, `cobol`, `pascal`, `odin`, `basic` | historical languages, a deliberate subset | default-off features; no corpus lane | private source |
 <!-- target-maturity:end -->
@@ -455,7 +455,7 @@ this repository (see Targets).
 
 Prebuilt `faber` binaries for macOS (Apple silicon) and Linux (x86-64) are
 published on the [releases page](https://github.com/faberlang/releases/releases);
-this one is [Faber 1.15.2](https://github.com/faberlang/releases/releases/tag/faber-v1.15.2).
+this one is [Faber 1.16.0](https://github.com/faberlang/releases/releases/tag/faber-v1.16.0).
 The installer downloads a release, verifies its SHA-256, installs it as
 `<prefix>/bin/faber-<version>`, and points a `faber` symlink at it:
 
@@ -468,7 +468,7 @@ or `--version` to choose another location or pin a release:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/faberlang/faber/main/install.sh \
-  | sh -s -- --version 1.15.2 --prefix "$HOME/.local"
+  | sh -s -- --version 1.16.0 --prefix "$HOME/.local"
 ```
 
 Check for and install updates with:
@@ -479,7 +479,7 @@ faber update
 ```
 
 Every released version stays in `<prefix>/bin/faber-<version>`, and `faber
-update` moves the `faber` symlink. `faber update --version 1.15.1` switches
+update` moves the `faber` symlink. `faber update --version 1.15.2` switches
 back, and `faber versions` lists what is installed. If you installed with an
 earlier faber installer, run `install.sh` once to adopt the versioned layout;
 `faber update` manages installs that have the `faber` symlink.
@@ -490,8 +490,8 @@ The tarball holds a single file, `bin/faber`. Download the archive and its
 `.sha256` file into one directory, check it, and put `faber` on your `PATH`:
 
 ```sh
-shasum -a 256 -c faber-v1.15.2-aarch64-apple-darwin.tar.gz.sha256   # Linux: sha256sum -c
-tar -xzf faber-v1.15.2-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c faber-v1.16.0-aarch64-apple-darwin.tar.gz.sha256   # Linux: sha256sum -c
+tar -xzf faber-v1.16.0-aarch64-apple-darwin.tar.gz
 sudo mv bin/faber /usr/local/bin/faber
 faber --version
 ```
