@@ -7,7 +7,8 @@ use radix_hir::{
 use radix_lexer::{Span, Symbol};
 use radix_syntax::TypeFormLevel;
 use radix_types::{
-    DefId, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable, USER_DEF_ID_BASE,
+    BitsWidth, DefId, FloatPolicy, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable,
+    USER_DEF_ID_BASE,
 };
 
 fn lit(id: u32, value: u64) -> HirExpression {
@@ -850,6 +851,47 @@ fn authored_types_v9_round_trip_preserves_nested_forms() {
         decoded_msgpack.presentation.authored_types,
         artifact.presentation.authored_types
     );
+}
+
+/// Rewrite the sole parameter's authored form into a zero-argument semantic
+/// head over `witness` at `level`, keeping the HIR parameter type in step so
+/// the root witness still matches the site.
+fn semantic_width_artifact(witness: Type, level: TypeFormLevel) -> crate::artifact::HirArtifact {
+    let mut artifact = authored_type_artifact();
+    let mut types = TypeTable::from_snapshot(artifact.types.clone()).expect("restore type table");
+    let witness_ty = types.intern(witness);
+    artifact.types = types.snapshot();
+    let HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.params[0].ty = witness_ty;
+    artifact.presentation.authored_types[0].form = radix_hir::HirTypeForm {
+        ty: witness_ty,
+        head: radix_hir::HirTypeFormHead::Semantic(level),
+        args: Vec::new(),
+        label: None,
+    };
+    artifact
+}
+
+#[test]
+fn bare_bits_annotation_validates() {
+    // A bare `b8` width word is authored at SHORT level with no arguments;
+    // the loader must accept the form the parser records for it.
+    let artifact = semantic_width_artifact(Type::Bits(BitsWidth::B8), TypeFormLevel::SHORT);
+    crate::decode(&crate::encode(&artifact).expect("encode bare bits artifact"))
+        .unwrap_or_else(|err| panic!("a bare b8 annotation must validate: {err:?}"));
+}
+
+#[test]
+fn trapping_float_policy_form_validates() {
+    // `trapping<f32>` is authored at POLICY level with no arguments.
+    let artifact = semantic_width_artifact(
+        Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F32),
+        TypeFormLevel::POLICY,
+    );
+    crate::decode(&crate::encode(&artifact).expect("encode trapping float artifact"))
+        .unwrap_or_else(|err| panic!("a trapping<f32> annotation must validate: {err:?}"));
 }
 
 #[test]

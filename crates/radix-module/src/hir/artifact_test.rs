@@ -490,10 +490,10 @@ fn load_error_for(source: &str) -> Result<(), HirArtifactError> {
 
 #[test]
 fn dangling_defid_repro_comptime_module_local() {
-    // A referenced local binding inside a *module-level* constant initializer
-    // (`const int N = comptime { const int t = 3; return t }`) is the smallest
-    // source that yields `DanglingIndex { kind: "DefId" }`. Printed once:
-    // index 1000000, arena size 1.
+    // A local binding referenced inside a *module-level* constant initializer
+    // (`const int N = comptime { const int t = 3; return t }`) survives folding
+    // in `HirStatic::authored`; the loader must register its defs so the
+    // artifact loads.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "const int N = comptime {\n",
@@ -502,18 +502,13 @@ fn dangling_defid_repro_comptime_module_local() {
         "}\n",
     );
     let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
-    );
+    assert!(result.is_ok(), "authored comptime module-local must load, got {result:?}");
 }
 
 #[test]
 fn dangling_defid_repro_comptime_block_local() {
     // The same referenced local inside a *block-level* constant initializer
-    // (`const int x = comptime { … }` in `main`) also yields
-    // `DanglingIndex { kind: "DefId" }`. Printed once: index 1000001,
-    // arena size 1.
+    // (`const int x = comptime { … }` in `main`) must load as well.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "main {\n",
@@ -525,18 +520,14 @@ fn dangling_defid_repro_comptime_block_local() {
         "}\n",
     );
     let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
-    );
+    assert!(result.is_ok(), "authored comptime block-local must load, got {result:?}");
 }
 
 #[test]
 fn dangling_defid_repro_comptime_class_static_local() {
     // A class `const` member initialized by `comptime` with a referenced
     // local (`const int X = comptime { const int t = 3; return t }`) read as
-    // `Tab.X` from `main` also yields `DanglingIndex { kind: "DefId" }`.
-    // Printed once: index 1000000, arena size 2.
+    // `Tab.X` from `main` must load as well.
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "class Tab {\n",
@@ -550,10 +541,128 @@ fn dangling_defid_repro_comptime_class_static_local() {
         "}\n",
     );
     let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
+    assert!(result.is_ok(), "authored comptime class-local must load, got {result:?}");
+}
+
+#[test]
+fn insere_local_static_loads() {
+    // `insere-local.fab` carries a module-level `const string SUMMA = comptime
+    // { return embed "nuntius.txt" }`. The authored body survives folding in
+    // `HirStatic::authored` and holds HirIds (the `embed` site) that the loader
+    // must keep resolvable; this pins the dangling `HirId` case.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/insere/insere-local.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("insere-local fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
     );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("insere-local fixture analyzes");
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize insere-local artifact");
+    load_fhir(&bytes).expect("insere-local artifact must load");
+}
+
+#[test]
+fn finite_nan_scalar_round_trips() {
+    // `scalar/finite-nan.fab` declares discard locals whose initializers are
+    // `↦` / `∷` chains (`x ↦ b32 ↦ u32`, `bits ⇒ 23 ∧ 255 ∷ u32`). Lowering
+    // records an `AscriptionTarget` owner for each `∷` ascription; every
+    // authored type site and typed trivia owner must still name a node present
+    // in the finalized HIR before the artifact round-trips, otherwise the
+    // loader fails with a dangling HirId.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+    use radix_hir::{HirExpression, HirOwnerRef, HirStatement};
+    use std::collections::HashSet;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/scalar/finite-nan.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("finite-nan fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("finite-nan fixture analyzes");
+
+    struct HirIds(HashSet<radix_hir::HirId>);
+    impl radix_hir::visit::HirVisitor for HirIds {
+        fn visit_item(&mut self, item: &radix_hir::HirItem) {
+            self.0.insert(item.id);
+            radix_hir::visit::walk_item(self, item);
+        }
+
+        fn visit_stmt(&mut self, stmt: &HirStatement) {
+            self.0.insert(stmt.id);
+            radix_hir::visit::walk_stmt(self, stmt);
+        }
+
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            self.0.insert(expr.id);
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut ids = HirIds(HashSet::new());
+    radix_hir::visit::walk_program(&mut ids, &original.hir);
+
+    for (index, authored) in original.presentation.authored_types.iter().enumerate() {
+        if let HirOwnerRef::Hir(id) = authored.site.owner {
+            assert!(
+                ids.0.contains(&id),
+                "authored_types[{index}] site owner HirId({}) ({:?}) is not in the finalized HIR",
+                id.0,
+                authored.site.slot
+            );
+        }
+    }
+    for (index, owner) in original.presentation.owners.iter().enumerate() {
+        if let Some(HirOwnerRef::Hir(id)) = owner.semantic {
+            assert!(
+                ids.0.contains(&id),
+                "owners[{index}] semantic HirId({}) ({:?}) is not in the finalized HIR",
+                id.0,
+                owner.kind
+            );
+        }
+    }
+
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize finite-nan artifact");
+    load_fhir(&bytes).expect("finite-nan artifact must load");
+}
+
+#[test]
+fn serve_typed_round_trips() {
+    // `ad/serve-typed.fab` authors `channel<O, R>` (`sermo<O, R>`) bindings.
+    // The conversation type is a builtin named constructor whose finalized
+    // witness is the bare carrier, so both authored heads and witnesses must
+    // survive the artifact round trip.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/ad/serve-typed.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("serve-typed fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("serve-typed fixture analyzes");
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize serve-typed artifact");
+    load_fhir(&bytes).expect("serve-typed artifact must load");
 }
 
 #[test]
@@ -697,6 +806,32 @@ fn transparent_generic_alias_annotation_survives_the_fhir_round_trip() {
     let artifact = from_analyzed(&original, "generic-alias", "generic-alias.fab");
     let bytes = postcard::to_allocvec(&artifact).expect("serialize generic alias artifact");
     load_fhir(&bytes).expect("generic alias artifact must load");
+}
+
+#[test]
+fn alias_chain_round_trips() {
+    // `type A = int`, `type B = A`, `type C = list<B>` and `type F = (int) →
+    // int` form a chain of transparent aliases. A recorded child witness can be
+    // the other member of the same alias pair (the alias versus its body), so
+    // the boundary pairs the child with the named witness instead of wrapping
+    // it in a `Semantic` head the validator rejects as a named constructor.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/typus/alias-chain.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("alias-chain fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("alias-chain fixture analyzes");
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize alias-chain artifact");
+    load_fhir(&bytes).expect("alias-chain artifact must load");
 }
 
 #[test]

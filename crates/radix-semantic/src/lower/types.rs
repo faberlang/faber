@@ -781,7 +781,7 @@ impl Lowerer<'_> {
             return ty;
         }
 
-        if let Some(ty) = self.lower_frame_named_type(name_str, params) {
+        if let Some(ty) = self.lower_frame_named_type(name, name_str, params) {
             return ty;
         }
 
@@ -995,6 +995,7 @@ impl Lowerer<'_> {
     /// Returns `None` when `name_str` is not one of these builtins.
     fn lower_frame_named_type(
         &mut self,
+        name: &Ident,
         name_str: &str,
         params: &[GenericArgExpr],
     ) -> Option<TypeId> {
@@ -1011,6 +1012,15 @@ impl Lowerer<'_> {
             };
             let opener = self.lower_generic_type_arg(opener);
             let reply = self.lower_generic_type_arg(reply);
+            // Authored-form capture: the conversation word names the builtin
+            // definition. Finalize erases `sermo<O, R>` to the bare carrier
+            // (D6.11), so the witness carries no applied arguments and the
+            // authored head must not keep the child forms lowering produced
+            // for the two type arguments.
+            if let Some(frame) = self.form_frames.last_mut() {
+                frame.named = Some((def_id, vec![name.name]));
+                frame.args.clear();
+            }
             return Some(crate::builtins::frame_types::sermo_typed_type_id(
                 self.types, def_id, opener, reply,
             ));
@@ -1029,6 +1039,12 @@ impl Lowerer<'_> {
                     return Some(self.types.intern(Type::Error));
                 }
             };
+            // Authored-form capture: the frame word names the builtin
+            // definition. Its witness stays `scrinium<T>` (unlike the erased
+            // conversation type), so the payload child keeps its form.
+            if let Some(frame) = self.form_frames.last_mut() {
+                frame.named = Some((def_id, vec![name.name]));
+            }
             return Some(crate::builtins::frame_types::scrinium_payload_type_id(
                 self.types, def_id, payload_ty,
             ));
