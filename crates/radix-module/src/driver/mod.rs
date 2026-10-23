@@ -5171,6 +5171,11 @@ mod causal_softmax_metal_reachability_tests;
 mod causal_softmax_nvvm_reachability_tests;
 
 #[cfg(test)]
+#[cfg(all(feature = "device", feature = "mir-metal"))]
+#[path = "batched_matmul_metal_reachability_test.rs"]
+mod batched_matmul_metal_reachability_tests;
+
+#[cfg(test)]
 #[path = "default_code_locale_test.rs"]
 mod default_code_locale_tests;
 
