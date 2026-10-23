@@ -48,6 +48,7 @@ const ISSUE_TENSOR_MEDIA_DECIMAL: &str = "tensor_media_decimal_rejected";
 const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
     "imperativus_operator_method_requires_varia_receiver";
 const ISSUE_MUTATING_RECEIVER_THROUGH_CONST: &str = "mutating_receiver_through_const";
+const ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED: &str = "intervallum_value_step_unsupported";
 const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
 const ISSUE_TENSOR_FORMATA_ELEMENT_TYPE_MISMATCH: &str = "tensor_formata_element_type_mismatch";
 const ISSUE_TENSOR_FORMATA_ELEMENT_COUNT_MISMATCH: &str = "tensor_formata_element_count_mismatch";
@@ -533,6 +534,25 @@ pub(super) fn check_intrinsic_method_call(
         && let Some(bound) = ctx.inner
         && !checker.check_intervallum_longitudo_bound(bound, span)
     {
+        return Some(checker.error_type);
+    }
+
+    // `coercere`, `inter` and `union` do not yet have a ruled meaning on a
+    // stepped receiver: the runtime helpers publish a step-one result, which
+    // would silently drop the stride. Refuse them by name. The query helpers
+    // `continet` and `longitudo` read the stride and stay accepted.
+    if matches!(
+        entry.receiver,
+        radix_intrinsics::IntrinsicReceiver::Intervallum
+    ) && matches!(entry.faber_name, "coercere" | "inter" | "union")
+        && checker.intervallum_type_id(receiver_ty).is_some()
+        && !checker.intervallum_step_is_one(receiver_ty)
+    {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED,
+            span,
+        );
         return Some(checker.error_type);
     }
 

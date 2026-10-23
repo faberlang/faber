@@ -1,0 +1,34 @@
++++
+term = "intervallum"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt", "expression", "literal"]
+category = "range"
+canonical = true
+summary = "A stored stepped interval carries its step in its type: `length()` counts on-step members and `contains(v)` is true only for on-step values."
+related = ["length", "contains", "step", "intervallum"]
+locale = "en"
++++
+# =============================================================================
+# intervallum — a stored stepped range carries its step
+# =============================================================================
+#
+# What this teaches:
+#   • The step of `0…10 step 2` lives in the value's type: `range<int, 2>`.
+#   • `length()` counts the members the step produces: `0…10 step 2` has 6.
+#   • `contains(v)` is true only for members on the step: 4 yes, 3 no.
+#
+# Common mistakes:
+#   • Counting the raw span (`0…10` is 11) instead of the stepped member count.
+#   • Expecting `contains(3)` to be true because 3 lies between the bounds;
+#     membership follows the step, not the span.
+#
+# See also: length, contains, step, intervallum
+# =============================================================================
+
+main {
+    # a stored range carries its step in its type
+    let range<int, 2> evens ← 0…10 step 2
+    print evens.length()
+    print evens.contains(4)
+    print evens.contains(3)
+}

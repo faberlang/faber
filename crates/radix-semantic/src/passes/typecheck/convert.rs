@@ -41,6 +41,7 @@ use crate::lista_tensor_conversio::{
 const ISSUE_INTERVALLUM_CLAMP_RECOVERY: &str = "intervallum_clamp_recovery_unsupported";
 const ISSUE_INTERVALLUM_TARGET_NOT_RANGE: &str = "intervallum_target_not_range";
 const ISSUE_INTERVALLUM_CLAMP_BOUND_MISMATCH: &str = "intervallum_clamp_bound_mismatch";
+const ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED: &str = "intervallum_value_step_unsupported";
 const ISSUE_INTERVALLUM_HELPER_BOUND_UNSUPPORTED: &str = "intervallum_helper_bound_unsupported";
 const ISSUE_SERMO_MATERIALIZE_TARGET_UNSUPPORTED: &str = "sermo_materialize_target_unsupported";
 const ISSUE_INTERVALLUM_MATERIALIZE_LISTA_ELEMENT_MISMATCH: &str =
@@ -1096,6 +1097,18 @@ impl TypeChecker<'_> {
                 return self.error_type;
             }
             return target_intervallum;
+        }
+
+        // A value clamped into a stepped range would lose the stride: the
+        // result is a plain bound value. No ruling gives that a meaning, so
+        // refuse by name instead of dropping the step.
+        if !self.intervallum_step_is_one(target_intervallum) {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED,
+                span,
+            );
+            return self.error_type;
         }
 
         let Some(bound) = self.intervallum_bound_type(target_intervallum) else {
