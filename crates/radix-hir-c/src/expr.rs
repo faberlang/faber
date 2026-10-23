@@ -12,7 +12,7 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
 use crate::items::Omission;
-use crate::ty::{Elem, Inner, IntWidth, Ty, classify, returns};
+use crate::ty::{Elem, Inner, IntWidth, Ty, classify, int_width_of_bits, returns};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
     DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
@@ -1913,6 +1913,7 @@ impl Emitter<'_> {
                 let at = self.text_literal(&self.store_position(site))?;
                 Ok(self.store_sized(&value, width, &at))
             }
+            (Ty::Bits(width), Value::Int | Value::Exact) => Self::store_bits(value, width),
             // A modular word reduces modulo 2^W at the store; a saturating
             // word clamps. Both are total (they never trap).
             (Ty::Modular(width), Value::Int | Value::Exact) => {
@@ -1971,6 +1972,26 @@ impl Emitter<'_> {
         operand.effect = value.effect;
         operand.stored = Some(class);
         operand
+    }
+
+    /// Store an integer value in a raw-bits cell. C's unsigned conversion is
+    /// modulo 2^N, but a folded out-of-range value is a rejected lowering, not
+    /// a constant that this backend silently masks.
+    fn store_bits(value: Operand, width: BitsWidth) -> Result<Operand, CodegenError> {
+        let class = Ty::Bits(width);
+        let (low, high) = int_width_of_bits(width).range();
+        if value
+            .constant
+            .is_some_and(|constant| !(low..=high).contains(&constant))
+        {
+            return Err(unsupported("bits value outside its width"));
+        }
+        let cell = int_width_of_bits(width).c_type();
+        let mut operand = Operand::new(format!("(({cell})({}))", value.text), Value::from(class));
+        operand.constant = value.constant;
+        operand.effect = value.effect;
+        operand.stored = Some(class);
+        Ok(operand)
     }
 
     /// A store into a modular or saturating word: the helper reduces modulo
@@ -2054,6 +2075,13 @@ impl Emitter<'_> {
                 let mut operand = Operand::new(stored, Value::Decimal).with_effect(value.effect);
                 operand.stored = Some(Ty::Decimal);
                 Ok(operand)
+            }
+            Ty::Bits(width) => {
+                if !matches!(value.value, Value::Int | Value::Exact) || value.stored == Some(class)
+                {
+                    return Ok(value);
+                }
+                Self::store_bits(value, width)
             }
             Ty::Modular(width) => {
                 if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact)

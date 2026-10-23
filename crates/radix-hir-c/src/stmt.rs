@@ -13,6 +13,7 @@ use radix_hir::{
     HirStatement, HirStatementKind,
 };
 use radix_lexer::Symbol;
+use radix_types::BitsWidth;
 
 impl Emitter<'_> {
     /// Emit a block's statements one level deeper than the current line.
@@ -1080,49 +1081,68 @@ impl Emitter<'_> {
         );
         let mut specs = Vec::with_capacity(operands.len());
         let mut values = Vec::with_capacity(operands.len());
-        for value in operands {
-            let (spec, text) = match value.value {
-                Value::Int => {
-                    self.support.need_ints();
-                    ("%\" PRId64 \"", value.text)
-                }
-                Value::Exact => {
-                    self.support.need(Helper::Text);
-                    (
+        for (arg, value) in args.iter().zip(operands) {
+            // Raw-bits values share an integer carrier with ordinary values,
+            // so their source type, not the carrier, selects hexadecimal.
+            let bits_width = arg
+                .ty
+                .and_then(|ty| classify(self.types, ty).ok())
+                .and_then(|class| match class {
+                    Ty::Bits(width) => Some(width),
+                    _ => None,
+                });
+            let (spec, text) = if let Some(width) = bits_width {
+                self.support.need_ints();
+                (
+                    bits_display_spec(width),
+                    format!("(uint64_t){}", value.text),
+                )
+            } else {
+                match value.value {
+                    Value::Int => {
+                        self.support.need_ints();
+                        ("%\" PRId64 \"", value.text)
+                    }
+                    Value::Exact => {
+                        self.support.need(Helper::Text);
+                        (
+                            "%s",
+                            format!("faber_i128_text({}, (char[41]){{0}})", value.text),
+                        )
+                    }
+                    Value::Text => ("%s", value.text),
+                    // The module's locale words: `true` / `false` for an `en`
+                    // program, `verum` / `falsum` for a `la` one.
+                    Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
+                    Value::List(elem) | Value::Set(elem) => {
+                        ("%s", self.show_list(&value.text, elem)?)
+                    }
+                    Value::Map(..) => return Err(unsupported("printing a map")),
+                    Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
+                    Value::Opt(inner) => ("%s", self.show_option(&value.text, inner)?),
+                    Value::Float => (
                         "%s",
-                        format!("faber_i128_text({}, (char[41]){{0}})", value.text),
-                    )
-                }
-                Value::Text => ("%s", value.text),
-                // The module's locale words: `true` / `false` for an `en`
-                // program, `verum` / `falsum` for a `la` one.
-                Value::Truth => ("%s", format!("({} ? {yes} : {no})", value.text)),
-                Value::List(elem) | Value::Set(elem) => ("%s", self.show_list(&value.text, elem)?),
-                Value::Map(..) => return Err(unsupported("printing a map")),
-                Value::Genus(def_id) => ("%s", self.show_genus(&value.text, def_id)?),
-                Value::Opt(inner) => ("%s", self.show_option(&value.text, inner)?),
-                Value::Float => (
-                    "%s",
-                    format!(
-                        "faber_f64_text({}, (char[FABER_F64_TEXT]){{0}})",
-                        value.text
+                        format!(
+                            "faber_f64_text({}, (char[FABER_F64_TEXT]){{0}})",
+                            value.text
+                        ),
                     ),
-                ),
-                Value::Float32 => (
-                    "%s",
-                    format!(
-                        "faber_f32_text({}, (char[FABER_F32_TEXT]){{0}})",
-                        value.text
+                    Value::Float32 => (
+                        "%s",
+                        format!(
+                            "faber_f32_text({}, (char[FABER_F32_TEXT]){{0}})",
+                            value.text
+                        ),
                     ),
-                ),
-                Value::Decimal => {
-                    self.support.need(Helper::DecimalText);
-                    ("%s", format!("faber_dec_fmt(faber_a, {})", value.text))
+                    Value::Decimal => {
+                        self.support.need(Helper::DecimalText);
+                        ("%s", format!("faber_dec_fmt(faber_a, {})", value.text))
+                    }
+                    // A bare `none` prints the locale's none word.
+                    Value::None => ("%s", self.text_literal(&tokens.none)?),
+                    Value::Func(_) => return Err(unsupported("printing a function value")),
+                    Value::Void => return Err(unsupported("printing a call with no result")),
                 }
-                // A bare `none` prints the locale's none word.
-                Value::None => ("%s", self.text_literal(&tokens.none)?),
-                Value::Func(_) => return Err(unsupported("printing a function value")),
-                Value::Void => return Err(unsupported("printing a call with no result")),
             };
             specs.push(spec);
             values.push(text);
@@ -1153,6 +1173,16 @@ impl Emitter<'_> {
             self.line(out, "}");
         }
         Ok(())
+    }
+}
+
+/// The full-width hexadecimal format fragment for a raw-bits value.
+fn bits_display_spec(width: BitsWidth) -> &'static str {
+    match width {
+        BitsWidth::B8 => "0x%02\" PRIx8 \"",
+        BitsWidth::B16 => "0x%04\" PRIx16 \"",
+        BitsWidth::B32 => "0x%08\" PRIx32 \"",
+        BitsWidth::B64 => "0x%016\" PRIx64 \"",
     }
 }
 
