@@ -8,7 +8,6 @@
 
 use crate::ty::Elem;
 use std::collections::BTreeSet;
-use std::fmt::Write as _;
 
 /// One runtime facility the emitted program calls or names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -179,11 +178,9 @@ impl Support {
         // dispatches to, and needs `faber.h` first.
         for helper in &self.helpers {
             if let Helper::LeafHeader(prefix) = helper {
-                let _ = writeln!(
-                    out,
-                    "#include \"{}\"",
-                    crate::leaf_routes::route_header(prefix)
-                );
+                out.push_str("#include \"");
+                out.push_str(&crate::leaf_routes::route_header(prefix));
+                out.push_str("\"\n");
             }
         }
         out.push('\n');
