@@ -25,11 +25,12 @@ const ISSUE: &str = "list_window_unsupported_on_target";
 
 /// Targets that carry a list window faithfully. The Faber re-emitter keeps the
 /// authored index; the MIR runner executes it and does not reach codegen; the
-/// clif backend lowers it to a runtime slice.
+/// clif backend lowers it to a runtime slice; the Python emitter copies the
+/// range through its `_faber_window` helper, striding by an optional step.
 fn target_admits_list_window(target: Target) -> bool {
     matches!(
         target,
-        Target::HirFaber | Target::MirStepper | Target::MirClif
+        Target::HirFaber | Target::MirStepper | Target::MirClif | Target::HirPython
     )
 }
 
