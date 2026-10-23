@@ -3526,6 +3526,149 @@ help = "استخدم «...» للنص الذي يحتوي على علامات ا
 [diagnostics.WARN034.issues.prefer_guillemet_for_quote]
 message = "هذه السلسلة تُهرّب `\\\"`؛ اكتبها بـ «…»، فلا حاجة إلى أي تهريب"
 help = "استخدم «...» للنص الذي يحتوي على علامات اقتباس"
+[diagnostics.LOCALE003]
+message = "reader locale `{locale_id}` في frontmatter غير معروف أو غير صالح"
+help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
+
+[diagnostics.LOCALE003.issues.invalid_id]
+message = "locale `{locale_id}` في frontmatter ليس معرّف locale صالحا؛ يجب أن تكون locale ids أسماء أدلة بسيطة"
+help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
+
+[diagnostics.LOCALE003.issues.no_root]
+message = "frontmatter يعلن locale `{locale_id}` لكن لا يوجد language-pack root مهيأ"
+help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
+
+[diagnostics.LOCALE003.issues.outside_root]
+message = "frontmatter locale `{locale_id}` يُحل خارج language-pack root"
+help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
+
+[diagnostics.LOCALE003.issues.load_failed]
+message = "reader locale `{locale_id}` غير معروف في frontmatter: {detail}"
+help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
+
+[diagnostics.LOCALE003.issues.not_a_string]
+message = "مفتاح `locale` في frontmatter يجب أن يكون string"
+help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
+
+[diagnostics.LOCALE003.issues.unresolved]
+message = "لم يُحل reader locale لهذا source"
+help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
+
+[diagnostics.PARSE060]
+message = "comment ليس في موضع attachment مسموح"
+help = "ضع comments قبل statement أو declaration أو member؛ أو مباشرة قبل `}` الختامية لـ block أو نهاية file"
+
+[diagnostics.SEM019]
+message = "visibility annotations متعارضة"
+help = "استخدم tier visibility واحدا لكل declaration"
+
+[diagnostics.SEM019.issues.conflicting_visibility]
+message = "visibility annotations متعارضة: `{first}` و`{second}`"
+help = "استخدم tier visibility واحدا لكل declaration"
+
+[diagnostics.SEM060]
+message = "constant initializer غير صالح"
+help = "انقل computation إلى function، أو استخدم block `{praefixum}`"
+
+[diagnostics.SEM060.issues.constant_initializer_not_constant]
+message = "initializer الخاص بـ constant `{name}` ليس compile-time constant"
+help = "`=` يعبّر عن حقيقة compile-time: استخدم literals والحساب والنصوص وcollection literals منها وconstants أخرى؛ احسب باستخدام block `{praefixum}`، أو لقيمة تُحسب في run-time اكتب `{fixum} T name ← value`"
+
+[diagnostics.SEM060.issues.constant_arithmetic_overflow]
+message = "initializer الخاص بـ constant `{name}` لا يتسع له type الخاص به"
+help = "constant `=` يجب أن يتسع له type مهما كانت overflow policy؛ استخدم type أوسع أو value أصغر"
+
+[diagnostics.SEM060.issues.constant_division_by_zero]
+message = "initializer الخاص بـ constant `{name}` يقسم على zero"
+help = "أصلح divisor"
+
+[diagnostics.SEM060.issues.constant_deferred]
+message = "constant initializer مؤجل"
+help = "استخدم initializer قابلا للحساب في compile-time"
+
+[diagnostics.SEM060.issues.constant_dependency]
+message = "constant initializer يعتمد على non-constant"
+help = "اعتمد على constants أخرى فقط"
+
+[diagnostics.SEM061]
+message = "build-time embed غير صالح"
+help = "ضمّن ملفا نسبيا إلى package وموجودا، كـ `textus` (UTF-8) أو `octeti`"
+
+[diagnostics.SEM061.issues.insere_file_missing]
+message = "embedded file `{path}` غير موجود"
+help = "تُحل paths مقابل package root (أقرب `faber.toml`)، أو مقابل دليل source file عندما لا يوجد"
+
+[diagnostics.SEM061.issues.insere_file_unreadable]
+message = "embedded file `{path}` لا يمكن قراءته"
+help = "ضمّن ملفا عاديا قابلا للقراءة"
+
+[diagnostics.SEM061.issues.insere_path_absolute]
+message = "embedded path `{path}` مطلق"
+help = "اكتب path نسبيا إلى package root"
+
+[diagnostics.SEM061.issues.insere_path_escapes_package]
+message = "embedded path `{path}` يخرج من package"
+help = "ضمّن ملفات داخل package فقط؛ لا يجوز لـ `..` أن يصعد فوق package root"
+
+[diagnostics.SEM061.issues.insere_no_source_root]
+message = "embedded path `{path}` لا يجد package يُحل مقابلها"
+help = "`{insere}` يحتاج source file على disk؛ لا يمكن استخدامه من stdin"
+
+[diagnostics.SEM061.issues.insere_invalid_utf8]
+message = "embedded file `{path}` ليس UTF-8 صالحا"
+help = "صرّح عن constant كـ `octeti` لتضمين bytes خام"
+
+[diagnostics.SEM061.issues.insere_type_invalid]
+message = "initializer `{insere}` يجب أن يعلن `textus` أو `octeti`"
+help = "صرّح بـ `textus` لنص UTF-8 أو `octeti` لـ bytes خام"
+
+[diagnostics.SEM061.issues.insere_type_required]
+message = "initializer `{insere}` ليس فيه slot `textus` أو `octeti` يأخذ type منه"
+help = "اربطه بـ constant ذي type: `{fixum} textus NAME = {insere} \"path\"` لنص UTF-8 أو `{fixum} octeti NAME = {insere} \"path\"` لـ bytes خام"
+
+[diagnostics.SEM061.issues.insere_outside_constant]
+message = "`{insere}` مسموح فقط في initializer الخاص بـ constant `=` أو field default"
+help = "اقرأ file إلى constant (`{fixum} textus NAME = {insere} \"path\"`) واستخدم ذلك constant هنا"
+
+[diagnostics.SEM062]
+message = "binding على top-level"
+help = "قيمة على مستوى module هي compile-time constant: `{fixum} T X = …`؛ أما قيمة run-time فمكانها داخل function"
+
+[diagnostics.SEM062.issues.top_level_binding]
+message = "`{name}` على top-level: لا وجود لحالة module-level قابلة للتغيير"
+help = "قيمة على مستوى module هي compile-time constant: `{fixum} T X = …`؛ أما قيمة run-time فمكانها داخل function"
+
+[diagnostics.SEM063]
+message = "member غير قابل للوصول هنا"
+help = "صل إلى member عبر methods الخاصة بـ type نفسها، أو غيّر visibility الخاص به"
+
+[diagnostics.SEM063.issues.member_private_read]
+message = "`{member}` خاص بـ `{owner}`؛ methods الخاصة به فقط يمكنها قراءته"
+help = "اقرأه عبر method من `{owner}`"
+
+[diagnostics.SEM063.issues.member_private_write]
+message = "`{member}` خاص بـ `{owner}`؛ methods الخاصة به فقط يمكنها كتابته"
+help = "اضبطه في construction literal، أو عبر method من `{owner}`"
+
+[diagnostics.SEM063.issues.member_private_call]
+message = "`{member}` خاص بـ `{owner}`؛ methods الخاصة به فقط يمكنها استدعاءه"
+help = "استدع method عامة من `{owner}` بدلا منه"
+
+[diagnostics.SEM063.issues.member_interna_read]
+message = "`{member}` من `{owner}` internal إلى package الخاصة به ولا يمكن قراءته من package أخرى"
+help = "استخدم member عامة من `{owner}`"
+
+[diagnostics.SEM063.issues.member_interna_write]
+message = "`{member}` من `{owner}` internal إلى package الخاصة به ولا يمكن كتابته من package أخرى"
+help = "اضبطه في construction literal، أو استخدم member عامة من `{owner}`"
+
+[diagnostics.SEM063.issues.member_interna_call]
+message = "`{member}` من `{owner}` internal إلى package الخاصة به ولا يمكن استدعاءه من package أخرى"
+help = "استدع method عامة من `{owner}` بدلا منه"
+
+[diagnostics.SEM063.issues.union_member_visibility_differs]
+message = "`{member}` يُكتب عبر union تعلن members فيه visibility مختلفة: {detail}"
+help = "علن `{member}` بـ visibility نفسها على كل member في union"
 
 
 [llm]

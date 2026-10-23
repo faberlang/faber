@@ -13,7 +13,7 @@
 # in crates/radix-module/src/locale_test.rs.
 
 [budget]
-ar = 881
+ar = 809
 hi = 875
 "th-TH" = 875
 vi = 881
