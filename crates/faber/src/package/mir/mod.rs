@@ -361,6 +361,9 @@ pub struct DeviceSessionRun {
     /// Host rows only. Kernel dispatches run on the device and are not
     /// measured (gpu-reset C2-U6c, D4).
     pub stats: Option<radix_mir_runner::RunnerStats>,
+    /// Device high-water mark from the dispatcher's runtime stats; a release
+    /// never lowers it.
+    pub peak_allocated_bytes: u64,
 }
 
 /// [`run_package_on_device_session`] with the opt-in host meter
@@ -383,7 +386,7 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
     // work is spent on it.
     let admitted = admit_device_session(input, selection, registry)?;
     let receipt = admitted.receipt.clone();
-    let (stats, _phases) = radix::program::mir::with_interpreted_bound_package_mir(
+    let (stats, phases) = radix::program::mir::with_interpreted_bound_package_mir(
         config,
         input,
         host,
@@ -400,7 +403,11 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
             )
         },
     )?;
-    Ok(DeviceSessionRun { receipt, stats })
+    Ok(DeviceSessionRun {
+        receipt,
+        stats,
+        peak_allocated_bytes: phases.dispatcher.runtime.peak_allocated_bytes,
+    })
 }
 
 /// [`run_package_on_device_session_with_stats`] for the `auto` selection: the
@@ -447,7 +454,13 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
                         host,
                         collect_stats,
                     )
-                    .map(|(stats, _phases)| Some(DeviceSessionRun { receipt, stats }))
+                    .map(|(stats, phases)| {
+                        Some(DeviceSessionRun {
+                            receipt,
+                            stats,
+                            peak_allocated_bytes: phases.dispatcher.runtime.peak_allocated_bytes,
+                        })
+                    })
                 }),
             )
         },

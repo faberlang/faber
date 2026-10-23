@@ -612,6 +612,12 @@ fn finish_device_run(
 ) -> Result<(), Vec<Diagnostic>> {
     if let (Some(metadata), Some(run_stats_value)) = (metadata, run.stats) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
+        writeln!(
+            out,
+            "device: peak allocated {} bytes",
+            run.peak_allocated_bytes
+        )
+        .ok();
         let artifact =
             RunStatsArtifact::new(metadata, run_stats_value, elapsed_wall_ms(started), 0);
         if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
