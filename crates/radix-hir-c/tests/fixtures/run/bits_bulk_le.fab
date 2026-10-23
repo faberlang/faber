@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+main {
+    let list<b8> raw ← [0x01, 0x02, 0x03, 0x04]
+    print raw ↦ list<u16> via Le
+    print raw ↦ list<u16> via Be
+    let list<b8> encoded ← (raw ↦ list<u16> via Le) ↦ list<b8> via Le
+    print encoded
+    print raw ↦ list<b16> via Be
+}

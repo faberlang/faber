@@ -10,14 +10,16 @@
 //! longer, the runner's rule.
 
 use crate::Emitter;
-use crate::error::unsupported;
+use crate::error::{UNSUPPORTED_ISSUE, unsupported};
 use crate::expr::{Operand, Value};
 use crate::helpers::{Helper, ListOp};
-use crate::ty::{IntWidth, Ty, classify};
+use crate::ty::{Elem, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
+use radix_codegen_shared::hints::{self, EndianHint};
+use radix_diagnostics::DiagnosticArg;
 use radix_hir::HirExpression;
 use radix_lexer::Symbol;
-use radix_types::{Type, TypeId};
+use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId};
 
 /// Which failure texts a fallible conversion uses (`FABER_CONV_*`).
 #[derive(Clone, Copy)]
@@ -107,6 +109,54 @@ fn int_target(class: Ty) -> Option<(i128, i128, bool)> {
     }
 }
 
+fn list_width_refusal(from: &str, to: &str) -> CodegenError {
+    let construct = format!("width-changing list conversion from {from} to {to}");
+    CodegenError {
+        message: format!("unsupported on target c: {construct}"),
+        args: vec![
+            DiagnosticArg::new("issue", UNSUPPORTED_ISSUE),
+            DiagnosticArg::new("construct", construct),
+            DiagnosticArg::new("target", "c"),
+        ],
+    }
+}
+
+/// The element type of an unbounded list, peeling an alias or access marker.
+fn list_element_type(types: &radix_types::TypeTable, mut ty: TypeId) -> Option<TypeId> {
+    loop {
+        ty = types.peel_access_marker(ty).1;
+        match types.get(ty) {
+            Type::Alias(_, inner) => ty = *inner,
+            Type::Array(element) => return Some(*element),
+            _ => return None,
+        }
+    }
+}
+
+/// The C element family and its byte width for the supported list byte view.
+fn bytes_list_element(types: &radix_types::TypeTable, mut ty: TypeId) -> Option<(Elem, usize)> {
+    loop {
+        ty = types.peel_access_marker(ty).1;
+        match types.get(ty) {
+            Type::Alias(_, inner) => ty = *inner,
+            Type::Bits(width) => {
+                let elem = Elem::Bits(*width);
+                return Some((elem, usize::from(bits_width(*width) / 8)));
+            }
+            Type::SizedNumeric(Primitive::Numerus, width) => {
+                let (width, bytes) = match width {
+                    NumericWidth::U16 => (IntWidth::U16, 2),
+                    NumericWidth::U32 => (IntWidth::U32, 4),
+                    NumericWidth::U64 => (IntWidth::U64, 8),
+                    _ => return None,
+                };
+                return Some((Elem::Modular(width), bytes));
+            }
+            _ => return None,
+        }
+    }
+}
+
 impl Emitter<'_> {
     pub(crate) fn conversion(
         &mut self,
@@ -164,6 +214,22 @@ impl Emitter<'_> {
             }
             if radix_codegen_shared::list_text_conversion(self.types, source_ty, target).is_some() {
                 return Err(unsupported("list of raw bits and text"));
+            }
+            if let Some((from, to)) =
+                radix_codegen_shared::list_width_change(self.types, source_ty, target)
+            {
+                let Some(be) = self.endian_hint(params) else {
+                    return Err(list_width_refusal(&from, &to));
+                };
+                return self.bits_list_width_change(
+                    source,
+                    source_ty,
+                    target,
+                    from,
+                    to,
+                    be,
+                    recovery.is_some(),
+                );
             }
         }
         let class = classify(self.types, target)?;
@@ -633,6 +699,82 @@ impl Emitter<'_> {
             }
             _ => None,
         }
+    }
+
+    /// The endian hint used by a width-changing list conversion.
+    fn endian_hint(&self, params: &[Symbol]) -> Option<bool> {
+        hints::endian_hint(params, |param| {
+            hints::classify(self.names.resolve_symbol(*param))
+        })
+        .map(|hint| hint == EndianHint::Be)
+    }
+
+    /// Lower a width-changing list pair through the runtime byte view. The
+    /// shared predicate admits the pair; this C lane carries b8 and the u16,
+    /// u32, u64, b16, b32 and b64 families only.
+    fn bits_list_width_change(
+        &mut self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target_ty: TypeId,
+        from: String,
+        to: String,
+        be: bool,
+        has_recovery: bool,
+    ) -> Result<Operand, CodegenError> {
+        if has_recovery {
+            return Err(list_width_refusal(&from, &to));
+        }
+        let Some(from_type) = list_element_type(self.types, source_ty) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let Some(to_type) = list_element_type(self.types, target_ty) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let Some((from_elem, from_bytes)) = bytes_list_element(self.types, from_type) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let Some((to_elem, to_bytes)) = bytes_list_element(self.types, to_type) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let decode = from_elem == Elem::Bits(BitsWidth::B8) && to_bytes > 1;
+        let encode = to_elem == Elem::Bits(BitsWidth::B8) && from_bytes > 1;
+        if !decode && !encode {
+            return Err(list_width_refusal(&from, &to));
+        }
+
+        let mut value = self.expr(source)?;
+        let Value::List(actual_elem) = value.value else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        if actual_elem != from_elem {
+            return Err(list_width_refusal(&from, &to));
+        }
+        let prelude = self.bind(&mut value);
+        let be = if be { "true" } else { "false" };
+        let call = if decode {
+            self.support
+                .need(Helper::List(Elem::Bits(BitsWidth::B8), ListOp::New));
+            self.support.need(Helper::List(to_elem, ListOp::New));
+            let bytes = format!(
+                "faber_bits_to_bytes(faber_a, {items}->items, {items}->len, sizeof *{items}->items)",
+                items = value.text,
+            );
+            format!(
+                "faber_bytes_to_{}(faber_a, {bytes}, {be})",
+                to_elem.suffix()
+            )
+        } else {
+            self.support.need(Helper::List(to_elem, ListOp::New));
+            format!(
+                "faber_bits_from_bytes(faber_a, {items}->items, {items}->len, sizeof *{items}->items, {be})",
+                items = value.text,
+            )
+        };
+        Ok(
+            Operand::new(crate::expr::wrap(&prelude, &call), Value::List(to_elem))
+                .with_effect(true),
+        )
     }
 
     /// The `via` hint of a float-to-integer conversion, as `faber_try_float_int`'s
