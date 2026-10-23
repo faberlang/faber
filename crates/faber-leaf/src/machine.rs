@@ -5,7 +5,7 @@
 //! finishes.
 //!
 //! Serves Latin `machina:specimen`: one host snapshot. This cut reports
-//! memory; per-core CPU and the process table land in c1de1950-2 and -3.
+//! memory and per-core CPU; the process table is still out of this cut.
 //! A deadline of 0 means never wait: answer from the previous slot without
 //! spawning a read.
 
@@ -28,8 +28,6 @@ const ROUTES: &[&str] = &["machina:specimen"];
 pub const MAX_PROCS: usize = 64;
 
 /// One core's absolute CPU tick counters from one host sample.
-// TARGET: c1de1950-2 differences these into `IntervalCore` rows.
-#[allow(dead_code)]
 struct CoreTicks {
     name: String,
     busy_ns: u64,
@@ -56,8 +54,6 @@ pub(crate) struct Collected {
 }
 
 /// One core's busy/total nanoseconds across the sampling interval.
-// TARGET: c1de1950-2 constructs these.
-#[allow(dead_code)]
 struct IntervalCore {
     name: String,
     busy_ns: i64,
@@ -246,10 +242,32 @@ fn render_intervals(old: Option<&Previous>, fresh: &Collected) -> Rendered {
 }
 
 fn interval_cores(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalCore> {
-    // TARGET: c1de1950-2 differences each core by name against the previous
-    // slot's absolutes. This unit ships the slot and the rendered shape.
     debug_assert!(old.is_none_or(|previous| previous.taken_at <= fresh.taken_at));
-    Vec::new()
+    fresh
+        .cores
+        .iter()
+        .map(|core| {
+            let previous = old.and_then(|previous| {
+                previous
+                    .cores_ticks
+                    .iter()
+                    .find(|previous_core| previous_core.name == core.name)
+            });
+            let (busy_ns, total_ns) = previous.map_or((0, 0), |previous_core| {
+                (
+                    i64::try_from(core.busy_ns.saturating_sub(previous_core.busy_ns))
+                        .unwrap_or(i64::MAX),
+                    i64::try_from(core.total_ns.saturating_sub(previous_core.total_ns))
+                        .unwrap_or(i64::MAX),
+                )
+            });
+            IntervalCore {
+                name: core.name.clone(),
+                busy_ns,
+                total_ns,
+            }
+        })
+        .collect()
 }
 
 fn interval_procs(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalProc> {
@@ -344,11 +362,149 @@ fn collect() -> Result<Collected, LeafError> {
     let used_bytes = used_memory()?;
     Ok(Collected {
         taken_at: Instant::now(),
-        cores: Vec::new(),
+        cores: collect_cores()?,
         used_bytes,
         total_bytes,
         procs: Vec::new(),
     })
+}
+
+/// Convert host processor counters, whose unit is one scheduling tick, to ns.
+#[cfg(target_os = "macos")]
+fn tick_hz() -> u64 {
+    // SAFETY: `sysconf` takes a scalar selector and writes no output buffer.
+    // This is the sole source for the scheduling-tick scale of host counters.
+    let hz = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+    if hz <= 0 {
+        100
+    } else {
+        u64::try_from(hz).unwrap_or(100)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn ticks_to_ns(ticks: u32, hz: u64) -> u64 {
+    if hz == 0 {
+        0
+    } else {
+        u64::from(ticks) * 1_000_000_000 / hz
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn wide_ticks_to_ns(ticks: u64, hz: u64) -> u64 {
+    if hz == 0 {
+        0
+    } else if let Ok(ticks) = u32::try_from(ticks) {
+        ticks_to_ns(ticks, hz)
+    } else {
+        ticks.saturating_mul(1_000_000_000) / hz
+    }
+}
+
+// WHY: libc deprecates `mach_host_self` in favour of the `mach2` crate; adding
+// a dependency is outside this leaf's cut, and the call is the same Mach port.
+#[cfg(target_os = "macos")]
+#[allow(deprecated)]
+fn collect_cores() -> Result<Vec<CoreTicks>, LeafError> {
+    let mut count: libc::natural_t = 0;
+    let mut info: libc::processor_info_array_t = std::ptr::null_mut();
+    let mut info_count: libc::mach_msg_type_number_t = 0;
+    // SAFETY: `count` and `info_count` each point to one output integer of
+    // their declared type, and `info` points to one output array pointer; on
+    // success the kernel fills the array whose length is `info_count` words.
+    let status = unsafe {
+        libc::host_processor_info(
+            libc::mach_host_self(),
+            libc::PROCESSOR_CPU_LOAD_INFO,
+            std::ptr::from_mut(&mut count),
+            std::ptr::from_mut(&mut info),
+            std::ptr::from_mut(&mut info_count),
+        )
+    };
+    if status != libc::KERN_SUCCESS {
+        if !info.is_null() {
+            // SAFETY: if the failed call returned an allocated `info` array,
+            // `info_count` gives its length in integer_t words.
+            let _ = unsafe {
+                libc::vm_deallocate(
+                    libc::mach_task_self(),
+                    info as libc::vm_address_t,
+                    usize::try_from(info_count)
+                        .unwrap_or(usize::MAX)
+                        .saturating_mul(std::mem::size_of::<libc::integer_t>()),
+                )
+            };
+        }
+        return Err(LeafError::unavailable(
+            ROUTE,
+            format!("host_processor_info failed ({status})"),
+        ));
+    }
+
+    let cores = (|| {
+        let processor_count = usize::try_from(count).unwrap_or(usize::MAX);
+        let info_words = usize::try_from(info_count).unwrap_or(usize::MAX);
+        let words_per_record = std::mem::size_of::<libc::processor_cpu_load_info>()
+            / std::mem::size_of::<libc::integer_t>();
+        let Some(required_words) = processor_count.checked_mul(words_per_record) else {
+            return Err(LeafError::unavailable(
+                ROUTE,
+                "host_processor_info returned an invalid CPU array",
+            ));
+        };
+        if (processor_count > 0 && info.is_null()) || required_words > info_words {
+            return Err(LeafError::unavailable(
+                ROUTE,
+                "host_processor_info returned an invalid CPU array",
+            ));
+        }
+
+        let records: &[libc::processor_cpu_load_info] = if processor_count == 0 {
+            &[]
+        } else {
+            // SAFETY: successful `host_processor_info` returned `count`
+            // records, and the validated `info_count` covers their full size.
+            unsafe { std::slice::from_raw_parts(info.cast(), processor_count) }
+        };
+        let hz = tick_hz();
+        let user_index = usize::try_from(libc::CPU_STATE_USER).unwrap_or(0);
+        let system_index = usize::try_from(libc::CPU_STATE_SYSTEM).unwrap_or(0);
+        let idle_index = usize::try_from(libc::CPU_STATE_IDLE).unwrap_or(0);
+        let nice_index = usize::try_from(libc::CPU_STATE_NICE).unwrap_or(0);
+        Ok(records
+            .iter()
+            .enumerate()
+            .map(|(index, record)| {
+                let user = u64::from(record.cpu_ticks[user_index]);
+                let system = u64::from(record.cpu_ticks[system_index]);
+                let idle = u64::from(record.cpu_ticks[idle_index]);
+                let nice = u64::from(record.cpu_ticks[nice_index]);
+                let busy_ticks = user + system + nice;
+                let total_ticks = busy_ticks + idle;
+                CoreTicks {
+                    name: format!("cpu{index}"),
+                    busy_ns: wide_ticks_to_ns(busy_ticks, hz),
+                    total_ns: wide_ticks_to_ns(total_ticks, hz),
+                }
+            })
+            .collect())
+    })();
+
+    if !info.is_null() {
+        // SAFETY: `info` is the kernel-allocated array returned above, and
+        // `info_count` gives its length in integer_t words.
+        let _ = unsafe {
+            libc::vm_deallocate(
+                libc::mach_task_self(),
+                info as libc::vm_address_t,
+                usize::try_from(info_count)
+                    .unwrap_or(usize::MAX)
+                    .saturating_mul(std::mem::size_of::<libc::integer_t>()),
+            )
+        };
+    }
+    cores
 }
 
 #[cfg(target_os = "macos")]

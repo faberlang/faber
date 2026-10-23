@@ -8,6 +8,32 @@ fn field<'a>(fields: &'a [(String, Reply)], key: &str) -> &'a Reply {
         .expect("field")
 }
 
+fn core_rows(reply: &Reply) -> Vec<(String, i64, i64)> {
+    let Reply::Map(fields) = reply else {
+        panic!("expected snapshot map");
+    };
+    let Reply::List(rows) = field(fields, "cores") else {
+        panic!("expected cores list");
+    };
+    rows.iter()
+        .map(|row| {
+            let Reply::Map(fields) = row else {
+                panic!("expected core map");
+            };
+            let Reply::Str(name) = field(fields, "name") else {
+                panic!("expected core name");
+            };
+            let Reply::Int(busy_ns) = field(fields, "busy_ns") else {
+                panic!("expected busy_ns");
+            };
+            let Reply::Int(total_ns) = field(fields, "total_ns") else {
+                panic!("expected total_ns");
+            };
+            (name.clone(), *busy_ns, *total_ns)
+        })
+        .collect()
+}
+
 #[test]
 fn route_list_matches_serve() {
     for route in super::ROUTES {
@@ -65,7 +91,13 @@ fn fresh_snapshot_reports_memory() {
     };
     assert_eq!(field(fields, "stale"), &Reply::Bool(false));
     assert_eq!(field(fields, "age_ms"), &Reply::Int(0));
-    assert_eq!(field(fields, "cores"), &Reply::List(Vec::new()));
+    let cores = core_rows(&reply);
+    assert!(!cores.is_empty());
+    assert!(
+        cores
+            .iter()
+            .all(|(_, busy_ns, total_ns)| total_ns >= busy_ns)
+    );
     let Reply::Map(memory) = field(fields, "memory") else {
         panic!("expected memory map");
     };
@@ -77,6 +109,148 @@ fn fresh_snapshot_reports_memory() {
     };
     assert!(*total > 0, "host total memory must be positive");
     assert!(*used <= *total, "used memory cannot exceed total");
+}
+
+#[test]
+fn interval_cores_differences_by_name() {
+    let old = super::make_previous(
+        1,
+        super::Collected {
+            taken_at: std::time::Instant::now(),
+            cores: vec![
+                super::CoreTicks {
+                    name: "cpu0".to_owned(),
+                    busy_ns: 100,
+                    total_ns: 400,
+                },
+                super::CoreTicks {
+                    name: "cpu1".to_owned(),
+                    busy_ns: 50,
+                    total_ns: 200,
+                },
+                super::CoreTicks {
+                    name: "cpu9".to_owned(),
+                    busy_ns: 1,
+                    total_ns: 2,
+                },
+            ],
+            used_bytes: 0,
+            total_bytes: 0,
+            procs: Vec::new(),
+        },
+        None,
+    );
+    let fresh = super::Collected {
+        taken_at: old.taken_at + std::time::Duration::from_nanos(1),
+        cores: vec![
+            super::CoreTicks {
+                name: "cpu1".to_owned(),
+                busy_ns: 80,
+                total_ns: 260,
+            },
+            super::CoreTicks {
+                name: "cpu0".to_owned(),
+                busy_ns: 160,
+                total_ns: 500,
+            },
+        ],
+        used_bytes: 0,
+        total_bytes: 0,
+        procs: Vec::new(),
+    };
+
+    let rows = super::interval_cores(Some(&old), &fresh);
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.name.as_str(), row.busy_ns, row.total_ns))
+            .collect::<Vec<_>>(),
+        vec![("cpu1", 30, 60), ("cpu0", 60, 100)]
+    );
+}
+
+#[test]
+fn interval_cores_first_snapshot_is_zero() {
+    let fresh = super::Collected {
+        taken_at: std::time::Instant::now(),
+        cores: vec![
+            super::CoreTicks {
+                name: "cpu1".to_owned(),
+                busy_ns: 80,
+                total_ns: 260,
+            },
+            super::CoreTicks {
+                name: "cpu0".to_owned(),
+                busy_ns: 160,
+                total_ns: 500,
+            },
+        ],
+        used_bytes: 0,
+        total_bytes: 0,
+        procs: Vec::new(),
+    };
+
+    let rows = super::interval_cores(None, &fresh);
+    assert_eq!(
+        rows.iter()
+            .map(|row| (row.name.as_str(), row.busy_ns, row.total_ns))
+            .collect::<Vec<_>>(),
+        vec![("cpu1", 0, 0), ("cpu0", 0, 0)]
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn ticks_to_ns() {
+    assert_eq!(super::ticks_to_ns(100, 100), 1_000_000_000);
+    assert_eq!(super::ticks_to_ns(0, 100), 0);
+    assert_eq!(super::ticks_to_ns(5, 0), 0);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn collect_reports_every_core() {
+    let collected = super::collect().expect("host collection");
+    assert!(!collected.cores.is_empty());
+    for (index, core) in collected.cores.iter().enumerate() {
+        assert_eq!(core.name, format!("cpu{index}"));
+        assert!(core.total_ns >= core.busy_ns);
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn fresh_snapshot_reports_per_core_cpu() {
+    let _guard = crate::test_support::handle_table_guard();
+    super::reset_previous();
+    let first = serve("machina:specimen", &[Arg::Int(5000)])
+        .expect("route")
+        .expect("specimen");
+    let second = serve("machina:specimen", &[Arg::Int(5000)])
+        .expect("route")
+        .expect("specimen");
+    let replay = serve("machina:specimen", &[Arg::Int(0)])
+        .expect("route")
+        .expect("specimen");
+
+    let first_rows = core_rows(&first);
+    let second_rows = core_rows(&second);
+    let replay_rows = core_rows(&replay);
+    assert!(!first_rows.is_empty());
+    assert_eq!(second_rows.len(), first_rows.len());
+    assert_eq!(replay_rows.len(), first_rows.len());
+    let names = |rows: &[(String, i64, i64)]| {
+        rows.iter()
+            .map(|(name, _, _)| name.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(names(&second_rows), names(&first_rows));
+    assert_eq!(names(&replay_rows), names(&first_rows));
+    for rows in [&first_rows, &second_rows, &replay_rows] {
+        assert!(
+            rows.iter()
+                .all(|(_, busy_ns, total_ns)| total_ns >= busy_ns && *busy_ns >= 0)
+        );
+    }
 }
 
 #[test]
