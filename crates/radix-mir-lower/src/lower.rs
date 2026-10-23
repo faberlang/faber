@@ -1468,6 +1468,20 @@ fn ensure_intervallum_iteration_array_types(hir: &radix_hir::HirModule, types: &
 }
 
 fn ensure_tensor_bracket_index_array_types(hir: &radix_hir::HirModule, types: &mut TypeTable) {
+    fn index_has_range(index: &HirExpression) -> bool {
+        match &index.kind {
+            HirExpressionKind::Intervallum { .. } => true,
+            HirExpressionKind::Array(elements) => elements.iter().any(|element| {
+                matches!(
+                    element,
+                    HirArrayElement::Expr(slot)
+                        if matches!(slot.kind, HirExpressionKind::Intervallum { .. })
+                )
+            }),
+            _ => false,
+        }
+    }
+
     struct TensorBracketIndexArrayCollector<'a> {
         types: &'a TypeTable,
         elements: FxHashSet<TypeId>,
@@ -1483,12 +1497,14 @@ fn ensure_tensor_bracket_index_array_types(hir: &radix_hir::HirModule, types: &m
                     .ty
                     .is_some_and(|ty| radix_semantic::tensor_bracket::is_bracket_index_list_type(self.types, ty));
                 // WHY: a bracket *range* (`t[1 ‥ 4]`) lowers to `TensorSliceNd`
-                // with five one-entry lists, but the range is untyped in this
-                // position, so no list type for its entries exists. Lowering
-                // holds the type table immutably and `find_array` only finds
-                // interned lists, so the axis-entry types (`numerus` counter,
-                // `bivalens` keep/inclusive flags) are interned here.
-                if object_is_coordinate && matches!(index.kind, HirExpressionKind::Intervallum { .. }) {
+                // with five one-entry lists, and a slot list with a range slot
+                // (`g[[1, 0 ‥ 3]]`) lowers to six N-entry lists, but a range is
+                // untyped in this position, so no list type for its entries
+                // exists. Lowering holds the type table immutably and
+                // `find_array` only finds interned lists, so the axis-entry types
+                // (`numerus` counter, `bivalens` keep/inclusive flags) are
+                // interned here.
+                if object_is_coordinate && index_has_range(index) {
                     self.elements
                         .insert(self.types.primitive(Primitive::Numerus));
                     self.elements
