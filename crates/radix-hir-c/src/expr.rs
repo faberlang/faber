@@ -12,6 +12,7 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
 use crate::items::Omission;
+use crate::leaf_routes;
 use crate::ty::{Elem, Inner, IntWidth, Ty, classify, int_width_of_bits, returns};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
@@ -473,6 +474,7 @@ impl Emitter<'_> {
             HirExpressionKind::Clausura(params, ret, _err, body) => {
                 self.closure(expr, params, *ret, body)
             }
+            HirExpressionKind::Ad { route, opener } => self.ad_route(*route, opener.as_deref()),
             other => Err(unsupported(construct_name(other))),
         }
     }
@@ -610,6 +612,41 @@ impl Emitter<'_> {
             text
         };
         Ok(Operand::new(text, value).with_effect(true))
+    }
+
+    /// An `ad '<route>' [opener]` stream value: the leaf wrapper for its
+    /// route. The leaf gate admits the route's leaf on the target before the
+    /// emitter runs; this table is the second admission, so a route whose
+    /// prefix has no `runtime/c/<prefix>.h` keeps the emitter's refusal. A
+    /// builtin route is never a leaf wrapper.
+    fn ad_route(
+        &mut self,
+        route: radix_lexer::Symbol,
+        opener: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        let route = self.names.resolve_symbol(route).to_owned();
+        let Some((prefix, _name)) = route.split_once(':') else {
+            return Err(unsupported("stream route"));
+        };
+        let Some(symbol) = leaf_routes::route_symbol(&route) else {
+            return Err(unsupported("stream route"));
+        };
+        if !leaf_routes::declared(prefix) {
+            return Err(unsupported("stream route"));
+        }
+        let Some(header) = leaf_routes::declared_prefix(prefix) else {
+            return Err(unsupported("stream route"));
+        };
+        self.support.need(Helper::LeafHeader(header));
+        // The wrapper's first argument is the arena every `faber_route_*`
+        // takes, so the leaf header can allocate its reply.
+        self.support.need(Helper::Arena);
+        let mut slots = vec!["faber_a".to_owned()];
+        if let Some(opener) = opener {
+            let operand = self.expr(opener)?;
+            slots.push(operand.text);
+        }
+        Ok(Operand::new(format!("{symbol}({})", slots.join(", ")), Value::Void).with_effect(true))
     }
 
     /// `read line` / `read`: one stdin line without its terminator, or all of

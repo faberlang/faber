@@ -28,6 +28,7 @@ mod float;
 mod genus;
 mod helpers;
 mod items;
+mod leaf_routes;
 mod list;
 mod map;
 mod names;
@@ -65,6 +66,8 @@ mod float32_test;
 mod float_math_test;
 #[cfg(test)]
 mod item_test;
+#[cfg(test)]
+mod leaf_routes_test;
 #[cfg(test)]
 mod list_test;
 #[cfg(test)]
