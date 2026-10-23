@@ -2788,6 +2788,55 @@ fn regex_literal_member_identifier_stays_division() {
     );
 }
 
+#[test]
+fn regex_literal_class_slash_requires_escape() {
+    let result = lex(r"regex /[\/]/");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let TokenKind::RegexString(sym) = result.tokens[1].kind else {
+        panic!("expected RegexString, got {:?}", result.tokens[1].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), r"[\/]");
+}
+
+#[test]
+fn regex_literal_unescaped_class_slash_ends_body() {
+    let result = lex(r"regex /[/]/");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    let TokenKind::RegexString(sym) = result.tokens[1].kind else {
+        panic!("expected RegexString, got {:?}", result.tokens[1].kind);
+    };
+    assert_eq!(result.interner.resolve(sym), "[");
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::RBracket),
+        "{:?}",
+        result.tokens
+    );
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::Slash),
+        "{:?}",
+        result.tokens
+    );
+}
+
+#[test]
+fn regex_literal_parenthesized_binding_stays_division() {
+    let result = lex("(regex) / 2");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert!(
+        result.tokens.iter().any(|t| t.kind == TokenKind::Slash),
+        "{:?}",
+        result.tokens
+    );
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|t| matches!(t.kind, TokenKind::RegexString(_))),
+        "{:?}",
+        result.tokens
+    );
+}
+
 /// Minimal pack: the localized regex type word is `expressio`.
 struct EnRegexTypePack;
 
