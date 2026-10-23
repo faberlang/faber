@@ -16,6 +16,8 @@ use crate::{
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
 
+use crate::tensor_type::Dim;
+
 fn f32_ty(types: &mut TypeTable) -> MirType {
     MirType::semantic(types.sized_numeric(Primitive::Fractus, NumericWidth::F32))
 }
@@ -1574,6 +1576,25 @@ fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignat
             z: 1,
         },
     }
+}
+
+#[test]
+fn transformer_operand_dims_typed_keeps_literal_axes() {
+    // The typed helper keeps the operand's axes as `Dim`s (a run-time extent
+    // stays `Dim::Runtime` instead of failing), and the typed recipe shape
+    // reports the same dims with the softmax last axis.
+    let mut types = TypeTable::new();
+    let function = transformer_function(&mut types, [4, 4], MirCollectionOp::TensorSoftmax, vec![]);
+    let validation = MirValidationContext::new(&types);
+    let operand = MirOperand::Place(MirPlace::local(MirLocalId(0)));
+    let dims = transformer_operand_dims_typed(&function, &operand, &validation)
+        .expect("the typed helper reads the operand's axes");
+    assert_eq!(dims, vec![Dim::Literal(4), Dim::Literal(4)]);
+    let (shape, axis) =
+        transformer_recipe_shape_typed(&function, &validation, MirCollectionOp::TensorSoftmax)
+            .expect("the typed softmax shape resolves");
+    assert_eq!(shape, dims);
+    assert_eq!(axis, 1);
 }
 
 #[test]
