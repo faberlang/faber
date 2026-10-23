@@ -3265,7 +3265,8 @@ enum {
     FABER_CONV_INT_INT = 2,
     FABER_CONV_FLOAT_INT = 3,
     FABER_CONV_TEXT_BOOL = 4,
-    FABER_CONV_ASCII_PACK = 5
+    FABER_CONV_ASCII_PACK = 5,
+    FABER_CONV_BYTES_TEXT = 6
 };
 
 static inline _Noreturn void faber_conv_fail(int kind, int why) {
@@ -3280,6 +3281,8 @@ static inline _Noreturn void faber_conv_fail(int kind, int why) {
     case FABER_CONV_ASCII_PACK:
         faber_trap(why == FABER_CONV_NEGATIVE ? "ascii_pack_negative_source"
                                               : "ascii_pack_width_overflow");
+    case FABER_CONV_BYTES_TEXT:
+        faber_trap("octeti to textus conversion failed");
     case FABER_CONV_INT_INT:
         faber_trap("numerus to numerus conversion out of range");
     default:
@@ -3373,6 +3376,87 @@ static inline int faber_try_text_int(faber_text text, int radix, faber_i128 low,
     }
     *out = negative ? -value : value;
     return *out >= low && *out <= high ? FABER_CONV_OK : FABER_CONV_RANGE;
+}
+
+/* Whether `length` bytes are one well-formed UTF-8 text: no overlong form,
+ * no surrogate, nothing past U+10FFFF, and no `0x00` byte. The text carrier
+ * is NUL-terminated, so a zero byte has no text value at all. */
+static inline bool faber_utf8_well_formed(const unsigned char *source, size_t length) {
+    size_t at = 0;
+    while (at < length) {
+        unsigned char lead = source[at];
+        size_t width = 1;
+        uint32_t least = 0;
+        uint32_t cp;
+        size_t step;
+        if (lead == 0x00) {
+            return false;
+        }
+        if (lead >= 0x80) {
+            if (lead >= 0xC2 && lead <= 0xDF) {
+                width = 2;
+                least = 0x80;
+            } else if (lead >= 0xE0 && lead <= 0xEF) {
+                width = 3;
+                least = 0x800;
+            } else if (lead >= 0xF0 && lead <= 0xF4) {
+                width = 4;
+                least = 0x10000;
+            } else {
+                return false;
+            }
+            if (length - at < width) {
+                return false;
+            }
+            for (step = 1; step < width; step++) {
+                if ((source[at + step] & 0xC0) != 0x80) {
+                    return false;
+                }
+            }
+            cp = faber_utf8_decode(source + at, width);
+            if (cp < least || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
+                return false;
+            }
+        }
+        at += width;
+    }
+    return true;
+}
+
+/* `lista<b8> ↦ string`: the UTF-8 decode, sealing the very bytes the list
+ * holds. An ill-formed sequence fails, and so does any `0x00` byte: the
+ * carrier has no text value for it, so the conversion fails exactly like a
+ * bad sequence rather than truncating the text. `*why` is FABER_CONV_RANGE on
+ * failure and the caller either traps or takes the `⊥` fallback. */
+static inline faber_text faber_try_bytes_text(faber_arena *arena, const faber_list_b8 *bytes,
+                                              int *why) {
+    size_t length = (size_t)bytes->len;
+    char *buffer;
+    char *text;
+    if (!faber_utf8_well_formed(bytes->items, length)) {
+        *why = FABER_CONV_RANGE;
+        return NULL;
+    }
+    *why = FABER_CONV_OK;
+    buffer = faber_alloc(arena, sizeof(faber_text_header) + length + 1);
+    text = buffer + sizeof(faber_text_header);
+    if (length > 0) {
+        memcpy(text, bytes->items, length);
+    }
+    text[length] = '\0';
+    return faber_text_seal(buffer, length, faber_text_count_cps(text, length));
+}
+
+/* `string ↦ lista<b8>`: the UTF-8 encode, the header's byte count copied out.
+ * It cannot fail: a text never carries a NUL byte. */
+static inline faber_list_b8 *faber_text_bytes(faber_arena *arena, faber_text text) {
+    size_t length = (size_t)faber_text_hdr(text)->bytes;
+    faber_list_b8 *bytes = faber_list_b8_new(arena, (int64_t)length);
+    if (length > 0) {
+        memcpy(bytes->items, text, length);
+    }
+    bytes->len = (int64_t)length;
+    return bytes;
 }
 
 static inline bool faber_ascii_equal_nocase(const char *a, const char *b) {
