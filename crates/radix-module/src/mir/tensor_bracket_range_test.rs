@@ -48,3 +48,29 @@ fn tensor_bracket_range_rank2_slots_slice_and_drop() {
         print x";
     assert_eq!(ok(body), ["[4.0, 5.0, 6.0]", "6.0"]);
 }
+
+const V: &str = "let vector<f32, 4> v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>";
+
+#[test]
+fn vector_bracket_range_slice_runs() {
+    // WHY: a register vector slice keeps the vector family, so lowering builds
+    // a fresh vector from the kept lanes instead of reading one lane.
+    let body = format!(
+        "{V}\n\
+         let vector<f32, 2> w ← v[1 ‥ 3]\n\
+         print w[0]\n\
+         print w[1]"
+    );
+    assert_eq!(ok(&body), ["2.0", "3.0"]);
+}
+
+#[test]
+fn vector_bracket_range_step_slice_runs() {
+    let body = format!(
+        "{V}\n\
+         let vector<f32, 2> w ← v[0 ‥ 4 step 2]\n\
+         print w[0]\n\
+         print w[1]"
+    );
+    assert_eq!(ok(&body), ["1.0", "3.0"]);
+}

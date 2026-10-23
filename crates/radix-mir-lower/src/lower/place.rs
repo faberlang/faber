@@ -108,10 +108,84 @@ impl FunctionBuilder<'_> {
                 expr.span,
             ));
         }
+        // WHY: a register vector is not a lane base for a range: `v[1 ‥ 3]`
+        // stays in the vector family at the width the checker computes, so it
+        // builds a fresh vector from the kept lanes instead of reading a lane
+        //.
+        if object.ty.is_some_and(|ty| self.is_vector_lane_base(ty))
+            && matches!(index.kind, HirExpressionKind::Intervallum { .. })
+        {
+            return self.lower_vector_bracket_slice(object, index, expr);
+        }
         let mut place = self.lower_projectable_place(object)?;
         let projection = self.lower_index_projection(&place, object.ty, index)?;
         place.projections.push(projection);
         Some(MirOperand::Place(place))
+    }
+
+    /// Lower a vector bracket range (`v[1 ‥ 3]`, `v[0 ‥ 4 per 2]`) as a fresh
+    /// vector of its kept lanes.
+    ///
+    /// The checker only accepts a range whose start, end and step are static
+    /// literals (a register vector carries a literal width), so the kept lanes
+    /// are enumerated here and each one read through the `VectorLane`
+    /// projection. A non-literal bound cannot reach this path; if it does, it
+    /// fails loudly instead of lowering a range value as a lane index.
+    fn lower_vector_bracket_slice(
+        &mut self,
+        object: &HirExpression,
+        index: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let HirExpressionKind::Intervallum { start, end, step, kind } = &index.kind else {
+            self.errors
+                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
+            return None;
+        };
+        let step_value = match step.as_deref() {
+            Some(step) => radix_semantic::passes::const_int_value(step),
+            None => Some(1),
+        };
+        let (Some(start_value), Some(end_value), Some(step_value)) = (
+            radix_semantic::passes::const_int_value(start),
+            radix_semantic::passes::const_int_value(end),
+            step_value,
+        ) else {
+            self.errors
+                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
+            return None;
+        };
+        if step_value <= 0 {
+            self.errors
+                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
+            return None;
+        }
+        let end_eff = if matches!(kind, HirRangeKind::Inclusive) {
+            end_value.saturating_add(1)
+        } else {
+            end_value
+        };
+        let place = self.lower_projectable_place(object)?;
+        let mut items = Vec::new();
+        let mut lane = start_value;
+        while lane < end_eff {
+            let Ok(lane_index) = u8::try_from(lane) else {
+                self.errors
+                    .push(MirError::unsupported(index.span, "vector bracket range lane out of range"));
+                return None;
+            };
+            // WHY: the lane read is the same `VectorLane` projection a
+            // swizzle uses (`vector_lane_operand` is private to the runtime
+            // module; the projection is identical).
+            let mut lane_place = place.clone();
+            lane_place
+                .projections
+                .push(MirProjection::VectorLane(lane_index));
+            items.push(MirAggregateItem::Operand(MirOperand::Place(lane_place)));
+            lane += step_value;
+        }
+        let ty = self.expr_ty(expr)?;
+        Some(self.construct_temp(MirAggregateKind::Vector, MirAggregateFields::Ordered(items), ty, expr.span))
     }
 
     /// Whether `object[index]` is a list window: a list receiver and a range
