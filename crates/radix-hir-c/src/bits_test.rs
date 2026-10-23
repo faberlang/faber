@@ -68,6 +68,34 @@ fn bits_list_refused_by_name() {
     assert_eq!(rejected_construct("case.fab", &source), "list of raw bits");
 }
 
+/// Raw-bits locals use their own unsigned C cell rather than the promoted
+/// integer value class.
+#[test]
+fn bits_store_is_the_unsigned_width_cell() {
+    let code = crate::test_support::emitted(
+        "main {\n    let b8 one ← 0x01\n    let b64 wide ← 0x0000000000000001\n}",
+    );
+    assert!(code.contains("uint8_t l_one = "), "{code}");
+    assert!(!code.contains("const int64_t l_one ="), "{code}");
+    assert!(code.contains("uint64_t l_wide = "), "{code}");
+    assert!(!code.contains("const int64_t l_wide ="), "{code}");
+}
+
+/// Raw-bits printing uses the width-specific hexadecimal conversion macro and
+/// passes its unsigned cell through the variadic-call carrier.
+#[test]
+fn bits_print_is_hex_at_full_width() {
+    let code = crate::test_support::emitted(
+        "main {\n    let b8 one8 ← 0x01\n    let b16 one16 ← 0x0001\n    let b32 one32 ← 0x00000001\n    let b64 one64 ← 0x0000000000000001\n    print one8\n    print one16\n    print one32\n    print one64\n}",
+    );
+    assert!(code.contains("0x%02\" PRIx8"), "{code}");
+    assert!(code.contains("0x%04\" PRIx16"), "{code}");
+    assert!(code.contains("0x%08\" PRIx32"), "{code}");
+    assert!(code.contains("0x%016\" PRIx64"), "{code}");
+    assert!(code.contains("(uint64_t)l_one8"), "{code}");
+    assert!(code.contains("(uint64_t)l_one64"), "{code}");
+}
+
 /// The carrier: a `bN` is held in the unsigned C cell of its own width, and
 /// `b64` reads exact (it fills a `uint64_t` that no `int64_t` holds).
 #[test]
