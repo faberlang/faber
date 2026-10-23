@@ -16,6 +16,7 @@ use super::validate::{
     validate_transpose_plan,
 };
 use crate::abi::{CollectionOpContract, MatMulDispatch, MirKernelSignature};
+use crate::tensor_type::Dim;
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirKernelResourceAccess, MirKernelResourceRole,
     MirLayoutKind, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
@@ -1401,6 +1402,78 @@ pub(crate) fn transformer_recipe_shape(
     }
 }
 
+/// The transformer row-op recipes' typed shape facts: the operand dims with
+/// run-time extents kept as [`Dim::Runtime`], and the resolved axis. Covers
+/// the four row recipes ([`MirCollectionOp::TensorSoftmax`],
+/// [`MirCollectionOp::TensorLayerNorm`], [`MirCollectionOp::TensorRmsNorm`],
+/// [`MirCollectionOp::TensorCausalMaskedSoftmax`]) under the same rank,
+/// last-axis and const-operand rules as [`transformer_recipe_shape`]; the
+/// literal-only recipes (sum-axis, rope, gather) still resolve through the
+/// literal helper. `None` where the literal helper refuses: the recipe is
+/// absent, a const axis disagrees, or a const fact fails.
+pub(crate) fn transformer_recipe_shape_typed(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    op: MirCollectionOp,
+) -> Option<(Vec<Dim>, u64)> {
+    match op {
+        MirCollectionOp::TensorSoftmax => {
+            let args = transformer_statement_args(function, MirCollectionOp::TensorSoftmax)?;
+            let dims = transformer_operand_dims_typed(function, &args[0], validation)?;
+            let rank = dims.len();
+            // U2 head-axis: rank 1-4 — the same surface the literal helper
+            // admits.
+            if rank == 0 || rank > 4 {
+                return None;
+            }
+            Some((dims, (rank - 1) as u64))
+        }
+        MirCollectionOp::TensorLayerNorm => {
+            let args = transformer_statement_args(function, MirCollectionOp::TensorLayerNorm)?;
+            let dims = transformer_operand_dims_typed(function, &args[0], validation)?;
+            let rank = dims.len();
+            if rank == 0 || rank > 2 {
+                return None;
+            }
+            let axis = (rank - 1) as u64;
+            // v1: the const axis must name the last (normalization) axis.
+            if const_non_negative(args.get(1)?)? != axis {
+                return None;
+            }
+            if !layer_norm_const_facts_typed(function, validation, &dims, axis) {
+                return None;
+            }
+            Some((dims, axis))
+        }
+        MirCollectionOp::TensorRmsNorm => {
+            // The v1 RMSNorm recipe is row-wise like layer norm: the const
+            // axis must agree with the last axis.
+            let args = transformer_statement_args(function, MirCollectionOp::TensorRmsNorm)?;
+            let dims = transformer_operand_dims_typed(function, &args[0], validation)?;
+            let rank = dims.len();
+            if rank == 0 || rank > 2 {
+                return None;
+            }
+            let axis = (rank - 1) as u64;
+            if const_non_negative(args.get(1)?)? != axis {
+                return None;
+            }
+            Some((dims, axis))
+        }
+        MirCollectionOp::TensorCausalMaskedSoftmax => {
+            // The causal masked-row softmax consumes a rank-2 score matrix.
+            let args =
+                transformer_statement_args(function, MirCollectionOp::TensorCausalMaskedSoftmax)?;
+            let dims = transformer_operand_dims_typed(function, &args[0], validation)?;
+            if dims.len() != 2 {
+                return None;
+            }
+            Some((dims, 1))
+        }
+        _ => None,
+    }
+}
+
 /// The `TensorLayerNorm` const-operand facts: the epsilon must be a
 /// `MirConstant::Float` (a const — never a value that would require
 /// inference, A3) that is finite and non-negative, and an optional affine
@@ -1410,6 +1483,30 @@ fn layer_norm_const_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
     dims: &[u64],
+    axis: u64,
+) -> bool {
+    let typed: Vec<Dim> = dims.iter().copied().map(Dim::Literal).collect();
+    layer_norm_const_facts_typed(function, validation, &typed, axis)
+}
+
+/// Whether a rank-1 affine peer's extent can agree with the normalization
+/// extent: two literals must be equal, a literal peer against a run-time
+/// extent is reconciled at launch, and a run-time peer against a literal
+/// extent cannot be checked here (the v1 affine surface is literal extents).
+fn affine_extent_agrees(affine: Dim, norm: Dim) -> bool {
+    match (affine, norm) {
+        (Dim::Literal(affine), Dim::Literal(norm)) => affine == norm,
+        (Dim::Literal(_), Dim::Runtime) | (Dim::Runtime, Dim::Runtime) => true,
+        (Dim::Runtime, Dim::Literal(_)) => false,
+    }
+}
+
+/// The `TensorLayerNorm` const-operand facts over typed dims (see
+/// [`layer_norm_const_facts`]).
+fn layer_norm_const_facts_typed(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    dims: &[Dim],
     axis: u64,
 ) -> bool {
     let Some(args) = transformer_statement_args(function, MirCollectionOp::TensorLayerNorm) else {
@@ -1434,16 +1531,16 @@ fn layer_norm_const_facts(
     else {
         return false;
     };
-    let norm_dim = dims[norm_index];
+    let norm_extent = dims[norm_index];
     for affine in args.iter().skip(3) {
         let Some(affine_ty) = crate::local_ty::operand_local_ty(function, affine) else {
             return false;
         };
-        let Ok(affine_dims) = crate::tensor_type::tensor_literal_dims(affine_ty, validation) else {
+        let Ok(affine_dims) = crate::tensor_type::tensor_dims(affine_ty, validation) else {
             return false;
         };
         // v1: gamma/beta are rank-1 over the normalization dimension.
-        if affine_dims.len() != 1 || affine_dims[0] != norm_dim {
+        if affine_dims.len() != 1 || !affine_extent_agrees(affine_dims[0], norm_extent) {
             return false;
         }
     }
@@ -1751,12 +1848,30 @@ fn transformer_statement_args(
 }
 
 /// The literal dims of a transformer recipe operand (the tensor the recipe
-/// reads).
+/// reads) for the non-row callers (sum-axis, rope, gather): a run-time extent
+/// has no literal size and maps to `None`.
 fn transformer_operand_dims(
     function: &MirFunction,
     operand: &MirOperand,
     validation: &MirValidationContext<'_>,
 ) -> Option<Vec<u64>> {
+    transformer_operand_dims_typed(function, operand, validation)?
+        .into_iter()
+        .map(|dim| match dim {
+            Dim::Literal(count) => Some(count),
+            Dim::Runtime => None,
+        })
+        .collect()
+}
+
+/// The typed dims of a transformer recipe operand (the tensor the recipe
+/// reads), keeping a run-time extent as [`Dim::Runtime`] for the row ops that
+/// carry their extents from the launch.
+pub(crate) fn transformer_operand_dims_typed(
+    function: &MirFunction,
+    operand: &MirOperand,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<Dim>> {
     // PGC-R5: the additive-idiom softmax reads an elementwise TEMP
     // (`(x + mask)` — the GEA2-U5e surface); its type lives in the temps
     // table, which the local-only `operand_local_ty` cannot read (the same
@@ -1776,7 +1891,7 @@ fn transformer_operand_dims(
             .find(|entry| entry.id == temp)
             .map(|entry| entry.ty)
     })?;
-    crate::tensor_type::tensor_literal_dims(ty, validation).ok()
+    crate::tensor_type::tensor_dims(ty, validation).ok()
 }
 
 /// The flattened element count of the literal dims. A product that does not
