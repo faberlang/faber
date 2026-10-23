@@ -161,6 +161,73 @@ static inline const char *faber_i128_text(faber_i128 value, char *buffer) {
 }
 
 /* ------------------------------------------------------------------------ */
+/* Error channel and faults                                                 */
+/* ------------------------------------------------------------------------ */
+
+/* The recoverable-error channel: `set` marks a failed call and `value` points
+ * at the error payload (a text value, a discretio or a genus). Scalar error
+ * classes stay refused by the emitter, so a pointer always suffices. */
+typedef struct faber_chan {
+    bool set;
+    const void *value;
+} faber_chan;
+
+/* A leaf fault crosses the wire as kind + path, never as a platform message:
+ * `kind` is the variant's stable `ERRnnn` code and `path` is the operation's
+ * path argument (`""` when the operation has none). */
+typedef struct faber_fault {
+    const char *kind;
+    faber_text path;
+} faber_fault;
+
+/* The rows of `crates/radix-runtime-contract/src/fault_codes.rs`, in registry
+ * order; that registry is the single source of truth and
+ * `c_runtime_carries_every_registered_fault_code` fails when the two drift. A
+ * number is never edited once it reaches main: a new variant appends a row. */
+static const struct {
+    const char *family;
+    const char *variant;
+    const char *code;
+} faber_fault_codes[] = {
+    {"IoFault", "NotFound", "ERR001"},
+    {"IoFault", "Permission", "ERR002"},
+    {"IoFault", "NotADirectory", "ERR003"},
+    {"IoFault", "IsADirectory", "ERR004"},
+    {"IoFault", "InvalidArgument", "ERR005"},
+    {"IoFault", "AlreadyExists", "ERR006"},
+    {"IoFault", "TimedOut", "ERR007"},
+    {"IoFault", "ConnectionRefused", "ERR008"},
+    {"IoFault", "ConnectionReset", "ERR009"},
+    {"IoFault", "AddrInUse", "ERR010"},
+    {"IoFault", "Io", "ERR011"},
+    {"IoFault", "Closed", "ERR012"},
+    {"IoFault", "Unset", "ERR013"},
+    {"IoFault", "Unavailable", "ERR014"},
+    {"IoFault", "Cancelled", "ERR015"},
+};
+
+/* The code registered for an exact (family, variant) pair, NULL otherwise. */
+static inline const char *faber_fault_code(const char *family, const char *variant) {
+    size_t index;
+    for (index = 0; index < sizeof faber_fault_codes / sizeof faber_fault_codes[0]; index++) {
+        if (strcmp(faber_fault_codes[index].family, family) == 0 &&
+            strcmp(faber_fault_codes[index].variant, variant) == 0) {
+            return faber_fault_codes[index].code;
+        }
+    }
+    return NULL;
+}
+
+/* The fault wire value for a variant's `kind` code and the operation's
+ * `path`. */
+static inline faber_fault faber_fault_of(const char *kind, faber_text path) {
+    faber_fault fault;
+    fault.kind = kind;
+    fault.path = path;
+    return fault;
+}
+
+/* ------------------------------------------------------------------------ */
 /* Exact integers                                                           */
 /* ------------------------------------------------------------------------ */
 
