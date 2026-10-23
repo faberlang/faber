@@ -65,8 +65,8 @@ use radix_mir::distributed::{
 use radix_mir::kernel_plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
     CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
-    LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan,
-    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowOpDims, RowSoftmaxBatch,
+    LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, PlanDim,
+    QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowOpDims, RowSoftmaxBatch,
     RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
@@ -590,9 +590,9 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         // (the S6-C2 mirror precedent; mechanical, no semantic facts ride the
         // mirror beyond the plan fields).
         WireCollectionKernelPlan::Gather(plan) => CollectionKernelPlan::Gather(GatherPlan {
-            table_rows: plan.table_rows,
-            table_cols: plan.table_cols,
-            id_count: plan.id_count,
+            table_rows: PlanDim::Literal(plan.table_rows),
+            table_cols: PlanDim::Literal(plan.table_cols),
+            id_count: PlanDim::Literal(plan.id_count),
         }),
         WireCollectionKernelPlan::RmsNormalization(plan) => {
             CollectionKernelPlan::RmsNormalization(RmsNormalizationPlan {

@@ -2862,9 +2862,21 @@ fn gather_body_decomposes_into_one_gather_subchain() {
             decomposition.subchains[0].plan
         );
     };
-    assert_eq!(plan.table_rows, 960, "table rows from the operand dims");
-    assert_eq!(plan.table_cols, 49_152, "table cols from the operand dims");
-    assert_eq!(plan.id_count, 9, "id count from the return-type dims");
+    assert_eq!(
+        plan.table_rows,
+        crate::kernel_plan::PlanDim::Literal(960),
+        "table rows from the operand dims"
+    );
+    assert_eq!(
+        plan.table_cols,
+        crate::kernel_plan::PlanDim::Literal(49_152),
+        "table cols from the operand dims"
+    );
+    assert_eq!(
+        plan.id_count,
+        crate::kernel_plan::PlanDim::Literal(9),
+        "id count from the return-type dims"
+    );
     decomposition.subchains[0]
         .plan
         .validate()

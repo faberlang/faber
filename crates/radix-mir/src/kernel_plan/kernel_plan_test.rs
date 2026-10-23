@@ -3036,6 +3036,269 @@ fn admit_quantized_gather_resolves_packed_embedding_tables() {
 }
 
 #[test]
+fn gather_plan_dim_carries_runtime_extents() {
+    assert!(PlanDim::Runtime.is_runtime());
+    assert_eq!(PlanDim::Literal(7).literal(), Some(7));
+
+    let plan = CollectionKernelPlan::Gather(GatherPlan {
+        table_rows: PlanDim::Runtime,
+        table_cols: PlanDim::Literal(64),
+        id_count: PlanDim::Runtime,
+    });
+    plan.validate()
+        .expect("runtime gather extents are not zero dimensions");
+}
+
+/// A tensor type over the given dims (`IndexExpr::Unspecified` is a run-time
+/// extent). The shape interns as a dim tuple, the form the plan facts read for
+/// every rank (a declared rank is always a tuple).
+fn tensor_ty_with_dims(types: &mut TypeTable, dims: Vec<IndexExpr>) -> MirType {
+    let element = f32_ty(types);
+    let dim_ids = dims
+        .into_iter()
+        .map(|dim| types.intern_index(dim))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(element.semantic_id(), shape)))
+}
+
+/// A row-gather kernel over the given table/ids/return extents:
+/// `t = gather(table, ids)` with the args and return type carrying the
+/// extents the recipe facts read.
+fn gather_typed_function(
+    types: &mut TypeTable,
+    table_dims: Vec<IndexExpr>,
+    ids_dims: Vec<IndexExpr>,
+    return_dims: Vec<IndexExpr>,
+) -> MirFunction {
+    let table = tensor_ty_with_dims(types, table_dims);
+    let ids = tensor_ty_with_dims(types, ids_dims);
+    let output = tensor_ty_with_dims(types, return_dims);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: table,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: ids,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: table,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: ids,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: output,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(2))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorGather),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                        ],
+                        return_ty: output,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(2),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: output,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// A gather signature whose input, ids extra input and output all carry the
+/// runtime-shaped marker (the ABI form for a launch-bound extent).
+fn gather_runtime_signature(types: &mut TypeTable) -> MirKernelSignature {
+    let element_ty = f32_ty(types);
+    let runtime_count = crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+    let resource = |binding: u32,
+                    role: MirKernelResourceRole,
+                    access: MirKernelResourceAccess,
+                    local: Option<MirLocalId>| MirKernelResource {
+        group: 0,
+        binding,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role,
+        access,
+        element_ty,
+        element_count: runtime_count,
+        source_local: local,
+        source_name: None,
+        reduced_projection: None,
+    };
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: resource(
+            0,
+            MirKernelResourceRole::Input,
+            MirKernelResourceAccess::Read,
+            Some(MirLocalId(0)),
+        ),
+        extra_inputs: vec![resource(
+            1,
+            MirKernelResourceRole::Input,
+            MirKernelResourceAccess::Read,
+            Some(MirLocalId(1)),
+        )],
+        output: resource(
+            2,
+            MirKernelResourceRole::Output,
+            MirKernelResourceAccess::Write,
+            None,
+        ),
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize {
+            x: runtime_count,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
+/// Rule 11: the gather glyph takes run-time sizes. A table `[N, 64]` with `N`
+/// bound at launch, ids `[T]` and output `[T, 64]` resolve a Gather plan
+/// carrying `Runtime` rows and id count with the literal width 64, instead of
+/// the `requires literal dimensions` refusal. A run-time table width resolves
+/// too (runtime-vs-runtime on both paired extents), while a literal-vs-runtime
+/// pair still fails closed.
+#[test]
+fn gather_runtime_facts_resolve_runtime_dims() {
+    let mut types = TypeTable::new();
+    let function = gather_typed_function(
+        &mut types,
+        vec![IndexExpr::Unspecified, IndexExpr::Literal(64)],
+        vec![IndexExpr::Unspecified],
+        vec![IndexExpr::Unspecified, IndexExpr::Literal(64)],
+    );
+    let signature = gather_runtime_signature(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorGather,
+    )
+    .expect("run-time gather extents resolve a plan");
+    let CollectionKernelPlan::Gather(gather) = &plan else {
+        panic!("gather must map to a gather plan, got {plan:?}");
+    };
+    assert_eq!(
+        gather.table_rows,
+        PlanDim::Runtime,
+        "a launch-bound table row count is a run-time extent"
+    );
+    assert_eq!(
+        gather.table_cols,
+        PlanDim::Literal(64),
+        "a written row width stays literal"
+    );
+    assert_eq!(
+        gather.id_count,
+        PlanDim::Runtime,
+        "the id count comes from the run-time return rows"
+    );
+    plan.validate().expect("the run-time gather plan validates");
+
+    // A run-time table width too: the return width and the table width are
+    // both run-time, and K7c is runtime-vs-runtime.
+    let mut types = TypeTable::new();
+    let function = gather_typed_function(
+        &mut types,
+        vec![IndexExpr::Unspecified, IndexExpr::Unspecified],
+        vec![IndexExpr::Unspecified],
+        vec![IndexExpr::Unspecified, IndexExpr::Unspecified],
+    );
+    let signature = gather_runtime_signature(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorGather,
+    )
+    .expect("a run-time table width resolves a plan");
+    let CollectionKernelPlan::Gather(gather) = &plan else {
+        panic!("gather must map to a gather plan, got {plan:?}");
+    };
+    assert_eq!(
+        (gather.table_rows, gather.table_cols, gather.id_count),
+        (PlanDim::Runtime, PlanDim::Runtime, PlanDim::Runtime)
+    );
+
+    // A literal width paired with a run-time return width cannot be proven
+    // and fails closed (rule 11: a mismatch is a recoverable error, never a
+    // silent reshape).
+    let mut types = TypeTable::new();
+    let function = gather_typed_function(
+        &mut types,
+        vec![IndexExpr::Unspecified, IndexExpr::Literal(64)],
+        vec![IndexExpr::Unspecified],
+        vec![IndexExpr::Unspecified, IndexExpr::Unspecified],
+    );
+    let signature = gather_runtime_signature(&mut types);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorGather,
+        )
+        .is_none(),
+        "a literal-vs-runtime width pair must not resolve a plan"
+    );
+}
+
+#[test]
 fn from_contract_f32_quantized_matmul_falls_back_to_tiled() {
     use crate::abi::PackedStorageLayout;
     let signature = quantized_matmul_signature(8, 16, 16);

@@ -3304,27 +3304,32 @@ pub fn transformer_shape_signature(
     op: MirCollectionOp,
     validation: &MirValidationContext<'_>,
 ) -> Result<MirKernelSignature, PlanMappingError> {
-    let (dims, axis) = crate::kernel_plan::transformer_recipe_shape(function, validation, op)
-        .ok_or_else(|| {
+    let (dims, axis) = if op == MirCollectionOp::TensorGather {
+        // Gather plan facts support run-time dimensions; the signature uses
+        // the typed table shape directly instead of the literal-only recipe
+        // shape helper shared by the other transformer recipes.
+        let operand_local = transformer_operand_local(function, op).ok_or_else(|| {
+            PlanMappingError::mapping(
+                "TensorGather operand has no local in the transformer signature",
+            )
+        })?;
+        let operand_ty = crate::local_ty::local_ty(function, operand_local)
+            .ok_or_else(|| PlanMappingError::mapping("TensorGather operand has no local type"))?;
+        let table_dims = crate::tensor_type::tensor_dims(operand_ty, validation)
+            .map_err(PlanMappingError::mapping)?;
+        if table_dims.len() != 2 {
+            return Err(PlanMappingError::mapping(
+                "TensorGather table must have rank two",
+            ));
+        }
+        (Vec::new(), 0)
+    } else {
+        crate::kernel_plan::transformer_recipe_shape(function, validation, op).ok_or_else(|| {
             PlanMappingError::mapping(format!(
                 "transformer recipe {op:?} has no resolvable shape facts \
                  (axis/epsilon from the const operands, dims from the tensor types)"
             ))
-        })?;
-    let input_count = dims.iter().copied().fold(1u64, u64::saturating_mul);
-    let output_count = if op == MirCollectionOp::TensorSumAxis {
-        dims.iter()
-            .enumerate()
-            .filter(|(index, _)| *index as u64 != axis)
-            .fold(1u64, |acc, (_, &dim)| acc.saturating_mul(dim))
-    } else if op == MirCollectionOp::TensorGather {
-        // GI3-1: the row-gather result is shape-transforming `[V, D] →
-        // [T, D]`; the output count comes from the statement's return-type
-        // dims (the CCI-1 source contract carries the concrete `[T, D]`
-        // fact), never inferred from text (A3).
-        gather_return_count(function, validation)?
-    } else {
-        input_count
+        })?
     };
     let operand_local = transformer_operand_local(function, op).ok_or_else(|| {
         PlanMappingError::mapping(format!(
@@ -3336,6 +3341,25 @@ pub fn transformer_shape_signature(
             "transformer recipe {op:?} operand has no local type"
         ))
     })?;
+    let input_count = if op == MirCollectionOp::TensorGather {
+        let dims = crate::tensor_type::tensor_dims(operand_ty, validation)
+            .map_err(PlanMappingError::mapping)?;
+        runtime_capable_dim_product(&dims)
+    } else {
+        dims.iter().copied().fold(1u64, u64::saturating_mul)
+    };
+    let output_count = if op == MirCollectionOp::TensorSumAxis {
+        dims.iter()
+            .enumerate()
+            .filter(|(index, _)| *index as u64 != axis)
+            .fold(1u64, |acc, (_, &dim)| acc.saturating_mul(dim))
+    } else if op == MirCollectionOp::TensorGather {
+        // GI3-1: the row-gather result shape `[T, D]` is typed on the
+        // statement; a run-time axis carries the launch-shaped marker.
+        gather_return_count(function, validation)?
+    } else {
+        input_count
+    };
     let element_ty = tensor_element_ty(operand_ty, validation)?;
     let mut signature = MirKernelSignature {
         function: function.id,
@@ -3393,11 +3417,11 @@ pub fn transformer_shape_signature(
             crate::kernel_plan::axis_reduction_projection(&dims, axis);
     }
     // GI3-1: the row-gather recipe binds its id vector as the signature's
-    // first extra input (binding 1, the kernel-index element type) at the
-    // id count resolved from the return-type dims; the output moves to
-    // binding 2. The CCI-1 contract validated the ids' literal values only
-    // — the count is a typed fact, never inferred — and the emitted body
-    // bounds-checks the runtime token against the table row count (SEC-G1).
+    // first extra input (binding 1, the kernel-index element type), sized
+    // from the typed return dims; a run-time row axis uses the launch-shaped
+    // marker. The output moves to binding 2. Gather values remain run-time
+    // tokens, never inferred from source text (A3), and the emitted body
+    // bounds-checks each token against the table row count (SEC-G1).
     if op == MirCollectionOp::TensorGather {
         let ids_local = gather_ids_local(function).ok_or_else(|| {
             PlanMappingError::mapping(
@@ -3408,11 +3432,18 @@ pub fn transformer_shape_signature(
             PlanMappingError::mapping("row-gather recipe ids operand has no local type")
         })?;
         let id_count = gather_id_count(function, validation)?;
-        signature.extra_inputs.push(storage_input(
-            1,
-            gather_ids_element_ty(ids_ty, validation)?,
-            id_count,
-        ));
+        let id_element_ty = gather_ids_element_ty(ids_ty, validation)?;
+        let ids_dims = crate::tensor_type::tensor_dims(ids_ty, validation)
+            .map_err(PlanMappingError::mapping)?;
+        let ids_input = if ids_dims
+            .iter()
+            .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime))
+        {
+            storage_input_with_local(1, id_element_ty, id_count, ids_local)
+        } else {
+            storage_input(1, id_element_ty, id_count)
+        };
+        signature.extra_inputs.push(ids_input);
         signature.output.binding = 2;
     }
     Ok(signature)
@@ -3453,41 +3484,60 @@ fn bind_rms_norm_affine_resources(
     Ok(())
 }
 
+/// The product of typed dimensions for a device resource. Any launch-bound
+/// axis makes its flattened count run-time shaped.
+fn runtime_capable_dim_product(dims: &[crate::tensor_type::Dim]) -> u64 {
+    if dims
+        .iter()
+        .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime))
+    {
+        return crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+    }
+    dims.iter().fold(1u64, |product, dim| match dim {
+        crate::tensor_type::Dim::Literal(count) => product.saturating_mul(*count),
+        crate::tensor_type::Dim::Runtime => product,
+    })
+}
+
 /// The row-gather return element count (GI3-1): the product of the gather
-/// statement's return-type literal dims (`[T, D]`).
+/// statement's typed `[T, D]` dims, or the run-time marker when an axis is
+/// bound at launch.
 fn gather_return_count(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<u64, PlanMappingError> {
     let dims = gather_statement_return_dims(function, validation)?;
-    Ok(dims.iter().copied().fold(1u64, u64::saturating_mul))
+    Ok(runtime_capable_dim_product(&dims))
 }
 
-/// The literal dims of the gather statement's return type.
+/// The typed dims of the gather statement's return type.
 fn gather_statement_return_dims(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
-) -> Result<Vec<u64>, PlanMappingError> {
+) -> Result<Vec<crate::tensor_type::Dim>, PlanMappingError> {
     let Some((call, _)) = first_collection_call(function, |op| op == MirCollectionOp::TensorGather)
     else {
         return Err(PlanMappingError::mapping(
             "row-gather statement not found in the subchain body",
         ));
     };
-    crate::tensor_type::tensor_literal_dims(call.return_ty, validation)
-        .map_err(PlanMappingError::mapping)
+    crate::tensor_type::tensor_dims(call.return_ty, validation).map_err(PlanMappingError::mapping)
 }
 
 /// The row-gather id-vector length (GI3-1): the return dims' first element
-/// (`[T, D]`), the same typed fact the plan resolution cross-checks.
+/// (`[T, D]`), including its run-time-shaped marker when T is dynamic.
 fn gather_id_count(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Result<u64, PlanMappingError> {
     let dims = gather_statement_return_dims(function, validation)?;
-    dims.first()
-        .copied()
-        .ok_or_else(|| PlanMappingError::mapping("row-gather return shape has no row dimension"))
+    match dims.first() {
+        Some(crate::tensor_type::Dim::Literal(count)) => Ok(*count),
+        Some(crate::tensor_type::Dim::Runtime) => Ok(crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT),
+        None => Err(PlanMappingError::mapping(
+            "row-gather return shape has no row dimension",
+        )),
+    }
 }
 
 /// The id vector's device element type (GI3-1, K7c): the ids are a rank-1
@@ -3942,6 +3992,39 @@ pub fn transformer_subchain_signature_for_emission_with_source(
         &bound,
         source,
     )?;
+    // Rule 11: a run-time row-gather reads its table's and its ids vector's
+    // launch-bound extents from `TensorAxisExtent` resources. The
+    // whole-function ABI appends those slots; a subchain emission signature
+    // must carry the same ones, or the emitted body reads an extent buffer
+    // the header never declares.
+    if op == MirCollectionOp::TensorGather {
+        let table_local = signature.input.source_local.ok_or_else(|| {
+            PlanMappingError::mapping("TensorGather table has no local in the emission signature")
+        })?;
+        let table_ty = function_local_ty(function, table_local)?;
+        let table_dims = crate::tensor_type::tensor_dims(table_ty, validation)
+            .map_err(PlanMappingError::mapping)?;
+        let ids_local = gather_ids_local(function).ok_or_else(|| {
+            PlanMappingError::mapping("row-gather ids operand has no local in the subchain body")
+        })?;
+        let ids_ty = function_local_ty(function, ids_local)?;
+        let ids_dims = crate::tensor_type::tensor_dims(ids_ty, validation)
+            .map_err(PlanMappingError::mapping)?;
+        let table_binding = signature.input.binding;
+        let ids_binding = signature
+            .extra_inputs
+            .first()
+            .map(|resource| resource.binding)
+            .ok_or_else(|| PlanMappingError::mapping("row-gather ids binding is missing"))?;
+        crate::abi::append_gather_axis_extent_resources(
+            &mut signature,
+            &table_dims,
+            &ids_dims,
+            table_binding,
+            ids_binding,
+            validation,
+        )?;
+    }
     // The transformer dispatch must cover EVERY output's extent — the union
     // (max) over the recipe output and the folded elementwise tail's
     // additional consumed outputs (the keep-dims SumAxis shape: a REDUCED

@@ -400,6 +400,7 @@ fn append_tensor_extent_resources(
     };
     collected.visit_function(function);
     collect_matmul_runtime_reads(function, validation, &mut collected.reads);
+    collect_gather_runtime_reads(function, validation, &mut collected.reads);
     if collected.non_parameter_operand {
         return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
     }
@@ -435,6 +436,35 @@ fn append_tensor_extent_resources(
     Ok(())
 }
 
+/// Rule 11: appends the run-time axis extent resources of a row-gather
+/// signature — the table's live axes (`table_binding`) and the ids vector's
+/// (`ids_binding`), in axis order. A subchain emission signature carries the
+/// same resources the whole-function ABI appends, so the emitted header
+/// declares the count-one `u32` extents the body reads.
+pub(crate) fn append_gather_axis_extent_resources(
+    signature: &mut MirKernelSignature,
+    table_dims: &[crate::tensor_type::Dim],
+    ids_dims: &[crate::tensor_type::Dim],
+    table_binding: u32,
+    ids_binding: u32,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    let runtime_axes = |dims: &[crate::tensor_type::Dim]| {
+        dims.iter()
+            .enumerate()
+            .filter(|(_, dim)| matches!(dim, crate::tensor_type::Dim::Runtime))
+            .map(|(axis, _)| axis as u32)
+            .collect::<Vec<u32>>()
+    };
+    for axis in runtime_axes(table_dims) {
+        push_axis_extent_resource(signature, table_binding, axis, validation)?;
+    }
+    for axis in runtime_axes(ids_dims) {
+        push_axis_extent_resource(signature, ids_binding, axis, validation)?;
+    }
+    Ok(())
+}
+
 /// Appends one count-one `u32` [`MirKernelResourceKind::TensorAxisExtent`]
 /// input after the highest binding the signature already holds.
 fn push_axis_extent_resource(
@@ -464,6 +494,60 @@ fn push_axis_extent_resource(
         reduced_projection: None,
     });
     Ok(())
+}
+
+/// A gather recipe consumes each run-time table axis and, when dynamic, the
+/// ids vector's single extent even though neither is read as a MIR
+/// `TensorExtent` value in the kernel body.
+fn collect_gather_runtime_reads(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    reads: &mut Vec<(MirLocalId, u32)>,
+) {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement)
+                != Some(crate::MirCollectionOp::TensorGather)
+            {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                continue;
+            };
+            let [table, ids] = call.args.as_slice() else {
+                continue;
+            };
+            let operand_dims = |arg: &MirOperand| match arg {
+                MirOperand::Place(place)
+                    if place.projections.is_empty()
+                        && matches!(place.base, MirPlaceBase::Local(_)) =>
+                {
+                    let MirPlaceBase::Local(local) = place.base else {
+                        return None;
+                    };
+                    let ty = crate::local_ty::operand_ty(function, arg)?;
+                    let dims = crate::tensor_type::tensor_dims(ty, validation).ok()?;
+                    Some((local, dims))
+                }
+                _ => None,
+            };
+            let (Some((table_local, table_dims)), Some((ids_local, ids_dims))) =
+                (operand_dims(table), operand_dims(ids))
+            else {
+                continue;
+            };
+            reads.extend(
+                table_dims
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, dim)| matches!(dim, crate::tensor_type::Dim::Runtime))
+                    .map(|(axis, _)| (table_local, axis as u32)),
+            );
+            if matches!(ids_dims.first(), Some(crate::tensor_type::Dim::Runtime)) {
+                reads.push((ids_local, 0));
+            }
+        }
+    }
 }
 
 /// The operand axes a run-time-extent matmul consumes: every axis whose dim is

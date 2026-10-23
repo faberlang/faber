@@ -3765,22 +3765,25 @@ fn gather_function_resolves_gather_plan() {
         panic!("gather body must derive a gather plan, got {derived:?}");
     };
     assert_eq!(
-        plan.table_rows, 960,
+        plan.table_rows,
+        crate::kernel_plan::PlanDim::Literal(960),
         "table rows V come from the operand dims"
     );
     assert_eq!(
-        plan.table_cols, 49_152,
+        plan.table_cols,
+        crate::kernel_plan::PlanDim::Literal(49_152),
         "table cols D come from the operand dims"
     );
     assert_eq!(
-        plan.id_count, 9,
+        plan.id_count,
+        crate::kernel_plan::PlanDim::Literal(9),
         "id count T comes from the return-type dims"
     );
     derived.validate().expect("the derived plan validates");
     let carried = CollectionKernelPlan::Gather(crate::kernel_plan::GatherPlan {
-        table_rows: 960,
-        table_cols: 49_152,
-        id_count: 9,
+        table_rows: crate::kernel_plan::PlanDim::Literal(960),
+        table_cols: crate::kernel_plan::PlanDim::Literal(49_152),
+        id_count: crate::kernel_plan::PlanDim::Literal(9),
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
@@ -3806,6 +3809,7 @@ fn gather_shape_signature_binds_the_ids_extra_input() {
     );
     assert_eq!(signature.extra_inputs[0].element_count, 9);
     assert_eq!(signature.extra_inputs[0].binding, 1);
+    assert_eq!(signature.extra_inputs[0].source_local, None);
     assert_eq!(signature.output.element_count, 9 * 49_152);
     assert_eq!(signature.output.binding, 2);
     // The plan pass resolves the seam signature exactly as it resolves the
@@ -3818,6 +3822,113 @@ fn gather_shape_signature_binds_the_ids_extra_input() {
     )
     .expect("the seam signature resolves the gather plan");
     assert!(matches!(plan, CollectionKernelPlan::Gather(_)));
+}
+
+#[test]
+fn gather_runtime_extents_append_axis_resources() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+
+    let mut types = TypeTable::new();
+    let mut function = gather_function(&mut types);
+    let table = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let output = rank2_tensor_ty_mixed(&mut types, [Err(2), Err(1)]);
+    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let ids_extent = types.intern_index(IndexExpr::Runtime(
+        radix_types::RuntimeExtentId::ScalarParameter { parameter: 2 },
+    ));
+    let ids_shape = types.intern_index(IndexExpr::Tuple(vec![ids_extent]));
+    let ids = MirType::semantic(types.intern(Type::Tensor(ids_element, ids_shape)));
+    function.params[0].ty = table;
+    function.params[1].ty = ids;
+    function.locals[0].ty = table;
+    function.locals[1].ty = ids;
+    function.locals[2].ty = output;
+    function.params.push(MirParam {
+        local: MirLocalId(2),
+        name: None,
+        ty: output,
+        mode: MirParamMode::MutRef,
+        span: test_span(),
+    });
+    let index_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
+    function.params.push(MirParam {
+        local: MirLocalId(3),
+        name: None,
+        ty: index_ty,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    });
+    function.locals.push(MirLocal {
+        id: MirLocalId(3),
+        name: None,
+        ty: index_ty,
+        mutable: false,
+        span: test_span(),
+    });
+    function.return_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
+    function.blocks[0].terminator.kind = MirTerminatorKind::Return(None);
+    if let MirStatementKind::RuntimeCall { call, .. } = &mut function.blocks[0].statements[0].kind {
+        call.return_ty = output;
+    }
+
+    let mut validation = MirValidationContext::new(&types);
+    for ty in [table, ids, output] {
+        let view = match validation
+            .layouts
+            .layout_for_type(ty)
+            .map(|layout| layout.kind)
+        {
+            Ok(crate::MirLayoutKind::DeviceView(view)) => view,
+            other => panic!("tensor fixture must resolve as a device view: {other:?}"),
+        };
+        let mut device_view = crate::MirDeviceViewLayout::device_handle_row_major(
+            crate::MirScalarLayout::F32,
+            view.rank,
+        );
+        device_view.element = view.element;
+        validation.layouts.set_type_layout(
+            ty.semantic_id(),
+            crate::MirLayoutKind::DeviceView(device_view),
+        );
+    }
+    let recipe_signature =
+        transformer_shape_signature(&function, MirCollectionOp::TensorGather, &validation)
+            .expect("run-time gather transformer signature resolves");
+    assert_eq!(
+        recipe_signature.input.element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    assert_eq!(
+        recipe_signature.output.element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    assert_eq!(
+        recipe_signature.extra_inputs[0].element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    let signature = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+        .expect("run-time gather signature resolves with its axis extents");
+    assert_eq!(signature.input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(signature.output.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    let ids_input = signature
+        .extra_inputs
+        .iter()
+        .find(|resource| resource.source_local == Some(MirLocalId(1)))
+        .expect("the ids tensor remains bound as the second storage input");
+    assert_eq!(ids_input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(ids_input.binding, 1);
+
+    let extents: Vec<_> = signature
+        .resources()
+        .filter_map(|resource| match resource.kind {
+            MirKernelResourceKind::TensorAxisExtent {
+                tensor_binding,
+                axis,
+            } => Some((resource.binding, tensor_binding, axis)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(extents, vec![(3, 0, 0), (4, 0, 1), (5, 1, 0)]);
 }
 
 #[test]
@@ -3853,9 +3964,9 @@ fn inference_recipe_kinds_are_typed() {
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::Gather(
             crate::kernel_plan::GatherPlan {
-                table_rows: 960,
-                table_cols: 49_152,
-                id_count: 9,
+                table_rows: crate::kernel_plan::PlanDim::Literal(960),
+                table_cols: crate::kernel_plan::PlanDim::Literal(49_152),
+                id_count: crate::kernel_plan::PlanDim::Literal(9),
             }
         )),
         RecipeKind::Gather

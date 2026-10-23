@@ -310,11 +310,11 @@ pub struct LayerNormalizationPlan {
 pub struct GatherPlan {
     /// Table rows `V` (the first axis of `token_embd.weight` for the
     /// pinned row).
-    pub table_rows: u64,
+    pub table_rows: PlanDim,
     /// Table columns `D` (the row width; also the output row width).
-    pub table_cols: u64,
+    pub table_cols: PlanDim,
     /// Id-vector length `T` (the output row count).
-    pub id_count: u64,
+    pub id_count: PlanDim,
 }
 
 /// Root-mean-square-normalization recipe plan (GI3-1: name frozen in this
@@ -699,6 +699,34 @@ pub enum MatMulDims {
     Literal { m: u64, k: u64, n: u64 },
     /// Extents bound at run time; the recipe body is the one for `class`.
     Runtime { class: MatMulClass },
+}
+
+/// A planned tensor extent: a compile-time literal or a resource-bound
+/// extent. `Runtime` means the extent is bound at launch from a
+/// `TensorAxisExtent` resource, never a number and never a silent default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlanDim {
+    /// A compile-time extent.
+    Literal(u64),
+    /// Bound at launch from a `TensorAxisExtent` resource.
+    Runtime,
+}
+
+impl PlanDim {
+    /// Return the compile-time extent, if this dimension is literal.
+    #[must_use]
+    pub const fn literal(self) -> Option<u64> {
+        match self {
+            Self::Literal(value) => Some(value),
+            Self::Runtime => None,
+        }
+    }
+
+    /// Whether this dimension is bound at run time.
+    #[must_use]
+    pub const fn is_runtime(self) -> bool {
+        matches!(self, Self::Runtime)
+    }
 }
 
 /// The matmul body a run-time-extent plan selects (one per body the literal

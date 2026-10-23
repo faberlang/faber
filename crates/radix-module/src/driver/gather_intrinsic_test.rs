@@ -468,8 +468,20 @@ fn gather_fixture_resolves_gather_recipe() {
     let CollectionKernelPlan::Gather(gather) = &plan else {
         panic!("expected Gather recipe, got {plan:?}");
     };
-    assert_eq!(gather.table_rows, 4, "table rows V come from the operand dims");
-    assert_eq!(gather.table_cols, 3, "table cols D come from the operand dims");
-    assert_eq!(gather.id_count, 4, "id count T comes from the return-type dims");
+    assert_eq!(
+        gather.table_rows,
+        radix_mir::kernel_plan::PlanDim::Literal(4),
+        "table rows V come from the operand dims"
+    );
+    assert_eq!(
+        gather.table_cols,
+        radix_mir::kernel_plan::PlanDim::Literal(3),
+        "table cols D come from the operand dims"
+    );
+    assert_eq!(
+        gather.id_count,
+        radix_mir::kernel_plan::PlanDim::Literal(4),
+        "id count T comes from the return-type dims"
+    );
     plan.validate().expect("the resolved plan validates");
 }

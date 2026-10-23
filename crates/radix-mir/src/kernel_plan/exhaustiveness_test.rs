@@ -128,9 +128,9 @@ fn dummy_axis_reduction() -> AxisReductionPlan {
 
 fn dummy_gather() -> GatherPlan {
     GatherPlan {
-        table_rows: 1,
-        table_cols: 1,
-        id_count: 1,
+        table_rows: PlanDim::Literal(1),
+        table_cols: PlanDim::Literal(1),
+        id_count: PlanDim::Literal(1),
     }
 }
 
