@@ -3364,6 +3364,20 @@ fn parses_bare_redde_return() {
 }
 
 #[test]
+fn bare_redde_ends_at_newline() {
+    let result = parse_ok("redde\nf(1)");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 2);
+    let StmtKind::Redde(redde) = &program.statements[0].kind else {
+        panic!("expected redde, got {:?}", program.statements[0].kind);
+    };
+    assert!(
+        redde.value.is_none(),
+        "a newline must end a bare redde, not start its value"
+    );
+}
+
+#[test]
 fn parses_rumpe_break() {
     let result = parse_ok("rumpe");
     let program = result

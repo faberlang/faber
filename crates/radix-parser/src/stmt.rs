@@ -592,12 +592,17 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   redde-stmt := `redde` [`expr`]
+    ///
+    /// The value must start on the `redde` line. A newline ends a bare
+    /// `redde`, so `si n ≡ 0 ergo redde` never swallows the next statement as
+    /// its return value.
     pub(super) fn parse_redde_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Redde)?;
 
         let value = if !self.is_at_end()
             && !self.check(&TokenKind::RBrace)
             && !self.check(&TokenKind::Semicolon)
+            && !self.raw_newline_before_next_word()
         {
             Some(Box::new(self.parse_expression()?))
         } else {
