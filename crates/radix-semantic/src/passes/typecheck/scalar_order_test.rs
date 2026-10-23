@@ -332,9 +332,10 @@ fn char_to_numerus_relational_rejects() {
 }
 
 #[test]
-fn multi_char_ascii_literal_relational_stays_rejected() {
-    rejects_with_issue(
-        &compile("incipit { si 'ab' ≥ 'cd' { nota \"bad\" } }"),
-        "numeric_operands_required",
-    );
+fn multi_char_ascii_literal_relational_is_text_order() {
+    // FLIPPED: bounded cords keep the text laws of their unbounded carrier, so
+    // two multi-char ascii literals order as whole strings (code-point order).
+    // A multi-char literal against a `textus` cord stays refused (see
+    // `char_to_multi_char_string_relational_rejects`).
+    accepts(&compile("incipit { si 'ab' ≥ 'cd' { nota \"ok\" } }"));
 }
