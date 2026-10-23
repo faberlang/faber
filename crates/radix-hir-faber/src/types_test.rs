@@ -2778,3 +2778,62 @@ fn marker_hole_prints_its_family() {
         assert_eq!(codegen.type_to_faber(hole, &names, &LatinSurface), expected);
     }
 }
+
+// ── erratum carrier surface routing probe ───────────────────────────
+
+/// Probe surface that maps the `erratum` carrier identity to an English
+/// marker. If the emitter printed the definition name, the marker would
+/// never appear.
+struct ErratumProbeSurface;
+
+impl KeywordSurface for ErratumProbeSurface {
+    fn keyword(&self, _kind: TokenKind) -> &'static str {
+        "kw"
+    }
+
+    fn type_surface(&self, kind: TypeBindingKind) -> &str {
+        match kind {
+            TypeBindingKind::Erratum => "error",
+            TypeBindingKind::Primitive(Primitive::Numerus) => "numerus",
+            _ => "ignotum",
+        }
+    }
+}
+
+#[test]
+fn erratum_type_head_projects_through_the_pack_surface() {
+    // `erratum` is a compiler-owned builtin genus, so its head must project
+    // through the target pack (`error` in en) instead of re-emitting the
+    // Latin definition name. A user genus that happens to be named
+    // `erratum` keeps its own spelling.
+    let mut types = TypeTable::new();
+    let mut names = FxHashMap::default();
+    let mut interner = Interner::new();
+    let surface = ErratumProbeSurface;
+
+    let numerus = types.primitive(Primitive::Numerus);
+    let builtin_base = types.intern(Type::Struct(DefId(1)));
+    let builtin = types.intern(Type::Applied(
+        builtin_base,
+        vec![radix_types::AppliedArg::Type(numerus)],
+    ));
+    names.insert(DefId(1), interner.intern("erratum"));
+
+    let user_base = DefId(radix_types::USER_DEF_ID_BASE + 1);
+    let user_head = types.intern(Type::Struct(user_base));
+    let user = types.intern(Type::Applied(
+        user_head,
+        vec![radix_types::AppliedArg::Type(numerus)],
+    ));
+    names.insert(user_base, interner.intern("erratum"));
+
+    let codegen = FaberCodegen::new(&types, &interner);
+    assert_eq!(
+        codegen.type_to_faber(builtin, &names, &surface),
+        "error<numerus>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(user, &names, &surface),
+        "erratum<numerus>"
+    );
+}

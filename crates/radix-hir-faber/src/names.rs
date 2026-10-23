@@ -34,6 +34,27 @@ impl super::FaberCodegen<'_> {
         crate::surface::FrameFamily::from_latin(self.interner.resolve(*sym))
     }
 
+    /// Carrier identity of the compiler-owned `erratum` genus.
+    ///
+    /// WHY: `erratum` is a compiler-owned builtin genus, so its type head
+    /// projects through the target pack (`error` in en, `erratum` in la).
+    /// Re-emitting the Latin definition name would produce a spelling the
+    /// target pack rejects (`PARSE040 wrong_locale_type`). The `is_builtin()`
+    /// guard keeps a user genus that happens to be named `erratum` on its own
+    /// spelling.
+    pub(super) fn builtin_erratum_carrier(
+        &self,
+        def_id: DefId,
+        names: &FxHashMap<DefId, Symbol>,
+    ) -> Option<crate::surface::TypeBindingKind> {
+        if !def_id.is_builtin() {
+            return None;
+        }
+        let sym = names.get(&def_id)?;
+        (self.interner.resolve(*sym) == "erratum")
+            .then_some(crate::surface::TypeBindingKind::Erratum)
+    }
+
     /// Return the printable spelling for an already-resolved definition.
     ///
     /// The fallback is for robustness at the output boundary, not a resolver.

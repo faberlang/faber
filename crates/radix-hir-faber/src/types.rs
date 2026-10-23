@@ -252,6 +252,9 @@ impl super::FaberCodegen<'_> {
                     .type_surface(TypeBindingKind::Frame(frame))
                     .to_owned()
             }
+            Type::Struct(def_id) if self.builtin_erratum_carrier(*def_id, names).is_some() => {
+                surface.type_surface(TypeBindingKind::Erratum).to_owned()
+            }
             Type::Struct(def_id) | Type::Enum(def_id) | Type::Interface(def_id) => self
                 .imported_type_spellings
                 .get(&type_id)
