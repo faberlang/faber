@@ -1,11 +1,5 @@
 {
   "targets": {
-    "runner": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "invalid MIR: destination type mismatch",
-      "reason": "The runner rejects the async fs read wrappers during MIR lowering: the solum:lege calls behind read_file_async<textus> fail to type their MIR destination, the same runner gap pinned for corpus/ad/async-solum-leget.fab."
-    },
     "clif": {
       "outcome": "known-fail",
       "phase": "emit",
