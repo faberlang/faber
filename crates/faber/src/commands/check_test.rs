@@ -115,24 +115,21 @@ fn run_check(args: &[&str], path: &std::path::Path) -> (bool, String) {
     )
 }
 
-/// A CLI program with a required operand passes semantic analysis, but the
-/// MIR package lowering refuses its CLI surface
-/// (`package_mir_cli_surface_unsupported`): plain `check` never supplies the
-/// runtime argumenta, so the required operand has no value and no default.
-/// It mirrors the `PKG001` row of `scripta/check-lower-sweep.known`
-/// (`corpus/operandus/operandus.fab`). It is the stable fixture for "checks
-/// but does not lower": the plumbing under test is the opt-in flag, the
-/// located named issue and the final line, not which construct is unsupported
-/// today. If lowering learns this surface, pick another
-/// checks-but-does-not-lower construct from `scripta/check-lower-sweep.known`.
+/// A subcommand CLI whose root carries an exit expression passes semantic
+/// analysis, but the MIR package lowering refuses that surface
+/// (`package_mir_cli_surface_unsupported`). Plain `check` never lowers. This
+/// is the stable fixture for "checks but does not lower": the plumbing under
+/// test is the opt-in flag, the located named issue and the final line, not
+/// which construct is unsupported today. If lowering learns this surface,
+/// pick another checks-but-does-not-lower construct from
+/// `scripta/check-lower-sweep.known`.
 const CHECKS_BUT_DOES_NOT_LOWER_SOURCE: &str = r#"+++
 locale = "en"
 +++
 @ cli "tool"
-@ operand string input description "Input path"
-main args a {
-    print "c"
-}
+main args a exit 3 { }
+@ command "greet"
+fn greet() { }
 "#;
 
 #[test]
@@ -196,16 +193,43 @@ fn check_lower_accepts_a_program_that_lowers() {
 fn check_lower_diagnostics_mode_keeps_the_named_issue() {
     let root = tempfile::tempdir().expect("create fixture root");
     let file = root.path().join("located.fab");
-    std::fs::write(
-        &file,
-        "+++\nlocale = \"en\"\n+++\n@ cli \"tool\"\n@ operand string input description \"Input path\"\nmain args a {\n    print \"c\"\n}\n",
-    )
-    .expect("write source");
+    std::fs::write(&file, CHECKS_BUT_DOES_NOT_LOWER_SOURCE).expect("write source");
     let (ok, stderr) = run_check(&["--lower", "--diagnostics"], &file);
     assert!(!ok, "{stderr}");
     assert!(
         stderr.contains("package_mir_cli_surface_unsupported"),
         "--diagnostics keeps the named issue:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_lower_accepts_a_single_command_cli_with_a_required_operand() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/operandus/operandus.fab")
+        .canonicalize()
+        .expect("locate operandus exemplar");
+    let (ok, stderr) = run_check(&["--lower"], &path);
+    assert!(
+        ok,
+        "a single-command CLI with a required operand lowers:\n{stderr}"
+    );
+    assert!(
+        stderr.contains(&format!("ok: {}", path.display())),
+        "successful lowering reports the input path:\n{stderr}"
+    );
+}
+
+#[test]
+fn check_lower_accepts_a_subcommand_cli_without_argumenta() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/cli/cli.fab")
+        .canonicalize()
+        .expect("locate CLI exemplar");
+    let (ok, stderr) = run_check(&["--lower"], &path);
+    assert!(ok, "a subcommand CLI without argumenta lowers:\n{stderr}");
+    assert!(
+        stderr.contains(&format!("ok: {}", path.display())),
+        "successful lowering reports the input path:\n{stderr}"
     );
 }
 
