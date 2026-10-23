@@ -2315,6 +2315,13 @@ fn floor_div_rem(left: i128, right: i128) -> Option<(i128, i128)> {
     }
 }
 
+/// The structured issue for a zero divisor in the modular ring. Shared with the
+/// runner's exact-intermediate dispatch, which keeps a modular operand's ring
+/// identity even when the lowered result type is the plain integer carrier.
+pub fn modular_word_division_by_zero(span: Span) -> RunnerError {
+    RunnerError::internal_with_issue(span, "modulus division failed", "modular_division_by_zero")
+}
+
 /// Execute one `wrapping<W>` arithmetic operation. Conversion at this boundary
 /// keeps modular wraparound separate from checked `numerus` math.
 pub fn modular_word_numeric_binop(
@@ -2326,13 +2333,7 @@ pub fn modular_word_numeric_binop(
 ) -> Result<Value, RunnerError> {
     let left = modular_operand(left, span, "modulus operand mismatch")?;
     let right = modular_operand(right, span, "modulus operand mismatch")?;
-    let by_zero = || {
-        RunnerError::internal_with_issue(
-            span,
-            "modulus division failed",
-            "modular_division_by_zero",
-        )
-    };
+    let by_zero = || modular_word_division_by_zero(span);
     let value = match op {
         // Representatives fit 64 bits, so sums and products fit i128 exactly
         // and reduction is exact.

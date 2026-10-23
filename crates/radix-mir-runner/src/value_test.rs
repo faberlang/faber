@@ -1016,6 +1016,116 @@ fn signed_wrapping_words_are_the_ring_with_signed_representatives() {
     assert!(zero.is_err(), "division by zero traps");
 }
 
+/// Run `operand op divisor` through the runner's dispatch, with the operand's
+/// static type and the binary value's declared type each either a `modulus<W>`
+/// or the exact integer carrier of the same width.
+fn runner_binop(
+    width: NumericWidth,
+    modular_operand: bool,
+    modular_result: bool,
+    operand: i64,
+    divisor: i64,
+    op: MirBinOp,
+) -> Result<Value, crate::RunnerError> {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirBlockId, MirConstant, MirFunction, MirFunctionId, MirOperand, MirProgram, MirTemp,
+        MirTempId, MirType, MirValidationContext,
+    };
+    use radix_types::{Primitive, Type, TypeTable};
+
+    let mut types = TypeTable::new();
+    let modular = types.intern(Type::ModularWord(width));
+    let exact = types.sized_numeric(Primitive::Numerus, width);
+    let operand_ty = if modular_operand { modular } else { exact };
+    let result_ty = if modular_result { modular } else { exact };
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let mut program = MirProgram::new();
+    program.functions.push(MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![],
+        locals: vec![],
+        temps: vec![MirTemp {
+            id: MirTempId(0),
+            ty: MirType::semantic(operand_ty),
+            span: Span::default(),
+        }],
+        blocks: vec![],
+        return_ty: MirType::semantic(result_ty),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    });
+    let mut host = BufferHost::default();
+    let mut runner = crate::Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner.frames.last_mut().expect("frame").temps[0] = Some(Value::Int(operand));
+    runner.eval_binop(
+        op,
+        &MirOperand::Temp(MirTempId(0)),
+        &MirOperand::Constant(MirConstant::Int(divisor)),
+        MirType::semantic(result_ty),
+        Span::default(),
+    )
+}
+
+#[test]
+fn modular_operands_report_the_ring_issue_for_a_zero_divisor() {
+    // The lowered binary value carries the exact integer carrier; the operand
+    // types still identify the ring, so `/` and `%` by zero share the
+    // structured modular issue.
+    for op in [MirBinOp::Div, MirBinOp::Mod] {
+        let error = runner_binop(NumericWidth::U8, true, false, 1, 0, op)
+            .expect_err("a zero divisor traps");
+        assert_eq!(error.issue, "modular_division_by_zero", "{op:?}");
+    }
+    // A modular result type reports the same issue from the wrap path.
+    let error = runner_binop(NumericWidth::U8, true, true, 1, 0, MirBinOp::Div)
+        .expect_err("a zero divisor traps");
+    assert_eq!(error.issue, "modular_division_by_zero");
+}
+
+#[test]
+fn exact_division_without_a_modular_operand_keeps_the_numerus_issue() {
+    let error = runner_binop(NumericWidth::U8, false, false, 1, 0, MirBinOp::Div)
+        .expect_err("a zero divisor traps");
+    assert_eq!(error.issue, "runner_numerus_division_failed");
+}
+
+#[test]
+fn modular_operands_keep_nonzero_exact_intermediates_until_the_store() {
+    // -128 / -1 is 128 exactly; only the store into a `modulus<i8>` reduces it
+    // to -128. Reducing at the operation would hide the exact intermediate.
+    assert!(values_equal(
+        &runner_binop(NumericWidth::I8, true, false, -128, -1, MirBinOp::Div)
+            .expect("exact quotient"),
+        &Value::Int(128)
+    ));
+    // `%` stays the exact floor remainder with the divisor's sign.
+    assert!(values_equal(
+        &runner_binop(NumericWidth::I8, true, false, -7, 2, MirBinOp::Mod)
+            .expect("floor remainder"),
+        &Value::Int(1)
+    ));
+    assert!(values_equal(
+        &runner_binop(NumericWidth::I8, true, false, -7, -2, MirBinOp::Mod)
+            .expect("floor remainder"),
+        &Value::Int(-1)
+    ));
+    // A modular result type still reduces at this boundary.
+    assert!(values_equal(
+        &runner_binop(NumericWidth::I8, true, true, -128, -1, MirBinOp::Div)
+            .expect("wrapping quotient"),
+        &Value::Int(-128)
+    ));
+}
+
 #[test]
 fn signed_wrapping_shifts_complement_and_negation_stay_in_the_ring() {
     let span = Span::default();

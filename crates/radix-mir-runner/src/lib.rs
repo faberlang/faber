@@ -67,8 +67,8 @@ use std::time::Instant;
 use value::{
     GradientStorage, add_values, compare_values, decimal_numeric_binop, decimal_scale_factor,
     effective_width, int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
-    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
-    round_float, values_equal,
+    modular_word_compare_values, modular_word_division_by_zero, modular_word_neg,
+    modular_word_numeric_binop, numeric_binop, round_float, values_equal,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -3542,6 +3542,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Width of the `modulus<W>` an operand statically carries, if any.
+    /// Modular arithmetic lowers to the plain integer carrier with the wrap at
+    /// the store, so the operand type is the remaining ring identity.
+    fn operand_modular_word_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
+        self.modular_word_width(MirType::semantic(self.operand_static_type(operand)?))
+    }
+
     #[expect(
         clippy::cast_precision_loss,
         reason = "sqrt/exp/ln promote Int/UInt operands to f64 for computation, deliberately accepting f64 mantissa precision for large integer magnitudes"
@@ -3845,6 +3852,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 | MirBinOp::Shr => modular_word_bitwise_binop(left, right, op, modular, span),
                 _ => Err(RunnerError::internal(span, "invalid modulus operator")),
             };
+        }
+        // A modular operand keeps its ring identity even when the lowered
+        // result type is the exact integer carrier (the store applies the one
+        // wrap). A zero divisor therefore reports the modular issue; nonzero
+        // arithmetic stays exact rather than reducing an intermediate.
+        if matches!(op, MirBinOp::Div | MirBinOp::Mod)
+            && exact_int::int_value(&right) == Some(0)
+            && (self.operand_modular_word_width(lhs).is_some()
+                || self.operand_modular_word_width(rhs).is_some())
+        {
+            return Err(modular_word_division_by_zero(span));
         }
         match op {
             MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod
