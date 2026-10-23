@@ -5176,6 +5176,11 @@ mod causal_softmax_nvvm_reachability_tests;
 mod batched_matmul_metal_reachability_tests;
 
 #[cfg(test)]
+#[cfg(feature = "mir-llvm")]
+#[path = "batched_matmul_nvvm_reachability_test.rs"]
+mod batched_matmul_nvvm_reachability_tests;
+
+#[cfg(test)]
 #[path = "default_code_locale_test.rs"]
 mod default_code_locale_tests;
 
