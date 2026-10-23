@@ -3542,12 +3542,21 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// Whether an operand's *static* type is a `wrapping<W>` word. Range-based
-    /// typing can give arithmetic on such operands a plain integer result, so
-    /// the result type alone cannot decide whether `/` is modular.
+    /// Whether an operand's *static* type is a `wrapping<W>` word, following
+    /// type aliases to their underlying word. Range-based typing can give
+    /// arithmetic on such operands a plain integer result, so the result type
+    /// alone cannot decide whether `/` is modular.
     fn operand_is_modular_word(&self, operand: &MirOperand) -> bool {
-        self.operand_static_type(operand)
-            .is_some_and(|ty| matches!(self.types.get(ty), Type::ModularWord(_)))
+        let Some(mut ty) = self.operand_static_type(operand) else {
+            return false;
+        };
+        loop {
+            match self.types.get(ty) {
+                Type::ModularWord(_) => return true,
+                Type::Alias(_, inner) => ty = *inner,
+                _ => return false,
+            }
+        }
     }
 
     #[expect(
