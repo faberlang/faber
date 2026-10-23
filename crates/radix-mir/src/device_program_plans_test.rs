@@ -5082,6 +5082,8 @@ fn subchain_emission_signature_keeps_runtime_data_flow_facts() {
 
 #[test]
 fn literal_data_flow_sites_still_fail_closed() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+
     let mut types = TypeTable::new();
     let runtime = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(4)]);
 
@@ -5150,16 +5152,31 @@ fn literal_data_flow_sites_still_fail_closed() {
         "kernel collection op requires literal dimensions"
     );
 
-    // The gather table's transformer shape reader must still reject runtime
-    // extents instead of inheriting the subchain-only runtime marker.
+    // The gather table's transformer shape reader is the rule-11 exception:
+    // a run-time table extent builds a runtime-shaped input (the planner
+    // cross-checks each resource against the extents it is sized from), while
+    // the rank-2 table law still fails closed.
     let mut gather_types = TypeTable::new();
     let mut gather = gather_function(&mut gather_types);
     let runtime_table = rank2_tensor_ty_mixed(&mut gather_types, [Err(0), Ok(4)]);
     gather.params[0].ty = runtime_table;
     gather.locals[0].ty = runtime_table;
     let validation = MirValidationContext::new(&gather_types);
+    let signature =
+        transformer_shape_signature(&gather, MirCollectionOp::TensorGather, &validation)
+            .expect("a run-time gather table extent builds a runtime-shaped input");
+    assert_eq!(signature.input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+
+    let mut rank3_types = TypeTable::new();
+    let mut rank3_gather = gather_function(&mut rank3_types);
+    let rank3_table = rank3_tensor_ty(&mut rank3_types, [960, 4, 4]);
+    rank3_gather.params[0].ty = rank3_table;
+    rank3_gather.locals[0].ty = rank3_table;
+    let validation = MirValidationContext::new(&rank3_types);
     assert!(
-        transformer_shape_signature(&gather, MirCollectionOp::TensorGather, &validation).is_err()
+        transformer_shape_signature(&rank3_gather, MirCollectionOp::TensorGather, &validation)
+            .is_err(),
+        "a rank-3 gather table fails closed"
     );
 }
 
