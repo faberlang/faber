@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/conversio/num-to-bytes-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/num-to-bytes-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "numeric_to_octeti_unspecified"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "numeric_to_octeti_unspecified"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "numeric_to_octeti_unspecified"
