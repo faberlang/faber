@@ -38,8 +38,26 @@ fn rust_admits_the_list_window() {
 
 #[cfg(feature = "hir-ts")]
 #[test]
-fn typescript_rejects_the_list_window_before_emission() {
-    assert_rejected(Target::HirTypeScript);
+fn typescript_admits_the_list_window() {
+    assert!(issues(Target::HirTypeScript).is_empty());
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn go_admits_the_list_window() {
+    assert!(issues(Target::HirGo).is_empty());
+}
+
+#[cfg(feature = "hir-swift")]
+#[test]
+fn swift_admits_the_list_window() {
+    assert!(issues(Target::HirSwift).is_empty());
+}
+
+#[cfg(feature = "hir-python")]
+#[test]
+fn python_admits_the_list_window() {
+    assert!(issues(Target::HirPython).is_empty());
 }
 
 #[cfg(feature = "mir-sexp")]
