@@ -1,7 +1,7 @@
 +++
 term = "lista"
 kind = "keyword"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "cast_expr", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "cast_expr", "call_expr", "call_suffix", "member_suffix", "expression", "range_expr", "range_tail", "literal", "nota_stmt"]
 category = "collection"
 canonical = true
 summary = "Generic ordered collection type."
@@ -26,7 +26,7 @@ locale = "en"
 
 # lista<T> copy, slice, and ordering intrinsics
 #
-# res.added(x) | res.slice(lo, hi) | res.take(n) | res.take_last(n)   -- views
+# res.added(x) | res.slice(lo, hi) | res.take(n) | res.take_last(n)   -- copies
 # res.drop(n) | res.invert() | res.sorted()                      -- reorder
 #
 # GRAMMAR:
@@ -41,6 +41,11 @@ locale = "en"
 #   [3, 4, 5]
 #   [5, 4, 3, 2, 1]
 #   [1, 2, 3]
+#   [0]
+#   [0]
+#   [1, 2]
+#   [99, 2]
+#   [1, 2, 3, 4, 5]
 #
 # BACKEND: Go e2e whitelist — lista intrinsic methods not yet lowered for Go
 # (whitelist: lista/methodi-copiae.fab).
@@ -61,4 +66,15 @@ main {
     print omissaduo
     print inversa
     print ordinata
+
+    let list<int> sectiofallax ← res.slice(1, 9) ⊥ [0]
+    let list<int> primafallax ← res.take(9) ⊥ [0]
+    let list<int> fenestra ← res[0‥2]
+    mut list<int> mutata ← res[0‥2]
+    mutata[0] ← 99
+    print sectiofallax
+    print primafallax
+    print fenestra
+    print mutata
+    print res
 }
