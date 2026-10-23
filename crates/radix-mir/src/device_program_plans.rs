@@ -12,9 +12,9 @@
 //! [`crate::kernel_decomposition::decompose_kernel_function`].
 
 use crate::abi::{
-    CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MirAbiError, MirKernelResource,
-    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
-    PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
+    CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MatMulDispatch, MirAbiError,
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
+    MirKernelSignature, PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
     device_view_element_count, device_view_element_count_or_runtime, storage_buffer_limit_error,
 };
 use crate::device_plan_compiler::LibraryOperation;
@@ -279,9 +279,15 @@ pub fn kernel_plan_for_function_with_limit(
     // recipe op; elementwise-only bodies resolve no contract. Matmul shapes
     // are resolved once from the body's matmul statement scan.
     let contract = collection_op_contract(function, validation)?;
-    // Run-time extents (`MatMulRuntime`) carry no literal shapes: the plan is
-    // built from the signature alone and the dims are read at launch.
-    let matmul_shapes = if matches!(contract, Some(CollectionOpContract::MatMulRuntime)) {
+    // Run-time extents (`MatMulDispatch::Runtime`) carry no literal shapes:
+    // the plan is built from the signature alone and the dims are read at
+    // launch.
+    let matmul_shapes = if matches!(
+        contract,
+        Some(CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime
+        })
+    ) {
         None
     } else {
         kernel_matmul_shapes(function, validation)?
@@ -2922,8 +2928,11 @@ pub fn contract_shape_signature(
             };
         }
         CollectionOpContract::MatMul {
-            dispatch_x,
-            dispatch_y,
+            dispatch:
+                MatMulDispatch::Literal {
+                    dispatch_x,
+                    dispatch_y,
+                },
         } => {
             let shapes = kernel_matmul_shapes(function, validation)?.ok_or_else(|| {
                 PlanMappingError::mapping("matmul subchain has no operand shapes")
@@ -2963,36 +2972,26 @@ pub fn contract_shape_signature(
                 z: 1,
             };
         }
-        CollectionOpContract::MatMulRuntime => {
+        CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        } => {
             // Run-time extents (design note item 4): operand and output
             // buffers are runtime-shaped; M, K and N travel as
             // `TensorAxisExtent` resources appended after the output. The
             // grid comes from the call-site shapes at launch, so
             // `dispatch_size` is left untouched.
             let (left_ty, right_ty) = matmul_operand_tys(function)?;
+            let return_ty = matmul_return_ty(function)?;
             let element_ty = tensor_element_ty(left_ty, validation)?;
             let left_dims = crate::tensor_type::tensor_dims(left_ty, validation)
                 .map_err(PlanMappingError::mapping)?;
             let right_dims = crate::tensor_type::tensor_dims(right_ty, validation)
                 .map_err(PlanMappingError::mapping)?;
-            let runtime = |dim: Option<&crate::tensor_type::Dim>| {
-                matches!(dim, Some(crate::tensor_type::Dim::Runtime))
-            };
-            // Output is [M, N] (N = 1 for a rank-1 right operand): runtime
-            // when M or N is, literal M*N otherwise (only K is runtime).
-            let output_count = match (left_dims.first(), right_dims.get(1)) {
-                (
-                    Some(crate::tensor_type::Dim::Literal(m)),
-                    Some(crate::tensor_type::Dim::Literal(n)),
-                ) => m.saturating_mul(*n),
-                (Some(crate::tensor_type::Dim::Literal(m)), None) => *m,
-                (m, n) if runtime(m) || runtime(n) => crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT,
-                _ => {
-                    return Err(PlanMappingError::mapping(
-                        "matmul with run-time extents requires rank-2 left and rank-1 or rank-2 right tensors",
-                    ));
-                }
-            };
+            // Output is the DECLARED result [M, N]: the checked dims reader
+            // binds a run-time axis as the runtime marker, and refuses a zero
+            // literal axis or an overflowing literal product instead of
+            // storing a saturated count. The contract resolver already
+            // enforces rank-2 left / rank-1-or-2 right.
             signature.input = storage_input(
                 0,
                 element_ty,
@@ -3003,7 +3002,11 @@ pub fn contract_shape_signature(
                 element_ty,
                 device_view_element_count_or_runtime(right_ty, validation)?,
             ));
-            signature.output = storage_output(2, element_ty, output_count);
+            signature.output = storage_output(
+                2,
+                element_ty,
+                device_view_element_count_or_runtime(return_ty, validation)?,
+            );
             signature.output.source_local =
                 recipe_destination_local_for(function, MirCollectionOp::TensorMatMul);
             signature.workgroup = MirWorkgroupSize {
@@ -3650,6 +3653,205 @@ pub fn subchain_signature_for_emission_with_source(
     Ok(signature)
 }
 
+/// Whether a subchain's data-flow surface carries a run-time-shaped buffer:
+/// any non-vacuum param type or any outputs local type whose tensor shape has
+/// a run-time extent ([`crate::tensor_type::Dim::Runtime`]). Callers use this
+/// to pick the runtime-aware [`elementwise_subchain_signature_for_emission`]
+/// over the literal-only ABI synthesis, whose buffer element counts cannot
+/// carry a run-time extent. A param/local type that is not a tensor (e.g. a
+/// kernel scalar) has no shape axes and never reads as runtime-shaped here —
+/// the signature builders stay the fail-closed authority on such types.
+pub fn subchain_has_runtime_shaped_buffer(
+    function: &MirFunction,
+    outputs: &[MirLocalId],
+    validation: &MirValidationContext<'_>,
+) -> bool {
+    fn shape_has_runtime_dim(ty: MirType, validation: &MirValidationContext<'_>) -> bool {
+        crate::tensor_type::tensor_dims(ty, validation).is_ok_and(|dims| {
+            dims.iter()
+                .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime))
+        })
+    }
+    function.params.iter().any(|param| {
+        !crate::abi::is_vacuum(param.ty, validation) && shape_has_runtime_dim(param.ty, validation)
+    }) || outputs.iter().any(|&local| {
+        function_local_ty(function, local).is_ok_and(|ty| shape_has_runtime_dim(ty, validation))
+    })
+}
+
+/// The emission signature for a decomposed ELEMENTWISE-ONLY subchain: every
+/// non-vacuum param binds as a read storage-buffer input in declaration order
+/// (the first at binding 0, the rest as extra inputs at the following
+/// bindings), then the outputs bind — the primary as the signature output,
+/// each additional consumed output as an extra output — all sized by
+/// [`data_flow_element_ty_and_count_or_runtime`] so a run-time-shaped tensor
+/// binds at the [`crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT`] marker instead
+/// of failing the literal-dimension law. A run-time-shaped surface appends one
+/// count-one `u32` [`MirKernelResourceKind::RuntimeExtent`] channel after the
+/// outputs: the host binds the written tensor's whole element count per call
+/// and the emitters' out-of-bounds guard reads it, so the generic launch
+/// geometry's rounded-up last workgroup cannot index past the last element.
+///
+/// Why not [`MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry`]:
+/// the whole-function ABI synthesis sizes every buffer with the literal-only
+/// `device_view_element_count`, so an elementwise subchain carrying a
+/// run-time-shaped intermediate is refused before emission. This builder is
+/// the runtime-aware path: the launch geometry (workgroup and dispatch) is a
+/// per-call fact for a runtime-shaped kernel — one thread-block of one lane,
+/// like the `MatMulDispatch::Runtime` signature — never a literal extent product.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when `outputs` is empty, or a param/local
+/// type is neither a tensor nor a kernel scalar (the same fail-closed law the
+/// literal data-flow reader applies).
+pub fn elementwise_subchain_signature_for_emission(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    outputs: &[MirLocalId],
+) -> Result<MirKernelSignature, PlanMappingError> {
+    if outputs.is_empty() {
+        return Err(PlanMappingError::mapping(
+            "elementwise subchain signature requires at least one output local",
+        ));
+    }
+    let mut signature = MirKernelSignature {
+        function: function.id,
+        input: storage_input(0, MirType::semantic(TypeId(0)), 0),
+        extra_inputs: Vec::new(),
+        output: storage_output(0, MirType::semantic(TypeId(0)), 0),
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: crate::abi::called_builtins_for_function(function),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize { x: 1, y: 1, z: 1 },
+    };
+    let mut next_binding = 0u32;
+    let mut bound_primary_input = false;
+    let mut runtime_shaped = false;
+    for param in &function.params {
+        if crate::abi::is_vacuum(param.ty, validation) {
+            continue;
+        }
+        let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(param.ty, validation)?;
+        runtime_shaped |= count == crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+        let resource = storage_input_with_local(next_binding, element_ty, count, param.local);
+        if bound_primary_input {
+            signature.extra_inputs.push(resource);
+        } else {
+            signature.input = resource;
+            bound_primary_input = true;
+        }
+        next_binding = next_binding.saturating_add(1);
+    }
+    for (index, &local) in outputs.iter().enumerate() {
+        let local_ty = function_local_ty(function, local)?;
+        let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(local_ty, validation)?;
+        runtime_shaped |= count == crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+        let resource = storage_output_with_local(next_binding, element_ty, count, local);
+        if index == 0 {
+            signature.output = resource;
+        } else {
+            signature.extra_outputs.push(resource);
+        }
+        next_binding = next_binding.saturating_add(1);
+    }
+    // The launch geometry of a run-time-shaped surface is a per-call fact, and
+    // the generic one-dimensional rule rounds that call's element count up to
+    // whole `GENERIC_1D_WORKGROUP_X` workgroups: a non-aligned tail such as
+    // `[3, 7]` (21 elements) dispatches 128 invocations. The emitted body must
+    // therefore guard on the per-call count, not on the placeholder one-lane
+    // dispatch and not on nothing. Append the count channel — the same
+    // `RuntimeExtent` binding a scalar-shaped kernel carries, which the host
+    // populates with the written tensor's whole element count before dispatch
+    // — so every invocation past the last element returns before its first
+    // indexed load or store. The channel is count-typed (`numerus<u32>`) and
+    // only appended when that width resolves; a table without it leaves the
+    // surface unbounded, which the Metal emitter refuses at emission.
+    if runtime_shaped
+        && let Some(extent_ty) = validation
+            .types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+    {
+        signature.extra_inputs.push(MirKernelResource {
+            group: 0,
+            binding: next_binding,
+            kind: MirKernelResourceKind::RuntimeExtent,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty: MirType::semantic(extent_ty),
+            element_count: 1,
+            source_local: None,
+            source_name: None,
+            reduced_projection: None,
+        });
+    }
+    Ok(signature)
+}
+
+/// Append the runtime-extent count channel (U2/L7) to a run-time-shaped
+/// elementwise emission signature.
+///
+/// [`elementwise_subchain_signature_for_emission`] sizes a run-time-shaped
+/// buffer at the [`crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT`] marker and
+/// keeps the one-lane placeholder dispatch, because the real extent is a
+/// per-call launch fact. An emitter whose OOB guard compares the dispatch
+/// index against a static limit therefore has no honest limit to use: the
+/// placeholder `dispatch_size.x == 1` would cull every invocation past the
+/// first element and leave the rest of a multi-element output unwritten.
+/// The count channel is the fix — the host binds the written output's whole
+/// element count at this slot before dispatch and the guard reads it.
+///
+/// Returns `true` when the resource was appended. A hand-built type table
+/// without `numerus<u32>` (unit fixtures) keeps the signature untouched; the
+/// production registry interns it for every kernel program.
+pub fn append_runtime_extent_count_channel(
+    signature: &mut MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> bool {
+    if !signature
+        .resources()
+        .any(MirKernelResource::is_runtime_shaped)
+    {
+        return false;
+    }
+    let Some(extent_ty) = validation
+        .types
+        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+    else {
+        return false;
+    };
+    let binding = signature
+        .resources()
+        .map(|resource| resource.binding)
+        .max()
+        .map_or(0, |binding| binding.saturating_add(1));
+    signature.extra_inputs.push(runtime_extent_count_resource(
+        binding,
+        MirType::semantic(extent_ty),
+    ));
+    true
+}
+
+/// The runtime-extent count resource a run-time-shaped emission signature
+/// carries: a count-one `u32` read input the host populates with the written
+/// output's whole element count before dispatch (the same channel the
+/// whole-function ABI appends for a scalar-shaped kernel).
+fn runtime_extent_count_resource(binding: u32, element_ty: MirType) -> MirKernelResource {
+    MirKernelResource {
+        group: 0,
+        binding,
+        kind: MirKernelResourceKind::RuntimeExtent,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty,
+        element_count: 1,
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    }
+}
+
 /// The emission signature for a decomposition subchain kernel carrying a
 /// S6-P1 transformer recipe (S6-P1 seam): the transformer-shaped recipe
 /// resources plus the subchain's data-flow inputs, with the recipe
@@ -4252,9 +4454,10 @@ pub fn resolve_subchain_plan(
         ))
     })?;
     let signature = contract_shape_signature(function, &contract, validation)?;
-    let shapes = if recipe_op == MirCollectionOp::TensorMatMul
-        && contract != CollectionOpContract::MatMulRuntime
-    {
+    let runtime_matmul = CollectionOpContract::MatMul {
+        dispatch: MatMulDispatch::Runtime,
+    };
+    let shapes = if recipe_op == MirCollectionOp::TensorMatMul && contract != runtime_matmul {
         kernel_matmul_shapes(function, validation)?
     } else {
         None
@@ -4294,8 +4497,8 @@ fn kernel_matmul_shapes(
         .any(|dim| matches!(dim, crate::tensor_type::Dim::Runtime))
     {
         // The contract resolver accepts rank-2 run-time extents
-        // (`MatMulRuntime`); `MatMulShapes` carries literal dims only, so no
-        // plan is built from them until the plan arm lands.
+        // (`MatMulDispatch::Runtime`); `MatMulShapes` carries literal dims
+        // only, so no plan is built from them until the plan arm lands.
         return Err(PlanMappingError::mapping(
             "matmul with run-time extents has no kernel plan yet",
         ));
@@ -4396,6 +4599,20 @@ fn matmul_operand_tys(function: &MirFunction) -> Result<(MirType, MirType), Plan
     let right_ty = crate::local_ty::operand_ty(function, &call.args[1])
         .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
     Ok((left_ty, right_ty))
+}
+
+/// The declared result type of the body's `TensorMatMul` statement — the
+/// `MirRuntimeCall.return_ty` the checked dims reader sizes the output buffer
+/// from, so a zero literal axis or an overflowing literal product in the
+/// result is a refusal rather than a saturated count.
+fn matmul_return_ty(function: &MirFunction) -> Result<MirType, PlanMappingError> {
+    let Some((call, _)) = first_collection_call(function, |op| op == MirCollectionOp::TensorMatMul)
+    else {
+        return Err(PlanMappingError::mapping(
+            "matmul subchain has no TensorMatMul statement",
+        ));
+    };
+    Ok(call.return_ty)
 }
 
 #[cfg(test)]

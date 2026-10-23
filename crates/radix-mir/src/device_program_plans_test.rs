@@ -6,9 +6,9 @@
 
 use super::*;
 use crate::abi::{
-    CollectionOpContract, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
-    MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirKernelWorkgroupCount,
-    MirWorkgroupSize,
+    CollectionOpContract, MatMulDispatch, MirKernelDispatchSize, MirKernelResource,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+    MirKernelWorkgroupCount, MirWorkgroupSize,
 };
 use crate::device_program::{
     BufferId, BufferIdentity, BufferLifetime, BufferVersion, DeviceProgram, DeviceProgramError,
@@ -1574,8 +1574,10 @@ fn matmul_maps_to_tiled_matmul() {
     };
     let signature = matmul_signature(shapes, 5, 3);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 5,
-        dispatch_y: 3,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 5,
+            dispatch_y: 3,
+        },
     };
     let plan = plan_for_collection_op(
         &signature,
@@ -1843,8 +1845,10 @@ fn contract_shape_signature_output_carries_produced_local() {
     );
 
     let matmul_contract = CollectionOpContract::MatMul {
-        dispatch_x: 5,
-        dispatch_y: 3,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 5,
+            dispatch_y: 3,
+        },
     };
     let matmul_signature = contract_shape_signature(&matmul, &matmul_contract, &validation)
         .expect("matmul contract shape resolves");
@@ -2846,8 +2850,10 @@ fn f32_scalar_data_flow_param_resolves_in_subchain_emission_signature() {
     let function = matmul_scalar_seed_function(&mut types, seed_ty);
     let validation = MirValidationContext::new(&types);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 1,
-        dispatch_y: 1,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 1,
+            dispatch_y: 1,
+        },
     };
 
     let signature = subchain_signature_for_emission(&function, &contract, &validation, &[])
@@ -2926,8 +2932,10 @@ fn f64_scalar_data_flow_param_fails_closed_in_subchain_emission_signature() {
     let function = matmul_scalar_seed_function(&mut types, seed_ty);
     let validation = MirValidationContext::new(&types);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 1,
-        dispatch_y: 1,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 1,
+            dispatch_y: 1,
+        },
     };
 
     let error = subchain_signature_for_emission(&function, &contract, &validation, &[])
@@ -2950,8 +2958,10 @@ fn f64_scalar_return_local_fails_closed_in_subchain_emission_signature() {
     let function = matmul_scalar_seed_function(&mut types, seed_ty);
     let validation = MirValidationContext::new(&types);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 1,
-        dispatch_y: 1,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 1,
+            dispatch_y: 1,
+        },
     };
 
     // outputs = [recipe result (4), scalar-return local (2)] — the f64 scalar
@@ -2982,8 +2992,10 @@ fn f64_scalar_data_flow_param_fails_closed_for_f64_tensor_graph() {
     let function = matmul_f64_tensor_seed_function(&mut types, seed_ty);
     let validation = MirValidationContext::new(&types);
     let contract = CollectionOpContract::MatMul {
-        dispatch_x: 1,
-        dispatch_y: 1,
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 1,
+            dispatch_y: 1,
+        },
     };
 
     let error = subchain_signature_for_emission(&function, &contract, &validation, &[])
@@ -4880,8 +4892,10 @@ fn matmul_contract_literal_dims_keep_the_numeric_tile_grid() {
     assert_eq!(
         contract,
         CollectionOpContract::MatMul {
-            dispatch_x: 5,
-            dispatch_y: 3
+            dispatch: MatMulDispatch::Literal {
+                dispatch_x: 5,
+                dispatch_y: 3
+            }
         }
     );
 }
@@ -4949,8 +4963,10 @@ fn subchain_emission_signature_keeps_runtime_data_flow_facts() {
     let signature = subchain_signature_for_emission(
         &function,
         &CollectionOpContract::MatMul {
-            dispatch_x: 1,
-            dispatch_y: 1,
+            dispatch: MatMulDispatch::Literal {
+                dispatch_x: 1,
+                dispatch_y: 1,
+            },
         },
         &validation,
         &[MirLocalId(2), MirLocalId(4)],
@@ -4967,6 +4983,118 @@ fn subchain_emission_signature_keeps_runtime_data_flow_facts() {
         signature.extra_outputs[0].element_count,
         RUNTIME_SHAPED_ELEMENT_COUNT
     );
+}
+
+/// The elementwise-only subchain emission signature binds a runtime-shaped
+/// intermediate at the [`crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT`] marker:
+/// params in declaration order (first at binding 0, the rest as extra
+/// inputs), then the outputs — and the predicate agrees the surface carries
+/// a run-time shape.
+#[test]
+fn elementwise_subchain_signature_binds_runtime_markers() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+
+    let mut types = TypeTable::new();
+    let runtime = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let mut function = matmul_function_over(runtime, runtime, runtime);
+    // The matmul destination local (2) must be declared for the output local
+    // type resolution, exactly as a decomposed subchain declares it.
+    function.locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: runtime,
+        mutable: false,
+        span: test_span(),
+    });
+    let validation = MirValidationContext::new(&types);
+    assert!(subchain_has_runtime_shaped_buffer(
+        &function,
+        &[MirLocalId(2)],
+        &validation
+    ));
+
+    let signature =
+        elementwise_subchain_signature_for_emission(&function, &validation, &[MirLocalId(2)])
+            .expect("runtime-shaped elementwise subchain resolves");
+
+    // Params bind in declaration order: a at binding 0, bias at binding 1.
+    assert_eq!(signature.input.binding, 0);
+    assert_eq!(signature.input.source_local, Some(MirLocalId(0)));
+    assert_eq!(signature.input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(signature.extra_inputs.len(), 1);
+    assert_eq!(signature.extra_inputs[0].binding, 1);
+    assert_eq!(signature.extra_inputs[0].source_local, Some(MirLocalId(1)));
+    assert_eq!(
+        signature.extra_inputs[0].element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    // The primary output binds at the next binding (2).
+    assert_eq!(signature.output.binding, 2);
+    assert_eq!(signature.output.source_local, Some(MirLocalId(2)));
+    assert_eq!(signature.output.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    // The launch geometry of a runtime-shaped kernel is a per-call fact.
+    assert_eq!(signature.workgroup, MirWorkgroupSize { x: 1, y: 1, z: 1 });
+    assert_eq!(
+        signature.dispatch_size,
+        MirKernelDispatchSize { x: 1, y: 1, z: 1 }
+    );
+}
+
+/// The elementwise subchain signature keeps the literal ABI counts (no
+/// runtime marker), the predicate reads the literal surface as false, and a
+/// kernel-scalar param binds as a 1-element input at its own type.
+#[test]
+fn elementwise_subchain_signature_keeps_literal_counts() {
+    let mut types = TypeTable::new();
+    let left = rank2_tensor_ty(&mut types, [3, 5]);
+    let right = rank2_tensor_ty(&mut types, [3, 5]);
+    let out = rank2_tensor_ty(&mut types, [3, 5]);
+    let scalar = f32_ty(&mut types);
+    let mut function = matmul_function_over(left, right, out);
+    function.locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: out,
+        mutable: false,
+        span: test_span(),
+    });
+    // A kernel-scalar data-flow param (the elementwise scalar seed) binds at
+    // count 1, mirroring the ABI kernel scalar surface.
+    function.params.push(MirParam {
+        local: MirLocalId(3),
+        name: None,
+        ty: scalar,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    });
+    function.locals.push(MirLocal {
+        id: MirLocalId(3),
+        name: None,
+        ty: scalar,
+        mutable: false,
+        span: test_span(),
+    });
+    let validation = MirValidationContext::new(&types);
+    assert!(!subchain_has_runtime_shaped_buffer(
+        &function,
+        &[MirLocalId(2)],
+        &validation
+    ));
+
+    let signature =
+        elementwise_subchain_signature_for_emission(&function, &validation, &[MirLocalId(2)])
+            .expect("literal elementwise subchain resolves");
+
+    assert_eq!(signature.input.binding, 0);
+    assert_eq!(signature.input.element_count, 15);
+    assert_eq!(signature.extra_inputs.len(), 2);
+    assert_eq!(signature.extra_inputs[0].binding, 1);
+    assert_eq!(signature.extra_inputs[0].element_count, 15);
+    assert_eq!(signature.extra_inputs[1].binding, 2);
+    assert_eq!(signature.extra_inputs[1].element_count, 1);
+    assert_eq!(signature.extra_inputs[1].element_ty, scalar);
+    assert_eq!(signature.output.binding, 3);
+    assert_eq!(signature.output.element_count, 15);
 }
 
 #[test]
@@ -5064,9 +5192,14 @@ fn matmul_contract_runtime_dims_resolve_without_a_numeric_grid() {
     let contract = collection_op_contract(&function, &validation)
         .expect("run-time matmul resolves")
         .expect("run-time matmul has a contract");
-    assert_eq!(contract, CollectionOpContract::MatMulRuntime);
+    assert_eq!(
+        contract,
+        CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime
+        }
+    );
     // `MatMulShapes` carries literal dims only, so it still refuses run-time
-    // dims by name; the plan pass skips it for `MatMulRuntime` and builds the
+    // dims by name; the plan pass skips it for `MatMulDispatch::Runtime` and builds the
     // plan from the signature alone.
     let error = kernel_matmul_shapes(&function, &validation).expect_err("no literal shapes");
     assert!(
@@ -5104,9 +5237,14 @@ fn matmul_runtime_tensor_extent_resources_follow_the_output() {
     let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(33)]);
     let function = matmul_function_over(left, right, out);
     let validation = MirValidationContext::new(&types);
-    let signature =
-        contract_shape_signature(&function, &CollectionOpContract::MatMulRuntime, &validation)
-            .expect("run-time matmul signature resolves");
+    let signature = contract_shape_signature(
+        &function,
+        &CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        },
+        &validation,
+    )
+    .expect("run-time matmul signature resolves");
     assert_eq!(signature.input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
     assert_eq!(signature.output.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
     assert_eq!(signature.output.binding, 2);
@@ -5144,10 +5282,74 @@ fn matmul_runtime_tensor_extent_resources_literal_output_when_only_k_is_runtime(
     let out = rank2_tensor_ty_mixed(&mut types, [Ok(4), Ok(5)]);
     let function = matmul_function_over(left, right, out);
     let validation = MirValidationContext::new(&types);
-    let signature =
-        contract_shape_signature(&function, &CollectionOpContract::MatMulRuntime, &validation)
-            .expect("run-time matmul signature resolves");
+    let signature = contract_shape_signature(
+        &function,
+        &CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        },
+        &validation,
+    )
+    .expect("run-time matmul signature resolves");
     assert_eq!(signature.output.element_count, 20);
+}
+
+/// The run-time matmul output count comes from the checked dims reader on the
+/// DECLARED result: a zero literal axis is a refusal (never the runtime
+/// marker), an overflowing literal product is a refusal (never a saturated
+/// count), and a run-time result axis stays the runtime marker.
+#[test]
+fn matmul_runtime_output_count_uses_the_checked_reader() {
+    use crate::tensor_type::{DIM_PRODUCT_OVERFLOW_MESSAGE, ZERO_LITERAL_DIM_MESSAGE};
+
+    // a [?0, ?1] x b [?1, 5] -> o [?0, 0]: a zero literal result axis.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Ok(5)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(0)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("run-time matmul resolves")
+        .expect("run-time matmul has a contract");
+    let error = contract_shape_signature(&function, &contract, &validation)
+        .expect_err("a zero literal result axis is refused");
+    assert_eq!(error.message, ZERO_LITERAL_DIM_MESSAGE);
+
+    // a [2^32, ?1] x b [?1, 2^32] -> o [2^32, 2^32]: the literal product
+    // leaves u64, so the count is refused instead of saturated.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = rank2_tensor_ty_mixed(&mut types, [Ok(4_294_967_296), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Ok(4_294_967_296)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Ok(4_294_967_296), Ok(4_294_967_296)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("run-time matmul resolves")
+        .expect("run-time matmul has a contract");
+    let error = contract_shape_signature(&function, &contract, &validation)
+        .expect_err("an overflowing literal result count is refused");
+    assert_eq!(error.message, DIM_PRODUCT_OVERFLOW_MESSAGE);
+
+    // a [?0, ?1] x b [?1, 33] -> o [?0, 33]: a run-time result axis is the
+    // runtime marker, not a literal count.
+    let mut types = TypeTable::new();
+    types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let left = rank2_tensor_ty_mixed(&mut types, [Err(0), Err(1)]);
+    let right = rank2_tensor_ty_mixed(&mut types, [Err(1), Ok(33)]);
+    let out = rank2_tensor_ty_mixed(&mut types, [Err(0), Ok(33)]);
+    let function = matmul_function_over(left, right, out);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("run-time matmul resolves")
+        .expect("run-time matmul has a contract");
+    let signature = contract_shape_signature(&function, &contract, &validation)
+        .expect("run-time matmul signature resolves");
+    assert_eq!(
+        signature.output.element_count,
+        crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT
+    );
 }
 
 #[test]
@@ -5160,7 +5362,9 @@ fn matmul_contract_mixed_dims_with_equal_literal_inner_is_runtime() {
     let validation = MirValidationContext::new(&types);
     assert_eq!(
         collection_op_contract(&function, &validation).unwrap(),
-        Some(CollectionOpContract::MatMulRuntime)
+        Some(CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime
+        })
     );
 }
 

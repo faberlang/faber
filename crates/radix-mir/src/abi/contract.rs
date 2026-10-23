@@ -53,6 +53,20 @@ fn push_unique_builtin(builtins: &mut Vec<MirKernelBuiltin>, builtin: MirKernelB
     }
 }
 
+/// Matmul tile-grid dispatch ([`CollectionOpContract::MatMul`]): the literal
+/// grid, or the run-time case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatMulDispatch {
+    /// Output tile grid `(ceil(N/8), ceil(M/8))`.
+    Literal { dispatch_x: u64, dispatch_y: u64 },
+    /// Rank-2 matmul whose M, K or N is bound at run time. The tile grid is
+    /// not a number here: `tiled_matmul` (launch geometry) computes
+    /// `(ceil(N/8), ceil(M/8))` from the call-site shapes, and the
+    /// inner-dimension equality becomes a launch-time check. Batched and
+    /// quantized matmul stay literal-only.
+    Runtime,
+}
+
 /// Corrected dispatch/workgroup/output-buffer contract for collection-op
 /// kernels (PRP-004 U3, decision D1-A default).
 ///
@@ -89,16 +103,8 @@ pub enum CollectionOpContract {
         partials: u64,
     },
     MatMul {
-        /// Output tile grid `(ceil(N/8), ceil(M/8))`.
-        dispatch_x: u64,
-        dispatch_y: u64,
+        dispatch: MatMulDispatch,
     },
-    /// Rank-2 matmul whose M, K or N is bound at run time. The tile grid is
-    /// not a number here: `tiled_matmul` (launch geometry) computes
-    /// `(ceil(N/8), ceil(M/8))` from the call-site shapes, and the
-    /// inner-dimension equality becomes a launch-time check. Batched and
-    /// quantized matmul stay literal-only.
-    MatMulRuntime,
     Transpose {
         /// Source rows `M` of the rank-2 operand (output columns).
         m: u64,
@@ -456,8 +462,11 @@ fn apply_launch_contract(contract: CollectionOpContract, signature: &mut MirKern
             signature.output.element_count = partials;
         }
         CollectionOpContract::MatMul {
-            dispatch_x,
-            dispatch_y,
+            dispatch:
+                MatMulDispatch::Literal {
+                    dispatch_x,
+                    dispatch_y,
+                },
         }
         | CollectionOpContract::QuantizedMatMul {
             dispatch_x,
@@ -471,7 +480,9 @@ fn apply_launch_contract(contract: CollectionOpContract, signature: &mut MirKern
         } => {
             set_matmul_launch(signature, dispatch_x, dispatch_y);
         }
-        CollectionOpContract::MatMulRuntime => {
+        CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        } => {
             // Same 8x8 workgroup; the grid comes from the call-site shapes
             // at launch, so `dispatch_size` is left untouched.
             signature.workgroup = MirWorkgroupSize { x: 8, y: 8, z: 1 };
@@ -748,7 +759,9 @@ fn matmul_contract(
         {
             return Err(MirAbiError::new("matmul inner dimensions must match"));
         }
-        return Ok(Some(CollectionOpContract::MatMulRuntime));
+        return Ok(Some(CollectionOpContract::MatMul {
+            dispatch: MatMulDispatch::Runtime,
+        }));
     }
     let left_dims =
         crate::tensor_type::tensor_literal_dims(left_ty, validation).map_err(MirAbiError::new)?;
@@ -784,8 +797,10 @@ fn matmul_contract(
         let n = right_dims[right_dims.len() - 1];
         let batch = left_dims[..left_dims.len() - 2].iter().product::<u64>();
         return Ok(Some(CollectionOpContract::MatMul {
-            dispatch_x: n.div_ceil(tile),
-            dispatch_y: batch * m.div_ceil(tile),
+            dispatch: MatMulDispatch::Literal {
+                dispatch_x: n.div_ceil(tile),
+                dispatch_y: batch * m.div_ceil(tile),
+            },
         }));
     }
     if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
@@ -798,8 +813,10 @@ fn matmul_contract(
     }
     let right_columns = right_dims.get(1).copied().unwrap_or(1);
     Ok(Some(CollectionOpContract::MatMul {
-        dispatch_x: right_columns.div_ceil(tile),
-        dispatch_y: left_dims[0].div_ceil(tile),
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: right_columns.div_ceil(tile),
+            dispatch_y: left_dims[0].div_ceil(tile),
+        },
     }))
 }
 

@@ -80,6 +80,26 @@ fn dims_product_checked_zero_dim_fails_closed() {
 }
 
 #[test]
+fn dims_product_checked_zero_after_runtime_dim_fails_closed() {
+    assert_eq!(
+        dims_product_checked(&[Dim::Runtime, Dim::Literal(0)]),
+        Err(ZERO_LITERAL_DIM_MESSAGE)
+    );
+}
+
+#[test]
+fn dims_product_checked_overflow_after_runtime_dim_fails_closed() {
+    assert_eq!(
+        dims_product_checked(&[
+            Dim::Runtime,
+            Dim::Literal(4_294_967_296),
+            Dim::Literal(4_294_967_296),
+        ]),
+        Err(DIM_PRODUCT_OVERFLOW_MESSAGE)
+    );
+}
+
+#[test]
 fn dims_product_checked_runtime_dim_keeps_the_literal_message() {
     assert_eq!(
         dims_product_checked(&[Dim::Literal(3), Dim::Runtime]),
