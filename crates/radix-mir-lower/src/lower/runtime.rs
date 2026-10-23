@@ -4309,6 +4309,18 @@ impl FunctionBuilder<'_> {
         {
             return self.lower_tensor_to_vector_conversio(source, target, ty, expr.span);
         }
+        // `tensor<E, [R, C]> ↦ matrix<E, [R, C]>`: flatten the tensor to its
+        // element lista, then build the matrix row-major — cell `(r, c)` reads
+        // flat slot `r * C + c`, the same order `MatrixValue` keeps and
+        // `lower_matrix_transpone` builds. The opposite crossing
+        // (`matrix ↦ tensor`) stays on the runtime conversio, which already
+        // converts a register matrix like its flat row-major cell list.
+        if recovery.is_none()
+            && matches!(self.normalized_type(target), Type::Matrix(_, _))
+            && matches!(self.normalized_type(source_type_id), Type::Tensor(_, _))
+        {
+            return self.lower_tensor_to_matrix_conversio(source, target, ty, expr.span);
+        }
         if recovery.is_none()
             && matches!(self.normalized_type(target), Type::Vector(_, _))
             && let HirExpressionKind::Array(elements) = &source.kind
@@ -4814,6 +4826,52 @@ impl FunctionBuilder<'_> {
             })
             .collect();
         Some(self.construct_temp(MirAggregateKind::Vector, MirAggregateFields::Ordered(fields), return_ty, span))
+    }
+
+    /// `tensor<E, [R, C]> ↦ matrix<E, [R, C]>`: flatten the tensor to its
+    /// element lista, then build the matrix row-major — cell `(r, c)` reads
+    /// flat slot `r * C + c`, the same order the runner's `MatrixValue` keeps
+    /// and `lower_matrix_transpone` builds.
+    fn lower_tensor_to_matrix_conversio(
+        &mut self,
+        source: &HirExpression,
+        target: TypeId,
+        return_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let Type::Matrix(element, shape) = self.normalized_type(target).clone() else {
+            return None;
+        };
+        let Some((rows, columns)) = radix_semantic::literal_matrix_shape(shape, self.types) else {
+            self.errors
+                .push(MirError::unsupported(span, "matrix shape before MIR lowering"));
+            return None;
+        };
+        let Some(flat_ty) = self.types.find_array(element) else {
+            self.errors
+                .push(MirError::unsupported(span, "matrix element lista type before MIR lowering"));
+            return None;
+        };
+        let flat_ty = MirType::semantic(flat_ty);
+        let tensor = self.lower_expr_value(source)?;
+        let flat = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorFlatten),
+            vec![tensor],
+            flat_ty,
+            span,
+        );
+        let flat = self.value_base_place(flat, flat_ty, span)?;
+        let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(columns));
+        for row in 0..rows {
+            for column in 0..columns {
+                let index = i64::from(row) * i64::from(columns) + i64::from(column);
+                fields.push(MirAggregateItem::Operand(projected_operand(
+                    &flat,
+                    MirProjection::Index(MirOperand::Constant(MirConstant::Int(index))),
+                )));
+            }
+        }
+        Some(self.construct_temp(MirAggregateKind::Matrix, MirAggregateFields::Ordered(fields), return_ty, span))
     }
 
     /// The fill element of a Route C padded snapshot, or `None` when the
