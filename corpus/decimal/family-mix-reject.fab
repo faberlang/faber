@@ -1,0 +1,39 @@
++++
+term = "d64 arithmetic family crossing"
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM011:numeric_family_crossing_requires_conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Arithmetic does not implicitly mix a d64 value with a typed integer operand."
+syntax = "d + whole"
+related = ["d64", "numerus", "↦"]
+locale = "en"
++++
+# =============================================================================
+# d64 arithmetic family crossing — typed operands need explicit conversion
+# =============================================================================
+#
+# What this teaches:
+#   • Arithmetic cannot implicitly combine d64 and a typed integer; this
+#     crossing is rejected as SEM011:numeric_family_crossing_requires_conversio.
+#   • Untyped integer constants are adopted by the decimal expression, so
+#     `d + 1` is valid; a typed i64 such as `whole` needs explicit `↦`.
+#   • Cross-family relational comparisons such as `d ≻ whole` are legal
+#     without `↦` (docs/design/numeric-model.md, ruling 22).
+#
+# Common mistake:
+#   • treating a typed integer variable like an untyped literal. Convert the
+#     operand (`whole ↦ d64`, or explicitly `1 ↦ d64`) before arithmetic.
+#
+# Controls (both check clean): let d64 e ← d + 1
+#   let bool greater ← d ≻ whole
+# See also: d64, numerus, ↦
+# =============================================================================
+
+main {
+    let d64 d ← 1.5
+    let i64 whole ← 1
+    let _ e ← d + whole
+}

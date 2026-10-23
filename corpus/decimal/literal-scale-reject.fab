@@ -1,0 +1,34 @@
++++
+term = "d64 literal scale"
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM010:decimal_literal_out_of_range"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A d64 literal cannot carry a ninth fractional digit because its scale is 8."
+syntax = "let d64 fine ← 0.000000001"
+related = ["d64", "numerus"]
+locale = "en"
++++
+# =============================================================================
+# d64 literal scale — precision loss is refused, never rounded
+# =============================================================================
+#
+# What this teaches:
+#   • d64 has scale 8. A literal with a ninth fractional digit cannot be
+#     represented exactly by its carrier and is rejected as
+#     SEM010:decimal_literal_out_of_range rather than rounded.
+#   • A value that needs rounding must be computed or read from text, not
+#     written as a literal.
+#
+# Common mistake:
+#   • expecting a literal with excess fractional digits to round to scale 8.
+#
+# Control (checks clean): let d64 fine ← 0.00000001
+# See also: d64, numerus
+# =============================================================================
+
+main {
+    let d64 fine ← 0.000000001
+}
