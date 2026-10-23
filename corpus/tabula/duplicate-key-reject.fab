@@ -1,0 +1,21 @@
++++
+term = "tabula"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "json_literal", "json_member", "json_value", "json_object", "json_number", "json_string", "nota_stmt"]
+category = "collection"
+canonical = false
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:json_duplicate_key"
+summary = "A brace literal with a repeated key is refused at the second occurrence."
+syntax = "{ \"alpha\": 1, \"alpha\": 3 } — rejected"
+related = ["tabula", "json"]
++++
+# Rejects a brace literal that repeats an object key.
+# Duplicate keys are refused at the second occurrence.
+# The checker reports the repeated key as an error.
+# This exercises the json_duplicate_key diagnostic.
+
+main {
+    let _ d ← { "alpha": 1, "beta": 2, "alpha": 3 }
+}
