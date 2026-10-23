@@ -143,6 +143,18 @@ impl TypeChecker<'_> {
         name: Symbol,
         span: radix_lexer::Span,
     ) {
+        let peeled = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(object_ty))
+            .1;
+        if matches!(self.types.get(peeled), Type::Record(_)) {
+            self.immutable_assignment_with_args(
+                "assignment_to_fixum_field",
+                span,
+                &[("field", self.member_display_name(name))],
+            );
+            return;
+        }
         if let Some(members) = self.union_members_of(object_ty) {
             // A write through the overlap reaches every member's field, so each
             // one that declares a modifier must declare `varia`.

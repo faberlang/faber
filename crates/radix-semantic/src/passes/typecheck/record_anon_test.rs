@@ -75,6 +75,14 @@ fn stated_field_list_hole_constructor_is_a_record() {
 }
 
 #[test]
+fn record_field_write_is_refused() {
+    refuses_with(
+        "main {\n    let _ p ← { g = 1.0, w = 2 }\n    p.g ← 3.0\n    print p.w\n}\n",
+        "assignment_to_fixum_field",
+    );
+}
+
+#[test]
 fn record_field_read_is_checked() {
     refuses_with(
         "main {\n    let _ p ← { g = 1.0 }\n    print p.nope\n}\n",
