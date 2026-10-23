@@ -6,7 +6,7 @@
 
 use crate::conversio::bits_conversion_width_mismatch;
 use crate::error::{UNSUPPORTED_ISSUE, unsupported};
-use crate::test_support::{emitted, inline, rejected_construct};
+use crate::test_support::{emitted, program};
 use crate::ty::{Ty, int_width_of_bits, refuse_bits_operand};
 use radix_codegen_shared::CodegenError;
 use radix_types::{BitsWidth, TypeTable};
@@ -101,13 +101,24 @@ fn bits_arithmetic_refused_by_name() {
     assert!(refuse_bits_operand(&types, None, "arithmetic on raw bits").is_ok());
 }
 
-/// A `list<bN>` is refused by name. `bytes` (`octeti`) is the seeded
-/// `lista<b8>`, so it reaches this leaf through an authored word and pins the
-/// array arm's refusal without the authored-marker gate.
+/// A `list<bN>` literal carries raw bits through its own C family and shows
+/// each element as a width-padded lowercase hexadecimal pattern.
 #[test]
-fn bits_list_refused_by_name() {
-    let source = inline("main {\n    let bytes b ← |de ad be ef|\n    print b\n}");
-    assert_eq!(rejected_construct("case.fab", &source), "list of raw bits");
+fn bits_list_round_trip() {
+    let code = program(
+        "bits_display.fab",
+        include_str!("../tests/fixtures/run/bits_display.fab"),
+    );
+    assert!(code.contains("faber_list_b8_of(faber_a,"), "{code}");
+    assert!(code.contains("faber_list_b8_show(faber_a,"), "{code}");
+
+    // Empty construction and append exercise the distinct family entrypoints,
+    // in addition to the corpus literal's bulk construction and display.
+    let mutating = crate::test_support::emitted(
+        "main {\n    mut list<b8> bytes ← empty\n    bytes.append(0x0f)\n}",
+    );
+    assert!(mutating.contains("faber_list_b8_new"), "{mutating}");
+    assert!(mutating.contains("faber_list_b8_push"), "{mutating}");
 }
 
 /// The C emitter keeps every operation in a raw-bits value at its own width.

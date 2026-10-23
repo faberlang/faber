@@ -228,6 +228,8 @@ pub(crate) enum Elem {
     /// `wrapping<W>`: the list stores the plain C width and its helpers are
     /// the `FABER_LIST_FAMILY`/`FABER_LIST_OPS` instantiations for that width.
     Modular(IntWidth),
+    /// Raw bits use a distinct `bN` family, separate from same-width words.
+    Bits(BitsWidth),
 }
 
 impl Elem {
@@ -240,6 +242,7 @@ impl Elem {
             Elem::Float => "f64",
             Elem::Float32 => "f32",
             Elem::Modular(width) => width.marker(),
+            Elem::Bits(width) => width.faber_marker(),
         }
     }
 
@@ -252,6 +255,7 @@ impl Elem {
             Elem::Float => "double",
             Elem::Float32 => "float",
             Elem::Modular(width) => width.c_type(),
+            Elem::Bits(width) => int_width_of_bits(width).c_type(),
         }
     }
 
@@ -264,6 +268,12 @@ impl Elem {
             Elem::Float => "faber_list_f64 *",
             Elem::Float32 => "faber_list_f32 *",
             Elem::Modular(width) => width.list_c_pointer(),
+            Elem::Bits(width) => match width {
+                BitsWidth::B8 => "faber_list_b8 *",
+                BitsWidth::B16 => "faber_list_b16 *",
+                BitsWidth::B32 => "faber_list_b32 *",
+                BitsWidth::B64 => "faber_list_b64 *",
+            },
         }
     }
 
@@ -276,6 +286,7 @@ impl Elem {
             Elem::Float => Ty::Float,
             Elem::Float32 => Ty::Float32,
             Elem::Modular(width) => Ty::Modular(width),
+            Elem::Bits(width) => Ty::Bits(width),
         }
     }
 }
@@ -445,7 +456,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Genus(_) => Err(unsupported("list of genus")),
                 Ty::Decimal => Err(unsupported("list of decimals")),
                 Ty::Modular(width) => Ok(Ty::List(Elem::Modular(width))),
-                Ty::Bits(_) => Err(unsupported("list of raw bits")),
+                Ty::Bits(width) => Ok(Ty::List(Elem::Bits(width))),
                 Ty::Saturating(_) => Err(unsupported("list of saturating words")),
                 Ty::None => Err(unsupported("list of none")),
                 Ty::Set(_) => Err(unsupported("list of sets")),

@@ -2022,6 +2022,12 @@ FABER_LIST_FAMILY(text, faber_text)
 FABER_LIST_FAMILY(bool, bool)
 FABER_LIST_FAMILY(f64, double)
 FABER_LIST_FAMILY(f32, float)
+/* Raw bits have their own ABI families: they must not alias the `uN`
+ * modular-word family even though both use the same unsigned C cell. */
+FABER_LIST_FAMILY(b8, uint8_t)
+FABER_LIST_FAMILY(b16, uint16_t)
+FABER_LIST_FAMILY(b32, uint32_t)
+FABER_LIST_FAMILY(b64, uint64_t)
 /* `list<wrapping<W>>` (modular words): the stored cell is the plain width,
  * written only through the modular store and read widened by the emitter. */
 FABER_LIST_FAMILY(i8, int8_t)
@@ -2197,6 +2203,36 @@ FABER_LIST_WORD_SHOW(u16, uint16_t, (uint64_t), "%" PRIu64)
 FABER_LIST_WORD_SHOW(u32, uint32_t, (uint64_t), "%" PRIu64)
 FABER_LIST_WORD_SHOW(u64, uint64_t, (uint64_t), "%" PRIu64)
 
+/* Raw bits show as a fixed-width lowercase hex pattern, not a number. DIGITS
+ * carries both the width and its matching inttypes format (`"2" PRIx8`). */
+#define FABER_LIST_BITS_SHOW(NAME, TYPE, DIGITS)                                        \
+    static inline faber_text faber_list_##NAME##_show(faber_arena *arena,                \
+                                                      const faber_list_##NAME *list) {  \
+        size_t capacity = faber_collection_size_add(                                    \
+            3, faber_collection_size_mul(faber_collection_count_size(list->len), 20));  \
+        char *out = (char *)faber_alloc(arena, sizeof(faber_text_header) + capacity) +   \
+                    sizeof(faber_text_header);                                           \
+        size_t at = 0;                                                                  \
+        int64_t index;                                                                  \
+        out[at++] = '[';                                                                \
+        for (index = 0; index < list->len; index++) {                                   \
+            if (index > 0) {                                                            \
+                out[at++] = ',';                                                        \
+                out[at++] = ' ';                                                        \
+            }                                                                           \
+            at += (size_t)snprintf(out + at, capacity - at, "0x%0" DIGITS,             \
+                                   (TYPE)list->items[index]);                            \
+        }                                                                               \
+        out[at++] = ']';                                                                \
+        out[at] = '\0';                                                               \
+        return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);       \
+    }
+
+FABER_LIST_BITS_SHOW(b8, uint8_t, "2" PRIx8)
+FABER_LIST_BITS_SHOW(b16, uint16_t, "4" PRIx16)
+FABER_LIST_BITS_SHOW(b32, uint32_t, "8" PRIx32)
+FABER_LIST_BITS_SHOW(b64, uint64_t, "16" PRIx64)
+
 /* ------------------------------------------------------------------------ */
 /* List operations beyond the family: queries, copies, ends, ordering       */
 /* ------------------------------------------------------------------------ */
@@ -2369,6 +2405,10 @@ FABER_LIST_OPS(u8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 
 /* Sets (`copia<T>`): the list storage under the set contract, plus an
  * open-addressing index over the element positions so membership stays

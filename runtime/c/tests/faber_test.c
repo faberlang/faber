@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
     faber_list_i64 *ints;
     faber_list_text *texts;
     faber_list_bool *flags;
+    faber_list_b8 *bits;
     int64_t index;
 
     if (argc == 2 && strcmp(argv[1], "--overflow-capacity") == 0) {
@@ -87,6 +88,13 @@ int main(int argc, char **argv) {
     flags = faber_list_bool_of(&arena, 2, (bool[]){true, false});
     check_text("bool show", faber_list_bool_show(&arena, flags, "true", "false"), "[true, false]");
     check_text("empty show", faber_list_i64_show(&arena, faber_list_i64_new(&arena, 0)), "[]");
+    bits = faber_list_b8_new(&arena, 0);
+    faber_list_b8_push(&arena, bits, 0x00);
+    faber_list_b8_push(&arena, bits, 0x0f);
+    faber_list_b8_push(&arena, bits, 0xa5);
+    faber_list_b8_push(&arena, bits, 0xff);
+    check_text("raw bits list show", faber_list_b8_show(&arena, bits),
+               "[0x00, 0x0f, 0xa5, 0xff]");
 
     /* Floats print as the runner prints them. */
     {
