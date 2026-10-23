@@ -23,6 +23,12 @@
       "phase": "emit",
       "diagnostic_contains": "failable_call_requires_handler",
       "reason": "The C route rejects fs-conformance during semantic analysis: the write_then_read helper's unhandled failable fs.write_file and fs.read_file calls emit SEM011 before the C package gate runs."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "failable_call_requires_handler",
+      "reason": "The Go lane carries no `solum:*` fs port yet, so this package could not be lowered to Go even once it compiles; today it is refused earlier still, by `failable_call_requires_handler` from the unhandled failable `fs.write_file` and `fs.read_file` calls in the `write_then_read` helper during semantic analysis, before the Go leaf gate runs. Re-measure this row when the fs port lands and the helper handles its failures."
     }
   }
 }

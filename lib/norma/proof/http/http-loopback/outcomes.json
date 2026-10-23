@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "error[E0308]",
       "reason": "Rust emit lowers `let string ∪ none sent ← incoming.req.header(\"x-client\")` to `let l_sent: Option<String> = Some(l_incoming.req.header(...))`: the already-optional header result is wrapped in Some, so cargo rejects the generated crate with E0308 (expected `String`, found `Option<String>`). The stored-promise E0562 reason is gone with the split open_pending/finish_pending exchange; the runner passes and the exchange assertions are untouched."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "leaf_unsupported_on_target",
+      "reason": "The Go lane carries no `http:*` http port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
     }
   }
 }
