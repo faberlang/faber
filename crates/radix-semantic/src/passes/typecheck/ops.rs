@@ -1353,10 +1353,6 @@ impl TypeChecker<'_> {
         rhs: &mut HirExpression,
         expected: Option<TypeId>,
     ) -> TypeId {
-        if matches!(op, HirBinOp::Coalesce) {
-            return self.check_coalesce(lhs, rhs);
-        }
-
         match op {
             HirBinOp::Add => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
@@ -1504,7 +1500,7 @@ impl TypeChecker<'_> {
             HirBinOp::Between | HirBinOp::NotBetween => {
                 unreachable!("membership is resolved by check_membership before check_binary")
             }
-            HirBinOp::Coalesce => unreachable!("coalesce is handled before eager rhs checking"),
+            HirBinOp::Coalesce => self.check_coalesce(lhs, rhs),
             HirBinOp::And => {
                 let lhs_ty = self.check_expr(lhs);
                 // `et` short-circuits: the right conjunct is evaluated only
