@@ -578,34 +578,72 @@ fn runtime_matmul_refuses_the_literal_only_outer_update() {
     assert!(error.args[0].1.contains("K == 1 outer update"));
 }
 
-/// The [`matmul`] fixture with a head-batched plan: a receiver batch of two
-/// over an argument batch of one (the GQA share).
+/// The [`matmul`] fixture with call-site-shape declarations that admit a
+/// batched contraction: a rank-3 receiver, a rank-3 argument and a rank-3
+/// output (`matmul()` declares `[2]` on every resource, which the shared rank
+/// check would reject for the batched shapes). Its plan carries run-time
+/// extents, the form the product dispatcher selects the class for.
 fn batched_matmul() -> KernelUnit {
     let mut unit = matmul();
+    for resource in &mut unit.resources {
+        resource.version.shape = Some(vec![0, 0, 0]);
+    }
     let mut plan = matmul_plan_of(&unit);
-    plan.batch = 2;
+    plan.dims = crate::kernel_plan::MatMulDims::Runtime {
+        class: crate::kernel_plan::MatMulClass::Tiled,
+    };
+    // A run-time plan carries no batch fact of its own: the call-site shapes
+    // are the only source.
+    plan.batch = 1;
     plan.right_batch = 1;
     unit.plan = CollectionKernelPlan::TiledMatMul(plan);
     unit
 }
 
-/// S05 family-3 seam: the batched tiled-matmul plan shape
-/// (`MatMulPlan::batch`/`right_batch`) is refused by launch geometry. This is
-/// a missing launch geometry for the batched form, not a missing spelling —
-/// the source spellings (`·` glyph and `matmul`) are rank-2 contractions, and
-/// the tuned batched-attention recipe (`TensorBatchedAttention`) is internal
-/// device vocabulary with no source spelling by design
-/// (`crates/radix-module/src/intrinsics/bijection_ratchet_test.rs`
-/// permanent allowlist).
+/// The batched launch is `dispatch_y = batch·ceil(M/tile)`: one padded
+/// row-block per flattened batch index, `dispatch_x = ceil(N/tile)` unchanged.
 #[test]
-fn batched_tiled_matmul_geometry_is_refused() {
-    // The refusal fires before extent selection, so plain rank-2 shapes do.
-    let shapes = vec![vec![4, 4], vec![4, 4], vec![4, 4]];
+fn runtime_batched_matmul_geometry_is_the_padded_row_block_grid() {
+    // [2,5,3] · [2,3,7]: ceil(7/8) = 1 on x, 2·ceil(5/8) = 2 on y.
+    let shapes = vec![vec![2, 5, 3], vec![2, 3, 7], vec![2, 5, 7]];
     assert_eq!(
         geometry_for_call(&batched_matmul(), &shapes),
-        Err(error(
-            GEOMETRY_PLAN_NOT_COVERED,
-            &[("plan", "TiledMatMul(batched)")]
-        ))
+        Ok(CallGeometry {
+            grid: [1, 2, 1],
+            block: [8, 8, 1]
+        })
     );
+}
+
+/// The right operand's batch axes must be an elementwise prefix of the
+/// receiver's: `[3]` is not a prefix of `[2]`.
+#[test]
+fn runtime_batched_matmul_geometry_refuses_a_batch_prefix_mismatch() {
+    let shapes = vec![vec![2, 5, 3], vec![3, 3, 7], vec![2, 5, 7]];
+    let error = geometry_for_call(&batched_matmul(), &shapes).expect_err("prefix mismatch");
+    assert_eq!(error.code, GEOMETRY_SHAPE_NOT_COVERED);
+}
+
+/// A batched call always launches the batched Tiled body, even where the same
+/// extents would select OneRow unbatched (`m == 1`).
+#[test]
+fn runtime_batched_matmul_launch_plan_selects_the_tiled_class() {
+    use crate::kernel_plan::{MatMulClass, MatMulDims};
+    let shapes = vec![vec![2, 1, 3], vec![2, 3, 7], vec![2, 1, 7]];
+    let launched = matmul_launch_plan(&matmul_plan_of(&batched_matmul()), &shapes)
+        .expect("batched launch plan");
+    assert_eq!(
+        launched.dims,
+        MatMulDims::Runtime {
+            class: MatMulClass::Tiled
+        }
+    );
+}
+
+/// The K == 1 outer update stays literal-only, batched or not.
+#[test]
+fn runtime_batched_matmul_geometry_keeps_the_outer_update_refusal() {
+    let shapes = vec![vec![2, 5, 1], vec![2, 1, 7], vec![2, 5, 7]];
+    let error = geometry_for_call(&batched_matmul(), &shapes).expect_err("K == 1 outer update");
+    assert_eq!(error.code, GEOMETRY_SHAPE_NOT_COVERED);
 }

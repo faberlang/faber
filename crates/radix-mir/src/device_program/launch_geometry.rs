@@ -17,7 +17,7 @@
 //! | plan | geometry |
 //! | --- | --- |
 //! | `Elementwise`, unbatched `RowSoftmax` | generic 1-D over the output element count |
-//! | `TiledMatMul` (rank-2, unbatched) | tile grid `(ceil(N/tile), ceil(M/tile))`, verbatim |
+//! | `TiledMatMul` | tile grid `(ceil(N/tile), batch · ceil(M/tile))`, verbatim; the batch is `1` for a rank-2 contraction |
 //! | `LaneGrid` | generic 1-D over the element count of the source resource's call-site shape |
 //! | `Transpose` | `plan.workgroup_x` lanes over the input element count |
 //! | `GridReduce` | two stages ([`LaunchStages::Staged`], via [`launch_stages_for_call`]): `p = min(ceil(n / workgroup), partials_cap)` workgroups, then one |
@@ -356,25 +356,40 @@ fn generic_1d(unit: &KernelUnit, elements: u64) -> Result<CallGeometry, Geometry
 ///
 /// # Errors
 ///
-/// Returns a [`GeometryError`] when the operand shapes are not a rank-2 (or
-/// rank-1 right) matmul with agreeing inner dimensions, or the shapes select
-/// a literal-only body.
+/// Returns a [`GeometryError`] when the operand shapes are not a rank 2..=4
+/// left with a rank 2..=left-rank (or rank-1, rank-2 left) right and agreeing
+/// inner dimensions, or the shapes select a literal-only body.
 pub fn matmul_launch_plan(
     matmul: &crate::kernel_plan::MatMulPlan,
     shapes: &[Vec<u64>],
 ) -> Result<crate::kernel_plan::MatMulPlan, GeometryError> {
-    let (m, k, n) = matmul_extents(shapes)?;
+    let extents = matmul_extents(shapes)?;
+    let k1_refusal = || {
+        GeometryError::new(
+            GEOMETRY_SHAPE_NOT_COVERED,
+            vec![(
+                "reason",
+                "matmul with run-time extents does not cover the K == 1 outer update (literal-only)"
+                    .to_owned(),
+            )],
+        )
+    };
     let mut plan = matmul.clone();
     if let MatMulDims::Runtime { .. } = plan.dims {
-        let Some(class) = matmul_class_for_extents(m, k, n) else {
-            return Err(GeometryError::new(
-                GEOMETRY_SHAPE_NOT_COVERED,
-                vec![(
-                    "reason",
-                    "matmul with run-time extents does not cover the K == 1 outer update (literal-only)"
-                        .to_owned(),
-                )],
-            ));
+        // A batched run-time call always launches the batched Tiled body: the
+        // OneRow, Gemv and Simdgroup bodies are rank-2-only. The K == 1 outer
+        // update stays literal-only for both forms.
+        if extents.batch > 1 {
+            if extents.k == 1 {
+                return Err(k1_refusal());
+            }
+            plan.dims = MatMulDims::Runtime {
+                class: crate::kernel_plan::MatMulClass::Tiled,
+            };
+            return Ok(plan);
+        }
+        let Some(class) = matmul_class_for_extents(extents.m, extents.k, extents.n) else {
+            return Err(k1_refusal());
         };
         plan.dims = MatMulDims::Runtime { class };
     }
@@ -409,61 +424,126 @@ pub fn matmul_class_entry(entry: &str, class: crate::kernel_plan::MatMulClass) -
     }
 }
 
-/// `(m, k, n)` from the two operand call-site shapes.
-fn matmul_extents(shapes: &[Vec<u64>]) -> Result<(u64, u64, u64), GeometryError> {
+/// The extents of one matmul call: the contraction `(m, k, n)` plus the batch
+/// facts the launch folds into `dispatch_y`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MatMulExtents {
+    m: u64,
+    k: u64,
+    n: u64,
+    /// Product of the left operand's leading axes, row-major; `1` for a rank-2
+    /// contraction.
+    batch: u64,
+    /// Product of the right operand's leading axes, row-major. The right batch
+    /// axes are an elementwise prefix of the left's (the GQA share); `1` for a
+    /// rank-2 right.
+    right_batch: u64,
+}
+
+/// The extents and batch facts of the two operand call-site shapes: the left
+/// operand is rank 2..=4 (`l_batch, m, k`), the right one rank 1 (only with a
+/// rank-2 left) or rank 2..=left-rank (`r_batch, k, n`).
+fn matmul_extents(shapes: &[Vec<u64>]) -> Result<MatMulExtents, GeometryError> {
     let uncovered = |reason: &str| {
         GeometryError::new(
             GEOMETRY_SHAPE_NOT_COVERED,
             vec![("reason", reason.to_owned())],
         )
     };
+    let product = |axes: &[u64]| {
+        axes.iter()
+            .try_fold(1_u64, |acc, &extent| acc.checked_mul(extent))
+    };
     let (Some(left), Some(right)) = (shapes.first(), shapes.get(1)) else {
         return Err(uncovered("matmul needs two operands"));
     };
-    let (m, k) = match left.as_slice() {
-        [m, k] => (*m, *k),
-        _ => return Err(uncovered("matmul left operand is not rank 2")),
-    };
-    let (k_right, n) = match right.as_slice() {
-        [k, n] => (*k, *n),
-        [k] => (*k, 1),
-        _ => return Err(uncovered("matmul right operand is not rank 1 or 2")),
+    if !(2..=4).contains(&left.len()) {
+        return Err(uncovered("matmul left operand is not rank 2 to 4"));
+    }
+    let (l_batch, rows) = left.split_at(left.len() - 2);
+    let (m, k) = (rows[0], rows[1]);
+    let (r_batch, k_right, n): (&[u64], u64, u64) = match right.as_slice() {
+        [k_right] if left.len() == 2 => (&[], *k_right, 1),
+        _ if (2..=left.len()).contains(&right.len()) => {
+            let (r_batch, tail) = right.split_at(right.len() - 2);
+            (r_batch, tail[0], tail[1])
+        }
+        _ => {
+            return Err(uncovered(
+                "matmul right operand is not rank 1 or 2 to the left's rank",
+            ));
+        }
     };
     if k != k_right {
         return Err(uncovered("matmul inner dimensions differ"));
     }
-    Ok((m, k, n))
+    let batch = product(l_batch).ok_or_else(|| uncovered("matmul batch overflows 64 bits"))?;
+    let right_batch =
+        product(r_batch).ok_or_else(|| uncovered("matmul batch overflows 64 bits"))?;
+    if batch == 0 || right_batch == 0 || m == 0 || k == 0 || n == 0 {
+        return Err(uncovered("matmul extents are zero"));
+    }
+    if !l_batch.starts_with(r_batch) {
+        return Err(uncovered("matmul batch axes are not a prefix"));
+    }
+    if !batch.is_multiple_of(right_batch) {
+        return Err(uncovered("matmul right batch does not divide the batch"));
+    }
+    Ok(MatMulExtents {
+        m,
+        k,
+        n,
+        batch,
+        right_batch,
+    })
 }
 
-/// Tile grid `(ceil(N/tile), ceil(M/tile))`, launched verbatim.
+/// Tile grid `(ceil(N/tile), batch · ceil(M/tile))`, launched verbatim: one
+/// padded row-block per flattened batch index.
 fn tiled_matmul(
     matmul: &crate::kernel_plan::MatMulPlan,
     shapes: &[Vec<u64>],
 ) -> Result<CallGeometry, GeometryError> {
-    if matmul.batch != 1 || matmul.right_batch != 1 {
+    let plan = matmul_launch_plan(matmul, shapes)?;
+    let extents = matmul_extents(shapes)?;
+    // A literal plan carries its batch facts; the call-site shapes must agree
+    // with them (a run-time plan has no batch of its own to compare against).
+    if matches!(plan.dims, MatMulDims::Literal { .. })
+        && (extents.batch != matmul.batch || extents.right_batch != matmul.right_batch)
+    {
         return Err(GeometryError::new(
-            GEOMETRY_PLAN_NOT_COVERED,
-            vec![("plan", "TiledMatMul(batched)".to_owned())],
+            GEOMETRY_SHAPE_NOT_COVERED,
+            vec![(
+                "reason",
+                "matmul batch disagrees with the literal plan".to_owned(),
+            )],
         ));
     }
-    let plan = matmul_launch_plan(matmul, shapes)?;
-    let (m, _, n) = matmul_extents(shapes)?;
     let tile = u64::from(plan.tile.max(1));
     let workgroup = MirWorkgroupSize {
         x: plan.workgroup_x,
         y: plan.workgroup_y,
         z: 1,
     };
-    let grid = |extent: u64| {
-        u32::try_from(extent.div_ceil(tile)).map_err(|_| {
+    let narrow = |count: u64| {
+        u32::try_from(count).map_err(|_| {
             GeometryError::new(
                 GEOMETRY_EXTENT_OVERFLOW,
-                vec![("extent", extent.to_string())],
+                vec![("extent", count.to_string())],
             )
         })
     };
+    let row_blocks = extents
+        .batch
+        .checked_mul(extents.m.div_ceil(tile))
+        .ok_or_else(|| {
+            GeometryError::new(
+                GEOMETRY_EXTENT_OVERFLOW,
+                vec![("extent", extents.batch.to_string())],
+            )
+        })?;
     Ok(CallGeometry {
-        grid: [grid(n)?, grid(m)?, 1],
+        grid: [narrow(extents.n.div_ceil(tile))?, narrow(row_blocks)?, 1],
         block: [workgroup.x, workgroup.y, workgroup.z],
     })
 }
