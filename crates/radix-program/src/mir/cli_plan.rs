@@ -2,6 +2,7 @@
 //! semantic-type import surface used when rehoming types between analysis
 //! `TypeTable`s (source → target with canonical nominal identity).
 
+use super::cli_values::plan_cli_command_records_check;
 use super::{
     AnalyzedProgram, AnalyzedProgramNode, BTreeSet, CliCommand, CliDefault, CliDispatchPlan,
     CliEntryRecords, CliMode, CliOperand, CliOption, CliPackagePlan, CliPlanningMode, CliProgram,
@@ -109,13 +110,21 @@ pub(super) fn plan_cli_package(
                 ));
                 return Err(diagnostics);
             }
-            plan.dispatch = plan_cli_subcommand(
-                package,
-                &cli_program,
-                argumenta,
-                &mut plan.entry_records,
-                &mut diagnostics,
-            );
+            if mode == CliPlanningMode::Check {
+                if let Some(entry_records) =
+                    plan_cli_subcommand_check(package, &cli_program, &mut diagnostics)
+                {
+                    plan.entry_records = entry_records;
+                }
+            } else {
+                plan.dispatch = plan_cli_subcommand(
+                    package,
+                    &cli_program,
+                    argumenta,
+                    &mut plan.entry_records,
+                    &mut diagnostics,
+                );
+            }
         }
         CliMode::NotCli => {}
     }
@@ -805,6 +814,92 @@ pub(super) fn plan_cli_subcommand(
         function: target_command.function_symbol,
         record_type_rewrite,
     })
+}
+
+/// `faber check --lower` planning for a subcommand root entry.
+///
+/// The argv is a runtime question, so this path keeps every surface rejection
+/// of [`plan_cli_subcommand`] but never parses arguments or matches a command:
+/// global options take their declared defaults, operands take their `vel`
+/// default or a typed placeholder, and each command that declares an args
+/// binding plans its own record. No dispatch entry is installed; the root body
+/// is required to be empty, so nothing needs one.
+pub(super) fn plan_cli_subcommand_check(
+    package: &mut AnalyzedProgram,
+    cli_program: &CliProgram,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<CliEntryRecords> {
+    let entry_path = package.spec.entry.clone();
+    if !subcommand_cli_surface_supported(cli_program, &entry_path, diagnostics) {
+        return None;
+    }
+
+    let entry_id = program_entry_id(package)?;
+    let global_options = planned_cli_options(
+        &package.nodes.get(&entry_id)?.analysis.interner,
+        cli_program.global_options.iter(),
+    );
+    let global_operands = planned_cli_operands(
+        &package.nodes.get(&entry_id)?.analysis.interner,
+        cli_program.global_operands.iter(),
+    );
+    let mut entry_records = CliEntryRecords::new();
+
+    let entry_unit = package.nodes.get_mut(&entry_id)?;
+    let mut entry_fields = global_options
+        .iter()
+        .map(|option| cli_option_default_field(entry_unit, option, diagnostics))
+        .collect::<Option<Vec<_>>>()?;
+    entry_fields.extend(cli_operand_record_fields(
+        entry_unit,
+        &global_operands,
+        &[],
+        diagnostics,
+        MissingOperandPolicy::Check,
+    )?);
+    if let Some(record_ty) = entry_cli_args_type(entry_unit)
+        && !entry_fields.is_empty()
+    {
+        entry_records
+            .entry(entry_unit.path.clone())
+            .or_default()
+            .insert(record_ty, entry_fields);
+    }
+
+    for command in &cli_program.commands {
+        // A command with no args binding takes no argument record; planning the
+        // global fields for it would trip the `CLI argument records` rejection.
+        if command.args_binding.is_none() {
+            continue;
+        }
+        let Some(unit_id) = command_unit_id(package, command) else {
+            diagnostics.push(
+                crate::package_diagnostic_error(format!(
+                    "package MIR could not resolve CLI command module for `{}`",
+                    command.path.join(" ")
+                ))
+                .with_file(entry_path.display().to_string()),
+            );
+            return None;
+        };
+        let target_command = command_in_unit(package.nodes.get(&unit_id)?, command)
+            .cloned()
+            .unwrap_or_else(|| command.clone());
+        let unit = package.nodes.get_mut(&unit_id)?;
+        let unit_path = unit.path.clone();
+        let record_fields = plan_cli_command_records_check(
+            unit,
+            &target_command,
+            &global_options,
+            &global_operands,
+            diagnostics,
+        )?;
+        if let Some(fields) = record_fields {
+            entry_records.entry(unit_path).or_default().extend(fields);
+        }
+    }
+
+    Some(entry_records)
 }
 
 /// Validate the subcommand CLI surface this planner can dispatch, pushing one

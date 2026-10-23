@@ -1,5 +1,6 @@
 //! Package-MIR CLI record/value planning and supported-surface checks.
 
+use super::cli_plan::cli_option_default_field;
 use super::{
     AnalyzedProgram, AnalyzedProgramNode, CliCommand, CliDefault, CliExit, CliOperand, CliOption,
     CliRecordFieldsByType, CliType, Diagnostic, HashMap, MirConstant, MirOperand,
@@ -31,6 +32,58 @@ pub(super) fn plan_cli_command_records(
         &parsed.positionals,
         diagnostics,
         MissingOperandPolicy::Reject,
+    )?);
+    let Some(_args_binding) = &command.args_binding else {
+        if !fields.is_empty() {
+            diagnostics.push(unsupported_cli_diagnostic(
+                &unit.path,
+                "CLI argument records",
+            ));
+            return None;
+        }
+        return Some(None);
+    };
+    let record_ty = match command_cli_args_type(unit, command) {
+        Some(record_ty) => record_ty,
+        None => {
+            diagnostics.push(unsupported_cli_diagnostic(
+                &unit.path,
+                "CLI argument records",
+            ));
+            return None;
+        }
+    };
+    Some(Some(HashMap::from([(record_ty, fields)])))
+}
+
+pub(super) fn plan_cli_command_records_check(
+    unit: &mut AnalyzedProgramNode,
+    command: &CliCommand,
+    global_options: &[PlannedCliOption<'_>],
+    global_operands: &[PlannedCliOperand<'_>],
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<Option<CliRecordFieldsByType>> {
+    let mut operands = global_operands.to_vec();
+    operands.extend(planned_cli_operands(
+        &unit.analysis.interner,
+        command.operands.iter(),
+    ));
+    let mut fields = global_options
+        .iter()
+        .map(|option| cli_option_default_field(unit, option, diagnostics))
+        .collect::<Option<Vec<_>>>()?;
+    fields.extend(
+        planned_cli_options(&unit.analysis.interner, command.options.iter())
+            .iter()
+            .map(|option| cli_option_default_field(unit, option, diagnostics))
+            .collect::<Option<Vec<_>>>()?,
+    );
+    fields.extend(cli_operand_record_fields(
+        unit,
+        &operands,
+        &[],
+        diagnostics,
+        MissingOperandPolicy::Check,
     )?);
     let Some(_args_binding) = &command.args_binding else {
         if !fields.is_empty() {
