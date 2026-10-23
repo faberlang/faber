@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/matrix/element-access-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "matrix/element-access-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "index_provably_out_of_bounds"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "index_provably_out_of_bounds"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "index_provably_out_of_bounds"
