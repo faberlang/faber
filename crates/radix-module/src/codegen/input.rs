@@ -14,7 +14,7 @@
 //!   analyzed unit the driver carried for that edge; a failed carriage stays
 //!   fail-closed as [`CodegenProvider::Failed`] instead of an absent unit.
 //! - The driver depends on codegen, never the reverse: this module names no
-//!   `crate::driver` type.
+//!   driver type.
 
 use crate::diagnostics::Diagnostic;
 use crate::hir::{DefId, HirModule, HirPresentation, LibraryRegistry};
