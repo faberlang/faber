@@ -1,0 +1,18 @@
++++
+locale = "en"
+term = "python_import_conversion_required"
+kind = "concept"
+category = "package"
+canonical = false
+summary = "A target-native import value cannot enter an aggregate cell without an explicit conversion."
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_sugar", "import_target", "named_import", "incipit_stmt", "block_stmt", "nota_stmt", "member_suffix", "expression"]
+no_expected = "rejects"
+diagnostic = "SEM010:import_conversion_required"
++++
+# A target-native import value needs an explicit conversion before it can be
+# stored in a structural cell.
+import python "math" m
+
+main {
+    let list<int> xs ← m.arange(5)
+}

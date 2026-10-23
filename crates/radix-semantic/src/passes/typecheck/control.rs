@@ -348,16 +348,92 @@ impl TypeChecker<'_> {
     ///
     /// The expected type helps shape unresolved expressions, but the final
     /// predicate still checks the resolved result so permissive inference cannot
-    /// silently accept a non-`bivalens` condition.
+    /// silently accept a non-`bivalens` condition. A condition that observes a
+    /// target-native import value (need, the condition half of the
+    /// observation law) is the one exemption: an `ignotum` condition converts
+    /// with implicit syntax but forced semantics, so the target's own truthiness
+    /// judges it and the checker accepts it instead of repainting it.
     pub fn check_condition(&mut self, cond: &mut HirExpression) {
         let bivalens = self.bool_type();
-        let cond_ty = self.check_expr_with_expected(cond, Some(bivalens));
-        if self.resolve_inferred_type(cond_ty) == self.error_type {
+        // WHY: no `bivalens` hint when an import value is observed — the hint
+        // would repaint the `ignotum` result and report the mismatch it was
+        // supposed to exempt.
+        let cond_ty = if self.condition_may_observe_import(cond) {
+            self.check_expr(cond)
+        } else {
+            self.check_expr_with_expected(cond, Some(bivalens))
+        };
+        let resolved = self.resolve_inferred_type(cond_ty);
+        if resolved == self.error_type {
             return;
         }
-        if !self.is_bool(cond_ty) {
-            self.report_mask_not_truth_value(cond_ty, cond.span);
+        if self.is_bool(cond_ty) {
+            return;
         }
+        if matches!(
+            self.types.get(resolved),
+            Type::Primitive(Primitive::Ignotum)
+        ) {
+            return;
+        }
+        // An open hole binds to `bivalens`; anything else stays a mask report.
+        if self.is_infer(resolved) {
+            self.unify_assign_issue(cond_ty, bivalens, cond.span, "expression_type_mismatch");
+            return;
+        }
+        self.report_mask_not_truth_value(cond_ty, cond.span);
+    }
+
+    /// Whether `cond` observes a target-native import value: a path to an
+    /// `ignotum` binding anywhere in the condition, including either side of an
+    /// ordering comparison, since an ordering with an `ignotum` operand yields
+    /// `ignotum` rather than `bivalens`.
+    fn condition_may_observe_import(&self, cond: &HirExpression) -> bool {
+        struct IgnotumPathProbe<'a, 'b> {
+            checker: &'a TypeChecker<'b>,
+            found: bool,
+        }
+
+        impl HirVisitor for IgnotumPathProbe<'_, '_> {
+            fn visit_expr(&mut self, expr: &HirExpression) {
+                if self.found {
+                    return;
+                }
+                if let HirExpressionKind::Path(def_id) = &expr.kind
+                    && self.checker.path_reads_as_ignotum(*def_id)
+                {
+                    self.found = true;
+                    return;
+                }
+                walk_expr(self, expr);
+            }
+        }
+
+        let mut probe = IgnotumPathProbe {
+            checker: self,
+            found: false,
+        };
+        probe.visit_expr(cond);
+        probe.found
+    }
+
+    /// Whether a resolved path reads as `ignotum`, either because it names a
+    /// target-native import receiver or because its visible binding is typed
+    /// `ignotum`.
+    fn path_reads_as_ignotum(&self, def_id: DefId) -> bool {
+        if self.import_receivers.contains(&def_id) {
+            return true;
+        }
+        let Some(binding) = self.lookup_binding(def_id) else {
+            return false;
+        };
+        let ty = self.resolve_inferred_type(binding.ty);
+        let ty = self.peel_nominal_aliases(ty);
+        let ty = self.types.peel_access_marker(ty).1;
+        matches!(
+            self.types.get(self.peel_nominal_aliases(ty)),
+            Type::Primitive(Primitive::Ignotum)
+        )
     }
 
     /// [`Self::check_condition`] for a condition that may be a select mask: a
@@ -375,6 +451,16 @@ impl TypeChecker<'_> {
             return None;
         }
         if self.is_bool(cond_ty) {
+            return None;
+        }
+        // A target-native import value observed at the condition is not a
+        // select mask and not a truth value: the target's own truthiness
+        // judges it (need, the condition half of the observation
+        // law), so it is accepted unreported.
+        if matches!(
+            self.types.get(self.peel_nominal_aliases(resolved)),
+            Type::Primitive(Primitive::Ignotum)
+        ) {
             return None;
         }
         if self.is_aggregate_mask_type(cond_ty) {

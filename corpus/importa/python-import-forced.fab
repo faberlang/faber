@@ -1,0 +1,20 @@
++++
+locale = "en"
+term = "python_import_forced"
+kind = "concept"
+category = "package"
+canonical = false
+summary = "A target-native import value crosses into a Faber scalar cell implicitly and into a structural cell only through an explicit transfer."
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_sugar", "import_target", "named_import", "incipit_stmt", "block_stmt", "nota_stmt", "member_suffix", "expression"]
++++
+# Both doors out of a target-native import: the scalar door converts silently
+# into an f64 cell, while the structural door needs the explicit ↦ transfer.
+import python "math" m
+import python "re" re
+
+main {
+    let f64 root ← m.sqrt(2.0)
+    let list<string> words ← re.findall("[a-z]+", "a1b2") ↦ list<string>
+    print root
+    print words
+}
