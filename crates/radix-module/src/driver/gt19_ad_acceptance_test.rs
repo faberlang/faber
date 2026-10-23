@@ -1,5 +1,8 @@
 //! GT19 product-boundary AD acceptance receipts, la locale.
 //!
+//! GT19 AD acceptance — the rope_norm backward companion, end-to-end through
+//! the driver.
+//!
 //! The single-file runner must install AIR backward companions just like the
 //! package MIR path. This pins an annotated mean-of-product primal and its
 //! interprocedural unit residual through the public source runner.
@@ -33,7 +36,9 @@ use crate::air::{
     AirTensorOp, AirToMirContext, AirValueId, to_mir_program,
 };
 use crate::codegen::Target;
-use crate::driver::{Config, Session};
+use crate::driver::{
+    AnalyzeRequest, Config, Session, SpannedCodegenError, analyze_source, lower_mir_with_context_for_target,
+};
 use crate::hir::DefId;
 use crate::lexer::{Span, Symbol};
 use crate::mir::{
@@ -43,6 +48,26 @@ use crate::mir::{
 };
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable, i64s_from_literal_index};
 use rustc_hash::FxHashMap;
+use crate::test_support::test_session_la;
+
+/// Unwrap a driver result, panicking with the codegen error message
+/// (`SpannedCodegenError` carries no `Debug` impl).
+fn expect_codegen_ok<T>(result: Result<T, SpannedCodegenError>, what: &str) -> T {
+    match result {
+        Ok(value) => value,
+        Err(error) => panic!("{what}: {}", error.message),
+    }
+}
+
+/// Names of every lowered MIR function, resolved through the lowering
+/// interner.
+fn mir_function_names(program: &crate::mir::MirProgram, interner: &crate::lexer::Interner) -> Vec<String> {
+    program
+        .functions
+        .iter()
+        .filter_map(|f| f.name.map(|symbol| interner.resolve(symbol).to_owned()))
+        .collect()
+}
 
 fn gt19_session() -> Session {
     Session::new(
@@ -137,6 +162,49 @@ fn gt19_check_close(name: &str, observed: &[f64], expected: &[f64]) {
             "{name}[{index}]: observed {observed} vs expected {expected}"
         );
     }
+}
+
+/// The GT19 rope backward companion fixture: an annotated `rope_norm` primal
+/// over an interleaved `[rows, dim/2, 3]` table with
+/// `theta_k = 8 * 100000^(-2k/8)`, cos and sin per pair, both rows identical.
+/// `x` mirrors the pinned `rope_norm` fixture rows.
+const GT19_ROPE_SOURCE: &str = r#"
+@ radix lane "air"
+@ radix backward "rope_backward"
+functio rot(tf32[2, 8] x, tf32[2, 4, 3] table) → fractus {
+    sit tensor<f32, [2, 8]> y ← x.rope_norm<8>(8, table)
+    redde y.media()
+}
+
+functio unitas() → vacuum {
+    tacet
+}
+
+incipit {
+    sit lista<f32> flat ← [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, -1.5]
+    sit tensor<f32, [2, 8]> x ← flat ↦ tensor<f32, [2, 8]>
+    sit lista<f32> table_flat ← [8.0, -0.1455000338, 0.9893582466, 0.4498730602, 0.9005023096, 0.434851228, 0.0252982213, 0.9996800171, 0.0252955229, 0.0014226235, 0.9999989881, 0.001422623, 8.0, -0.1455000338, 0.9893582466, 0.4498730602, 0.9005023096, 0.434851228, 0.0252982213, 0.9996800171, 0.0252955229, 0.0014226235, 0.9999989881, 0.001422623]
+    sit tensor<f32, [2, 4, 3]> rope_table ← table_flat ↦ tensor<f32, [2, 4, 3]>
+    sit [gx, gt] ← rope_backward(x, rope_table, unitas(), 1.0)
+    nota gx
+    nota gt
+}
+"#;
+
+#[test]
+fn gt19_rope_backward_companion_compiles() {
+    let session = test_session_la(Target::MirLlvm);
+    let mut analysis = analyze_source(&session, "gt19_rope_backward.fab", GT19_ROPE_SOURCE, AnalyzeRequest::default())
+        .expect("rope backward should analyze cleanly");
+    let lowered = expect_codegen_ok(
+        lower_mir_with_context_for_target(&mut analysis, false),
+        "rope backward should lower after bundle application",
+    );
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
+    assert!(
+        names.iter().any(|name| name == "rope_backward"),
+        "rope backward companion must be installed; got functions: {names:?}"
+    );
 }
 
 #[test]
