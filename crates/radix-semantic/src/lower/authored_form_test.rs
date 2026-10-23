@@ -219,8 +219,9 @@ fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
 #[test]
 fn sermo_authored_head_is_named() {
     // The conversation word is a builtin authored head: `sermo<O, R>` names
-    // the frame definition, and finalize erases the applied witness to the
-    // bare carrier `sermo`, so the recorded form keeps no child arguments.
+    // the frame definition and keeps both authored child forms. Finalize
+    // erases only the applied semantic witness to the bare carrier `sermo`,
+    // canonicalizing the children instead of dropping them.
     let source = concat!(
         "@ call 'salutatio:greeting'\n",
         "fn greeting() → string {\n",
@@ -247,11 +248,28 @@ fn sermo_authored_head_is_named() {
     };
     assert_eq!(*def_id, sermo_def, "named head names the sermo definition");
     assert!(!path.is_empty(), "named head keeps the authored spelling");
-    assert!(
-        form.args.is_empty(),
-        "the erased witness has no applied arguments, got {:?}",
-        form.args
-    );
+    let [HirTypeFormArg::Type(opener), HirTypeFormArg::Type(reply)] = form.args.as_slice() else {
+        panic!(
+            "expected the two authored children `none, string`, got {:?}",
+            form.args
+        );
+    };
+    for (child, expected, name) in [
+        (opener, Primitive::Nihil, "none"),
+        (reply, Primitive::Textus, "string"),
+    ] {
+        assert_eq!(
+            child.head,
+            HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+            "{name} keeps its authored semantic head"
+        );
+        assert!(child.args.is_empty(), "{name} is a leaf form");
+        assert!(
+            matches!(fixture.result.types.get(child.ty), Type::Primitive(prim) if *prim == expected),
+            "{name} keeps its semantic witness, got {:?}",
+            fixture.result.types.get(child.ty)
+        );
+    }
     assert_eq!(Some(form.ty), local_ty, "witness equals HIR type");
     assert!(
         matches!(fixture.result.types.get(form.ty), Type::Struct(def) if *def == sermo_def),
