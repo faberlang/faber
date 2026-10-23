@@ -2,27 +2,28 @@
 locale = "en"
 +++
 
-# N2 remainder: stdio, process, clock, entropy on both runtimes.
-# Output must match under `faber run` and a `faber build` Rust binary.
-
-import from "norma:process" process
-import from "norma:time" time
-import from "norma:random" random
+# The route set exercised here spans process, clock and entropy on runner and
+# Go; Go leaf tests pin OS bytes, UUID shape, process faults and exit status.
 
 main {
-    time.sleep(0)
-    let int before ← time.monotonic()
-    let int after ← time.monotonic()
+    let void _ ← call 'tempus:dormiet' (0) ↦ void
+    let int before ← call 'tempus:monotonicum' ↦ int
+    let int after ← call 'tempus:monotonicum' ↦ int
     assert after ≥ before
-    random.seed(7)
-    let int first ← random.random_int(1, 9)
-    random.seed(7)
-    let int second ← random.random_int(1, 9)
+
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int first ← call 'aleator:sortire' ([1, 9]) ↦ int
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int second ← call 'aleator:sortire' ([1, 9]) ↦ int
     assert first ≡ second
-    let string id ← random.uuid()
+    let string id ← call 'aleator:uuid' ↦ string
     assert id.length() ≡ 36
-    assert process.pid() ≻ 0
-    assert process.cwd().length() ≻ 0
-    assert process.exec("printf leaves-ok") ≡ "leaves-ok"
+
+    let int pid ← call 'processus:identitas' ↦ int
+    assert pid ≻ 0
+    let string cwd ← call 'processus:sedes' ↦ string
+    assert cwd.length() ≻ 0
+    let string output ← call 'processus:exsequi' ("printf leaves-ok") ↦ string
+    assert output ≡ "leaves-ok"
     print "leaves-ok"
 }

@@ -11,12 +11,6 @@
       "phase": "emit",
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber build -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate runs, so no C code is produced and the leaves-conformance route sweep is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
-    },
-    "go": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "undefined: time",
-      "reason": "The Go lane does not yet provide the Norma time, entropy, and process leaf bindings used by this case."
     }
   }
 }

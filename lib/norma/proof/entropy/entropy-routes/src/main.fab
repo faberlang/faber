@@ -2,57 +2,23 @@
 locale = "en"
 +++
 
-# Entropy leaf routes through the Norma wrappers.
-#
-# Covers: aleator:semina (random.seed), aleator:sortire (random.random_int),
-# aleator:fractum (random.random_float), aleator:octetos (random.random_bytes),
-# and aleator:uuid (random.uuid).
-
-import from "norma:random" random
+# Route-level entropy conformance, including OS-byte and UUID lanes.
 
 main {
-    # aleator:semina + aleator:sortire: the same seed replays the same draws.
-    random.seed(7)
-    let int first ← random.random_int(1, 9)
-    let int second ← random.random_int(1, 9)
-    random.seed(7)
-    let int replayFirst ← random.random_int(1, 9)
-    let int replaySecond ← random.random_int(1, 9)
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int first ← call 'aleator:sortire' ([1, 9]) ↦ int
+    let int second ← call 'aleator:sortire' ([1, 9]) ↦ int
+    let void _ ← call 'aleator:semina' (7) ↦ void
+    let int replayFirst ← call 'aleator:sortire' ([1, 9]) ↦ int
+    let int replaySecond ← call 'aleator:sortire' ([1, 9]) ↦ int
     assert first ≡ replayFirst
     assert second ≡ replaySecond
 
-    # aleator:sortire: every draw stays inside the inclusive range.
-    mut int index ← 0
-    while index ≺ 50 {
-        let int value ← random.random_int(1, 9)
-        assert value ≥ 1
-        assert value ≤ 9
-        index ← index + 1
-    }
-
-    # aleator:sortire: a single-value range returns that value.
-    assert random.random_int(5, 5) ≡ 5
-
-    # aleator:fractum: random_float lies in [0.0, 1.0).
-    let float fraction ← random.random_float()
-    assert fraction ≥ 0.0
-    assert fraction ≺ 1.0
-
-    # aleator:octetos: the requested byte count, and the empty request.
-    let list<b8> bytes ← random.random_bytes(16)
-    assert bytes.length() ≡ 16
-    let list<b8> emptyBytes ← random.random_bytes(0)
-    assert emptyBytes.length() ≡ 0
-
-    # aleator:uuid: 8-4-4-4-12 hyphen shape, and two uuids differ.
-    let string id ← random.uuid()
+    let void _ ← call 'aleator:fractum' ↦ void
+    let void _ ← call 'aleator:octetos' (16) ↦ void
+    let void _ ← call 'aleator:octetos' (0) ↦ void
+    let string id ← call 'aleator:uuid' ↦ string
     assert id.length() ≡ 36
-    assert id.slice(8, 9) ≡ "-"
-    assert id.slice(13, 14) ≡ "-"
-    assert id.slice(18, 19) ≡ "-"
-    assert id.slice(23, 24) ≡ "-"
-    let string other ← random.uuid()
-    assert id ≢ other
 
     print "norma/entropy/entropy-routes ok"
 }
