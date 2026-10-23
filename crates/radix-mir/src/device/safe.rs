@@ -178,6 +178,12 @@ struct DeviceSafeClassifier<'a> {
     /// visit whose layout resolves, keyed by parameter local. A read of one
     /// field (`p.f`) is the only admitted use.
     genus_params: FxHashMap<MirLocalId, MirStructLayout>,
+    /// The lane-form function's record-element device-view PARAMETERS
+    /// (`tensor<Block, [n]>`) whose element record layout resolves, keyed by
+    /// parameter local. Indexing the view and reading fields of the element
+    /// (`blocks[i].f`, `blocks[i].f[j]`, `blocks[i].f.lane`) is the only
+    /// admitted use.
+    record_view_params: FxHashMap<MirLocalId, MirStructLayout>,
     allows_structured_return_branch: bool,
     allows_structured_indexed_write_branch: bool,
     allows_structured_indexed_write_goto: bool,
@@ -248,6 +254,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             in_lane_form_function: false,
             reduction_terms: rustc_hash::FxHashSet::default(),
             genus_params: FxHashMap::default(),
+            record_view_params: FxHashMap::default(),
             allows_structured_return_branch: false,
             allows_structured_indexed_write_branch: false,
             allows_structured_indexed_write_goto: false,
@@ -548,6 +555,43 @@ impl<'a> DeviceSafeClassifier<'a> {
             .collect()
     }
 
+    /// The lane-form function's record-element device-view parameters whose
+    /// element record layout resolves.
+    fn resolved_record_view_params(
+        &self,
+        function: &MirFunction,
+    ) -> FxHashMap<MirLocalId, MirStructLayout> {
+        if !self.in_lane_form_function {
+            return FxHashMap::default();
+        }
+        function
+            .params
+            .iter()
+            .filter(|param| param.mode != crate::MirParamMode::MutRef)
+            .filter_map(|param| {
+                let layout = self.layouts.layout_for_type(param.ty).ok()?;
+                let MirLayoutKind::DeviceView(view) = layout.kind else {
+                    return None;
+                };
+                let MirDeviceViewElement::Record(record_ty) = view.element else {
+                    return None;
+                };
+                resolve_struct_layout(MirType::semantic(record_ty), self.validation)
+                    .ok()
+                    .map(|layout| (param.local, layout))
+            })
+            .collect()
+    }
+
+    /// Whether the place base is one of the function's record-element device
+    /// view parameters.
+    fn record_view_base(&self, place: &MirPlace) -> Option<&MirStructLayout> {
+        match place.base {
+            MirPlaceBase::Local(local) => self.record_view_params.get(&local),
+            MirPlaceBase::Temp(_) => None,
+        }
+    }
+
     /// C4-6b: a genus parameter is admitted by value and read-only when its
     /// layout resolves; a refusal surfaces by the resolver's name.
     fn check_genus_param(&mut self, param: &MirParam) {
@@ -633,6 +677,27 @@ impl<'a> DeviceSafeClassifier<'a> {
             );
             if !admitted {
                 self.record_policy(SHAPE_GENUS_PARAM_PROJECTION);
+            }
+            return;
+        }
+        // A record-element device view: the only admitted projections are one
+        // index into the view followed by a read of one declared field
+        // (`blocks[i].f`), a fixed-array element of that field
+        // (`blocks[i].f[j]`), or a lane of that field (`blocks[i].f.lane`).
+        if let Some(layout) = self.record_view_base(place) {
+            let field_read =
+                |name: &radix_lexer::Symbol| layout.fields.iter().any(|field| field.name == *name);
+            let admitted = match place.projections.as_slice() {
+                [MirProjection::Index(_), MirProjection::Field(name)] => field_read(name),
+                [
+                    MirProjection::Index(_),
+                    MirProjection::Field(name),
+                    MirProjection::Index(_) | MirProjection::VectorLane(_),
+                ] => field_read(name),
+                _ => false,
+            };
+            if !admitted {
+                self.record_policy(SHAPE_DEVICE_PLACE_PROJECTION);
             }
             return;
         }
@@ -1218,6 +1283,7 @@ fn classify_structured_allowances(
         || (classifier.reduction_terms.contains(&function.id)
             && crate::structurize::structurize_duplicating_tails(function).is_ok());
     classifier.genus_params = classifier.resolved_genus_params(function);
+    classifier.record_view_params = classifier.resolved_record_view_params(function);
     let allows_structured_return_branch = is_structured_return_branch(function);
     let allows_structured_indexed_write_branch = is_structured_indexed_write_branch(function);
     let allows_structured_indexed_write_goto = is_structured_indexed_write_goto(function);
