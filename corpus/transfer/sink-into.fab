@@ -7,7 +7,7 @@ category = "collection"
 canonical = true
 summary = "Sink-into writes one exactly typed item with ⇜, the operator form of sink.sink(item)."
 syntax = "<mut Sink<T>> ⇜ <T>"
-related = ["Sink", "⇇", "transfer"]
+related = ["⇇", "transfer"]
 locale = "en"
 +++
 # =============================================================================
