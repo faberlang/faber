@@ -618,12 +618,20 @@ fn finish_device_run(
     } = run;
     if let (Some(metadata), Some(runner_stats)) = (metadata, run_stats_value) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
-        writeln!(
-            out,
+        // `--stats` writes the structured artifact to stdout, so stdout stays
+        // marker-only there and the peak high-water note goes to stderr; the
+        // file-only mode (`--stats-file` alone) has no other channel and keeps
+        // both receipt lines on stdout. Either way the artifact carries
+        // `peak_allocated_bytes`.
+        let peak_note = format!(
             "device: peak allocated {} bytes",
             device.runtime.peak_allocated_bytes
-        )
-        .ok();
+        );
+        if stats {
+            eprintln!("{peak_note}");
+        } else {
+            writeln!(out, "{peak_note}").ok();
+        }
         let mut artifact =
             RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0);
         artifact.device = Some(run_stats::DeviceMetadata::from_receipt(&device));
