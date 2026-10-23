@@ -1,0 +1,39 @@
++++
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM016:decimal_radix_hint_rejected"
+term = "↦"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "inline_default", "via_clause", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Rejected route: radix hints are integer machinery and do not apply to a decimal."
+syntax = "\"ff\" ↦ d64 via Hex — rejected; use \"ff\" ↦ i32 via Hex or plain decimal text"
+related = ["↦", "via", "d64"]
+locale = "en"
++++
+# =============================================================================
+# decimal radix hint — a scaled decimal has no radix digits
+# =============================================================================
+#
+# What this teaches:
+#   • `via Hex` / `Bin` / `Oct` parse integer digits in that radix. A `d64` is
+#     a scaled decimal: it has a mantissa and a scale, not radix digits, so the
+#     parse is refused by name (SEM016 decimal_radix_hint_rejected) instead of
+#     falling through to a generic type mismatch.
+#   • The same issue covers the reverse direction: a decimal source packed
+#     into `ascii<N> via Hex` is refused for the same reason.
+#
+# How to make it legal:
+#   • an integer with a radix:   "ff" ↦ i32 via Hex
+#   • a decimal from plain decimal text: "1.5" ↦ d64
+#
+# Common mistakes:
+#   • assuming a radix hint changes a decimal's scale — it never applies.
+#
+# See also: ↦, via, d64
+# =============================================================================
+
+main {
+    let _ v ← "ff" ↦ d64 via Hex
+    print v
+}

@@ -1,0 +1,44 @@
++++
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM011:failable_conversio_requires_handler"
+term = "↦"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Rejected route: a failable narrowing outside main needs a ⊥ default, a catch, or a ⇥ E channel."
+syntax = "<int> ↦ <narrower integer> inside a plain fn — rejected without ⊥ / do-catch / ⇥ E"
+related = ["↦", "⊥", "⇥", "do", "catch"]
+locale = "en"
++++
+# =============================================================================
+# failable conversio with no handler — a helper must handle its own failure
+# =============================================================================
+#
+# What this teaches:
+#   • A narrowing `↦` can fail at run time, so outside `main` it must say what
+#     happens on failure. With no handler the checker refuses it with one named
+#     diagnostic (SEM011 failable_conversio_requires_handler).
+#   • The `main` (incipit) body is exempt: an unhandled conversion directly
+#     there panics on every backend. Helpers called from main are NOT exempt,
+#     which is why the failure below sits in `narrow`.
+#
+# How to make it legal (pick one):
+#   • a `⊥` default:        return x ↦ u8 ⊥ 0
+#   • a local catch:        do { return x ↦ u8 } catch err { return 0 }
+#   • an error channel:     fn narrow(int x) → u8 ⇥ string { return x ↦ u8 }
+#
+# Common mistakes:
+#   • expecting `main`'s exemption to cover a helper it calls — it does not.
+#
+# See also: ↦, ⊥, ⇥, do, catch — and the channel form in
+# corpus/decimal/conversio_channel.fab.
+# =============================================================================
+
+fn narrow(int x) → u8 {
+    return x ↦ u8
+}
+
+main {
+    print "narrow is rejected"
+}
