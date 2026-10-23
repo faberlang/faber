@@ -575,26 +575,26 @@ fn admit_device_session(
     registry: &mut radix_device_core::registry::DeviceRegistry,
 ) -> Result<AdmittedDeviceSession, Vec<Diagnostic>> {
     use super::device::DeviceImageBackend;
-    use super::host_factory::{discovery_receipt, host_error_diagnostic, open_device_selection};
+    use super::host_factory::{
+        DEVICE_MEMORY_BUDGET_ENV, budget_request_from_override, discovery_receipt,
+        host_error_diagnostic, open_device_selection,
+    };
     use radix_device_core::backend::{DeviceBackend, DeviceClass};
-    use radix_device_core::partition::MemoryBudget;
     use radix_device_core::session::DeviceSession;
     use std::time::Instant;
 
     let admit_start = Instant::now();
-    let opened = open_device_selection(
-        registry,
-        selection,
-        true,
-        MemoryBudget::new(DEVICE_RUN_MEMORY_BUDGET_BYTES),
-    )
-    .map_err(|diagnostic| vec![diagnostic])?
-    .ok_or_else(|| {
-        vec![mir_diag(
-            input,
-            "no device was admitted for the device route",
-        )]
-    })?;
+    let request =
+        budget_request_from_override(std::env::var(DEVICE_MEMORY_BUDGET_ENV).ok().as_deref())
+            .map_err(|diagnostic| vec![diagnostic])?;
+    let opened = open_device_selection(registry, selection, true, request)
+        .map_err(|diagnostic| vec![diagnostic])?
+        .ok_or_else(|| {
+            vec![mir_diag(
+                input,
+                "no device was admitted for the device route",
+            )]
+        })?;
     let receipt = discovery_receipt(&opened);
     let backend = match receipt.class {
         DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
@@ -837,11 +837,6 @@ fn lowered_declares_kernels(lowered: &radix::module::mir::LoweredMirUnit<'_>) ->
         .iter()
         .any(|function| function.shader_stage == Some(radix_mir::MirKernelShaderStage::Compute))
 }
-
-/// Device-route memory budget declared at admission (the registry's policy
-/// ceiling is the declared budget itself).
-#[cfg(all(feature = "runner", feature = "device-runtime"))]
-const DEVICE_RUN_MEMORY_BUDGET_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 
 /// Register the system device runtimes this machine provides: Metal on
 /// macOS when a Metal device opens, and CUDA wherever the CUDA driver

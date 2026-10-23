@@ -618,6 +618,12 @@ fn finish_device_run(
     } = run;
     if let (Some(metadata), Some(runner_stats)) = (metadata, run_stats_value) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
+        writeln!(
+            out,
+            "device: peak allocated {} bytes",
+            device.runtime.peak_allocated_bytes
+        )
+        .ok();
         let mut artifact =
             RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0);
         artifact.device = Some(run_stats::DeviceMetadata::from_receipt(&device));
