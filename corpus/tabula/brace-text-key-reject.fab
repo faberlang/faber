@@ -1,0 +1,21 @@
++++
+term = "tabula"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "json_literal", "json_member", "json_value", "json_object", "json_number", "json_string", "nota_stmt"]
+category = "collection"
+canonical = false
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:json_map_key_must_be_textus"
+summary = "A brace literal's text keys cannot key a tabula whose key type is not text."
+syntax = "map<int, int> bad ← { \"a\": 1 } — rejected"
+related = ["tabula", "json"]
++++
+# Brace literal text-key rejection
+# A brace literal uses text keys, so it cannot initialize a map<int, int>.
+# This exemplum is refused during semantic checking.
+#
+main {
+    let map<int, int> bad ← { "a": 1 }
+    print bad
+}
