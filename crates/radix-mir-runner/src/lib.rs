@@ -3542,6 +3542,19 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    fn operand_is_modular_word(&self, operand: &MirOperand) -> bool {
+        let Some(mut ty) = self.operand_static_type(operand) else {
+            return false;
+        };
+        loop {
+            match self.types.get(ty) {
+                Type::ModularWord(_) => return true,
+                Type::Alias(_, inner) => ty = *inner,
+                _ => return false,
+            }
+        }
+    }
+
     #[expect(
         clippy::cast_precision_loss,
         reason = "sqrt/exp/ln promote Int/UInt operands to f64 for computation, deliberately accepting f64 mantissa precision for large integer magnitudes"
@@ -3813,6 +3826,21 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         } else {
             (left, right)
         };
+        // WHY: exact MIR intermediates can lose the modular result type while
+        // their operands still carry the modular source context.
+        let modular_context =
+            self.operand_is_modular_word(lhs) || self.operand_is_modular_word(rhs);
+        if modular_context
+            && matches!(op, MirBinOp::Div | MirBinOp::Mod)
+            && (matches!(&right, Value::Int(0) | Value::UInt(0))
+                || matches!(&right, Value::Magnus(value) if value.is_zero()))
+        {
+            return Err(RunnerError::internal_with_issue(
+                span,
+                "modulus division failed",
+                "modular_division_by_zero",
+            ));
+        }
         if let Some(compared) = self.decimal_comparison(op, lhs, rhs, &left, &right) {
             return Ok(Value::Bool(compared));
         }
