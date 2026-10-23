@@ -1,0 +1,64 @@
++++
+term = "matrix"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "expression", "multiplicative_expr", "equality", "literal", "vel_expr", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "The matrix glyph surface: matmul, transpose, matvec, elementwise product, inverse and whole-value equality."
+syntax = "o · right | o.transpose() | o.apply(v) | o ⊙ o | m.invert() | m ≡ m"
+related = ["matrix", "vector", "tensor"]
+locale = "en"
++++
+# =============================================================================
+# matrix — the glyph surface
+# =============================================================================
+#
+# What this teaches:
+#   • Matmul — `o · right` contracts the inner dimension of two rank-2 matrices
+#   • Transpose — `o.transpose()` swaps rows and columns
+#   • Matvec — `o.apply(v)` multiplies a matrix by a vector
+#   • Elementwise — `o ⊙ o` multiplies cell by cell, never contracting
+#   • Inverse — `m.invert()` gives `matrix ∪ none`; `coalesce` reads the present value
+#   • Whole values — `≡` compares two matrices as one value
+#
+# Common mistakes:
+#   • writing `o * right` for the elementwise product — use `⊙`
+#   • writing `o * right` for matmul — use `·`
+#   • forgetting that the inverse is optional — a singular matrix gives none
+#
+# See also: matrix, vector, tensor
+# =============================================================================
+
+# matrix — glyph operations from a host main
+#
+# WHY: the register matrix surface is driven by glyphs and Latin method rows.
+# Operands come from `⊗` outer products (a vector pair), since register
+# matrices have no general literal construction surface; the 2x2 inverse uses
+# the array-literal conversion that `lift-compare.fab` also demonstrates.
+#
+# o      = a ⊗ p = [[1,1],[2,2],[3,3]]           (3x2)
+# right  = q ⊗ s = [[1,2,3,4],[1,2,3,4]]         (2x4)
+# o · right = [[2,4,6,8],[4,8,12,16],[6,12,18,24]]  (3x4)
+# o.transpose() = [[1,2,3],[1,2,3]]              (2x3)
+# o.apply([2, 3]) = [5, 10, 15]                  (3)
+# o ⊙ o = [[1,1],[4,4],[9,9]]                    (3x2)
+# m.invert() on [[4,7],[2,6]] = [[0.6,-0.7],[-0.2,0.4]]
+#
+# EXPECTED stdout: see glyph-ops.expected
+
+main {
+    let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    let vf32[2] p ← [1.0, 1.0] ↦ vf32[2]
+    let matrix<f32, [3, 2]> o ← a ⊗ p
+    let vf32[2] q ← [1.0, 1.0] ↦ vf32[2]
+    let vf32[4] s ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
+    let matrix<f32, [2, 4]> right ← q ⊗ s
+    print o · right
+    print o.transpose()
+    print o.apply([2.0, 3.0] ↦ vf32[2])
+    print o ⊙ o
+    let matrix<f32, [2, 2]> m ← [[4.0, 7.0], [2.0, 6.0]] ↦ matrix<f32, [2, 2]>
+    let matrix<f32, [2, 2]> ∪ none inverted ← m.invert()
+    print inverted coalesce m
+    print m ≡ m
+}

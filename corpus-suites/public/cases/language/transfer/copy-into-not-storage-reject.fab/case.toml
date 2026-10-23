@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/transfer/copy-into-not-storage-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "transfer/copy-into-not-storage-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.copy_into_target_not_storage"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.copy_into_target_not_storage"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM057:copy_into_target_not_storage"

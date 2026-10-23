@@ -1,0 +1,38 @@
++++
+term = "vector"
+kind = "exemplum"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "redde_stmt", "fixum_decl", "assignment", "place", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "dum_stmt", "comparison", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "Run-time vector lanes can be read, written in a loop, and reduced from a host main."
+syntax = "<vector>[<integer expression>]"
+related = ["vector", "dot"]
+locale = "en"
++++
+fn lane_sum(vf32[4] v) → f32 {
+    mut f32 total ← 0.0
+    mut int j ← 0
+    while j ≺ 4 {
+        total ← total + v[j]
+        j ← j + 1
+    }
+    return total
+}
+
+fn scale(vf32[4] v, f32 s) → vf32[4] {
+    mut vf32[4] out ← copy v
+    mut int j ← 0
+    while j ≺ 4 {
+        out[j] ← v[j] * s
+        j ← j + 1
+    }
+    return out
+}
+
+main {
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let vf32[4] v ← [flat[0], flat[1], flat[2], flat[3]] ↦ vf32[4]
+    print lane_sum(v)
+    print scale(v, 2.0)
+    print v[3]
+}

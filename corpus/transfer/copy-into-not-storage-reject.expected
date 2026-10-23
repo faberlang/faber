@@ -1,0 +1,2 @@
+# R2: a call result is a value, not a place, so it is not a writable copy-into target.
+SEM057:copy_into_target_not_storage
