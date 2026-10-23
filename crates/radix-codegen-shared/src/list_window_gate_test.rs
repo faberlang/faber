@@ -1,7 +1,8 @@
 //! The list window gate (ruling B10 of need): `xs[lo‥hi]` on a list is
-//! refused with `list_window_unsupported_on_target` on every emitter except the
-//! Faber re-emitter and the MIR runner; scalar indexing and the octeti window
-//! are untouched.
+//! refused with `list_window_unsupported_on_target` on the emitters that do not
+//! carry it (LLVM, sexp, wasm) and admitted by the ones that do (the Faber
+//! re-emitter, the MIR runner, clif, Rust, Go, TypeScript, Swift and Python);
+//! scalar indexing and the octeti window are untouched.
 
 use super::*;
 use radix_hir::{HirBlock, HirId, HirLiteral, HirStatement, HirStatementKind};
@@ -57,13 +58,13 @@ fn issue_of(error: &CodegenError) -> Option<&str> {
 }
 
 #[test]
-fn list_window_is_rejected_by_name_on_a_source_target() {
+fn list_window_is_rejected_by_name_on_a_target_without_the_emission() {
     let mut types = TypeTable::new();
     let int = types.primitive(Primitive::Numerus);
     let list = types.array(int);
     let range = types.intervallum(int);
     let module = index_module(list, range);
-    for target in [Target::HirTypeScript, Target::HirGo, Target::MirWasm] {
+    for target in [Target::MirWasm, Target::MirSexp] {
         let error = reject_list_window(&module, &types, target).expect_err("list window refused");
         assert_eq!(issue_of(&error), Some("list_window_unsupported_on_target"));
         assert!(
@@ -73,6 +74,24 @@ fn list_window_is_rejected_by_name_on_a_source_target() {
                 .any(|arg| arg.name == "target" && arg.value == format!("{target:?}")),
             "{target:?}: {error:?}"
         );
+    }
+}
+
+#[test]
+fn list_window_is_admitted_by_the_go_typescript_swift_and_python_emitters() {
+    let mut types = TypeTable::new();
+    let int = types.primitive(Primitive::Numerus);
+    let list = types.array(int);
+    let range = types.intervallum(int);
+    let module = index_module(list, range);
+    for target in [
+        Target::HirGo,
+        Target::HirTypeScript,
+        Target::HirSwift,
+        Target::HirPython,
+    ] {
+        reject_list_window(&module, &types, target)
+            .unwrap_or_else(|error| panic!("{target:?} carries the list window: {error:?}"));
     }
 }
 
