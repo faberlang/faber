@@ -598,16 +598,31 @@ impl CollectionKernelPlan {
                             return None;
                         }
                     }
-                    // A run-time extent is a launch fact (rule 11), so the
-                    // ABI carries no count to cross-check: every gather
-                    // resource must instead carry the runtime-shaped marker.
+                    // A run-time extent is a launch fact (rule 11), so a
+                    // resource sized from it carries the runtime-shaped
+                    // marker instead of a count. Each resource is checked
+                    // against the extents IT is sized from — the table
+                    // input from `[V, D]`, the output from `[T, D]`, the
+                    // ids extra input from `[T]` — because the signature
+                    // builder marks each resource independently. Requiring
+                    // every resource to be runtime-shaped would refuse a
+                    // run-time table with literal ids (and the converse).
                     // The ranks and the paired extents were already checked
                     // by [`gather_recipe_facts`].
                     None => {
                         if signature.extra_inputs.len() != 1
-                            || !signature.input.is_runtime_shaped()
-                            || !signature.output.is_runtime_shaped()
-                            || !signature.extra_inputs[0].is_runtime_shaped()
+                            || !gather_count_matches_extents(
+                                &signature.input,
+                                &[table_rows, table_cols],
+                            )
+                            || !gather_count_matches_extents(
+                                &signature.output,
+                                &[id_count, table_cols],
+                            )
+                            || !gather_count_matches_extents(
+                                &signature.extra_inputs[0],
+                                &[id_count],
+                            )
                         {
                             return None;
                         }
@@ -2011,6 +2026,28 @@ fn plan_dim(dim: Dim) -> PlanDim {
         Dim::Literal(value) => PlanDim::Literal(value),
         Dim::Runtime => PlanDim::Runtime,
     }
+}
+
+/// Whether a gather signature resource's element count is the count its own
+/// plan extents produce: the runtime-shaped marker when any of them is bound
+/// at launch, the literal product otherwise. The signature builder marks each
+/// resource independently from the extents it is sized from, so the planner
+/// cross-checks each resource the same way rather than demanding that every
+/// resource be launch-shaped because one extent is.
+fn gather_count_matches_extents(
+    resource: &crate::abi::MirKernelResource,
+    extents: &[PlanDim],
+) -> bool {
+    if extents.iter().any(|extent| extent.is_runtime()) {
+        return resource.is_runtime_shaped();
+    }
+    let product = extents
+        .iter()
+        .try_fold(1u64, |product, extent| {
+            extent.literal().map(|value| product.saturating_mul(value))
+        })
+        .unwrap_or(u64::MAX);
+    resource.element_count == product
 }
 
 /// Whether two paired extents agree: both literal and equal, or both bound at

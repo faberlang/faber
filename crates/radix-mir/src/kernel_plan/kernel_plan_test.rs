@@ -3298,6 +3298,177 @@ fn gather_runtime_facts_resolve_runtime_dims() {
     );
 }
 
+/// A row-gather kernel whose ids operand is the `tensor<u32, [n]>` element
+/// type the recipe requires (the shared fixture keeps the table's `tf32`
+/// element type on every operand).
+fn gather_u32_ids_function(
+    types: &mut TypeTable,
+    table_dims: Vec<IndexExpr>,
+    ids_dims: Vec<IndexExpr>,
+    return_dims: Vec<IndexExpr>,
+) -> MirFunction {
+    let mut function = gather_typed_function(types, table_dims, ids_dims.clone(), return_dims);
+    let ids_element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let dim_ids = ids_dims
+        .into_iter()
+        .map(|dim| types.intern_index(dim))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    let ids = MirType::semantic(types.intern(Type::Tensor(ids_element, shape)));
+    function.params[1].ty = ids;
+    function.locals[1].ty = ids;
+    function
+}
+
+/// AUD-GATHER-001: the signature builder marks each gather resource from the
+/// extents that resource is sized from — the table input from `[V, D]`, the
+/// output from `[T, D]`, the ids extra input from `[T]` — so the planner must
+/// check each resource against its own extents, not demand that every
+/// resource be launch-bound because one extent is. A run-time table with
+/// literal ids (`[Runtime, 64]` / `[1]` / `[1, 64]`) and a literal table with
+/// run-time ids (`[7, 64]` / `[Runtime]` / `[Runtime, 64]`) resolve the Gather
+/// recipe end to end (signature builder → planner), while a shape
+/// incompatibility still fails closed.
+#[test]
+fn gather_mixed_runtime_and_literal_extents_resolve_a_plan() {
+    use crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
+
+    // Run-time table rows, literal ids and literal output rows.
+    let mut types = TypeTable::new();
+    let function = gather_u32_ids_function(
+        &mut types,
+        vec![IndexExpr::Unspecified, IndexExpr::Literal(64)],
+        vec![IndexExpr::Literal(1)],
+        vec![IndexExpr::Literal(1), IndexExpr::Literal(64)],
+    );
+    let validation = MirValidationContext::new(&types);
+    let signature = crate::device_program_plans::transformer_shape_signature(
+        &function,
+        MirCollectionOp::TensorGather,
+        &validation,
+    )
+    .expect("a run-time table row count builds a gather signature");
+    assert_eq!(signature.input.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(
+        signature.output.element_count, 64,
+        "a literal [1, 64] output carries its literal count"
+    );
+    assert_eq!(
+        signature.extra_inputs[0].element_count, 1,
+        "a literal [1] ids vector carries its literal count"
+    );
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorGather,
+    )
+    .expect("a run-time table with literal ids resolves a plan");
+    let CollectionKernelPlan::Gather(gather) = &plan else {
+        panic!("gather must map to a gather plan, got {plan:?}");
+    };
+    assert_eq!(
+        (gather.table_rows, gather.table_cols, gather.id_count),
+        (PlanDim::Runtime, PlanDim::Literal(64), PlanDim::Literal(1)),
+        "each extent keeps its own literal-or-run-time fact"
+    );
+    plan.validate().expect("the mixed-extent plan validates");
+
+    // Literal table, run-time ids.
+    let mut types = TypeTable::new();
+    let function = gather_u32_ids_function(
+        &mut types,
+        vec![IndexExpr::Literal(7), IndexExpr::Literal(64)],
+        vec![IndexExpr::Unspecified],
+        vec![IndexExpr::Unspecified, IndexExpr::Literal(64)],
+    );
+    let validation = MirValidationContext::new(&types);
+    let signature = crate::device_program_plans::transformer_shape_signature(
+        &function,
+        MirCollectionOp::TensorGather,
+        &validation,
+    )
+    .expect("a run-time ids count builds a gather signature");
+    assert_eq!(signature.input.element_count, 7 * 64);
+    assert_eq!(signature.output.element_count, RUNTIME_SHAPED_ELEMENT_COUNT);
+    assert_eq!(
+        signature.extra_inputs[0].element_count,
+        RUNTIME_SHAPED_ELEMENT_COUNT
+    );
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorGather,
+    )
+    .expect("a literal table with run-time ids resolves a plan");
+    let CollectionKernelPlan::Gather(gather) = &plan else {
+        panic!("gather must map to a gather plan, got {plan:?}");
+    };
+    assert_eq!(
+        (gather.table_rows, gather.table_cols, gather.id_count),
+        (PlanDim::Literal(7), PlanDim::Literal(64), PlanDim::Runtime)
+    );
+    plan.validate().expect("the mixed-extent plan validates");
+
+    // A table width that disagrees with the return width is a shape
+    // incompatibility: the paired extents cannot be proven equal and the
+    // plan stays failed closed.
+    let mut types = TypeTable::new();
+    let function = gather_u32_ids_function(
+        &mut types,
+        vec![IndexExpr::Unspecified, IndexExpr::Literal(64)],
+        vec![IndexExpr::Literal(1)],
+        vec![IndexExpr::Literal(1), IndexExpr::Literal(32)],
+    );
+    let validation = MirValidationContext::new(&types);
+    let signature = crate::device_program_plans::transformer_shape_signature(
+        &function,
+        MirCollectionOp::TensorGather,
+        &validation,
+    )
+    .expect("the signature builder is not the paired-extent cross-check");
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorGather,
+        )
+        .is_none(),
+        "a table/return width mismatch must not resolve a plan"
+    );
+
+    // A signature whose resource counts contradict the recipe extents is
+    // still refused: a literal table with literal ids cannot produce a
+    // run-time-shaped output.
+    let mut types = TypeTable::new();
+    let function = gather_u32_ids_function(
+        &mut types,
+        vec![IndexExpr::Literal(7), IndexExpr::Literal(64)],
+        vec![IndexExpr::Literal(1)],
+        vec![IndexExpr::Literal(1), IndexExpr::Literal(64)],
+    );
+    let validation = MirValidationContext::new(&types);
+    let mut signature = crate::device_program_plans::transformer_shape_signature(
+        &function,
+        MirCollectionOp::TensorGather,
+        &validation,
+    )
+    .expect("the literal gather signature resolves");
+    signature.output.element_count = RUNTIME_SHAPED_ELEMENT_COUNT;
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorGather,
+        )
+        .is_none(),
+        "a run-time-shaped output over literal extents must not resolve a plan"
+    );
+}
+
 #[test]
 fn from_contract_f32_quantized_matmul_falls_back_to_tiled() {
     use crate::abi::PackedStorageLayout;
