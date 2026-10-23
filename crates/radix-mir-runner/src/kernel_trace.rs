@@ -44,22 +44,11 @@ pub type KernelTrace = Vec<KernelTraceRecord>;
 /// A view's trace is its backing array, not its logical coordinates, because
 /// the device dispatcher refuses a non-contiguous or non-zero-offset tensor
 /// argument.
-///
-/// # Panics
-///
-/// Panics if the backing storage reports a length but cannot return an element
-/// at an index below that length.
 #[must_use]
 pub fn traced_tensor(slot: &str, tensor: &TensorValue) -> TracedTensor {
     let elements = (0..tensor.data.len())
-        .map(|index| {
-            trace_value(
-                tensor
-                    .data
-                    .get(index)
-                    .expect("tensor backing index remains in bounds while tracing"),
-            )
-        })
+        .filter_map(|index| tensor.data.get(index))
+        .map(trace_value)
         .collect();
     TracedTensor {
         slot: slot.to_owned(),
