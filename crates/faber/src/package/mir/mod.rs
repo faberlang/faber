@@ -638,6 +638,12 @@ pub struct DeviceRunPhases {
     prepare_ns: u64,
     /// Host time spent building the per-kernel device image, in nanoseconds.
     pub image_build_ns: u64,
+    /// Host time of the image build spent emitting the backend artifact, in
+    /// nanoseconds.
+    pub image_emission_ns: u64,
+    /// Host time of the image build spent compiling the emitted NVVM module to
+    /// PTX, in nanoseconds (0 for the Metal backend).
+    pub image_ptx_compile_ns: u64,
     /// Host time spent compiling device modules, in nanoseconds.
     pub module_compile_ns: u64,
     /// Wall time spent executing the entry, in nanoseconds.
@@ -699,7 +705,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         ..
     } = admitted;
     let image_start = Instant::now();
-    let (mut image, omitted) = device_image_for_lowered(lowered, backend)?;
+    let (mut image, omitted, image_timing) = device_image_for_lowered(lowered, backend)?;
     let image_build_ns = image_start.elapsed().as_nanos() as u64;
     if image.kernels.is_empty() {
         let reasons = omitted
@@ -814,6 +820,8 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
             admit_ns,
             prepare_ns,
             image_build_ns,
+            image_emission_ns: image_timing.emission_ns,
+            image_ptx_compile_ns: image_timing.ptx_compile_ns,
             module_compile_ns,
             execution_ns,
             dispatcher: dispatcher_receipt,

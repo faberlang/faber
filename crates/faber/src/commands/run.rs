@@ -623,6 +623,8 @@ fn finish_device_run(
             RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0)
                 .with_cold_start(run_stats::ColdStartMetadata {
                     image_build_ns: phases.image_build_ns,
+                    emission_ns: phases.image_emission_ns,
+                    ptx_compile_ns: phases.image_ptx_compile_ns,
                     module_compile_ns: phases.module_compile_ns,
                     execution_ns: phases.execution_ns,
                 });
