@@ -1,0 +1,46 @@
++++
+locale = "en"
++++
+
+# fs durable-write leaf routes: write_file_durably and write_bytes_durably.
+# Both dispatch `solum:conde` (the leaf's replace_durably): stage a hidden
+# sibling temporary `.NAME.faber-conde-PID-NANOS` in the target's directory,
+# flush it, rename it over the target and remove its own temporary. Each case
+# asserts the replaced content and that no temporary sibling survives.
+import from "norma:fs" fs
+import from "norma:process" process
+
+main {
+    let string dir ← fs.join([fs.temp_dir(), "norma-fs-durable-§"(process.pid())])
+    fs.create_dir(dir)
+
+    # solum:conde text replace: the whole file is replaced, not appended.
+    let string text ← fs.join([dir, "conde.txt"])
+    fs.write_file(text, "old")
+    assert fs.read_file<string>(text) ≡ "old"
+    fs.write_file_durably(text, "new-content")
+    assert fs.read_file<string>(text) ≡ "new-content"
+    assert fs.byte_length(text) ≡ 11
+
+    # solum:conde bytes replace: the bytes land whole.
+    let string bytes ← fs.join([dir, "conde.bin"])
+    fs.write_bytes_durably(bytes, |de ad be ef|)
+    assert fs.read_bytes(bytes) ≡ |de ad be ef|
+
+    # solum:conde on a path that does not exist yet: it creates the target.
+    let string fresh ← fs.join([dir, "fresh.txt"])
+    fs.write_file_durably(fresh, "fresh")
+    assert fs.read_file<string>(fresh) ≡ "fresh"
+    assert fs.exists(fresh)
+
+    # No orphaned `.NAME.faber-conde-*` temporary: the directory holds exactly
+    # conde.txt, conde.bin and fresh.txt. A leftover sibling makes this 4.
+    assert fs.list_dir(dir).length() ≡ 3
+
+    fs.delete(text)
+    fs.delete(bytes)
+    fs.delete(fresh)
+    fs.remove_tree(dir)
+
+    print "norma/fs/fs-durable ok"
+}
