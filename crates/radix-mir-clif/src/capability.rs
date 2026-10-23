@@ -397,25 +397,32 @@ impl<'a> ClifCapability<'a> {
         }
     }
 
-    /// Whether `ty` is a conversation handle this program opened.
-    fn is_sermo_handle(&self, ty: MirType) -> bool {
-        let mut id = ty.semantic_id();
+    /// Resolve aliases before checking a semantic type identity.
+    fn resolve_alias(&self, mut id: TypeId) -> TypeId {
         while let Type::Alias(_, inner) = self.types.get(id) {
             id = *inner;
         }
-        self.sermo_handles.contains(&id)
+        id
     }
 
-    /// A conversation handle materializing into a scalar: the sync
-    /// conversation's `sermo ↦ numerus` route. Only `numerus` has a CLIF
-    /// materialize symbol (`SERMO_MATERIALIZE_I64`); `textus`, `fractus` and
-    /// `bivalens` stay declined until their symbols exist.
-    fn sermo_scalar_conversion(&self, conversion: &MirConversion) -> bool {
+    /// Whether `ty` is a conversation handle this program opened.
+    fn is_sermo_handle(&self, ty: MirType) -> bool {
+        self.sermo_handles
+            .contains(&self.resolve_alias(ty.semantic_id()))
+    }
+
+    /// A conversation handle materializing to a CLIF-supported value. The
+    /// `SERMO_MATERIALIZE_I64`, `SERMO_DRAIN`, and
+    /// `SERMO_MATERIALIZE_INSTANT` symbols cover numerus, vacuum, and instans;
+    /// textus, fractus, and bivalens remain declined.
+    fn sermo_materialization(&self, conversion: &MirConversion) -> bool {
         conversion.store.is_none()
             && self.is_sermo_handle(conversion.source_ty)
             && matches!(
-                self.types.get(conversion.target_ty.semantic_id()),
-                Type::Primitive(Primitive::Numerus)
+                self.types
+                    .get(self.resolve_alias(conversion.target_ty.semantic_id())),
+                Type::Primitive(Primitive::Numerus | Primitive::Vacuum | Primitive::Instans)
+                    | Type::SizedInstans(_)
             )
     }
 
@@ -660,9 +667,9 @@ impl MirVisitor for ClifCapability<'_> {
                     )
                     .is_some()
         );
-        let sermo_scalar = matches!(
+        let sermo_materialization = matches!(
             &call.intrinsic,
-            MirIntrinsic::Convert(conversion) if self.sermo_scalar_conversion(conversion)
+            MirIntrinsic::Convert(conversion) if self.sermo_materialization(conversion)
         );
         let open_data = matches!(
             &call.intrinsic,
@@ -678,7 +685,7 @@ impl MirVisitor for ClifCapability<'_> {
                     )
         );
         if renders_text
-            || sermo_scalar
+            || sermo_materialization
             || open_data
             || numeric
             || sequence
