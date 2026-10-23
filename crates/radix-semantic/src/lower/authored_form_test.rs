@@ -217,10 +217,10 @@ fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
 }
 
 #[test]
-fn sermo_authored_head_is_named() {
-    // The conversation word is a builtin authored head: `sermo<O, R>` names
-    // the frame definition, and finalize erases the applied witness to the
-    // bare carrier `sermo`, so the recorded form keeps no child arguments.
+fn sermo_authored_head_keeps_only_authored_children() {
+    // `sermo<O, R>` names the builtin frame definition and finalizes to the
+    // bare carrier. Its authored form keeps both type arguments; a bare
+    // `sermo` annotation has no authored children.
     let source = concat!(
         "@ call 'salutatio:greeting'\n",
         "fn greeting() → string {\n",
@@ -229,6 +229,7 @@ fn sermo_authored_head_is_named() {
         "\n",
         "main {\n",
         "    let channel<none, string> g ← call 'salutatio:greeting'\n",
+        "    let channel bare ← g\n",
         "}\n",
     );
     let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
@@ -241,21 +242,49 @@ fn sermo_authored_head_is_named() {
 
     let sermo_def = crate::builtins::frame_types::sermo_def_id(&fixture.result.resolver)
         .expect("sermo builtin is registered");
-    let (form, local_ty) = first_declared_form(&fixture, "g");
-    let HirTypeFormHead::Named { def_id, path } = &form.head else {
-        panic!("expected named head, got {:?}", form.head);
+    let (typed_form, typed_ty) = first_declared_form(&fixture, "g");
+    let HirTypeFormHead::Named { def_id, path } = &typed_form.head else {
+        panic!("expected named head, got {:?}", typed_form.head);
     };
     assert_eq!(*def_id, sermo_def, "named head names the sermo definition");
     assert!(!path.is_empty(), "named head keeps the authored spelling");
-    assert!(
-        form.args.is_empty(),
-        "the erased witness has no applied arguments, got {:?}",
-        form.args
+    assert_eq!(
+        typed_form.args.len(),
+        2,
+        "typed sermo retains both authored arguments"
     );
-    assert_eq!(Some(form.ty), local_ty, "witness equals HIR type");
     assert!(
-        matches!(fixture.result.types.get(form.ty), Type::Struct(def) if *def == sermo_def),
+        typed_form
+            .args
+            .iter()
+            .all(|arg| matches!(arg, HirTypeFormArg::Type(_)))
+    );
+    assert_eq!(Some(typed_form.ty), typed_ty, "witness equals HIR type");
+    assert!(
+        matches!(fixture.result.types.get(typed_form.ty), Type::Struct(def) if *def == sermo_def),
         "finalized witness is the bare sermo carrier"
+    );
+
+    let (bare_form, bare_ty) = first_declared_form(&fixture, "bare");
+    let HirTypeFormHead::Named { def_id, path } = &bare_form.head else {
+        panic!("expected named head, got {:?}", bare_form.head);
+    };
+    assert_eq!(
+        *def_id, sermo_def,
+        "bare named head names the sermo definition"
+    );
+    assert!(
+        !path.is_empty(),
+        "bare named head keeps the authored spelling"
+    );
+    assert!(
+        bare_form.args.is_empty(),
+        "bare sermo has no authored arguments"
+    );
+    assert_eq!(Some(bare_form.ty), bare_ty, "witness equals HIR type");
+    assert!(
+        matches!(fixture.result.types.get(bare_form.ty), Type::Struct(def) if *def == sermo_def),
+        "bare annotation also resolves to the sermo carrier"
     );
 }
 
