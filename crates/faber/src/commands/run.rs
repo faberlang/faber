@@ -539,13 +539,14 @@ fn run_auto_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
     }
 }
 
-/// The marker a dispatching run prints with its host stats: kernels ran on the
-/// device and carry no timing (gpu-reset C2-U6c, D4).
+/// The marker a dispatching run prints with its stats artifact: device phases
+/// and runtime counters are measured, even when the driver has no GPU times.
 #[cfg(feature = "device-runtime")]
-const DEVICE_STATS_MARKER: &str = "device: dispatched (not measured)";
+const DEVICE_STATS_MARKER: &str = "device: dispatched (measured)";
 
 /// Run `input` on the in-process device session over the system registry,
-/// emitting host-only stats plus [`DEVICE_STATS_MARKER`] when requested.
+/// emitting host stats and a device receipt in [`DEVICE_STATS_MARKER`] format
+/// when requested.
 #[cfg(feature = "device-runtime")]
 fn run_on_device_session(
     config: &radix::module::driver::Config,
@@ -599,8 +600,8 @@ fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
     finish_device_run(run, metadata, started, stats, stats_file, out)
 }
 
-/// Emit the host-only stats artifact and [`DEVICE_STATS_MARKER`] for a
-/// finished device run that was asked to collect stats.
+/// Emit the host stats and device receipt in [`DEVICE_STATS_MARKER`] format
+/// for a finished device run that was asked to collect stats.
 #[cfg(feature = "device-runtime")]
 fn finish_device_run(
     run: package::mir::DeviceSessionRun,
@@ -610,10 +611,16 @@ fn finish_device_run(
     stats_file: Option<&std::path::PathBuf>,
     out: &mut dyn io::Write,
 ) -> Result<(), Vec<Diagnostic>> {
-    if let (Some(metadata), Some(run_stats_value)) = (metadata, run.stats) {
+    let package::mir::DeviceSessionRun {
+        stats: run_stats_value,
+        device,
+        ..
+    } = run;
+    if let (Some(metadata), Some(runner_stats)) = (metadata, run_stats_value) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
-        let artifact =
-            RunStatsArtifact::new(metadata, run_stats_value, elapsed_wall_ms(started), 0);
+        let mut artifact =
+            RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0);
+        artifact.device = Some(run_stats::DeviceMetadata::from_receipt(&device));
         if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
             eprintln!("error: could not write run statistics: {error}");
             std::process::exit(1);
@@ -629,7 +636,7 @@ fn finish_device_run(
 /// resolved selection is the CPU device. Any other route fails closed before
 /// launch rather than silently ignoring the count; there is no `[device]
 /// threads` manifest key. A stats request is permitted with any selection: a
-/// dispatching run reports host rows only (gpu-reset C2-U6c, D4).
+/// dispatching run reports host rows and a device receipt.
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
@@ -824,3 +831,7 @@ mod tests;
 #[cfg(all(test, feature = "device-runtime", target_os = "macos"))]
 #[path = "run_device_test.rs"]
 mod run_device_tests;
+
+#[cfg(all(test, feature = "device-runtime", target_os = "macos"))]
+#[path = "run_device_hw_test.rs"]
+mod run_device_hw_tests;
