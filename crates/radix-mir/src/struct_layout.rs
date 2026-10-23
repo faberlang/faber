@@ -81,6 +81,32 @@ pub enum StructLayoutRefusal {
 }
 
 impl StructLayoutRefusal {
+    /// Stable machine-readable identifier for this refusal.
+    #[must_use]
+    pub fn identifier(self) -> &'static str {
+        match self {
+            Self::NotAGenus => "not_a_genus",
+            Self::UnknownFields => "unknown_fields",
+            Self::OpaqueGenus => "opaque_genus",
+            Self::EmptyGenus => "empty_genus",
+            Self::Bool => "bool",
+            Self::F64 => "f64",
+            Self::NestedGenus => "nested_genus",
+            Self::Generic => "generic",
+            Self::Tuple => "tuple",
+            Self::Record => "record",
+            Self::List => "list",
+            Self::Map => "map",
+            Self::Set => "set",
+            Self::Tensor => "tensor",
+            Self::Nullable => "nullable",
+            Self::Text => "text",
+            Self::Vec3PackedNotYet => "vec3_packed_not_yet",
+            Self::TooLarge => "too_large",
+            Self::UnsupportedField => "unsupported_field",
+        }
+    }
+
     /// Stable lowercase reason string.
     #[must_use]
     pub fn reason(self) -> &'static str {

@@ -397,7 +397,11 @@ pub(crate) fn reflect_kernel_resource(
         {
             let struct_layout = crate::resolve_struct_layout(resource.element_ty, validation)
                 .map_err(|refusal| {
-                    MirAbiError::new(format!("kernel device view element: {}", refusal.reason()))
+                    MirAbiError::with_detail(
+                        format!("kernel device view element: {}", refusal.reason()),
+                        "mir_kernel_record_element_layout_unsupported",
+                        refusal.identifier(),
+                    )
                 })?;
             record_byte_width = Some(
                 u16::try_from(struct_layout.size)
@@ -710,7 +714,11 @@ pub(crate) fn require_kernel_device_view(
         crate::MirDeviceViewElement::Record(record_ty) => {
             let layout = crate::resolve_struct_layout(MirType::semantic(record_ty), validation)
                 .map_err(|refusal| {
-                    MirAbiError::new(format!("kernel device view element: {}", refusal.reason()))
+                    MirAbiError::with_detail(
+                        format!("kernel device view element: {}", refusal.reason()),
+                        "mir_kernel_record_element_layout_unsupported",
+                        refusal.identifier(),
+                    )
                 })?;
             // A record cell widens to a u16 byte width in the reflection row;
             // an empty or oversized struct has no legal ABI width.
