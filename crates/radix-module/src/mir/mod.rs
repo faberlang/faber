@@ -447,6 +447,9 @@ mod ascii_unicode_escape_tests;
 #[path = "tensor_bracket_range_test.rs"]
 mod tensor_bracket_range_tests;
 #[cfg(test)]
+#[path = "tensor_family_conversio_test.rs"]
+mod tensor_family_conversio_tests;
+#[cfg(test)]
 #[path = "tensor_lift_test.rs"]
 mod tensor_lift_tests;
 #[cfg(test)]

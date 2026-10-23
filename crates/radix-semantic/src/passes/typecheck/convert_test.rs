@@ -2694,3 +2694,75 @@ fn empty_list_conversio_nonempty_source_accepts() {
 }"#,
     );
 }
+
+// Ruling 16: `tensor ↔ vector` and `tensor ↔ matrix` are family crossings, so
+// they always need the explicit `↦` — and the crossing is exact (equal element
+// type, equal static extents).
+
+#[test]
+fn tensor_family_conversio_tensor_to_vector_accepts() {
+    test_support::assert_accepts_la(
+        r"incipit {
+  sit tf32[3] t ← vacua
+  sit vector<f32, 3> v ← t ↦ vector<f32, 3>
+  nota v
+}",
+    );
+}
+
+#[test]
+fn tensor_family_conversio_vector_to_tensor_accepts() {
+    test_support::assert_accepts_la(
+        r"incipit {
+  sit vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  sit tf32[3] t ← v ↦ tf32[3]
+  nota t
+}",
+    );
+}
+
+#[test]
+fn tensor_family_conversio_tensor_to_matrix_accepts() {
+    test_support::assert_accepts_la(
+        r"incipit {
+  sit tf32[2, 3] t ← vacua
+  sit matrix<f32, [2, 3]> m ← t ↦ matrix<f32, [2, 3]>
+  nota m
+}",
+    );
+}
+
+#[test]
+fn tensor_family_conversio_matrix_to_tensor_accepts() {
+    test_support::assert_accepts_la(
+        r"incipit {
+  sit matrix<f32, [2, 3]> m ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ matrix<f32, [2, 3]>
+  sit tf32[2, 3] t ← m ↦ tf32[2, 3]
+  nota t
+}",
+    );
+}
+
+#[test]
+fn tensor_family_conversio_width_mismatch_rejects() {
+    test_support::assert_rejects_with_issue_la(
+        r"incipit {
+  sit tf32[4] t ← vacua
+  sit vector<f32, 3> v ← t ↦ vector<f32, 3>
+  nota v
+}",
+        "tensor_shape_mismatch",
+    );
+}
+
+#[test]
+fn tensor_family_conversio_element_mismatch_rejects() {
+    test_support::assert_rejects_with_issue_la(
+        r"incipit {
+  sit tu32[3] t ← vacua
+  sit vector<f32, 3> v ← t ↦ vector<f32, 3>
+  nota v
+}",
+        "tensor_element_mismatch",
+    );
+}

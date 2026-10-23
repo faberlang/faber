@@ -62,19 +62,41 @@ impl FunctionBuilder<'_> {
         index: &HirExpression,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        let object_is_coordinate = object
+            .ty
+            .is_some_and(|ty| radix_semantic::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty));
+        // WHY: kernel slice lowering is deliberately not in need, so a
+        // range bracket on the device path fails loudly instead of lowering a
+        // range value as a projection.
+        if self.is_device_lowering() && object_is_coordinate && tensor_bracket_index_has_range(index) {
+            self.errors.push(MirError::unsupported(
+                index.span,
+                "kernel bracket range slice is not lowered on the device path",
+            ));
+            return None;
+        }
         // WHY: tensor bracket read (`grid[idx]`) is sugar for `accipe`. Desugar
         // to the `TensorGet` collection op so MIR reuses the existing tensor
         // runtime path instead of a second `MirProjection::Index` protocol,
         // which validate rejects for tensors (DEFER-063).
-        if !self.is_device_lowering()
-            && object
-                .ty
-                .is_some_and(|ty| radix_semantic::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty))
-        {
+        if !self.is_device_lowering() && object_is_coordinate {
             // WHY: a range index (`t[1 ‥ 4]`) is the trapping slice view of
             // need, not a coordinate read.
             if matches!(index.kind, HirExpressionKind::Intervallum { .. }) {
                 return self.lower_tensor_bracket_slice(object, index, expr);
+            }
+            // WHY: a slot list with a range slot (`g[[1, 0 ‥ 3]]`) retains and
+            // drops axes per slot; an all-integer slot list stays a coordinate
+            // read. A matrix is a register aggregate, not a tensor, so its
+            // slice is built from cell reads rather than `TensorSliceNd`.
+            if tensor_bracket_index_has_range(index) {
+                let object_is_matrix = object.ty.is_some_and(|ty| {
+                    matches!(self.normalized_type(self.types.peel_access_marker(ty).1), Type::Matrix(..))
+                });
+                if object_is_matrix {
+                    return self.lower_matrix_bracket_slot_slice(object, index, expr);
+                }
+                return self.lower_tensor_bracket_slot_slice(object, index, expr);
             }
             return self.lower_tensor_bracket_get(object, index, expr);
         }
@@ -93,10 +115,84 @@ impl FunctionBuilder<'_> {
                 expr.span,
             ));
         }
+        // WHY: a register vector is not a lane base for a range: `v[1 ‥ 3]`
+        // stays in the vector family at the width the checker computes, so it
+        // builds a fresh vector from the kept lanes instead of reading a lane
+        //.
+        if object.ty.is_some_and(|ty| self.is_vector_lane_base(ty))
+            && matches!(index.kind, HirExpressionKind::Intervallum { .. })
+        {
+            return self.lower_vector_bracket_slice(object, index, expr);
+        }
         let mut place = self.lower_projectable_place(object)?;
         let projection = self.lower_index_projection(&place, object.ty, index)?;
         place.projections.push(projection);
         Some(MirOperand::Place(place))
+    }
+
+    /// Lower a vector bracket range (`v[1 ‥ 3]`, `v[0 ‥ 4 per 2]`) as a fresh
+    /// vector of its kept lanes.
+    ///
+    /// The checker only accepts a range whose start, end and step are static
+    /// literals (a register vector carries a literal width), so the kept lanes
+    /// are enumerated here and each one read through the `VectorLane`
+    /// projection. A non-literal bound cannot reach this path; if it does, it
+    /// fails loudly instead of lowering a range value as a lane index.
+    fn lower_vector_bracket_slice(
+        &mut self,
+        object: &HirExpression,
+        index: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let HirExpressionKind::Intervallum { start, end, step, kind } = &index.kind else {
+            self.errors
+                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
+            return None;
+        };
+        let step_value = match step.as_deref() {
+            Some(step) => radix_semantic::passes::const_int_value(step),
+            None => Some(1),
+        };
+        let (Some(start_value), Some(end_value), Some(step_value)) = (
+            radix_semantic::passes::const_int_value(start),
+            radix_semantic::passes::const_int_value(end),
+            step_value,
+        ) else {
+            self.errors
+                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
+            return None;
+        };
+        if step_value <= 0 {
+            self.errors
+                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
+            return None;
+        }
+        let end_eff = if matches!(kind, HirRangeKind::Inclusive) {
+            end_value.saturating_add(1)
+        } else {
+            end_value
+        };
+        let place = self.lower_projectable_place(object)?;
+        let mut items = Vec::new();
+        let mut lane = start_value;
+        while lane < end_eff {
+            let Ok(lane_index) = u8::try_from(lane) else {
+                self.errors
+                    .push(MirError::unsupported(index.span, "vector bracket range lane out of range"));
+                return None;
+            };
+            // WHY: the lane read is the same `VectorLane` projection a
+            // swizzle uses (`vector_lane_operand` is private to the runtime
+            // module; the projection is identical).
+            let mut lane_place = place.clone();
+            lane_place
+                .projections
+                .push(MirProjection::VectorLane(lane_index));
+            items.push(MirAggregateItem::Operand(MirOperand::Place(lane_place)));
+            lane += step_value;
+        }
+        let ty = self.expr_ty(expr)?;
+        Some(self.construct_temp(MirAggregateKind::Vector, MirAggregateFields::Ordered(items), ty, expr.span))
     }
 
     /// Whether `object[index]` is a list window: a list receiver and a range
@@ -314,11 +410,206 @@ impl FunctionBuilder<'_> {
         ))
     }
 
+    /// Lower a rank-N tensor bracket slot list (`g[[1, 0 ‥ 3]]`) as the
+    /// `TensorSliceNd` collection op: one axis entry per slot, in receiver
+    /// axis order. A range slot keeps its axis; an integer slot selects one
+    /// coordinate and drops its axis.
+    fn lower_tensor_bracket_slot_slice(
+        &mut self,
+        object: &HirExpression,
+        index: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let HirExpressionKind::Array(elements) = &index.kind else {
+            return self.lower_tensor_bracket_slice(object, index, expr);
+        };
+        let receiver = self.lower_expr_value(object)?;
+        // WHY: a range used only as a bracket index is not typed by the check
+        // pass, so the axis entries take the counter type an ordinary `itera`
+        // range defaults to. The list types are interned by
+        // `ensure_tensor_bracket_index_array_types`.
+        let counter = self.types.primitive(Primitive::Numerus);
+        let int_list_ty =
+            MirType::semantic(self.require_array(counter, index.span, "tensor bracket slot index list")?);
+        let flags = self.types.primitive(Primitive::Bivalens);
+        let bool_list_ty = MirType::semantic(self.require_array(flags, index.span, "tensor bracket slot flag list")?);
+        let mut starts = Vec::with_capacity(elements.len());
+        let mut ends = Vec::with_capacity(elements.len());
+        let mut steps = Vec::with_capacity(elements.len());
+        let mut keeps = Vec::with_capacity(elements.len());
+        let mut inclusives = Vec::with_capacity(elements.len());
+        for element in elements {
+            let HirArrayElement::Expr(slot) = element else {
+                self.errors.push(MirError::unsupported(
+                    index.span,
+                    "tensor bracket slot list with a non-slot element",
+                ));
+                return None;
+            };
+            if let HirExpressionKind::Intervallum { start, end, step, kind } = &slot.kind {
+                starts.push(self.lower_expr_value(start)?);
+                ends.push(self.lower_expr_value(end)?);
+                steps.push(match step.as_deref() {
+                    Some(step) => self.lower_expr_value(step)?,
+                    None => MirOperand::Constant(MirConstant::Int(1)),
+                });
+                keeps.push(MirOperand::Constant(MirConstant::Bool(true)));
+                inclusives.push(MirOperand::Constant(MirConstant::Bool(matches!(kind, HirRangeKind::Inclusive))));
+            } else {
+                // WHY: a dropped axis is a one-cell window: the runner folds the
+                // inclusive flag into `end_eff = end + 1`, so the slot value is
+                // both bounds and no add is emitted here.
+                let value = self.lower_expr_value(slot)?;
+                starts.push(value.clone());
+                ends.push(value);
+                steps.push(MirOperand::Constant(MirConstant::Int(1)));
+                keeps.push(MirOperand::Constant(MirConstant::Bool(false)));
+                inclusives.push(MirOperand::Constant(MirConstant::Bool(true)));
+            }
+        }
+        let starts = self.element_list(starts, int_list_ty, index.span);
+        let ends = self.element_list(ends, int_list_ty, index.span);
+        let steps = self.element_list(steps, int_list_ty, index.span);
+        let keeps = self.element_list(keeps, bool_list_ty, index.span);
+        let inclusives = self.element_list(inclusives, bool_list_ty, index.span);
+        let ty = self.expr_ty(expr)?;
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorSliceNd),
+            vec![receiver, starts, ends, steps, keeps, inclusives],
+            ty,
+            expr.span,
+        ))
+    }
+
+    /// Lower a matrix slot list with a range slot (`m[[1, 0 ‥ 3]]`) as a fresh
+    /// register aggregate of cell reads.
+    ///
+    /// A matrix is rank 2 and its cells are addressed by the `MatrixCell`
+    /// projection, so the kept row and column coordinates are enumerated here
+    /// from the literal slots. One range slot keeps a row or a column as a
+    /// `vector`; two range slots keep a block as a `matrix`, in row-major
+    /// order. The checker only accepts literal bounds on this path; a
+    /// non-literal bound fails loudly instead of guessing a shape.
+    fn lower_matrix_bracket_slot_slice(
+        &mut self,
+        object: &HirExpression,
+        index: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let HirExpressionKind::Array(elements) = &index.kind else {
+            self.errors.push(MirError::unsupported(
+                index.span,
+                "matrix bracket slot list needs a slot per axis",
+            ));
+            return None;
+        };
+        let [HirArrayElement::Expr(row_slot), HirArrayElement::Expr(column_slot)] = elements.as_slice() else {
+            self.errors.push(MirError::unsupported(
+                index.span,
+                "matrix bracket slot list needs one slot per axis",
+            ));
+            return None;
+        };
+        let rows = self.matrix_slot_indices(row_slot, index.span)?;
+        let columns = self.matrix_slot_indices(column_slot, index.span)?;
+        let row_is_range = matches!(row_slot.kind, HirExpressionKind::Intervallum { .. });
+        let column_is_range = matches!(column_slot.kind, HirExpressionKind::Intervallum { .. });
+        if !row_is_range && !column_is_range {
+            // WHY: an all-integer slot list is a coordinate read; it cannot
+            // reach here through `lower_index`, but keep the fallback honest.
+            return self.lower_tensor_bracket_get(object, index, expr);
+        }
+        let place = self.lower_projectable_place(object)?;
+        let ty = self.expr_ty(expr)?;
+        let cells = |rows: &[u8], columns: &[u8]| {
+            let mut items = Vec::with_capacity(rows.len().saturating_mul(columns.len()));
+            for &row in rows {
+                for &column in columns {
+                    items.push(MirAggregateItem::Operand(runtime::matrix_cell_operand(&place, row, column)));
+                }
+            }
+            items
+        };
+        let kind = if row_is_range && column_is_range {
+            // WHY: two kept axes form a block; the cells are already in
+            // row-major order.
+            MirAggregateKind::Matrix
+        } else {
+            // WHY: one kept axis is a row or a column.
+            MirAggregateKind::Vector
+        };
+        Some(self.construct_temp(kind, MirAggregateFields::Ordered(cells(&rows, &columns)), ty, expr.span))
+    }
+
+    /// Enumerate the literal coordinates a matrix bracket slot keeps: a range
+    /// slot expands start to end by step, an integer slot is one coordinate.
+    fn matrix_slot_indices(&mut self, slot: &HirExpression, span: Span) -> Option<Vec<u8>> {
+        let mut indices = Vec::new();
+        if let HirExpressionKind::Intervallum { start, end, step, kind } = &slot.kind {
+            let step_value = match step.as_deref() {
+                Some(step) => radix_semantic::passes::const_int_value(step),
+                None => Some(1),
+            };
+            let (Some(start_value), Some(end_value), Some(step_value)) = (
+                radix_semantic::passes::const_int_value(start),
+                radix_semantic::passes::const_int_value(end),
+                step_value,
+            ) else {
+                self.errors
+                    .push(MirError::unsupported(span, "matrix bracket range needs literal bounds"));
+                return None;
+            };
+            if step_value <= 0 {
+                self.errors
+                    .push(MirError::unsupported(span, "matrix bracket range needs literal bounds"));
+                return None;
+            }
+            let end_eff = if matches!(kind, HirRangeKind::Inclusive) {
+                end_value.saturating_add(1)
+            } else {
+                end_value
+            };
+            let mut coordinate = start_value;
+            while coordinate < end_eff {
+                let Ok(coordinate_u8) = u8::try_from(coordinate) else {
+                    self.errors
+                        .push(MirError::unsupported(span, "matrix bracket slot coordinate out of range"));
+                    return None;
+                };
+                indices.push(coordinate_u8);
+                coordinate += step_value;
+            }
+            return Some(indices);
+        }
+        let Some(value) = radix_semantic::passes::const_int_value(slot) else {
+            self.errors
+                .push(MirError::unsupported(span, "matrix bracket slot needs a literal coordinate"));
+            return None;
+        };
+        let Ok(value) = u8::try_from(value) else {
+            self.errors
+                .push(MirError::unsupported(span, "matrix bracket slot coordinate out of range"));
+            return None;
+        };
+        indices.push(value);
+        Some(indices)
+    }
+
     /// A one-element `lista` aggregate operand (one TensorSliceNd axis entry).
     fn one_element_list(&mut self, operand: MirOperand, list_ty: MirType, span: Span) -> MirOperand {
+        self.element_list(vec![operand], list_ty, span)
+    }
+
+    /// An N-element `lista` aggregate operand (one entry per TensorSliceNd axis).
+    fn element_list(&mut self, operands: Vec<MirOperand>, list_ty: MirType, span: Span) -> MirOperand {
         self.construct_temp(
             MirAggregateKind::Array,
-            MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(operand)]),
+            MirAggregateFields::Ordered(
+                operands
+                    .into_iter()
+                    .map(MirAggregateItem::Operand)
+                    .collect(),
+            ),
             list_ty,
             span,
         )
@@ -651,5 +942,20 @@ impl FunctionBuilder<'_> {
     fn nullable_inner_ty(&self, expr: &HirExpression) -> Option<MirType> {
         let ty = expr.ty?;
         self.types.nullable_inner(ty).map(MirType::semantic)
+    }
+}
+
+/// Whether a tensor bracket index is a range or a slot list containing one:
+/// the forms that lower to `TensorSliceNd` rather than a coordinate read.
+fn tensor_bracket_index_has_range(index: &HirExpression) -> bool {
+    match &index.kind {
+        HirExpressionKind::Intervallum { .. } => true,
+        HirExpressionKind::Array(elements) => elements.iter().any(|element| {
+            matches!(
+                element,
+                HirArrayElement::Expr(slot) if matches!(slot.kind, HirExpressionKind::Intervallum { .. })
+            )
+        }),
+        _ => false,
     }
 }

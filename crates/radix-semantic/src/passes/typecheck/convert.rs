@@ -899,6 +899,20 @@ impl TypeChecker<'_> {
             return error_ty;
         }
 
+        // Ruling 16: `tensor ↔ vector` and `tensor ↔ matrix`
+        // are family crossings, so they always need the explicit `↦` — but the
+        // crossing itself is exact. This runs before the literal-shaped
+        // lista/vector/matrix arms, which would otherwise refuse a tensor
+        // source as `lista_to_vector_literal_required`.
+        if let Some(result_ty) = self.check_collection_family_bridge_conversio(
+            source_ty,
+            target_resolved,
+            recovery.as_deref_mut(),
+            span,
+        ) {
+            return result_ty;
+        }
+
         if let Some(result_ty) =
             self.check_lista_to_matrix_conversio(source, source_ty, target_carrier, span)
         {
@@ -2344,6 +2358,120 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         None
+    }
+
+    /// Ruling 16: the exact `tensor ↔ vector` and
+    /// `tensor ↔ matrix` family crossings. Accepting the pair needs equal
+    /// element types and equal static extents; the extent and element refusals
+    /// reuse the tensor issues. Pairs outside these four (non-static extents,
+    /// another rank, every other family pairing) are not this bridge and keep
+    /// their existing refusal.
+    fn check_collection_family_bridge_conversio(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        recovery: Option<&mut HirExpression>,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let source_resolved = self.resolve_inferred_type(source_ty);
+        let (source_elem, target_elem, source_extents, target_extents) =
+            self.collection_family_bridge_pair(source_resolved, target_resolved)?;
+        if source_extents != target_extents {
+            self.invalid_conversion(ISSUE_TENSOR_SHAPE_MISMATCH, span);
+            return Some(self.error_type);
+        }
+        if !self.types.equals(source_elem, target_elem) {
+            self.invalid_conversion(ISSUE_TENSOR_ELEMENT_MISMATCH, span);
+            return Some(self.error_type);
+        }
+        self.settle_conversio_result(recovery, source_ty, target_resolved, span);
+        Some(target_resolved)
+    }
+
+    /// The four accepted bridge pairs, as `(source element, target element,
+    /// source extents, target extents)`. Only a static rank-1 tensor against a
+    /// literal vector width, or a static rank-2 tensor against a literal
+    /// matrix shape, names a pair at all.
+    fn collection_family_bridge_pair(
+        &mut self,
+        source_resolved: TypeId,
+        target_resolved: TypeId,
+    ) -> Option<(TypeId, TypeId, Vec<u64>, Vec<u64>)> {
+        let pair = match (
+            self.types.get(source_resolved).clone(),
+            self.types.get(target_resolved).clone(),
+        ) {
+            (Type::Tensor(elem, shape), Type::Vector(vector_elem, width)) => {
+                let width = u64::from(crate::literal_vector_width(width, self.types)?);
+                let extents = self.static_tensor_extents(shape)?;
+                let [extent] = extents.as_slice() else {
+                    return None;
+                };
+                (elem, vector_elem, vec![*extent], vec![width])
+            }
+            (Type::Vector(vector_elem, width), Type::Tensor(elem, shape)) => {
+                let width = u64::from(crate::literal_vector_width(width, self.types)?);
+                let extents = self.static_tensor_extents(shape)?;
+                let [extent] = extents.as_slice() else {
+                    return None;
+                };
+                (vector_elem, elem, vec![width], vec![*extent])
+            }
+            (Type::Tensor(elem, shape), Type::Matrix(matrix_elem, matrix_shape)) => {
+                let (rows, columns) = crate::literal_matrix_shape(matrix_shape, self.types)?;
+                let extents = self.static_tensor_extents(shape)?;
+                let [rows_extent, columns_extent] = extents.as_slice() else {
+                    return None;
+                };
+                (
+                    elem,
+                    matrix_elem,
+                    vec![*rows_extent, *columns_extent],
+                    vec![u64::from(rows), u64::from(columns)],
+                )
+            }
+            (Type::Matrix(matrix_elem, matrix_shape), Type::Tensor(elem, shape)) => {
+                let (rows, columns) = crate::literal_matrix_shape(matrix_shape, self.types)?;
+                let extents = self.static_tensor_extents(shape)?;
+                let [rows_extent, columns_extent] = extents.as_slice() else {
+                    return None;
+                };
+                (
+                    matrix_elem,
+                    elem,
+                    vec![u64::from(rows), u64::from(columns)],
+                    vec![*rows_extent, *columns_extent],
+                )
+            }
+            _ => return None,
+        };
+        Some(pair)
+    }
+
+    /// Static extents of a tensor figura. A reduced rank-1 tensor keeps its
+    /// surviving dim as a bare `Literal` shape rather than a one-element tuple
+    /// (`tensor_index::sectio_axis0_shape` reads both spellings), so both mean
+    /// one dim here.
+    fn static_tensor_extents(&mut self, shape: crate::IndexId) -> Option<Vec<u64>> {
+        let resolved = self.resolve_index(shape);
+        let dims = match self.types.get_index(resolved) {
+            IndexExpr::Tuple(dims) => dims.clone(),
+            IndexExpr::Literal(value) => return Some(vec![*value]),
+            _ => return None,
+        };
+        let mut extents = Vec::with_capacity(dims.len());
+        for dim in dims {
+            extents.push(self.static_index_extent(dim)?);
+        }
+        Some(extents)
+    }
+
+    fn static_index_extent(&mut self, index: crate::IndexId) -> Option<u64> {
+        let resolved = self.resolve_index(index);
+        match self.types.get_index(resolved) {
+            IndexExpr::Literal(value) => Some(*value),
+            _ => None,
+        }
     }
 
     fn is_tensor_scalar_extract_target(&self, ty: &Type) -> bool {

@@ -1058,12 +1058,43 @@ impl TypeChecker<'_> {
         // composite-key path (a range is never a tuple key) and before the
         // window decline in `check_index_from_type`.
         let (_, payload) = self.types.peel_access_marker(resolved);
-        if let Type::Tensor(elem, shape) = self.types.get(payload).clone()
-            && matches!(index.kind, HirExpressionKind::Intervallum { .. })
+        if let Type::Tensor(elem, shape) = self.types.get(payload).clone() {
+            if matches!(index.kind, HirExpressionKind::Intervallum { .. }) {
+                return super::tensor_index::check_tensor_bracket_range_index(
+                    self, obj_ty, elem, shape, index,
+                );
+            }
+            if matches!(index.kind, HirExpressionKind::Array(_)) {
+                return super::tensor_index::check_tensor_bracket_slot_list_index(
+                    self, obj_ty, elem, shape, index,
+                );
+            }
+        }
+        if let Type::Matrix(elem, shape) = self.types.get(payload).clone()
+            && let HirExpressionKind::Array(elements) = &index.kind
+            && elements.iter().any(|element| {
+                matches!(
+                    element,
+                    HirArrayElement::Spread(_) | HirArrayElement::Infer(_)
+                ) || matches!(
+                    element,
+                    HirArrayElement::Expr(expr)
+                        if matches!(expr.kind, HirExpressionKind::Intervallum { .. })
+                )
+            })
         {
-            return super::tensor_index::check_tensor_bracket_range_index(
+            return super::tensor_index::check_matrix_bracket_slot_list_index(
                 self, obj_ty, elem, shape, index,
             );
+        }
+        // WHY: `v[lo ‥ hi]` on a register vector is a vector slice whose width
+        // is computed at compile time from literal bounds (operator ruling
+        // 2026-10-17: a slice stays in its family), not a `lista` window, so it
+        // routes before the window decline in `check_index_from_type`.
+        if let Type::Vector(elem, width) = self.types.get(payload).clone()
+            && matches!(index.kind, HirExpressionKind::Intervallum { .. })
+        {
+            return super::tensor_index::check_vector_bracket_range_index(self, elem, width, index);
         }
         let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
             Some(ty) => ty,

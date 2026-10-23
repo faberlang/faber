@@ -19,6 +19,7 @@ use super::*;
 const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 const ISSUE_UNPROVEN_KERNEL_INDEX: &str = "unproven_kernel_index";
 pub(super) const ISSUE_PROVABLY_OUT_OF_BOUNDS: &str = "index_provably_out_of_bounds";
+const ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED: &str = "bracket_range_static_bounds_required";
 
 const TENSOR_FORMA: &str = "forma";
 const TENSOR_GATHER: &str = "gather";
@@ -888,17 +889,396 @@ pub(super) fn reject_static_bounded_index_oob(
     report_static_index_oob(checker, index, &range);
 }
 
+/// Check a two-axis matrix bracket list whose range slots retain their axes.
+/// Integer slots select coordinates; two ranges produce a matrix block, while
+/// one range produces a row or column vector.
+pub(super) fn check_matrix_bracket_slot_list_index(
+    checker: &mut TypeChecker<'_>,
+    _receiver_ty: TypeId,
+    elem: TypeId,
+    shape: IndexId,
+    index: &mut HirExpression,
+) -> TypeId {
+    let HirExpressionKind::Array(elements) = &mut index.kind else {
+        return checker.error_type;
+    };
+    if elements.len() != 2
+        || elements.iter().any(|element| {
+            matches!(
+                element,
+                HirArrayElement::Spread(_) | HirArrayElement::Infer(_)
+            )
+        })
+    {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            index.span,
+        );
+        return checker.error_type;
+    }
+
+    let matrix_bounds = crate::literal_matrix_shape(shape, checker.types)
+        .map(|(rows, columns)| [u64::from(rows), u64::from(columns)]);
+    let mut range_axes = [false; 2];
+    let mut kept_extents = [None; 2];
+    let mut missing_static_bounds = false;
+    let mut static_oob = Vec::new();
+    let mut index_elem_ty: Option<TypeId> = None;
+
+    for (axis, element) in elements.iter_mut().enumerate() {
+        let HirArrayElement::Expr(slot) = element else {
+            unreachable!("spread and inferred matrix slots were rejected above");
+        };
+        if let HirExpressionKind::Intervallum {
+            start,
+            end,
+            step,
+            kind,
+        } = &mut slot.kind
+        {
+            range_axes[axis] = true;
+            let range_kind = *kind;
+            for part in [start.as_mut(), end.as_mut()] {
+                let ty = checker.check_expr(part);
+                index_elem_ty = Some(match index_elem_ty {
+                    None => ty,
+                    Some(existing) => checker.array_common_type(existing, ty, part.span),
+                });
+                if !crate::numeric_width::is_integer_index_scalar(
+                    checker.types,
+                    checker.resolve_inferred_type(ty),
+                ) {
+                    checker
+                        .invalid_operand_types("tensor_bracket_slot_integer_or_range", part.span);
+                }
+            }
+            if let Some(step_expr) = step {
+                let previous = checker.allow_intervallum_step;
+                checker.allow_intervallum_step = true;
+                let step_ty = checker.check_expr(step_expr);
+                checker.allow_intervallum_step = previous;
+                if !crate::numeric_width::is_integer_index_scalar(
+                    checker.types,
+                    checker.resolve_inferred_type(step_ty),
+                ) {
+                    checker.invalid_operand_types(
+                        "tensor_bracket_slot_integer_or_range",
+                        step_expr.span,
+                    );
+                }
+            }
+
+            let static_step = step
+                .as_deref()
+                .map_or(Some(1), static_signed_numerus_literal);
+            let literal_window = static_signed_numerus_literal(start)
+                .zip(static_signed_numerus_literal(end))
+                .zip(static_step);
+            let Some(((start_value, end_value), step_value)) = literal_window else {
+                missing_static_bounds = true;
+                continue;
+            };
+            let Some(end_eff) = (if range_kind == HirRangeKind::Inclusive {
+                end_value.checked_add(1)
+            } else {
+                Some(end_value)
+            }) else {
+                missing_static_bounds = true;
+                continue;
+            };
+
+            if let Some(bound) = matrix_bounds.map(|bounds| bounds[axis]) {
+                if start_value < 0
+                    || end_eff < 0
+                    || start_value > end_eff
+                    || u128::try_from(end_eff).map_or(true, |end| end > u128::from(bound))
+                    || step_value <= 0
+                {
+                    static_oob.push((vec![start_value, end_eff.saturating_sub(1)], bound, axis));
+                }
+            } else if step_value <= 0 {
+                missing_static_bounds = true;
+            }
+
+            if step_value > 0
+                && start_value <= end_eff
+                && let Some(distance) = end_eff.checked_sub(start_value)
+            {
+                let extent = distance / step_value + i128::from(distance % step_value != 0);
+                if let Ok(extent) = u64::try_from(extent) {
+                    kept_extents[axis] =
+                        Some(checker.types.intern_index(IndexExpr::Literal(extent)));
+                }
+            }
+        } else {
+            let slot_ty = checker.check_expr(slot);
+            index_elem_ty = Some(match index_elem_ty {
+                None => slot_ty,
+                Some(existing) => checker.array_common_type(existing, slot_ty, slot.span),
+            });
+            if !crate::numeric_width::is_integer_index_scalar(
+                checker.types,
+                checker.resolve_inferred_type(slot_ty),
+            ) {
+                checker.invalid_operand_types("tensor_bracket_slot_integer_or_range", slot.span);
+            }
+            if let (Some(bounds), Some(value)) =
+                (matrix_bounds, static_signed_numerus_literal(slot))
+                && (value < 0
+                    || u128::try_from(value)
+                        .map_or(true, |value| value >= u128::from(bounds[axis])))
+            {
+                static_oob.push((vec![value], bounds[axis], axis));
+            }
+        }
+    }
+
+    let has_static_oob = !static_oob.is_empty();
+    for (indices, bound, axis) in static_oob {
+        report_static_index_oob(
+            checker,
+            index,
+            &StaticIndexRange::OutOfRange {
+                indices,
+                bound,
+                axis,
+            },
+        );
+    }
+
+    // The bracket list lowers as a single coordinate list; retain its typed
+    // list annotation even though range expressions are handled axis-wise.
+    let index_elem = index_elem_ty.unwrap_or_else(|| checker.types.primitive(Primitive::Numerus));
+    let capacity = checker.types.intern_index(IndexExpr::Literal(2));
+    index.ty = Some(checker.types.bounded_array(index_elem, capacity));
+
+    if missing_static_bounds {
+        checker.invalid_operand_types(ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED, index.span);
+        return checker.error_type;
+    }
+    if has_static_oob {
+        return checker.error_type;
+    }
+    if range_axes[0] && range_axes[1] {
+        let (Some(rows), Some(columns)) = (kept_extents[0], kept_extents[1]) else {
+            checker.invalid_operand_types(ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED, index.span);
+            return checker.error_type;
+        };
+        let result_shape = checker
+            .types
+            .intern_index(IndexExpr::Tuple(vec![rows, columns]));
+        checker.types.matrix_with_shape(elem, result_shape)
+    } else if range_axes[0] {
+        let Some(width) = kept_extents[0] else {
+            checker.invalid_operand_types(ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED, index.span);
+            return checker.error_type;
+        };
+        checker.types.vector_with_width(elem, width)
+    } else {
+        let Some(width) = kept_extents[1] else {
+            checker.invalid_operand_types(ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED, index.span);
+            return checker.error_type;
+        };
+        checker.types.vector_with_width(elem, width)
+    }
+}
+
+/// Check a bracket list whose elements independently retain or drop tensor axes.
+/// Integer slots select coordinates; range slots slice and retain their axis.
+pub(super) fn check_tensor_bracket_slot_list_index(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    elem: TypeId,
+    shape: IndexId,
+    index: &mut HirExpression,
+) -> TypeId {
+    let HirExpressionKind::Array(elements) = &mut index.kind else {
+        return tensor_with_fresh_shape(checker, elem);
+    };
+    if elements.iter().any(|element| {
+        matches!(
+            element,
+            HirArrayElement::Spread(_) | HirArrayElement::Infer(_)
+        )
+    }) {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            index.span,
+        );
+        return tensor_with_fresh_shape(checker, elem);
+    }
+
+    let slots_len = elements.len();
+    let resolved_shape = checker.resolve_index(shape);
+    if matches!(
+        checker.types.get_index(resolved_shape),
+        IndexExpr::Tuple(dims) if dims.len() != slots_len
+    ) {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            index.span,
+        );
+        return tensor_with_fresh_shape(checker, elem);
+    }
+
+    let static_bounds = static_tensor_bounds(checker, shape);
+    let mut has_range = false;
+    let mut all_kept_extents_static = true;
+    let mut kept_extents = Vec::new();
+    let mut static_oob = Vec::new();
+    let mut index_elem_ty: Option<TypeId> = None;
+    for (axis, element) in elements.iter_mut().enumerate() {
+        let HirArrayElement::Expr(slot) = element else {
+            continue;
+        };
+        if let HirExpressionKind::Intervallum {
+            start,
+            end,
+            step,
+            kind,
+        } = &mut slot.kind
+        {
+            has_range = true;
+            let range_kind = *kind;
+            for part in [start.as_mut(), end.as_mut()] {
+                let ty = checker.check_expr(part);
+                index_elem_ty = Some(match index_elem_ty {
+                    None => ty,
+                    Some(existing) => checker.array_common_type(existing, ty, part.span),
+                });
+                if !crate::numeric_width::is_integer_index_scalar(
+                    checker.types,
+                    checker.resolve_inferred_type(ty),
+                ) {
+                    checker
+                        .invalid_operand_types("tensor_bracket_slot_integer_or_range", part.span);
+                }
+            }
+            if let Some(step_expr) = step {
+                let previous = checker.allow_intervallum_step;
+                checker.allow_intervallum_step = true;
+                let step_ty = checker.check_expr(step_expr);
+                checker.allow_intervallum_step = previous;
+                if !crate::numeric_width::is_integer_index_scalar(
+                    checker.types,
+                    checker.resolve_inferred_type(step_ty),
+                ) {
+                    checker.invalid_operand_types(
+                        "tensor_bracket_slot_integer_or_range",
+                        step_expr.span,
+                    );
+                }
+            }
+
+            let static_step = step.as_deref().map_or(Some(1), static_numerus_literal);
+            let literal_window = static_numerus_literal(start)
+                .zip(static_numerus_literal(end))
+                .zip(static_step);
+            if let (Some(bound), Some(((start_value, end_value), step_value))) =
+                (static_bounds.get(axis).copied(), literal_window)
+            {
+                let end_eff = if range_kind == HirRangeKind::Inclusive {
+                    end_value.checked_add(1)
+                } else {
+                    Some(end_value)
+                };
+                if let Some(end_eff) = end_eff {
+                    let out_of_range = start_value > end_eff || end_eff > bound || step_value == 0;
+                    if out_of_range {
+                        static_oob.push((
+                            vec![
+                                i128::from(start_value),
+                                i128::from(end_eff.saturating_sub(1)),
+                            ],
+                            bound,
+                            axis,
+                        ));
+                    }
+                    if step_value > 0 && start_value <= end_eff {
+                        let extent = (end_eff - start_value).div_ceil(step_value);
+                        kept_extents.push(checker.types.intern_index(IndexExpr::Literal(extent)));
+                    } else {
+                        all_kept_extents_static = false;
+                    }
+                } else {
+                    static_oob.push((
+                        vec![i128::from(start_value), i128::from(end_value)],
+                        bound,
+                        axis,
+                    ));
+                    all_kept_extents_static = false;
+                }
+            } else {
+                all_kept_extents_static = false;
+            }
+        } else {
+            let slot_ty = checker.check_expr(slot);
+            index_elem_ty = Some(match index_elem_ty {
+                None => slot_ty,
+                Some(existing) => checker.array_common_type(existing, slot_ty, slot.span),
+            });
+            if !crate::numeric_width::is_integer_index_scalar(
+                checker.types,
+                checker.resolve_inferred_type(slot_ty),
+            ) {
+                checker.invalid_operand_types("tensor_bracket_slot_integer_or_range", slot.span);
+            }
+            if let (Some(bound), Some(value)) = (
+                static_bounds.get(axis).copied(),
+                static_signed_numerus_literal(slot),
+            ) && (value < 0 || u128::try_from(value).map_or(true, |v| v >= u128::from(bound)))
+            {
+                static_oob.push((vec![value], bound, axis));
+            }
+        }
+    }
+
+    for (indices, bound, axis) in static_oob {
+        report_static_index_oob(
+            checker,
+            index,
+            &StaticIndexRange::OutOfRange {
+                indices,
+                bound,
+                axis,
+            },
+        );
+    }
+    // The bracket list lowers as one `lista` value at the MIR boundary, so
+    // the index node must carry its list type here: the generic index route
+    // typed this literal through the array-literal rule, and skipping it
+    // left the node untyped for lowering. Unify the checked slot element
+    // types; a list of only range slots still lowers its axis coordinates,
+    // so fall back to the integer index scalar.
+    let index_elem = index_elem_ty.unwrap_or_else(|| checker.types.primitive(Primitive::Numerus));
+    let capacity = checker
+        .types
+        .intern_index(IndexExpr::Literal(slots_len as u64));
+    index.ty = Some(checker.types.bounded_array(index_elem, capacity));
+    if !has_range {
+        warn_unproven_kernel_index(checker, receiver_ty, index);
+        return elem;
+    }
+    if all_kept_extents_static && !kept_extents.is_empty() {
+        let result_shape = checker.types.intern_index(IndexExpr::Tuple(kept_extents));
+        return checker.types.tensor_with_shape(elem, result_shape);
+    }
+    // WHY: dynamic range bounds leave the retained axes' extents unknown;
+    // preserve the tensor family with a fresh shape hole rather than guessing.
+    tensor_with_fresh_shape(checker, elem)
+}
+
 /// Check a bracket range read on a rank-1 tensor: `t[lo ‥ hi]` reads a sliced
 /// tensor, not a list window (operator ruling 2026-10-17: every slot of a
 /// bracket index takes a range, with step; out of range, the bracket dies).
 ///
-/// Only the rank-1 scalar range is admitted. Per-slot list indexes and
-/// matrix/vector receivers keep declining as before. The caller guarantees the
-/// receiver is a tensor and passes its element type and shape.
-// Uncalled until the bracket-index caller unit (5433ed4f-1.2.3) wires it; the
-// literal-shape tail is 5433ed4f-1.2.2. Dead until then by design, like the
-// `FactKey::Field` producer in control.rs.
-#[allow(dead_code)]
+/// Direct scalar ranges are admitted only on rank-1 tensors; rank-N bracket
+/// lists use [`check_tensor_bracket_slot_list_index`] to retain/drop axes.
+/// The caller guarantees the receiver is a tensor and passes its element type
+/// and shape.
 pub(super) fn check_tensor_bracket_range_index(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
@@ -989,6 +1369,109 @@ pub(super) fn check_tensor_bracket_range_index(
     let result = tensor_with_fresh_shape(checker, elem);
     reject_static_bounded_index_oob(checker, receiver_ty, index);
     result
+}
+
+/// Check a bracket range read on a register vector: `v[lo ‥ hi]` slices to a
+/// vector whose width is computed at compile time from literal bounds and step
+/// (operator ruling 2026-10-17: a slice stays in its family, and its shape is
+/// computed at compile time when the bounds are constant).
+///
+/// A register vector carries a literal width, so a non-literal bound or step
+/// cannot leave the slice width unknown the way a tensor shape hole can; that
+/// decline is its own issue rather than a silent `lista` window.
+///
+/// The caller guarantees the receiver is a vector and passes its element type
+/// and width.
+pub(super) fn check_vector_bracket_range_index(
+    checker: &mut TypeChecker<'_>,
+    elem: TypeId,
+    width: IndexId,
+    index: &mut HirExpression,
+) -> TypeId {
+    let HirExpressionKind::Intervallum {
+        start,
+        end,
+        step,
+        kind,
+    } = &mut index.kind
+    else {
+        return checker.error_type;
+    };
+    let range_kind = *kind;
+    let start_ty = checker.check_expr(start);
+    let start_ty = checker.resolve_inferred_type(start_ty);
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, start_ty) {
+        checker.invalid_operand_types(
+            super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+            start.span,
+        );
+    }
+    let end_ty = checker.check_expr(end);
+    let end_ty = checker.resolve_inferred_type(end_ty);
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, end_ty) {
+        checker.invalid_operand_types(
+            super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+            end.span,
+        );
+    }
+    if let Some(step_expr) = step {
+        // WHY: the step of an `intervallum` here is a direct step by
+        // construction, so the flag admits it the same way the range
+        // expression does.
+        let prev = checker.allow_intervallum_step;
+        checker.allow_intervallum_step = true;
+        let step_ty = checker.check_expr(step_expr);
+        checker.allow_intervallum_step = prev;
+        let step_ty = checker.resolve_inferred_type(step_ty);
+        if !crate::numeric_width::is_integer_index_scalar(checker.types, step_ty) {
+            checker.invalid_operand_types(
+                super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+                step_expr.span,
+            );
+        }
+    }
+    // WHY: a register vector slice keeps the vector family at a computed
+    // width, so every part of the range must be static; a non-literal bound or
+    // step is a decline, not a shape hole.
+    let static_step: Option<u64> = match step.as_deref() {
+        Some(step_expr) => static_numerus_literal(step_expr),
+        None => Some(1),
+    };
+    let static_width = crate::literal_vector_width(width, checker.types).map(u64::from);
+    let bounds = static_numerus_literal(start).zip(static_numerus_literal(end));
+    let (Some(width_value), Some((start_value, end_value)), Some(step_value)) =
+        (static_width, bounds, static_step)
+    else {
+        checker.invalid_operand_types(ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED, index.span);
+        return checker.error_type;
+    };
+    let end_eff = if range_kind == HirRangeKind::Inclusive {
+        end_value.saturating_add(1)
+    } else {
+        end_value
+    };
+    // WHY: the static bound proof uses the same OutOfRange form as
+    // `classify_static_index_range`, so `index_provably_out_of_bounds` carries
+    // the same `index`/`bound`/`axis` arguments here. A literal step of 0 is
+    // equally unusable and reports through the same issue.
+    if start_value > end_eff || end_eff > width_value || step_value == 0 {
+        report_static_index_oob(
+            checker,
+            index,
+            &StaticIndexRange::OutOfRange {
+                indices: vec![
+                    i128::from(start_value),
+                    i128::from(end_eff.saturating_sub(1)),
+                ],
+                bound: width_value,
+                axis: 0,
+            },
+        );
+        return checker.error_type;
+    }
+    let sliced = (end_eff - start_value).div_ceil(step_value);
+    let sliced_width = checker.types.intern_index(IndexExpr::Literal(sliced));
+    checker.types.vector_with_width(elem, sliced_width)
 }
 
 /// Axis extents of a tensor type, resolved; `None` when the type is not a
