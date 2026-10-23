@@ -1411,6 +1411,7 @@ pub(crate) fn transformer_recipe_shape(
 /// literal-only recipes (sum-axis, rope, gather) still resolve through the
 /// literal helper. `None` where the literal helper refuses: the recipe is
 /// absent, a const axis disagrees, or a const fact fails.
+#[allow(dead_code)] // WHY: typed row-op admission surface; the typed recipe shape is exercised by the kernel-plan tests and the row-op emitters consume it next.
 pub(crate) fn transformer_recipe_shape_typed(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
