@@ -72,7 +72,7 @@ fn int_kind(table: &TypeTable, id: TypeId) -> Option<IntKind> {
 }
 
 /// The cell kind of `id` when it takes part in a numeric conversion.
-fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
+pub(super) fn num_of(table: &TypeTable, id: TypeId) -> Option<Num> {
     match resolve(table, id) {
         Type::Primitive(Primitive::Instans) => return Some(Num::Ins(0)),
         Type::SizedInstans(precision) => {
