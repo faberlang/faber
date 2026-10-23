@@ -354,6 +354,48 @@ mod evaluation {
         // validation dangles on them at load.
         let dead = DeadNodes::of(&authored);
         unit.presentation
+            .guard_si_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .elige_expr_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .glyph_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .radical_quarta_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .numeric_twin_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .empty_dense_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .inferred_constructor_ids
+            .retain(|id| !dead.hirs.contains(id));
+        unit.presentation
+            .axis_sugar
+            .retain(|record| !dead.hirs.contains(&record.id));
+        unit.presentation
+            .discard_binding_stmts
+            .retain(|record| !dead.hirs.contains(&record.expr_id));
+        unit.presentation
+            .tuple_label_accesses
+            .retain(|record| !dead.hirs.contains(&record.expr_id));
+        unit.presentation
+            .insere_exprs
+            .retain(|record| !dead.hirs.contains(&record.expr));
+        unit.presentation
+            .destructure_bindings
+            .retain(|record| !record.stmt_ids.iter().any(|id| dead.hirs.contains(id)));
+        unit.presentation
+            .await_assignment_bindings
+            .retain(|def| !dead.defs.contains(def));
+        unit.presentation
+            .function_modifier_bindings
+            .retain(|record| !dead.defs.contains(&record.local));
+        unit.presentation
             .owners
             .retain(|owner| match &owner.semantic {
                 Some(HirOwnerRef::Hir(id)) => !dead.hirs.contains(id),

@@ -972,7 +972,7 @@ fn loaded_package_canonical_faber_parity() {
             .get(&loaded_module.relative_path)
             .unwrap_or_else(|| panic!("no direct unit for {}", loaded_module.relative_path));
         let direct_code = output_code(
-            &generate_from_analyzed(Target::HirFaber, direct_unit, &surface)
+            &generate_from_analyzed(Target::HirFaber, *direct_unit, &surface)
                 .expect("direct canonical Faber emit"),
         )
         .to_owned();
