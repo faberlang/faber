@@ -1,0 +1,21 @@
++++
+term = "tabula"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "call_expr", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:tabula_arity"
+summary = "A map type takes two type parameters: key and value."
+syntax = "map<int> — rejected"
+related = ["tabula", "map"]
++++
+# Rejects a map declaration with only one type parameter.
+# A map type must specify both its key type and its value type.
+# The checker refuses the malformed collection type at check time.
+# This exercises the tabula_arity diagnostic.
+
+main {
+    let map<int> scores ← empty
+}
