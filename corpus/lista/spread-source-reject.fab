@@ -1,0 +1,21 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A spread source must be a list; spreading an integer is refused."
+syntax = "[spread 1] — rejected"
+related = ["lista", "spread"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:array_spread_requires_lista"
++++
+# A spread source must be a list.
+# `[spread 1]` is refused because an integer is not a list.
+# The spread marker requires a list-valued source.
+# This is a semantic rejection, not a parser limitation.
+
+main {
+    let _ xs ← [spread 1]
+}
