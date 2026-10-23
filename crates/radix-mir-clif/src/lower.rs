@@ -3831,8 +3831,9 @@ impl FunctionLower<'_, '_> {
                 self.define_result(destination, handle, Rep::Record)
             }
             // The opener a conversation reopens on: `nihil` clears it, a
-            // `numerus` passes itself, and no other representation has a leaf
-            // symbol. The call answers nothing, so nothing is stored.
+            // `numerus` passes itself, a boxed `valor` passes its tagged
+            // payload, and no other representation has a leaf symbol. The
+            // call answers nothing, so nothing is stored.
             MirIntrinsic::SermoSetOpener => {
                 let [handle, opener] = call.args.as_slice() else {
                     return Err(Decline::new("sermo opener shape"));
@@ -3848,6 +3849,9 @@ impl FunctionLower<'_, '_> {
                     (Some(value), Rep::Int) => {
                         let value = self.narrow(value)?;
                         self.call_runtime(&abi::SERMO_SET_OPENER_I64, &[handle, value])?;
+                    }
+                    (Some(value), Rep::Opt) => {
+                        self.call_runtime(&abi::SERMO_SET_OPENER_VALOR, &[handle, value])?;
                     }
                     _ => return Err(Decline::new("sermo opener representation")),
                 }
@@ -5824,6 +5828,84 @@ mod sermo_lower_test {
             is_generator: false,
         });
         (program, types, interner)
+    }
+
+    #[test]
+    fn sermo_lower_valor_opener_emits_the_tagged_set_opener() {
+        let mut types = TypeTable::new();
+        let handle = sermo_handle(&mut types);
+        let numerus = ty(&types, Primitive::Numerus);
+        let valor = ty(&types, Primitive::Valor);
+        let vacuum = ty(&types, Primitive::Vacuum);
+        let mut interner = Interner::new();
+        let route = interner.intern("tempus:dormiet");
+        let program = single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, handle)],
+            temps: vec![MirTemp {
+                id: MirTempId(0),
+                ty: valor,
+                span: sample_span(),
+            }],
+            statements: vec![
+                runtime_call(
+                    MirIntrinsic::SermoOpen,
+                    vec![MirOperand::Constant(MirConstant::String(route))],
+                    Some(MirPlace::local(MirLocalId(0))),
+                    handle,
+                ),
+                runtime_call(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty: numerus,
+                        target_ty: valor,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![MirOperand::Constant(MirConstant::Int(7))],
+                    Some(MirPlace::temp(MirTempId(0))),
+                    valor,
+                ),
+                runtime_call(
+                    MirIntrinsic::SermoSetOpener,
+                    vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Temp(MirTempId(0)),
+                    ],
+                    None,
+                    vacuum,
+                ),
+            ],
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        });
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the boxed valor opener lowers");
+
+        let valor_name = b"__faber_clif_v1_sermo_set_opener_valor";
+        let named = object
+            .bytes
+            .windows(valor_name.len())
+            .any(|window| window == valor_name);
+        assert!(named, "the object names the tagged set-opener call");
+        let i64_name = b"__faber_clif_v1_sermo_set_opener_i64";
+        let untagged = object
+            .bytes
+            .windows(i64_name.len())
+            .any(|window| window == i64_name);
+        assert!(!untagged, "the object names no untagged set-opener call");
     }
 
     #[test]
