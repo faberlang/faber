@@ -4080,3 +4080,25 @@ help = "ติดตั้ง opt ของ LLVM ไว้ข้าง llvm-as �
 [diagnostics.PKG001.issues.llvm_host_link_failed]
 message = "clang ลิงก์ {path} ไม่สำเร็จ: {detail}"
 help = "ตรวจสอบว่า clang ทำงานได้และอาร์ไคฟ์รันไทม์ตรงกับคอมไพเลอร์นี้; รายละเอียดคือผลลัพธ์ของ clang เอง"
+
+# Sink contract diagnostics: item typing, receiver shape, and retired syntax.
+
+[diagnostics.SEM010.issues.sink_into_item_type_mismatch]
+message = "รายการหลัง '⇜' ต้องมีชนิดตรงกับ 'T' ของ sink ทุกประการ"
+help = "แปลงรายการอย่างชัดเจน: 'console.out ⇜ \"§\"(n)' ไม่ใช่ 'console.out ⇜ n'"
+
+[diagnostics.SEM010.issues.sink_into_value_used]
+message = "คำสั่ง '⇜' ไม่มีค่า"
+help = "เขียน sink เป็นคำสั่งแยกต่างหาก; '⇜' ส่งรายการหนึ่งรายการและไม่ให้ผลลัพธ์"
+
+[diagnostics.SEM011.issues.sink_into_receiver_not_sink]
+message = "ด้านซ้ายของ '⇜' ต้องเป็นไปตาม sinking contract"
+help = "'⇜' ส่งรายการไปยังค่า 'Sink<T>'; ให้เขียน tensor, vector และ matrix ด้วย '⇇'"
+
+[diagnostics.SEM012.issues.transfer_sink_retired]
+message = "เลิกใช้รูปแบบ 'sink ⇇ value' (ซึ่งด้านซ้ายเรียกได้) แล้ว"
+help = "ตอนนี้ '⇇' คัดลอกค่าด้านขวาไปยังที่เก็บ tensor ที่มีอยู่ด้านซ้าย; ให้เรียกฟังก์ชันโดยตรงแทน"
+
+[diagnostics.SEM018.issues.radix_contract_sinking_shape]
+message = "sinking contract ต้องประกาศ `sink(T) → vacuum ⇥ E` และ `flush() → vacuum ⇥ E` อย่างละหนึ่งเมธอด โดยมี type parameter เดียว"
+help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink(T res) → vacuum ⇥ E` และ `{functio} flush() → vacuum ⇥ E`"

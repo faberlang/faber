@@ -4068,3 +4068,25 @@ help = "ثبّت opt من LLVM بجوار llvm-as أو في PATH، ثم أعد �
 [diagnostics.PKG001.issues.llvm_host_link_failed]
 message = "فشل clang في ربط {path}: {detail}"
 help = "تحقق من أن clang يعمل وأن أرشيف وقت التشغيل يطابق هذا المصرِّف؛ التفاصيل هي مخرجات clang نفسه"
+
+# Sink contract diagnostics: item typing, receiver shape, and retired syntax.
+
+[diagnostics.SEM010.issues.sink_into_item_type_mismatch]
+message = "يجب أن يكون العنصر بعد '⇜' من النوع 'T' الخاص بالمصب تمامًا"
+help = "حوّل العنصر صراحةً: 'console.out ⇜ \"§\"(n)'، وليس 'console.out ⇜ n'"
+
+[diagnostics.SEM010.issues.sink_into_value_used]
+message = "جملة '⇜' لا تنتج قيمة"
+help = "اكتب الإرسال كجملة مستقلة؛ فالعامل '⇜' يسلّم عنصرًا ولا ينتج شيئًا"
+
+[diagnostics.SEM011.issues.sink_into_receiver_not_sink]
+message = "يجب أن يطابق الطرف الأيسر لـ '⇜' عقد المصب"
+help = "يسلّم '⇜' عنصرًا إلى قيمة 'Sink<T>'؛ وتُكتب الموترات والمتجهات والمصفوفات باستخدام '⇇'"
+
+[diagnostics.SEM012.issues.transfer_sink_retired]
+message = "أُلغيت الصيغة 'sink ⇇ value' (حيث يكون الطرف الأيسر قابلاً للاستدعاء)"
+help = "ينسخ '⇇' الآن قيم الطرف الأيمن إلى تخزين الموتر الموجود على اليسار؛ استدعِ الدالة مباشرةً بدلاً من ذلك"
+
+[diagnostics.SEM018.issues.radix_contract_sinking_shape]
+message = "يجب أن يعرّف عقد الإرسال بالضبط `sink(T) → vacuum ⇥ E` و`flush() → vacuum ⇥ E` باستخدام معامل نوع واحد"
+help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum ⇥ E` و`{functio} flush() → vacuum ⇥ E`"

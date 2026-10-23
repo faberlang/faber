@@ -1,0 +1,40 @@
+# Library-owned member fragment for the Arabic reader surface.
+# Not a reader keyword pack — only [pack] + [[library_members]].
+
+[pack]
+id = "ar"
+schema_version = 1
+
+[[library_members]]
+provider = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "sink"
+surface = "أودع"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "sink"
+surface = "أودع"
+
+[[library_members]]
+provider = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "flush"
+surface = "أفرغ"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["sink"]
+owner = "Sink"
+kind = "method"
+canonical = "flush"
+surface = "أفرغ"
