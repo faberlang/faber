@@ -121,6 +121,9 @@ mod optional_vector_literal_tests;
 #[path = "queue_stack_test.rs"]
 mod queue_stack_test;
 #[cfg(test)]
+#[path = "sink_into_run_test.rs"]
+mod sink_into_run_test;
+#[cfg(test)]
 #[path = "union_overlap_dispatch_test.rs"]
 mod union_overlap_dispatch_test;
 
