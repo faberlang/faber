@@ -618,13 +618,21 @@ fn finish_device_run(
         ..
     } = run;
     if let (Some(metadata), Some(runner_stats)) = (metadata, run_stats_value) {
+        // The dispatch marker always belongs to the supplied sink: it is the
+        // receipt every measured run prints. The peak-allocation notice is
+        // console noise when the host rows are already on stdout
+        // (`stats == true`), so it goes to stderr there; a stats-file-only
+        // request keeps it on the sink, since stdout carries no host rows.
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
-        writeln!(
-            out,
+        let peak_notice = format!(
             "device: peak allocated {} bytes",
             device.runtime.peak_allocated_bytes
-        )
-        .ok();
+        );
+        if stats {
+            eprintln!("{peak_notice}");
+        } else {
+            writeln!(out, "{peak_notice}").ok();
+        }
         let mut artifact =
             RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0)
                 .with_cold_start(run_stats::ColdStartMetadata {
