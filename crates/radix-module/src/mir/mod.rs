@@ -52,6 +52,10 @@ mod bounded_itera_test;
 mod bounded_cord_methods_test;
 
 #[cfg(test)]
+#[path = "bounded_text_ops_test.rs"]
+mod bounded_text_ops_test;
+
+#[cfg(test)]
 #[path = "affine_destination_test.rs"]
 mod affine_destination_test;
 

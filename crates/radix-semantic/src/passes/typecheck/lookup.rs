@@ -279,6 +279,43 @@ impl TypeChecker<'_> {
         matches!(self.types.get(payload), Type::Primitive(Primitive::Textus))
     }
 
+    pub fn is_cord_text(&self, ty: TypeId) -> bool {
+        if self.is_bounded_cord(ty) {
+            return true;
+        }
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
+        matches!(
+            self.types.get(payload),
+            Type::Primitive(Primitive::Textus | Primitive::Ascii)
+        )
+    }
+
+    pub fn is_bounded_cord(&self, ty: TypeId) -> bool {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
+        matches!(
+            self.types.get(payload),
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. }
+        )
+    }
+
+    pub fn is_bounded_textus(&self, ty: TypeId) -> bool {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
+        matches!(self.types.get(payload), Type::BoundedTextus { .. })
+    }
+
+    pub fn is_bounded_ascii(&self, ty: TypeId) -> bool {
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
+        matches!(self.types.get(payload), Type::BoundedAscii { .. })
+    }
+
     pub fn is_bool(&self, ty: TypeId) -> bool {
         let (_, payload) = self
             .types
@@ -339,10 +376,10 @@ impl TypeChecker<'_> {
     }
 
     pub fn is_ascii(&self, ty: TypeId) -> bool {
-        matches!(
-            self.types.get(self.resolve_inferred_type(ty)),
-            Type::Primitive(Primitive::Ascii)
-        )
+        let (_, payload) = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(ty));
+        matches!(self.types.get(payload), Type::Primitive(Primitive::Ascii))
     }
 
     pub fn bool_type(&mut self) -> TypeId {
