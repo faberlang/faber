@@ -137,3 +137,22 @@ fn bits_lists_decode_and_encode_text_at_widths_8_16_32() {
     );
     assert_eq!(ok("sit lista<b32> l ← [0x110000]\nnota l ↦ textus ⊥ \"?\""), ["?"]);
 }
+
+#[test]
+fn bits_list_to_unsigned_list_compares_equal_to_an_equal_literal() {
+    // A lista<u8> produced from a lista<b8> keeps bit-pattern cells while the
+    // literal holds number cells; equality compares collections elementwise
+    // by value, so the two compare equal.
+    assert_eq!(
+        ok(
+            "sit lista<b8> raw ← [0x01, 0xff]\nsit lista<u8> want ← [1, 255]\nsit bivalens same ← (raw ↦ lista<u8>) ≡ want\nnota same"
+        ),
+        ["verum"]
+    );
+    assert_eq!(
+        ok(
+            "sit lista<b8> raw ← [0x01, 0xff]\nsit lista<u8> want ← [1, 255]\nsit bivalens other ← (raw ↦ lista<u8>) ≢ want\nnota other"
+        ),
+        ["falsum"]
+    );
+}
