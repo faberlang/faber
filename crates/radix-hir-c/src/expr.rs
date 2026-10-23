@@ -1277,8 +1277,22 @@ impl Emitter<'_> {
     }
 
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
-        // A `bN` has no operator the C carrier would make right yet: `¬` at a
-        // promoted width flips bits outside the type (unit 3e80d069-1.3).
+        let bits_width = operand
+            .ty
+            .and_then(|ty| match classify(self.types, ty).ok()? {
+                Ty::Bits(width) => Some(width),
+                _ => None,
+            });
+        if let Some(width) = bits_width
+            && op == HirUnOp::BitNot
+        {
+            let inner = self.expr(operand)?;
+            let cell = int_width_of_bits(width).c_type();
+            let text = format!("(({cell})(~({cell}){}))", inner.text);
+            return Ok(Operand::new(text, Value::from(Ty::Bits(width))).with_effect(inner.effect));
+        }
+        // Negation remains refused: raw bits have no arithmetic, and the
+        // existing construct name is retained for every unsupported unary op.
         crate::ty::refuse_bits_operand(self.types, operand.ty, "bitwise operator on raw bits")?;
         let wide = operand
             .ty
@@ -1371,12 +1385,19 @@ impl Emitter<'_> {
         if matches!(op, HirBinOp::InRange | HirBinOp::NotInRange) {
             return self.range_membership(op == HirBinOp::NotInRange, left, right);
         }
-        // Every operator over a `bN` is refused by name until its own-width
-        // form lands (3e80d069-1.3/-1.4): a C signed compare or a width-blind
-        // bitwise op on the promoted carrier would be a wrong program, and
-        // `bits have their width always` (operator ruling 2026-10-10).
-        crate::ty::refuse_bits_operand(self.types, left.ty, "arithmetic on raw bits")?;
-        crate::ty::refuse_bits_operand(self.types, right.ty, "arithmetic on raw bits")?;
+        let left_bits = left.ty.and_then(|ty| match classify(self.types, ty).ok()? {
+            Ty::Bits(width) => Some(width),
+            _ => None,
+        });
+        let right_bits = right
+            .ty
+            .and_then(|ty| match classify(self.types, ty).ok()? {
+                Ty::Bits(width) => Some(width),
+                _ => None,
+            });
+        if left_bits.is_some() || right_bits.is_some() {
+            return self.bits_binary(op, left, right, left_bits, right_bits);
+        }
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         // `≈` / `≉` is tolerance equality over either family, never the C `==`
@@ -1439,6 +1460,106 @@ impl Emitter<'_> {
             HirBinOp::And | HirBinOp::Or => Self::logical(op, &l, &r),
             other => Err(unsupported(binary_name(other))),
         }
+    }
+
+    fn bits_binary(
+        &mut self,
+        op: HirBinOp,
+        left: &HirExpression,
+        right: &HirExpression,
+        left_width: Option<BitsWidth>,
+        right_width: Option<BitsWidth>,
+    ) -> Result<Operand, CodegenError> {
+        if matches!(
+            op,
+            HirBinOp::Add
+                | HirBinOp::Sub
+                | HirBinOp::Mul
+                | HirBinOp::Div
+                | HirBinOp::TrueDiv
+                | HirBinOp::Mod
+        ) {
+            crate::ty::refuse_bits_operand(self.types, left.ty, "arithmetic on raw bits")?;
+            crate::ty::refuse_bits_operand(self.types, right.ty, "arithmetic on raw bits")?;
+            return Err(unsupported("arithmetic on raw bits"));
+        }
+
+        let shift = matches!(op, HirBinOp::Shl | HirBinOp::Shr);
+        let width = if shift {
+            match (left_width, right_width) {
+                (Some(width), None) => {
+                    let count_is_integer = right.ty.is_some_and(|ty| {
+                        matches!(
+                            classify(self.types, ty),
+                            Ok(Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_))
+                        )
+                    });
+                    if !count_is_integer {
+                        return Err(unsupported("bitwise operator on raw bits"));
+                    }
+                    width
+                }
+                _ => return Err(unsupported("bitwise operator on raw bits")),
+            }
+        } else {
+            match (left_width, right_width) {
+                (Some(left), Some(right)) if left == right => left,
+                _ => return Err(unsupported("bitwise operator on raw bits")),
+            }
+        };
+
+        let bitwise = matches!(op, HirBinOp::BitAnd | HirBinOp::BitOr | HirBinOp::BitXor);
+        let comparison = matches!(
+            op,
+            HirBinOp::Eq
+                | HirBinOp::NotEq
+                | HirBinOp::StrictEq
+                | HirBinOp::StrictNotEq
+                | HirBinOp::Lt
+                | HirBinOp::Gt
+                | HirBinOp::LtEq
+                | HirBinOp::GtEq
+        );
+        if !shift && !bitwise && !comparison {
+            return Err(unsupported("bitwise operator on raw bits"));
+        }
+
+        let mut operands = [self.expr(left)?, self.expr(right)?];
+        let prelude = self.sequence(&mut operands);
+        let effect = operands.iter().any(|operand| operand.effect);
+        let [l, r] = operands;
+        let cell = int_width_of_bits(width).c_type();
+        let body = match op {
+            HirBinOp::BitAnd => format!("(({cell})({} & {}))", l.text, r.text),
+            HirBinOp::BitOr => format!("(({cell})({} | {}))", l.text, r.text),
+            HirBinOp::BitXor => format!("(({cell})({} ^ {}))", l.text, r.text),
+            HirBinOp::Shl | HirBinOp::Shr => {
+                let width_name = match width {
+                    BitsWidth::B8 => "b8",
+                    BitsWidth::B16 => "b16",
+                    BitsWidth::B32 => "b32",
+                    BitsWidth::B64 => "b64",
+                };
+                let direction = if op == HirBinOp::Shl { "shl" } else { "shr" };
+                format!(
+                    "faber_bits_{direction}_{width_name}({}, {})",
+                    l.text, r.text
+                )
+            }
+            HirBinOp::Eq | HirBinOp::StrictEq => format!("({} == {})", l.text, r.text),
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => format!("({} != {})", l.text, r.text),
+            HirBinOp::Lt => format!("({} < {})", l.text, r.text),
+            HirBinOp::Gt => format!("({} > {})", l.text, r.text),
+            HirBinOp::LtEq => format!("({} <= {})", l.text, r.text),
+            HirBinOp::GtEq => format!("({} >= {})", l.text, r.text),
+            _ => return Err(unsupported("bitwise operator on raw bits")),
+        };
+        let value = if comparison {
+            Value::Truth
+        } else {
+            Value::from(Ty::Bits(width))
+        };
+        Ok(Operand::new(wrap(&prelude, &body), value).with_effect(effect))
     }
 
     /// Whether a type classifies to an 8- or 16-bit integer, the widths the
