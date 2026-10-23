@@ -9,6 +9,9 @@
 //! Package fixtures and package-shaped proofs live under `faber/corpus` —
 //! not in this crate.
 
+pub mod loose_parts;
+pub use loose_parts::generate_from_loose_parts;
+
 use crate::CompileResult;
 use crate::codegen::Target;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};

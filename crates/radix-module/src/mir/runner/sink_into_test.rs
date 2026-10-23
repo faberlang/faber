@@ -92,7 +92,7 @@ main {
     print xs.length()
 }
 "#;
-    let source = format!("+++\nlocale = \"en\"\n+++\n{SINKING}{REPORTING}");
+    let source = format!("+++\nlocale = \"en\"\n+++\n{REPORTING}");
     let lines = run_program("full-bounded-list-reports.fab", &source);
     assert_eq!(lines, ["reported", "2"]);
 }

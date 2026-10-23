@@ -264,8 +264,6 @@ use crate::diagnostics::DiagnosticArg;
 use crate::hir::HirModule;
 use crate::lexer::Interner;
 use crate::locale::KeywordSurface;
-#[cfg(test)]
-use crate::locale::latin_locale_pack;
 use crate::semantic::TypeTable;
 #[cfg(feature = "hir-rust")]
 use crate::semantic::{NumericWidth, Primitive, Type, TypeId};
@@ -360,7 +358,7 @@ fn imported_tensor_edge_policy_callback_identities(
 /// or if the target is `MIR`-backed and must be routed through the driver.
 pub fn generate_from_analyzed(
     target: Target,
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     surface: &KeywordSurface<'_>,
 ) -> Result<crate::Output, CodegenError> {
     generate_from_analyzed_with_options(target, analysis, surface, OutputMode::Application, None)
@@ -379,14 +377,14 @@ pub fn generate_from_analyzed(
 /// or if the target is `MIR`-backed and must be routed through the driver.
 pub fn generate_from_analyzed_with_options(
     target: Target,
-    analysis: &crate::driver::AnalyzedModule,
+    analysis: &dyn CodegenAnalysis,
     #[cfg_attr(not(feature = "hir-faber"), allow(unused_variables))] surface: &KeywordSurface<'_>,
     output_mode: OutputMode,
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
-    radix_codegen_shared::reject_hir_errors(&analysis.hir)?;
-    radix_codegen_shared::reject_bits_type(&analysis.types, target)?;
-    radix_codegen_shared::reject_ledger_type(&analysis.types, target)?;
+    radix_codegen_shared::reject_hir_errors(analysis.hir())?;
+    radix_codegen_shared::reject_bits_type(analysis.types(), target)?;
+    radix_codegen_shared::reject_ledger_type(analysis.types(), target)?;
     reject_unsupported_leaves(analysis, target)?;
     if !target.is_available() {
         return Err(unavailable_target_error(target));
@@ -394,8 +392,8 @@ pub fn generate_from_analyzed_with_options(
     // Declaration-only `@ nondum` functions have nothing to emit. The Faber
     // re-emitter below reads the full module so the declaration survives.
     let emit_hir = analysis
-        .hir
-        .without_unavailable_declarations(&analysis.interner);
+        .hir()
+        .without_unavailable_declarations(analysis.interner());
     let hir = &*emit_hir;
     match target {
         Target::HirRust => generate_rust_from_analyzed(analysis, hir),
@@ -406,22 +404,22 @@ pub fn generate_from_analyzed_with_options(
                 // provider files carry named exports and their namespace
                 // aggregate. Clone the analyzed interner only to intern the
                 // output module name; HIR symbol ids remain stable.
-                let mut module_interner = analysis.interner.clone();
+                let mut module_interner = analysis.interner().clone();
                 let ts_surface = ts::TsKeywordSurfaceBridge(*surface);
                 let mut r#gen = if output_mode == OutputMode::Library {
                     let namespace = module_interner.intern(module_name.unwrap_or("FaberModule"));
-                    ts::TsCodegen::new_module(hir, &analysis.types, &module_interner, namespace)
+                    ts::TsCodegen::new_module(hir, analysis.types(), &module_interner, namespace)
                 } else {
-                    ts::TsCodegen::new(hir, &analysis.types, &module_interner)
+                    ts::TsCodegen::new(hir, analysis.types(), &module_interner)
                 };
                 r#gen.set_display_tokens(display_tokens_for_module(analysis));
-                r#gen.set_failable_facts(&failable_facts(&analysis.function_facts));
-                r#gen.set_library_registry(&analysis.libraries);
-                r#gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
+                r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
+                r#gen.set_library_registry(analysis.libraries());
+                r#gen.set_gpu_builtins(&ts_gpu_builtins(analysis.gpu_builtins()));
                 r#gen.set_intrinsic_surface(&ts_surface);
                 r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
-                register_cross_file_defids(&mut r#gen, hir, &analysis.resolver, &analysis.libraries);
-                let output = r#gen.generate(hir, &analysis.types, &module_interner)?;
+                register_cross_file_defids(&mut r#gen, hir, analysis.resolver(), analysis.libraries());
+                let output = r#gen.generate(hir, analysis.types(), &module_interner)?;
                 Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
             }
             #[cfg(not(feature = "hir-ts"))]
@@ -440,22 +438,22 @@ pub fn generate_from_analyzed_with_options(
         Target::HirC => generate_c_from_analyzed(analysis, hir),
         #[cfg(feature = "hir-faber")]
         Target::HirFaber => {
-            let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
-            let mut presentation = analysis.presentation.clone();
+            let imported_spellings = analysis.resolver().imported_spellings(analysis.interner());
+            let mut presentation = analysis.presentation().clone();
             crate::hir::presentation_witness::normalize_presentation_witnesses(
-                &analysis.hir,
+                analysis.hir(),
                 &mut presentation,
-                &analysis.types,
+                analysis.types(),
             );
             let mut by_def = imported_spellings.by_def;
             by_def.extend(
                 analysis
-                    .resolver
-                    .generated_companion_spellings(&analysis.interner),
+                    .resolver()
+                    .generated_companion_spellings(analysis.interner()),
             );
-            let output = faber::FaberCodegen::new(&analysis.types, &analysis.interner)
+            let output = faber::FaberCodegen::new(analysis.types(), analysis.interner())
                 .with_imported_spellings(&imported_spellings.by_type, &by_def, &imported_spellings.by_def_pattern)
-                .generate(&analysis.hir, &presentation, &faber::LocaleKeywordBridge(*surface))?;
+                .generate(analysis.hir(), &presentation, &faber::LocaleKeywordBridge(*surface))?;
             Ok(crate::Output::Faber(crate::FaberOutput { code: output.code }))
         }
         #[cfg(not(feature = "hir-faber"))]
@@ -1150,69 +1148,6 @@ fn emit_provider_module_code(
     let failable_exports = radix_hir_rust::provider_failable_export_names(provider.hir(), provider.interner());
     modules.insert(module_name.to_owned(), (module_out.code, failable_exports));
     Ok(())
-}
-
-/// Loose-parts test seam (register row S01-2, batch 4b unit B4B-3): assemble a
-/// real [`crate::driver::AnalyzedModule`] from hand-constructed arenas and
-/// dispatch through the production entry.
-///
-/// Synthetic-HIR fixtures — shapes source-level analysis helpers cannot
-/// express, including dangling-`DefId` error proofs — are packed with the pub
-/// artifact-loader constructor [`crate::driver::AnalyzedModule::from_loaded`]
-/// (empty resolver/registry side tables) plus
-/// [`crate::semantic::analyze_function_facts`], the same fact computation the
-/// retired test-only entry performed, and then forwarded to
-/// [`generate_from_analyzed_with_options`] with the driver-default latin
-/// keyword surface and application output mode.
-///
-/// This seam is a constructor plus one forward: no per-target dispatch lives
-/// here, so tests exercise the single production chain and its five effect
-/// seams (library registry, GPU builtins, intrinsic surface, cross-file
-/// defids, used imports) exactly as package builds do.
-///
-/// # Errors
-///
-/// Returns [`CodegenError`] as [`generate_from_analyzed_with_options`] does
-/// for the synthetic module.
-#[cfg(test)]
-pub fn generate_from_loose_parts(
-    target: Target,
-    hir: &HirModule,
-    types: &TypeTable,
-    interner: &Interner,
-) -> Result<crate::Output, CodegenError> {
-    let type_table = TypeTable::from_snapshot(types.snapshot()).map_err(|message| CodegenError {
-        message: format!("type table snapshot round-trip failed: {message}"),
-        args: vec![DiagnosticArg::new("issue", "type_table_snapshot_failed")],
-    })?;
-    let analysis = crate::driver::AnalyzedModule::from_loaded(
-        // Synthetic modules never join a real analysis snapshot; stamp 0 is
-        // unreachable for analyzed units (`AnalysisStamp::next` starts at 1).
-        crate::semantic::AnalysisStamp::from_persisted(0),
-        interner.clone(),
-        // `TypeTable` is not `Clone`; the snapshot round-trip is the copy
-        // path (it can only fail on tables missing primitives that
-        // `TypeTable::new()` preloads, so a live table always round-trips).
-        type_table,
-        crate::semantic::Resolver::default(),
-        hir.clone(),
-        None,
-        crate::hir::LibraryRegistry::default(),
-        crate::semantic::AnnotationContractMetadata::default(),
-        crate::semantic::analyze_function_facts(hir, types),
-        crate::semantic::ResolvedUseIndex::default(),
-        crate::semantic::QualifiedIdentityTable::default(),
-        crate::semantic::FunctionProvenanceTable::default(),
-        crate::semantic::RadixLaneMetadata::default(),
-        Vec::new(),
-        radix_hir::TensorEdgePolicyTable::default(),
-        #[cfg(feature = "mir-core")]
-        crate::driver::GraphicsSourceFacts::default(),
-        Vec::new(),
-    );
-    let latin = latin_locale_pack();
-    let surface = KeywordSurface::new(&latin);
-    generate_from_analyzed_with_options(target, &analysis, &surface, OutputMode::Application, None)
 }
 
 /// Emit Rust CLI product code from a CLI program.
