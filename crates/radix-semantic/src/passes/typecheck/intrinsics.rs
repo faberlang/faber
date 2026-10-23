@@ -407,7 +407,12 @@ pub(super) fn check_intrinsic_method_call(
         return Some(checker.error_type);
     }
     let resolved = checker.types.get(payload_ty);
-    let bounded_appende = entry.faber_name == "appende"
+    // Ruling 2026-10-17 (bounded `lista<T, N>`): the sink operator `⇜` dies on
+    // overflow, its method form reports. `appende` and `immerge` are two names
+    // for one append op on a bounded receiver (the `immerge` registry row lowers
+    // to `collection Append`), so both carry the `⇥ textus` alternate exit.
+    // Unbounded `lista<T>` / `set<T>` stay infallible.
+    let bounded_appende = matches!(entry.faber_name, "appende" | "immerge")
         && matches!(
             resolved,
             Type::BoundedArray { .. }
