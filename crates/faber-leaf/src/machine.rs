@@ -5,9 +5,8 @@
 //! finishes.
 //!
 //! Serves Latin `machina:specimen`: one host snapshot. This cut reports
-//! memory and per-core CPU; the process table is still out of this cut.
-//! A deadline of 0 means never wait: answer from the previous slot without
-//! spawning a read.
+//! memory, per-core CPU and the process table. A deadline of 0 means never
+//! wait: answer from the previous slot without spawning a read.
 
 #[cfg(test)]
 #[path = "machine_test.rs"]
@@ -35,8 +34,6 @@ struct CoreTicks {
 }
 
 /// One process row's absolute CPU and resident-memory figures.
-// TARGET: c1de1950-3 differences these into `IntervalProc` rows.
-#[allow(dead_code)]
 struct ProcTicks {
     pid: i64,
     command: String,
@@ -61,8 +58,6 @@ struct IntervalCore {
 }
 
 /// One process row's CPU and memory across the sampling interval.
-// TARGET: c1de1950-3 constructs these.
-#[allow(dead_code)]
 struct IntervalProc {
     pid: i64,
     command: String,
@@ -79,8 +74,6 @@ struct Rendered {
 }
 
 /// The last completed sample: absolutes for differencing, render for replay.
-// TARGET: c1de1950-2/-3 read the absolute tick vectors.
-#[allow(dead_code)]
 struct Previous {
     /// Issue order of the read that produced this snapshot. A straggler whose
     /// generation is older than the slot's is rejected on arrival.
@@ -271,10 +264,38 @@ fn interval_cores(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalCore
 }
 
 fn interval_procs(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalProc> {
-    // TARGET: c1de1950-3 differences the process table against the previous
-    // slot's absolutes, capped at `MAX_PROCS`.
     debug_assert!(old.is_none_or(|previous| previous.taken_at <= fresh.taken_at));
-    Vec::new()
+    let mut rows = fresh
+        .procs
+        .iter()
+        .map(|proc_row| {
+            let previous = old.and_then(|previous| {
+                previous
+                    .proc_ticks
+                    .iter()
+                    .find(|previous_proc| previous_proc.pid == proc_row.pid)
+            });
+            let cpu_ns = previous.map_or(0, |previous_proc| {
+                i64::try_from(proc_row.cpu_ns)
+                    .unwrap_or(i64::MAX)
+                    .saturating_sub(i64::try_from(previous_proc.cpu_ns).unwrap_or(i64::MAX))
+            });
+            IntervalProc {
+                pid: proc_row.pid,
+                command: proc_row.command.clone(),
+                cpu_ns,
+                mem_bytes: i64::try_from(proc_row.mem_bytes).unwrap_or(i64::MAX),
+            }
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| {
+        right
+            .cpu_ns
+            .cmp(&left.cpu_ns)
+            .then_with(|| left.pid.cmp(&right.pid))
+    });
+    rows.truncate(MAX_PROCS);
+    rows
 }
 
 fn previous_reply() -> Reply {
@@ -365,8 +386,115 @@ fn collect() -> Result<Collected, LeafError> {
         cores: collect_cores()?,
         used_bytes,
         total_bytes,
-        procs: Vec::new(),
+        procs: collect_procs()?,
     })
+}
+
+#[cfg(target_os = "macos")]
+#[allow(deprecated)]
+fn mach_timebase() -> (u32, u32) {
+    let mut info = std::mem::MaybeUninit::<libc::mach_timebase_info>::zeroed();
+    // SAFETY: `mach_timebase_info` writes one timebase struct to `info`.
+    let status = unsafe { libc::mach_timebase_info(info.as_mut_ptr()) };
+    if status != 0 {
+        return (1, 1);
+    }
+    // SAFETY: a successful call initialized the full timebase struct.
+    let info = unsafe { info.assume_init() };
+    if info.denom == 0 {
+        (1, 1)
+    } else {
+        (info.numer, info.denom)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn scale_mach_ticks(ticks: u64, numer: u32, denom: u32) -> u64 {
+    if denom == 0 {
+        0
+    } else {
+        ticks * u64::from(numer) / u64::from(denom)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn collect_procs() -> Result<Vec<ProcTicks>, LeafError> {
+    // `PROC_ALL_PIDS` is defined by libproc.h but is not exported by libc.
+    const PROC_ALL_PIDS: u32 = 1;
+
+    // SAFETY: a null buffer with size zero asks libproc for the required size.
+    let initial_size = unsafe { libc::proc_listpids(PROC_ALL_PIDS, 0, std::ptr::null_mut(), 0) };
+    if initial_size < 0 {
+        return Ok(Vec::new());
+    }
+    let pid_size = std::mem::size_of::<u32>();
+    let initial_pids = usize::try_from(initial_size).unwrap_or(0) / pid_size;
+    let mut pids = vec![0_u32; initial_pids.saturating_add(64)];
+    let mut retries = 0;
+    let pid_count = loop {
+        let buffer_bytes = pids.len().saturating_mul(pid_size);
+        let buffer_size = i32::try_from(buffer_bytes).unwrap_or(i32::MAX);
+        // SAFETY: `pids` is writable for `buffer_size` bytes.
+        let listed =
+            unsafe { libc::proc_listpids(PROC_ALL_PIDS, 0, pids.as_mut_ptr().cast(), buffer_size) };
+        if listed < 0 {
+            return Ok(Vec::new());
+        }
+        let listed_bytes = usize::try_from(listed).unwrap_or(usize::MAX);
+        if listed_bytes < usize::try_from(buffer_size).unwrap_or(0) {
+            break (listed_bytes / pid_size).min(pids.len());
+        }
+        if retries == 3 {
+            break pids.len();
+        }
+        retries += 1;
+        let required_pids = listed_bytes / pid_size;
+        pids.resize(required_pids.saturating_add(64), 0);
+    };
+
+    let (numer, denom) = mach_timebase();
+    let info_size =
+        i32::try_from(std::mem::size_of::<libc::proc_taskallinfo>()).unwrap_or(i32::MAX);
+    let mut procs = Vec::with_capacity(pid_count);
+    for &pid in &pids[..pid_count] {
+        let mut info = std::mem::MaybeUninit::<libc::proc_taskallinfo>::zeroed();
+        // SAFETY: `info` is writable for the exact task-all-info structure size.
+        let read = unsafe {
+            libc::proc_pidinfo(
+                pid as libc::c_int,
+                libc::PROC_PIDTASKALLINFO,
+                0,
+                info.as_mut_ptr().cast(),
+                info_size,
+            )
+        };
+        if read != info_size {
+            continue;
+        }
+        // SAFETY: `proc_pidinfo` returned the exact structure size.
+        let info = unsafe { info.assume_init() };
+        let name = if info.pbsd.pbi_name[0] != 0 {
+            &info.pbsd.pbi_name[..]
+        } else {
+            &info.pbsd.pbi_comm[..]
+        };
+        let command_bytes = name
+            .iter()
+            .take_while(|&&byte| byte != 0)
+            .map(|&byte| byte.to_ne_bytes()[0])
+            .collect::<Vec<_>>();
+        procs.push(ProcTicks {
+            pid: i64::from(pid),
+            command: String::from_utf8_lossy(&command_bytes).into_owned(),
+            cpu_ns: scale_mach_ticks(
+                info.ptinfo.pti_total_user + info.ptinfo.pti_total_system,
+                numer,
+                denom,
+            ),
+            mem_bytes: info.ptinfo.pti_resident_size,
+        });
+    }
+    Ok(procs)
 }
 
 /// Convert host processor counters, whose unit is one scheduling tick, to ns.
