@@ -17,6 +17,7 @@ mod i64_const_copy;
 mod live_tuple;
 mod multi_output;
 mod record_element;
+mod register_conversio;
 mod tensor_extent;
 mod transformer;
 
