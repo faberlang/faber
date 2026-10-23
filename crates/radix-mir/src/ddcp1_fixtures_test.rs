@@ -30,7 +30,7 @@ use crate::device_semantics::{
 };
 use crate::kernel_plan::{
     CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, MatMulShapes, RmsNormalizationPlan,
-    RopePlan,
+    RopePlan, RowOpDims,
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::{MirCollectionOp, MirFunctionId, MirLocalId, MirType};
@@ -1315,6 +1315,10 @@ fn whole_recipe_rms_normalization_row_and_logits() {
     const N_EMBD: u64 = 960;
     for (name, count) in [("rms_row", T * N_EMBD), ("norm_final", T * N_EMBD)] {
         let plan = CollectionKernelPlan::RmsNormalization(RmsNormalizationPlan {
+            dims: RowOpDims::Literal {
+                rows: T,
+                width: N_EMBD,
+            },
             axis: 0,
             epsilon_bits: f32::to_bits(1e-5),
             width: N_EMBD,

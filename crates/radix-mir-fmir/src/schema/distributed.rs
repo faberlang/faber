@@ -577,7 +577,12 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         // axes; the additive mask operand kept as a broadcast count).
         WireCollectionKernelPlan::BatchedRowSoftmax(plan) => wire_batched_row_softmax_plan(plan),
         WireCollectionKernelPlan::LayerNormalization(plan) => {
-            CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: plan.axis })
+            CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
+                // The wire mirror carries no extents (only the axis); the
+                // decoded plan is the equivalence substrate, never launched.
+                dims: RowOpDims::Literal { rows: 0, width: 0 },
+                axis: plan.axis,
+            })
         }
         // GI3-1: the inference-recipe wire mirrors reconstruct field-for-field
         // (the S6-C2 mirror precedent; mechanical, no semantic facts ride the
@@ -589,6 +594,12 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         }),
         WireCollectionKernelPlan::RmsNormalization(plan) => {
             CollectionKernelPlan::RmsNormalization(RmsNormalizationPlan {
+                // The wire mirror carries `width` but no row extent; the
+                // decoded dims are the literal form of the facts it carries.
+                dims: RowOpDims::Literal {
+                    rows: 0,
+                    width: plan.width,
+                },
                 axis: plan.axis,
                 epsilon_bits: plan.epsilon_bits,
                 width: plan.width,
