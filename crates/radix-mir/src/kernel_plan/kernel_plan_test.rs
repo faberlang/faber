@@ -1628,6 +1628,27 @@ fn softmax_resolves_row_softmax_plan() {
 }
 
 #[test]
+fn row_softmax_plan_carries_literal_row_and_width() {
+    // The unbatched row-softmax plan carries the operand's literal extents:
+    // `[4,4]` resolves `rows: 4, width: 4` over the last (row) axis.
+    let mut types = TypeTable::new();
+    let function = transformer_function(&mut types, [4, 4], MirCollectionOp::TensorSoftmax, vec![]);
+    let signature = transformer_signature(16, 16);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorSoftmax,
+    )
+    .expect("softmax typed facts resolve a plan");
+    let CollectionKernelPlan::RowSoftmax(row_softmax) = &plan else {
+        panic!("softmax must map to a row-softmax plan, got {plan:?}");
+    };
+    assert_eq!(row_softmax.dims, RowOpDims::Literal { rows: 4, width: 4 });
+}
+
+#[test]
 fn layer_norm_resolves_layer_normalization_plan() {
     // S6-P1 admission: `t = layernorm(x, 1, 1e-5)` over `[4,4]` resolves the
     // LayerNormalization recipe with the axis from the const operand.
@@ -1865,6 +1886,7 @@ fn axis_reduction_plan_validate_rejects_non_sum_op() {
 #[test]
 fn transformer_plans_validate() {
     CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        dims: RowOpDims::Literal { rows: 1, width: 1 },
         axis: 1,
         batched: None,
     })
@@ -3210,6 +3232,10 @@ fn batched_softmax_rank5_still_fails_closed() {
 #[test]
 fn batched_softmax_batch_law_validation_fails_closed() {
     let plan = CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        dims: RowOpDims::Literal {
+            rows: 15,
+            width: 76,
+        },
         axis: 3,
         batched: Some(RowSoftmaxBatch {
             batch: 15,

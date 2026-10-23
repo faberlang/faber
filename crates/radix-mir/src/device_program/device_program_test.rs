@@ -673,6 +673,10 @@ fn a_single_work_item_stays_a_single_thread() {
 fn the_per_element_row_softmax_body_widens_too() {
     let signature = elementwise_signature(16_384, 1);
     let softmax = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+        dims: crate::kernel_plan::RowOpDims::Literal {
+            rows: 16_384,
+            width: 1,
+        },
         axis: 1,
         batched: None,
     });
@@ -697,6 +701,10 @@ fn recipes_with_their_own_contracts_keep_their_geometry() {
     // A plan outside the admitted list keeps its signature workgroup, and its
     // work-item extent stays the established workgroups x lanes product.
     let batched = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+        dims: crate::kernel_plan::RowOpDims::Literal {
+            rows: 64,
+            width: 256,
+        },
         axis: 3,
         batched: Some(crate::kernel_plan::RowSoftmaxBatch {
             batch: 64,
@@ -742,6 +750,7 @@ fn the_batched_row_softmax_variant_is_not_admitted() {
     // Its body is not covered by the block-size-independence evidence.
     assert!(!is_generic_1d_plan(&CollectionKernelPlan::RowSoftmax(
         crate::kernel_plan::RowSoftmaxPlan {
+            dims: crate::kernel_plan::RowOpDims::Literal { rows: 8, width: 64 },
             axis: 3,
             batched: Some(crate::kernel_plan::RowSoftmaxBatch {
                 batch: 8,

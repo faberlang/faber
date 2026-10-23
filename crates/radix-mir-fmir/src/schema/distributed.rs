@@ -66,8 +66,8 @@ use radix_mir::kernel_plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
     CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
     LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan,
-    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxBatch, RowSoftmaxMask,
-    RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
+    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowOpDims, RowSoftmaxBatch,
+    RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirScalarLayout, MirType};
@@ -562,6 +562,10 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
         WireCollectionKernelPlan::AxisReduction(plan) => wire_axis_reduction_plan(plan),
         WireCollectionKernelPlan::RowSoftmax(plan) => {
             CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+                // The wire mirror carries no extents (matching
+                // `WireMatMulPlan`, which carries no `MatMulDims`); the
+                // decoded plan is the equivalence substrate, never launched.
+                dims: RowOpDims::Literal { rows: 0, width: 0 },
                 axis: plan.axis,
                 // The legacy wire image carries no batch axes — the
                 // ordinary rank-1/2 law. Batched images ride the dedicated
@@ -743,6 +747,10 @@ fn wire_batched_row_softmax_plan(
     plan: &super::wire::WireBatchedRowSoftmaxPlan,
 ) -> CollectionKernelPlan {
     CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        dims: RowOpDims::Literal {
+            rows: plan.batch,
+            width: plan.width,
+        },
         axis: plan.axis,
         batched: Some(RowSoftmaxBatch {
             batch: plan.batch,

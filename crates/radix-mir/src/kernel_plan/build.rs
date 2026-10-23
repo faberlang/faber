@@ -4,8 +4,8 @@ use super::plan::{
     GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MATMUL_SHARED_A_BUFFER_NAME,
     MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulShapes, MatMulSharedMemory,
     OobPaddingPolicy, REDUCTION_SHARED_BUFFER_NAME, ReduceOp, ReductionPlan, RmsNormalizationPlan,
-    RopePlan, RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan,
-    SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
+    RopePlan, RowOpDims, RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout,
+    SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
 };
 use super::validate::{
     PlanValidationError, validate_axis_reduction_plan, validate_batched_attention_plan,
@@ -509,6 +509,10 @@ impl CollectionKernelPlan {
                 }
                 let plan = if op == MirCollectionOp::TensorSoftmax {
                     CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+                        dims: RowOpDims::Literal {
+                            rows: count.checked_div(dims[axis as usize])?,
+                            width: dims[axis as usize],
+                        },
                         axis,
                         batched: None,
                     })
@@ -1093,6 +1097,7 @@ fn batched_row_softmax_plan(
         None
     };
     Some(CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        dims: RowOpDims::Literal { rows: batch, width },
         axis,
         batched: Some(RowSoftmaxBatch { batch, width, mask }),
     }))
