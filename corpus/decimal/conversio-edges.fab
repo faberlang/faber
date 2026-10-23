@@ -1,0 +1,51 @@
++++
+term = "d64"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "conversio_expr", "cast_expr", "fac_stmt", "fac_block", "cape_clause", "call_expr", "call_suffix", "argument_list", "argument", "redde_stmt", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "The d64 carrier edges against int and float: checked widening at ±92233720368 and explicit rounded decimal-to-integer conversion."
+syntax = "n ↦ d64; d ↦ i64 via Trunc"
+related = ["↦", "via", "int", "float", "d64"]
+locale = "en"
++++
+# =============================================================================
+# d64 — carrier edges against integer and float
+# =============================================================================
+#
+# What this teaches:
+#   • d64 stores an i64 scaled by 10^-8. Integer ↦ d64 therefore fits through
+#     ±92233720368, while 92233720369 is outside the carrier and takes the
+#     explicit recovery value rather than wrapping or clamping.
+#   • Decimal ↦ integer needs a rounding choice. Trunc moves toward zero,
+#     Floor toward −∞, Ceil toward +∞, and HalfEven rounds to the nearest
+#     integer with ties to even.
+#   • Decimal ↔ float is explicit at the family boundary. The decimal edge
+#     converts to float, and a float at that edge converts back to d64.
+#
+# See also: ↦, via, int, float, d64
+# =============================================================================
+
+main {
+    let d64 fits ← 92233720368 ↦ d64
+    print fits
+    let d64 over ← 92233720369 ↦ d64 ⊥ -1.0
+    print over
+
+    let d64 top ← 92233720368.54775807
+    print top ↦ i64 via Trunc
+    print top ↦ i64 via Floor
+    print top ↦ i64 via Ceil
+    print top ↦ i64 via HalfEven
+
+    let d64 low ← -92233720368.54775807
+    print low ↦ i64 via Trunc
+    print low ↦ i64 via Floor
+    print low ↦ i64 via Ceil
+    print low ↦ i64 via HalfEven
+
+    print top ↦ float
+    let d64 back ← 92233720368.0 ↦ d64
+    print back
+    print 1e19 ↦ d64 ⊥ -1.0
+}

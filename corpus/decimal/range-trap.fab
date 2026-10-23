@@ -1,0 +1,27 @@
++++
+term = "d64 range trap"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "d64 arithmetic stays exact until a receiving slot rounds and checks its range."
+syntax = "let d64 x ← top + 0.00000001"
+related = ["numerus", "d64"]
+locale = "en"
++++
+# d64 — exact arithmetic, one rounding point, and a trapping store.
+# The intermediate expression is exact: adding and then subtracting the
+# smallest scale-8 step returns to the carrier maximum without an intermediate
+# store. A receiving d64 slot is the single rounding point; storing one step
+# beyond the carrier traps. The trapping declaration is last, so no later
+# statement can run.
+
+main {
+    let d64 top ← 92233720368.54775807
+    print top
+    print top + 0.00000001 - 0.00000001
+    let d64 restored ← top + 0.00000001 - 0.00000001
+    print restored
+    print top - 0.00000001
+    let d64 over ← top + 0.00000001
+}

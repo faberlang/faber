@@ -1,0 +1,35 @@
++++
+term = "↦"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "conversio_expr", "inline_default", "via_clause", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Conversions into wrapping and saturating words are total: wrapping reduces modulo the width and saturating clamps."
+syntax = "<expr> ↦ wrapping<W>|saturating<W> [via Floor|Ceil|HalfEven|Trunc]"
+related = ["↦", "wrapping", "saturating", "numerus"]
+locale = "en"
++++
+# Policy-word conversions are total: wrapping reduces modulo 2^W and saturating clamps.
+# Do not add a ⊥ default: policy-word recovery is rejected (SEM016:word_conversio_recovery_unsupported).
+main {
+    let int n ← 300
+    print n ↦ wrapping<u8>
+    print n ↦ saturating<u8>
+
+    print -5 ↦ wrapping<u8>
+    print -5 ↦ saturating<u8>
+
+    let d64 half ← 2.5
+    print half ↦ wrapping<u8> via HalfEven
+    print half ↦ wrapping<u8> via Ceil
+    print half ↦ saturating<u8> via HalfEven
+
+    # Converting one policy word to another needs no recovery either.
+    let wrapping<u8> wrapped ← n ↦ wrapping<u8>
+    print wrapped ↦ saturating<i8>
+    let saturating<u8> clamped ← n ↦ saturating<u8>
+    print clamped ↦ wrapping<u8>
+
+    # A literal also takes the total policy-word path, not a failure channel.
+    print 300 ↦ wrapping<u32>
+}

@@ -1,0 +1,36 @@
++++
+term = "↦"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Integer-to-float conversion rounds to the nearest representable value; it is not a widening conversion."
+syntax = "<integer> ↦ <f32|f64>"
+related = ["↦", "⊥", "numerus", "fractus"]
+locale = "en"
++++
+# =============================================================================
+# integer to float — explicit rounding at the destination precision
+# =============================================================================
+#
+# Integer-to-float conversion rounds to the nearest representable float, with
+# ties going to the even neighbour. `print` of a float shows its shortest
+# exact form.
+#
+# An int in a float slot without `↦` is SEM010:
+# integer_to_float_requires_conversio.
+
+main {
+    let i64 large_odd ← 9007199254740993
+    let i64 large_tie ← 9007199254740995
+    let i64 medium_odd ← 16777217
+    let i64 medium_tie ← 16777219
+
+    print large_odd ↦ f64
+    print large_tie ↦ f64
+    print medium_odd ↦ f32
+    print medium_tie ↦ f32
+
+    print 1 ↦ f64
+    print 2048 ↦ f32
+}

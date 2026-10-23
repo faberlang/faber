@@ -1,0 +1,45 @@
++++
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM016:numeric_to_octeti_unspecified"
+term = "↦"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "inline_default", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Rejected route: a bare number has no byte layout without a width and an endianness."
+syntax = "<number> ↦ bytes — rejected; write a sized n ↦ bytes<N> via Be|Le"
+related = ["↦", "via", "bytes", "Be", "Le"]
+locale = "en"
++++
+# =============================================================================
+# number to bytes — no layout until a width and an endianness are chosen
+# =============================================================================
+#
+# What this teaches:
+#   • Bytes come from a bit pattern, not from a bare number. An unsized
+#     number-to-bytes conversion leaves both the width and the endianness
+#     unstated, so the checker refuses it (SEM016 numeric_to_octeti_unspecified).
+#   • Choose the width and byte order first: a sized numeric scalar writes
+#     into a fixed-width carrier with `n ↦ bytes<N> via Be` (or `via Le`),
+#     where N is the source's exact byte width.
+#   • The bit pattern works too, once the source is a sized slot:
+#     `n ↦ b64` gives the bits and `bits ↦ bytes` gives their octets.
+#
+# How to make it legal:
+#   • let i64 n ← 300
+#     let bytes<8> raw ← n ↦ bytes<8> via Be      (big endian)
+#   • let bytes<8> raw ← n ↦ bytes<8> via Le      (little endian)
+#
+# Common mistakes:
+#   • assuming a default width — a number has no implicit byte layout.
+#   • omitting `via Be` / `via Le` — the endianness is part of the request.
+#
+# See also: ↦, via, bytes — and the working forms in
+# corpus/conversio/octeti-scalar-write.fab (pack) and
+# corpus/conversio/octeti-endian.fab (unpack).
+# =============================================================================
+
+main {
+    let _ raw ← 1.5 ↦ bytes
+    print raw
+}

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/conversio/via-unknown-hint-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/via-unknown-hint-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "conversio_via_unknown_hint"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "conversio_via_unknown_hint"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "conversio_via_unknown_hint"
