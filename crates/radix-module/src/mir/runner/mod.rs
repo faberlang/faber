@@ -47,6 +47,10 @@ mod http_route_tests;
 mod range_step_tests;
 
 #[cfg(test)]
+#[path = "sink_into_test.rs"]
+mod sink_into_tests;
+
+#[cfg(test)]
 #[path = "creo_hook_test.rs"]
 mod creo_hook_tests;
 

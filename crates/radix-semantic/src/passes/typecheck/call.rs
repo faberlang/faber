@@ -2307,7 +2307,8 @@ impl TypeChecker<'_> {
     ///
     /// - Rule 8: the left operand must conform to the sinking contract
     ///   (`Sink<T>`), recognized by the contract role, never by the name.
-    ///   Tensors, vectors and matrices are not sinks (`⇇` stays their write).
+    ///   Lists, bounded lists and sets sink their elements; tensors, vectors
+    ///   and matrices are not sinks (`⇇` stays their write).
     /// - Rule 3: the item is exactly the contract's `T`. The item type is the
     ///   contract argument, never the receiver's own type
     ///   (`class Box implements Sink<string>` sinks strings), and there is no
@@ -2463,6 +2464,8 @@ impl TypeChecker<'_> {
                 .iter()
                 .find(|bound| bound.contract == contract)
                 .and_then(|bound| item_of(&bound.args)),
+            Type::Array(elem) | Type::Set(elem) => Some(self.resolve_inferred_type(elem)),
+            Type::BoundedArray { element, .. } => Some(self.resolve_inferred_type(element)),
             _ => None,
         }
     }

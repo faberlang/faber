@@ -200,3 +200,109 @@ fn sink_into_send_view_lowers_to_sermo_send() {
         "an infallible send op needs no die trap"
     );
 }
+
+impl Fixture {
+    fn list(&mut self) -> TypeId {
+        self.types.intern(Type::Array(self.textus))
+    }
+
+    fn set(&mut self) -> TypeId {
+        self.types.intern(Type::Set(self.textus))
+    }
+
+    fn bounded(&mut self, capacity: u64) -> TypeId {
+        let capacity = self.types.intern_index(IndexExpr::Literal(capacity));
+        self.types
+            .intern(Type::BoundedArray { element: self.textus, capacity })
+    }
+}
+
+/// The single collection append in the body, if the body has exactly one.
+fn single_append<'a>(builder: &'a FunctionBuilder<'a>) -> Option<&'a radix_mir::MirRuntimeCall> {
+    let mut appends = builder
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. }
+                if matches!(call.intrinsic, MirIntrinsic::Collection(MirCollectionOp::Append)) =>
+            {
+                Some(call)
+            }
+            _ => None,
+        });
+    let first = appends.next()?;
+    assert!(appends.next().is_none(), "a `⇜` write appends exactly once");
+    Some(first)
+}
+
+fn has_panic(builder: &FunctionBuilder<'_>) -> bool {
+    builder
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .any(|statement| {
+            matches!(
+                &statement.kind,
+                MirStatementKind::RuntimeCall { call, .. } if matches!(call.intrinsic, MirIntrinsic::Panic)
+            )
+        })
+}
+
+#[test]
+fn sink_into_a_list_lowers_to_one_append() {
+    let mut fixture = Fixture::new();
+    let list = fixture.list();
+    let mut builder = fixture.builder(list, false);
+    let sink = fixture.receiver(list);
+    let item = fixture.item();
+    let expr = fixture.statement(sink.clone(), item.clone());
+
+    let lowered = builder.lower_sink_into(&sink, &item, &expr);
+
+    assert!(lowered.is_some(), "a list sink lowers: {:?}", builder.errors);
+    let append = single_append(&builder).expect("a list sink lowers to one append");
+    assert_eq!(append.args.len(), 2, "the list and the item are both passed to the append");
+    assert!(
+        !has_panic(&builder),
+        "an unbounded list append cannot overflow, so it needs no die trap"
+    );
+}
+
+#[test]
+fn sink_into_a_set_lowers_to_one_append() {
+    let mut fixture = Fixture::new();
+    let set = fixture.set();
+    let mut builder = fixture.builder(set, false);
+    let sink = fixture.receiver(set);
+    let item = fixture.item();
+    let expr = fixture.statement(sink.clone(), item.clone());
+
+    let lowered = builder.lower_sink_into(&sink, &item, &expr);
+
+    assert!(lowered.is_some(), "a set sink lowers: {:?}", builder.errors);
+    let append = single_append(&builder).expect("a set sink lowers to one append");
+    assert_eq!(append.args.len(), 2, "the set and the item are both passed to the append");
+    assert!(
+        !has_panic(&builder),
+        "an unbounded set add cannot overflow, so it needs no die trap"
+    );
+}
+
+#[test]
+fn sink_into_a_bounded_list_dies_on_overflow() {
+    let mut fixture = Fixture::new();
+    let bounded = fixture.bounded(2);
+    let mut builder = fixture.builder(bounded, false);
+    let sink = fixture.receiver(bounded);
+    let item = fixture.item();
+    let expr = fixture.statement(sink.clone(), item.clone());
+
+    let lowered = builder.lower_sink_into(&sink, &item, &expr);
+
+    assert!(lowered.is_some(), "a bounded list sink lowers: {:?}", builder.errors);
+    assert!(
+        builder.blocks.iter().any(dies),
+        "a full bounded list dies on the failed write instead of reporting it"
+    );
+}

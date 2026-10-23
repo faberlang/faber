@@ -276,7 +276,7 @@ exchange = "exchange"
 load = "load"
 store = "store"
 
-# lista (27)
+# lista (28)
 accipe = "get"
 # sermo directional view methods (SERMO_VIEW_METHODS): `accipe` / `cursor`
 # are shared with the rows above and below; `fini` / `exhauri` live only here.
@@ -292,6 +292,9 @@ continet = "contains"
 cumulata = "cumulate"
 decapita = "remove_first"
 filtrata = "filter"
+# The sinking contract's method form (`immerge`); the `⇜` operator twin is its
+# identity, and both append.
+immerge = "sink"
 # `inversa` serves two owners: Lista (immutable reverse) and Matrix
 # (square-matrix inverse). "invert" reads naturally for both.
 inversa = "invert"
@@ -320,7 +323,7 @@ habet = "has"
 pone = "put"
 valores = "values"
 
-# copia (11) — dele / habet / longitudo / vacua shared above.
+# copia (12) — dele / habet / longitudo / vacua shared above.
 adde = "add"
 differentia = "difference"
 intersectio = "intersection"

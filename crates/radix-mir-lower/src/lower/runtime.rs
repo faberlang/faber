@@ -1560,6 +1560,43 @@ impl FunctionBuilder<'_> {
             ));
         }
 
+        // A list or set receiver has no `sink` method: the write is the
+        // collection's one shared append (`appende` / `adde`). A bounded list
+        // dies on overflow, so its append runs through the bounded helper
+        // inside the same die trap the method form uses.
+        let payload = self
+            .types
+            .get(self.method_receiver_payload_id(sink_ty))
+            .clone();
+        match payload {
+            Type::Array(_) | Type::Set(_) => {
+                let receiver = self.lower_expr_value(sink)?;
+                let item = self.lower_expr_value(item)?;
+                return Some(self.runtime_call_value(
+                    MirIntrinsic::Collection(MirCollectionOp::Append),
+                    vec![receiver, item],
+                    vacuum,
+                    span,
+                ));
+            }
+            Type::BoundedArray { .. } => {
+                let receiver_ty = MirType::semantic(self.method_receiver_payload_id(sink_ty));
+                let item_ty = self.expr_ty(item)?;
+                let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+                let helper = self.push_bounded_append_helper(receiver_ty, item_ty, vacuum, textus, span);
+                let receiver = self.lower_expr_value(sink)?;
+                let item = self.lower_expr_value(item)?;
+                return self.lower_dying_failable_call(
+                    MirCallee::Function(helper),
+                    vec![receiver, item],
+                    vacuum,
+                    textus,
+                    span,
+                );
+            }
+            _ => {}
+        }
+
         let Some(method) = self
             .context
             .interner
@@ -1594,7 +1631,24 @@ impl FunctionBuilder<'_> {
         // the call itself is wrapped in its die trap.
         let receiver = self.lower_expr_value(sink)?;
         let item = self.lower_expr_value(item)?;
+        let call_ty = self.expr_ty(expr)?;
+        self.lower_dying_failable_call(MirCallee::definition(def_id), vec![receiver, item], call_ty, err_ty, span)
+    }
 
+    /// A failable call whose failure is a death: the call runs inside its own
+    /// trap so its error edge lands on a block that panics instead of leaving
+    /// through an enclosing `fac`/`cape` handler or the unit's `⇥` channel.
+    ///
+    /// The innermost trap wins ([`Self::take_innermost_trap`]), which is what
+    /// keeps a dying `⇜` from being routed to a surrounding handler.
+    fn lower_dying_failable_call(
+        &mut self,
+        callee: MirCallee,
+        args: Vec<MirOperand>,
+        ty: MirType,
+        err_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
         let error_temp = self.push_temp(err_ty, span);
         let fail_block = self.fresh_block(span);
         let join = self.fresh_block(span);
@@ -1605,7 +1659,7 @@ impl FunctionBuilder<'_> {
             error_paths: false,
             depth: self.capture_depth,
         });
-        let call = self.lower_definition_call(def_id, Vec::new(), vec![receiver, item], None, 1, expr);
+        let call = self.lower_failable_call(callee, args, ty, err_ty, None, span);
         let error_paths = self.traps.pop().is_some_and(|trap| trap.error_paths);
         let call_reaches = call.is_some() && self.terminate_open_current(MirTerminatorKind::Goto(join), span);
         if error_paths {
