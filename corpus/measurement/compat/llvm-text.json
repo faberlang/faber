@@ -5,7 +5,7 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 438,
+    "capable": 439,
     "analyzable": 511
   },
   "terms": [
@@ -954,7 +954,7 @@
     {
       "term": "vector",
       "rule": "type",
-      "capable": 15,
+      "capable": 16,
       "analyzable": 16
     },
     {

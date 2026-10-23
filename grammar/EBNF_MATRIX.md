@@ -42,7 +42,7 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 438 | 511 | 86% |
+| llvm-text | 439 | 511 | 86% |
 | wasm-text | 376 | 511 | 74% |
 | wasm | 375 | 511 | 73% |
 | metal-text | 5 | 511 | 1% |
