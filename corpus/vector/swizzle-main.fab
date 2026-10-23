@@ -1,0 +1,23 @@
++++
+term = "vector"
+kind = "exemplum"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "redde_stmt", "incipit_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "register"
+canonical = false
+summary = "A host main runs a vector swizzle permutation and its inverse."
+syntax = "<vector>.swizzle(<mask>)"
+related = ["vector", "gpu", "nucleum"]
+locale = "en"
++++
+fn permute(vf32[4] v) → vf32[4] {
+    return v.swizzle("wzyx")
+}
+
+main {
+    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    let vf32[4] v ← [flat[0], flat[1], flat[2], flat[3]] ↦ vf32[4]
+
+    print permute(v)
+    print permute(v).dot(v)
+    print permute(permute(v))
+}
