@@ -1989,6 +1989,7 @@ fn softmax_function_resolves_row_softmax_plan() {
     derived.validate().expect("the derived plan validates");
     // A carried plan built from the same typed facts agrees exactly.
     let carried = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+        dims: crate::kernel_plan::RowOpDims::Literal { rows: 4, width: 4 },
         axis: 1,
         batched: None,
     });
@@ -2265,7 +2266,9 @@ fn layer_norm_function_resolves_layer_normalization_plan() {
     // A carried plan built from the same typed facts agrees exactly.
     let carried =
         CollectionKernelPlan::LayerNormalization(crate::kernel_plan::LayerNormalizationPlan {
+            dims: crate::kernel_plan::RowOpDims::Literal { rows: 4, width: 4 },
             axis: 1,
+            epsilon_bits: 1e-5_f32.to_bits(),
         });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
@@ -2309,6 +2312,7 @@ fn transformer_recipe_kinds_are_typed() {
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::RowSoftmax(
             crate::kernel_plan::RowSoftmaxPlan {
+                dims: crate::kernel_plan::RowOpDims::Literal { rows: 1, width: 1 },
                 axis: 1,
                 batched: None
             }
@@ -2317,7 +2321,11 @@ fn transformer_recipe_kinds_are_typed() {
     );
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::LayerNormalization(
-            crate::kernel_plan::LayerNormalizationPlan { axis: 1 }
+            crate::kernel_plan::LayerNormalizationPlan {
+                dims: crate::kernel_plan::RowOpDims::Literal { rows: 1, width: 1 },
+                axis: 1,
+                epsilon_bits: 0,
+            }
         )),
         RecipeKind::LayerNormalization
     );
@@ -2337,6 +2345,7 @@ fn transformer_plans_report_zero_shared_memory() {
         entry: "softmaxa".to_owned(),
         library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+            dims: crate::kernel_plan::RowOpDims::Literal { rows: 4, width: 4 },
             axis: 1,
             batched: None,
         }),
@@ -3650,6 +3659,10 @@ fn rms_norm_function_resolves_rms_normalization_plan() {
     derived.validate().expect("the derived plan validates");
     let carried =
         CollectionKernelPlan::RmsNormalization(crate::kernel_plan::RmsNormalizationPlan {
+            dims: crate::kernel_plan::RowOpDims::Literal {
+                rows: 2,
+                width: 960,
+            },
             axis: 1,
             epsilon_bits: (1e-5_f32).to_bits(),
             width: 960,
@@ -3807,6 +3820,7 @@ fn causal_masked_softmax_function_resolves_causal_masked_softmax_plan() {
     derived.validate().expect("the derived plan validates");
     let carried =
         CollectionKernelPlan::CausalMaskedSoftmax(crate::kernel_plan::CausalMaskedSoftmaxPlan {
+            dims: crate::kernel_plan::RowOpDims::Literal { rows: 9, width: 9 },
             rows: 9,
             cols: 9,
         });
@@ -3828,6 +3842,10 @@ fn inference_recipe_kinds_are_typed() {
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::RmsNormalization(
             crate::kernel_plan::RmsNormalizationPlan {
+                dims: crate::kernel_plan::RowOpDims::Literal {
+                    rows: 1,
+                    width: 960,
+                },
                 axis: 1,
                 epsilon_bits: (1e-5_f32).to_bits(),
                 width: 960,
@@ -3848,7 +3866,11 @@ fn inference_recipe_kinds_are_typed() {
     );
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::CausalMaskedSoftmax(
-            crate::kernel_plan::CausalMaskedSoftmaxPlan { rows: 9, cols: 9 }
+            crate::kernel_plan::CausalMaskedSoftmaxPlan {
+                dims: crate::kernel_plan::RowOpDims::Literal { rows: 9, width: 9 },
+                rows: 9,
+                cols: 9
+            }
         )),
         RecipeKind::CausalMaskedSoftmax
     );

@@ -247,6 +247,8 @@ pub struct AxisReductionPlan {
 /// axis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowSoftmaxPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Row axis (the last axis in v1).
     pub axis: u64,
     /// U2 head-axis batch facts; `None` is the ordinary rank-1/2 image
@@ -288,8 +290,13 @@ pub struct RowSoftmaxMask {
 /// (epsilon, affine) is resolved by P1 from the const operands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LayerNormalizationPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Normalization axis (from the trailing const operand).
     pub axis: u64,
+    /// Epsilon as f32 bits. A zero value is reserved for a dynamic epsilon
+    /// operand, which remains explicit in the MIR call and kernel signature.
+    pub epsilon_bits: u32,
 }
 
 /// Row-gather recipe plan (GI3-1: name frozen in this unit, S6-N1
@@ -316,6 +323,8 @@ pub struct GatherPlan {
 /// peer's width cross-checked against the normalization dimension.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RmsNormalizationPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Normalization axis (from the trailing const operand; the last axis
     /// in v1).
     pub axis: u64,
@@ -424,6 +433,8 @@ fn row_reduction_admission(rows: u64, width: u64) -> Option<RowReductionFacts> {
 /// before the numerically stable row softmax.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CausalMaskedSoftmaxPlan {
+    /// Whether the extents are compile-time literals or bound at run time.
+    pub dims: RowOpDims,
     /// Row (query) extent.
     pub rows: u64,
     /// Column (key) extent.
@@ -702,6 +713,34 @@ pub enum MatMulClass {
     Simdgroup,
     /// Scalar tiled body.
     Tiled,
+}
+
+/// How a row operation plan (row softmax, layer norm, RMS norm, causal
+/// softmax) knows its extents: literal numbers, or run-time extents selected
+/// by shape class. The row-op twin of [`MatMulDims`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowOpDims {
+    /// Compile-time extents. `rows` is the product of the leading axes (`1`
+    /// at rank 1) and `width` the last axis.
+    Literal { rows: u64, width: u64 },
+    /// Extents bound at run time. The literal numbers are zero and `class` is
+    /// the plan-time placeholder ([`RowOpClass::Generic1D`]) until the launch
+    /// selects the real class from the call-site shape.
+    Runtime { class: RowOpClass },
+}
+
+/// The row-op body a run-time-extent plan selects (one per body the literal
+/// form chooses by value). The class follows from the call-site
+/// `[rows, width]` at launch: row reduction for `width >= 32 && width % 4 ==
+/// 0`, row-mapped for the wide flat shapes, generic 1D otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RowOpClass {
+    /// Flat one-thread-per-element body.
+    Generic1D,
+    /// One workgroup per row tree reduction.
+    RowReduction,
+    /// Row-mapped flat body (guards `if o < rows`).
+    RowMapped,
 }
 
 /// The two shared-memory operand tiles of the tiled-matmul recipe.
