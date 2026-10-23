@@ -124,8 +124,9 @@ static inline double faber_f64_of_bits(uint64_t bits) {
     return value;
 }
 
-/* A text value: a NUL-terminated C string of UTF-8 bytes. Text containing
- * NUL never reaches the runtime; the emitter rejects such literals. */
+/* A text value: a NUL-terminated C string of UTF-8 bytes. Every text is
+ * NUL-free: the emitter rejects such literals and the stdin readers reject
+ * such input before constructing a text. */
 typedef const char *faber_text;
 
 /* ------------------------------------------------------------------------ */
@@ -1199,7 +1200,8 @@ static inline void *faber_alloc(faber_arena *arena, size_t size) {
 }
 
 /* `read line` / `read`: one stdin line without its terminator, or all of
-   stdin to EOF. EOF is the runner's Nil, so the result is NULL (none). */
+   stdin to EOF. EOF is the runner's Nil, so the result is NULL (none). An
+   embedded NUL is rejected before the bytes are sealed into a text. */
 static inline faber_text faber_text_make(faber_arena *arena, const char *from, size_t bytes,
                                          int64_t cps);
 static inline int64_t faber_text_count_cps(const char *from, size_t length);
@@ -1213,6 +1215,10 @@ static inline const char *faber_read_line(faber_arena *arena) {
         faber_trap("out of memory");
     }
     while ((c = fgetc(stdin)) != EOF) {
+        if (c == '\0') {
+            free(buffer);
+            faber_trap("text input contains NUL byte");
+        }
         any = true;
         if (c == '\n') {
             break;
@@ -1264,6 +1270,10 @@ static inline const char *faber_read_all(faber_arena *arena) {
             buffer = grown;
         }
         got = fread(buffer + length, 1, capacity - length - 1, stdin);
+        if (got != 0 && memchr(buffer + length, '\0', got) != NULL) {
+            free(buffer);
+            faber_trap("text input contains NUL byte");
+        }
         length += got;
         if (got == 0) {
             break;
