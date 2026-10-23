@@ -33,6 +33,9 @@ pub(crate) struct Function {
     pub(crate) omissions: Vec<Omission>,
     /// `None` for a function with no result (`void`).
     pub(crate) ret: Option<Ty>,
+    /// `⇥ E`'s C carrier. Error payloads must have a pointer representation
+    /// because `faber_chan.value` is an unowned `const void *`.
+    pub(crate) err: Option<Ty>,
     /// The genus a method belongs to; its receiver follows the arena.
     pub(crate) receiver: Option<DefId>,
 }
@@ -303,9 +306,21 @@ impl Emitter<'_> {
         {
             return Err(unsupported("device function"));
         }
-        if function.err_ty.is_some() {
-            return Err(unsupported("error channel function"));
-        }
+        let err = if let Some(err_ty) = function.err_ty {
+            if is_void_or_none(self.types, err_ty) {
+                return Err(unsupported("void or none error channel type"));
+            }
+            let class = classify(self.types, err_ty)?;
+            if !self.c_type(class)?.ends_with('*') {
+                return Err(unsupported("scalar error channel type"));
+            }
+            self.need_class(class);
+            // The channel's carrier is declared in the runtime header.
+            self.support.need(crate::helpers::Helper::Trap);
+            Some(class)
+        } else {
+            None
+        };
         if function.cli_args.is_some() || function.test.is_some() {
             return Err(unsupported("command or test function"));
         }
@@ -393,6 +408,7 @@ impl Emitter<'_> {
                 pointee: pointees,
                 omissions,
                 ret,
+                err,
                 receiver,
             },
         );
@@ -421,6 +437,9 @@ impl Emitter<'_> {
             let c = self.c_type(*ty)?;
             slots.push(if *pointer { format!("{c} *") } else { c });
         }
+        if function.err.is_some() {
+            slots.push("faber_chan *".to_owned());
+        }
         let params = if slots.is_empty() {
             "void".to_owned()
         } else {
@@ -438,11 +457,12 @@ impl Emitter<'_> {
         let Some(signature) = self.functions.get(&def_id) else {
             return Err(unsupported("function without a recorded signature"));
         };
-        let (name, param_types, pointees, ret, receiver) = (
+        let (name, param_types, pointees, ret, err, receiver) = (
             signature.name.clone(),
             signature.params.clone(),
             signature.pointee.clone(),
             signature.ret,
+            signature.err,
             signature.receiver,
         );
         self.scope = Namer::program_scope();
@@ -494,6 +514,9 @@ impl Emitter<'_> {
                 },
             );
         }
+        if err.is_some() {
+            params.push("faber_chan *faber_e".to_owned());
+        }
         let mut body = String::new();
         let Some(block) = &function.body else {
             return Err(unsupported("function without a body"));
@@ -512,6 +535,9 @@ impl Emitter<'_> {
                 body.insert_str(0, &format!("    (void){name};\n"));
             }
         }
+        if err.is_some() && !crate::mentions_name(&body, "faber_e") {
+            body.insert_str(0, "    (void)faber_e;\n");
+        }
         // Typecheck proves every path of a function with a result returns; C
         // cannot always see that (`-Wreturn-type`), so a body that does not end
         // in `return` gets an unreachable trap rather than undefined behavior.
@@ -522,6 +548,18 @@ impl Emitter<'_> {
         if ret.is_some() && !ends_in_return {
             self.support.need(crate::helpers::Helper::Trap);
             body.push_str("    faber_trap(\"function ended without a return\");\n");
+        }
+        if err.is_some() && !crate::mentions_name(&body, "faber_fail") {
+            // Keep the mandated failure label warning-free when the declared
+            // channel has no throwing site in this body.
+            body.push_str("    if (0) goto faber_fail;\n");
+        }
+        if err.is_some() {
+            let failure_return = match ret {
+                Some(class) => format!("return {};", zero_of(self, class)?),
+                None => "return;".to_owned(),
+            };
+            body.push_str(&format!("faber_fail:\n    {failure_return}\n"));
         }
         let ret_text = match ret {
             Some(ty) => self.c_type(ty)?,
@@ -534,5 +572,39 @@ impl Emitter<'_> {
             params.join(", ")
         };
         Ok(format!("{ret_text}{space}{name}({params}) {{\n{body}}}\n"))
+    }
+}
+
+fn is_void_or_none(types: &radix_types::TypeTable, ty: radix_types::TypeId) -> bool {
+    match types.get(ty) {
+        radix_types::Type::Alias(_, inner) => is_void_or_none(types, *inner),
+        radix_types::Type::Primitive(
+            radix_types::Primitive::Vacuum
+            | radix_types::Primitive::Nihil
+            | radix_types::Primitive::Numquam,
+        ) => true,
+        _ => false,
+    }
+}
+
+fn zero_of(emitter: &Emitter<'_>, class: Ty) -> Result<String, CodegenError> {
+    let c_type = emitter.c_type(class)?;
+    if c_type.ends_with('*') {
+        Ok("NULL".to_owned())
+    } else if class == Ty::Decimal {
+        Ok("(faber_dec){0}".to_owned())
+    } else if matches!(
+        class,
+        Ty::Int
+            | Ty::Bool
+            | Ty::Sized(_)
+            | Ty::Modular(_)
+            | Ty::Saturating(_)
+            | Ty::Bits(_)
+            | Ty::None
+    ) {
+        Ok("0".to_owned())
+    } else {
+        Ok(format!("({c_type}){{0}}"))
     }
 }
