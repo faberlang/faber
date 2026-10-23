@@ -1,0 +1,37 @@
++++
+term = "ad"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "iace_stmt", "iace_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "incipit_stmt", "fixum_decl", "binding_decl", "ad_expr", "ad_opener", "conversio_expr", "fac_stmt", "cape_clause", "nota_stmt"]
+category = "endpoint"
+canonical = false
+summary = "A handler that fails on its alternate exit is caught inside do/catch as the thrown text."
+syntax = "do { let int b ← call 'm:fail' (4) ↦ int } catch e { print \"caught §\"(e) }"
+related = ["ad", "call", "iace", "cape"]
+locale = "en"
++++
+# =============================================================================
+# call — a handler's alternate exit is thrown into the surrounding do/catch.
+# =============================================================================
+#
+# What this teaches:
+#   • A failure raised by a `@ call` handler crosses the call boundary as the
+#     thrown text, rather than becoming a successful return value.
+#   • The enclosing `do/catch` receives that text; statements after the call
+#     are skipped when the handler fails.
+#
+# See also: ad, call, iace, cape
+# =============================================================================
+
+@ call 'm:fail'
+fn fail(int n) → int ⇥ string {
+    throw "bad §"(n)
+}
+
+main {
+    do {
+        let int b ← call 'm:fail' (4) ↦ int
+        print b
+    } catch e {
+        print "caught §"(e)
+    }
+}
