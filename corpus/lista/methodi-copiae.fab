@@ -16,10 +16,15 @@ locale = "en"
 #
 # What this teaches:
 #   • copy, slice, and reordering intrinsics — `addita()`, `sectio()`, `prima()`, `ultima()`
+#   • `mut list<int> mutata ← res[0‥2]` gets a new list containing the same
+#     value elements. This is a shallow window copy: replacing a slot in
+#     `mutata` does not replace a slot in `res`.
 #   • ordering operations — `inversa()`, `ordinata()`
 #
 # Common mistakes:
 #   • Forgetting that sectio(lo, hi) uses an exclusive hi bound — the returned slice may be shorter than expected.
+#   • Assuming a window aliases the source list itself; it is a new list with
+#     the same elements, not a view into the source's slots.
 #
 # See also: tabula, copia, ∷, itera
 # =============================================================================
