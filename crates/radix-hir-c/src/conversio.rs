@@ -602,12 +602,14 @@ impl Emitter<'_> {
         let n = self.temps;
         self.temps += 1;
         let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let mut effect = value.effect;
         let tail = match recovery {
             Some(recovery) => {
                 let fallback = self.expr(recovery)?;
                 if fallback.value != Value::Text {
                     return Err(unsupported("recovery value of a different class"));
                 }
+                effect |= fallback.effect;
                 format!("{s} == 0 ? {v} : {};", fallback.text)
             }
             None => {
@@ -618,7 +620,7 @@ impl Emitter<'_> {
             "(__extension__ ({{ int {s} = 0; faber_text {v} = faber_try_bytes_text(faber_a, {}, &{s}); {tail} }}))",
             value.text
         );
-        Ok(Operand::new(text, Value::Text))
+        Ok(Operand::new(text, Value::Text).with_effect(effect))
     }
 
     /// `string ↦ lista<b8>`: the UTF-8 encode. The header's byte count is
@@ -633,6 +635,7 @@ impl Emitter<'_> {
             format!("faber_text_bytes(faber_a, {})", value.text),
             Value::List(crate::ty::Elem::Bits(radix_types::BitsWidth::B8)),
         )
+        .with_effect(value.effect)
     }
 
     /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
