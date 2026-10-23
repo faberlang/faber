@@ -1,0 +1,51 @@
++++
+term = "¶"
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+summary = "Format operator: ¶ keeps integer extremes intact while applying sign, width, padding, and radix rules."
+syntax = "<value> ¶ \"[fill][align][sign][0][width][.precision][kind]\""
+aliases = ["format"]
+related = ["scriptum", "textus"]
+locale = "en"
++++
+# =============================================================================
+# ¶ — format operator: integer extremes and center-padding ties
+# =============================================================================
+#
+# What this teaches:
+#   • Integer extremes across widths still format as exact integer values;
+#     radix kinds use lowercase digits and preserve a negative sign.
+#   • Numbers right-align by default. Width is a minimum and grows to fit;
+#     zero-padding follows the sign.
+#   • Center alignment splits padding evenly, placing an odd extra space on
+#     the right. Explicit fill uses the same tie rule.
+#   • An unformatted integer print remains the exact decimal value.
+#
+# Common mistakes:
+#   • Treating width as truncation — a too-small width never drops digits.
+#   • Putting zeroes before a sign — `0` padding follows the sign.
+#   • Expecting uppercase radix digits or the odd center pad on the left.
+#
+# See also: scriptum, textus
+# =============================================================================
+
+main {
+    let i8 lo ← -128
+    let i8 hi ← 127
+    let u8 max ← 255
+    let int big ← 9223372036854775807
+    let i8 m ← -5
+
+    print lo ¶ "x"
+    print hi ¶ "04x"
+    print max ¶ "x"
+    print max ¶ "08b"
+    print big ¶ "e"
+    print hi ¶ "2"
+    print m ¶ "05"
+    print 7 ¶ "+4"
+    print 42 ¶ "^5"
+    print 255 ¶ "*^7"
+    print big
+}
