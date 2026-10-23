@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/vector/lanes-main.fab"
+group = "language"
+input_root = "corpus"
+input = "vector/lanes-main.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
