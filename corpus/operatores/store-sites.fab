@@ -1,0 +1,57 @@
++++
+term = "numerus"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "typed_constructor", "field_list", "field_init", "field_key", "array_literal", "array_element_list", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Arithmetic over saturating and wrapping integers stays exact until the value is stored; each destination applies its policy once."
+syntax = "saturating<u8> | wrapping<u8>"
+related = ["numerus", "saturating", "wrapping"]
+locale = "en"
++++
+# =============================================================================
+# numerus — saturating and wrapping policies apply once at each store site.
+# =============================================================================
+#
+# What this teaches:
+#   • Arithmetic over policy integers is exact until a value is stored.
+#   • A declaration, argument, return, genus field and list element each apply
+#     their destination policy once: saturation clamps to 255 and wrapping
+#     reduces modulo 256.
+#   • `250 + 10` remains 260 as an expression; it is not clamped or wrapped
+#     between operations.
+#
+# See also: numerus, saturating, wrapping
+# =============================================================================
+
+class Gauge {
+    mut saturating<u8> level
+    let wrapping<u8> tag
+}
+
+fn clamp_at_return() → saturating<u8> {
+    return 250 + 10
+}
+
+fn clamp_at_argument(saturating<u8> given) → saturating<u8> {
+    return given
+}
+
+fn wrap_at_return() → wrapping<u8> {
+    return 250 + 10
+}
+
+main {
+    print 250 + 10
+    print clamp_at_return()
+    print wrap_at_return()
+    print clamp_at_argument(250 + 10)
+    print clamp_at_argument(5)
+
+    let Gauge gauge ← Gauge { level = 250 + 10, tag = 250 + 10 }
+    print gauge
+
+    let list<saturating<u8>> levels ← [250 + 10, 5 - 10]
+    print levels
+    print levels.sum()
+}
