@@ -3686,7 +3686,11 @@ pub fn subchain_has_runtime_shaped_buffer(
 /// each additional consumed output as an extra output — all sized by
 /// [`data_flow_element_ty_and_count_or_runtime`] so a run-time-shaped tensor
 /// binds at the [`crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT`] marker instead
-/// of failing the literal-dimension law.
+/// of failing the literal-dimension law. A run-time-shaped surface appends one
+/// count-one `u32` [`MirKernelResourceKind::RuntimeExtent`] channel after the
+/// outputs: the host binds the written tensor's whole element count per call
+/// and the emitters' out-of-bounds guard reads it, so the generic launch
+/// geometry's rounded-up last workgroup cannot index past the last element.
 ///
 /// Why not [`MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry`]:
 /// the whole-function ABI synthesis sizes every buffer with the literal-only
@@ -3724,11 +3728,13 @@ pub fn elementwise_subchain_signature_for_emission(
     };
     let mut next_binding = 0u32;
     let mut bound_primary_input = false;
+    let mut runtime_shaped = false;
     for param in &function.params {
         if crate::abi::is_vacuum(param.ty, validation) {
             continue;
         }
         let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(param.ty, validation)?;
+        runtime_shaped |= count == crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
         let resource = storage_input_with_local(next_binding, element_ty, count, param.local);
         if bound_primary_input {
             signature.extra_inputs.push(resource);
@@ -3741,6 +3747,7 @@ pub fn elementwise_subchain_signature_for_emission(
     for (index, &local) in outputs.iter().enumerate() {
         let local_ty = function_local_ty(function, local)?;
         let (element_ty, count) = data_flow_element_ty_and_count_or_runtime(local_ty, validation)?;
+        runtime_shaped |= count == crate::abi::RUNTIME_SHAPED_ELEMENT_COUNT;
         let resource = storage_output_with_local(next_binding, element_ty, count, local);
         if index == 0 {
             signature.output = resource;
@@ -3748,6 +3755,36 @@ pub fn elementwise_subchain_signature_for_emission(
             signature.extra_outputs.push(resource);
         }
         next_binding = next_binding.saturating_add(1);
+    }
+    // The launch geometry of a run-time-shaped surface is a per-call fact, and
+    // the generic one-dimensional rule rounds that call's element count up to
+    // whole `GENERIC_1D_WORKGROUP_X` workgroups: a non-aligned tail such as
+    // `[3, 7]` (21 elements) dispatches 128 invocations. The emitted body must
+    // therefore guard on the per-call count, not on the placeholder one-lane
+    // dispatch and not on nothing. Append the count channel — the same
+    // `RuntimeExtent` binding a scalar-shaped kernel carries, which the host
+    // populates with the written tensor's whole element count before dispatch
+    // — so every invocation past the last element returns before its first
+    // indexed load or store. The channel is count-typed (`numerus<u32>`) and
+    // only appended when that width resolves; a table without it leaves the
+    // surface unbounded, which the Metal emitter refuses at emission.
+    if runtime_shaped
+        && let Some(extent_ty) = validation
+            .types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+    {
+        signature.extra_inputs.push(MirKernelResource {
+            group: 0,
+            binding: next_binding,
+            kind: MirKernelResourceKind::RuntimeExtent,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty: MirType::semantic(extent_ty),
+            element_count: 1,
+            source_local: None,
+            source_name: None,
+            reduced_projection: None,
+        });
     }
     Ok(signature)
 }
