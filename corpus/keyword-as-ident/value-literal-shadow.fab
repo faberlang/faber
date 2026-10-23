@@ -1,0 +1,42 @@
++++
+term = "keyword-as-ident"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "genus_decl", "field_decl", "member_suffix", "sit_decl"]
+category = "identifier"
+canonical = false
+summary = "A binding named after a value literal shadows it and warns WARN021."
+syntax = "let string true - WARN021 value_literal_shadowing"
+related = ["verum", "falsum", "nulla"]
+locale = "en"
++++
+# =============================================================================
+# keyword-as-ident — binding named after a value literal
+# =============================================================================
+#
+# What this teaches:
+#   • A binding may be named after a value literal (`true`, `false`, `null`,
+#     `nan`); the live binding wins inside its scope.
+#   • Every use reads the binding, so the program still runs.
+#   • The checker reports WARN021 `value_literal_shadowing` for the binding.
+#
+# See also: verum, falsum, nulla, print-binding.fab
+# =============================================================================
+#
+# Operator example:
+#   let string true ← "t"
+#   let string false ← "f"
+#   print true
+#   print false
+#
+# GRAMMAR:
+#   sit_decl :← 'let' type name '←' expr
+#
+# EXPECTED OUTPUT:
+#   value-literal-shadow.expected — t, then f
+
+main {
+    let string true ← "t"
+    let string false ← "f"
+    print true
+    print false
+}
