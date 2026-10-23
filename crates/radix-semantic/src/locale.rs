@@ -1533,6 +1533,7 @@ fn insert_latin_extra_types(types: &mut BTreeMap<String, TypeBinding>) {
             TypeBindingKind::Relational(RelationalTypeKind::Census),
         ),
         ("ratio", TypeBindingKind::Ratio),
+        ("erratum", TypeBindingKind::Erratum),
         ("sermo", TypeBindingKind::Frame(FrameTypeKind::Sermo)),
         ("scrinium", TypeBindingKind::Frame(FrameTypeKind::Scrinium)),
         ("meus", TypeBindingKind::Frame(FrameTypeKind::Meus)),

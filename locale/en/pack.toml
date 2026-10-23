@@ -239,6 +239,7 @@ ratio = "record"
 sermo = "channel"
 scrinium = "frame"
 trapped = "trapped"
+erratum = "error"
 meus = "send"
 tuus = "recv"
 
