@@ -2,34 +2,20 @@
 //! duplicates, and is a no-op on a set that already holds the item. The runner
 //! is pinned here directly rather than through the corpus suite.
 //!
-//! The compiler recognizes the sinking contract by its `@ radix contract
-//! "sinking"` role, never by name, so the fixture declares the same interface
-//! `norma:sink` declares. The bodies above `main` stay out of the tests.
+//! The runner tests these built-in collection sinks without declaring or
+//! importing the user-defined sinking contract.
 
 use super::{BufferHost, run_source};
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-/// The sinking contract, as `norma:sink` declares it, plus a local fault type.
-const SINKING: &str = r#"@ radix contract "sinking"
-interface Sink<T> {
-    fn sink(T item) → void ⇥ Oops
-    fn flush() → void ⇥ Oops
-}
-
-union Oops {
-    Broken { string path }
-}
-
-"#;
-
 fn session() -> Session {
     Session::new(Config::default().with_target(Target::HirRust))
 }
 
 fn program(body: &str) -> String {
-    format!("+++\nlocale = \"en\"\n+++\n{SINKING}main {{\n{body}\n}}\n")
+    format!("+++\nlocale = \"en\"\n+++\nmain {{\n{body}\n}}\n")
 }
 
 fn run_program(name: &str, source: &str) -> Vec<String> {
@@ -50,6 +36,15 @@ fn sink_into_a_list_appends_and_keeps_duplicates() {
         "mut list<int> xs ← []\nxs ⇜ 3\nxs ⇜ 3\nprint xs.length()\nprint xs[0]\nprint xs[1]",
     );
     assert_eq!(lines, ["2", "3", "3"]);
+}
+
+#[test]
+fn sink_into_a_bounded_list_runs_without_a_contract_declaration() {
+    let lines = run_lines(
+        "sink-into-bounded-list.fab",
+        "mut list<int, 2> xs ← []\nxs ⇜ 3\nprint xs.length()\nprint xs[0]",
+    );
+    assert_eq!(lines, ["1", "3"]);
 }
 
 #[test]
