@@ -1,0 +1,28 @@
++++
+term = "matrix"
+kind = "type"
+category = "collection"
+canonical = false
+locale = "en"
+related = ["matrix", "apud", "ponde", "accipe"]
+summary = "A matrix element read by row and column, literal or computed, with the coordinate read and store forms."
+syntax = "matrix[[row, column]] | matrix[[row, column]] ← value"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
++++
+main {
+    mut matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
+    let f32 literal ← m[[0, 1]]
+    let int row ← 1
+    let f32 computed ← m[[row, 0]]
+    m[[row, 1]] ← 9.5
+    let f32 viaAt ← m.at([1, 1])
+    let f32 viaAtComputed ← m.at([row, 1]) ⊥ 0.0
+    m.set([row, 0], 7.5)
+    let f32 viaGet ← m.get([0, 1]) coalesce 0.0
+    print literal
+    print computed
+    print m
+    print viaAt
+    print viaAtComputed
+    print viaGet
+}
