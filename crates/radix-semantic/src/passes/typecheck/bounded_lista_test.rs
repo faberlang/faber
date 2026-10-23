@@ -149,6 +149,43 @@ fn unbounded_lista_appende_stays_infallible() {
 }
 
 #[test]
+fn bounded_lista_sink_requires_alternate_exit() {
+    // The sinking method twin of `appende` (the `immerge` row) is the same
+    // op, so a bounded receiver reports overflow the same way.
+    assert_rejects_with_issue_la(
+        r"functio grow() → vacuum {
+    varia lista<numerus, 8> xs ← vacua
+    xs.immerge(1)
+}",
+        "failable_call_requires_handler",
+    );
+}
+
+#[test]
+fn bounded_lista_sink_propagates_on_textus_channel() {
+    assert_accepts_la(
+        r"functio grow() → vacuum ⇥ textus {
+    varia lista<numerus, 8> xs ← vacua
+    xs.immerge(1)
+}
+
+incipit {
+    nota 0
+}",
+    );
+}
+
+#[test]
+fn unbounded_lista_sink_stays_infallible() {
+    assert_accepts_la(
+        r"incipit {
+    varia lista<numerus> xs ← vacua
+    xs.immerge(1)
+}",
+    );
+}
+
+#[test]
 fn bounded_lista_d7_conversions_are_explicit() {
     assert_accepts_la(
         r"incipit {
