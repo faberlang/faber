@@ -9,8 +9,8 @@ use crate::{Emitter, Local};
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
-    HirBlock, HirCustodi, HirExpression, HirExpressionKind, HirIteraMode, HirLocal, HirScribeKind,
-    HirStatement, HirStatementKind,
+    HirBlock, HirCape, HirCustodi, HirExpression, HirExpressionKind, HirIteraMode, HirLocal,
+    HirScribeKind, HirStatement, HirStatementKind,
 };
 use radix_lexer::Symbol;
 use radix_types::BitsWidth;
@@ -19,6 +19,13 @@ impl Emitter<'_> {
     /// Emit a block's statements one level deeper than the current line.
     pub(crate) fn block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
         self.depth += 1;
+        let result = self.block_contents(out, block);
+        self.depth -= 1;
+        result
+    }
+
+    /// Emit a block at the current indentation without changing its scope.
+    fn block_contents(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
         for statement in &block.statements {
             self.statement(out, statement)?;
         }
@@ -29,7 +36,6 @@ impl Emitter<'_> {
         if let Some(tail) = &block.expr {
             self.expr_statement(out, tail)?;
         }
-        self.depth -= 1;
         Ok(())
     }
 
@@ -326,6 +332,7 @@ impl Emitter<'_> {
                 scrutinees, arms, ..
             } => self.switch(out, scrutinees, arms),
             HirExpressionKind::Block(block) => self.plain_block(out, block),
+            HirExpressionKind::Handled { body, catch } => self.handled(out, body, catch),
             HirExpressionKind::Loop(block) => self.loop_block(out, block),
             HirExpressionKind::Panic(message) => {
                 let message = self.expr(message)?;
@@ -356,14 +363,96 @@ impl Emitter<'_> {
         if value.value != Value::from(err) {
             return Err(unsupported("error payload stored without a store check"));
         }
-        self.line(
-            out,
-            &format!(
-                "*faber_e = (faber_chan){{true, (const void *)({})}};",
-                value.text
-            ),
+        if let Some(channel) = self.channels.last().cloned() {
+            self.channel_handlers.insert(channel.clone());
+            self.line(
+                out,
+                &format!(
+                    "{channel} = (faber_chan){{true, (const void *)({})}};",
+                    value.text
+                ),
+            );
+            self.line(out, &format!("goto {channel}_handler;"));
+        } else {
+            self.line(
+                out,
+                &format!(
+                    "*faber_e = (faber_chan){{true, (const void *)({})}};",
+                    value.text
+                ),
+            );
+            self.line(out, "goto faber_fail;");
+        }
+        Ok(())
+    }
+
+    /// `do { ... } catch name { ... }`: a local channel records one failure,
+    /// and a handler label leaves the body before the catch arm runs.
+    fn handled(
+        &mut self,
+        out: &mut String,
+        body: &HirBlock,
+        catch: &HirCape,
+    ) -> Result<(), CodegenError> {
+        let channel = format!("faber_c{}", self.temps);
+        self.temps += 1;
+        let handler = format!("{channel}_handler");
+        self.line(out, "{");
+        self.depth += 1;
+        self.line(out, &format!("faber_chan {channel} = {{false, NULL}};"));
+        self.channels.push(channel.clone());
+        let body_result = self.block_contents(out, body);
+        let popped = self.channels.pop();
+        debug_assert_eq!(popped.as_deref(), Some(channel.as_str()));
+        if let Err(error) = body_result {
+            self.depth -= 1;
+            self.line(out, "}");
+            return Err(error);
+        }
+        if self.channel_handlers.remove(&channel) {
+            self.line(out, &format!("{handler}:;"));
+        }
+        self.line(out, &format!("if ({channel}.set) {{"));
+        self.depth += 1;
+        let catch_result = self.catch_binding(out, catch, &channel);
+        let catch_result = catch_result.and_then(|()| self.block_contents(out, &catch.body));
+        self.depth -= 1;
+        self.line(out, "}");
+        self.depth -= 1;
+        self.line(out, "}");
+        catch_result
+    }
+
+    /// Bind the caught payload as the catch clause's ordinary local.
+    fn catch_binding(
+        &mut self,
+        out: &mut String,
+        catch: &HirCape,
+        channel: &str,
+    ) -> Result<(), CodegenError> {
+        let Some(ty) = catch.binding_ty else {
+            return Err(unsupported("catch binding without a resolved type"));
+        };
+        let class = classify(self.types, ty)?;
+        self.need_class(class);
+        let c_type = self.c_type(class)?;
+        let Some(kind) = self.names.binding_kind(catch.binding_def_id) else {
+            return Err(unsupported(
+                "catch binding the name catalog does not classify",
+            ));
+        };
+        let raw = self.names.resolve_symbol(catch.binding_name);
+        let name = self.scope.claim(&prefixed_binding_name(kind, raw));
+        let declaration = self.declare(class, &name, false)?;
+        self.line(out, &format!("{declaration} = ({c_type}){channel}.value;"));
+        self.locals.insert(
+            catch.binding_def_id,
+            Local {
+                name,
+                ty: class,
+                constant: None,
+            },
         );
-        self.line(out, "goto faber_fail;");
         Ok(())
     }
 

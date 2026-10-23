@@ -840,7 +840,12 @@ impl Emitter<'_> {
                 .current
                 .and_then(|current| self.functions.get(&current))
                 .is_some_and(|current| current.err.is_some());
-            let failure = if caller_has_channel {
+            let failure = if let Some(active_channel) = self.channels.last().cloned() {
+                self.channel_handlers.insert(active_channel.clone());
+                format!(
+                    "if ({channel}.set) {{ {active_channel} = {channel}; goto {active_channel}_handler; }}"
+                )
+            } else if caller_has_channel {
                 format!("if ({channel}.set) {{ *faber_e = {channel}; goto faber_fail; }}")
             } else {
                 self.support.need(Helper::Trap);

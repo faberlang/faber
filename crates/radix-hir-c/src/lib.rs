@@ -188,6 +188,8 @@ impl CCodegen<'_> {
             text_literals: Vec::new(),
             text_literal_index: FxHashMap::default(),
             closure_seq: 0,
+            channels: Vec::new(),
+            channel_handlers: FxHashSet::default(),
         }
         .program(hir)
     }
@@ -260,6 +262,10 @@ pub(crate) struct Emitter<'a> {
     text_literal_index: FxHashMap<String, usize>,
     /// How many synthesized closure names have been claimed.
     closure_seq: u32,
+    /// Error channel receiving a failure in the active `do`/`catch` body.
+    channels: Vec<String>,
+    /// Handler labels referenced by emitted throw/call propagation paths.
+    channel_handlers: FxHashSet<String>,
 }
 
 /// One local, parameter or module constant, by its C identifier.
