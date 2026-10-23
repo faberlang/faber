@@ -46,9 +46,9 @@ use crate::mir::{
     MirOperand, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirType, MirValidationContext, RunSourceError,
     run_source, validate_program as validate_mir_program,
 };
+use crate::test_support::test_session_la;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable, i64s_from_literal_index};
 use rustc_hash::FxHashMap;
-use crate::test_support::test_session_la;
 
 /// Unwrap a driver result, panicking with the codegen error message
 /// (`SpannedCodegenError` carries no `Debug` impl).

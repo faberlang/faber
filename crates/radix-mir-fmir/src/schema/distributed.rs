@@ -66,8 +66,9 @@ use radix_mir::kernel_plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
     CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
     LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, PlanDim,
-    QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowOpDims, RowSoftmaxBatch,
-    RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
+    QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowOpDims,
+    RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan,
+    SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirScalarLayout, MirType};
