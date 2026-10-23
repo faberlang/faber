@@ -779,3 +779,49 @@ fn single_file_exit_code_cli_expression() {
     assert_eq!(output.status.code(), Some(6));
     assert_eq!(String::from_utf8_lossy(&output.stdout), "cli\n");
 }
+
+// ── source admission: record-element tensor ──────────────
+
+/// A `tensor<Block, [n]>` source fixture must pass admission, lower, and run
+/// on the reference runner: the host constructs the tensor of genus values,
+/// indexes one element and reads its narrow scalar field and an element of
+/// its fixed-array field. No GPU is needed.
+#[test]
+fn record_tensor_index_and_field_read_runs_in_reference() {
+    let dir = temp_dir("record-tensor-reference");
+    let entry = dir.join("blocks.fab");
+    std::fs::write(
+        &entry,
+        r#"+++
+locale = "en"
++++
+
+@ public
+class Block {
+    let f16 scale
+    let list<int, 2> values
+}
+
+@ public
+fn read_blocks(tensor<Block, [2]> blocks, mut tensor<f32, [2]> out) → void {
+    for from blocks at [i] let b {
+        out[[i]] ← (b.scale ↦ f32) + (b.values[0] ↦ f32)
+    }
+}
+
+main {
+    let list<Block> rows ← [Block { scale = 1.5 ↦ f16, values = [3, 4] ↦ list<int, 2> }, Block { scale = 2.5 ↦ f16, values = [5, 6] ↦ list<int, 2> }]
+    mut tensor<Block, [2]> blocks ← rows ↦ tensor<Block, [2]>
+    mut tensor<f32, [2]> out ← tf32[2] {}
+    read_blocks(blocks, mut out)
+    print out[[0]]
+    print out[[1]]
+}
+"#,
+    )
+    .expect("write record-tensor fixture");
+
+    let (result, stdout) = run_single_file_under(&entry, DeviceSelection::Reference, Vec::new());
+    assert!(result.is_ok(), "reference run failed: {result:?}");
+    assert_eq!(stdout, vec!["4.5".to_owned(), "7.5".to_owned()]);
+}
