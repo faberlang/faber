@@ -1121,6 +1121,17 @@ otherwise. Equal bounds walk the ascending way (`5‥5` is empty, `5…5` is the
 single value `5`). The step never changes which endpoint a range includes:
 `…` includes its end only when the progression reaches it.
 
+A range value carries its step in its type: `range<T>` has step 1, and
+`range<T, S>` carries the compile-time constant `S > 0`, as in
+`let range<int, 2> evens ← 0…10 step 2`. A step in a value position must be a
+positive integer literal; a run-time step remains inline in `for range` and
+bracket windows and is rejected elsewhere (`intervallum_value_step_unsupported`).
+A stepped range takes integer bounds only; an `instans` bound takes no step
+(`intervallum_step_bound_not_integer`). The grammar admits a stepped range as
+a clamp target (`↦` or `coercere`), in `inter` and `union`, and in equality
+across different steps, but these are named rejections, never silent drops of
+the step.
+
 A range binder declared `varia` is a fresh per-iteration copy of the walk's
 counter. A write to it inside the body (`itera ab 0‥6 varia i { i ← i + 1 }`)
 changes only the body's copy and never steers the loop, so the example visits
