@@ -451,3 +451,104 @@ main args args {
         field("files").value
     );
 }
+
+// ── `faber check --lower` plans subcommand records without argumenta ───────
+//
+// A subcommand whose function takes no argument record must not be planned:
+// the global option fields would otherwise trip the `CLI argument records`
+// rejection for `version`, which has no args binding.
+
+#[test]
+fn check_mode_plans_subcommand_records_without_argumenta() {
+    let dir = crate::test_support::test_temp_dir("cli-check-mode-subcommand-records");
+    std::fs::write(
+        dir.join("main.fab"),
+        r#"
+@ cli "exemplum"
+@ option verbose short "v" long "verbose" type bool global description "Enable verbose output"
+main args args {
+}
+
+@ command "greet"
+@ operand string nomen description "Name to greet"
+fn greet() args args → void {
+  print "Salve, §!"(args.nomen)
+}
+
+@ command "version"
+fn version() → void {
+  print "exemplum v0.1.0"
+}
+"#,
+    )
+    .expect("write package file");
+    let mut package = crate::analyze::analyze_package(
+        &radix_module::driver::Config::default(),
+        &dir,
+        &crate::test_support::test_analysis_seams(),
+    )
+    .expect("analyze package");
+    let plan = super::plan_cli_package(&mut package, &[], CliPlanningMode::Check).unwrap_or_else(
+        |diagnostics| {
+            panic!(
+                "check planning must not require argumenta, got {:?}",
+                diagnostic_identities(&diagnostics)
+            )
+        },
+    );
+    assert!(plan.uses_cli_runtime);
+    assert!(
+        plan.dispatch.is_none(),
+        "check planning must not install a CLI dispatch entry"
+    );
+
+    let mut record_count = 0;
+    let mut verbose_records = 0;
+    let mut nomen_values = Vec::new();
+    for (path, records) in &plan.entry_records {
+        let unit = package
+            .nodes
+            .values()
+            .find(|node| &node.path == path)
+            .expect("entry record unit");
+        for fields in records.values() {
+            record_count += 1;
+            let field = |name: &str| {
+                fields
+                    .iter()
+                    .find(|field| unit.analysis.interner.resolve(field.name) == name)
+            };
+            if let Some(verbose) = field("verbose") {
+                assert!(
+                    matches!(
+                        &verbose.value,
+                        MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Bool(_)))
+                    ),
+                    "the global option fields carry a bool default, got {:?}",
+                    verbose.value
+                );
+                verbose_records += 1;
+            }
+            if let Some(nomen) = field("nomen") {
+                nomen_values.push(nomen);
+            }
+        }
+    }
+    assert_eq!(
+        record_count, 2,
+        "the entry root and `greet` plan records; `version` takes no record"
+    );
+    assert_eq!(
+        verbose_records, 2,
+        "both the entry root and `greet` carry the global option fields"
+    );
+    assert_eq!(nomen_values.len(), 1, "only `greet` declares `nomen`");
+    assert!(
+        matches!(
+            &nomen_values[0].value,
+            MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::String(_)))
+        ),
+        "a required text operand plans a typed placeholder, got {:?}",
+        nomen_values[0].value
+    );
+}
