@@ -179,6 +179,10 @@ pub struct Lowerer<'a> {
     /// Stack of function/block-local bindings visible only during lowering.
     local_scopes: Vec<FxHashMap<Symbol, radix_hir::DefId>>,
 
+    /// Explicit local value types needed by lowering shape-dependent
+    /// destructuring, keyed by the unique local definition identity.
+    local_types: FxHashMap<radix_hir::DefId, TypeId>,
+
     /// Current function's scalar/value parameter ordinals, used to keep
     /// runtime Figura references portable across file interfaces.
     parameter_ordinals: FxHashMap<radix_hir::DefId, u32>,
@@ -317,6 +321,7 @@ impl<'a> Lowerer<'a> {
             errors: Vec::new(),
             current_span: Span::default(),
             local_scopes: Vec::new(),
+            local_types: FxHashMap::default(),
             parameter_ordinals: FxHashMap::default(),
             figura_extent_admissible_locals: FxHashSet::default(),
             figura_extent_nesting: 0,
