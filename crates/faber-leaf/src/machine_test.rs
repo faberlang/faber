@@ -481,6 +481,137 @@ fn out_of_order_guard_rejects_older_generation() {
     assert_eq!(field(memory, "used_bytes"), &Reply::Int(333));
 }
 
+// WHY: a late read lands with no slot of its own, so its intervals must be
+// measured against the snapshot already in the slot; rendering against `None`
+// would report zero CPU even though the counters moved. The poll waits for the
+// late snapshot to become visible instead of sleeping a fixed time, so the
+// assertions never depend on scheduler timing.
+#[test]
+fn late_result_renders_intervals_against_previous_snapshot() {
+    let _guard = crate::test_support::handle_table_guard();
+    super::reset_previous();
+    super::store_if_newer(super::make_previous(
+        0,
+        super::Collected {
+            taken_at: std::time::Instant::now(),
+            cores: vec![
+                super::CoreTicks {
+                    name: "cpu0".to_owned(),
+                    busy_ns: 100,
+                    total_ns: 400,
+                },
+                super::CoreTicks {
+                    name: "cpu1".to_owned(),
+                    busy_ns: 50,
+                    total_ns: 200,
+                },
+            ],
+            used_bytes: 111,
+            total_bytes: 1000,
+            procs: vec![proc_ticks(7, 1000, 500), proc_ticks(8, 2000, 600)],
+        },
+        None,
+    ));
+
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    // WHY: `Receiver` is `Send` but not `Sync`, and the override is shared; the
+    // lock is only ever taken by the one read that blocks.
+    let release_rx = std::sync::Mutex::new(release_rx);
+    super::set_collect_override(Some(std::sync::Arc::new(move || {
+        release_rx
+            .lock()
+            .expect("release lock")
+            .recv()
+            .expect("release reader");
+        Ok(super::Collected {
+            taken_at: std::time::Instant::now(),
+            cores: vec![
+                super::CoreTicks {
+                    name: "cpu0".to_owned(),
+                    busy_ns: 160,
+                    total_ns: 500,
+                },
+                super::CoreTicks {
+                    name: "cpu1".to_owned(),
+                    busy_ns: 80,
+                    total_ns: 260,
+                },
+            ],
+            used_bytes: 222,
+            total_bytes: 1000,
+            procs: vec![
+                proc_ticks(7, 1400, 520),
+                proc_ticks(8, 2300, 610),
+                proc_ticks(9, 99, 70),
+            ],
+        })
+    })));
+
+    // The read times out while the override blocks, so no slot exists for it
+    // yet; the seeded snapshot is the only baseline it can difference against.
+    let timed_out = serve("machina:specimen", &[Arg::Int(1)])
+        .expect("route")
+        .expect("specimen");
+    release_tx.send(()).expect("release reader");
+
+    let mut late = None;
+    for _ in 0..200 {
+        let reply = serve("machina:specimen", &[Arg::Int(0)])
+            .expect("route")
+            .expect("specimen");
+        let Reply::Map(fields) = &reply else {
+            panic!("expected map, got {reply:?}");
+        };
+        let Reply::Map(memory) = field(fields, "memory") else {
+            panic!("expected memory map");
+        };
+        if field(memory, "used_bytes") == &Reply::Int(222) {
+            late = Some(reply);
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    // Clear the override before asserting so a panic cannot leak it.
+    super::set_collect_override(None);
+    let late = late.expect("late snapshot lands in the slot");
+
+    let Reply::Map(fields) = &timed_out else {
+        panic!("expected map, got {timed_out:?}");
+    };
+    assert_eq!(field(fields, "stale"), &Reply::Bool(true));
+    let Reply::Map(memory) = field(fields, "memory") else {
+        panic!("expected memory map");
+    };
+    assert_eq!(field(memory, "used_bytes"), &Reply::Int(111));
+
+    assert_eq!(
+        core_rows(&late),
+        vec![("cpu0".to_owned(), 60, 100), ("cpu1".to_owned(), 30, 60),]
+    );
+    assert_eq!(
+        proc_rows(&late),
+        vec![
+            (7, "proc7".to_owned(), 400, 520),
+            (8, "proc8".to_owned(), 300, 610),
+            (9, "proc9".to_owned(), 0, 70),
+        ]
+    );
+
+    // A straggler that is not newer than the stored one is still rejected, so
+    // rendering against the baseline does not loosen the generation ordering.
+    super::store_late(1, super::collected_for_test(333));
+    let reply = serve("machina:specimen", &[Arg::Int(0)])
+        .expect("route")
+        .expect("specimen");
+    let Reply::Map(fields) = &reply else {
+        panic!("expected map, got {reply:?}");
+    };
+    let Reply::Map(memory) = field(fields, "memory") else {
+        panic!("expected memory map");
+    };
+    assert_eq!(field(memory, "used_bytes"), &Reply::Int(222));
+}
+
 // WHY: the final assertion is timing-independent on correct code --
 // `store_if_newer` can only ever leave 222 in the slot, because the timeout
 // watcher's generation (1) is behind the stored one (2). The bounded wait
