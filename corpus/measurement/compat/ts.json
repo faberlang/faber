@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 496,
-    "analyzable": 496
+    "capable": 509,
+    "analyzable": 509
   },
   "terms": [
     {
@@ -72,14 +72,14 @@
     {
       "term": "ad",
       "rule": "keyword",
-      "capable": 5,
-      "analyzable": 5
+      "capable": 6,
+      "analyzable": 6
     },
     {
       "term": "adfirma",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "alias",
@@ -426,8 +426,8 @@
     {
       "term": "importa",
       "rule": "keyword",
-      "capable": 10,
-      "analyzable": 10
+      "capable": 11,
+      "analyzable": 11
     },
     {
       "term": "in",
@@ -498,8 +498,8 @@
     {
       "term": "matrix",
       "rule": "type",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 6,
+      "analyzable": 6
     },
     {
       "term": "metior",
@@ -576,8 +576,8 @@
     {
       "term": "numerus",
       "rule": "keyword",
-      "capable": 9,
-      "analyzable": 9
+      "capable": 10,
+      "analyzable": 10
     },
     {
       "term": "numquam",
@@ -954,8 +954,8 @@
     {
       "term": "vector",
       "rule": "type",
-      "capable": 14,
-      "analyzable": 14
+      "capable": 16,
+      "analyzable": 16
     },
     {
       "term": "vel",
@@ -1050,8 +1050,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 37,
-      "analyzable": 37
+      "capable": 41,
+      "analyzable": 41
     },
     {
       "term": "⇇",
@@ -1068,6 +1068,12 @@
     {
       "term": "⇒",
       "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "⇜",
+      "rule": "operator",
       "capable": 1,
       "analyzable": 1
     },

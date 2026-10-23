@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 492 | 496 | 99% |
-| go | 452 | 496 | 91% |
-| ts | 496 | 496 | 100% |
-| faber | 496 | 496 | 100% |
+| rust | 505 | 509 | 99% |
+| go | 458 | 509 | 90% |
+| ts | 509 | 509 | 100% |
+| faber | 509 | 509 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 436 | 500 | 87% |
-| wasm-text | 373 | 500 | 75% |
-| wasm | 373 | 500 | 75% |
-| metal-text | 5 | 500 | 1% |
-| wgsl-text | 5 | 500 | 1% |
-| sexp-struct | 452 | 500 | 90% |
-| sexp | 450 | 500 | 90% |
-| runner | 443 | 500 | 89% |
+| llvm-text | 438 | 511 | 86% |
+| wasm-text | 376 | 511 | 74% |
+| wasm | 375 | 511 | 73% |
+| metal-text | 5 | 511 | 1% |
+| wgsl-text | 5 | 511 | 1% |
+| sexp-struct | 461 | 511 | 90% |
+| sexp | 459 | 511 | 90% |
+| runner | 453 | 511 | 89% |
 
 ## Keywords — application lane
 
@@ -236,7 +236,7 @@ pages of the documentation site.
 |---|---|---|---|---|---|---|---|---|
 | <a id="ab"></a>`ab` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ad"></a>`ad` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
-| <a id="adfirma"></a>`adfirma` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="adfirma"></a>`adfirma` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="ante"></a>`ante` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="argumenta"></a>`argumenta` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="bivalens"></a>`bivalens` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -272,7 +272,7 @@ pages of the documentation site.
 | <a id="fragilis"></a>`fragilis` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="functio"></a>`functio` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="futurum"></a>`futurum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="genus"></a>`genus` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="genus"></a>`genus` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="iace"></a>`iace` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ignotum"></a>`ignotum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="immutata"></a>`immutata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
