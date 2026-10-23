@@ -1014,12 +1014,10 @@ impl Lowerer<'_> {
             let reply = self.lower_generic_type_arg(reply);
             // Authored-form capture: the conversation word names the builtin
             // definition. Finalize erases `sermo<O, R>` to the bare carrier
-            // (D6.11), so the witness carries no applied arguments and the
-            // authored head must not keep the child forms lowering produced
-            // for the two type arguments.
+            // (D6.11), but the authored form retains the lowered argument
+            // forms for fidelity during re-emission.
             if let Some(frame) = self.form_frames.last_mut() {
                 frame.named = Some((def_id, vec![name.name]));
-                frame.args.clear();
             }
             return Some(crate::builtins::frame_types::sermo_typed_type_id(
                 self.types, def_id, opener, reply,
