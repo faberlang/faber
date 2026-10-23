@@ -4300,6 +4300,15 @@ impl FunctionBuilder<'_> {
                 expr.span,
             ));
         }
+        // `tensor<E, [N]> ↦ vector<E, N>`: the tensor flattens to its element
+        // lista and lane `k` reads slot `k`. A tensor source is not a literal,
+        // so it never reaches the `lista` literal arm below.
+        if recovery.is_none()
+            && matches!(self.normalized_type(target), Type::Vector(_, _))
+            && matches!(self.normalized_type(source_type_id), Type::Tensor(_, _))
+        {
+            return self.lower_tensor_to_vector_conversio(source, target, ty, expr.span);
+        }
         if recovery.is_none()
             && matches!(self.normalized_type(target), Type::Vector(_, _))
             && let HirExpressionKind::Array(elements) = &source.kind
@@ -4763,6 +4772,48 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         let flat = self.lower_expr_value(source)?;
         self.lower_tensor_from_flat_conversio(flat, target, return_ty, span)
+    }
+
+    /// `tensor<E, [N]> ↦ vector<E, N>`: flatten the tensor to its element
+    /// lista, then build lane `k` from slot `k` of that lista in order.
+    fn lower_tensor_to_vector_conversio(
+        &mut self,
+        source: &HirExpression,
+        target: TypeId,
+        return_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let Type::Vector(element, width) = self.normalized_type(target).clone() else {
+            return None;
+        };
+        let Some(lanes) = radix_semantic::literal_vector_width(width, self.types) else {
+            self.errors
+                .push(MirError::unsupported(span, "vector width before MIR lowering"));
+            return None;
+        };
+        let Some(flat_ty) = self.types.find_array(element) else {
+            self.errors
+                .push(MirError::unsupported(span, "vector element lista type before MIR lowering"));
+            return None;
+        };
+        let flat_ty = MirType::semantic(flat_ty);
+        let tensor = self.lower_expr_value(source)?;
+        let flat = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorFlatten),
+            vec![tensor],
+            flat_ty,
+            span,
+        );
+        let flat = self.value_base_place(flat, flat_ty, span)?;
+        let fields = (0..lanes)
+            .map(|lane| {
+                MirAggregateItem::Operand(projected_operand(
+                    &flat,
+                    MirProjection::Index(MirOperand::Constant(MirConstant::Int(i64::from(lane)))),
+                ))
+            })
+            .collect();
+        Some(self.construct_temp(MirAggregateKind::Vector, MirAggregateFields::Ordered(fields), return_ty, span))
     }
 
     /// The fill element of a Route C padded snapshot, or `None` when the
