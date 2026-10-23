@@ -43,7 +43,7 @@ functio multiplica(tf32[2] a, tf32[2] b) → tf32[2] {
         assert!(
             output
                 .code
-                .contains("define { ptr, ptr } @multiplica_backward(ptr %l0, ptr %l1, ptr %l3)"),
+                .contains("define internal { ptr, ptr } @multiplica_backward(ptr %l0, ptr %l1, ptr %l3)"),
             "backward companion should have the expected LLVM signature:\n{}",
             output.code,
         );
