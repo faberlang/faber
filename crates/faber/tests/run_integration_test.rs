@@ -2901,3 +2901,55 @@ fn run_kernel_package_default_route_and_cpu_device_by_flag_manifest_and_with_sta
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "auto", path]);
     assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
 }
+
+/// The corpus-product device tensor fragments must print on the reference route
+/// exactly what their hand-computed `main.ref.json` reference says.
+fn assert_reference_route_matches_reference_fixture(package: &str) {
+    let dir = repo_root()
+        .join("corpus-product/tensor-fragment")
+        .join(package);
+    let path = dir.display().to_string();
+    let (stdout, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
+    assert!(ok, "{package}: reference run failed:\n{stderr}");
+    let fixture_text =
+        fs::read_to_string(dir.join("src").join("main.ref.json")).expect("read main.ref.json");
+    let fixture: serde_json::Value =
+        serde_json::from_str(&fixture_text).expect("parse main.ref.json");
+    let tolerance = fixture["tolerance"].as_f64().expect("tolerance");
+    let want: Vec<f64> = fixture["reference"]
+        .as_array()
+        .expect("reference array")
+        .iter()
+        .map(|value| value.as_f64().expect("reference number"))
+        .collect();
+    let got: Vec<f64> = stdout
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            line.parse::<f64>()
+                .unwrap_or_else(|_| panic!("{package}: printed line {line:?} is not a number"))
+        })
+        .collect();
+    assert_eq!(
+        got.len(),
+        want.len(),
+        "{package}: printed {got:?}, reference {want:?}\n{stdout}"
+    );
+    for (index, (got, want)) in got.iter().zip(&want).enumerate() {
+        assert!(
+            (got - want).abs() <= tolerance,
+            "{package}: element {index}: reference route {got} vs main.ref.json {want}"
+        );
+    }
+}
+
+#[test]
+fn tiny_linear_device_reference_route_prints_the_reference_fixture() {
+    assert_reference_route_matches_reference_fixture("tiny-linear-device");
+}
+
+#[test]
+fn tiny_linear_device_relu_reference_route_prints_the_reference_fixture() {
+    assert_reference_route_matches_reference_fixture("tiny-linear-device-relu");
+}
