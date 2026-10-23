@@ -621,10 +621,13 @@ impl Validator<'_, '_> {
                 };
                 let struct_layout = match crate::resolve_struct_layout(base_ty, self.context) {
                     Ok(layout) => layout,
-                    Err(refusal) => {
-                        self.error(span, refusal.reason());
-                        return;
-                    }
+                    // A refusal (`text field`, `f64 field`, `nested genus
+                    // field`, …) is the device layout law declining the
+                    // struct, not an ordinary-execution defect. The device
+                    // gate surfaces it by name when a kernel actually
+                    // receives the genus (C4-6b); a plain field read is
+                    // admitted without the byte facts.
+                    Err(_) => return,
                 };
                 let Some(field) = struct_layout
                     .fields
