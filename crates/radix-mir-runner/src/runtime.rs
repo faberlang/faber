@@ -1990,15 +1990,30 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "tensor shape arity"));
         };
-        let tensor = self.tensor_arg(receiver, span)?;
-        let shape = tensor
-            .borrow()
-            .shape
-            .iter()
-            .copied()
-            .map(Value::Int)
-            .collect();
-        Ok(array_value(shape))
+        match self.eval_operand(receiver, span)? {
+            Value::Tensor(cell) => {
+                let shape = cell
+                    .borrow()
+                    .shape
+                    .iter()
+                    .copied()
+                    .map(Value::Int)
+                    .collect();
+                Ok(array_value(shape))
+            }
+            Value::Matrix(matrix) => {
+                let borrow = matrix.borrow();
+                let shape = vec![
+                    Value::Int(i64::from(borrow.rows)),
+                    Value::Int(i64::from(borrow.columns)),
+                ];
+                Ok(array_value(shape))
+            }
+            other => Err(RunnerError::internal(
+                span,
+                format!("tensor receiver type mismatch: {other:?}"),
+            )),
+        }
     }
 
     fn tensor_reshape(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {

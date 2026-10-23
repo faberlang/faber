@@ -50,6 +50,23 @@ fn matrix_bracket_access_reads_writes_get_and_at() {
 }
 
 #[test]
+fn matrix_computed_coordinate_methods_read_write_and_fall_back() {
+    let body = format!(
+        "{GRID}\n\
+         sit numerus r ← 1\n\
+         sit f32 read ← grid.apud([r, 0]) ⊥ 0.0\n\
+         grid.ponde([r, 1], 8.5)\n\
+         sit f32 written ← grid.apud([r, r]) ⊥ 0.0\n\
+         sit numerus far ← 5\n\
+         sit f32 miss ← grid.apud([far, 0]) ⊥ 0.0\n\
+         nota read\n\
+         nota written\n\
+         nota miss"
+    );
+    assert_eq!(ok(&body), ["3.0", "8.5", "0.0"]);
+}
+
+#[test]
 fn matrix_bracket_read_with_computed_out_of_range_coordinate_traps() {
     let session = session();
     let source = wrap(&format!("{GRID}\nsit numerus far ← 5\nnota grid[[far, 0]]"));
