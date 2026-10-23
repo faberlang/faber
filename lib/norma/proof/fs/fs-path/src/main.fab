@@ -1,0 +1,48 @@
++++
+locale = "en"
++++
+
+# fs path routes: parent (solum:parens), file_name (solum:nomen),
+# extension (solum:suffixum), resolve (solum:absolve) and home (solum:domus).
+#
+# The proof builds a directory under the canonical temp dir, so every path
+# below is already canonical and resolves to itself.
+import from "norma:fs" fs
+import from "norma:process" process
+
+main {
+    let string dir ← fs.join([fs.temp_dir(), "norma-fs-path-§"(process.pid())])
+    fs.create_dir(dir)
+
+    let string note ← fs.join([dir, "notes.txt"])
+    fs.write_file(note, "x")
+
+    # solum:parens, solum:nomen, solum:suffixum: the three nominal
+    # projections about a path string.
+    assert fs.parent(note) ≡ dir
+    assert fs.file_name(note) ≡ "notes.txt"
+    assert fs.extension(note) ≡ ".txt"
+
+    # A name without an extension gives the empty string.
+    assert fs.extension(fs.join([dir, "noext"])) ≡ ""
+
+    # solum:absolve: an existing path resolves to its own canonical absolute
+    # path.
+    assert fs.resolve(note) ≡ note
+
+    # solum:absolve: a path that does not exist is joined onto the working
+    # directory, not rejected.
+    let string rel ← "norma-fs-path-rel-§"(process.pid())
+    let string abs ← fs.resolve(rel)
+    assert abs.starts_with("/")
+    assert abs.ends_with(rel)
+
+    # solum:domus: $HOME when set, "/" when unset.
+    let string ∪ none home_env ← process.read_env("HOME")
+    assert fs.home() ≡ (home_env coalesce "/")
+
+    fs.delete(note)
+    fs.remove_tree(dir)
+
+    print "norma/fs/fs-path ok"
+}
