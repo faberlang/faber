@@ -1,7 +1,7 @@
 //! FHIR artifact validation and round-trip preservation at the analyzed-module boundary.
 
 use super::*;
-use crate::driver::AnalyzeRequest;
+use crate::driver::{AnalyzeRequest, AnalyzedModule};
 use radix_hir_fhir::HirArtifact;
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -469,9 +469,8 @@ fn selective_import_rust_emit_is_identical_after_load() {
     );
 }
 
-/// Analyze `source`, serialize it to FHIR, and return the load result.
-/// Shared by the `dangling_defid_repro_*` pins of UNIT 21398a30-5.1.
-fn load_error_for(source: &str) -> Result<(), HirArtifactError> {
+/// Analyze `source`, serialize it to FHIR, and return the loaded unit.
+fn load_unit_for(source: &str) -> Result<AnalyzedModule, HirArtifactError> {
     use crate::codegen::Target;
     use crate::driver::{Config, Session, analyze_source};
     use crate::hir::serialize::from_analyzed;
@@ -481,19 +480,15 @@ fn load_error_for(source: &str) -> Result<(), HirArtifactError> {
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
-    let original = analyze_source(&session, "dangling-defid.fab", source, AnalyzeRequest::default())
-        .expect("dangling-defid fixture analyzes");
-    let artifact = from_analyzed(&original, "dangling-defid", "dangling-defid.fab");
-    let bytes = postcard::to_allocvec(&artifact).expect("serialize dangling-defid artifact");
-    load_fhir(&bytes).map(|_| ())
+    let original = analyze_source(&session, "comptime-fold.fab", source, AnalyzeRequest::default())
+        .expect("comptime-fold fixture analyzes");
+    let artifact = from_analyzed(&original, "comptime-fold", "comptime-fold.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize comptime-fold artifact");
+    load_fhir(&bytes)
 }
 
 #[test]
-fn dangling_defid_repro_comptime_module_local() {
-    // A referenced local binding inside a *module-level* constant initializer
-    // (`const int N = comptime { const int t = 3; return t }`) is the smallest
-    // source that yields `DanglingIndex { kind: "DefId" }`. Printed once:
-    // index 1000000, arena size 1.
+fn comptime_module_constant_survives_the_fhir_round_trip() {
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "const int N = comptime {\n",
@@ -501,19 +496,24 @@ fn dangling_defid_repro_comptime_module_local() {
         "    return t\n",
         "}\n",
     );
-    let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
-    );
+    let loaded = load_unit_for(source).expect("module comptime constant artifact loads");
+    let constant = loaded
+        .hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            radix_hir::HirItemKind::Constant(konst) if loaded.interner.resolve(konst.name) == "N" => Some(konst),
+            _ => None,
+        })
+        .expect("module constant is present after loading");
+    assert!(matches!(
+        &constant.value.kind,
+        radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::Int(3))
+    ));
 }
 
 #[test]
-fn dangling_defid_repro_comptime_block_local() {
-    // The same referenced local inside a *block-level* constant initializer
-    // (`const int x = comptime { … }` in `main`) also yields
-    // `DanglingIndex { kind: "DefId" }`. Printed once: index 1000001,
-    // arena size 1.
+fn comptime_block_constant_survives_the_fhir_round_trip() {
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "main {\n",
@@ -524,19 +524,11 @@ fn dangling_defid_repro_comptime_block_local() {
         "    print x\n",
         "}\n",
     );
-    let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
-    );
+    load_unit_for(source).expect("block comptime constant artifact loads");
 }
 
 #[test]
-fn dangling_defid_repro_comptime_class_static_local() {
-    // A class `const` member initialized by `comptime` with a referenced
-    // local (`const int X = comptime { const int t = 3; return t }`) read as
-    // `Tab.X` from `main` also yields `DanglingIndex { kind: "DefId" }`.
-    // Printed once: index 1000000, arena size 2.
+fn comptime_class_constant_survives_the_fhir_round_trip() {
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
         "class Tab {\n",
@@ -549,11 +541,25 @@ fn dangling_defid_repro_comptime_class_static_local() {
         "    print Tab.X\n",
         "}\n",
     );
-    let result = load_error_for(source);
-    assert!(
-        matches!(result, Err(HirArtifactError::DanglingIndex { kind: "DefId", .. })),
-        "expected dangling DefId, got {result:?}"
-    );
+    let loaded = load_unit_for(source).expect("class comptime constant artifact loads");
+    let strukt = loaded
+        .hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            radix_hir::HirItemKind::Struct(strukt) if loaded.interner.resolve(strukt.name) == "Tab" => Some(strukt),
+            _ => None,
+        })
+        .expect("class is present after loading");
+    let field = strukt
+        .fields
+        .iter()
+        .find(|field| loaded.interner.resolve(field.name) == "X")
+        .expect("class constant is present after loading");
+    assert!(matches!(
+        field.init.as_ref().map(|init| &init.kind),
+        Some(radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::Int(3)))
+    ));
 }
 
 #[test]

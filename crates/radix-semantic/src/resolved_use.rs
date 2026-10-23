@@ -147,6 +147,17 @@ impl ResolvedUseIndex {
         self.uses.clone()
     }
 
+    /// Drop the uses a caller's rewrite orphaned, rebuilding both lookup maps.
+    pub fn retain(&mut self, mut keep: impl FnMut(&ResolvedUse) -> bool) {
+        let kept: Vec<ResolvedUse> = self
+            .uses
+            .iter()
+            .filter(|use_| keep(use_))
+            .cloned()
+            .collect();
+        *self = ResolvedUseIndex::from_snapshot(kept);
+    }
+
     fn push(&mut self, use_site: ResolvedUse) {
         self.push_with_local(None, use_site);
     }
