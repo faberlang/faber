@@ -110,6 +110,21 @@ fn set(receiver: Value, coordinates: &[i64], value: Value) -> Result<Value, Runn
     )
 }
 
+fn shape(receiver: Value) -> Result<Value, RunnerError> {
+    eval_call(MirCollectionOp::TensorShape, vec![receiver], |types| {
+        let numerus = types.primitive(Primitive::Numerus);
+        types.ensure_array(numerus)
+    })
+}
+
+#[test]
+fn matrix_shape_answers_rows_then_columns() {
+    let Value::Array(cells) = shape(matrix([1.0, 2.0, 3.0, 4.0])).unwrap() else {
+        panic!("matrix shape is not an array");
+    };
+    assert_eq!(*cells.borrow(), vec![Value::Int(2), Value::Int(2)]);
+}
+
 #[test]
 fn matrix_read_is_row_major_cell() {
     let value = matrix([1.0, 2.0, 3.0, 4.0]);

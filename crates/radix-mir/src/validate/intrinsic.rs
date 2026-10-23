@@ -1905,9 +1905,12 @@ impl Validator<'_, '_> {
                 };
                 if !matches!(
                     self.type_kind(receiver_ty),
-                    Type::Tensor(_, _) | Type::Sparsa(_, _)
+                    Type::Tensor(_, _) | Type::Matrix(_, _) | Type::Sparsa(_, _)
                 ) {
-                    self.error(span, "tensor shape receiver is not tensor or sparsa");
+                    self.error(
+                        span,
+                        "tensor shape receiver is not tensor, matrix or sparsa",
+                    );
                 }
                 // A tensor of static rank yields the bounded `lista<numerus, R>`;
                 // one without a static rank yields the unbounded list.
