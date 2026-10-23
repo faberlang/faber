@@ -1,0 +1,19 @@
+version = 1
+id = "corpus/adfirma/adfirma-abort.fab"
+group = "language"
+input_root = "corpus"
+input = "adfirma/adfirma-abort.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit_nonzero = true
+stdout_contains = "before\n"
+stderr_contains = "abort: values differ"
+check_only = false
