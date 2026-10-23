@@ -4,8 +4,8 @@ use super::plan::{
     GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MATMUL_SHARED_A_BUFFER_NAME,
     MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulShapes, MatMulSharedMemory,
     OobPaddingPolicy, REDUCTION_SHARED_BUFFER_NAME, ReduceOp, ReductionPlan, RmsNormalizationPlan,
-    RopePlan, RowOpDims, RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout,
-    SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
+    RopePlan, RowOpClass, RowOpDims, RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan,
+    SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
 };
 use super::validate::{
     PlanValidationError, validate_axis_reduction_plan, validate_batched_attention_plan,
@@ -495,6 +495,33 @@ impl CollectionKernelPlan {
                 }))
             }
             MirCollectionOp::TensorSoftmax | MirCollectionOp::TensorLayerNorm => {
+                if let Some((typed_dims, axis)) =
+                    transformer_recipe_shape_typed(function, validation, op)
+                        .filter(|(dims, _)| dims.iter().any(|dim| matches!(dim, Dim::Runtime)))
+                {
+                    // Runtime row-softmax currently has no batched recipe
+                    // facts: rank-3/4 is intentionally left to the caller's
+                    // typed diagnostic until that body is supported.
+                    if op == MirCollectionOp::TensorSoftmax && typed_dims.len() > 2 {
+                        return None;
+                    }
+                    let dims = runtime_rowop_dims(signature, function, op)?;
+                    return Some(if op == MirCollectionOp::TensorSoftmax {
+                        CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+                            dims,
+                            axis,
+                            batched: None,
+                        })
+                    } else {
+                        let epsilon_bits =
+                            layer_norm_const_facts(function, validation, &typed_dims, axis)?;
+                        CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
+                            dims,
+                            axis,
+                            epsilon_bits,
+                        })
+                    });
+                }
                 let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
                 let count = dims_product(&dims)?;
                 if !signature_matches_transformer_counts(signature, count, count) {
@@ -567,6 +594,17 @@ impl CollectionKernelPlan {
                 }))
             }
             MirCollectionOp::TensorCausalMaskedSoftmax => {
+                if let Some((typed_dims, _axis)) =
+                    transformer_recipe_shape_typed(function, validation, op)
+                        .filter(|(dims, _)| dims.iter().any(|dim| matches!(dim, Dim::Runtime)))
+                {
+                    let dims = runtime_rowop_dims(signature, function, op)?;
+                    let rows = literal_dim_or_zero(typed_dims.first().copied()?);
+                    let cols = literal_dim_or_zero(typed_dims.get(1).copied()?);
+                    return Some(CollectionKernelPlan::CausalMaskedSoftmax(
+                        CausalMaskedSoftmaxPlan { dims, rows, cols },
+                    ));
+                }
                 // GI3-1: the causal masked-row softmax recipe resolves the
                 // rank-2 causal score matrix dims (row = query extent, col =
                 // key extent) and keeps the same shape end to end.
@@ -634,8 +672,22 @@ impl CollectionKernelPlan {
             // [`CollectionKernelPlan::from_transformer_op`]; the static
             // validators pin the positive-dimension floors.
             CollectionKernelPlan::Gather(plan) => validate_gather_plan(plan),
+            CollectionKernelPlan::RmsNormalization(plan)
+                if matches!(plan.dims, RowOpDims::Runtime { .. }) =>
+            {
+                // Runtime row extents have no static positive-width fact;
+                // the call-site launch re-checks the bound axes and floor.
+                Ok(())
+            }
             CollectionKernelPlan::RmsNormalization(plan) => validate_rms_normalization_plan(plan),
             CollectionKernelPlan::Rope(plan) => validate_rope_plan(plan),
+            CollectionKernelPlan::CausalMaskedSoftmax(plan)
+                if matches!(plan.dims, RowOpDims::Runtime { .. }) =>
+            {
+                // Runtime row/column extents are launch facts, not static
+                // plan dimensions; the literal plan keeps its positive floor.
+                Ok(())
+            }
             CollectionKernelPlan::CausalMaskedSoftmax(plan) => {
                 validate_causal_masked_softmax_plan(plan)
             }
@@ -749,12 +801,83 @@ fn rope_plan(
     }))
 }
 
+fn rms_norm_runtime_const_facts(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    dims: &[Dim],
+    axis: u64,
+) -> Option<(u32, Dim, MirLocalId, Dim)> {
+    let args = transformer_statement_args(function, MirCollectionOp::TensorRmsNorm)?;
+    if args.len() != 4 {
+        return None;
+    }
+    let epsilon_bits = match literal_const_operand(function, &args[2]) {
+        Some(MirConstant::Float(epsilon)) => {
+            #[allow(clippy::cast_possible_truncation)]
+            let epsilon = epsilon as f32;
+            if !epsilon.is_finite() || epsilon <= 0.0 {
+                return None;
+            }
+            epsilon.to_bits()
+        }
+        Some(_) => return None,
+        None => {
+            let epsilon_local = crate::read_analysis::operand_local(&args[2])?;
+            let epsilon_ty = crate::local_ty::local_ty(function, epsilon_local)?;
+            if !validation
+                .layouts
+                .layout_for_type(epsilon_ty)
+                .ok()
+                .is_some_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
+            {
+                return None;
+            }
+            0
+        }
+    };
+    let norm_dim = *dims.get(usize::try_from(axis).ok()?)?;
+    let gamma_ty = crate::local_ty::operand_local_ty(function, &args[3])?;
+    let gamma_dims = crate::tensor_type::tensor_dims(gamma_ty, validation).ok()?;
+    if gamma_dims.len() != 1 || !affine_extent_agrees(gamma_dims[0], norm_dim) {
+        return None;
+    }
+    let gamma_local = crate::read_analysis::operand_local(&args[3])?;
+    Some((epsilon_bits, norm_dim, gamma_local, gamma_dims[0]))
+}
+
 fn rms_norm_plan(
     signature: &MirKernelSignature,
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
     op: MirCollectionOp,
 ) -> Option<CollectionKernelPlan> {
+    if let Some((dims, axis)) = transformer_recipe_shape_typed(function, validation, op)
+        .filter(|(dims, _)| dims.iter().any(|dim| matches!(dim, Dim::Runtime)))
+    {
+        let row_dims = runtime_rowop_dims(signature, function, op)?;
+        let (epsilon_bits, width_dim, gamma_local, gamma_dim) =
+            rms_norm_runtime_const_facts(function, validation, &dims, axis)?;
+        let gamma_resource = signature.extra_inputs.iter().find(|resource| {
+            resource.source_local == Some(gamma_local)
+                && match gamma_dim {
+                    Dim::Literal(width) => resource.element_count == width,
+                    Dim::Runtime => resource.is_runtime_shaped(),
+                }
+        })?;
+        if gamma_resource.role != MirKernelResourceRole::Input
+            || gamma_resource.access != MirKernelResourceAccess::Read
+        {
+            return None;
+        }
+        return Some(CollectionKernelPlan::RmsNormalization(
+            RmsNormalizationPlan {
+                dims: row_dims,
+                axis,
+                epsilon_bits,
+                width: literal_dim_or_zero(width_dim),
+            },
+        ));
+    }
     // GI3-1: the RMSNorm recipe resolves the typed facts like the
     // S6-P1 transformer recipes — dims from the operand tensor,
     // axis from the trailing const operand (must be the last
@@ -1072,6 +1195,58 @@ fn signature_matches_transformer_counts(
     output_count: u64,
 ) -> bool {
     signature.input.element_count == input_count && signature.output.element_count == output_count
+}
+
+/// Resolve the run-time row-op class only after the typed shape and resource
+/// signatures agree that both ends are launch-shaped. A row-mapped body is
+/// admitted only when the recipe writes the signature's whole output local
+/// and that result is returned without an intervening consumer.
+fn runtime_rowop_dims(
+    signature: &MirKernelSignature,
+    function: &MirFunction,
+    op: MirCollectionOp,
+) -> Option<RowOpDims> {
+    if !signature.input.is_runtime_shaped() || !signature.output.is_runtime_shaped() {
+        return None;
+    }
+    let operand = transformer_statement_args(function, op)?.first()?;
+    if matches!(operand, MirOperand::Temp(_))
+        || matches!(operand, MirOperand::Place(place) if matches!(place.base, MirPlaceBase::Temp(_)))
+    {
+        // The runtime row bodies consume a raw operand buffer, not an
+        // elementwise-produced temporary; retain the caller's typed issue.
+        return None;
+    }
+    let destination = function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find(|statement| crate::collection_ops::statement_collection_op(statement) == Some(op))
+        .and_then(crate::read_analysis::statement_destination_place);
+    let row_mapped = signature.output.source_local.is_some_and(|output_local| {
+        destination.as_ref().is_some_and(|destination| {
+            destination.projections.is_empty()
+                && destination.base == MirPlaceBase::Local(output_local)
+                && crate::result_use::result_only_returned(function, destination)
+        })
+    });
+    Some(RowOpDims::Runtime {
+        class: if row_mapped {
+            RowOpClass::RowMapped
+        } else {
+            RowOpClass::Generic1D
+        },
+    })
+}
+
+/// `RowOpDims::Runtime` makes the legacy scalar row/width fields dormant;
+/// zero records that the corresponding literal extent is unavailable rather
+/// than fabricating a launch-time value.
+fn literal_dim_or_zero(dim: Dim) -> u64 {
+    match dim {
+        Dim::Literal(value) => value,
+        Dim::Runtime => 0,
+    }
 }
 
 /// U2 head-axis: resolve the batched row-softmax facts from the softmax

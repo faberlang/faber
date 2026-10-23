@@ -5,16 +5,16 @@ use super::*;
 use crate::abi::{
     CollectionOpContract, MatMulDispatch, MirKernelDispatchSize, MirKernelResource,
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
-    MirWorkgroupSize, ReducedProjection,
+    MirWorkgroupSize, RUNTIME_SHAPED_ELEMENT_COUNT, ReducedProjection,
 };
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
-    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
-    MirValidationContext,
+    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator,
+    MirTerminatorKind, MirType, MirValidationContext,
 };
 use radix_lexer::Span;
-use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
+use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeTable};
 
 use crate::tensor_type::Dim;
 
@@ -42,6 +42,32 @@ fn rank1_tensor_ty(types: &mut TypeTable, count: u64) -> MirType {
     let f32_ty = f32_ty(types);
     let len = types.intern_index(IndexExpr::Literal(count));
     MirType::semantic(types.intern(Type::Tensor(f32_ty.semantic_id(), len)))
+}
+
+/// A generic rank-2 tensor whose axes are runtime function-parameter extents.
+fn runtime_rank2_tensor_ty(types: &mut TypeTable, parameter: u32) -> MirType {
+    let element = f32_ty(types);
+    let dims = (0..2)
+        .map(|axis| {
+            types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+                parameter,
+                axis,
+            }))
+        })
+        .collect();
+    let shape = types.intern_index(IndexExpr::Tuple(dims));
+    MirType::semantic(types.intern(Type::Tensor(element.semantic_id(), shape)))
+}
+
+/// A generic rank-1 affine tensor, with the extent supplied by its parameter.
+fn runtime_rank1_tensor_ty(types: &mut TypeTable, parameter: u32) -> MirType {
+    let element = f32_ty(types);
+    let extent = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+        parameter,
+        axis: 0,
+    }));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![extent]));
+    MirType::semantic(types.intern(Type::Tensor(element.semantic_id(), shape)))
 }
 
 /// A post-contract reduction signature: workgroup `(ws, 1, 1)`, dispatch
@@ -1532,6 +1558,66 @@ fn transformer_function(
     }
 }
 
+/// Runtime-extent counterpart to [`transformer_function`], with generic
+/// function-parameter axes on the rank-2 operand.
+fn runtime_transformer_function(
+    types: &mut TypeTable,
+    op: MirCollectionOp,
+    const_args: Vec<MirOperand>,
+) -> MirFunction {
+    let r2 = runtime_rank2_tensor_ty(types, 0);
+    let span = test_span();
+    let mut args = vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))];
+    args.extend(const_args);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mode: MirParamMode::Owned,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: r2,
+            mutable: false,
+            span,
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(op),
+                        args,
+                        return_ty: r2,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(1),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: r2,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
 /// A generic-1D transformer signature: workgroup `(1,1,1)`, dispatch
 /// `(output_count, 1, 1)`, input/output at the flattened counts — the shape
 /// the ABI produces for kernels without a collection-op contract.
@@ -1576,6 +1662,274 @@ fn transformer_signature(input_count: u64, output_count: u64) -> MirKernelSignat
             z: 1,
         },
     }
+}
+
+/// A runtime-shaped row-op signature; the output's source local names the
+/// statement destination for the RowMapped eligibility proof.
+fn runtime_transformer_signature() -> MirKernelSignature {
+    let mut signature =
+        transformer_signature(RUNTIME_SHAPED_ELEMENT_COUNT, RUNTIME_SHAPED_ELEMENT_COUNT);
+    signature.output.source_local = Some(MirLocalId(1));
+    signature
+}
+
+#[test]
+fn rowop_runtime_extents_resolve_runtime_plans() {
+    let mut types = TypeTable::new();
+    let mut plain_softmax =
+        runtime_transformer_function(&mut types, MirCollectionOp::TensorSoftmax, vec![]);
+    plain_softmax.blocks[0].terminator.kind = MirTerminatorKind::Return(None);
+    let returned_softmax =
+        runtime_transformer_function(&mut types, MirCollectionOp::TensorSoftmax, vec![]);
+    let layer_norm = runtime_transformer_function(
+        &mut types,
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+        ],
+    );
+    let causal = runtime_transformer_function(
+        &mut types,
+        MirCollectionOp::TensorCausalMaskedSoftmax,
+        vec![],
+    );
+    let mut signature = runtime_transformer_signature();
+    signature.output.source_local = None;
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &plain_softmax,
+        &validation,
+        MirCollectionOp::TensorSoftmax,
+    )
+    .expect("runtime softmax resolves");
+    assert!(
+        matches!(
+            plan,
+            CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+                dims: RowOpDims::Runtime {
+                    class: RowOpClass::Generic1D
+                },
+                batched: None,
+                ..
+            })
+        ),
+        "unexpected plain softmax plan: {plan:?}"
+    );
+
+    let returned_signature = runtime_transformer_signature();
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &returned_signature,
+        &returned_softmax,
+        &validation,
+        MirCollectionOp::TensorSoftmax,
+    )
+    .expect("returned runtime softmax resolves");
+    assert!(matches!(
+        plan,
+        CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+            dims: RowOpDims::Runtime {
+                class: RowOpClass::RowMapped
+            },
+            batched: None,
+            ..
+        })
+    ));
+
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &layer_norm,
+        &validation,
+        MirCollectionOp::TensorLayerNorm,
+    )
+    .expect("runtime layer norm resolves");
+    assert!(matches!(
+        plan,
+        CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
+            dims: RowOpDims::Runtime { .. },
+            axis: 1,
+            ..
+        })
+    ));
+
+    let mut rms_types = TypeTable::new();
+    let gamma_ty = runtime_rank1_tensor_ty(&mut rms_types, 1);
+    let mut rms_norm = runtime_transformer_function(
+        &mut rms_types,
+        MirCollectionOp::TensorRmsNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+        ],
+    );
+    rms_norm.params.push(MirParam {
+        local: MirLocalId(1),
+        name: None,
+        ty: gamma_ty,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    });
+    rms_norm.locals.push(MirLocal {
+        id: MirLocalId(1),
+        name: None,
+        ty: gamma_ty,
+        mutable: false,
+        span: test_span(),
+    });
+    let mut rms_signature = runtime_transformer_signature();
+    rms_signature.extra_inputs.push(MirKernelResource {
+        group: 0,
+        binding: 2,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty: rms_signature.input.element_ty,
+        element_count: RUNTIME_SHAPED_ELEMENT_COUNT,
+        source_local: Some(MirLocalId(1)),
+        source_name: None,
+        reduced_projection: None,
+    });
+    let rms_validation = MirValidationContext::new(&rms_types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &rms_signature,
+        &rms_norm,
+        &rms_validation,
+        MirCollectionOp::TensorRmsNorm,
+    )
+    .expect("runtime RMS norm resolves");
+    assert!(matches!(
+        plan,
+        CollectionKernelPlan::RmsNormalization(RmsNormalizationPlan {
+            dims: RowOpDims::Runtime { .. },
+            axis: 1,
+            width: 0,
+            ..
+        })
+    ));
+    plan.validate()
+        .expect("runtime RMS dimensions defer positivity to launch");
+
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &causal,
+        &validation,
+        MirCollectionOp::TensorCausalMaskedSoftmax,
+    )
+    .expect("runtime causal softmax resolves");
+    assert!(matches!(
+        plan,
+        CollectionKernelPlan::CausalMaskedSoftmax(CausalMaskedSoftmaxPlan {
+            dims: RowOpDims::Runtime { .. },
+            rows: 0,
+            cols: 0,
+        })
+    ));
+    plan.validate()
+        .expect("runtime causal dimensions defer positivity to launch");
+}
+
+#[test]
+fn rowop_runtime_batched_softmax_is_refused() {
+    let mut types = TypeTable::new();
+    let mut function =
+        runtime_transformer_function(&mut types, MirCollectionOp::TensorSoftmax, vec![]);
+    let element = f32_ty(&mut types);
+    let axes = (0..3)
+        .map(|axis| {
+            types.intern_index(IndexExpr::Runtime(RuntimeExtentId::FunctionParameterAxis {
+                parameter: 0,
+                axis,
+            }))
+        })
+        .collect();
+    let shape = types.intern_index(IndexExpr::Tuple(axes));
+    let rank3 = MirType::semantic(types.intern(Type::Tensor(element.semantic_id(), shape)));
+    function.params[0].ty = rank3;
+    function.locals[0].ty = rank3;
+    function.return_ty = rank3;
+    let MirStatementKind::RuntimeCall { call, .. } = &mut function.blocks[0].statements[0].kind
+    else {
+        unreachable!("softmax is a runtime call");
+    };
+    call.return_ty = rank3;
+
+    let signature = runtime_transformer_signature();
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorSoftmax,
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn rowop_runtime_elementwise_operand_is_refused() {
+    let mut types = TypeTable::new();
+    let mut function =
+        runtime_transformer_function(&mut types, MirCollectionOp::TensorSoftmax, vec![]);
+    let tensor_ty = function.params[0].ty;
+    let span = test_span();
+    function.temps.push(MirTemp {
+        id: MirTempId(0),
+        ty: tensor_ty,
+        span,
+    });
+    let other_ty = runtime_rank2_tensor_ty(&mut types, 1);
+    function.params.push(MirParam {
+        local: MirLocalId(2),
+        name: None,
+        ty: other_ty,
+        mode: MirParamMode::Owned,
+        span,
+    });
+    function.locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: other_ty,
+        mutable: false,
+        span,
+    });
+    let additive = MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace {
+                base: MirPlaceBase::Temp(MirTempId(0)),
+                projections: Vec::new(),
+            }),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                args: vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                ],
+                return_ty: tensor_ty,
+            },
+        },
+        span,
+    };
+    function.blocks[0].statements.insert(0, additive);
+    let MirStatementKind::RuntimeCall { call, .. } = &mut function.blocks[0].statements[1].kind
+    else {
+        unreachable!("the softmax statement follows its additive producer");
+    };
+    call.args[0] = MirOperand::Temp(MirTempId(0));
+
+    let signature = runtime_transformer_signature();
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorSoftmax,
+        )
+        .is_none()
+    );
 }
 
 #[test]
