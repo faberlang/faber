@@ -71,8 +71,7 @@ impl Fault {
         self.kind.variant_name()
     }
 
-    /// The path the failing call was given; the route for a fault that no
-    /// leaf call produced.
+    /// The path supplied by the leaf, or the route for a synthesized fault.
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
@@ -82,11 +81,7 @@ impl Fault {
     fn from_leaf(error: &LeafError) -> Self {
         Self {
             kind: error.kind(),
-            path: if error.path().is_empty() {
-                error.route().to_owned()
-            } else {
-                error.path().to_owned()
-            },
+            path: error.path().to_owned(),
         }
     }
 

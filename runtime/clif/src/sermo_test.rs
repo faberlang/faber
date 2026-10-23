@@ -211,23 +211,34 @@ fn drain_serves_a_unit_route_and_clears_the_fault() {
     assert_eq!(__faber_clif_v1_sermo_failed(handle), 0);
 }
 
+fn assert_fault_exports_match_leaf(handle: i64, error: &faber_leaf::LeafError) {
+    let (kind, path) = error.facts();
+    assert_eq!(
+        unsafe { raw_field(__faber_clif_v1_sermo_fault_kind, handle) },
+        kind.as_bytes()
+    );
+    assert_eq!(
+        unsafe { raw_field(__faber_clif_v1_sermo_fault_path, handle) },
+        path.as_bytes()
+    );
+}
+
 #[test]
-fn drain_records_an_invalid_argument_fault() {
+fn drain_preserves_the_shared_empty_path_fault_facts() {
     const ROUTE: &str = "tempus:dormiet";
+
+    let leaf_error = faber_leaf::serve(ROUTE, &[faber_leaf::Arg::Int(-1)])
+        .expect("clock route")
+        .expect_err("negative duration");
+    assert_eq!(leaf_error.kind(), LeafErrorKind::InvalidArgument);
+    assert!(leaf_error.path().is_empty());
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
     __faber_clif_v1_sermo_set_opener_i64(handle, -1);
     __faber_clif_v1_sermo_drain(handle);
     assert_eq!(__faber_clif_v1_sermo_failed(handle), 1);
-    assert_eq!(
-        unsafe { raw_field(__faber_clif_v1_sermo_fault_kind, handle) },
-        LeafErrorKind::InvalidArgument.variant_name().as_bytes()
-    );
-    assert_eq!(
-        unsafe { raw_field(__faber_clif_v1_sermo_fault_path, handle) },
-        ROUTE.as_bytes()
-    );
+    assert_fault_exports_match_leaf(handle, &leaf_error);
 }
 
 #[test]
@@ -249,6 +260,28 @@ fn missing_file_fault_carries_kind_and_path() {
     assert_eq!(fault.kind(), LeafErrorKind::NotFound);
     assert_eq!(fault.kind_name(), LeafErrorKind::NotFound.variant_name());
     assert_eq!(fault.path(), PATH);
+}
+
+#[test]
+fn c_fault_exports_preserve_the_shared_nonempty_path_facts() {
+    const ROUTE: &str = "solum:lege";
+    const PATH: &str = "/nonexistent/faber-clif-sermo/cross-lane-fault-path";
+
+    let leaf_error = faber_leaf::serve(ROUTE, &[faber_leaf::Arg::Str(PATH.to_owned())])
+        .expect("filesystem route")
+        .expect_err("missing path");
+    assert_eq!(leaf_error.kind(), LeafErrorKind::NotFound);
+    assert_eq!(leaf_error.path(), PATH);
+
+    let handle = open(ROUTE);
+    assert!(handle > 0, "open returned {handle}");
+    let text = crate::text_new(PATH.as_bytes());
+    let text_bits = i64::try_from(text as usize).expect("text pointer fits ABI payload");
+    let boxed = crate::__faber_clif_v1_opt_some(crate::TAG_TEXT, text_bits);
+    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, boxed) };
+    __faber_clif_v1_sermo_drain(handle);
+    assert_eq!(__faber_clif_v1_sermo_failed(handle), 1);
+    assert_fault_exports_match_leaf(handle, &leaf_error);
 }
 
 #[test]
