@@ -422,7 +422,7 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             build: true,
             run: true,
             package: true,
-            note: "CUDA device execution via `faber run --device cuda` (in process through the NVIDIA driver; PTX built at run time with clang's NVPTX target; whole-tensor kernels, lane-form kernels not yet); `-t llvm-text` remains emit-only",
+            note: "CUDA device execution via `faber run --device cuda` (in process through the NVIDIA driver; PTX built at run time with clang's NVPTX target; whole-tensor kernels, lane-form kernels execute through the NVVM lane emitter (statements, control flow, genus parameters, bounds faults, constant throws)); `-t llvm-text` remains emit-only",
         },
         crate::codegen::Target::HirRust => capabilities,
         // Stage 9 (llvm-host-parity product slice): llvm-host is the native
