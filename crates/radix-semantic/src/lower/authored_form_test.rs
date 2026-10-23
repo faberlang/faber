@@ -230,6 +230,7 @@ fn sermo_authored_head_is_named() {
         "\n",
         "main {\n",
         "    let channel<none, string> g ← call 'salutatio:greeting'\n",
+        "    let channel loose ← g\n",
         "}\n",
     );
     let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
@@ -274,6 +275,77 @@ fn sermo_authored_head_is_named() {
     assert!(
         matches!(fixture.result.types.get(form.ty), Type::Struct(def) if *def == sermo_def),
         "finalized witness is the bare sermo carrier"
+    );
+
+    // A separately authored bare `sermo` has no arguments to keep.
+    let (loose_form, loose_ty) = first_declared_form(&fixture, "loose");
+    assert!(
+        matches!(&loose_form.head, HirTypeFormHead::Named { def_id, .. } if *def_id == sermo_def),
+        "bare sermo names the same definition, got {:?}",
+        loose_form.head
+    );
+    assert!(
+        loose_form.args.is_empty(),
+        "a bare sermo authoress no children, got {:?}",
+        loose_form.args
+    );
+    assert_eq!(Some(loose_form.ty), loose_ty, "witness equals HIR type");
+}
+
+/// A typed conversation annotation keeps the two type arguments the author
+/// wrote as authored child forms, even though the semantic witness is erased to
+/// the bare carrier.
+#[test]
+fn typed_sermo_annotation_keeps_its_authored_children() {
+    let fixture = analyze_ok(concat!(
+        "@ ad 'numeri:twice'\n",
+        "functio twice(numerus n) → numerus {\n",
+        "    redde n * 2\n",
+        "}\n",
+        "\n",
+        "incipit {\n",
+        "    sit sermo<numerus, numerus> t ← ad 'numeri:twice' (5)\n",
+        "    sit sermo loose ← t\n",
+        "}\n"
+    ));
+
+    let sermo_def = crate::builtins::frame_types::sermo_def_id(&fixture.result.resolver)
+        .expect("sermo builtin is registered");
+    let (form, local_ty) = first_declared_form(&fixture, "t");
+    assert!(
+        matches!(&form.head, HirTypeFormHead::Named { def_id, .. } if *def_id == sermo_def),
+        "named head names the sermo definition, got {:?}",
+        form.head
+    );
+    assert_eq!(
+        form.args.len(),
+        2,
+        "the typed annotation keeps its two authored children, got {:?}",
+        form.args
+    );
+    for arg in &form.args {
+        let HirTypeFormArg::Type(child) = arg else {
+            panic!("expected a type child, got {arg:?}");
+        };
+        assert!(
+            matches!(
+                fixture.result.types.get(child.ty),
+                Type::Primitive(Primitive::Numerus)
+            ),
+            "child witnesses the authored `numerus`"
+        );
+    }
+    assert_eq!(Some(form.ty), local_ty, "witness equals HIR type");
+    assert!(
+        matches!(fixture.result.types.get(form.ty), Type::Struct(def) if *def == sermo_def),
+        "finalized witness is the bare sermo carrier"
+    );
+
+    let (loose_form, _) = first_declared_form(&fixture, "loose");
+    assert!(
+        loose_form.args.is_empty(),
+        "the separately authored bare sermo stays bare, got {:?}",
+        loose_form.args
     );
 }
 
