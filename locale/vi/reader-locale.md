@@ -1,0 +1,215 @@
+## Conventions
+
+Vietnamese is written in Latin script with its vowel and tone diacritics intact: spelling is accent-sensitive, and the globally applied NFKC normalization documented for Faber runs before keyword matching; it does not license dropping tones or treating distinct accented letters as interchangeable. Use standard, neutral/formal Vietnamese technical wording rather than switching between formal terms and everyday or slang expressions, while preferring familiar everyday words when they remain semantically exact. Today `sit` is `đặt`, an imperative used for a let binding, while `iacit` is `ném_lỗi`; the former describes placing rather than declaring a binding, and the latter omits the may-throw force. Review every row for its actual concept, part of speech, and statement role: choose a Vietnamese verb or noun as that role requires, use a natural Vietnamese command form for imperative statements, and do not mechanically impose Latin person or tense on Vietnamese verbs.
+
+An underscore is the default join for a two-word Vietnamese name: it is already used by 113 of these 206 rows, the highest share among the six packs. Keep a technical Latin name only where it is an established international term, acronym, standard token, or deliberately reserved product/directive name and no clearer Vietnamese spelling serves the concept; declare that choice by proposing the exact Latin key and marking `equals-latin-key: yes` when the current pack spelling is byte-for-byte that key. Do not preserve Latin merely because a term is technical if a clear, established Vietnamese equivalent exists.
+
+Avoid collisions among related rows. A shared Latin key is evaluated in its keyword, type, or method role rather than forced into one translation: `cursor` currently has `con_trỏ` as a keyword but `bộ_lặp` as a type, reflecting cursor versus iterator, and method spellings should likewise describe the operation. `genus` currently renders as `kiểu`, `typus` as `kiểu_tên`, and the `modulus` type as `môđun_kiểu`, so their forms share a `kiểu` stem while the class, type-alias declaration, and modular integer type are distinct concepts. I rule that distinction in favor of `lớp` for the class, `bí_danh_kiểu` for the alias declaration, and `kiểu_môđun` for the modular type; the common type stem alone must not erase the class-versus-alias distinction. The grammar role of `primus_quem` and the complete intended use of `ubi` are not clear enough in the available concept notes to settle their best Vietnamese names; specialist terminology for a few domain-specific types may also merit a native technical review.
+
+## Findings
+- row: discretio - section: keywords - current: hợp_nhất - proposed: hợp_nhất - confidence: high - equals-latin-key: no - reason: hợp_nhất names the union concept in this row
+- row: fixum - section: keywords - current: hằng - proposed: hằng - confidence: high - equals-latin-key: no - reason: hằng correctly names the compile-time constant rather than a run-time binding
+- row: functio - section: keywords - current: hàm - proposed: hàm - confidence: high - equals-latin-key: no - reason: hàm names the fn concept in this row
+- row: genus - section: keywords - current: kiểu - proposed: lớp - confidence: high - equals-latin-key: no - reason: kiểu names a general type and obscures the class declaration
+- row: implendum - section: keywords - current: giao_ước - proposed: giao_diện - confidence: high - equals-latin-key: no - reason: giao_ước means an agreement rather than an interface contract
+- row: importa - section: keywords - current: nhập - proposed: nhập - confidence: high - equals-latin-key: no - reason: nhập names the import concept in this row
+- row: regio - section: keywords - current: vùng - proposed: mô_đun - confidence: high - equals-latin-key: no - reason: vùng means a geographic region rather than a module
+- row: modulus - section: keywords - current: môđun - proposed: môđun - confidence: high - equals-latin-key: no - reason: môđun names the wrapping concept in this row
+- row: ordo - section: keywords - current: liệt_kê - proposed: liệt_kê - confidence: high - equals-latin-key: no - reason: liệt_kê names the enum concept in this row
+- row: sit - section: keywords - current: đặt - proposed: khai_báo - confidence: high - equals-latin-key: no - reason: đặt means place and misses the let-binding declaration
+- row: typus - section: keywords - current: kiểu_tên - proposed: bí_danh_kiểu - confidence: high - equals-latin-key: no - reason: kiểu_tên says type name rather than declaring a type alias
+- row: schema - section: keywords - current: lược_đồ - proposed: lược_đồ - confidence: high - equals-latin-key: no - reason: lược_đồ names the schema concept in this row
+- row: columna - section: keywords - current: cột - proposed: cột - confidence: high - equals-latin-key: no - reason: cột names the column concept in this row
+- row: varia - section: keywords - current: khả_biến - proposed: khả_biến - confidence: high - equals-latin-key: no - reason: khả_biến names the mut concept in this row
+- row: ceteri - section: keywords - current: còn_lại - proposed: còn_lại - confidence: high - equals-latin-key: no - reason: còn_lại names the rest concept in this row
+- row: errata - section: keywords - current: lỗi - proposed: lỗi - confidence: high - equals-latin-key: no - reason: lỗi names the errors concept in this row
+- row: exitus - section: keywords - current: thoát - proposed: thoát - confidence: high - equals-latin-key: no - reason: thoát names the exit concept in this row
+- row: generis - section: keywords - current: tĩnh - proposed: tĩnh - confidence: high - equals-latin-key: no - reason: tĩnh names the static concept in this row
+- row: iacit - section: keywords - current: ném_lỗi - proposed: có_thể_ném_lỗi - confidence: high - equals-latin-key: no - reason: ném_lỗi omits the function-level possibility of throwing
+- row: immutata - section: keywords - current: bất_biến - proposed: bất_biến - confidence: high - equals-latin-key: no - reason: bất_biến names the readonly concept in this row
+- row: interna - section: keywords - current: nội_bộ - proposed: nội_bộ - confidence: high - equals-latin-key: no - reason: nội_bộ names the internal concept in this row
+- row: magnitudo - section: keywords - current: kích_thước - proposed: kích_thước - confidence: high - equals-latin-key: no - reason: kích_thước names the size concept in this row
+- row: iuncta - section: keywords - current: bộ - proposed: bộ_giá_trị - confidence: medium - equals-latin-key: no - reason: bộ alone loses the tuple role of an ordered group of values
+- row: optiones - section: keywords - current: lựa_chọn - proposed: các_tùy_chọn - confidence: medium - equals-latin-key: no - reason: lựa_chọn names choices rather than the options bundle
+- row: praefixum - section: keywords - current: tiền_tố - proposed: thời_biên_dịch - confidence: high - equals-latin-key: no - reason: tiền_tố means prefix rather than compile-time evaluation
+- row: insere - section: keywords - current: nhúng - proposed: nhúng - confidence: high - equals-latin-key: no - reason: nhúng names the embed concept in this row
+- row: privata - section: keywords - current: riêng_tư - proposed: riêng_tư - confidence: high - equals-latin-key: no - reason: riêng_tư names the private concept in this row
+- row: protecta - section: keywords - current: bảo_vệ - proposed: được_bảo_vệ - confidence: medium - equals-latin-key: no - reason: bảo_vệ is an active verb rather than the protected visibility level
+- row: publica - section: keywords - current: công_khai - proposed: công_khai - confidence: high - equals-latin-key: no - reason: công_khai names the public concept in this row
+- row: sponte - section: keywords - current: tự_nguyện - proposed: tùy_chọn - confidence: high - equals-latin-key: no - reason: tự_nguyện means voluntary rather than optional
+- row: casu - section: keywords - current: trường_hợp - proposed: trường_hợp - confidence: high - equals-latin-key: no - reason: trường_hợp names the case concept in this row
+- row: ceterum - section: keywords - current: mặc_định - proposed: mặc_định - confidence: high - equals-latin-key: no - reason: mặc_định names the default concept in this row
+- row: custodi - section: keywords - current: canh_gác - proposed: canh_gác - confidence: medium - equals-latin-key: no - reason: canh_gác fits guard but does not name the early-return condition
+- row: discerne - section: keywords - current: phân_tích - proposed: khớp_mẫu - confidence: high - equals-latin-key: no - reason: phân_tích means analyze rather than pattern-match
+- row: dum - section: keywords - current: trong_khi - proposed: trong_khi - confidence: high - equals-latin-key: no - reason: trong_khi names the while concept in this row
+- row: elige - section: keywords - current: chọn - proposed: rẽ_nhánh - confidence: medium - equals-latin-key: no - reason: chọn names selection but not switch-style value dispatch
+- row: ergo - section: keywords - current: do_đó - proposed: thì - confidence: high - equals-latin-key: no - reason: do_đó means therefore rather than the then clause joint
+- row: fac - section: keywords - current: làm - proposed: làm - confidence: high - equals-latin-key: no - reason: làm names the do concept in this row
+- row: itera - section: keywords - current: lặp - proposed: cho_mỗi - confidence: high - equals-latin-key: no - reason: lặp names repetition rather than per-element for iteration
+- row: apud - section: keywords - current: tại - proposed: tại - confidence: high - equals-latin-key: no - reason: tại names the at concept in this row
+- row: secus - section: keywords - current: khác - proposed: ngược_lại - confidence: high - equals-latin-key: no - reason: khác means different rather than the else alternative
+- row: si - section: keywords - current: nếu - proposed: nếu - confidence: high - equals-latin-key: no - reason: nếu names the if concept in this row
+- row: sin - section: keywords - current: nếukhôngthì - proposed: nếu_không_thì - confidence: high - equals-latin-key: no - reason: nếukhôngthì fuses words and is not a readable else-if form
+- row: perge - section: keywords - current: tiếp - proposed: tiếp_tục - confidence: high - equals-latin-key: no - reason: tiếp alone is an incomplete form for continue control flow
+- row: redde - section: keywords - current: trả - proposed: trả - confidence: high - equals-latin-key: no - reason: trả names the return concept in this row
+- row: rumpe - section: keywords - current: dừng - proposed: dừng - confidence: high - equals-latin-key: no - reason: dừng names the break concept in this row
+- row: tacet - section: keywords - current: im_lặng - proposed: không_làm_gì - confidence: high - equals-latin-key: no - reason: im_lặng means silent rather than a no-op statement
+- row: adfirma - section: keywords - current: khẳng_định - proposed: khẳng_định - confidence: high - equals-latin-key: no - reason: khẳng_định names the assert concept in this row
+- row: cape - section: keywords - current: bắt - proposed: bắt - confidence: high - equals-latin-key: no - reason: bắt names the catch concept in this row
+- row: capta - section: keywords - current: bẫy - proposed: bẫy - confidence: high - equals-latin-key: no - reason: bẫy names the trap concept in this row
+- row: cede - section: keywords - current: nhường - proposed: phát_ra - confidence: medium - equals-latin-key: no - reason: nhường means yield in the sense of giving way rather than emitting an item
+- row: iace - section: keywords - current: ném - proposed: ném - confidence: high - equals-latin-key: no - reason: ném names the throw concept in this row
+- row: mori - section: keywords - current: chết - proposed: dừng_khẩn_cấp - confidence: medium - equals-latin-key: no - reason: chết is colloquial and names death rather than an unrecoverable panic
+- row: requirit - section: keywords - current: yêu_cầu - proposed: yêu_cầu - confidence: high - equals-latin-key: no - reason: yêu_cầu names the require concept in this row
+- row: reice - section: keywords - current: từ_chối - proposed: từ_chối - confidence: high - equals-latin-key: no - reason: từ_chối names the reject concept in this row
+- row: clausura - section: keywords - current: đóng - proposed: hàm_ẩn_danh - confidence: high - equals-latin-key: no - reason: đóng means close rather than an anonymous function
+- row: falsum - section: keywords - current: sai - proposed: sai - confidence: high - equals-latin-key: no - reason: sai names the false concept in this row
+- row: verum - section: keywords - current: đúng - proposed: đúng - confidence: high - equals-latin-key: no - reason: đúng names the true concept in this row
+- row: nonnumerus - section: keywords - current: nan - proposed: nan - confidence: high - equals-latin-key: no - reason: nan is the internationally fixed numeric sentinel for a non-number value
+- row: aut - section: keywords - current: hoặc - proposed: hoặc - confidence: high - equals-latin-key: no - reason: hoặc names the or concept in this row
+- row: est - section: keywords - current: là - proposed: là - confidence: high - equals-latin-key: no - reason: là names the is concept in this row
+- row: et - section: keywords - current: và - proposed: và - confidence: high - equals-latin-key: no - reason: và names the and concept in this row
+- row: non - section: keywords - current: không - proposed: không - confidence: high - equals-latin-key: no - reason: không names the not concept in this row
+- row: vel - section: keywords - current: hoặc_nếu_rỗng - proposed: mặc_định_khi_vắng - confidence: high - equals-latin-key: no - reason: hoặc_nếu_rỗng confuses nullish absence with an empty value
+- row: ego - section: keywords - current: tôi - proposed: bản_thân - confidence: high - equals-latin-key: no - reason: tôi is the speaker pronoun rather than the method receiver self
+- row: finge - section: keywords - current: tạo - proposed: biến_thể - confidence: high - equals-latin-key: no - reason: tạo means create rather than a tagged-union variant case
+- row: implet - section: keywords - current: thực_thi - proposed: triển_khai - confidence: high - equals-latin-key: no - reason: thực_thi means execute rather than implement an interface
+- row: mone - section: keywords - current: cảnh_báo - proposed: cảnh_báo - confidence: high - equals-latin-key: no - reason: cảnh_báo names the warn concept in this row
+- row: nota - section: keywords - current: ghi_chú - proposed: in - confidence: high - equals-latin-key: no - reason: ghi_chú means take a note rather than print output
+- row: scribe - section: keywords - current: viết - proposed: viết - confidence: high - equals-latin-key: no - reason: viết names the write concept in this row
+- row: vide - section: keywords - current: xem - proposed: gỡ_lỗi - confidence: medium - equals-latin-key: no - reason: xem means see rather than the diagnostic debug operation
+- row: argumenta - section: keywords - current: đối_số - proposed: đối_số - confidence: high - equals-latin-key: no - reason: đối_số names the args concept in this row
+- row: incipiet - section: keywords - current: bắt_đầu_bất_đồng_bộ - proposed: khởi_động_bất_đồng_bộ - confidence: medium - equals-latin-key: no - reason: bắt_đầu omits the async property of the entry point
+- row: incipit - section: keywords - current: bắt_đầu - proposed: bắt_đầu - confidence: high - equals-latin-key: no - reason: bắt_đầu names the main concept in this row
+- row: ad - section: keywords - current: gọi - proposed: gọi - confidence: high - equals-latin-key: no - reason: gọi names the call concept in this row
+- row: fiet - section: keywords - current: async - proposed: bất_đồng_bộ - confidence: high - equals-latin-key: no - reason: async is an English spelling where a standard Vietnamese equivalent exists
+- row: fiunt - section: keywords - current: sinh - proposed: trình_sinh - confidence: medium - equals-latin-key: no - reason: sinh is a verb and does not name the generator construct
+- row: fient - section: keywords - current: async_sinh - proposed: trình_sinh_bất_đồng_bộ - confidence: medium - equals-latin-key: no - reason: async_sinh mixes an English modifier with a Vietnamese verb
+- row: figendum - section: keywords - current: đợi_hằng - proposed: chờ_gán_cố_định - confidence: medium - equals-latin-key: no - reason: đợi_hằng treats the fixed binding as a constant value
+- row: variandum - section: keywords - current: đợi_biến - proposed: chờ_gán_khả_biến - confidence: medium - equals-latin-key: no - reason: đợi_biến omits the await-and-bind operation
+- row: reddet - section: keywords - current: đợi_trả - proposed: chờ_và_trả - confidence: medium - equals-latin-key: no - reason: đợi_trả does not clearly express awaiting before returning
+- row: tacebit - section: keywords - current: đợi_bỏ - proposed: chờ_bỏ_kết_quả - confidence: medium - equals-latin-key: no - reason: đợi_bỏ leaves the discarded awaited result unspecified
+- row: vacua - section: keywords - current: tập_rỗng - proposed: tập_rỗng - confidence: high - equals-latin-key: no - reason: tập_rỗng names the empty concept in this row
+- row: primus_quem - section: keywords - current: primus_quem - proposed: primus_quem - confidence: low - equals-latin-key: yes - reason: the available grammar notes do not establish this token’s intended role
+- row: ubi - section: keywords - current: ubi - proposed: ubi - confidence: low - equals-latin-key: yes - reason: the available grammar notes do not establish this predicate token’s complete meaning
+- row: summa - section: keywords - current: tổng - proposed: tổng - confidence: high - equals-latin-key: no - reason: tổng names the sum concept in this row
+- row: filum - section: keywords - current: sợi - proposed: luồng - confidence: high - equals-latin-key: no - reason: sợi denotes a fiber or thread of material rather than an execution thread
+- row: maxima - section: keywords - current: lớn_nhất - proposed: lớn_nhất - confidence: high - equals-latin-key: no - reason: lớn_nhất names the max concept in this row
+- row: minima - section: keywords - current: nhỏ_nhất - proposed: nhỏ_nhất - confidence: high - equals-latin-key: no - reason: nhỏ_nhất names the min concept in this row
+- row: de - section: keywords - current: ra - proposed: mượn_chỉ_đọc - confidence: high - equals-latin-key: no - reason: ra means out and misses an immutable reference borrow
+- row: ex - section: keywords - current: từ - proposed: từ - confidence: high - equals-latin-key: no - reason: từ names the from concept in this row
+- row: in - section: keywords - current: khả_biến - proposed: mượn_ghi - confidence: high - equals-latin-key: no - reason: khả_biến collides with varia and does not identify a mutable borrow
+- row: own - section: keywords - current: sở_hữu - proposed: sở_hữu - confidence: high - equals-latin-key: no - reason: sở_hữu names the own concept in this row
+- row: copy - section: keywords - current: sao_chép - proposed: sao_chép - confidence: high - equals-latin-key: no - reason: sao_chép names the copy concept in this row
+- row: axis - section: keywords - current: trục - proposed: trục - confidence: high - equals-latin-key: no - reason: trục names the axis concept in this row
+- row: lege - section: keywords - current: đọc - proposed: đọc - confidence: high - equals-latin-key: no - reason: đọc names the read concept in this row
+- row: lineam - section: keywords - current: dòng - proposed: dòng - confidence: high - equals-latin-key: no - reason: dòng names the line concept in this row
+- row: omnia - section: keywords - current: tất_cả - proposed: tất_cả - confidence: high - equals-latin-key: no - reason: tất_cả names the all concept in this row
+- row: scriptum - section: keywords - current: văn_bản_hóa - proposed: định_dạng - confidence: high - equals-latin-key: no - reason: văn_bản_hóa means textualize rather than format a template
+- row: sparge - section: keywords - current: rải - proposed: trải_rộng - confidence: medium - equals-latin-key: no - reason: rải suggests scattering rather than spreading values into a structure
+- row: ut - section: keywords - current: như - proposed: như - confidence: high - equals-latin-key: no - reason: như names the as concept in this row
+- row: via - section: keywords - current: thông_qua - proposed: thông_qua - confidence: high - equals-latin-key: no - reason: thông_qua names the via concept in this row
+- row: ante - section: keywords - current: trước - proposed: trước - confidence: high - equals-latin-key: no - reason: trước names the before concept in this row
+- row: inter - section: keywords - current: giữa - proposed: giữa - confidence: high - equals-latin-key: no - reason: giữa names the between concept in this row
+- row: intra - section: keywords - current: trong - proposed: trong - confidence: high - equals-latin-key: no - reason: trong names the within concept in this row
+- row: per - section: keywords - current: qua - proposed: bước - confidence: high - equals-latin-key: no - reason: qua means through rather than the stride of a range
+- row: ab - section: keywords - current: khoảng - proposed: khoảng - confidence: high - equals-latin-key: no - reason: khoảng names the range concept in this row
+- row: usque - section: keywords - current: tới - proposed: đến_trước - confidence: medium - equals-latin-key: no - reason: tới can imply an inclusive endpoint unlike the exclusive range end
+- row: erratur - section: keywords - current: mong_đợi_thất_bại - proposed: mong_đợi_thất_bại - confidence: high - equals-latin-key: no - reason: mong_đợi_thất_bại names the expect failure concept in this row
+- row: fragilis - section: keywords - current: mong_manh - proposed: không_ổn_định - confidence: medium - equals-latin-key: no - reason: mong_manh means fragile rather than an intermittently failing test
+- row: futurum - section: keywords - current: việc_cần_làm - proposed: việc_cần_làm - confidence: high - equals-latin-key: no - reason: việc_cần_làm names the todo concept in this row
+- row: metior - section: keywords - current: đo_lường - proposed: đo_hiệu_năng - confidence: high - equals-latin-key: no - reason: đo_lường omits that a bench measures performance
+- row: omitte - section: keywords - current: bỏ_qua - proposed: bỏ_qua - confidence: high - equals-latin-key: no - reason: bỏ_qua names the skip concept in this row
+- row: postpara - section: keywords - current: sau_chuẩn_bị - proposed: dọn_dẹp - confidence: high - equals-latin-key: no - reason: sau_chuẩn_bị only gives sequence and misses teardown cleanup
+- row: postparabit - section: keywords - current: sẽ_sau_chuẩn_bị - proposed: dọn_dẹp_bất_đồng_bộ - confidence: medium - equals-latin-key: no - reason: sẽ_sau_chuẩn_bị expresses future time rather than async teardown
+- row: praepara - section: keywords - current: chuẩn_bị - proposed: chuẩn_bị - confidence: high - equals-latin-key: no - reason: chuẩn_bị names the setup concept in this row
+- row: praeparabit - section: keywords - current: sẽ_chuẩn_bị - proposed: chuẩn_bị_bất_đồng_bộ - confidence: high - equals-latin-key: no - reason: sẽ_chuẩn_bị expresses futurity rather than asynchronous setup
+- row: proba - section: keywords - current: kiểm_thử - proposed: kiểm_thử - confidence: high - equals-latin-key: no - reason: kiểm_thử names the test concept in this row
+- row: probandum - section: keywords - current: đối_tượng_kiểm_thử - proposed: nhóm_kiểm_thử - confidence: medium - equals-latin-key: no - reason: đối_tượng_kiểm_thử means test subject rather than a describe suite block
+- row: repete - section: keywords - current: lặp_lại - proposed: lặp_lại - confidence: high - equals-latin-key: no - reason: lặp_lại names the repeat concept in this row
+- row: solum - section: keywords - current: chỉ - proposed: chỉ - confidence: high - equals-latin-key: no - reason: chỉ names the only concept in this row
+- row: solum_in - section: keywords - current: chỉ_trong - proposed: chỉ_trong - confidence: high - equals-latin-key: no - reason: chỉ_trong names the only in concept in this row
+- row: tag - section: keywords - current: nhãn - proposed: nhãn - confidence: high - equals-latin-key: no - reason: nhãn names the tag concept in this row
+- row: temporis - section: keywords - current: thời_gian - proposed: hết_giờ - confidence: high - equals-latin-key: no - reason: thời_gian means time rather than a timeout limit
+- row: nulla - section: keywords - current: vắng - proposed: vắng - confidence: high - equals-latin-key: no - reason: vắng names the null concept in this row
+- row: cli - section: keywords - current: cli - proposed: cli - confidence: high - equals-latin-key: yes - reason: cli is the standard acronym for the command-line interface and is used unchanged in Vietnamese technical contexts
+- row: commune - section: keywords - current: dùng_chung - proposed: dùng_chung - confidence: high - equals-latin-key: no - reason: dùng_chung names the shared concept in this row
+- row: cursor - section: keywords - current: con_trỏ - proposed: con_trỏ - confidence: high - equals-latin-key: no - reason: con_trỏ names the cursor concept in this row
+- row: futura - section: keywords - current: tương_lai - proposed: tương_lai - confidence: high - equals-latin-key: no - reason: tương_lai names the future concept in this row
+- row: imperium - section: keywords - current: lệnh - proposed: lệnh - confidence: high - equals-latin-key: no - reason: lệnh names the command concept in this row
+- row: operandus - section: keywords - current: toán_hạng - proposed: toán_hạng - confidence: high - equals-latin-key: no - reason: toán_hạng names the operand concept in this row
+- row: optio - section: keywords - current: tùy_chọn - proposed: tùy_chọn - confidence: high - equals-latin-key: no - reason: tùy_chọn names the option concept in this row
+- row: conversion - section: keywords - current: chuyển - proposed: chuyển_đổi - confidence: medium - equals-latin-key: no - reason: chuyển is a verb and does not name the conversion operation
+- row: conversio - section: keywords - current: chuyển_đổi - proposed: chuyển_đổi - confidence: high - equals-latin-key: no - reason: chuyển_đổi names the conversion concept in this row
+- row: nucleum - section: keywords - current: hạt_nhân - proposed: hạt_nhân - confidence: high - equals-latin-key: no - reason: hạt_nhân names the kernel concept in this row
+- row: vertex - section: keywords - current: đỉnh - proposed: đỉnh - confidence: high - equals-latin-key: no - reason: đỉnh names the vertex concept in this row
+- row: fragment - section: keywords - current: mảnh - proposed: mảnh - confidence: high - equals-latin-key: no - reason: mảnh names the fragment concept in this row
+- row: nondum - section: keywords - current: không_ổn_định - proposed: không_ổn_định - confidence: high - equals-latin-key: no - reason: không_ổn_định names the unstable concept in this row
+- row: verte - section: keywords - current: đổi_tên - proposed: đổi_tên - confidence: high - equals-latin-key: no - reason: đổi_tên names the rename concept in this row
+- row: nomen - section: keywords - current: tên - proposed: tên - confidence: high - equals-latin-key: no - reason: tên names the name concept in this row
+- row: radix - section: keywords - current: radix - proposed: radix - confidence: high - equals-latin-key: yes - reason: radix is the reserved name of the compiler directive family rather than a translatable source concept
+- row: brevis - section: keywords - current: ngắn - proposed: ngắn - confidence: high - equals-latin-key: no - reason: ngắn names the short concept in this row
+- row: descriptio - section: keywords - current: mô_tả - proposed: mô_tả - confidence: high - equals-latin-key: no - reason: mô_tả names the description concept in this row
+- row: longum - section: keywords - current: dài - proposed: dài - confidence: high - equals-latin-key: no - reason: dài names the long concept in this row
+- row: lane - section: keywords - current: làn - proposed: làn - confidence: high - equals-latin-key: no - reason: làn names the lane concept in this row
+- row: ubique - section: keywords - current: toàn_cục - proposed: toàn_cục - confidence: high - equals-latin-key: no - reason: toàn_cục names the global concept in this row
+- row: annotatio - section: keywords - current: chú_thích - proposed: siêu_dữ_liệu - confidence: medium - equals-latin-key: no - reason: chú_thích suggests a comment rather than declaration metadata
+- row: versio - section: keywords - current: phiên_bản - proposed: phiên_bản - confidence: high - equals-latin-key: no - reason: phiên_bản names the version concept in this row
+- row: imperia - section: keywords - current: các_lệnh - proposed: các_lệnh - confidence: high - equals-latin-key: no - reason: các_lệnh names the commands concept in this row
+- row: reducta - section: keywords - current: rút_gọn - proposed: rút_gọn - confidence: high - equals-latin-key: no - reason: rút_gọn names the reduce concept in this row
+- row: pro - section: keywords - current: theo - proposed: theo - confidence: high - equals-latin-key: no - reason: theo names the per concept in this row
+- row: factum - section: keywords - current: tích - proposed: tích - confidence: high - equals-latin-key: no - reason: tích names the product concept in this row
+- row: numeratio - section: keywords - current: đếm - proposed: đếm - confidence: high - equals-latin-key: no - reason: đếm names the count concept in this row
+- row: quilibet - section: keywords - current: bất_kỳ - proposed: bất_kỳ - confidence: high - equals-latin-key: no - reason: bất_kỳ names the any concept in this row
+- row: argmaxima - section: keywords - current: argmax - proposed: argmax - confidence: high - equals-latin-key: no - reason: argmax is the standard mathematical operator name for the maximizing argument
+- row: argminima - section: keywords - current: argmin - proposed: argmin - confidence: high - equals-latin-key: no - reason: argmin is the standard mathematical operator name for the minimizing argument
+- row: ordinata - section: keywords - current: sắp_xếp - proposed: sắp_xếp - confidence: high - equals-latin-key: no - reason: sắp_xếp names the sort concept in this row
+- row: ascendens - section: keywords - current: tăng_dần - proposed: tăng_dần - confidence: high - equals-latin-key: no - reason: tăng_dần names the asc concept in this row
+- row: descendens - section: keywords - current: giảm_dần - proposed: giảm_dần - confidence: high - equals-latin-key: no - reason: giảm_dần names the desc concept in this row
+- row: ascii - section: types - current: ascii - proposed: ascii - confidence: high - equals-latin-key: yes - reason: ascii is the internationally standardized character-set name and has no more exact Vietnamese replacement
+- row: textus - section: types - current: văn_bản - proposed: chuỗi_văn_bản - confidence: high - equals-latin-key: no - reason: văn_bản names text content but not the string type
+- row: numerus - section: types - current: số - proposed: số - confidence: high - equals-latin-key: no - reason: số names the int concept in this row
+- row: modulus - section: types - current: môđun_kiểu - proposed: kiểu_môđun - confidence: high - equals-latin-key: no - reason: môđun_kiểu uses an unnatural modifier order for the modular type
+- row: saturatus - section: types - current: bão_hòa - proposed: bão_hòa - confidence: high - equals-latin-key: no - reason: bão_hòa names the saturating concept in this row
+- row: exactus - section: types - current: chính_xác - proposed: bẫy_tràn - confidence: high - equals-latin-key: no - reason: chính_xác means exact rather than trapping overflow behavior
+- row: fractus - section: types - current: thập_phân - proposed: số_thực - confidence: high - equals-latin-key: no - reason: thập_phân means decimal rather than floating-point number
+- row: bivalens - section: types - current: logic - proposed: đúng_sai - confidence: medium - equals-latin-key: no - reason: logic names a field of reasoning rather than the boolean value type
+- row: nihil - section: types - current: hư_không - proposed: không_có - confidence: medium - equals-latin-key: no - reason: hư_không is philosophical nothingness rather than the null type
+- row: vacuum - section: types - current: trống - proposed: vô_giá_trị - confidence: high - equals-latin-key: no - reason: trống means empty rather than the no-value void type
+- row: numquam - section: types - current: không_bao_giờ - proposed: không_bao_giờ - confidence: high - equals-latin-key: no - reason: không_bao_giờ names the never concept in this row
+- row: ignotum - section: types - current: chưa_biết - proposed: chưa_biết - confidence: high - equals-latin-key: no - reason: chưa_biết names the unknown concept in this row
+- row: octeti - section: types - current: byte - proposed: dãy_byte - confidence: high - equals-latin-key: no - reason: byte is singular while octeti denotes a byte sequence
+- row: octetus - section: types - current: byte_đơn - proposed: byte_đơn - confidence: high - equals-latin-key: no - reason: byte_đơn names the byte concept in this row
+- row: clampa - section: types - current: kẹp_biên - proposed: kẹp_biên - confidence: high - equals-latin-key: no - reason: kẹp_biên names the clamp concept in this row
+- row: reflexa - section: types - current: phản_xạ_biên - proposed: phản_xạ_biên - confidence: high - equals-latin-key: no - reason: phản_xạ_biên names the reflect concept in this row
+- row: involuta - section: types - current: vòng_biên - proposed: vòng_biên - confidence: high - equals-latin-key: no - reason: vòng_biên names the wrap concept in this row
+- row: littera - section: types - current: ký_tự - proposed: ký_tự - confidence: high - equals-latin-key: no - reason: ký_tự names the char concept in this row
+- row: regex - section: types - current: chính_quy - proposed: chính_quy - confidence: high - equals-latin-key: no - reason: chính_quy names the regex concept in this row
+- row: json - section: types - current: json - proposed: json - confidence: high - equals-latin-key: yes - reason: json is the standardized data-format acronym used unchanged in Vietnamese technical writing
+- row: valor - section: types - current: giá_trị - proposed: giá_trị - confidence: high - equals-latin-key: no - reason: giá_trị names the value concept in this row
+- row: instans - section: types - current: thời_điểm - proposed: thời_điểm - confidence: high - equals-latin-key: no - reason: thời_điểm names the instant concept in this row
+- row: objectum - section: types - current: đối_tượng - proposed: đối_tượng - confidence: high - equals-latin-key: no - reason: đối_tượng names the object concept in this row
+- row: quidlibet - section: types - current: bất_kỳ - proposed: bất_kỳ - confidence: high - equals-latin-key: no - reason: bất_kỳ names the any concept in this row
+- row: lista - section: types - current: danh_sách - proposed: danh_sách - confidence: high - equals-latin-key: no - reason: danh_sách names the list concept in this row
+- row: tabula - section: types - current: bảng - proposed: ánh_xạ - confidence: high - equals-latin-key: no - reason: bảng means table rather than a key-to-value map
+- row: tabulae - section: types - current: sổ_cái - proposed: sổ_cái - confidence: high - equals-latin-key: no - reason: sổ_cái names the ledger concept in this row
+- row: copia - section: types - current: tập_hợp - proposed: tập_hợp - confidence: high - equals-latin-key: no - reason: tập_hợp names the set concept in this row
+- row: promissum - section: types - current: lời_hứa - proposed: lời_hứa - confidence: high - equals-latin-key: no - reason: lời_hứa names the promise concept in this row
+- row: cursor - section: types - current: bộ_lặp - proposed: bộ_lặp - confidence: high - equals-latin-key: no - reason: bộ_lặp names the iterator concept in this row
+- row: queue - section: types - current: hàng_đợi - proposed: hàng_đợi - confidence: high - equals-latin-key: no - reason: hàng_đợi names the queue concept in this row
+- row: stack - section: types - current: ngăn_xếp - proposed: ngăn_xếp - confidence: high - equals-latin-key: no - reason: ngăn_xếp names the stack concept in this row
+- row: tensor - section: types - current: ten_xo - proposed: tensor - confidence: medium - equals-latin-key: no - reason: ten_xo is an opaque phonetic rendering rather than the established technical name
+- row: vector - section: types - current: vectơ - proposed: vectơ - confidence: high - equals-latin-key: no - reason: vectơ names the vector concept in this row
+- row: matrix - section: types - current: ma_trận - proposed: ma_trận - confidence: high - equals-latin-key: no - reason: ma_trận names the matrix concept in this row
+- row: sparsa - section: types - current: thưa - proposed: thưa - confidence: high - equals-latin-key: no - reason: thưa names the sparse concept in this row
+- row: atomic - section: types - current: nguyên_tử - proposed: nguyên_tử - confidence: high - equals-latin-key: no - reason: nguyên_tử names the atomic concept in this row
+- row: intervallum - section: types - current: miền - proposed: khoảng - confidence: high - equals-latin-key: no - reason: miền means a broad domain rather than a mathematical interval
+- row: filtrum - section: types - current: bộ_lọc - proposed: bộ_lọc - confidence: high - equals-latin-key: no - reason: bộ_lọc names the filter concept in this row
+- row: series - section: types - current: chuỗi - proposed: chuỗi - confidence: high - equals-latin-key: no - reason: chuỗi names the series concept in this row
+- row: census - section: types - current: điều_tra - proposed: kiểm_kê - confidence: medium - equals-latin-key: no - reason: điều_tra means survey rather than a count or census
+- row: ratio - section: types - current: ratio - proposed: bản_ghi - confidence: high - equals-latin-key: yes - reason: ratio means a mathematical proportion rather than the record type
+- row: sermo - section: types - current: kênh - proposed: kênh - confidence: high - equals-latin-key: no - reason: kênh names the channel concept in this row
+- row: scrinium - section: types - current: khung - proposed: khung - confidence: high - equals-latin-key: no - reason: khung names the frame concept in this row
+- row: trapped - section: types - current: mắc_bẫy - proposed: mắc_bẫy - confidence: high - equals-latin-key: no - reason: mắc_bẫy names the trapped concept in this row
+- row: meus - section: types - current: gửi - proposed: gửi - confidence: high - equals-latin-key: no - reason: gửi names the send concept in this row
+- row: tuus - section: types - current: nhận - proposed: nhận - confidence: high - equals-latin-key: no - reason: nhận names the recv concept in this row
