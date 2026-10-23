@@ -1020,42 +1020,51 @@ impl TypeChecker<'_> {
                     );
                     return self.error_type;
                 }
-                if entries.is_some() && self.is_infer(self.resolve_inferred_type(*target)) {
-                    // `_ { … }`: the hole before braces builds the expected
-                    // type. No concrete expected type is a named error.
-                    match expected.map(|ty| self.resolve_inferred_type(ty)) {
-                        Some(ty) if !self.is_infer(ty) => *target = ty,
-                        _ => {
-                            // Bare `{ field = value }` with no typed cell: the
-                            // anonymous object IS `record` (operator ruling
-                            // 2026-10-14). Values are checked here, so the arm
-                            // returns without re-checking through `check_verte`.
-                            if let Some(record_ty) = entries.as_deref_mut().and_then(|fields| {
-                                self.check_default_record_literal(target, fields, expr.span)
-                            }) {
-                                return record_ty;
+                let default_record =
+                    if entries.is_some() && self.is_infer(self.resolve_inferred_type(*target)) {
+                        match expected.map(|ty| self.resolve_inferred_type(ty)) {
+                            Some(ty) if !self.is_infer(ty) => {
+                                *target = ty;
+                                None
                             }
-                            self.invalid_conversion(
-                                super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
-                                expr.span,
-                            );
-                            return self.error_type;
+                            _ => {
+                                // Bare `{ field = value }` with no typed cell, or
+                                // the explicit `record<*>` field-list hole, builds
+                                // a record from its own entries. Keep the result in
+                                // the ordinary expression flow below so its type
+                                // is written onto the HIR node before MIR lowering.
+                                let Some(record_ty) = entries.as_deref_mut().and_then(|fields| {
+                                    self.check_default_record_literal(target, fields, expr.span)
+                                }) else {
+                                    self.invalid_conversion(
+                                        super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,
+                                        expr.span,
+                                    );
+                                    return self.error_type;
+                                };
+                                Some(record_ty)
+                            }
                         }
+                    } else {
+                        None
+                    };
+                if let Some(record_ty) = default_record {
+                    record_ty
+                } else {
+                    let checked =
+                        self.check_verte(source, *target, entries.as_mut(), expected, expr.span);
+                    // WHY: the authored target of `list<_>[1, 2]` keeps the
+                    // unsolved hole id while the element checks bind it in the
+                    // substitution table. Lowering reads this field, not the
+                    // expression type finalization rewrites, so write the solved
+                    // canonical shape back. The memoized cache may hold the
+                    // pre-solve shape, so drop it first.
+                    if self.verte_type_has_inference_hole(*target) {
+                        self.canonical_cache.clear();
+                        *target = self.canonicalize_type(*target);
                     }
+                    checked
                 }
-                let checked =
-                    self.check_verte(source, *target, entries.as_mut(), expected, expr.span);
-                // WHY: the authored target of `list<_>[1, 2]` keeps the
-                // unsolved hole id while the element checks bind it in the
-                // substitution table. Lowering reads this field, not the
-                // expression type finalization rewrites, so write the solved
-                // canonical shape back. The memoized cache may hold the
-                // pre-solve shape, so drop it first.
-                if self.verte_type_has_inference_hole(*target) {
-                    self.canonical_cache.clear();
-                    *target = self.canonicalize_type(*target);
-                }
-                checked
             }
             // An implicit store node is the checker's own output; re-checking
             // it re-derives the slot type and never re-runs `↦` admission.

@@ -116,3 +116,40 @@ main {
     assert_eq!(out.len(), 1, "{out:?}");
     assert!(out[0].contains("loss") && out[0].contains("steps"), "{out:?}");
 }
+
+#[test]
+fn bare_record_literal_lowers_and_prints_namelessly() {
+    let out = run(r"
+main {
+    let _ p ← { g = 1.0, w = 2 }
+    print p.w
+    print p
+}
+");
+    assert_eq!(out, ["2", "{ g = 1.0, w = 2 }"]);
+}
+
+#[test]
+fn record_star_literal_lowers() {
+    let out = run(r#"
+main {
+    let record<*> q ← record<*> { a = 1, b = "s" }
+    print q.b
+    print q
+}
+"#);
+    assert_eq!(out, ["s", "{ a = 1, b = \"s\" }"]);
+}
+
+#[test]
+fn destructuring_rest_is_a_record() {
+    let out = run(r"
+main {
+    let record<loss: f32, steps: int> metrics ← record<loss: f32, steps: int> { loss = 3.0, steps = 4 }
+    let {loss, rest leftover} ← metrics
+    print leftover.steps
+    print leftover
+}
+");
+    assert_eq!(out, ["4", "{ steps = 4 }"]);
+}

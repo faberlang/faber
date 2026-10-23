@@ -331,7 +331,9 @@ impl FunctionBuilder<'_> {
                     return None;
                 };
                 let fields = self.lower_record_object_fields(entries, &field_tys, expr.span)?;
-                let ty = self.expr_ty(expr).unwrap_or(MirType::semantic(target));
+                // `entries` retain source order; the target record contributes
+                // only the solved field carrier for each named value.
+                let ty = self.expr_ty(expr)?;
                 Some(self.construct_temp(MirAggregateKind::Record, MirAggregateFields::Named(fields), ty, expr.span))
             }
             Type::Map(_, _) | Type::Ledger(_, _) => {

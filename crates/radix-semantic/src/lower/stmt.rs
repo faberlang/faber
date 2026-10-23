@@ -558,7 +558,8 @@ impl Lowerer<'_> {
                     span: rest_ident.span,
                 }
             } else {
-                self.lower_expr(subject)
+                self.lower_record_rest_initializer(init, subject, fields, rest_ident.span)
+                    .unwrap_or_else(|| self.lower_expr(subject))
             };
             let def_id = self.next_def_id();
             self.bind_local(rest_ident.name, def_id);
@@ -584,6 +585,70 @@ impl Lowerer<'_> {
             is_await,
         );
         out
+    }
+
+    /// Build a fresh record value for a typed record's object-pattern rest.
+    /// The annotation fixes the source field set before typechecking, so each
+    /// unbound field can be projected into a constructor of the remainder.
+    fn lower_record_rest_initializer(
+        &mut self,
+        initializer: &radix_syntax::Expr,
+        subject: &radix_syntax::Expr,
+        fields: &[radix_syntax::ExField],
+        span: Span,
+    ) -> Option<HirExpression> {
+        let source_def = match &initializer.kind {
+            radix_syntax::ExprKind::Ident(ident) => self.lookup_name(ident.name)?,
+            radix_syntax::ExprKind::Paren(inner) => match &inner.kind {
+                radix_syntax::ExprKind::Ident(ident) => self.lookup_name(ident.name)?,
+                _ => return None,
+            },
+            _ => return None,
+        };
+        let mut source_ty = *self.local_types.get(&source_def)?;
+        let source_fields = loop {
+            match self.types.get(source_ty) {
+                crate::Type::Record(fields) => break fields.clone(),
+                crate::Type::Alias(_, inner) => source_ty = *inner,
+                _ => return None,
+            }
+        };
+        let excluded: Vec<_> = fields.iter().map(|field| field.name.name).collect();
+        let mut remaining: Vec<_> = source_fields
+            .into_iter()
+            .filter(|(name, _)| !excluded.contains(name))
+            .collect();
+        remaining.sort_by_key(|(name, _)| name.0);
+        let target = self.types.record(remaining.iter().copied());
+        let mut entries = Vec::with_capacity(remaining.len());
+        for (name, _) in remaining {
+            let value = HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::Field(Box::new(self.lower_expr(subject)), name),
+                ty: None,
+                span,
+            };
+            entries.push(radix_hir::HirObjectField {
+                key: radix_hir::HirObjectKey::Ident(name),
+                value: Some(value),
+            });
+        }
+        let source = HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Tuple(Vec::new(), None),
+            ty: None,
+            span,
+        };
+        Some(HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Verte {
+                source: Box::new(source),
+                target,
+                entries: Some(entries),
+            },
+            ty: None,
+            span,
+        })
     }
 
     /// Return the label table for a direct binding subject, including a parenthesized
@@ -708,6 +773,9 @@ impl Lowerer<'_> {
                         false,
                     )
                 });
+                if let Some(ty) = ty {
+                    self.local_types.insert(def_id, ty);
+                }
                 // A declared integer-list binding keeps the whole-shape value
                 // reading (`tensor<f32, shape>`); scalar value bindings do
                 // not (size-type Z3 refuses them in extent positions).
