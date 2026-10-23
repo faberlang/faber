@@ -4,7 +4,8 @@
 //! out as a C-style struct: fields in DECLARATION order (taken from
 //! `MirValidationContext::struct_field_order`, never the unordered
 //! `struct_fields` map and never interner `Symbol` order), each at the next
-//! offset rounded up to its alignment. Scalars `f32`/`i32`/`u32` are 4/4, `int`
+//! offset rounded up to its alignment. Scalars `i8`/`u8` are 1/1,
+//! `i16`/`u16`/`f16`/`bf16` are 2/2, `f32`/`i32`/`u32` are 4/4, `int`
 //! (`numerus`, i64) and `u64` are 8/8, `vector<_, 2>` is 8/8, `vector<_, 4>` is
 //! 16/16. The struct alignment is the maximum field alignment and the struct
 //! size is rounded up to it.
@@ -58,8 +59,6 @@ pub enum StructLayoutRefusal {
     /// A genus with no instance fields.
     EmptyGenus,
     Bool,
-    /// 8-bit and 16-bit integers, `f16`, `bf16`.
-    NarrowScalar,
     F64,
     NestedGenus,
     /// A generic genus, a generic type parameter, or `Type::Applied`.
@@ -91,7 +90,6 @@ impl StructLayoutRefusal {
             Self::OpaqueGenus => "opaque genus",
             Self::EmptyGenus => "empty genus",
             Self::Bool => "bool field",
-            Self::NarrowScalar => "8-bit, 16-bit, f16 and bf16 fields",
             Self::F64 => "f64 field",
             Self::NestedGenus => "nested genus field",
             Self::Generic => "generic field or genus",
@@ -232,12 +230,11 @@ fn scalar_size_align(scalar: MirScalarLayout) -> Result<(u32, u32), StructLayout
         MirScalarLayout::F32 | MirScalarLayout::I32 | MirScalarLayout::U32 => Ok((4, 4)),
         MirScalarLayout::I64 | MirScalarLayout::U64 => Ok((8, 8)),
         MirScalarLayout::Bool => Err(StructLayoutRefusal::Bool),
-        MirScalarLayout::I8
-        | MirScalarLayout::U8
-        | MirScalarLayout::I16
+        MirScalarLayout::I8 | MirScalarLayout::U8 => Ok((1, 1)),
+        MirScalarLayout::I16
         | MirScalarLayout::U16
         | MirScalarLayout::F16
-        | MirScalarLayout::Bf16 => Err(StructLayoutRefusal::NarrowScalar),
+        | MirScalarLayout::Bf16 => Ok((2, 2)),
         MirScalarLayout::F64 => Err(StructLayoutRefusal::F64),
         MirScalarLayout::I128 | MirScalarLayout::Magnus => {
             Err(StructLayoutRefusal::UnsupportedField)

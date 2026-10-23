@@ -280,19 +280,29 @@ fn refuses_bool() {
 }
 
 #[test]
-fn refuses_narrow_scalars() {
-    for (prim, width) in [
-        (Primitive::Numerus, NumericWidth::I8),
-        (Primitive::Numerus, NumericWidth::U8),
-        (Primitive::Numerus, NumericWidth::I16),
-        (Primitive::Numerus, NumericWidth::U16),
-        (Primitive::Fractus, NumericWidth::F16),
-        (Primitive::Fractus, NumericWidth::BF16),
-    ] {
-        let mut t = Types::new();
-        let ty = t.sized(prim, width);
-        assert_eq!(refusal(&t, &[ty]), StructLayoutRefusal::NarrowScalar);
-    }
+fn narrow_scalars_pack_by_width() {
+    let mut t = Types::new();
+    let i8 = t.sized(Primitive::Numerus, NumericWidth::I8);
+    let u8 = t.sized(Primitive::Numerus, NumericWidth::U8);
+    let i16 = t.sized(Primitive::Numerus, NumericWidth::I16);
+    let u16 = t.sized(Primitive::Numerus, NumericWidth::U16);
+    let f16 = t.sized(Primitive::Fractus, NumericWidth::F16);
+    let bf16 = t.sized(Primitive::Fractus, NumericWidth::BF16);
+    let f32 = t.f32();
+    let layout = resolve(&t, &[i8, u8, i16, u16, f16, bf16, f32]).expect("layout");
+    assert_eq!(
+        rows(&layout),
+        vec![
+            (0, 1, 1),
+            (1, 1, 1),
+            (2, 2, 2),
+            (4, 2, 2),
+            (6, 2, 2),
+            (8, 2, 2),
+            (12, 4, 4),
+        ]
+    );
+    assert_eq!((layout.size, layout.align), (16, 4));
 }
 
 #[test]
@@ -419,7 +429,6 @@ fn refusal_reasons_are_lowercase_and_distinct() {
         R::OpaqueGenus,
         R::EmptyGenus,
         R::Bool,
-        R::NarrowScalar,
         R::F64,
         R::NestedGenus,
         R::Generic,
