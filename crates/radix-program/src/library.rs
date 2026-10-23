@@ -18,8 +18,8 @@
 //!   APIs on the normal parse/typecheck path.
 //! - Old built-in slash forms such as `norma/json` are rejected instead of
 //!   silently reinterpreted.
-//! - `FABER_LIBRARY_HOME` env reading stays faber-side; this crate receives an
-//!   explicit configured home and falls back to the in-tree `<repo>/lib`.
+//! - The library home is explicit: this crate receives the home resolved by
+//!   faber and falls back to the in-tree `<repo>/lib`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -198,9 +198,9 @@ pub enum LibraryResolveError {
 /// locked. Faber never discovers package-manager store roots.
 ///
 /// The resolver carries explicit inputs only — a concrete home (or `None`),
-/// locked package roots, and declared dependencies. Ambient `FABER_LIBRARY_HOME`
-/// env reading is faber-side and constructs
-/// this resolver with the resolved home (CTO memo).
+/// locked package roots, and declared dependencies. The faber side resolves
+/// `--library-home` / `[paths] library_home` and passes the result here (CTO
+/// memo).
 #[derive(Debug, Clone)]
 pub struct LibraryResolver {
     library_home: Option<PathBuf>,
@@ -221,8 +221,8 @@ impl LibraryResolver {
     /// Build a resolver from an explicit optional home.
     ///
     /// `None` means no library home is available (deterministic for the same
-    /// input); the faber side resolves `FABER_LIBRARY_HOME` and passes the result
-    /// here; the in-tree `<repo>/lib` is searched after it.
+    /// input); the faber side resolves `--library-home` / `[paths] library_home`
+    /// and passes the result here; the in-tree `<repo>/lib` is searched after it.
     #[must_use]
     pub fn with_optional_home(library_home: Option<PathBuf>) -> Self {
         Self {

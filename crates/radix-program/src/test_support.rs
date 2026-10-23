@@ -145,7 +145,7 @@ fn test_executed_lane_target(
 
 /// A config-rooted library resolver: an explicit `library_home` becomes the
 /// home (the moved tests use `Config::with_library_home` fixtures); without
-/// one the resolver has no home (no `FABER_LIBRARY_HOME` in tests).
+/// one the resolver has no home (no library home in tests).
 fn test_library_resolver(config: &Config) -> LibraryResolver {
     if let Some(path) = config.library_home.as_ref() {
         return LibraryResolver::new(path.clone());
