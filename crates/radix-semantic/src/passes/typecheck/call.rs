@@ -1289,6 +1289,12 @@ impl TypeChecker<'_> {
                 vacuum_ty,
                 span,
             )),
+            (DirectionalViewKind::Meus, "flush") => {
+                if self.reject_view_method_args(args, span, "meus.flush") {
+                    return Some(self.error_type);
+                }
+                Some(vacuum_ty)
+            }
             (DirectionalViewKind::Meus, "fini") => {
                 if self.reject_view_method_args(args, span, "meus.fini") {
                     return Some(self.error_type);
