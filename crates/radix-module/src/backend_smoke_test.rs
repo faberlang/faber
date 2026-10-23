@@ -59,12 +59,13 @@ fn smoke_hir_rust_mangled_real_emit_fails_when_rustc_present() {
     assert!(failed.is_err(), "mangled real Rust emit must fail smoke when rustc is present");
 }
 
+#[ignore = "requires llvm-as on PATH; manual verifier proof"]
 #[test]
 fn smoke_mir_llvm_mangled_real_emit_fails_when_llvm_as_present() {
-    if !llvm_as_available() {
-        eprintln!("llvm-as not found on PATH; skipping llvm mangled-emit self-test");
-        return;
-    }
+    assert!(
+        llvm_as_available(),
+        "llvm-as must be on PATH for the LLVM mangled-emit manual proof"
+    );
     let ll = emit_llvm_from_faber(
         r"
 functio adde(numerus a, numerus b) → numerus {

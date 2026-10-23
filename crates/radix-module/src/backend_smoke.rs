@@ -505,6 +505,10 @@ pub fn assert_mir_wasm_text_smoke(wat: &str, label: &str) {
 }
 
 /// Family B entry point: assembles LLVM IR with `llvm-as` when available.
+///
+/// Opt-in only: ordinary suites must assert emitted text instead of calling
+/// this. The remaining callers are the ignored manual verifier proof and the
+/// `./scripta/smoke-ci` lane, where a missing tool skips with a traced line.
 /// # Panics
 ///
 /// Panics when an assertion or unwrap path fails (test/helper utilities).
