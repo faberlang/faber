@@ -463,10 +463,12 @@ impl Target {
     /// Rust, the runner family (`MirStepper`, `MirFmir*`), and Faber/FHIR
     /// share `faber-leaf` or preserve its calls, and declare all nine leaves
     /// (129 routes: fs 47, stdio 18, process 12, clock 4, entropy 5, tcp 14,
-    /// http 20, websocket 8, machine 1). Go declares only its complete ports:
-    /// clock 4/4, entropy 5/5, and stdio 18/18 (including `consolum:metire`).
-    /// Its process module implements only 5 of 12 routes, so process remains
-    /// undeclared; partial coverage is never declared as a whole leaf. Wasm
+    /// http 20, websocket 8, machine 1). Go declares its four complete ports:
+    /// stdio 18/18 (including `consolum:metire`), process 12/12 (including
+    /// `processus:captura`, `processus:exsequi` and `processus:exsequetur`),
+    /// clock 4/4, and entropy 5/5. Its fs, tcp, http, websocket and machine
+    /// ports stay undeclared, because partial coverage is never declared as a
+    /// whole leaf. Wasm
     /// declares stdio for its closed-set WAT probe. Clif declares clock 4/4,
     /// served by the native runtime's `faber-leaf` conversations; every other
     /// leaf still fails closed.
@@ -480,7 +482,7 @@ impl Target {
             | Target::MirFmirBundle
             | Target::HirFaber
             | Target::HirFhir => Leaf::ALL,
-            Target::HirGo => &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy],
+            Target::HirGo => &[Leaf::Stdio, Leaf::Process, Leaf::Clock, Leaf::Entropy],
             Target::MirWasm => &[Leaf::Stdio],
             Target::MirClif => &[Leaf::Clock],
             Target::HirTypeScript

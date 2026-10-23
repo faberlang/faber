@@ -69,6 +69,19 @@ incipit {
     assert!(result.success(), "go must declare stdio: {:?}", issue_values(&result));
 }
 
+#[cfg(feature = "hir-go")]
+#[test]
+fn go_admits_inline_process_leaf() {
+    const SOURCE: &str = r#"
+incipit {
+    sit numerus identitas ← ad 'processus:identitas' ↦ numerus
+    nota identitas
+}
+"#;
+    let result = compile(Target::HirGo, SOURCE);
+    assert!(result.success(), "go must declare process: {:?}", issue_values(&result));
+}
+
 #[test]
 fn go_rejects_inline_fs_leaf() {
     let result = compile(Target::HirGo, INLINE_FS);

@@ -418,7 +418,7 @@ fn rust_and_runner_declare_the_n2_leaves() {
     }
     assert_eq!(
         target_leaves(crate::codegen::Target::HirGo),
-        &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy]
+        &[Leaf::Stdio, Leaf::Process, Leaf::Clock, Leaf::Entropy]
     );
 }
 

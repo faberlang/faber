@@ -72,7 +72,7 @@ fn program_argv() -> Vec<String> {
 }
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "processus:genera",
     "processus:dimitte",
     "processus:captura",

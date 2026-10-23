@@ -45,11 +45,10 @@ fn all_is_the_declared_set() {
 fn supported_leaves_go_is_exactly_the_ported_set() {
     assert_eq!(
         Target::HirGo.supported_leaves(),
-        &[Leaf::Stdio, Leaf::Clock, Leaf::Entropy]
+        &[Leaf::Stdio, Leaf::Process, Leaf::Clock, Leaf::Entropy]
     );
     for leaf in [
         Leaf::Fs,
-        Leaf::Process,
         Leaf::Tcp,
         Leaf::Http,
         Leaf::Websocket,

@@ -39,7 +39,7 @@ fn with_rng<R>(f: impl FnOnce(&mut Rng) -> R) -> R {
 }
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "aleator:fractum",
     "aleator:sortire",
     "aleator:octetos",

@@ -11,6 +11,12 @@
       "phase": "build",
       "diagnostic_contains": "clif-subset",
       "reason": "The clif package builder declines this case before any code is generated: the MIR capability classifier reports the `clif-subset` issue, so the `norma:websocket` loopback is never lowered. The clif lane carries no `websocket:*` port for this family yet; re-measure this row when that port lands."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "leaf_unsupported_on_target",
+      "reason": "The Go lane carries no `websocket:*` websocket port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
     }
   }
 }
