@@ -1,0 +1,31 @@
++++
+term = "genus const receiver method"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "construction_source", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "assignment", "place"]
+category = "type"
+canonical = false
+summary = "A method that writes its receiver requires a writable genus binding."
+syntax = "c.bump()"
+related = ["genus", "let", "mut"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM020:imperativus_operator_method_requires_varia_receiver"
++++
+# =============================================================================
+# genus const receiver method — writes need a writable receiver binding
+# =============================================================================
+# The method changes its own value through `self`. Calling it through a `let`
+# binding would write through a read-only receiver, so the call is rejected.
+
+class Counter {
+    mut int value
+
+    fn bump() {
+        self.value ← self.value + 1
+    }
+}
+
+main {
+    let Counter c ← Counter { value = 0 }
+    c.bump()
+}
