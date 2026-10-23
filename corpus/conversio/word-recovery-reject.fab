@@ -1,0 +1,26 @@
++++
+kind = "reject"
+no_expected = "rejects"
+diagnostic = "SEM016:word_conversio_recovery_unsupported"
+term = "↦"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "conversio_expr", "inline_default", "via_clause", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "A conversion into a policy word is total, so a recovery slot is not accepted."
+syntax = "n ↦ wrapping<u8> ⊥ 0 — rejected; wrapping and saturating conversions are total"
+related = ["↦", "⊥", "wrapping", "saturating"]
+locale = "en"
++++
+# =============================================================================
+# Policy-word recovery — total conversions have no failure to recover from.
+# =============================================================================
+#
+# What this teaches:
+#   • A conversion into a policy word cannot fail, so a `⊥` recovery slot is
+#     refused rather than accepted and ignored.
+#   • Wrap and clamp are values, not failures.
+#
+main {
+    let int n ← 300
+    let wrapping<u8> w ← n ↦ wrapping<u8> ⊥ 0
+}

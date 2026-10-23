@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/conversio/ascription-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/ascription-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "numeric_ascription_requires_conversion"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "numeric_ascription_requires_conversion"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "numeric_ascription_requires_conversion"
