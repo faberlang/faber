@@ -243,3 +243,71 @@ fn tensor_bracket_range_write_refused() {
         "tensor_bracket_index_integer_or_lista",
     );
 }
+
+#[test]
+fn tensor_bracket_slot_range_drops_integer_axis() {
+    accepts(
+        r"functio row(tf32[2, 3] g) → tf32[3] {
+    sit tf32[3] s ← g[[1, 0 ‥ 3]]
+    redde s
+}",
+    );
+}
+
+#[test]
+fn tensor_bracket_slot_range_keeps_written_range_axis() {
+    accepts(
+        r"functio row(tf32[2, 3] g) → tf32[1, 3] {
+    sit tf32[1, 3] s ← g[[1 … 1, 0 ‥ 3]]
+    redde s
+}",
+    );
+}
+
+#[test]
+fn tensor_bracket_slot_range_step_kept_extent() {
+    accepts(
+        r"functio strides(tf32[4, 6] g) → tf32[2, 3] {
+    redde g[[0 ‥ 4 per 2, 0 ‥ 6 per 2]]
+}",
+    );
+}
+
+#[test]
+fn tensor_bracket_slot_integer_keeps_coordinate_read() {
+    accepts(
+        r"functio cell(tf32[2, 3] g) → f32 {
+    redde g[[1, 2]]
+}",
+    );
+}
+
+#[test]
+fn tensor_bracket_slot_float_slot_rejects() {
+    rejects_with_issue(
+        r"functio bad(tf32[2, 3] g) → tf32[2] {
+    redde g[[1, 0.5 ‥ 2]]
+}",
+        "tensor_bracket_slot_integer_or_range",
+    );
+}
+
+#[test]
+fn tensor_bracket_slot_count_mismatch_rejects() {
+    rejects_with_issue(
+        r"functio bad(tf32[2, 2, 2] g) → tf32[2] {
+    redde g[[1, 0 ‥ 3]]
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn tensor_bracket_slot_window_out_of_range_rejects() {
+    rejects_with_issue(
+        r"functio bad(tf32[2, 3] g) → tf32[2] {
+    redde g[[1, 1 ‥ 5]]
+}",
+        "index_provably_out_of_bounds",
+    );
+}

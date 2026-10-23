@@ -888,17 +888,189 @@ pub(super) fn reject_static_bounded_index_oob(
     report_static_index_oob(checker, index, &range);
 }
 
+/// Check a bracket list whose elements independently retain or drop tensor axes.
+/// Integer slots select coordinates; range slots slice and retain their axis.
+pub(super) fn check_tensor_bracket_slot_list_index(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    elem: TypeId,
+    shape: IndexId,
+    index: &mut HirExpression,
+) -> TypeId {
+    let HirExpressionKind::Array(elements) = &mut index.kind else {
+        return tensor_with_fresh_shape(checker, elem);
+    };
+    if elements.iter().any(|element| {
+        matches!(element, HirArrayElement::Spread(_) | HirArrayElement::Infer(_))
+    }) {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            index.span,
+        );
+        return tensor_with_fresh_shape(checker, elem);
+    }
+
+    let slots_len = elements.len();
+    let resolved_shape = checker.resolve_index(shape);
+    if matches!(
+        checker.types.get_index(resolved_shape),
+        IndexExpr::Tuple(dims) if dims.len() != slots_len
+    ) {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+            index.span,
+        );
+        return tensor_with_fresh_shape(checker, elem);
+    }
+
+    let static_bounds = static_tensor_bounds(checker, shape);
+    let mut has_range = false;
+    let mut all_kept_extents_static = true;
+    let mut kept_extents = Vec::new();
+    let mut static_oob = Vec::new();
+    for (axis, element) in elements.iter_mut().enumerate() {
+        let HirArrayElement::Expr(slot) = element else {
+            continue;
+        };
+        if let HirExpressionKind::Intervallum {
+            start,
+            end,
+            step,
+            kind,
+        } = &mut slot.kind
+        {
+            has_range = true;
+            let range_kind = *kind;
+            for part in [start.as_mut(), end.as_mut()] {
+                let ty = checker.check_expr(part);
+                if !crate::numeric_width::is_integer_index_scalar(
+                    checker.types,
+                    checker.resolve_inferred_type(ty),
+                ) {
+                    checker.invalid_operand_types(
+                        "tensor_bracket_slot_integer_or_range",
+                        part.span,
+                    );
+                }
+            }
+            if let Some(step_expr) = step {
+                let previous = checker.allow_intervallum_step;
+                checker.allow_intervallum_step = true;
+                let step_ty = checker.check_expr(step_expr);
+                checker.allow_intervallum_step = previous;
+                if !crate::numeric_width::is_integer_index_scalar(
+                    checker.types,
+                    checker.resolve_inferred_type(step_ty),
+                ) {
+                    checker.invalid_operand_types(
+                        "tensor_bracket_slot_integer_or_range",
+                        step_expr.span,
+                    );
+                }
+            }
+
+            let static_step = step
+                .as_deref()
+                .map_or(Some(1), static_numerus_literal);
+            let literal_window = static_numerus_literal(start)
+                .zip(static_numerus_literal(end))
+                .zip(static_step);
+            if let (Some(bound), Some(((start_value, end_value), step_value))) =
+                (static_bounds.get(axis).copied(), literal_window)
+            {
+                let end_eff = if range_kind == HirRangeKind::Inclusive {
+                    end_value.checked_add(1)
+                } else {
+                    Some(end_value)
+                };
+                if let Some(end_eff) = end_eff {
+                    let out_of_range = start_value > end_eff
+                        || end_eff > bound
+                        || step_value == 0;
+                    if out_of_range {
+                        static_oob.push((
+                            vec![
+                                i128::from(start_value),
+                                i128::from(end_eff.saturating_sub(1)),
+                            ],
+                            bound,
+                            axis,
+                        ));
+                    }
+                    if step_value > 0 && start_value <= end_eff {
+                        let extent = (end_eff - start_value).div_ceil(step_value);
+                        kept_extents.push(checker.types.intern_index(IndexExpr::Literal(extent)));
+                    } else {
+                        all_kept_extents_static = false;
+                    }
+                } else {
+                    static_oob.push((
+                        vec![i128::from(start_value), i128::from(end_value)],
+                        bound,
+                        axis,
+                    ));
+                    all_kept_extents_static = false;
+                }
+            } else {
+                all_kept_extents_static = false;
+            }
+        } else {
+            let slot_ty = checker.check_expr(slot);
+            if !crate::numeric_width::is_integer_index_scalar(
+                checker.types,
+                checker.resolve_inferred_type(slot_ty),
+            ) {
+                checker.invalid_operand_types(
+                    "tensor_bracket_slot_integer_or_range",
+                    slot.span,
+                );
+            }
+            if let (Some(bound), Some(value)) = (
+                static_bounds.get(axis).copied(),
+                static_signed_numerus_literal(slot),
+            ) && (value < 0 || u128::try_from(value).map_or(true, |v| v >= u128::from(bound)))
+            {
+                static_oob.push((vec![value], bound, axis));
+            }
+        }
+    }
+
+    for (indices, bound, axis) in static_oob {
+        report_static_index_oob(
+            checker,
+            index,
+            &StaticIndexRange::OutOfRange {
+                indices,
+                bound,
+                axis,
+            },
+        );
+    }
+    if !has_range {
+        warn_unproven_kernel_index(checker, receiver_ty, index);
+        return elem;
+    }
+    if all_kept_extents_static && !kept_extents.is_empty() {
+        let result_shape = checker
+            .types
+            .intern_index(IndexExpr::Tuple(kept_extents));
+        return checker.types.tensor_with_shape(elem, result_shape);
+    }
+    // WHY: dynamic range bounds leave the retained axes' extents unknown;
+    // preserve the tensor family with a fresh shape hole rather than guessing.
+    tensor_with_fresh_shape(checker, elem)
+}
+
 /// Check a bracket range read on a rank-1 tensor: `t[lo ‥ hi]` reads a sliced
 /// tensor, not a list window (operator ruling 2026-10-17: every slot of a
 /// bracket index takes a range, with step; out of range, the bracket dies).
 ///
-/// Only the rank-1 scalar range is admitted. Per-slot list indexes and
-/// matrix/vector receivers keep declining as before. The caller guarantees the
-/// receiver is a tensor and passes its element type and shape.
-// Uncalled until the bracket-index caller unit (5433ed4f-1.2.3) wires it; the
-// literal-shape tail is 5433ed4f-1.2.2. Dead until then by design, like the
-// `FactKey::Field` producer in control.rs.
-#[allow(dead_code)]
+/// Direct scalar ranges are admitted only on rank-1 tensors; rank-N bracket
+/// lists use [`check_tensor_bracket_slot_list_index`] to retain/drop axes.
+/// The caller guarantees the receiver is a tensor and passes its element type
+/// and shape.
 pub(super) fn check_tensor_bracket_range_index(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
