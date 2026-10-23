@@ -10,6 +10,10 @@ locale = "en"
 # Each sink type decides what adding one item means: a list appends, a set
 # adds the item if it is absent, a stream writes it.
 #
+# The contract's collect-and-read implementation is `Collector` below: an
+# in-memory sink that keeps every item it received and hands the buffer back
+# as a list (`to_list`), so tests and callers can read what was sunk.
+#
 # The compiler recognizes this contract by the `@ radix contract "sinking"`
 # mark (never by its name) and adds what a plain contract cannot:
 # - `s ⇜ x` is the operator form of `s.sink(x)`; it dies on a failed write
@@ -31,4 +35,30 @@ import from "norma:fault" fault
 interface Sink<T> {
     fn sink(T item) → void ⇥ fault.IoFault
     fn flush() → void ⇥ fault.IoFault
+}
+
+# =============================================================================
+# COLLECTOR (in-memory sink)
+# =============================================================================
+#
+# Keeps what it receives in `received` and returns a copy of it from
+# `to_list`, so a caller can collect output and read it back. Bound to
+# `string`: a generic `Collector<T>` is not supported because the contract
+# check does not substitute a receiver's type arguments into `sink(T)`.
+@ public
+class Collector implements Sink<string> {
+    mut list<string> received = []
+
+    fn sink(string item) → void ⇥ fault.IoFault {
+        self.received.append(item)
+    }
+
+    fn flush() → void ⇥ fault.IoFault {
+    }
+
+    # Perfectum — copy out; does not consume the collector.
+    fn to_list() → list<string> {
+        mut list<string> out ← copy self.received
+        return out
+    }
 }
