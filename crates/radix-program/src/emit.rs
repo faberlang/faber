@@ -28,18 +28,23 @@ use crate::library::LibraryResolver;
 use crate::test_source_filter::TestSourceFilter;
 
 /// Result of a package compile that explicitly carries the Go multi-module
-/// file collection produced by the Go assembly path (G6 GO3/GO4).
+/// file collection produced by the Go assembly path (G6 GO3/GO4), and the
+/// Python multi-file collection produced by Python package assembly.
 ///
 /// RP4: moved from `crates/faber/src/package/compile.rs`. The module files are
-/// an output of the Go compile path — never hidden thread-local state
-/// (FBR-P2-003) — so failed, repeated, nested, and concurrent compile calls
-/// cannot exchange module output.
+/// outputs of their compile paths — never hidden thread-local state (FBR-P2-003)
+/// — so failed, repeated, nested, and concurrent compile calls cannot exchange
+/// module output.
 pub struct PackageCompileResult {
     pub compile_result: CompileResult,
     /// Go multi-module files `(file name, file body)` for non-entry units,
     /// populated only for `Target::HirGo` packages that reached codegen.
     #[cfg(feature = "hir-go")]
     pub go_modules: Vec<(String, String)>,
+    /// Python package files `(relative path, file body)` for units that reached
+    /// codegen. This output is explicit, never hidden thread-local state.
+    #[cfg(feature = "hir-python")]
+    pub python_modules: Vec<(String, String)>,
 }
 
 /// Go package-emission seam: faber's `generate_package_go_result` (uses the
@@ -78,6 +83,8 @@ pub fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
         },
         #[cfg(feature = "hir-go")]
         go_modules: Vec::new(),
+        #[cfg(feature = "hir-python")]
+        python_modules: Vec::new(),
     }
 }
 
@@ -376,6 +383,8 @@ fn compile_package_ts(
             compile_result: (seams.emit_ts)(package, input),
             #[cfg(feature = "hir-go")]
             go_modules: Vec::new(),
+            #[cfg(feature = "hir-python")]
+            python_modules: Vec::new(),
         }
     }
 }
@@ -465,6 +474,8 @@ fn compile_package_wasm(package: AnalyzedProgram, input: &Path) -> PackageCompil
             },
             #[cfg(feature = "hir-go")]
             go_modules: Vec::new(),
+            #[cfg(feature = "hir-python")]
+            python_modules: Vec::new(),
         }
     }
 }

@@ -15,6 +15,13 @@ use radix_module::driver::Config;
 use super::*;
 use crate::test_support::test_analysis_seams;
 
+#[cfg(feature = "hir-python")]
+#[test]
+fn package_result_python_modules_start_empty() {
+    let result = compile_failure(vec![]);
+    assert!(result.python_modules.is_empty());
+}
+
 /// Minimal emission seams for the Rust emission tests: no product manifest
 /// validation, no ambient library home, and a never-exercised Go emitter
 /// (these tests only run the Rust path).
@@ -68,6 +75,8 @@ fn go_package_test_emission(package: &AnalyzedProgram, _input: &Path) -> Package
             diagnostics: package.diagnostics.clone(),
         },
         go_modules,
+        #[cfg(feature = "hir-python")]
+        python_modules: Vec::new(),
     }
 }
 
