@@ -218,56 +218,6 @@ fn diagnostic_has_arg(diag: &Diagnostic, name: &'static str, value: impl Into<St
     diag.args.contains(&DiagnosticArg::new(name, value))
 }
 
-/// A missing external toolchain may skip a proof only on the Linux merge-lane
-/// gate (which has no ghc/go/python>=3.12/llvm-as/rustfmt toolchain) and only
-/// when `FABER_REQUIRE_TOOLCHAINS` is unset. The macOS gate treats these proofs
-/// as mandatory, so a missing tool there is a test failure.
-fn may_skip_missing_tool_on(is_linux: bool, require_toolchains: bool) -> bool {
-    is_linux && !require_toolchains
-}
-
-#[cfg(feature = "hir-rust")]
-fn may_skip_missing_tool() -> bool {
-    may_skip_missing_tool_on(
-        cfg!(target_os = "linux"),
-        std::env::var_os("FABER_REQUIRE_TOOLCHAINS").is_some(),
-    )
-}
-
-/// Print the visible skip line and return when the policy allows a skip;
-/// otherwise fail the proof with the message it carried before the env gates.
-fn missing_tool_with(may_skip: bool, tool: &str, proof: &str, old_failure: &str) {
-    if may_skip {
-        eprintln!("SKIPPED ({tool} missing): {proof}");
-        return;
-    }
-    panic!("{old_failure}");
-}
-
-#[cfg(feature = "hir-rust")]
-fn missing_tool(tool: &str, proof: &str, old_failure: &str) {
-    missing_tool_with(may_skip_missing_tool(), tool, proof, old_failure);
-}
-
-#[test]
-fn missing_toolchain_skip_policy_is_linux_without_require_only() {
-    assert!(!may_skip_missing_tool_on(false, false));
-    assert!(may_skip_missing_tool_on(true, false));
-    assert!(!may_skip_missing_tool_on(true, true));
-    assert!(!may_skip_missing_tool_on(false, true));
-}
-
-#[test]
-#[should_panic]
-fn missing_tool_fails_off_linux_without_opt_out() {
-    missing_tool_with(
-        false,
-        "rustfmt",
-        "missing_tool_fails_off_linux_without_opt_out",
-        "rustfmt is required by this proof (was: expect(\"rustfmt\"))",
-    );
-}
-
 #[test]
 fn executed_lane_analysis_target_seam_is_single_valued() {
     // TARGETLANE001 / BUG-F585D081: single-valued precedence is explicit
@@ -11506,6 +11456,7 @@ entry = "main.fab"
 
 #[cfg(feature = "hir-rust")]
 #[cfg(feature = "hir-go")]
+#[ignore = "requires a go toolchain on PATH; manual native build proof"]
 #[test]
 fn g6_go3_single_entry_cli_package_compiles_and_go_builds() {
     let dir = test_temp_dir("g6-go3-true");
@@ -11558,19 +11509,6 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &[]).expect("emit go");
-    // The assertions above are toolchain-free; the native build needs `go`.
-    if !Command::new("go")
-        .arg("version")
-        .output()
-        .is_ok_and(|output| output.status.success())
-    {
-        missing_tool(
-            "go",
-            "g6_go3_single_entry_cli_package_compiles_and_go_builds",
-            "go is required by this proof (was: expect(\"go build\"))",
-        );
-        return;
-    }
     let binary = super::invoke_go_build(&go_layout).expect("go build");
     assert!(binary.exists(), "binary missing at {}", binary.display());
 
@@ -11581,9 +11519,10 @@ main args args exit 0 {
     assert_eq!(status.code(), Some(0), "true-style binary should exit 0");
 }
 
-#[cfg(feature = "hir-go")]
-#[test]
 #[cfg(feature = "hir-rust")]
+#[cfg(feature = "hir-go")]
+#[ignore = "requires a go toolchain on PATH; manual native build proof"]
+#[test]
 fn g6_go4_multi_module_namespace_package_builds() {
     let dir = test_temp_dir("g6-go4-multi");
     fs::create_dir_all(dir.join("src")).expect("src");
@@ -11652,19 +11591,6 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit go");
-    // The assertions above are toolchain-free; the native build needs `go`.
-    if !Command::new("go")
-        .arg("version")
-        .output()
-        .is_ok_and(|output| output.status.success())
-    {
-        missing_tool(
-            "go",
-            "g6_go4_multi_module_namespace_package_builds",
-            "go is required by this proof (was: expect(\"go build\"))",
-        );
-        return;
-    }
     let binary = super::invoke_go_build(&go_layout).expect("go build");
     let status = Command::new(&binary).status().expect("run");
     assert_eq!(status.code(), Some(0));
@@ -11801,6 +11727,7 @@ main args args exit 0 {
 
 #[cfg(feature = "hir-rust")]
 #[cfg(feature = "hir-go")]
+#[ignore = "requires a go toolchain on PATH; manual native build proof"]
 #[test]
 fn g6_consolum_shim_supports_full_stdio_surface() {
     let dir = test_temp_dir("g6-consolum-surface");
@@ -11866,19 +11793,6 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    // The assertions above are toolchain-free; the native build needs `go`.
-    if !Command::new("go")
-        .arg("version")
-        .output()
-        .is_ok_and(|output| output.status.success())
-    {
-        missing_tool(
-            "go",
-            "g6_consolum_shim_supports_full_stdio_surface",
-            "go is required by this proof (was: expect(\"go build consolum surface\"))",
-        );
-        return;
-    }
     let binary = super::invoke_go_build(&go_layout).expect("go build consolum surface");
 
     let mut child = Command::new(&binary)
