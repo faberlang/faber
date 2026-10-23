@@ -1,0 +1,62 @@
++++
+term = "⇜"
+explains = ["⇜"]
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "entry_header", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "sink_into", "transfer", "assignment", "expression", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "typed_constructor", "field_list", "field_init", "literal", "nota_stmt"]
+category = "collection"
+canonical = true
+summary = "Sink-into writes one exactly typed item with ⇜, the operator form of sink.sink(item)."
+syntax = "<mut Sink<T>> ⇜ <T>"
+related = ["Sink", "⇇", "transfer"]
+locale = "en"
++++
+# =============================================================================
+# ⇜ — sink-into writes one item to a Sink<T>
+# =============================================================================
+#
+# What this teaches:
+#   • `sink ⇜ item` is the statement form of `sink.sink(item)`
+#   • The item must be exactly the `T` in `Sink<T>`; the operator does not
+#     implicitly convert it
+#   • A sink chooses its own meaning for one item and for `flush()`
+#
+# The local contract below is the same marked Sink<T> contract Norma exports.
+# `TextSink` records exact items so both the method and glyph forms are visible.
+
+@ radix contract "sinking"
+interface Sink<T> {
+    fn sink(T item) → void ⇥ string
+    fn flush() → void ⇥ string
+}
+
+class TextSink implements Sink<string> {
+    mut list<string> items = empty
+
+    fn sink(string item) → void ⇥ string {
+        self.items.append(item)
+    }
+
+    fn flush() → void ⇥ string {
+    }
+}
+
+fn write(mut TextSink sink) → void ⇥ string {
+    sink.sink("method")
+    sink ⇜ "operator"
+    sink.flush()
+}
+
+main args args {
+    if args.length() ≻ 0 {
+        assert args[0] ≡ "sink"
+    }
+
+    mut TextSink sink ← TextSink { items = [] }
+    do {
+        write(mut sink)
+    }
+    catch error {
+        print error
+    }
+    print sink.items
+}

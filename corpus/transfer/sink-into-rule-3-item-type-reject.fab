@@ -1,0 +1,38 @@
++++
+term = "⇜"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "sink_into", "transfer", "assignment", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Rule 3 rejects an item that is not exactly the T of Sink<T>."
+syntax = "sink ⇜ item of a different type"
+related = ["⇜", "Sink"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM010:sink_into_item_type_mismatch"
++++
+# Rule 3: the item must be exactly the type parameter in Sink<T>; ⇜ never
+# inserts an implicit conversion.
+
+@ radix contract "sinking"
+interface Sink<T> {
+    fn sink(T item) → void ⇥ string
+    fn flush() → void ⇥ string
+}
+
+class TextSink implements Sink<string> {
+    mut list<string> items = empty
+
+    fn sink(string item) → void ⇥ string {
+        self.items.append(item)
+    }
+
+    fn flush() → void ⇥ string {
+    }
+}
+
+fn write(mut TextSink sink) → void {
+    sink ⇜ 7
+}
+
+main {}
