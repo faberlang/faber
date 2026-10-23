@@ -167,6 +167,30 @@ fn bits_print_is_hex_at_full_width() {
     assert!(code.contains("(uint64_t)l_one64"), "{code}");
 }
 
+/// `lista<b8> ↦ string` is the UTF-8 decode and `string ↦ lista<b8>` the
+/// encode: the byte list and the counted text are the same bytes, so the
+/// emitted program calls the two runtime helpers rather than a list show or a
+/// cast.
+#[test]
+fn bits_bytes_decode_and_encode() {
+    let code = emitted(
+        "main {\n    let string word ← \"héllo\"\n    let list<b8> utf8 ← word ↦ list<b8>\n    print utf8 ↦ string ⊥ \"?\"\n}",
+    );
+    assert!(code.contains("faber_text_bytes(faber_a,"), "{code}");
+    assert!(code.contains("faber_try_bytes_text(faber_a,"), "{code}");
+}
+
+/// The 16- and 32-bit text pairs stay refused by name: the C leaf carries the
+/// UTF-8 pair only, and a UTF-16 or UTF-32 unit list printed as a list would
+/// be a wrong program, not a missing one.
+#[test]
+fn bits_bytes_text_wide_pairs_are_refused() {
+    let construct = crate::test_support::rejected(
+        "main {\n    let list<b16> units ← [0x0068]\n    let string word ← units ↦ string ⊥ \"?\"\n}",
+    );
+    assert_eq!(construct, "list of raw bits and text");
+}
+
 /// The carrier: a `bN` is held in the unsigned C cell of its own width, and
 /// `b64` reads exact (it fills a `uint64_t` that no `int64_t` holds).
 #[test]

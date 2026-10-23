@@ -148,6 +148,24 @@ impl Emitter<'_> {
             }
             return Err(unsupported("conversion to bounded ascii from this value"));
         }
+        // The text pairs of a list of raw bits: `lista<b8> ↦ string` is the
+        // UTF-8 decode and `string ↦ lista<b8>` the encode, the pair the
+        // `octeti` (en `bytes`) leaf needs. The 16- and 32-bit pairs stay
+        // refused by name: no C text carrier here is UTF-16 or UTF-32, so a
+        // list show or a cast would be a wrong program.
+        if let Some(source_ty) = source.ty {
+            if radix_codegen_shared::is_byte_text_conversion(self.types, source_ty, target) {
+                let value = self.expr(source)?;
+                return if matches!(value.value, Value::List(_)) {
+                    self.bytes_text_decode(value, recovery)
+                } else {
+                    Ok(self.text_bytes_encode(value))
+                };
+            }
+            if radix_codegen_shared::list_text_conversion(self.types, source_ty, target).is_some() {
+                return Err(unsupported("list of raw bits and text"));
+            }
+        }
         let class = classify(self.types, target)?;
         let value = self.expr(source)?;
         let source_class = source.ty.map(|ty| classify(self.types, ty)).transpose()?;
@@ -498,6 +516,57 @@ impl Emitter<'_> {
             value.text
         );
         Ok(Operand::new(text, Value::Text).with_effect(value.effect))
+    }
+
+    /// `lista<b8> ↦ string`: the UTF-8 decode. The bytes are valid UTF-8 and
+    /// carry no `0x00` byte, which the NUL-terminated carrier has no text
+    /// value for, so `faber_try_bytes_text` says why it failed and the `⊥`
+    /// recovery takes its place.
+    fn bytes_text_decode(
+        &mut self,
+        value: Operand,
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Conv);
+        // The decode allocates the text it seals, like a list build.
+        self.support.need(Helper::List(
+            crate::ty::Elem::Bits(radix_types::BitsWidth::B8),
+            ListOp::New,
+        ));
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::Text {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} == 0 ? {v} : {};", fallback.text)
+            }
+            None => {
+                format!("if ({s} != 0) {{ faber_conv_fail(FABER_CONV_BYTES_TEXT, {s}); }} {v};")
+            }
+        };
+        let text = format!(
+            "(__extension__ ({{ int {s} = 0; faber_text {v} = faber_try_bytes_text(faber_a, {}, &{s}); {tail} }}))",
+            value.text
+        );
+        Ok(Operand::new(text, Value::Text))
+    }
+
+    /// `string ↦ lista<b8>`: the UTF-8 encode. The header's byte count is
+    /// copied into a fresh byte list, and it cannot fail: a text never carries
+    /// a NUL byte.
+    fn text_bytes_encode(&mut self, value: Operand) -> Operand {
+        self.support.need(Helper::List(
+            crate::ty::Elem::Bits(radix_types::BitsWidth::B8),
+            ListOp::New,
+        ));
+        Operand::new(
+            format!("faber_text_bytes(faber_a, {})", value.text),
+            Value::List(crate::ty::Elem::Bits(radix_types::BitsWidth::B8)),
+        )
     }
 
     /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
