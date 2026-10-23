@@ -384,11 +384,12 @@ fn tick_hz() -> u64 {
 
 #[cfg(target_os = "macos")]
 fn ticks_to_ns(ticks: u32, hz: u64) -> u64 {
-    if hz == 0 {
-        0
-    } else {
-        u64::from(ticks) * 1_000_000_000 / hz
-    }
+    // `checked_div` yields `None` exactly when `hz` is zero, so the zero-tick
+    // scale falls through to the same `0` the explicit guard produced.
+    u64::from(ticks)
+        .checked_mul(1_000_000_000)
+        .and_then(|scaled| scaled.checked_div(hz))
+        .unwrap_or(0)
 }
 
 #[cfg(target_os = "macos")]
