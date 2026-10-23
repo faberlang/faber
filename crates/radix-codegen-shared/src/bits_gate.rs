@@ -25,7 +25,8 @@ const ISSUE: &str = "bits_type_unsupported_on_target";
 /// (b64), the MIR sexp target as a non-negative exact Racket integer kept
 /// inside its N bits, the MIR wasm target as i32 (b8..b32) and i64 (b64) kept
 /// zero-extended in N bits, the MIR llvm target as iN, and the MIR clif target
-/// as an `i64` holding the zero-extended pattern.
+/// as an `i64` holding the zero-extended pattern, and the C emitter as
+/// `uint8_t`..`uint64_t`.
 fn target_admits_bits(target: Target) -> bool {
     matches!(
         target,
@@ -34,6 +35,7 @@ fn target_admits_bits(target: Target) -> bool {
             | Target::HirRust
             | Target::HirTypeScript
             | Target::HirGo
+            | Target::HirC
             | Target::HirSwift
             | Target::HirPython
             | Target::MirSexp

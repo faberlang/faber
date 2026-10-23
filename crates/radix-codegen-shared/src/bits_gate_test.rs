@@ -10,6 +10,23 @@ fn list_of(types: &mut TypeTable, element: TypeId) -> TypeId {
 }
 
 #[test]
+fn raw_bits_are_admitted_on_the_c_target() {
+    let mut types = TypeTable::new();
+    let _b8 = types.bits(BitsWidth::B8);
+
+    assert!(reject_bits_type(&types, Target::HirC).is_ok());
+
+    let error =
+        reject_bits_type(&types, Target::HirFhir).expect_err("FHIR has no raw-bits carrier");
+    assert!(
+        error
+            .args
+            .iter()
+            .any(|arg| { arg.name == "issue" && arg.value == "bits_type_unsupported_on_target" })
+    );
+}
+
+#[test]
 fn width_changing_list_decode_is_refused_by_name() {
     let mut types = TypeTable::new();
     let b8 = types.bits(BitsWidth::B8);
