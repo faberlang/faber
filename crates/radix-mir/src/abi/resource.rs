@@ -604,7 +604,7 @@ pub(crate) fn buffer_element_type(
             scalar.spelling(),
         )),
         MirLayoutKind::DeviceView(view) => {
-            require_kernel_device_view(view, allow_host_owned_tensor_entry)?;
+            require_kernel_device_view(view, validation, allow_host_owned_tensor_entry)?;
             tensor_element_type(ty, validation)
                 .ok_or_else(|| MirAbiError::new(ERR_KERNEL_DEVICE_VIEW_ELEMENT))
         }
@@ -634,7 +634,7 @@ pub(crate) fn device_view_element_type(
         .map_err(|error| MirAbiError::new(error.message))?;
     match layout.kind {
         MirLayoutKind::DeviceView(view) => {
-            require_kernel_device_view(view, allow_host_owned_tensor_entry)?;
+            require_kernel_device_view(view, validation, allow_host_owned_tensor_entry)?;
             tensor_element_type(ty, validation)
                 .ok_or_else(|| MirAbiError::new(ERR_KERNEL_DEVICE_VIEW_ELEMENT))
         }
@@ -644,6 +644,7 @@ pub(crate) fn device_view_element_type(
 
 pub(crate) fn require_kernel_device_view(
     view: crate::MirDeviceViewLayout,
+    validation: &MirValidationContext<'_>,
     allow_host_owned_tensor_entry: bool,
 ) -> Result<(), MirAbiError> {
     // MLC-4: sparse storage is rejected by name, before the generic
@@ -678,9 +679,19 @@ pub(crate) fn require_kernel_device_view(
     }
     // G15-3: a packed vector element (width 2 or 4; layout time already
     // declined width 3) is admitted when its lane element is a kernel element.
+    // A genus record element is admitted only when its field layout resolves;
+    // its byte width lands in the reflection row.
     let element = match view.element {
         crate::MirDeviceViewElement::Scalar(scalar) => scalar,
         crate::MirDeviceViewElement::Vector(vector) => vector.element,
+        crate::MirDeviceViewElement::Record(record_ty) => {
+            crate::resolve_struct_layout(MirType::semantic(record_ty), validation).map_err(
+                |refusal| {
+                    MirAbiError::new(format!("kernel device view element: {}", refusal.reason()))
+                },
+            )?;
+            return Ok(());
+        }
     };
     if !crate::tensor_type::is_kernel_element_layout(element) {
         return Err(MirAbiError::with_detail(

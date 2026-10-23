@@ -356,6 +356,9 @@ pub(crate) fn pack_table_with_packed_vec3(
                     element: *element,
                 }
             }
+            // A record has no table-only packed-vec3 spec; the row packer is
+            // test-only and admits only scalars and vectors.
+            MirDeviceViewElement::Record(_) => return Err(StructLayoutRefusal::UnsupportedField),
         };
         specs.push(spec);
     }
