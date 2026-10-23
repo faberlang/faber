@@ -1,0 +1,34 @@
++++
+locale = "en"
++++
+
+# fs symlink routes: create_link, read_link, and read_link_async.
+import from "norma:fs" fs
+import from "norma:process" process
+
+async_main {
+    let string dir ← fs.join([fs.temp_dir(), "norma-fs-symlink-§"(process.pid())])
+    fs.create_dir(dir)
+
+    let string target ← fs.join([dir, "target.txt"])
+    fs.write_file(target, "linked-payload")
+
+    let string link ← fs.join([dir, "link.txt"])
+    fs.create_link(target, link)
+
+    assert fs.exists(link)
+    assert fs.is_symlink(link)
+    assert fs.is_symlink(target) ≢ true
+
+    assert fs.read_link(link) ≡ target
+    await_const string link_target ← fs.read_link_async(link)
+    assert link_target ≡ target
+    assert fs.read_file<string>(link) ≡ "linked-payload"
+
+    fs.delete(link)
+    assert fs.exists(link) ≢ true
+    assert fs.exists(target)
+
+    fs.remove_tree(dir)
+    print "norma/fs/fs-symlink ok"
+}
