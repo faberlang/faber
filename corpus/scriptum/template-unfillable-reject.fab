@@ -1,0 +1,35 @@
++++
+term = "scriptum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "template_argument", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "A named template hole with no matching labeled actual is a lowering error."
+syntax = "\"§{a} §{b}\"(a: \"x\", extra: \"y\")"
+related = ["scriptum", "named-holes", "forma"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:unfillable_template_hole"
++++
+# =============================================================================
+# scriptum — named hole left unfilled
+# =============================================================================
+#
+# What this teaches:
+#   • Every named hole (`§{b}`) must be filled by a labeled actual of the same
+#     name; a labeled actual naming no hole is also rejected.
+#   • The pinned identity of this exemplum is `unfillable_template_hole`; the
+#     stray `extra` label additionally reports `unknown_template_hole_label`.
+#
+# Common mistakes:
+#   • Supplying an unrelated label instead of the one the template names.
+#
+# See also: scriptum, named-holes, forma
+#
+# This exemplum intentionally fails to compile.
+# =============================================================================
+
+main {
+    let string out ← "§{a} §{b}"(a: "x", extra: "y")
+    print out
+}

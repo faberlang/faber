@@ -1,0 +1,33 @@
++++
+term = "scriptum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "hole_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "template_argument", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "Labeled and positional actuals cannot be mixed in one template application."
+syntax = "\"§{a} §\"(\"x\", a: \"y\")"
+related = ["scriptum", "named-holes", "forma"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:mixed_template_actuals_unsupported"
++++
+# =============================================================================
+# scriptum — mixed labeled and positional actuals
+# =============================================================================
+#
+# What this teaches:
+#   • One application is either all-labeled (named holes) or all-positional
+#     (anonymous `§` holes); the two forms do not mix.
+#
+# Common mistakes:
+#   • Writing a positional argument next to a labeled one in the same call.
+#
+# See also: scriptum, named-holes, forma
+#
+# This exemplum intentionally fails to compile.
+# =============================================================================
+
+main {
+    let string out ← "§{a} §"("x", a: "y")
+    print out
+}
