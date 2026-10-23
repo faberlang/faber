@@ -570,6 +570,77 @@ fn insere_local_static_loads() {
 }
 
 #[test]
+fn finite_nan_scalar_round_trips() {
+    // `scalar/finite-nan.fab` declares discard locals whose initializers are
+    // `↦` / `∷` chains (`x ↦ b32 ↦ u32`, `bits ⇒ 23 ∧ 255 ∷ u32`). Lowering
+    // records an `AscriptionTarget` owner for each `∷` ascription; every
+    // authored type site and typed trivia owner must still name a node present
+    // in the finalized HIR before the artifact round-trips, otherwise the
+    // loader fails with a dangling HirId.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+    use radix_hir::{HirExpression, HirOwnerRef, HirStatement};
+    use std::collections::HashSet;
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/scalar/finite-nan.fab");
+    let name = path.display().to_string();
+    let source = std::fs::read_to_string(&path).expect("finite-nan fixture reads");
+    let session = Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original =
+        analyze_source(&session, &name, &source, AnalyzeRequest::default()).expect("finite-nan fixture analyzes");
+
+    struct HirIds(HashSet<radix_hir::HirId>);
+    impl radix_hir::visit::HirVisitor for HirIds {
+        fn visit_item(&mut self, item: &radix_hir::HirItem) {
+            self.0.insert(item.id);
+            radix_hir::visit::walk_item(self, item);
+        }
+
+        fn visit_stmt(&mut self, stmt: &HirStatement) {
+            self.0.insert(stmt.id);
+            radix_hir::visit::walk_stmt(self, stmt);
+        }
+
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            self.0.insert(expr.id);
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut ids = HirIds(HashSet::new());
+    radix_hir::visit::walk_program(&mut ids, &original.hir);
+
+    for (index, authored) in original.presentation.authored_types.iter().enumerate() {
+        if let HirOwnerRef::Hir(id) = authored.site.owner {
+            assert!(
+                ids.0.contains(&id),
+                "authored_types[{index}] site owner HirId({}) ({:?}) is not in the finalized HIR",
+                id.0,
+                authored.site.slot
+            );
+        }
+    }
+    for (index, owner) in original.presentation.owners.iter().enumerate() {
+        if let Some(HirOwnerRef::Hir(id)) = owner.semantic {
+            assert!(
+                ids.0.contains(&id),
+                "owners[{index}] semantic HirId({}) ({:?}) is not in the finalized HIR",
+                id.0,
+                owner.kind
+            );
+        }
+    }
+
+    let artifact = from_analyzed(&original, &name, &name);
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize finite-nan artifact");
+    load_fhir(&bytes).expect("finite-nan artifact must load");
+}
+
+#[test]
 fn serve_typed_round_trips() {
     // `ad/serve-typed.fab` authors `channel<O, R>` (`sermo<O, R>`) bindings.
     // The conversation type is a builtin named constructor whose finalized
