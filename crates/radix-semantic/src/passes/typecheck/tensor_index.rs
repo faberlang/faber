@@ -19,6 +19,7 @@ use super::*;
 const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 const ISSUE_UNPROVEN_KERNEL_INDEX: &str = "unproven_kernel_index";
 pub(super) const ISSUE_PROVABLY_OUT_OF_BOUNDS: &str = "index_provably_out_of_bounds";
+const ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED: &str = "bracket_range_static_bounds_required";
 
 const TENSOR_FORMA: &str = "forma";
 const TENSOR_GATHER: &str = "gather";
@@ -1173,6 +1174,109 @@ pub(super) fn check_tensor_bracket_range_index(
     let result = tensor_with_fresh_shape(checker, elem);
     reject_static_bounded_index_oob(checker, receiver_ty, index);
     result
+}
+
+/// Check a bracket range read on a register vector: `v[lo ‥ hi]` slices to a
+/// vector whose width is computed at compile time from literal bounds and step
+/// (operator ruling 2026-10-17: a slice stays in its family, and its shape is
+/// computed at compile time when the bounds are constant).
+///
+/// A register vector carries a literal width, so a non-literal bound or step
+/// cannot leave the slice width unknown the way a tensor shape hole can; that
+/// decline is its own issue rather than a silent `lista` window.
+///
+/// The caller guarantees the receiver is a vector and passes its element type
+/// and width.
+pub(super) fn check_vector_bracket_range_index(
+    checker: &mut TypeChecker<'_>,
+    elem: TypeId,
+    width: IndexId,
+    index: &mut HirExpression,
+) -> TypeId {
+    let HirExpressionKind::Intervallum {
+        start,
+        end,
+        step,
+        kind,
+    } = &mut index.kind
+    else {
+        return checker.error_type;
+    };
+    let range_kind = *kind;
+    let start_ty = checker.check_expr(start);
+    let start_ty = checker.resolve_inferred_type(start_ty);
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, start_ty) {
+        checker.invalid_operand_types(
+            super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+            start.span,
+        );
+    }
+    let end_ty = checker.check_expr(end);
+    let end_ty = checker.resolve_inferred_type(end_ty);
+    if !crate::numeric_width::is_integer_index_scalar(checker.types, end_ty) {
+        checker.invalid_operand_types(
+            super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+            end.span,
+        );
+    }
+    if let Some(step_expr) = step {
+        // WHY: the step of an `intervallum` here is a direct step by
+        // construction, so the flag admits it the same way the range
+        // expression does.
+        let prev = checker.allow_intervallum_step;
+        checker.allow_intervallum_step = true;
+        let step_ty = checker.check_expr(step_expr);
+        checker.allow_intervallum_step = prev;
+        let step_ty = checker.resolve_inferred_type(step_ty);
+        if !crate::numeric_width::is_integer_index_scalar(checker.types, step_ty) {
+            checker.invalid_operand_types(
+                super::access::ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA,
+                step_expr.span,
+            );
+        }
+    }
+    // WHY: a register vector slice keeps the vector family at a computed
+    // width, so every part of the range must be static; a non-literal bound or
+    // step is a decline, not a shape hole.
+    let static_step: Option<u64> = match step.as_deref() {
+        Some(step_expr) => static_numerus_literal(step_expr),
+        None => Some(1),
+    };
+    let static_width = crate::literal_vector_width(width, checker.types).map(u64::from);
+    let bounds = static_numerus_literal(start).zip(static_numerus_literal(end));
+    let (Some(width_value), Some((start_value, end_value)), Some(step_value)) =
+        (static_width, bounds, static_step)
+    else {
+        checker.invalid_operand_types(ISSUE_BRACKET_RANGE_STATIC_BOUNDS_REQUIRED, index.span);
+        return checker.error_type;
+    };
+    let end_eff = if range_kind == HirRangeKind::Inclusive {
+        end_value.saturating_add(1)
+    } else {
+        end_value
+    };
+    // WHY: the static bound proof uses the same OutOfRange form as
+    // `classify_static_index_range`, so `index_provably_out_of_bounds` carries
+    // the same `index`/`bound`/`axis` arguments here. A literal step of 0 is
+    // equally unusable and reports through the same issue.
+    if start_value > end_eff || end_eff > width_value || step_value == 0 {
+        report_static_index_oob(
+            checker,
+            index,
+            &StaticIndexRange::OutOfRange {
+                indices: vec![
+                    i128::from(start_value),
+                    i128::from(end_eff.saturating_sub(1)),
+                ],
+                bound: width_value,
+                axis: 0,
+            },
+        );
+        return checker.error_type;
+    }
+    let sliced = (end_eff - start_value).div_ceil(step_value);
+    let sliced_width = checker.types.intern_index(IndexExpr::Literal(sliced));
+    checker.types.vector_with_width(elem, sliced_width)
 }
 
 /// Axis extents of a tensor type, resolved; `None` when the type is not a

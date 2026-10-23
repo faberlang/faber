@@ -1058,6 +1058,15 @@ impl TypeChecker<'_> {
                 );
             }
         }
+        // WHY: `v[lo ‥ hi]` on a register vector is a vector slice whose width
+        // is computed at compile time from literal bounds (operator ruling
+        // 2026-10-17: a slice stays in its family), not a `lista` window, so it
+        // routes before the window decline in `check_index_from_type`.
+        if let Type::Vector(elem, width) = self.types.get(payload).clone()
+            && matches!(index.kind, HirExpressionKind::Intervallum { .. })
+        {
+            return super::tensor_index::check_vector_bracket_range_index(self, elem, width, index);
+        }
         let idx_ty = match self.check_tuple_key_bracket(resolved, index) {
             Some(ty) => ty,
             None => self.check_expr_allowing_direct_intervallum_step(index),
