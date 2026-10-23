@@ -3603,6 +3603,10 @@ help = "use an integer scalar or {lista} of integer indices"
 message = "tensor bracket slot requires an integer or range"
 help = "make each bracket slot an integer or an integer range such as 0 ‥ 2"
 
+[diagnostics.SEM011.issues.bracket_range_static_bounds_required]
+message = "vector bracket range requires literal integer bounds"
+help = "write the range bounds and step as integer literals so the slice width is known at compile time"
+
 [diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
 message = "tensor arithmetic requires numeric element type"
 help = "use numeric tensor or sparse element types"

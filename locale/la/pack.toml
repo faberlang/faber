@@ -3265,6 +3265,10 @@ help = "use an integer scalar or {lista} of integer indices"
 message = "index tensoris in uncis numerus aut intervallum esse debet"
 help = "quemque indicem numerum aut intervallum scribe, ut 0 ‥ 2"
 
+[diagnostics.SEM011.issues.bracket_range_static_bounds_required]
+message = "intervallum in uncis vectoris terminos litterales numerorum postulat"
+help = "terminos et passum intervallum litteralibus numeris scribe ut latitudo sectionis constet"
+
 [diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
 message = "tensor arithmetic requires numeric element type"
 help = "use numeric tensor or sparsa element types"

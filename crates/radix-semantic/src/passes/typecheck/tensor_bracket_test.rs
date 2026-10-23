@@ -311,3 +311,47 @@ fn tensor_bracket_slot_window_out_of_range_rejects() {
         "index_provably_out_of_bounds",
     );
 }
+
+#[test]
+fn vector_bracket_range_slice_accepts() {
+    // WHY: a register vector slice stays in the vector family, and a literal
+    // window gives the slice a statically computed width.
+    accepts(
+        r"functio cut(vector<f32, 4> v) → vector<f32, 2> {
+    sit vector<f32, 2> w ← v[1 ‥ 3]
+    redde w
+}",
+    );
+}
+
+#[test]
+fn vector_bracket_range_step_accepts() {
+    accepts(
+        r"functio passus(vector<f32, 4> v) → vector<f32, 2> {
+    sit vector<f32, 2> w ← v[0 ‥ 4 per 2]
+    redde w
+}",
+    );
+}
+
+#[test]
+fn vector_bracket_range_out_of_range_rejects() {
+    rejects_with_issue(
+        r"functio bad(vector<f32, 4> v) → vector<f32, 2> {
+    sit vector<f32, 2> w ← v[3 ‥ 7]
+    redde w
+}",
+        "index_provably_out_of_bounds",
+    );
+}
+
+#[test]
+fn vector_bracket_range_runtime_bounds_rejects() {
+    rejects_with_issue(
+        r"functio win(vector<f32, 4> v, numerus lo) → vector<f32, 2> {
+    sit vector<f32, 2> w ← v[lo ‥ 3]
+    redde w
+}",
+        "bracket_range_static_bounds_required",
+    );
+}
