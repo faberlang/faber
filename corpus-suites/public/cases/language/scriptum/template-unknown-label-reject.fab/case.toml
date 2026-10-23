@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/scriptum/template-unknown-label-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "scriptum/template-unknown-label-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_template_hole_label"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_template_hole_label"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "unknown_template_hole_label"
