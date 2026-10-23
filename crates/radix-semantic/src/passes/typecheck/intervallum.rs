@@ -163,6 +163,19 @@ impl TypeChecker<'_> {
         matches!(self.types.get(resolved), Type::Intervallum(..)).then_some(resolved)
     }
 
+    /// Whether `ty` is a range whose compile-time step is exactly one. A
+    /// non-range type is not a step-one range, so it answers `false`.
+    pub fn intervallum_step_is_one(&self, ty: TypeId) -> bool {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(resolved) {
+            Type::Intervallum(_, step) => matches!(
+                self.types.get_index(*step),
+                radix_types::IndexExpr::Literal(1)
+            ),
+            _ => false,
+        }
+    }
+
     pub fn resolve_intervallum_type(
         &mut self,
         ty: TypeId,
