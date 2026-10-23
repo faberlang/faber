@@ -174,7 +174,7 @@ fn sample(args: &[Arg]) -> Result<Reply, LeafError> {
             // the receiver, so its late value becomes the next previous slot.
             std::thread::spawn(move || {
                 if let Ok(Ok(late)) = rx.recv() {
-                    store_if_newer(make_previous(generation, late, None));
+                    store_late(generation, late);
                 }
             });
             Ok(previous_reply())
@@ -191,8 +191,8 @@ fn store_and_render(generation: u64, fresh: Collected) -> Reply {
 }
 
 /// Store `previous` only if it is newer than the slot's current snapshot.
-/// Callers have already released their guard (`store_and_render` drops the
-/// `slot()` guard of its `take()` at the semicolon), so this never nests.
+/// Callers have already released their guard (`store_and_render` and
+/// `store_late` drop it at the end of their body), so this never nests.
 fn store_if_newer(previous: Previous) {
     let mut guard = slot();
     if guard
@@ -201,6 +201,27 @@ fn store_if_newer(previous: Previous) {
     {
         *guard = Some(previous);
     }
+}
+
+/// Store a late collection against the snapshot that is current when it lands.
+/// A late read never had a slot of its own, so the stored snapshot is the only
+/// interval baseline available; rendering against `None` would drop the CPU
+/// signal from every replay even though the counters moved. A slot with a
+/// newer generation rejects the straggler outright, and a slot sampled after
+/// this late result is not an interval base (its counters are not a prefix).
+fn store_late(generation: u64, collected: Collected) {
+    let mut guard = slot();
+    let accepted = guard
+        .as_ref()
+        .is_none_or(|prev| prev.generation < generation);
+    if !accepted {
+        return;
+    }
+    let baseline = guard
+        .as_ref()
+        .filter(|prev| prev.taken_at <= collected.taken_at);
+    let rendered = render_intervals(baseline, &collected);
+    *guard = Some(make_previous(generation, collected, Some(rendered)));
 }
 
 fn make_previous(generation: u64, collected: Collected, rendered: Option<Rendered>) -> Previous {
