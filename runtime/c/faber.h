@@ -262,6 +262,36 @@ static inline faber_i128 faber_shr(faber_i128 value, faber_i128 count) {
     return value >> (int)count;
 }
 
+/* Raw bits shift inside their unsigned cell: unlike integer shifts, a count
+ * at least the cell width yields zero. The bound is checked before casting
+ * the count, so no C shift reaches or exceeds the width (undefined behavior). */
+#define FABER_BITS_SHIFTS(NAME, TYPE, WIDTH)                                         \
+    static inline TYPE faber_bits_shl_##NAME(TYPE value, faber_i128 count) {          \
+        if (count < 0) {                                                             \
+            faber_trap("negative shift count");                                     \
+        }                                                                            \
+        if (count >= (faber_i128)(WIDTH)) {                                          \
+            return (TYPE)0;                                                          \
+        }                                                                            \
+        return (TYPE)(value << (unsigned)count);                                     \
+    }                                                                                \
+    static inline TYPE faber_bits_shr_##NAME(TYPE value, faber_i128 count) {          \
+        if (count < 0) {                                                             \
+            faber_trap("negative shift count");                                     \
+        }                                                                            \
+        if (count >= (faber_i128)(WIDTH)) {                                          \
+            return (TYPE)0;                                                          \
+        }                                                                            \
+        return (TYPE)(value >> (unsigned)count);                                     \
+    }
+
+FABER_BITS_SHIFTS(b8, uint8_t, 8)
+FABER_BITS_SHIFTS(b16, uint16_t, 16)
+FABER_BITS_SHIFTS(b32, uint32_t, 32)
+FABER_BITS_SHIFTS(b64, uint64_t, 64)
+
+#undef FABER_BITS_SHIFTS
+
 /* `≈` / `≉` between integers: `10^9 · |a − b| ≤ max(|a|, |b|)` over the exact
  * values, never through a float. Mirrors `faber::exact::approx_int`. */
 static inline bool faber_approx_int(faber_i128 a, faber_i128 b) {

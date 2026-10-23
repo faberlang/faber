@@ -68,6 +68,24 @@ fn bits_list_refused_by_name() {
     assert_eq!(rejected_construct("case.fab", &source), "list of raw bits");
 }
 
+/// The C emitter keeps every operation in a raw-bits value at its own width.
+#[test]
+fn bits_operations_act_at_the_width() {
+    let code = crate::test_support::program(
+        "bits_operations.fab",
+        include_str!("../tests/fixtures/run/bits_operations.fab"),
+    );
+    assert!(code.contains("faber_bits_shl_b8"), "{code}");
+    assert!(code.contains("~(uint8_t)l_a"), "{code}");
+    // The source pipeline currently stops `a + mask` at SEM011 before C;
+    // pin the C target's unsupported construct guard at its own boundary.
+    let mut types = TypeTable::new();
+    let bits = types.bits(BitsWidth::B8);
+    let error = refuse_bits_operand(&types, Some(bits), "arithmetic on raw bits")
+        .expect_err("arithmetic on raw bits must remain unsupported");
+    assert_eq!(construct_of(&error), "arithmetic on raw bits");
+}
+
 /// Raw-bits locals use their own unsigned C cell rather than the promoted
 /// integer value class.
 #[test]
