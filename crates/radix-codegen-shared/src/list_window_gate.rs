@@ -10,8 +10,13 @@
 //! (which executes it), the clif backend and the Go, TypeScript, Swift and
 //! Python emitters (which copy the range behind a checked helper) implement the
 //! form, as does the Rust emitter (which is checked in [`is_list_window`]).
-//! This gate rejects any module that takes one before an emitter runs, naming
-//! the target, until a target's own emission lands and adds itself to
+//! A receiver is a list window in either shape, the unbounded `lista<T>`
+//! ([`Type::Array`]) and the bounded `lista<T, N>` ([`Type::BoundedArray`]);
+//! every emitter listed here dispatches both, so admission is per target, not
+//! per receiver shape.
+//! This gate rejects any module
+//! that takes one before an emitter runs, naming the target, until a target's
+//! own emission lands and adds itself to
 //! [`target_admits_list_window`]. The
 //! octeti window, plain or under an endian conversion `buf[lo‥hi] ↦ W via Be`,
 //! indexes a byte receiver (`lista<b8>`, the word `octeti`), not a list, and is
@@ -29,7 +34,8 @@ const ISSUE: &str = "list_window_unsupported_on_target";
 /// Targets that carry a list window faithfully. The Faber re-emitter keeps the
 /// authored index; the MIR runner executes it and does not reach codegen; the
 /// clif backend lowers it to a runtime slice; the Go, TypeScript, Swift and
-/// Python emitters copy the range, striding by an optional step. LLVM, sexp and
+/// Python emitters copy the range, striding by an optional step, for both the
+/// unbounded and the bounded list receiver. LLVM, sexp and
 /// wasm still refuse it.
 fn target_admits_list_window(target: Target) -> bool {
     matches!(
@@ -92,6 +98,8 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bo
             !(target_admits_byte_window(target)
                 && matches!(resolved(types, *element), Type::Bits(BitsWidth::B8)))
         }
+        // A bounded list `lista<T, N>` is the same window over the same
+        // carrier: its capacity bounds construction, never a range.
         Type::BoundedArray { .. } => true,
         _ => false,
     }
