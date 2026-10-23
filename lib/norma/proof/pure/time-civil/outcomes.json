@@ -5,6 +5,12 @@
       "phase": "emit",
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf or bits gate runs, so no C code is produced and the time-civil proof is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "assignment mismatch: 1 variable but time.Parse returns 2 values",
+      "reason": "The Go package emitter binds `norma:time` calls to the Go `time` package instead of emitting Norma time-leaf helpers: `time.Parse` is called with one argument although it takes two, and `time.Render`, `time.Year`, `time.Day` and `time.Construct` do not exist, so `go build` stops at the first mismatch. Re-measure this row when the Go time bindings are emitted."
     }
   }
 }

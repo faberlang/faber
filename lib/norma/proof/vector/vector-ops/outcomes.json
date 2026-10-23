@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "clif-policy",
       "reason": "The clif package builder declines this case before any code is generated: the MIR capability classifier reports the `clif-policy` issue, so the `norma:vector` genus is never lowered. The clif lane carries no vector port for this family yet; re-measure this row when that port lands."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "undefined: vector",
+      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:vector` module this proof imports, so the generated `main.go` calls `vector.*` with no such package-level identifier and `go build` stops with `undefined: vector`. Re-measure this row when the Go package emitter lowers that module binding."
     }
   }
 }

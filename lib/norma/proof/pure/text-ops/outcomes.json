@@ -14,6 +14,12 @@
       "expect": {
         "stdout": "stdout.expected"
       }
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "undefined: text",
+      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:text` module this proof imports, so the generated `main.go` calls `text.*` with no such package-level identifier and `go build` stops with `undefined: text`. Re-measure this row when the Go package emitter lowers that module binding."
     }
   }
 }
