@@ -17,7 +17,7 @@ use std::io::{self, BufRead, IsTerminal, Read, Write};
 pub const MAX_STDIN_READ_BYTES: i64 = 1024 * 1024;
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "consolum:hauri",
     "consolum:hauriet",
     "consolum:lege",

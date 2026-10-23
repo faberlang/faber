@@ -65,6 +65,10 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
 }
 
 #[cfg(test)]
+#[path = "go_registry_test.rs"]
+mod go_registry_test;
+
+#[cfg(test)]
 mod test_support;
 
 #[cfg(test)]

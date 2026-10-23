@@ -18,7 +18,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 static MONOTONIC_ORIGIN: OnceLock<Instant> = OnceLock::new();
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "tempus:nunc",
     "tempus:monotonicum",
     "tempus:activum",
