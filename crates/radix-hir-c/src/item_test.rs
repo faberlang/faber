@@ -1,7 +1,33 @@
 //! File-scope behavior: storage of uncalled functions, the header a signature
 //! needs, and module constants that are built at run time.
 
-use crate::test_support::emitted;
+use crate::test_support::{emitted, rejected_construct};
+
+#[test]
+fn failable_function_carries_the_channel() {
+    let code = emitted(
+        "fn risky(int n) → int ⇥ string {\n    if n ≻ 3 {\n        throw \"too big\"\n    }\n    return n + 1\n}\nfn caller(int n) → int ⇥ string {\n    return risky(n)\n}\nmain {\n    print \"ready\"\n}",
+    );
+    assert!(code.contains("faber_chan *"), "{code}");
+    assert!(code.contains("faber_fail:"), "{code}");
+    assert!(code.contains("(faber_chan){true, "), "{code}");
+    assert!(code.contains("f_risky(p_n, &faber_t0)"), "{code}");
+    assert!(
+        code.contains("*faber_e = faber_t0; goto faber_fail;"),
+        "{code}"
+    );
+}
+
+#[test]
+fn scalar_error_channel_is_refused() {
+    let construct = rejected_construct(
+        "case.fab",
+        &crate::test_support::inline(
+            "fn risky() → int ⇥ int {\n    return 1\n}\nmain {\n    print \"ready\"\n}",
+        ),
+    );
+    assert_eq!(construct, "scalar error channel type");
+}
 
 #[test]
 fn an_uncalled_function_is_marked_unused() {

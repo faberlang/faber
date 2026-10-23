@@ -671,12 +671,13 @@ impl Emitter<'_> {
             }
             return Err(unsupported("call to a function outside the program"));
         };
-        let (name, params, pointees, omissions, ret) = (
+        let (name, params, pointees, omissions, ret, err) = (
             function.name.clone(),
             function.params.clone(),
             function.pointee.clone(),
             function.omissions.clone(),
             function.ret,
+            function.err,
         );
         // A call from a function to itself is no use: a function only it
         // calls is as unused as one nothing calls.
@@ -804,11 +805,19 @@ impl Emitter<'_> {
             operands.push(operand);
         }
         let prelude = self.sequence(&mut operands);
-        let mut slots = Vec::with_capacity(operands.len() + 1);
+        let channel = err.map(|_| {
+            let name = format!("faber_t{}", self.temps);
+            self.temps += 1;
+            name
+        });
+        let mut slots = Vec::with_capacity(operands.len() + 2);
         if self.arena {
-            slots.push("faber_a");
+            slots.push("faber_a".to_owned());
         }
-        slots.extend(operands.iter().map(|operand| operand.text.as_str()));
+        slots.extend(operands.iter().map(|operand| operand.text.clone()));
+        if let Some(channel) = &channel {
+            slots.push(format!("&{channel}"));
+        }
         let list = slots.join(", ");
         let value = ret.map_or(Value::Void, Value::from);
         let mut call = format!("{name}({list})");
@@ -825,9 +834,37 @@ impl Emitter<'_> {
             }
             _ => {}
         }
-        let text = wrap(&prelude, &call);
+        let has_channel = channel.is_some();
+        let text = if let Some(channel) = channel.as_deref() {
+            let caller_has_channel = self
+                .current
+                .and_then(|current| self.functions.get(&current))
+                .is_some_and(|current| current.err.is_some());
+            let failure = if caller_has_channel {
+                format!("if ({channel}.set) {{ *faber_e = {channel}; goto faber_fail; }}")
+            } else {
+                self.support.need(Helper::Trap);
+                format!("if ({channel}.set) faber_trap(\"unhandled error\");")
+            };
+            let channel_init = format!("faber_chan {channel} = {{false, NULL}}; ");
+            if value == Value::Void {
+                wrap(
+                    &format!("{channel_init}{prelude}"),
+                    &format!("{call}; {failure}"),
+                )
+            } else {
+                let mut result = Operand::new(call, value);
+                let declaration = self.bind(&mut result);
+                wrap(
+                    &format!("{channel_init}{prelude}{declaration}"),
+                    &format!("{failure} {}", result.text),
+                )
+            }
+        } else {
+            wrap(&prelude, &call)
+        };
         // A boolean result carries its own parentheses like every truth operand.
-        let text = if value == Value::Truth && prelude.is_empty() {
+        let text = if value == Value::Truth && prelude.is_empty() && !has_channel {
             format!("({text})")
         } else {
             text

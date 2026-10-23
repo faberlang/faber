@@ -249,6 +249,7 @@ impl Emitter<'_> {
     ) -> Result<(), CodegenError> {
         match &expr.kind {
             HirExpressionKind::Scribe(kind, args) => self.print(out, *kind, args),
+            HirExpressionKind::Throw(value) => self.throw(out, value),
             HirExpressionKind::Call(..) | HirExpressionKind::MethodCall(..) => {
                 let call = self.expr(expr)?;
                 let line = if call.value == Value::Void {
@@ -340,6 +341,30 @@ impl Emitter<'_> {
             }
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    fn throw(&mut self, out: &mut String, value: &HirExpression) -> Result<(), CodegenError> {
+        let Some(err) = self
+            .current
+            .and_then(|def_id| self.functions.get(&def_id))
+            .and_then(|function| function.err)
+        else {
+            return Err(unsupported("throw without an error channel"));
+        };
+        let value = self.expr(value)?;
+        let value = self.settle(value, err)?;
+        if value.value != Value::from(err) {
+            return Err(unsupported("error payload stored without a store check"));
+        }
+        self.line(
+            out,
+            &format!(
+                "*faber_e = (faber_chan){{true, (const void *)({})}};",
+                value.text
+            ),
+        );
+        self.line(out, "goto faber_fail;");
+        Ok(())
     }
 
     /// A block written as a statement. A `fac` block is a breakable scope:
