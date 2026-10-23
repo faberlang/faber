@@ -36,3 +36,15 @@ fn tensor_bracket_range_rank1_slices_with_step() {
     );
     assert_eq!(ok(&body), ["[2.0, 3.0, 4.0]", "[1.0, 3.0, 5.0]"]);
 }
+
+#[test]
+fn tensor_bracket_range_rank2_slots_slice_and_drop() {
+    let body = "\
+        let tf32[2, 3] g ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]\n\
+        let tf32[3] row ← g[[1, 0 ‥ 3]]\n\
+        let tf32[1, 3] keep ← g[[1 … 1, 0 ‥ 3]]\n\
+        print row\n\
+        let f32 x ← keep[[0, 2]]\n\
+        print x";
+    assert_eq!(ok(body), ["[4.0, 5.0, 6.0]", "6.0"]);
+}
