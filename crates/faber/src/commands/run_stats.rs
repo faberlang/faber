@@ -44,6 +44,8 @@ pub(crate) struct RunStatsArtifact {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ColdStartMetadata {
     pub(crate) image_build_ns: u64,
+    pub(crate) emission_ns: u64,
+    pub(crate) ptx_compile_ns: u64,
     pub(crate) module_compile_ns: u64,
     pub(crate) execution_ns: u64,
 }
