@@ -74,3 +74,18 @@ fn vector_bracket_range_step_slice_runs() {
     );
     assert_eq!(ok(&body), ["1.0", "3.0"]);
 }
+
+#[test]
+fn matrix_bracket_slot_range_runs() {
+    // WHY: a matrix is a register aggregate, not a tensor; a slot list with a
+    // range keeps a row, a column or a block as cell reads, not `TensorSliceNd`.
+    let body = "\
+        let matrix<f32, [2, 3]> m ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ matrix<f32, [2, 3]>\n\
+        let vector<f32, 3> row ← m[[1, 0 ‥ 3]]\n\
+        let vector<f32, 2> col ← m[[0 ‥ 2, 2]]\n\
+        let matrix<f32, [1, 2]> block ← m[[0 … 0, 1 ‥ 3]]\n\
+        print row[0]\n\
+        print col[1]\n\
+        print block[[0, 1]]";
+    assert_eq!(ok(body), ["4.0", "6.0", "3.0"]);
+}
