@@ -4142,10 +4142,20 @@ impl FunctionLower<'_, '_> {
         let [argument] = args else {
             return Err(Decline::new("conversion arity"));
         };
+        // A unit conversation is consumed for effects and has no result value.
+        if conversion.store.is_none()
+            && self.state.is_sermo_handle(conversion.source_ty)
+            && matches!(
+                resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Vacuum)
+            )
+        {
+            let (handle, _rep) = self.scalar(argument)?;
+            self.call_runtime(&abi::SERMO_DRAIN, &[handle])?;
+            return self.define_result(destination, None, Rep::Unit);
+        }
         // The sync conversation's `sermo ↦ numerus` route materializes the
-        // opened conversation's leaf value. Only `numerus` has a CLIF
-        // materialize symbol; every other target falls through to the decline
-        // paths below rather than widen the capability.
+        // opened conversation's leaf value as an integer.
         if conversion.store.is_none()
             && self.state.is_sermo_handle(conversion.source_ty)
             && matches!(
@@ -4160,6 +4170,35 @@ impl FunctionLower<'_, '_> {
             };
             let value = self.call_runtime(&abi::SERMO_MATERIALIZE_I64, &[handle, fallback])?;
             return self.define_result(destination, value, Rep::Int);
+        }
+        // A conversation can also materialize its leaf's integer epoch as an
+        // instant at the target type's precision.
+        if conversion.store.is_none()
+            && self.state.is_sermo_handle(conversion.source_ty)
+            && matches!(
+                resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Instans) | Type::SizedInstans(_)
+            )
+        {
+            let (handle, _rep) = self.scalar(argument)?;
+            let fallback = match &conversion.recovery {
+                Some(recovery) => self.scalar(recovery)?.0,
+                None => self.builder.ins().iconst(types::I64, 0),
+            };
+            let epoch = self
+                .call_runtime(&abi::SERMO_MATERIALIZE_I64, &[handle, fallback])?
+                .ok_or_else(|| Decline::new("sermo materialize result"))?;
+            let convert::Num::Ins(code) =
+                convert::num_of(self.state.input.types, conversion.target_ty.semantic_id())
+                    .ok_or_else(|| Decline::new("sermo instant precision"))?
+            else {
+                return Err(Decline::new("sermo instant precision"));
+            };
+            let code = self.builder.ins().iconst(types::I32, code);
+            let instant = self
+                .call_runtime(&abi::INS_FROM_EPOCH, &[epoch, code])?
+                .ok_or_else(|| Decline::new("instant result"))?;
+            return self.define_result(destination, Some(instant), Rep::Ins);
         }
         // Every other target from a conversation handle has no CLIF materialize
         // symbol; decline it rather than let the handle render as a record.
@@ -5927,6 +5966,52 @@ mod sermo_lower_test {
             .windows(name.len())
             .any(|window| window == name);
         assert!(named, "the object names the materialize call");
+    }
+
+    #[test]
+    fn sermo_lower_unit_materialization_emits_the_drain_call() {
+        let (program, types, interner) = open_then_convert(Primitive::Vacuum);
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the sync unit materialization lowers");
+
+        let name = b"__faber_clif_v1_sermo_drain";
+        let named = object
+            .bytes
+            .windows(name.len())
+            .any(|window| window == name);
+        assert!(named, "the object names the drain call");
+    }
+
+    #[test]
+    fn sermo_lower_instant_materialization_emits_from_epoch() {
+        let (program, types, interner) = open_then_convert(Primitive::Instans);
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the sync instant materialization lowers");
+
+        for name in [
+            "__faber_clif_v1_sermo_materialize_i64",
+            "__faber_clif_v1_ins_from_epoch",
+        ] {
+            let named = object
+                .bytes
+                .windows(name.len())
+                .any(|window| window == name.as_bytes());
+            assert!(named, "the object names {name}");
+        }
     }
 
     #[test]
