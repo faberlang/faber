@@ -2083,7 +2083,7 @@ fn mir_output_reports_unknown_library_module_for_unresolved_norma_import() {
     let errors = mir_output_for_source(&path, &source).expect_err("unresolved norma import should be rejected");
     let identity = errors
         .iter()
-        .find_map(|error| error.strip_prefix("error[")?.split_once(']'))
+        .find_map(|error| error.strip_prefix("error[")?.split_once("]: "))
         .map(|(identity, _)| identity)
         .expect("error output should have a diagnostic identity header");
     assert_eq!(identity, "PKG001:unknown_library_module");
