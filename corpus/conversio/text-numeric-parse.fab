@@ -1,0 +1,42 @@
++++
+term = "↦"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Text converts by a checked parse: decimal integer, float and decimal spellings are accepted only when the whole text is valid and in range."
+syntax = "<text> ↦ <integer|float|d64> [via Hex|Bin|Oct] [⊥ <default>]"
+related = ["↦", "⊥", "numerus", "fractus"]
+locale = "en"
++++
+# =============================================================================
+# text to number — checked parsing and defaults
+# =============================================================================
+#
+# Integer parsing accepts an optional sign and decimal digits only. It rejects
+# surrounding whitespace, separators, empty text, trailing junk and values
+# outside the target range. A `⊥` default receives every failed parse.
+#
+# The radix example is `corpus/conversio/via-hint.fab`'s territory; this file
+# only contrasts decimal text with integer text.
+
+main {
+    print "42" ↦ int ⊥ -1
+    print "+7" ↦ int ⊥ -1
+    print "-0" ↦ int ⊥ -1
+
+    print " 42" ↦ int ⊥ -1
+    print "42 " ↦ int ⊥ -1
+    print "1_000" ↦ int ⊥ -1
+    print "" ↦ int ⊥ -1
+    print "12a" ↦ int ⊥ -1
+    print "9223372036854775808" ↦ int ⊥ -1
+
+    print "1.5" ↦ float ⊥ -1.0
+    print "1.5" ↦ int ⊥ -1
+    print "0.1" ↦ d64 ⊥ 0.0
+    print "1e3" ↦ float ⊥ -1.0
+    print "1e3" ↦ int ⊥ -1
+
+    print "ff" ↦ i32 via Hex ⊥ -1
+}
