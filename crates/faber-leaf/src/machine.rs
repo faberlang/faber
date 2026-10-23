@@ -26,11 +26,14 @@ const ROUTES: &[&str] = &["machina:specimen"];
 /// Process-table cap for one snapshot; the sampler keeps the busiest rows.
 pub const MAX_PROCS: usize = 64;
 
-/// One core's absolute CPU tick counters from one host sample.
+/// One core's finite-width CPU state counters from one host sample.
 struct CoreTicks {
     name: String,
-    busy_ns: u64,
-    total_ns: u64,
+    user_ticks: u32,
+    system_ticks: u32,
+    idle_ticks: u32,
+    nice_ticks: u32,
+    tick_hz: u64,
 }
 
 /// One process row's absolute CPU and resident-memory figures.
@@ -247,17 +250,25 @@ fn interval_cores(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalCore
                     .find(|previous_core| previous_core.name == core.name)
             });
             let (busy_ns, total_ns) = previous.map_or((0, 0), |previous_core| {
+                // WHY: Mach exposes each CPU state as a finite-width counter.
+                // Difference each state before summing so one state's rollover
+                // cannot erase progress in another (or make total < busy).
+                let user_ticks = core.user_ticks.wrapping_sub(previous_core.user_ticks);
+                let system_ticks = core.system_ticks.wrapping_sub(previous_core.system_ticks);
+                let idle_ticks = core.idle_ticks.wrapping_sub(previous_core.idle_ticks);
+                let nice_ticks = core.nice_ticks.wrapping_sub(previous_core.nice_ticks);
+                let busy_ticks =
+                    u64::from(user_ticks) + u64::from(system_ticks) + u64::from(nice_ticks);
+                let total_ticks = busy_ticks + u64::from(idle_ticks);
                 (
-                    i64::try_from(core.busy_ns.saturating_sub(previous_core.busy_ns))
-                        .unwrap_or(i64::MAX),
-                    i64::try_from(core.total_ns.saturating_sub(previous_core.total_ns))
-                        .unwrap_or(i64::MAX),
+                    wide_ticks_to_ns(busy_ticks, core.tick_hz),
+                    wide_ticks_to_ns(total_ticks, core.tick_hz),
                 )
             });
             IntervalCore {
                 name: core.name.clone(),
-                busy_ns,
-                total_ns,
+                busy_ns: i64::try_from(busy_ns).unwrap_or(i64::MAX),
+                total_ns: i64::try_from(total_ns).unwrap_or(i64::MAX),
             }
         })
         .collect()
@@ -510,7 +521,6 @@ fn tick_hz() -> u64 {
     }
 }
 
-#[cfg(target_os = "macos")]
 fn ticks_to_ns(ticks: u32, hz: u64) -> u64 {
     // `checked_div` yields `None` exactly when `hz` is zero, so the zero-tick
     // scale falls through to the same `0` the explicit guard produced.
@@ -520,7 +530,6 @@ fn ticks_to_ns(ticks: u32, hz: u64) -> u64 {
         .unwrap_or(0)
 }
 
-#[cfg(target_os = "macos")]
 fn wide_ticks_to_ns(ticks: u64, hz: u64) -> u64 {
     if hz == 0 {
         0
@@ -555,7 +564,7 @@ fn collect_cores() -> Result<Vec<CoreTicks>, LeafError> {
         if !info.is_null() {
             // SAFETY: if the failed call returned an allocated `info` array,
             // `info_count` gives its length in integer_t words.
-            let _ = unsafe {
+            let _deallocated = unsafe {
                 libc::vm_deallocate(
                     libc::mach_task_self(),
                     info as libc::vm_address_t,
@@ -604,18 +613,13 @@ fn collect_cores() -> Result<Vec<CoreTicks>, LeafError> {
         Ok(records
             .iter()
             .enumerate()
-            .map(|(index, record)| {
-                let user = u64::from(record.cpu_ticks[user_index]);
-                let system = u64::from(record.cpu_ticks[system_index]);
-                let idle = u64::from(record.cpu_ticks[idle_index]);
-                let nice = u64::from(record.cpu_ticks[nice_index]);
-                let busy_ticks = user + system + nice;
-                let total_ticks = busy_ticks + idle;
-                CoreTicks {
-                    name: format!("cpu{index}"),
-                    busy_ns: wide_ticks_to_ns(busy_ticks, hz),
-                    total_ns: wide_ticks_to_ns(total_ticks, hz),
-                }
+            .map(|(index, record)| CoreTicks {
+                name: format!("cpu{index}"),
+                user_ticks: record.cpu_ticks[user_index],
+                system_ticks: record.cpu_ticks[system_index],
+                idle_ticks: record.cpu_ticks[idle_index],
+                nice_ticks: record.cpu_ticks[nice_index],
+                tick_hz: hz,
             })
             .collect())
     })();
@@ -623,7 +627,7 @@ fn collect_cores() -> Result<Vec<CoreTicks>, LeafError> {
     if !info.is_null() {
         // SAFETY: `info` is the kernel-allocated array returned above, and
         // `info_count` gives its length in integer_t words.
-        let _ = unsafe {
+        let _deallocated = unsafe {
             libc::vm_deallocate(
                 libc::mach_task_self(),
                 info as libc::vm_address_t,

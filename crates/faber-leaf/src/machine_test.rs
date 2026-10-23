@@ -72,6 +72,21 @@ fn proc_ticks(pid: i64, cpu_ns: u64, mem_bytes: u64) -> super::ProcTicks {
     }
 }
 
+fn core_states(name: &str, user: u32, system: u32, idle: u32, nice: u32) -> super::CoreTicks {
+    super::CoreTicks {
+        name: name.to_owned(),
+        user_ticks: user,
+        system_ticks: system,
+        idle_ticks: idle,
+        nice_ticks: nice,
+        tick_hz: 1_000_000_000,
+    }
+}
+
+fn core_ticks(name: &str, busy: u32, total: u32) -> super::CoreTicks {
+    core_states(name, busy, 0, total - busy, 0)
+}
+
 fn collected_procs(procs: Vec<super::ProcTicks>) -> super::Collected {
     super::Collected {
         taken_at: std::time::Instant::now(),
@@ -160,27 +175,41 @@ fn fresh_snapshot_reports_memory() {
 }
 
 #[test]
+fn interval_cores_cpu_state_rollover_preserves_interval() {
+    let old = super::make_previous(
+        1,
+        super::Collected {
+            taken_at: std::time::Instant::now(),
+            cores: vec![core_states("cpu0", 100, 10, u32::MAX - 5, 20)],
+            used_bytes: 0,
+            total_bytes: 0,
+            procs: Vec::new(),
+        },
+        None,
+    );
+    let fresh = super::Collected {
+        taken_at: old.taken_at + std::time::Duration::from_nanos(1),
+        cores: vec![core_states("cpu0", 105, 12, 2, 21)],
+        used_bytes: 0,
+        total_bytes: 0,
+        procs: Vec::new(),
+    };
+
+    let rows = super::interval_cores(Some(&old), &fresh);
+    assert_eq!((rows[0].busy_ns, rows[0].total_ns), (8, 16));
+    assert!(rows[0].total_ns >= rows[0].busy_ns);
+}
+
+#[test]
 fn interval_cores_differences_by_name() {
     let old = super::make_previous(
         1,
         super::Collected {
             taken_at: std::time::Instant::now(),
             cores: vec![
-                super::CoreTicks {
-                    name: "cpu0".to_owned(),
-                    busy_ns: 100,
-                    total_ns: 400,
-                },
-                super::CoreTicks {
-                    name: "cpu1".to_owned(),
-                    busy_ns: 50,
-                    total_ns: 200,
-                },
-                super::CoreTicks {
-                    name: "cpu9".to_owned(),
-                    busy_ns: 1,
-                    total_ns: 2,
-                },
+                core_ticks("cpu0", 100, 400),
+                core_ticks("cpu1", 50, 200),
+                core_ticks("cpu9", 1, 2),
             ],
             used_bytes: 0,
             total_bytes: 0,
@@ -190,18 +219,7 @@ fn interval_cores_differences_by_name() {
     );
     let fresh = super::Collected {
         taken_at: old.taken_at + std::time::Duration::from_nanos(1),
-        cores: vec![
-            super::CoreTicks {
-                name: "cpu1".to_owned(),
-                busy_ns: 80,
-                total_ns: 260,
-            },
-            super::CoreTicks {
-                name: "cpu0".to_owned(),
-                busy_ns: 160,
-                total_ns: 500,
-            },
-        ],
+        cores: vec![core_ticks("cpu1", 80, 260), core_ticks("cpu0", 160, 500)],
         used_bytes: 0,
         total_bytes: 0,
         procs: Vec::new(),
@@ -220,18 +238,7 @@ fn interval_cores_differences_by_name() {
 fn interval_cores_first_snapshot_is_zero() {
     let fresh = super::Collected {
         taken_at: std::time::Instant::now(),
-        cores: vec![
-            super::CoreTicks {
-                name: "cpu1".to_owned(),
-                busy_ns: 80,
-                total_ns: 260,
-            },
-            super::CoreTicks {
-                name: "cpu0".to_owned(),
-                busy_ns: 160,
-                total_ns: 500,
-            },
-        ],
+        cores: vec![core_ticks("cpu1", 80, 260), core_ticks("cpu0", 160, 500)],
         used_bytes: 0,
         total_bytes: 0,
         procs: Vec::new(),
@@ -395,7 +402,10 @@ fn collect_reports_every_core() {
     assert!(!collected.cores.is_empty());
     for (index, core) in collected.cores.iter().enumerate() {
         assert_eq!(core.name, format!("cpu{index}"));
-        assert!(core.total_ns >= core.busy_ns);
+        let busy_ticks =
+            u64::from(core.user_ticks) + u64::from(core.system_ticks) + u64::from(core.nice_ticks);
+        let total_ticks = busy_ticks + u64::from(core.idle_ticks);
+        assert!(total_ticks >= busy_ticks);
     }
 }
 
