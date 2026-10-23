@@ -147,3 +147,18 @@ fn bits_print_as_hex_inside_lists_tuples_genus_fields_and_templates() {
     let genus = "genus Reg { varia b16 value }\nincipit {\nsit Reg r ← Reg { value = 0x7f }\nnota r\n}\n";
     assert_eq!(ok_program(genus), ["Reg { value = 0x007f }"]);
 }
+
+#[test]
+fn bits_option_coalesce_fallback_takes_the_option_width() {
+    // A `b8 ∪ none` read from a list; the fallback literal carries no
+    // ascription and takes the option's width, so the runner selects two b8
+    // cells instead of splicing an int cell into a bits place.
+    assert_eq!(
+        ok("sit lista<b8> buf ← [0xde, 0xad]\nsit b8 absent ← buf.accipe(2) vel 0x00\nnota absent"),
+        ["0x00"]
+    );
+    assert_eq!(
+        ok("sit lista<b8> buf ← [0xde, 0xad]\nsit b8 present ← buf.accipe(0) vel 0x00\nnota present"),
+        ["0xde"]
+    );
+}
