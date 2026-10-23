@@ -45,6 +45,9 @@ use std::sync::Arc;
 /// Callable parameter metadata preserved for MIR call lowering.
 #[derive(Debug, Clone)]
 pub(super) struct CallableParamMeta<'a> {
+    /// Declared parameter type (`None` for the synthetic method receiver slot,
+    /// which is never omitted at a call site).
+    pub ty: Option<TypeId>,
     pub optional: bool,
     pub default: Option<&'a HirExpression>,
 }
@@ -1158,7 +1161,11 @@ pub(super) fn function_param_map(
                     function
                         .params
                         .iter()
-                        .map(|param| CallableParamMeta { optional: param.optional, default: param.default.as_ref() })
+                        .map(|param| CallableParamMeta {
+                            ty: Some(param.ty),
+                            optional: param.optional,
+                            default: param.default.as_ref(),
+                        })
                         .collect(),
                 );
             }
@@ -1169,8 +1176,9 @@ pub(super) fn function_param_map(
                 for method in &strukt.methods {
                     params.insert(
                         method.def_id,
-                        std::iter::once(CallableParamMeta { optional: false, default: None })
+                        std::iter::once(CallableParamMeta { ty: None, optional: false, default: None })
                             .chain(method.func.params.iter().map(|param| CallableParamMeta {
+                                ty: Some(param.ty),
                                 optional: param.optional,
                                 default: param.default.as_ref(),
                             }))

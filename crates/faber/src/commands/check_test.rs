@@ -188,6 +188,25 @@ fn check_lower_accepts_a_program_that_lowers() {
     );
 }
 
+/// An omitted bare-`optional` argument lowers: the placeholder the caller keeps
+/// for the missing position validates as the parameter's declared slot.
+#[test]
+fn check_lower_accepts_the_optional_parameter_exemplar() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/functio/sponte-vel.fab")
+        .canonicalize()
+        .expect("locate the sponte/vel exemplar");
+    let (ok, stderr) = run_check(&["--lower"], &path);
+    assert!(
+        ok,
+        "omitted optional and defaulted call arguments lower:\n{stderr}"
+    );
+    assert!(
+        stderr.contains(&format!("ok: {}", path.display())),
+        "successful lowering reports the input path:\n{stderr}"
+    );
+}
+
 /// `--diagnostics` renders the lowering failure with its named issue too.
 #[test]
 fn check_lower_diagnostics_mode_keeps_the_named_issue() {

@@ -2490,6 +2490,16 @@ struct ImportedMethodProvider {
     canonical_name: Symbol,
 }
 
+/// One callee parameter, snapshotted out of [`FunctionBuilderContext`]'s
+/// `function_params` before call lowering mutably borrows the builder.
+#[derive(Clone, Copy)]
+struct CallableParamLowerMeta<'a> {
+    /// Declared parameter type; `None` for a synthetic receiver slot.
+    ty: Option<TypeId>,
+    optional: bool,
+    default: Option<&'a HirExpression>,
+}
+
 /// Immutable whole-unit facts needed while lowering one function body.
 ///
 /// This context is intentionally cloned into each [`FunctionBuilder`] instead of
@@ -2590,13 +2600,14 @@ impl<'a> FunctionBuilderContext<'a> {
     ///
     /// `lower_direct_call_args` must lower default expressions while mutably
     /// borrowing the builder, so it cannot hold an immutable borrow of
-    /// `function_params` on `self`. Extract the small `(optional, default)`
-    /// pairs first instead of cloning the full metadata vec.
-    fn callable_param_lower_meta(&self, callee: DefId) -> Option<Vec<(bool, Option<&'a HirExpression>)>> {
+    /// `function_params` on `self`. Extract the small
+    /// `(type, optional, default)` triples first instead of cloning the full
+    /// metadata vec.
+    fn callable_param_lower_meta(&self, callee: DefId) -> Option<Vec<CallableParamLowerMeta<'a>>> {
         self.function_params.get(&callee).map(|params| {
             params
                 .iter()
-                .map(|param| (param.optional, param.default))
+                .map(|param| CallableParamLowerMeta { ty: param.ty, optional: param.optional, default: param.default })
                 .collect()
         })
     }
@@ -4586,8 +4597,27 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     /// Placeholder operand for an omitted `sponte` parameter without `vel`.
-    pub(super) fn omitted_optional_operand(&self, _span: Span) -> MirOperand {
-        MirOperand::Constant(MirConstant::Nil)
+    ///
+    /// The omitted value is `nihil`, but the argument still has to type as the
+    /// parameter's declared slot. A callee resolved by MIR function id (the
+    /// package linker's canonicalization step) carries no optional markers —
+    /// the validator reads its signature from the MIR parameter list alone — so
+    /// a bare `nil` operand there is a call-argument type mismatch against the
+    /// declared `textus`/`numerus` parameter. Materializing the nil in a slot of
+    /// the declared type keeps the argument assignable at every callee shape
+    /// while the runtime value stays `nihil` (so `x is none` still holds).
+    fn omitted_optional_operand(&mut self, ty: Option<TypeId>, span: Span) -> MirOperand {
+        // WHY: an imported (package-linked) callee's declared parameter types
+        // are not carried in `imported_function_params`; its signature keeps
+        // the `optional` flag, which is what the validator exempts a bare nil
+        // against.
+        let Some(ty) = ty else {
+            return MirOperand::Constant(MirConstant::Nil);
+        };
+        // A `ref`/`mut` parameter's MIR slot is the referent, not the view.
+        let (_, ty) = self.types.peel_access_marker(ty);
+        let ty = MirType::semantic(ty);
+        self.assign_temp(MirValueKind::Operand(MirOperand::Constant(MirConstant::Nil)), ty, span)
     }
 
     fn type_zero_struct_operand(&mut self, def_id: DefId, mir_ty: MirType, span: Span) -> Option<MirOperand> {
