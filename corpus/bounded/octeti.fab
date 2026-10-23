@@ -8,8 +8,6 @@ summary = "Bounded octeti<N>: byte capacity N; longitudo is len; appende overflo
 syntax = "octeti<N>"
 related = ["longitudo", "appende", "accipe", "sectio", "vacua"]
 locale = "en"
-no_expected = "awaiting-ruling"
-ruling = "6a13d711"
 +++
 # =============================================================================
 # octeti<N> — bounded byte buffer (BB-8R)
