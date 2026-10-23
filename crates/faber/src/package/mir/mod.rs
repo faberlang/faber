@@ -423,6 +423,8 @@ pub struct DeviceSessionRun {
     /// reported by [`device`](Self::device) rather than as host runner rows
     /// (gpu-reset C2-U6c, D4).
     pub stats: Option<radix_mir_runner::RunnerStats>,
+    /// The inner phase clocks used to report cold-start stages separately.
+    pub phases: DeviceRunPhases,
     /// The per-phase device receipt: admission, preparation, image build,
     /// module compile and execution clocks, runtime counters and transfer
     /// traffic.
@@ -475,6 +477,7 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
         receipt,
         stats,
         device: phases.into_receipt(),
+        phases,
     })
 }
 
@@ -532,6 +535,7 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
                             receipt,
                             stats,
                             device: phases.into_receipt(),
+                            phases,
                         })
                     })
                 }),
@@ -628,20 +632,30 @@ fn admit_device_session(
 /// The inner phases of one admitted device session, with the dispatcher's own
 /// receipt (observed before the dispatcher `Rc` drops at return).
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
-struct DeviceRunPhases {
+#[derive(Debug)]
+pub struct DeviceRunPhases {
     admit_ns: u64,
     prepare_ns: u64,
-    image_build_ns: u64,
-    module_compile_ns: u64,
-    execution_ns: u64,
+    /// Host time spent building the per-kernel device image, in nanoseconds.
+    pub image_build_ns: u64,
+    /// Host time of the image build spent emitting the backend artifact, in
+    /// nanoseconds.
+    pub image_emission_ns: u64,
+    /// Host time of the image build spent compiling the emitted NVVM module to
+    /// PTX, in nanoseconds (0 for the Metal backend).
+    pub image_ptx_compile_ns: u64,
+    /// Host time spent compiling device modules, in nanoseconds.
+    pub module_compile_ns: u64,
+    /// Wall time spent executing the entry, in nanoseconds.
+    pub execution_ns: u64,
     dispatcher: super::device::DispatcherReceipt,
 }
 
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 impl DeviceRunPhases {
     /// The public phase receipt for this run.
-    fn into_receipt(self) -> DeviceRunReceipt {
-        let dispatcher = self.dispatcher;
+    fn into_receipt(&self) -> DeviceRunReceipt {
+        let dispatcher = self.dispatcher.clone();
         let runtime = dispatcher.runtime;
         let gpu_timing = if runtime.timed_launch_count == 0 {
             DeviceGpuTiming::Unavailable
@@ -691,7 +705,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         ..
     } = admitted;
     let image_start = Instant::now();
-    let (mut image, omitted) = device_image_for_lowered(lowered, backend)?;
+    let (mut image, omitted, image_timing) = device_image_for_lowered(lowered, backend)?;
     let image_build_ns = image_start.elapsed().as_nanos() as u64;
     if image.kernels.is_empty() {
         let reasons = omitted
@@ -806,6 +820,8 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
             admit_ns,
             prepare_ns,
             image_build_ns,
+            image_emission_ns: image_timing.emission_ns,
+            image_ptx_compile_ns: image_timing.ptx_compile_ns,
             module_compile_ns,
             execution_ns,
             dispatcher: dispatcher_receipt,

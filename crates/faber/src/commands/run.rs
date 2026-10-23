@@ -613,6 +613,7 @@ fn finish_device_run(
 ) -> Result<(), Vec<Diagnostic>> {
     let package::mir::DeviceSessionRun {
         stats: run_stats_value,
+        phases,
         device,
         ..
     } = run;
@@ -625,7 +626,14 @@ fn finish_device_run(
         )
         .ok();
         let mut artifact =
-            RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0);
+            RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0)
+                .with_cold_start(run_stats::ColdStartMetadata {
+                    image_build_ns: phases.image_build_ns,
+                    emission_ns: phases.image_emission_ns,
+                    ptx_compile_ns: phases.image_ptx_compile_ns,
+                    module_compile_ns: phases.module_compile_ns,
+                    execution_ns: phases.execution_ns,
+                });
         artifact.device = Some(run_stats::DeviceMetadata::from_receipt(&device));
         if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
             eprintln!("error: could not write run statistics: {error}");
