@@ -1761,6 +1761,81 @@ fn rms_norm_transformer_function(types: &mut TypeTable, dims: [u64; 2]) -> MirFu
 }
 
 #[test]
+fn layer_norm_dynamic_epsilon_resolves_dynamic_plan() {
+    let mut types = TypeTable::new();
+    let mut dynamic_function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Place(MirPlace::local(MirLocalId(2))),
+        ],
+    );
+    let epsilon_ty = f32_ty(&mut types);
+    dynamic_function.params.push(MirParam {
+        local: MirLocalId(2),
+        name: None,
+        ty: epsilon_ty,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    });
+    dynamic_function.locals.push(MirLocal {
+        id: MirLocalId(2),
+        name: None,
+        ty: epsilon_ty,
+        mutable: false,
+        span: test_span(),
+    });
+    let mut dynamic_signature = transformer_signature(16, 16);
+    dynamic_signature.extra_inputs.push(MirKernelResource {
+        group: 0,
+        binding: 2,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::Read,
+        element_ty: dynamic_signature.input.element_ty,
+        element_count: 1,
+        source_local: Some(MirLocalId(2)),
+        source_name: None,
+        reduced_projection: None,
+    });
+    let literal_function = transformer_function(
+        &mut types,
+        [4, 4],
+        MirCollectionOp::TensorLayerNorm,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(1e-5)),
+        ],
+    );
+    let validation = MirValidationContext::new(&types);
+    let dynamic = CollectionKernelPlan::from_transformer_op(
+        &dynamic_signature,
+        &dynamic_function,
+        &validation,
+        MirCollectionOp::TensorLayerNorm,
+    )
+    .expect("scalar-param epsilon resolves a layer-norm plan");
+    let CollectionKernelPlan::LayerNormalization(dynamic) = dynamic else {
+        panic!("layer norm must resolve a layer-normalization plan");
+    };
+    assert_eq!(dynamic.epsilon_bits, 0);
+
+    let literal = CollectionKernelPlan::from_transformer_op(
+        &transformer_signature(16, 16),
+        &literal_function,
+        &validation,
+        MirCollectionOp::TensorLayerNorm,
+    )
+    .expect("literal epsilon resolves a layer-norm plan");
+    let CollectionKernelPlan::LayerNormalization(literal) = literal else {
+        panic!("layer norm must resolve a layer-normalization plan");
+    };
+    assert_eq!(literal.epsilon_bits, 1e-5_f32.to_bits());
+}
+
+#[test]
 fn layer_norm_and_rms_plan_carry_literal_dims() {
     // Both normalization recipes carry the operand's literal extents: the
     // `[4,4]` fixtures resolve `dims == Literal { rows: 4, width: 4 }`.
@@ -2042,6 +2117,7 @@ fn transformer_plans_validate() {
     CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
         dims: RowOpDims::Literal { rows: 1, width: 1 },
         axis: 1,
+        epsilon_bits: 0,
     })
     .validate()
     .expect("layer-normalization plan validates");

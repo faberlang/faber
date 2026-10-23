@@ -582,6 +582,8 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
                 // decoded plan is the equivalence substrate, never launched.
                 dims: RowOpDims::Literal { rows: 0, width: 0 },
                 axis: plan.axis,
+                // The legacy wire mirror carries no layer-norm epsilon.
+                epsilon_bits: 0,
             })
         }
         // GI3-1: the inference-recipe wire mirrors reconstruct field-for-field

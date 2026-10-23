@@ -518,12 +518,16 @@ impl CollectionKernelPlan {
                         batched: None,
                     })
                 } else {
+                    let typed_dims: Vec<Dim> = dims.iter().copied().map(Dim::Literal).collect();
+                    let epsilon_bits =
+                        layer_norm_const_facts(function, validation, &typed_dims, axis)?;
                     CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan {
                         dims: RowOpDims::Literal {
                             rows: count.checked_div(dims[axis as usize])?,
                             width: dims[axis as usize],
                         },
                         axis,
+                        epsilon_bits,
                     })
                 };
                 Some(plan)
@@ -1345,9 +1349,8 @@ pub(crate) fn transformer_recipe_shape(
             if const_non_negative(args.get(1)?)? != axis {
                 return None;
             }
-            if !layer_norm_const_facts(function, validation, &dims, axis) {
-                return None;
-            }
+            let typed_dims: Vec<Dim> = dims.iter().copied().map(Dim::Literal).collect();
+            layer_norm_const_facts(function, validation, &typed_dims, axis)?;
             Some((dims, axis))
         }
         MirCollectionOp::TensorRmsNorm => {
@@ -1441,9 +1444,7 @@ pub(crate) fn transformer_recipe_shape_typed(
             if const_non_negative(args.get(1)?)? != axis {
                 return None;
             }
-            if !layer_norm_const_facts_typed(function, validation, &dims, axis) {
-                return None;
-            }
+            layer_norm_const_facts(function, validation, &dims, axis)?;
             Some((dims, axis))
         }
         MirCollectionOp::TensorRmsNorm => {
@@ -1475,19 +1476,60 @@ pub(crate) fn transformer_recipe_shape_typed(
     }
 }
 
-/// The `TensorLayerNorm` const-operand facts: the epsilon must be a
-/// `MirConstant::Float` (a const — never a value that would require
-/// inference, A3) that is finite and non-negative, and an optional affine
-/// pair (gamma, beta) must each be rank-1 tensors of the normalization
-/// dimension when present (the runner's v1 constraint).
+/// The `TensorLayerNorm` operand facts: a literal epsilon must be a
+/// `MirConstant::Float` that is finite and non-negative; a dynamic epsilon
+/// must resolve to a scalar local. Optional affine peers (gamma, beta) must
+/// each be rank-1 tensors whose extent agrees with the normalization axis.
+/// Returns the epsilon's f32 bits, with zero reserved for a dynamic operand.
 fn layer_norm_const_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
-    dims: &[u64],
+    dims: &[Dim],
     axis: u64,
-) -> bool {
-    let typed: Vec<Dim> = dims.iter().copied().map(Dim::Literal).collect();
-    layer_norm_const_facts_typed(function, validation, &typed, axis)
+) -> Option<u32> {
+    let args = transformer_statement_args(function, MirCollectionOp::TensorLayerNorm)?;
+    if args.len() < 3 || args.len() > 5 {
+        return None;
+    }
+    let epsilon_bits = match literal_const_operand(function, &args[2]) {
+        Some(MirConstant::Float(epsilon)) => {
+            // WHY: the recipe stores operation-precision f32 bits; reject
+            // overflow and positive underflow after IEEE-754 narrowing, as
+            // RMSNorm does.
+            #[allow(clippy::cast_possible_truncation)]
+            let epsilon_f32 = epsilon as f32;
+            if !epsilon_f32.is_finite() || epsilon < 0.0 || (epsilon > 0.0 && epsilon_f32 == 0.0) {
+                return None;
+            }
+            epsilon_f32.to_bits()
+        }
+        Some(_) => return None,
+        None => {
+            let epsilon_local = crate::read_analysis::operand_local(&args[2])?;
+            let epsilon_ty = crate::local_ty::local_ty(function, epsilon_local)?;
+            if !validation
+                .layouts
+                .layout_for_type(epsilon_ty)
+                .ok()
+                .is_some_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
+            {
+                return None;
+            }
+            0
+        }
+    };
+    let norm_index = usize::try_from(axis)
+        .ok()
+        .filter(|index| *index < dims.len())?;
+    let norm_extent = dims[norm_index];
+    for affine in args.iter().skip(3) {
+        let affine_ty = crate::local_ty::operand_local_ty(function, affine)?;
+        let affine_dims = crate::tensor_type::tensor_dims(affine_ty, validation).ok()?;
+        if affine_dims.len() != 1 || !affine_extent_agrees(affine_dims[0], norm_extent) {
+            return None;
+        }
+    }
+    Some(epsilon_bits)
 }
 
 /// Whether a rank-1 affine peer's extent can agree with the normalization
@@ -1500,52 +1542,6 @@ fn affine_extent_agrees(affine: Dim, norm: Dim) -> bool {
         (Dim::Literal(_), Dim::Runtime) | (Dim::Runtime, Dim::Runtime) => true,
         (Dim::Runtime, Dim::Literal(_)) => false,
     }
-}
-
-/// The `TensorLayerNorm` const-operand facts over typed dims (see
-/// [`layer_norm_const_facts`]).
-fn layer_norm_const_facts_typed(
-    function: &MirFunction,
-    validation: &MirValidationContext<'_>,
-    dims: &[Dim],
-    axis: u64,
-) -> bool {
-    let Some(args) = transformer_statement_args(function, MirCollectionOp::TensorLayerNorm) else {
-        return false;
-    };
-    if args.len() < 3 || args.len() > 5 {
-        return false;
-    }
-    // The epsilon is a const the source frontend may have materialized
-    // through a single const temp (floating-point literals are), exactly as
-    // the RMSNorm epsilon is read below; matching only a direct constant
-    // rejected every source-level layer norm.
-    let Some(MirConstant::Float(epsilon)) = literal_const_operand(function, &args[2]) else {
-        return false;
-    };
-    if !epsilon.is_finite() || epsilon < 0.0 {
-        return false;
-    }
-    let Some(norm_index) = usize::try_from(axis)
-        .ok()
-        .filter(|index| *index < dims.len())
-    else {
-        return false;
-    };
-    let norm_extent = dims[norm_index];
-    for affine in args.iter().skip(3) {
-        let Some(affine_ty) = crate::local_ty::operand_local_ty(function, affine) else {
-            return false;
-        };
-        let Ok(affine_dims) = crate::tensor_type::tensor_dims(affine_ty, validation) else {
-            return false;
-        };
-        // v1: gamma/beta are rank-1 over the normalization dimension.
-        if affine_dims.len() != 1 || !affine_extent_agrees(affine_dims[0], norm_extent) {
-            return false;
-        }
-    }
-    true
 }
 
 /// Whether `place` names the whole temporary `temp` (no projections).

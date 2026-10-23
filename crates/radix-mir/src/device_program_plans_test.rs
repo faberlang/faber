@@ -2268,6 +2268,7 @@ fn layer_norm_function_resolves_layer_normalization_plan() {
         CollectionKernelPlan::LayerNormalization(crate::kernel_plan::LayerNormalizationPlan {
             dims: crate::kernel_plan::RowOpDims::Literal { rows: 4, width: 4 },
             axis: 1,
+            epsilon_bits: 1e-5_f32.to_bits(),
         });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
@@ -2323,6 +2324,7 @@ fn transformer_recipe_kinds_are_typed() {
             crate::kernel_plan::LayerNormalizationPlan {
                 dims: crate::kernel_plan::RowOpDims::Literal { rows: 1, width: 1 },
                 axis: 1,
+                epsilon_bits: 0,
             }
         )),
         RecipeKind::LayerNormalization
