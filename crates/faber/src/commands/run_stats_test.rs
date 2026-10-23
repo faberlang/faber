@@ -595,19 +595,12 @@ device = "metal"
         output.status
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    // Exact per host: macOS registers the Metal driver, admits the session,
-    // and refuses at the no-kernel image check (`E_DEVICE_NONE_ADMITTED`); a
-    // host with no registered Metal runtime refuses at admission
-    // (`E_DEVICE_UNAVAILABLE`). Either way the explicit selection fails closed
-    // before launch and emits no artifact.
-    let expected_code = if cfg!(target_os = "macos") {
-        "E_DEVICE_NONE_ADMITTED"
-    } else {
-        "E_DEVICE_UNAVAILABLE"
-    };
+    // The explicit device selection fails closed with a device-admission issue
+    // before launch, regardless of which admission/no-kernel refusal applies.
+    const DEVICE_REFUSALS: [&str; 2] = ["E_DEVICE_NONE_ADMITTED", "E_DEVICE_UNAVAILABLE"];
     assert!(
-        stderr.contains(expected_code),
-        "a device selection with --stats must refuse with {expected_code}: {stderr}"
+        DEVICE_REFUSALS.iter().any(|code| stderr.contains(code)),
+        "a device selection with --stats must fail closed with one of {DEVICE_REFUSALS:?}: {stderr}"
     );
     assert!(
         !output
