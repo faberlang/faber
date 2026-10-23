@@ -108,6 +108,39 @@ fn exec_returns_stdout() {
 }
 
 #[test]
+fn capture_decodes_invalid_and_mixed_utf8_like_go_leaf() {
+    const STDOUT_COMMAND: &str = r"printf '\377A\342\202B\303\251'";
+    const STDERR_COMMAND: &str = r"printf '\376C\342\202D\303\251' >&2";
+    let script = format!("{STDOUT_COMMAND}; {STDERR_COMMAND}");
+    let reply = serve(
+        "processus:captura",
+        &[
+            Arg::Str("sh".to_owned()),
+            Arg::Str("-c".to_owned()),
+            Arg::Str(script),
+        ],
+    )
+    .expect("route")
+    .expect("capture");
+    let Reply::Map(fields) = reply else {
+        panic!("expected map, got {reply:?}");
+    };
+    assert!(fields.contains(&("stdout".to_owned(), Reply::Str("�A�Bé".to_owned()))));
+    assert!(fields.contains(&("stderr".to_owned(), Reply::Str("�C�Dé".to_owned()))));
+}
+
+#[test]
+fn both_exec_routes_decode_invalid_and_mixed_utf8_like_go_leaf() {
+    const COMMAND: &str = r"printf '\377A\342\202B\303\251'";
+    for route in ["processus:exsequi", "processus:exsequetur"] {
+        let reply = serve(route, &[Arg::Str(COMMAND.to_owned())])
+            .expect("route")
+            .expect("exec");
+        assert_eq!(reply, Reply::Str("�A�Bé".to_owned()));
+    }
+}
+
+#[test]
 fn read_env_unset_is_an_absent_record() {
     let reply = serve(
         "processus:lege",
