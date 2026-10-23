@@ -22,7 +22,7 @@ use crate::{
     MirValidationContext,
 };
 use radix_lexer::Symbol;
-use radix_types::{Primitive, Type, TypeId};
+use radix_types::{IndexExpr, IndexId, Primitive, Type, TypeId};
 use serde::{Deserialize, Serialize};
 
 /// Largest admitted struct, in bytes.
@@ -196,6 +196,9 @@ fn field_spec(
         Type::Tuple(_) => return Err(StructLayoutRefusal::Tuple),
         Type::Record(_) => return Err(StructLayoutRefusal::Record),
         Type::Array(_) => return Err(StructLayoutRefusal::List),
+        Type::BoundedArray { element, capacity } => {
+            return bounded_array_spec(ctx, name, *element, *capacity);
+        }
         Type::Map(_, _) | Type::Ledger(_, _) => return Err(StructLayoutRefusal::Map),
         Type::Set(_) => return Err(StructLayoutRefusal::Set),
         Type::Tensor(_, _) | Type::Sparsa(_, _) => return Err(StructLayoutRefusal::Tensor),
@@ -223,6 +226,41 @@ fn field_spec(
         MirLayoutKind::DeviceVector(vector) => vector_spec(name, vector),
         _ => Err(StructLayoutRefusal::UnsupportedField),
     }
+}
+
+fn bounded_array_spec(
+    ctx: &MirValidationContext<'_>,
+    name: Symbol,
+    element: TypeId,
+    capacity: IndexId,
+) -> Result<FieldSpec, StructLayoutRefusal> {
+    let types = ctx.types.as_table();
+    let IndexExpr::Literal(n) = types.get_index(capacity) else {
+        return Err(StructLayoutRefusal::UnsupportedField);
+    };
+    let mut element = element;
+    while let Type::Alias(_, target) = types.get(element) {
+        element = *target;
+    }
+    let Ok(layout) = ctx.layouts.layout_for_type(MirType::semantic(element)) else {
+        return Err(StructLayoutRefusal::UnsupportedField);
+    };
+    let MirLayoutKind::Scalar(scalar) = layout.kind else {
+        return Err(StructLayoutRefusal::UnsupportedField);
+    };
+    let (size, align) = scalar_size_align(scalar)?;
+    let Some(total) = u32::try_from(*n).ok().and_then(|n| size.checked_mul(n)) else {
+        return Err(StructLayoutRefusal::UnsupportedField);
+    };
+    if total > MAX_STRUCT_LAYOUT_BYTES {
+        return Err(StructLayoutRefusal::UnsupportedField);
+    }
+    Ok(FieldSpec {
+        name,
+        size: total,
+        align,
+        element: MirDeviceViewElement::Scalar(scalar),
+    })
 }
 
 fn scalar_size_align(scalar: MirScalarLayout) -> Result<(u32, u32), StructLayoutRefusal> {

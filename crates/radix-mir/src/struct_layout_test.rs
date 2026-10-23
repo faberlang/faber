@@ -51,6 +51,11 @@ impl Types {
         let width = self.table.intern_index(IndexExpr::Literal(width));
         self.table.intern(Type::Vector(element, width))
     }
+
+    fn bounded_array(&mut self, element: TypeId, capacity: IndexExpr) -> TypeId {
+        let capacity = self.table.intern_index(capacity);
+        self.table.bounded_array(element, capacity)
+    }
 }
 
 fn sym(index: usize) -> Symbol {
@@ -110,6 +115,59 @@ fn mixed_scalar_and_vector_struct() {
     assert_eq!((layout.size, layout.align), (48, 16));
     assert_eq!(layout.fields[0].name, sym(0));
     assert_eq!(layout.fields[4].name, sym(4));
+}
+
+#[test]
+fn bounded_array_fields_pack_as_rows() {
+    let mut t = Types::new();
+    let f16 = t.sized(Primitive::Fractus, NumericWidth::F16);
+    let i8 = t.sized(Primitive::Numerus, NumericWidth::I8);
+    let first = t.bounded_array(i8, IndexExpr::Literal(32));
+    let layout = resolve(&t, &[f16, first]).expect("Q8_0 row layout");
+    assert_eq!(rows(&layout), vec![(0, 2, 2), (2, 32, 1)]);
+    assert_eq!((layout.size, layout.align), (34, 2));
+
+    let u8 = t.sized(Primitive::Numerus, NumericWidth::U8);
+    let first = t.bounded_array(u8, IndexExpr::Literal(12));
+    let second = t.bounded_array(u8, IndexExpr::Literal(128));
+    let layout = resolve(&t, &[first, second]).expect("packed quantization rows");
+    assert_eq!(rows(&layout), vec![(0, 12, 1), (12, 128, 1)]);
+    assert_eq!((layout.size, layout.align), (140, 1));
+
+    let f32 = t.f32();
+    let i16 = t.sized(Primitive::Numerus, NumericWidth::I16);
+    let third = t.bounded_array(i16, IndexExpr::Literal(3));
+    let layout = resolve(&t, &[f32, third]).expect("aligned scalar tail");
+    assert_eq!(rows(&layout), vec![(0, 4, 4), (4, 6, 2)]);
+    assert_eq!((layout.size, layout.align), (12, 4));
+}
+
+#[test]
+fn bounded_array_requires_literal_scalar_rows() {
+    let mut t = Types::new();
+    let f32 = t.f32();
+    let hole = t.table.fresh_index_infer_var();
+    let capacity_hole = t.bounded_array(f32, IndexExpr::Infer(hole));
+    assert_eq!(
+        refusal(&t, &[capacity_hole]),
+        StructLayoutRefusal::UnsupportedField
+    );
+
+    let vector = t.vec(f32, 4);
+    let vector_row = t.bounded_array(vector, IndexExpr::Literal(2));
+    assert_eq!(
+        refusal(&t, &[vector_row]),
+        StructLayoutRefusal::UnsupportedField
+    );
+
+    let oversized_row = t.bounded_array(f32, IndexExpr::Literal(1025));
+    assert_eq!(
+        refusal(&t, &[oversized_row]),
+        StructLayoutRefusal::UnsupportedField
+    );
+
+    let unbounded = t.table.intern(Type::Array(f32));
+    assert_eq!(refusal(&t, &[unbounded]), StructLayoutRefusal::List);
 }
 
 #[test]
