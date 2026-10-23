@@ -110,3 +110,20 @@ fn fault_codes_every_iofault_variant_has_a_code() {
         );
     }
 }
+
+/// The C runtime repeats the registry as a static table; drift on either side
+/// (a new row, a renamed variant, a renumbered code) fails here.
+#[test]
+fn c_runtime_carries_every_registered_fault_code() {
+    let header = include_str!("../../../runtime/c/faber.h");
+    for entry in FAULT_CODES {
+        let row = format!(
+            "{{\"{}\", \"{}\", \"{}\"}}",
+            entry.family, entry.variant, entry.code
+        );
+        assert!(
+            header.contains(&row),
+            "runtime/c/faber.h lacks the registry row {row}"
+        );
+    }
+}

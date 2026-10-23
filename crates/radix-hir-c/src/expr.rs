@@ -12,7 +12,8 @@ use crate::Emitter;
 use crate::error::unsupported;
 use crate::helpers::Helper;
 use crate::items::Omission;
-use crate::ty::{Elem, Inner, IntWidth, Ty, classify, returns};
+use crate::leaf_routes;
+use crate::ty::{Elem, Inner, IntWidth, Ty, classify, int_width_of_bits, returns};
 use radix_codegen_shared::CodegenError;
 use radix_hir::{
     DefId, HirBinOp, HirConversioTarget, HirExpression, HirExpressionKind, HirLiteral,
@@ -473,6 +474,7 @@ impl Emitter<'_> {
             HirExpressionKind::Clausura(params, ret, _err, body) => {
                 self.closure(expr, params, *ret, body)
             }
+            HirExpressionKind::Ad { route, opener } => self.ad_route(*route, opener.as_deref()),
             other => Err(unsupported(construct_name(other))),
         }
     }
@@ -612,6 +614,41 @@ impl Emitter<'_> {
         Ok(Operand::new(text, value).with_effect(true))
     }
 
+    /// An `ad '<route>' [opener]` stream value: the leaf wrapper for its
+    /// route. The leaf gate admits the route's leaf on the target before the
+    /// emitter runs; this table is the second admission, so a route whose
+    /// prefix has no `runtime/c/<prefix>.h` keeps the emitter's refusal. A
+    /// builtin route is never a leaf wrapper.
+    fn ad_route(
+        &mut self,
+        route: radix_lexer::Symbol,
+        opener: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        let route = self.names.resolve_symbol(route).to_owned();
+        let Some((prefix, _name)) = route.split_once(':') else {
+            return Err(unsupported("stream route"));
+        };
+        let Some(symbol) = leaf_routes::route_symbol(&route) else {
+            return Err(unsupported("stream route"));
+        };
+        if !leaf_routes::declared(prefix) {
+            return Err(unsupported("stream route"));
+        }
+        let Some(header) = leaf_routes::declared_prefix(prefix) else {
+            return Err(unsupported("stream route"));
+        };
+        self.support.need(Helper::LeafHeader(header));
+        // The wrapper's first argument is the arena every `faber_route_*`
+        // takes, so the leaf header can allocate its reply.
+        self.support.need(Helper::Arena);
+        let mut slots = vec!["faber_a".to_owned()];
+        if let Some(opener) = opener {
+            let operand = self.expr(opener)?;
+            slots.push(operand.text);
+        }
+        Ok(Operand::new(format!("{symbol}({})", slots.join(", ")), Value::Void).with_effect(true))
+    }
+
     /// `read line` / `read`: one stdin line without its terminator, or all of
     /// stdin to EOF. EOF is the runner's Nil, so the slot must be nullable;
     /// the helper returns NULL (none) at EOF.
@@ -671,12 +708,13 @@ impl Emitter<'_> {
             }
             return Err(unsupported("call to a function outside the program"));
         };
-        let (name, params, pointees, omissions, ret) = (
+        let (name, params, pointees, omissions, ret, err) = (
             function.name.clone(),
             function.params.clone(),
             function.pointee.clone(),
             function.omissions.clone(),
             function.ret,
+            function.err,
         );
         // A call from a function to itself is no use: a function only it
         // calls is as unused as one nothing calls.
@@ -804,11 +842,19 @@ impl Emitter<'_> {
             operands.push(operand);
         }
         let prelude = self.sequence(&mut operands);
-        let mut slots = Vec::with_capacity(operands.len() + 1);
+        let channel = err.map(|_| {
+            let name = format!("faber_t{}", self.temps);
+            self.temps += 1;
+            name
+        });
+        let mut slots = Vec::with_capacity(operands.len() + 2);
         if self.arena {
-            slots.push("faber_a");
+            slots.push("faber_a".to_owned());
         }
-        slots.extend(operands.iter().map(|operand| operand.text.as_str()));
+        slots.extend(operands.iter().map(|operand| operand.text.clone()));
+        if let Some(channel) = &channel {
+            slots.push(format!("&{channel}"));
+        }
         let list = slots.join(", ");
         let value = ret.map_or(Value::Void, Value::from);
         let mut call = format!("{name}({list})");
@@ -825,9 +871,42 @@ impl Emitter<'_> {
             }
             _ => {}
         }
-        let text = wrap(&prelude, &call);
+        let has_channel = channel.is_some();
+        let text = if let Some(channel) = channel.as_deref() {
+            let caller_has_channel = self
+                .current
+                .and_then(|current| self.functions.get(&current))
+                .is_some_and(|current| current.err.is_some());
+            let failure = if let Some(active_channel) = self.channels.last().cloned() {
+                self.channel_handlers.insert(active_channel.clone());
+                format!(
+                    "if ({channel}.set) {{ {active_channel} = {channel}; goto {active_channel}_handler; }}"
+                )
+            } else if caller_has_channel {
+                format!("if ({channel}.set) {{ *faber_e = {channel}; goto faber_fail; }}")
+            } else {
+                self.support.need(Helper::Trap);
+                format!("if ({channel}.set) faber_trap(\"unhandled error\");")
+            };
+            let channel_init = format!("faber_chan {channel} = {{false, NULL}}; ");
+            if value == Value::Void {
+                wrap(
+                    &format!("{channel_init}{prelude}"),
+                    &format!("{call}; {failure}"),
+                )
+            } else {
+                let mut result = Operand::new(call, value);
+                let declaration = self.bind(&mut result);
+                wrap(
+                    &format!("{channel_init}{prelude}{declaration}"),
+                    &format!("{failure} {}", result.text),
+                )
+            }
+        } else {
+            wrap(&prelude, &call)
+        };
         // A boolean result carries its own parentheses like every truth operand.
-        let text = if value == Value::Truth && prelude.is_empty() {
+        let text = if value == Value::Truth && prelude.is_empty() && !has_channel {
             format!("({text})")
         } else {
             text
@@ -1277,8 +1356,22 @@ impl Emitter<'_> {
     }
 
     fn unary(&mut self, op: HirUnOp, operand: &HirExpression) -> Result<Operand, CodegenError> {
-        // A `bN` has no operator the C carrier would make right yet: `¬` at a
-        // promoted width flips bits outside the type (unit 3e80d069-1.3).
+        let bits_width = operand
+            .ty
+            .and_then(|ty| match classify(self.types, ty).ok()? {
+                Ty::Bits(width) => Some(width),
+                _ => None,
+            });
+        if let Some(width) = bits_width
+            && op == HirUnOp::BitNot
+        {
+            let inner = self.expr(operand)?;
+            let cell = int_width_of_bits(width).c_type();
+            let text = format!("(({cell})(~({cell}){}))", inner.text);
+            return Ok(Operand::new(text, Value::from(Ty::Bits(width))).with_effect(inner.effect));
+        }
+        // Negation remains refused: raw bits have no arithmetic, and the
+        // existing construct name is retained for every unsupported unary op.
         crate::ty::refuse_bits_operand(self.types, operand.ty, "bitwise operator on raw bits")?;
         let wide = operand
             .ty
@@ -1371,12 +1464,19 @@ impl Emitter<'_> {
         if matches!(op, HirBinOp::InRange | HirBinOp::NotInRange) {
             return self.range_membership(op == HirBinOp::NotInRange, left, right);
         }
-        // Every operator over a `bN` is refused by name until its own-width
-        // form lands (3e80d069-1.3/-1.4): a C signed compare or a width-blind
-        // bitwise op on the promoted carrier would be a wrong program, and
-        // `bits have their width always` (operator ruling 2026-10-10).
-        crate::ty::refuse_bits_operand(self.types, left.ty, "arithmetic on raw bits")?;
-        crate::ty::refuse_bits_operand(self.types, right.ty, "arithmetic on raw bits")?;
+        let left_bits = left.ty.and_then(|ty| match classify(self.types, ty).ok()? {
+            Ty::Bits(width) => Some(width),
+            _ => None,
+        });
+        let right_bits = right
+            .ty
+            .and_then(|ty| match classify(self.types, ty).ok()? {
+                Ty::Bits(width) => Some(width),
+                _ => None,
+            });
+        if left_bits.is_some() || right_bits.is_some() {
+            return self.bits_binary(op, left, right, left_bits, right_bits);
+        }
         let l = self.expr(left)?;
         let r = self.expr(right)?;
         // `≈` / `≉` is tolerance equality over either family, never the C `==`
@@ -1439,6 +1539,106 @@ impl Emitter<'_> {
             HirBinOp::And | HirBinOp::Or => Self::logical(op, &l, &r),
             other => Err(unsupported(binary_name(other))),
         }
+    }
+
+    fn bits_binary(
+        &mut self,
+        op: HirBinOp,
+        left: &HirExpression,
+        right: &HirExpression,
+        left_width: Option<BitsWidth>,
+        right_width: Option<BitsWidth>,
+    ) -> Result<Operand, CodegenError> {
+        if matches!(
+            op,
+            HirBinOp::Add
+                | HirBinOp::Sub
+                | HirBinOp::Mul
+                | HirBinOp::Div
+                | HirBinOp::TrueDiv
+                | HirBinOp::Mod
+        ) {
+            crate::ty::refuse_bits_operand(self.types, left.ty, "arithmetic on raw bits")?;
+            crate::ty::refuse_bits_operand(self.types, right.ty, "arithmetic on raw bits")?;
+            return Err(unsupported("arithmetic on raw bits"));
+        }
+
+        let shift = matches!(op, HirBinOp::Shl | HirBinOp::Shr);
+        let width = if shift {
+            match (left_width, right_width) {
+                (Some(width), None) => {
+                    let count_is_integer = right.ty.is_some_and(|ty| {
+                        matches!(
+                            classify(self.types, ty),
+                            Ok(Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_))
+                        )
+                    });
+                    if !count_is_integer {
+                        return Err(unsupported("bitwise operator on raw bits"));
+                    }
+                    width
+                }
+                _ => return Err(unsupported("bitwise operator on raw bits")),
+            }
+        } else {
+            match (left_width, right_width) {
+                (Some(left), Some(right)) if left == right => left,
+                _ => return Err(unsupported("bitwise operator on raw bits")),
+            }
+        };
+
+        let bitwise = matches!(op, HirBinOp::BitAnd | HirBinOp::BitOr | HirBinOp::BitXor);
+        let comparison = matches!(
+            op,
+            HirBinOp::Eq
+                | HirBinOp::NotEq
+                | HirBinOp::StrictEq
+                | HirBinOp::StrictNotEq
+                | HirBinOp::Lt
+                | HirBinOp::Gt
+                | HirBinOp::LtEq
+                | HirBinOp::GtEq
+        );
+        if !shift && !bitwise && !comparison {
+            return Err(unsupported("bitwise operator on raw bits"));
+        }
+
+        let mut operands = [self.expr(left)?, self.expr(right)?];
+        let prelude = self.sequence(&mut operands);
+        let effect = operands.iter().any(|operand| operand.effect);
+        let [l, r] = operands;
+        let cell = int_width_of_bits(width).c_type();
+        let body = match op {
+            HirBinOp::BitAnd => format!("(({cell})({} & {}))", l.text, r.text),
+            HirBinOp::BitOr => format!("(({cell})({} | {}))", l.text, r.text),
+            HirBinOp::BitXor => format!("(({cell})({} ^ {}))", l.text, r.text),
+            HirBinOp::Shl | HirBinOp::Shr => {
+                let width_name = match width {
+                    BitsWidth::B8 => "b8",
+                    BitsWidth::B16 => "b16",
+                    BitsWidth::B32 => "b32",
+                    BitsWidth::B64 => "b64",
+                };
+                let direction = if op == HirBinOp::Shl { "shl" } else { "shr" };
+                format!(
+                    "faber_bits_{direction}_{width_name}({}, {})",
+                    l.text, r.text
+                )
+            }
+            HirBinOp::Eq | HirBinOp::StrictEq => format!("({} == {})", l.text, r.text),
+            HirBinOp::NotEq | HirBinOp::StrictNotEq => format!("({} != {})", l.text, r.text),
+            HirBinOp::Lt => format!("({} < {})", l.text, r.text),
+            HirBinOp::Gt => format!("({} > {})", l.text, r.text),
+            HirBinOp::LtEq => format!("({} <= {})", l.text, r.text),
+            HirBinOp::GtEq => format!("({} >= {})", l.text, r.text),
+            _ => return Err(unsupported("bitwise operator on raw bits")),
+        };
+        let value = if comparison {
+            Value::Truth
+        } else {
+            Value::from(Ty::Bits(width))
+        };
+        Ok(Operand::new(wrap(&prelude, &body), value).with_effect(effect))
     }
 
     /// Whether a type classifies to an 8- or 16-bit integer, the widths the
@@ -1913,6 +2113,7 @@ impl Emitter<'_> {
                 let at = self.text_literal(&self.store_position(site))?;
                 Ok(self.store_sized(&value, width, &at))
             }
+            (Ty::Bits(width), Value::Int | Value::Exact) => Self::store_bits(value, width),
             // A modular word reduces modulo 2^W at the store; a saturating
             // word clamps. Both are total (they never trap).
             (Ty::Modular(width), Value::Int | Value::Exact) => {
@@ -1971,6 +2172,26 @@ impl Emitter<'_> {
         operand.effect = value.effect;
         operand.stored = Some(class);
         operand
+    }
+
+    /// Store an integer value in a raw-bits cell. C's unsigned conversion is
+    /// modulo 2^N, but a folded out-of-range value is a rejected lowering, not
+    /// a constant that this backend silently masks.
+    fn store_bits(value: Operand, width: BitsWidth) -> Result<Operand, CodegenError> {
+        let class = Ty::Bits(width);
+        let (low, high) = int_width_of_bits(width).range();
+        if value
+            .constant
+            .is_some_and(|constant| !(low..=high).contains(&constant))
+        {
+            return Err(unsupported("bits value outside its width"));
+        }
+        let cell = int_width_of_bits(width).c_type();
+        let mut operand = Operand::new(format!("(({cell})({}))", value.text), Value::from(class));
+        operand.constant = value.constant;
+        operand.effect = value.effect;
+        operand.stored = Some(class);
+        Ok(operand)
     }
 
     /// A store into a modular or saturating word: the helper reduces modulo
@@ -2054,6 +2275,13 @@ impl Emitter<'_> {
                 let mut operand = Operand::new(stored, Value::Decimal).with_effect(value.effect);
                 operand.stored = Some(Ty::Decimal);
                 Ok(operand)
+            }
+            Ty::Bits(width) => {
+                if !matches!(value.value, Value::Int | Value::Exact) || value.stored == Some(class)
+                {
+                    return Ok(value);
+                }
+                Self::store_bits(value, width)
             }
             Ty::Modular(width) => {
                 if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact)

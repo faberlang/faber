@@ -4,6 +4,30 @@
 use crate::test_support::emitted;
 
 #[test]
+fn handled_block_runs_its_catch_arm() {
+    let code = crate::test_support::program(
+        "error_channel.fab",
+        include_str!("../tests/fixtures/run/error_channel.fab"),
+    );
+    assert!(
+        code.contains("faber_chan faber_c0 = {false, NULL};"),
+        "{code}"
+    );
+    assert!(code.contains("if (faber_c0.set) {"), "{code}");
+    assert!(code.contains("printf(\"%s\\n\", faber_join("), "{code}");
+    assert!(code.contains("caught:"), "{code}");
+    assert!(code.contains("(const char *)faber_c0.value"), "{code}");
+}
+
+#[test]
+fn handled_block_carries_a_genus_error() {
+    let code = crate::test_support::emitted(
+        "union Fault { Missing { string path } }\nfn risky() → int ⇥ Fault {\n    return 1\n}\nmain {\n    do { print risky() } catch err { print \"caught\" }\n}",
+    );
+    assert!(code.contains("(g_Fault *)faber_c0.value"), "{code}");
+}
+
+#[test]
 fn a_conditional_value_is_a_c_conditional() {
     let code = emitted(
         "main {\n    let int a ← 3\n    let int b ← 9\n    let int m ← a ≻ b ✓ a ✗ b\n    print m\n}",

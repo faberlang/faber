@@ -1,0 +1,28 @@
++++
+locale = "en"
++++
+main {
+    let b8 a ← 0xf3
+    let b8 mask ← 0x0f
+    print a ∧ mask
+    print a ∨ mask
+    print a ⊻ mask
+    print ¬ a
+    print a ⇐ 4
+    print a ⇒ 4
+    let b8 cleared ← (a ⇐ 4) ⇒ 4
+    print cleared
+    print a ⇐ 8
+    print a ⇒ 8
+
+    let b64 wide ← 0xf0f0f0f0f0f0f0f0
+    let b64 low ← 0x00000000ffffffff
+    print wide ∧ low
+    print wide ∨ low
+    print wide ⊻ low
+    print ¬ wide
+    print wide ⇐ 4
+    print wide ⇒ 60
+    print wide ⇐ 64
+    print wide ⇒ 64
+}

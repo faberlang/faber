@@ -191,6 +191,9 @@ impl Emitter<'_> {
             // as a scalar store does; a value that already carries the class
             // is left alone.
             Elem::Modular(width) => self.settle(operand, Ty::Modular(width))?,
+            // A raw-bits literal may still be exact; settle it into the
+            // unsigned carrier at its declared width before the list store.
+            Elem::Bits(width) => self.settle(operand, Ty::Bits(width))?,
             _ => operand,
         };
         if operand.value != Value::from(elem.ty()) {

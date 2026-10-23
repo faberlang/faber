@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
     faber_list_i64 *ints;
     faber_list_text *texts;
     faber_list_bool *flags;
+    faber_list_b8 *bits;
     int64_t index;
 
     if (argc == 2 && strcmp(argv[1], "--overflow-capacity") == 0) {
@@ -87,6 +88,13 @@ int main(int argc, char **argv) {
     flags = faber_list_bool_of(&arena, 2, (bool[]){true, false});
     check_text("bool show", faber_list_bool_show(&arena, flags, "true", "false"), "[true, false]");
     check_text("empty show", faber_list_i64_show(&arena, faber_list_i64_new(&arena, 0)), "[]");
+    bits = faber_list_b8_new(&arena, 0);
+    faber_list_b8_push(&arena, bits, 0x00);
+    faber_list_b8_push(&arena, bits, 0x0f);
+    faber_list_b8_push(&arena, bits, 0xa5);
+    faber_list_b8_push(&arena, bits, 0xff);
+    check_text("raw bits list show", faber_list_b8_show(&arena, bits),
+               "[0x00, 0x0f, 0xa5, 0xff]");
 
     /* Floats print as the runner prints them. */
     {
@@ -216,6 +224,18 @@ int main(int argc, char **argv) {
         check_int("text map delete", faber_map_text_i64_delete(map, "alpha"), 1);
         check_int("text map len after delete", map->keys->len, 2);
         check_int("text map has deleted", faber_map_text_i64_has(map, "alpha"), 0);
+    }
+
+    /* The fault wire contract: a registered pair names its stable code, an
+     * unknown pair is unregistered, and a fault carries kind + path. */
+    check_text("fault code not found", faber_fault_code("IoFault", "NotFound"), "ERR001");
+    check_text("fault code cancelled", faber_fault_code("IoFault", "Cancelled"), "ERR015");
+    check_int("fault code unknown variant", faber_fault_code("IoFault", "NoSuch") == NULL, 1);
+    check_int("fault code unknown family", faber_fault_code("NoSuchFault", "NotFound") == NULL, 1);
+    {
+        faber_fault fault = faber_fault_of(faber_fault_code("IoFault", "NotFound"), "a.txt");
+        check_text("fault kind", fault.kind, "ERR001");
+        check_text("fault path", fault.path, "a.txt");
     }
 
     /* An interleaved delete/has stress over a size that forces index growth:

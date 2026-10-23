@@ -49,6 +49,81 @@
 __extension__ typedef __int128 faber_i128;
 __extension__ typedef unsigned __int128 faber_u128;
 
+/* Same-width scalar views of raw bits use object-representation copies. In
+ * particular, reading a high-bit unsigned pattern as a signed value avoids
+ * C's implementation-defined unsigned-to-signed conversion. */
+static inline int8_t faber_bits_read_i8(uint8_t bits) {
+    int8_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline int16_t faber_bits_read_i16(uint16_t bits) {
+    int16_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline int32_t faber_bits_read_i32(uint32_t bits) {
+    int32_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline int64_t faber_bits_read_i64(uint64_t bits) {
+    int64_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint8_t faber_bits_read_u8(uint8_t bits) {
+    uint8_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint16_t faber_bits_read_u16(uint16_t bits) {
+    uint16_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint32_t faber_bits_read_u32(uint32_t bits) {
+    uint32_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint64_t faber_bits_read_u64(uint64_t bits) {
+    uint64_t value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline uint32_t faber_bits_of_f32(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof bits);
+    return bits;
+}
+
+static inline uint64_t faber_bits_of_f64(double value) {
+    uint64_t bits;
+    memcpy(&bits, &value, sizeof bits);
+    return bits;
+}
+
+static inline float faber_f32_of_bits(uint32_t bits) {
+    float value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
+static inline double faber_f64_of_bits(uint64_t bits) {
+    double value;
+    memcpy(&value, &bits, sizeof value);
+    return value;
+}
+
 /* A text value: a NUL-terminated C string of UTF-8 bytes. Text containing
  * NUL never reaches the runtime; the emitter rejects such literals. */
 typedef const char *faber_text;
@@ -83,6 +158,73 @@ static inline const char *faber_i128_text(faber_i128 value, char *buffer) {
         *--cursor = '-';
     }
     return cursor;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Error channel and faults                                                 */
+/* ------------------------------------------------------------------------ */
+
+/* The recoverable-error channel: `set` marks a failed call and `value` points
+ * at the error payload (a text value, a discretio or a genus). Scalar error
+ * classes stay refused by the emitter, so a pointer always suffices. */
+typedef struct faber_chan {
+    bool set;
+    const void *value;
+} faber_chan;
+
+/* A leaf fault crosses the wire as kind + path, never as a platform message:
+ * `kind` is the variant's stable `ERRnnn` code and `path` is the operation's
+ * path argument (`""` when the operation has none). */
+typedef struct faber_fault {
+    const char *kind;
+    faber_text path;
+} faber_fault;
+
+/* The rows of `crates/radix-runtime-contract/src/fault_codes.rs`, in registry
+ * order; that registry is the single source of truth and
+ * `c_runtime_carries_every_registered_fault_code` fails when the two drift. A
+ * number is never edited once it reaches main: a new variant appends a row. */
+static const struct {
+    const char *family;
+    const char *variant;
+    const char *code;
+} faber_fault_codes[] = {
+    {"IoFault", "NotFound", "ERR001"},
+    {"IoFault", "Permission", "ERR002"},
+    {"IoFault", "NotADirectory", "ERR003"},
+    {"IoFault", "IsADirectory", "ERR004"},
+    {"IoFault", "InvalidArgument", "ERR005"},
+    {"IoFault", "AlreadyExists", "ERR006"},
+    {"IoFault", "TimedOut", "ERR007"},
+    {"IoFault", "ConnectionRefused", "ERR008"},
+    {"IoFault", "ConnectionReset", "ERR009"},
+    {"IoFault", "AddrInUse", "ERR010"},
+    {"IoFault", "Io", "ERR011"},
+    {"IoFault", "Closed", "ERR012"},
+    {"IoFault", "Unset", "ERR013"},
+    {"IoFault", "Unavailable", "ERR014"},
+    {"IoFault", "Cancelled", "ERR015"},
+};
+
+/* The code registered for an exact (family, variant) pair, NULL otherwise. */
+static inline const char *faber_fault_code(const char *family, const char *variant) {
+    size_t index;
+    for (index = 0; index < sizeof faber_fault_codes / sizeof faber_fault_codes[0]; index++) {
+        if (strcmp(faber_fault_codes[index].family, family) == 0 &&
+            strcmp(faber_fault_codes[index].variant, variant) == 0) {
+            return faber_fault_codes[index].code;
+        }
+    }
+    return NULL;
+}
+
+/* The fault wire value for a variant's `kind` code and the operation's
+ * `path`. */
+static inline faber_fault faber_fault_of(const char *kind, faber_text path) {
+    faber_fault fault;
+    fault.kind = kind;
+    fault.path = path;
+    return fault;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -261,6 +403,36 @@ static inline faber_i128 faber_shr(faber_i128 value, faber_i128 count) {
     }
     return value >> (int)count;
 }
+
+/* Raw bits shift inside their unsigned cell: unlike integer shifts, a count
+ * at least the cell width yields zero. The bound is checked before casting
+ * the count, so no C shift reaches or exceeds the width (undefined behavior). */
+#define FABER_BITS_SHIFTS(NAME, TYPE, WIDTH)                                         \
+    static inline TYPE faber_bits_shl_##NAME(TYPE value, faber_i128 count) {          \
+        if (count < 0) {                                                             \
+            faber_trap("negative shift count");                                     \
+        }                                                                            \
+        if (count >= (faber_i128)(WIDTH)) {                                          \
+            return (TYPE)0;                                                          \
+        }                                                                            \
+        return (TYPE)(value << (unsigned)count);                                     \
+    }                                                                                \
+    static inline TYPE faber_bits_shr_##NAME(TYPE value, faber_i128 count) {          \
+        if (count < 0) {                                                             \
+            faber_trap("negative shift count");                                     \
+        }                                                                            \
+        if (count >= (faber_i128)(WIDTH)) {                                          \
+            return (TYPE)0;                                                          \
+        }                                                                            \
+        return (TYPE)(value >> (unsigned)count);                                     \
+    }
+
+FABER_BITS_SHIFTS(b8, uint8_t, 8)
+FABER_BITS_SHIFTS(b16, uint16_t, 16)
+FABER_BITS_SHIFTS(b32, uint32_t, 32)
+FABER_BITS_SHIFTS(b64, uint64_t, 64)
+
+#undef FABER_BITS_SHIFTS
 
 /* `≈` / `≉` between integers: `10^9 · |a − b| ≤ max(|a|, |b|)` over the exact
  * values, never through a float. Mirrors `faber::exact::approx_int`. */
@@ -1917,6 +2089,12 @@ FABER_LIST_FAMILY(text, faber_text)
 FABER_LIST_FAMILY(bool, bool)
 FABER_LIST_FAMILY(f64, double)
 FABER_LIST_FAMILY(f32, float)
+/* Raw bits have their own ABI families: they must not alias the `uN`
+ * modular-word family even though both use the same unsigned C cell. */
+FABER_LIST_FAMILY(b8, uint8_t)
+FABER_LIST_FAMILY(b16, uint16_t)
+FABER_LIST_FAMILY(b32, uint32_t)
+FABER_LIST_FAMILY(b64, uint64_t)
 /* `list<wrapping<W>>` (modular words): the stored cell is the plain width,
  * written only through the modular store and read widened by the emitter. */
 FABER_LIST_FAMILY(i8, int8_t)
@@ -1926,6 +2104,80 @@ FABER_LIST_FAMILY(u8, uint8_t)
 FABER_LIST_FAMILY(u16, uint16_t)
 FABER_LIST_FAMILY(u32, uint32_t)
 FABER_LIST_FAMILY(u64, uint64_t)
+
+/* A list of raw b8 cells is a byte view of a list at another fixed width.
+ * `faber_bits_to_bytes` copies the elements in their host memory order;
+ * `faber_bits_from_bytes` writes each multi-byte element in the requested
+ * wire order. */
+static inline faber_list_b8 *faber_bits_to_bytes(faber_arena *arena, const void *items,
+                                                 int64_t len, size_t elem_bytes) {
+    faber_list_b8 *bytes;
+    int64_t count;
+    if (len < 0 || elem_bytes == 0 ||
+        (len > 0 && (uint64_t)elem_bytes > (uint64_t)INT64_MAX / (uint64_t)len)) {
+        faber_trap("collection capacity overflow");
+    }
+    count = len == 0 ? 0 : len * (int64_t)elem_bytes;
+    bytes = faber_list_b8_new(arena, count);
+    if (count > 0) {
+        memcpy(bytes->items, items, (size_t)count);
+    }
+    bytes->len = count;
+    return bytes;
+}
+
+static inline faber_list_b8 *faber_bits_from_bytes(faber_arena *arena, const void *items,
+                                                   int64_t len, size_t elem_bytes, bool be) {
+    faber_list_b8 *bytes = faber_bits_to_bytes(arena, items, len, elem_bytes);
+    const uint16_t one = 1;
+    const bool host_little = *(const unsigned char *)&one == 1;
+    if (be == host_little) {
+        int64_t at;
+        for (at = 0; at < len; ++at) {
+            size_t left = (size_t)at * elem_bytes;
+            size_t right = left + elem_bytes - 1;
+            while (left < right) {
+                uint8_t byte = bytes->items[left];
+                bytes->items[left++] = bytes->items[right];
+                bytes->items[right--] = byte;
+            }
+        }
+    }
+    return bytes;
+}
+
+#define FABER_BYTES_DECODE(NAME, TYPE, WIDTH)                                           \
+    static inline faber_list_##NAME *faber_bytes_to_##NAME(                            \
+        faber_arena *arena, const faber_list_b8 *bytes, bool be) {                      \
+        int64_t count;                                                                  \
+        int64_t at;                                                                     \
+        faber_list_##NAME *values;                                                      \
+        if (bytes->len % (WIDTH) != 0) {                                                \
+            faber_trap("bits list length mismatch");                                  \
+        }                                                                               \
+        count = bytes->len / (WIDTH);                                                   \
+        values = faber_list_##NAME##_new(arena, count);                                \
+        for (at = 0; at < count; ++at) {                                               \
+            uint64_t value = 0;                                                        \
+            size_t byte;                                                               \
+            for (byte = 0; byte < (WIDTH); ++byte) {                                   \
+                size_t shift = be ? (size_t)((WIDTH) - 1 - byte) : byte;               \
+                value |= (uint64_t)bytes->items[(size_t)at * (WIDTH) + byte]           \
+                         << (shift * 8);                                                \
+            }                                                                           \
+            values->items[at] = (TYPE)value;                                           \
+        }                                                                               \
+        values->len = count;                                                           \
+        return values;                                                                 \
+    }
+
+FABER_BYTES_DECODE(u16, uint16_t, 2)
+FABER_BYTES_DECODE(u32, uint32_t, 4)
+FABER_BYTES_DECODE(u64, uint64_t, 8)
+FABER_BYTES_DECODE(b16, uint16_t, 2)
+FABER_BYTES_DECODE(b32, uint32_t, 4)
+FABER_BYTES_DECODE(b64, uint64_t, 8)
+#undef FABER_BYTES_DECODE
 
 /* How a list shows, as the runner prints it: `[1, 2]`, `["a", "b"]`,
  * `[true, false]` in the module's display tokens. */
@@ -2091,6 +2343,36 @@ FABER_LIST_WORD_SHOW(u8, uint8_t, (uint64_t), "%" PRIu64)
 FABER_LIST_WORD_SHOW(u16, uint16_t, (uint64_t), "%" PRIu64)
 FABER_LIST_WORD_SHOW(u32, uint32_t, (uint64_t), "%" PRIu64)
 FABER_LIST_WORD_SHOW(u64, uint64_t, (uint64_t), "%" PRIu64)
+
+/* Raw bits show as a fixed-width lowercase hex pattern, not a number. DIGITS
+ * carries both the width and its matching inttypes format (`"2" PRIx8`). */
+#define FABER_LIST_BITS_SHOW(NAME, TYPE, DIGITS)                                        \
+    static inline faber_text faber_list_##NAME##_show(faber_arena *arena,                \
+                                                      const faber_list_##NAME *list) {  \
+        size_t capacity = faber_collection_size_add(                                    \
+            3, faber_collection_size_mul(faber_collection_count_size(list->len), 20));  \
+        char *out = (char *)faber_alloc(arena, sizeof(faber_text_header) + capacity) +   \
+                    sizeof(faber_text_header);                                           \
+        size_t at = 0;                                                                  \
+        int64_t index;                                                                  \
+        out[at++] = '[';                                                                \
+        for (index = 0; index < list->len; index++) {                                   \
+            if (index > 0) {                                                            \
+                out[at++] = ',';                                                        \
+                out[at++] = ' ';                                                        \
+            }                                                                           \
+            at += (size_t)snprintf(out + at, capacity - at, "0x%0" DIGITS,             \
+                                   (TYPE)list->items[index]);                            \
+        }                                                                               \
+        out[at++] = ']';                                                                \
+        out[at] = '\0';                                                               \
+        return faber_text_seal(out - sizeof(faber_text_header), at, (int64_t)at);       \
+    }
+
+FABER_LIST_BITS_SHOW(b8, uint8_t, "2" PRIx8)
+FABER_LIST_BITS_SHOW(b16, uint16_t, "4" PRIx16)
+FABER_LIST_BITS_SHOW(b32, uint32_t, "8" PRIx32)
+FABER_LIST_BITS_SHOW(b64, uint64_t, "16" PRIx64)
 
 /* ------------------------------------------------------------------------ */
 /* List operations beyond the family: queries, copies, ends, ordering       */
@@ -2264,6 +2546,10 @@ FABER_LIST_OPS(u8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(b64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
 
 /* Sets (`copia<T>`): the list storage under the set contract, plus an
  * open-addressing index over the element positions so membership stays
@@ -3120,7 +3406,8 @@ enum {
     FABER_CONV_INT_INT = 2,
     FABER_CONV_FLOAT_INT = 3,
     FABER_CONV_TEXT_BOOL = 4,
-    FABER_CONV_ASCII_PACK = 5
+    FABER_CONV_ASCII_PACK = 5,
+    FABER_CONV_BYTES_TEXT = 6
 };
 
 static inline _Noreturn void faber_conv_fail(int kind, int why) {
@@ -3135,6 +3422,8 @@ static inline _Noreturn void faber_conv_fail(int kind, int why) {
     case FABER_CONV_ASCII_PACK:
         faber_trap(why == FABER_CONV_NEGATIVE ? "ascii_pack_negative_source"
                                               : "ascii_pack_width_overflow");
+    case FABER_CONV_BYTES_TEXT:
+        faber_trap("octeti to textus conversion failed");
     case FABER_CONV_INT_INT:
         faber_trap("numerus to numerus conversion out of range");
     default:
@@ -3228,6 +3517,87 @@ static inline int faber_try_text_int(faber_text text, int radix, faber_i128 low,
     }
     *out = negative ? -value : value;
     return *out >= low && *out <= high ? FABER_CONV_OK : FABER_CONV_RANGE;
+}
+
+/* Whether `length` bytes are one well-formed UTF-8 text: no overlong form,
+ * no surrogate, nothing past U+10FFFF, and no `0x00` byte. The text carrier
+ * is NUL-terminated, so a zero byte has no text value at all. */
+static inline bool faber_utf8_well_formed(const unsigned char *source, size_t length) {
+    size_t at = 0;
+    while (at < length) {
+        unsigned char lead = source[at];
+        size_t width = 1;
+        uint32_t least = 0;
+        uint32_t cp;
+        size_t step;
+        if (lead == 0x00) {
+            return false;
+        }
+        if (lead >= 0x80) {
+            if (lead >= 0xC2 && lead <= 0xDF) {
+                width = 2;
+                least = 0x80;
+            } else if (lead >= 0xE0 && lead <= 0xEF) {
+                width = 3;
+                least = 0x800;
+            } else if (lead >= 0xF0 && lead <= 0xF4) {
+                width = 4;
+                least = 0x10000;
+            } else {
+                return false;
+            }
+            if (length - at < width) {
+                return false;
+            }
+            for (step = 1; step < width; step++) {
+                if ((source[at + step] & 0xC0) != 0x80) {
+                    return false;
+                }
+            }
+            cp = faber_utf8_decode(source + at, width);
+            if (cp < least || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
+                return false;
+            }
+        }
+        at += width;
+    }
+    return true;
+}
+
+/* `lista<b8> ↦ string`: the UTF-8 decode, sealing the very bytes the list
+ * holds. An ill-formed sequence fails, and so does any `0x00` byte: the
+ * carrier has no text value for it, so the conversion fails exactly like a
+ * bad sequence rather than truncating the text. `*why` is FABER_CONV_RANGE on
+ * failure and the caller either traps or takes the `⊥` fallback. */
+static inline faber_text faber_try_bytes_text(faber_arena *arena, const faber_list_b8 *bytes,
+                                              int *why) {
+    size_t length = (size_t)bytes->len;
+    char *buffer;
+    char *text;
+    if (!faber_utf8_well_formed(bytes->items, length)) {
+        *why = FABER_CONV_RANGE;
+        return NULL;
+    }
+    *why = FABER_CONV_OK;
+    buffer = faber_alloc(arena, sizeof(faber_text_header) + length + 1);
+    text = buffer + sizeof(faber_text_header);
+    if (length > 0) {
+        memcpy(text, bytes->items, length);
+    }
+    text[length] = '\0';
+    return faber_text_seal(buffer, length, faber_text_count_cps(text, length));
+}
+
+/* `string ↦ lista<b8>`: the UTF-8 encode, the header's byte count copied out.
+ * It cannot fail: a text never carries a NUL byte. */
+static inline faber_list_b8 *faber_text_bytes(faber_arena *arena, faber_text text) {
+    size_t length = (size_t)faber_text_hdr(text)->bytes;
+    faber_list_b8 *bytes = faber_list_b8_new(arena, (int64_t)length);
+    if (length > 0) {
+        memcpy(bytes->items, text, length);
+    }
+    bytes->len = (int64_t)length;
+    return bytes;
 }
 
 static inline bool faber_ascii_equal_nocase(const char *a, const char *b) {

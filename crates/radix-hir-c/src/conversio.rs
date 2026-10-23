@@ -10,14 +10,16 @@
 //! longer, the runner's rule.
 
 use crate::Emitter;
-use crate::error::unsupported;
+use crate::error::{UNSUPPORTED_ISSUE, unsupported};
 use crate::expr::{Operand, Value};
 use crate::helpers::{Helper, ListOp};
-use crate::ty::{IntWidth, Ty, classify};
+use crate::ty::{Elem, IntWidth, Ty, classify};
 use radix_codegen_shared::CodegenError;
+use radix_codegen_shared::hints::{self, EndianHint};
+use radix_diagnostics::DiagnosticArg;
 use radix_hir::HirExpression;
 use radix_lexer::Symbol;
-use radix_types::{Type, TypeId};
+use radix_types::{BitsWidth, NumericWidth, Primitive, Type, TypeId};
 
 /// Which failure texts a fallible conversion uses (`FABER_CONV_*`).
 #[derive(Clone, Copy)]
@@ -39,6 +41,62 @@ impl Kind {
     }
 }
 
+fn int_width_for_class(class: Ty) -> Option<u8> {
+    match class {
+        Ty::Int => Some(64),
+        Ty::Sized(IntWidth::I8 | IntWidth::U8) => Some(8),
+        Ty::Sized(IntWidth::I16 | IntWidth::U16) => Some(16),
+        Ty::Sized(IntWidth::I32 | IntWidth::U32) => Some(32),
+        Ty::Sized(IntWidth::U64) => Some(64),
+        _ => None,
+    }
+}
+
+fn bits_width(width: radix_types::BitsWidth) -> u8 {
+    match width {
+        radix_types::BitsWidth::B8 => 8,
+        radix_types::BitsWidth::B16 => 16,
+        radix_types::BitsWidth::B32 => 32,
+        radix_types::BitsWidth::B64 => 64,
+    }
+}
+
+/// Return the target refusal name for a cross-width scalar bits conversion.
+pub(crate) fn bits_conversion_width_mismatch(
+    source: Option<Ty>,
+    target: Ty,
+) -> Option<&'static str> {
+    let source = source?;
+    match (source, target) {
+        (Ty::Bits(from), Ty::Bits(to)) if from != to => {
+            Some("raw bits conversion at a different width")
+        }
+        (Ty::Bits(from), Ty::Int | Ty::Sized(_))
+            if int_width_for_class(target) != Some(bits_width(from)) =>
+        {
+            Some("raw bits to integer conversion at a different width")
+        }
+        (Ty::Int | Ty::Sized(_), Ty::Bits(to))
+            if int_width_for_class(source) != Some(bits_width(to)) =>
+        {
+            Some("integer to raw bits conversion at a different width")
+        }
+        (Ty::Bits(from), Ty::Float32) if bits_width(from) != 32 => {
+            Some("raw bits to float conversion at a different width")
+        }
+        (Ty::Bits(from), Ty::Float) if bits_width(from) != 64 => {
+            Some("raw bits to float conversion at a different width")
+        }
+        (Ty::Float32, Ty::Bits(to)) if bits_width(to) != 32 => {
+            Some("float to raw bits conversion at a different width")
+        }
+        (Ty::Float, Ty::Bits(to)) if bits_width(to) != 64 => {
+            Some("float to raw bits conversion at a different width")
+        }
+        _ => None,
+    }
+}
+
 /// The range an integer class holds, and its value form once converted.
 fn int_target(class: Ty) -> Option<(i128, i128, bool)> {
     match class {
@@ -48,6 +106,54 @@ fn int_target(class: Ty) -> Option<(i128, i128, bool)> {
             Some((low, high, width == IntWidth::U64))
         }
         _ => None,
+    }
+}
+
+fn list_width_refusal(from: &str, to: &str) -> CodegenError {
+    let construct = format!("width-changing list conversion from {from} to {to}");
+    CodegenError {
+        message: format!("unsupported on target c: {construct}"),
+        args: vec![
+            DiagnosticArg::new("issue", UNSUPPORTED_ISSUE),
+            DiagnosticArg::new("construct", construct),
+            DiagnosticArg::new("target", "c"),
+        ],
+    }
+}
+
+/// The element type of an unbounded list, peeling an alias or access marker.
+fn list_element_type(types: &radix_types::TypeTable, mut ty: TypeId) -> Option<TypeId> {
+    loop {
+        ty = types.peel_access_marker(ty).1;
+        match types.get(ty) {
+            Type::Alias(_, inner) => ty = *inner,
+            Type::Array(element) => return Some(*element),
+            _ => return None,
+        }
+    }
+}
+
+/// The C element family and its byte width for the supported list byte view.
+fn bytes_list_element(types: &radix_types::TypeTable, mut ty: TypeId) -> Option<(Elem, usize)> {
+    loop {
+        ty = types.peel_access_marker(ty).1;
+        match types.get(ty) {
+            Type::Alias(_, inner) => ty = *inner,
+            Type::Bits(width) => {
+                let elem = Elem::Bits(*width);
+                return Some((elem, usize::from(bits_width(*width) / 8)));
+            }
+            Type::SizedNumeric(Primitive::Numerus, width) => {
+                let (width, bytes) = match width {
+                    NumericWidth::U16 => (IntWidth::U16, 2),
+                    NumericWidth::U32 => (IntWidth::U32, 4),
+                    NumericWidth::U64 => (IntWidth::U64, 8),
+                    _ => return None,
+                };
+                return Some((Elem::Modular(width), bytes));
+            }
+            _ => return None,
+        }
     }
 }
 
@@ -92,13 +198,105 @@ impl Emitter<'_> {
             }
             return Err(unsupported("conversion to bounded ascii from this value"));
         }
+        // The text pairs of a list of raw bits: `lista<b8> ↦ string` is the
+        // UTF-8 decode and `string ↦ lista<b8>` the encode, the pair the
+        // `octeti` (en `bytes`) leaf needs. The 16- and 32-bit pairs stay
+        // refused by name: no C text carrier here is UTF-16 or UTF-32, so a
+        // list show or a cast would be a wrong program.
+        if let Some(source_ty) = source.ty {
+            if radix_codegen_shared::is_byte_text_conversion(self.types, source_ty, target) {
+                let value = self.expr(source)?;
+                return if matches!(value.value, Value::List(_)) {
+                    self.bytes_text_decode(value, recovery)
+                } else {
+                    Ok(self.text_bytes_encode(value))
+                };
+            }
+            if radix_codegen_shared::list_text_conversion(self.types, source_ty, target).is_some() {
+                return Err(unsupported("list of raw bits and text"));
+            }
+            if let Some((from, to)) =
+                radix_codegen_shared::list_width_change(self.types, source_ty, target)
+            {
+                let Some(be) = self.endian_hint(params) else {
+                    return Err(list_width_refusal(&from, &to));
+                };
+                return self.bits_list_width_change(
+                    source,
+                    source_ty,
+                    target,
+                    from,
+                    to,
+                    be,
+                    recovery.is_some(),
+                );
+            }
+        }
         let class = classify(self.types, target)?;
         let value = self.expr(source)?;
+        let source_class = source.ty.map(|ty| classify(self.types, ty)).transpose()?;
+        if let Some(construct) = bits_conversion_width_mismatch(source_class, class) {
+            return Err(unsupported(construct));
+        }
         let integer = matches!(value.value, Value::Int | Value::Exact);
         let effect = value.effect;
         // Conversions that cannot fail ignore a recovery (typecheck allows
         // one only where the conversion can fail).
         let operand = match (value.value, class) {
+            // Raw bits are a same-width view of an integer's low-width
+            // pattern. C's conversion to an unsigned cell is defined modulo
+            // 2^N, including negative signed sources.
+            (Value::Int | Value::Exact, Ty::Bits(width))
+                if source_class.and_then(int_width_for_class) == Some(bits_width(width)) =>
+            {
+                let c_type = crate::ty::int_width_of_bits(width).c_type();
+                Operand::new(format!("(({c_type})({}))", value.text), Value::from(class))
+            }
+            // A bN-to-bN conversion preserves the already unsigned carrier.
+            (Value::Int | Value::Exact, Ty::Bits(width))
+                if source_class == Some(Ty::Bits(width)) =>
+            {
+                value
+            }
+            // Reading raw bits into an integer must copy the representation:
+            // an out-of-range unsigned-to-signed C cast is implementation-defined.
+            (Value::Int | Value::Exact, Ty::Int)
+                if source_class == Some(Ty::Bits(radix_types::BitsWidth::B64)) =>
+            {
+                Operand::new(format!("faber_bits_read_i64({})", value.text), Value::Int)
+            }
+            (Value::Int | Value::Exact, Ty::Sized(width)) if matches!(source_class, Some(Ty::Bits(bits)) if int_width_for_class(Ty::Sized(width)) == Some(bits_width(bits))) => {
+                Operand::new(
+                    format!("faber_bits_read_{}({})", width.marker(), value.text),
+                    Value::from(class),
+                )
+            }
+            (Value::Float32, Ty::Bits(radix_types::BitsWidth::B32))
+                if source_class == Some(Ty::Float32) =>
+            {
+                Operand::new(
+                    format!("faber_bits_of_f32({})", value.text),
+                    Value::from(class),
+                )
+            }
+            (Value::Float, Ty::Bits(radix_types::BitsWidth::B64))
+                if source_class == Some(Ty::Float) =>
+            {
+                Operand::new(
+                    format!("faber_bits_of_f64({})", value.text),
+                    Value::from(class),
+                )
+            }
+            (Value::Int | Value::Exact, Ty::Float32)
+                if source_class == Some(Ty::Bits(radix_types::BitsWidth::B32)) =>
+            {
+                Operand::new(format!("faber_f32_of_bits({})", value.text), Value::Float32)
+            }
+            (Value::Int | Value::Exact, Ty::Float)
+                if source_class == Some(Ty::Bits(radix_types::BitsWidth::B64)) =>
+            {
+                Operand::new(format!("faber_f64_of_bits({})", value.text), Value::Float)
+            }
             // A conversion into a float class is the C cast: `int ↦ float`
             // widens, `float ↦ f32` narrows, and `f32 ↦ float` widens the
             // already-binary32 value.
@@ -386,6 +584,57 @@ impl Emitter<'_> {
         Ok(Operand::new(text, Value::Text).with_effect(value.effect))
     }
 
+    /// `lista<b8> ↦ string`: the UTF-8 decode. The bytes are valid UTF-8 and
+    /// carry no `0x00` byte, which the NUL-terminated carrier has no text
+    /// value for, so `faber_try_bytes_text` says why it failed and the `⊥`
+    /// recovery takes its place.
+    fn bytes_text_decode(
+        &mut self,
+        value: Operand,
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        self.support.need(Helper::Conv);
+        // The decode allocates the text it seals, like a list build.
+        self.support.need(Helper::List(
+            crate::ty::Elem::Bits(radix_types::BitsWidth::B8),
+            ListOp::New,
+        ));
+        let n = self.temps;
+        self.temps += 1;
+        let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
+        let tail = match recovery {
+            Some(recovery) => {
+                let fallback = self.expr(recovery)?;
+                if fallback.value != Value::Text {
+                    return Err(unsupported("recovery value of a different class"));
+                }
+                format!("{s} == 0 ? {v} : {};", fallback.text)
+            }
+            None => {
+                format!("if ({s} != 0) {{ faber_conv_fail(FABER_CONV_BYTES_TEXT, {s}); }} {v};")
+            }
+        };
+        let text = format!(
+            "(__extension__ ({{ int {s} = 0; faber_text {v} = faber_try_bytes_text(faber_a, {}, &{s}); {tail} }}))",
+            value.text
+        );
+        Ok(Operand::new(text, Value::Text))
+    }
+
+    /// `string ↦ lista<b8>`: the UTF-8 encode. The header's byte count is
+    /// copied into a fresh byte list, and it cannot fail: a text never carries
+    /// a NUL byte.
+    fn text_bytes_encode(&mut self, value: Operand) -> Operand {
+        self.support.need(Helper::List(
+            crate::ty::Elem::Bits(radix_types::BitsWidth::B8),
+            ListOp::New,
+        ));
+        Operand::new(
+            format!("faber_text_bytes(faber_a, {})", value.text),
+            Value::List(crate::ty::Elem::Bits(radix_types::BitsWidth::B8)),
+        )
+    }
+
     /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
     /// and its literal capacity. `None` for any other target.
     fn bounded_list_target(&self, ty: TypeId) -> Option<(TypeId, u64)> {
@@ -450,6 +699,83 @@ impl Emitter<'_> {
             }
             _ => None,
         }
+    }
+
+    /// The endian hint used by a width-changing list conversion.
+    fn endian_hint(&self, params: &[Symbol]) -> Option<bool> {
+        hints::endian_hint(params, |param| {
+            hints::classify(self.names.resolve_symbol(*param))
+        })
+        .map(|hint| hint == EndianHint::Be)
+    }
+
+    /// Lower a width-changing list pair through the runtime byte view. The
+    /// shared predicate admits the pair; this C lane carries b8 and the u16,
+    /// u32, u64, b16, b32 and b64 families only.
+    #[allow(clippy::too_many_arguments)]
+    fn bits_list_width_change(
+        &mut self,
+        source: &HirExpression,
+        source_ty: TypeId,
+        target_ty: TypeId,
+        from: String,
+        to: String,
+        be: bool,
+        has_recovery: bool,
+    ) -> Result<Operand, CodegenError> {
+        if has_recovery {
+            return Err(list_width_refusal(&from, &to));
+        }
+        let Some(from_type) = list_element_type(self.types, source_ty) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let Some(to_type) = list_element_type(self.types, target_ty) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let Some((from_elem, from_bytes)) = bytes_list_element(self.types, from_type) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let Some((to_elem, to_bytes)) = bytes_list_element(self.types, to_type) else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        let decode = from_elem == Elem::Bits(BitsWidth::B8) && to_bytes > 1;
+        let encode = to_elem == Elem::Bits(BitsWidth::B8) && from_bytes > 1;
+        if !decode && !encode {
+            return Err(list_width_refusal(&from, &to));
+        }
+
+        let mut value = self.expr(source)?;
+        let Value::List(actual_elem) = value.value else {
+            return Err(list_width_refusal(&from, &to));
+        };
+        if actual_elem != from_elem {
+            return Err(list_width_refusal(&from, &to));
+        }
+        let prelude = self.bind(&mut value);
+        let be = if be { "true" } else { "false" };
+        let call = if decode {
+            self.support
+                .need(Helper::List(Elem::Bits(BitsWidth::B8), ListOp::New));
+            self.support.need(Helper::List(to_elem, ListOp::New));
+            let bytes = format!(
+                "faber_bits_to_bytes(faber_a, {items}->items, {items}->len, sizeof *{items}->items)",
+                items = value.text,
+            );
+            format!(
+                "faber_bytes_to_{}(faber_a, {bytes}, {be})",
+                to_elem.suffix()
+            )
+        } else {
+            self.support.need(Helper::List(to_elem, ListOp::New));
+            format!(
+                "faber_bits_from_bytes(faber_a, {items}->items, {items}->len, sizeof *{items}->items, {be})",
+                items = value.text,
+            )
+        };
+        Ok(
+            Operand::new(crate::expr::wrap(&prelude, &call), Value::List(to_elem))
+                .with_effect(true),
+        )
     }
 
     /// The `via` hint of a float-to-integer conversion, as `faber_try_float_int`'s

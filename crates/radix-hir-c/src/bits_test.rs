@@ -4,8 +4,9 @@
 //! carrier, which would be a wrong program (operator ruling 2026-10-10:
 //! `bits have their width always`).
 
-use crate::error::UNSUPPORTED_ISSUE;
-use crate::test_support::{inline, rejected_construct};
+use crate::conversio::bits_conversion_width_mismatch;
+use crate::error::{UNSUPPORTED_ISSUE, unsupported};
+use crate::test_support::{emitted, program};
 use crate::ty::{Ty, int_width_of_bits, refuse_bits_operand};
 use radix_codegen_shared::CodegenError;
 use radix_types::{BitsWidth, TypeTable};
@@ -28,11 +29,52 @@ fn construct_of(error: &CodegenError) -> String {
     arg("construct")
 }
 
-/// A raw-bits operand refuses every operator by name. Authored `bN` cannot
-/// reach this leaf yet (the module gate keeps target c out until unit
-/// 3e80d069-1.1, and the front end refuses bits arithmetic first with SEM011
-/// `bits_arithmetic_refused`), so the leaf's guard is pinned at the class it
-/// reads: an operand whose type classifies to `Ty::Bits`.
+/// Same-width scalar conversions in the corpus reinterpret one cell rather
+/// than range-checking or converting through a wider signed value.
+#[test]
+fn bits_scalar_conversion_reads_the_pattern() {
+    let corpus = include_str!("../../../corpus/bits/bits-scalar-conversion.fab");
+    let body = corpus
+        .split_once("\n+++\n")
+        .expect("corpus frontmatter closes")
+        .1;
+    let code = emitted(body);
+    assert!(code.contains("faber_bits_read_i8"), "{code}");
+    assert!(code.contains("((uint8_t)("), "{code}");
+}
+
+/// Floating-point bit conversions preserve the declared IEEE width in both
+/// directions instead of casting through an integer value.
+#[test]
+fn bits_float_conversion_copies_the_pattern() {
+    let code = emitted(
+        "main {\n    let f32 single ← 1.5\n    let b32 single_bits ← single ↦ b32\n    let f32 single_back ← single_bits ↦ f32\n    let f64 double ← 1.5\n    let b64 double_bits ← double ↦ b64\n    let f64 double_back ← double_bits ↦ f64\n}",
+    );
+    assert!(code.contains("faber_bits_of_f32"), "{code}");
+    assert!(code.contains("faber_f32_of_bits"), "{code}");
+    assert!(code.contains("faber_bits_of_f64"), "{code}");
+    assert!(code.contains("faber_f64_of_bits"), "{code}");
+}
+
+/// Even though semantic analysis normally diagnoses this width change first,
+/// the C boundary independently refuses `b8 ↦ b16` as a named unsupported
+/// construct if mismatched HIR reaches it.
+#[test]
+fn bits_conversion_mixing_is_still_refused() {
+    let construct =
+        bits_conversion_width_mismatch(Some(Ty::Bits(BitsWidth::B8)), Ty::Bits(BitsWidth::B16))
+            .expect("cross-width bits conversion must be named");
+    let error = unsupported(construct);
+    assert_eq!(
+        construct_of(&error),
+        "raw bits conversion at a different width"
+    );
+}
+
+/// A raw-bits operand refuses every operator by name. Authored `bN` reaches
+/// this leaf now that the C target carries it, but the front end refuses bits
+/// arithmetic first with SEM011 `bits_arithmetic_refused`. Pin the target guard
+/// at the class it reads: an operand whose type classifies to `Ty::Bits`.
 #[test]
 fn bits_arithmetic_refused_by_name() {
     let mut types = TypeTable::new();
@@ -59,13 +101,123 @@ fn bits_arithmetic_refused_by_name() {
     assert!(refuse_bits_operand(&types, None, "arithmetic on raw bits").is_ok());
 }
 
-/// A `list<bN>` is refused by name. `bytes` (`octeti`) is the seeded
-/// `lista<b8>`, so it reaches this leaf through an authored word and pins the
-/// array arm's refusal without the authored-marker gate.
+/// A `list<bN>` literal carries raw bits through its own C family and shows
+/// each element as a width-padded lowercase hexadecimal pattern.
 #[test]
-fn bits_list_refused_by_name() {
-    let source = inline("main {\n    let bytes b ← |de ad be ef|\n    print b\n}");
-    assert_eq!(rejected_construct("case.fab", &source), "list of raw bits");
+fn bits_list_round_trip() {
+    let code = program(
+        "bits_display.fab",
+        include_str!("../tests/fixtures/run/bits_display.fab"),
+    );
+    assert!(code.contains("faber_list_b8_of(faber_a,"), "{code}");
+    assert!(code.contains("faber_list_b8_show(faber_a,"), "{code}");
+
+    // Empty construction and append exercise the distinct family entrypoints,
+    // in addition to the corpus literal's bulk construction and display.
+    let mutating = crate::test_support::emitted(
+        "main {\n    mut list<b8> bytes ← empty\n    bytes.append(0x0f)\n}",
+    );
+    assert!(mutating.contains("faber_list_b8_new"), "{mutating}");
+    assert!(mutating.contains("faber_list_b8_push"), "{mutating}");
+}
+
+/// The C emitter keeps every operation in a raw-bits value at its own width.
+#[test]
+fn bits_operations_act_at_the_width() {
+    let code = crate::test_support::program(
+        "bits_operations.fab",
+        include_str!("../tests/fixtures/run/bits_operations.fab"),
+    );
+    assert!(code.contains("faber_bits_shl_b8"), "{code}");
+    assert!(code.contains("~(uint8_t)l_a"), "{code}");
+    // The source pipeline currently stops `a + mask` at SEM011 before C;
+    // pin the C target's unsupported construct guard at its own boundary.
+    let mut types = TypeTable::new();
+    let bits = types.bits(BitsWidth::B8);
+    let error = refuse_bits_operand(&types, Some(bits), "arithmetic on raw bits")
+        .expect_err("arithmetic on raw bits must remain unsupported");
+    assert_eq!(construct_of(&error), "arithmetic on raw bits");
+}
+
+/// Raw-bits locals use their own unsigned C cell rather than the promoted
+/// integer value class.
+#[test]
+fn bits_store_is_the_unsigned_width_cell() {
+    let code = crate::test_support::emitted(
+        "main {\n    let b8 one ← 0x01\n    let b64 wide ← 0x0000000000000001\n}",
+    );
+    assert!(code.contains("uint8_t l_one = "), "{code}");
+    assert!(!code.contains("const int64_t l_one ="), "{code}");
+    assert!(code.contains("uint64_t l_wide = "), "{code}");
+    assert!(!code.contains("const int64_t l_wide ="), "{code}");
+}
+
+/// Raw-bits printing uses the width-specific hexadecimal conversion macro and
+/// passes its unsigned cell through the variadic-call carrier.
+#[test]
+fn bits_print_is_hex_at_full_width() {
+    let code = crate::test_support::emitted(
+        "main {\n    let b8 one8 ← 0x01\n    let b16 one16 ← 0x0001\n    let b32 one32 ← 0x00000001\n    let b64 one64 ← 0x0000000000000001\n    print one8\n    print one16\n    print one32\n    print one64\n}",
+    );
+    assert!(code.contains("0x%02\" PRIx8"), "{code}");
+    assert!(code.contains("0x%04\" PRIx16"), "{code}");
+    assert!(code.contains("0x%08\" PRIx32"), "{code}");
+    assert!(code.contains("0x%016\" PRIx64"), "{code}");
+    assert!(code.contains("(uint64_t)l_one8"), "{code}");
+    assert!(code.contains("(uint64_t)l_one64"), "{code}");
+}
+
+/// `lista<b8> ↦ string` is the UTF-8 decode and `string ↦ lista<b8>` the
+/// encode: the byte list and the counted text are the same bytes, so the
+/// emitted program calls the two runtime helpers rather than a list show or a
+/// cast.
+#[test]
+fn bits_bytes_decode_and_encode() {
+    let code = emitted(
+        "main {\n    let string word ← \"héllo\"\n    let list<b8> utf8 ← word ↦ list<b8>\n    print utf8 ↦ string ⊥ \"?\"\n}",
+    );
+    assert!(code.contains("faber_text_bytes(faber_a,"), "{code}");
+    assert!(code.contains("faber_try_bytes_text(faber_a,"), "{code}");
+}
+
+/// Width-changing b8 list conversions pass through the byte-view helpers,
+/// preserving the requested endian order for both decode and encode paths.
+#[test]
+fn via_le_and_be_decode_the_byte_order() {
+    let code = crate::test_support::program(
+        "bits_bulk_le.fab",
+        include_str!("../tests/fixtures/run/bits_bulk_le.fab"),
+    );
+    assert!(code.contains("faber_bits_to_bytes(faber_a,"), "{code}");
+    assert!(
+        code.contains("faber_bytes_to_u16(faber_a, faber_bits_to_bytes("),
+        "{code}"
+    );
+    let u16_decodes: Vec<_> = code
+        .lines()
+        .filter(|line| line.contains("faber_bytes_to_u16(faber_a,"))
+        .collect();
+    assert!(
+        u16_decodes.iter().any(|line| line.contains(", true)")),
+        "{code}"
+    );
+    assert!(
+        u16_decodes.iter().any(|line| line.contains(", false)")),
+        "{code}"
+    );
+    assert!(code.contains("faber_bits_from_bytes(faber_a,"), "{code}");
+    assert!(code.contains("faber_bytes_to_b16(faber_a,"), "{code}");
+}
+
+/// The 16- and 32-bit text pairs stay refused by name: the C leaf carries the
+/// UTF-8 pair only, and a UTF-16 or UTF-32 unit list printed as a list would
+/// be a wrong program, not a missing one.
+#[test]
+fn bits_bytes_text_wide_pairs_are_refused() {
+    let construct = crate::test_support::rejected(
+        "main {\n    let list<b16> units ← [0x0068]\n    let string word ← units ↦ string ⊥ \"?\"\n}",
+    );
+    assert_eq!(construct, "list of raw bits and text");
 }
 
 /// The carrier: a `bN` is held in the unsigned C cell of its own width, and
