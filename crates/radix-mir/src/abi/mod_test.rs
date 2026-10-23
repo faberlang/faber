@@ -2264,11 +2264,8 @@ fn record_element_reflects_struct_size_as_byte_width() {
         .insert(RECORD, vec![scale, data]);
     let error = reflect_kernel_resource(&record_resource(MirType::semantic(record)), &validation)
         .expect_err("an f64 field is refused");
-    assert!(
-        error.message.contains("f64 field"),
-        "refusal names the field: {}",
-        error.message
-    );
+    assert_eq!(error.issue, "mir_kernel_record_element_layout_unsupported");
+    assert_eq!(error.detail.as_deref(), Some("f64"));
 }
 
 fn record_resource(element_ty: MirType) -> MirKernelResource {
