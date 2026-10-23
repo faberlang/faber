@@ -1,0 +1,22 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "A list index must be an integer: a text index is refused by name."
+syntax = "xs[\"x\"] on list<int> — rejected"
+related = ["lista", "textus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:array_index_must_be_numerus"
++++
+# lista reject case — a text index on a list is refused.
+# A list is addressed by an integer position; `xs["x"]` has no position.
+# The checker names the issue `array_index_must_be_numerus`.
+# This exemplum intentionally fails to check.
+
+main {
+    let list<int> xs ← [1, 2, 3]
+    print xs["x"]
+}
