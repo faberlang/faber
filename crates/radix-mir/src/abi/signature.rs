@@ -436,6 +436,35 @@ fn append_tensor_extent_resources(
     Ok(())
 }
 
+/// Rule 11: appends the run-time axis extent resources of a row-gather
+/// signature — the table's live axes (`table_binding`) and the ids vector's
+/// (`ids_binding`), in axis order. A subchain emission signature carries the
+/// same resources the whole-function ABI appends, so the emitted header
+/// declares the count-one `u32` extents the body reads.
+pub(crate) fn append_gather_axis_extent_resources(
+    signature: &mut MirKernelSignature,
+    table_dims: &[crate::tensor_type::Dim],
+    ids_dims: &[crate::tensor_type::Dim],
+    table_binding: u32,
+    ids_binding: u32,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    let runtime_axes = |dims: &[crate::tensor_type::Dim]| {
+        dims.iter()
+            .enumerate()
+            .filter(|(_, dim)| matches!(dim, crate::tensor_type::Dim::Runtime))
+            .map(|(axis, _)| axis as u32)
+            .collect::<Vec<u32>>()
+    };
+    for axis in runtime_axes(table_dims) {
+        push_axis_extent_resource(signature, table_binding, axis, validation)?;
+    }
+    for axis in runtime_axes(ids_dims) {
+        push_axis_extent_resource(signature, ids_binding, axis, validation)?;
+    }
+    Ok(())
+}
+
 /// Appends one count-one `u32` [`MirKernelResourceKind::TensorAxisExtent`]
 /// input after the highest binding the signature already holds.
 fn push_axis_extent_resource(
