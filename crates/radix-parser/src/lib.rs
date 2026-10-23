@@ -110,7 +110,11 @@ pub const MAX_PARSE_OPERATORS: usize = 512;
 ///
 /// Subparser modules extend this type instead of each owning token state. That
 /// keeps recovery, comment skipping, spans, identifiers, and node allocation
-/// consistent across the grammar.
+/// consistent across the grammar. Some state predicates are independent facts
+/// that can coexist across parsing phases; keeping them as booleans avoids
+/// artificial enum combinations and preserves the direct checks used by the
+/// subparsers.
+#[allow(clippy::struct_excessive_bools)] // WHY: parser context carries independent state predicates across subparsers.
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
@@ -529,7 +533,7 @@ impl Parser {
         match kind {
             TokenKind::Eof | TokenKind::Comma | TokenKind::Star => true,
             kind if self.token_keyword_identity(kind) == Some(TokenKind::Ut) => true,
-            kind if self.is_import_binding_name_kind(kind) => {
+            kind if Self::is_import_binding_name_kind(kind) => {
                 match tokens.get(index + 1).map(|token| &token.kind) {
                     None | Some(TokenKind::Eof | TokenKind::Comma | TokenKind::Star) => true,
                     Some(kind) if self.token_keyword_identity(kind) == Some(TokenKind::Ut) => true,
@@ -544,7 +548,7 @@ impl Parser {
     }
 
     /// Token-index twin of [`Parser::is_import_binding_name`].
-    fn is_import_binding_name_kind(&self, kind: &TokenKind) -> bool {
+    fn is_import_binding_name_kind(kind: &TokenKind) -> bool {
         match kind {
             TokenKind::Ident(_) | TokenKind::Underscore(_) | TokenKind::Tag => true,
             kind => keyword_allowed_as_ident(KeywordOwner::DeclarationName, kind).is_some(),
@@ -1368,9 +1372,8 @@ impl Parser {
             self.advance();
             Ok(())
         } else {
-            let keyword = spelling
-                .map(|latin| self.keyword_surface(latin))
-                .unwrap_or_else(|| "keyword".to_owned());
+            let keyword =
+                spelling.map_or_else(|| "keyword".to_owned(), |latin| self.keyword_surface(latin));
             Err(
                 ParseError::structured(ParseErrorKind::Expected, self.current_span())
                     .with_arg("issue", "expected_keyword")

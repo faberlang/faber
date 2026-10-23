@@ -339,7 +339,9 @@ impl Parser {
             self.keyword_ident("iuncta", span)
         } else {
             let ident = self.parse_ident()?;
-            authored_word = self.interner.resolve(ident.name).to_owned();
+            self.interner
+                .resolve(ident.name)
+                .clone_into(&mut authored_word);
             // Canonicalize a type spelling to its latin identity only for
             // a single-part type. A qualified prefix is an import binding
             // (namespace) and must keep its authored spelling — a binding
