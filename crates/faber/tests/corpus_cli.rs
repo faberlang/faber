@@ -1403,7 +1403,7 @@ fn corpus_filter_selects_matching_cases() {
 }
 
 #[test]
-fn corpus_embedded_only_refuses_library_home_env() {
+fn corpus_embedded_only_ignores_library_home_env() {
     let temp = tempfile::tempdir().expect("temporary suite");
     check_only_case(temp.path(), "smoke");
     fs::write(
@@ -1416,26 +1416,23 @@ fn corpus_embedded_only_refuses_library_home_env() {
         .args(["corpus", "--target", "runner"])
         .arg(temp.path())
         .env("FABER_LIBRARY_HOME", "/nonexistent-faber-library-home")
-        .env_remove("FABER_SUPPORT_PATH_OVERRIDE")
         .output()
         .expect("run embedded-only suite under a library home");
     assert!(
-        !output.status.success(),
-        "embedded_only must refuse FABER_LIBRARY_HOME"
-    );
-    assert!(
-        corpus_error_message(&output).contains("embedded_only"),
+        output.status.success(),
         "stdout: {}\nstderr: {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    let rows = records(&output.stdout);
+    let summary = rows.last().expect("summary");
+    assert_eq!(summary["status"], "pass");
 }
 
 #[cfg(feature = "hir-rust")]
 #[test]
 fn corpus_embedded_only_rust_builds_against_materialized_runtime() {
     let temp = tempfile::tempdir().expect("temporary suite");
-    let cache = tempfile::tempdir().expect("temporary cache");
     let case = temp.path().join("cases/smoke");
     fs::create_dir_all(&case).expect("create case directory");
     fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
@@ -1458,9 +1455,6 @@ fn corpus_embedded_only_rust_builds_against_materialized_runtime() {
     let output = Command::new(env!("CARGO_BIN_EXE_faber"))
         .args(["corpus", "--target", "rust"])
         .arg(temp.path())
-        .env("FABER_CACHE_HOME", cache.path())
-        .env_remove("FABER_LIBRARY_HOME")
-        .env_remove("FABER_SUPPORT_PATH_OVERRIDE")
         .output()
         .expect("run embedded-only Rust suite");
     assert!(
