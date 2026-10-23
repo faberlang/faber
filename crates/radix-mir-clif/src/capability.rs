@@ -684,9 +684,26 @@ impl MirVisitor for ClifCapability<'_> {
                         Type::Primitive(Primitive::Json | Primitive::Valor)
                     )
         );
+        // A leaf opener is typed `valor` in HIR while the operand keeps its
+        // own scalar representation, so the `SermoSetOpener` conversion is an
+        // identity at the type table. It boxes the payload the shims read, so
+        // it is not the open-data gap the list and map conversions name.
+        let open_identity = matches!(
+            &call.intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && self.resolve_alias(conversion.source_ty.semantic_id())
+                        == self.resolve_alias(conversion.target_ty.semantic_id())
+                    && matches!(
+                        self.types
+                            .get(self.resolve_alias(conversion.target_ty.semantic_id())),
+                        Type::Primitive(Primitive::Json | Primitive::Valor)
+                    )
+        );
         if renders_text
             || sermo_materialization
             || open_data
+            || open_identity
             || numeric
             || sequence
             || type_check

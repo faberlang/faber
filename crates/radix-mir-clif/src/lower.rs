@@ -3759,12 +3759,7 @@ impl FunctionLower<'_, '_> {
                 };
                 self.print(*kind, argument)
             }
-            MirIntrinsic::Convert(conversion) => {
-                let Some(destination) = destination else {
-                    return Err(Decline::new("conversion without destination"));
-                };
-                self.convert(destination, conversion, &call.args)
-            }
+            MirIntrinsic::Convert(conversion) => self.convert(destination, conversion, &call.args),
             MirIntrinsic::FormatString { template } => {
                 let Some(destination) = destination else {
                     return Err(Decline::new("format without destination"));
@@ -4135,14 +4130,15 @@ impl FunctionLower<'_, '_> {
     /// the store) or a scalar identity store.
     fn convert(
         &mut self,
-        destination: &MirPlace,
+        destination: Option<&MirPlace>,
         conversion: &MirConversion,
         args: &[MirOperand],
     ) -> Lowered<()> {
         let [argument] = args else {
             return Err(Decline::new("conversion arity"));
         };
-        // A unit conversation is consumed for effects and has no result value.
+        // A unit conversation is consumed for effects and has no result value,
+        // so a drain statement may carry no destination at all.
         if conversion.store.is_none()
             && self.state.is_sermo_handle(conversion.source_ty)
             && matches!(
@@ -4152,8 +4148,15 @@ impl FunctionLower<'_, '_> {
         {
             let (handle, _rep) = self.scalar(argument)?;
             self.call_runtime(&abi::SERMO_DRAIN, &[handle])?;
-            return self.define_result(destination, None, Rep::Unit);
+            return match destination {
+                Some(destination) => self.define_result(destination, None, Rep::Unit),
+                None => Ok(()),
+            };
         }
+        // Every other conversion stores a result.
+        let Some(destination) = destination else {
+            return Err(Decline::new("conversion without destination"));
+        };
         // The sync conversation's `sermo ↦ numerus` route materializes the
         // opened conversation's leaf value as an integer.
         if conversion.store.is_none()
@@ -4215,7 +4218,12 @@ impl FunctionLower<'_, '_> {
                 self.builder.def_var(variable, keys);
                 return Ok(());
             }
-            if matches!(rep, Rep::List | Rep::Map)
+            // Open data (`json`, `valor`) is a tagged box, so an operand
+            // carrying any other representation is boxed into it. A leaf
+            // opener is typed `valor` while its operand keeps its own scalar
+            // representation, so the box is keyed on the operand rather than
+            // on the conversion's (identical) declared types.
+            if rep != Rep::Opt
                 && slot_rep == Rep::Opt
                 && matches!(
                     resolve(self.state.input.types, conversion.target_ty.semantic_id()),
@@ -4226,10 +4234,25 @@ impl FunctionLower<'_, '_> {
                     .builder
                     .ins()
                     .iconst(types::I32, Self::element_tag(rep)?);
+                let bits = self.element_bits(value, rep);
                 let boxed = self
-                    .call_runtime(&abi::DYN_BOX, &[tag, value])?
+                    .call_runtime(&abi::DYN_BOX, &[tag, bits])?
                     .ok_or_else(|| Decline::new("open data result"))?;
                 self.builder.def_var(variable, boxed);
+                return Ok(());
+            }
+            // An identity conversion of an open-data box is a copy: the box
+            // already carries its tagged payload.
+            if rep == Rep::Opt
+                && slot_rep == Rep::Opt
+                && resolve(self.state.input.types, conversion.source_ty.semantic_id())
+                    == resolve(self.state.input.types, conversion.target_ty.semantic_id())
+                && matches!(
+                    resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                    Type::Primitive(Primitive::Json | Primitive::Valor)
+                )
+            {
+                self.builder.def_var(variable, value);
                 return Ok(());
             }
             if let Some(plan) = sequence_conversion(
@@ -5948,6 +5971,86 @@ mod sermo_lower_test {
     }
 
     #[test]
+    fn sermo_lower_identity_valor_opener_boxes_the_scalar() {
+        // A leaf opener is typed `valor` in HIR while the operand keeps its
+        // own scalar representation, so the conversion is an identity at the
+        // type table. The lowering boxes what the operand carries instead of
+        // copying a box that is not there.
+        let mut types = TypeTable::new();
+        let handle = sermo_handle(&mut types);
+        let numerus = ty(&types, Primitive::Numerus);
+        let valor = ty(&types, Primitive::Valor);
+        let vacuum = ty(&types, Primitive::Vacuum);
+        let mut interner = Interner::new();
+        let route = interner.intern("tempus:dormiet");
+        let program = single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, handle), local(1, numerus)],
+            temps: vec![MirTemp {
+                id: MirTempId(0),
+                ty: valor,
+                span: sample_span(),
+            }],
+            statements: vec![
+                runtime_call(
+                    MirIntrinsic::SermoOpen,
+                    vec![MirOperand::Constant(MirConstant::String(route))],
+                    Some(MirPlace::local(MirLocalId(0))),
+                    handle,
+                ),
+                runtime_call(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty: valor,
+                        target_ty: valor,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![MirOperand::Place(MirPlace::local(MirLocalId(1)))],
+                    Some(MirPlace::temp(MirTempId(0))),
+                    valor,
+                ),
+                runtime_call(
+                    MirIntrinsic::SermoSetOpener,
+                    vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Temp(MirTempId(0)),
+                    ],
+                    None,
+                    vacuum,
+                ),
+            ],
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        });
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the identity valor opener boxes and lowers");
+
+        for name in [
+            "__faber_clif_v1_dyn_box",
+            "__faber_clif_v1_sermo_set_opener_valor",
+        ] {
+            let named = object
+                .bytes
+                .windows(name.len())
+                .any(|window| window == name.as_bytes());
+            assert!(named, "the object names {name}");
+        }
+    }
+
+    #[test]
     fn sermo_lower_scalar_materialization_emits_the_leaf_call() {
         let (program, types, interner) = open_then_convert(Primitive::Numerus);
         let object = emit_program(
@@ -5980,6 +6083,66 @@ mod sermo_lower_test {
             &StructMeta::default(),
         )
         .expect("the sync unit materialization lowers");
+
+        let name = b"__faber_clif_v1_sermo_drain";
+        let named = object
+            .bytes
+            .windows(name.len())
+            .any(|window| window == name);
+        assert!(named, "the object names the drain call");
+    }
+
+    #[test]
+    fn sermo_lower_void_materialization_needs_no_destination() {
+        // The unit conversation is consumed for effects, so the drain
+        // statement carries no destination in the MIR the package lowering
+        // produces.
+        let mut types = TypeTable::new();
+        let handle = sermo_handle(&mut types);
+        let vacuum = ty(&types, Primitive::Vacuum);
+        let mut interner = Interner::new();
+        let route = interner.intern("tempus:dormiet");
+        let program = single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, handle)],
+            temps: Vec::new(),
+            statements: vec![
+                runtime_call(
+                    MirIntrinsic::SermoOpen,
+                    vec![MirOperand::Constant(MirConstant::String(route))],
+                    Some(MirPlace::local(MirLocalId(0))),
+                    handle,
+                ),
+                runtime_call(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty: handle,
+                        target_ty: vacuum,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                    None,
+                    vacuum,
+                ),
+            ],
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        });
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("a destination-less drain lowers");
 
         let name = b"__faber_clif_v1_sermo_drain";
         let named = object
