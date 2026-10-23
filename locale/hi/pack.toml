@@ -4080,3 +4080,25 @@ help = "LLVM का opt llvm-as के पास या PATH में इंस
 [diagnostics.PKG001.issues.llvm_host_link_failed]
 message = "clang {path} को लिंक करने में विफल रहा: {detail}"
 help = "जाँचें कि clang काम करता है और रनटाइम आर्काइव इस कंपाइलर से मेल खाता है; विवरण स्वयं clang का आउटपुट है"
+
+# Sink contract diagnostics: item typing, receiver shape, and retired syntax.
+
+[diagnostics.SEM010.issues.sink_into_item_type_mismatch]
+message = "'⇜' के बाद दिया गया आइटम sink के 'T' प्रकार का ही होना चाहिए"
+help = "आइटम को स्पष्ट रूप से बदलें: 'console.out ⇜ \"§\"(n)', 'console.out ⇜ n' कभी नहीं"
+
+[diagnostics.SEM010.issues.sink_into_value_used]
+message = "'⇜' कथन का कोई मान नहीं होता"
+help = "sink को अलग कथन के रूप में लिखें; '⇜' एक आइटम देता है और कुछ भी परिणाम में नहीं देता"
+
+[diagnostics.SEM011.issues.sink_into_receiver_not_sink]
+message = "'⇜' का बायाँ भाग sinking contract के अनुरूप होना चाहिए"
+help = "'⇜' किसी 'Sink<T>' मान को आइटम देता है; tensor, vector और matrix को '⇇' से लिखा जाता है"
+
+[diagnostics.SEM012.issues.transfer_sink_retired]
+message = "'sink ⇇ value' रूप (जिसमें बायाँ भाग callable है) हटा दिया गया है"
+help = "'⇇' अब दाईं ओर के मानों को बाईं ओर के मौजूदा tensor storage में कॉपी करता है; इसके बजाय फ़ंक्शन को सीधे कॉल करें"
+
+[diagnostics.SEM018.issues.radix_contract_sinking_shape]
+message = "sinking contract में एक type parameter पर ठीक `sink(T) → vacuum ⇥ E` और `flush() → vacuum ⇥ E` घोषित होना चाहिए"
+help = "`{implendum} Sink<T>` में `{functio} sink(T res) → vacuum ⇥ E` और `{functio} flush() → vacuum ⇥ E` घोषित करें"

@@ -4068,3 +4068,25 @@ help = "hãy cài opt của LLVM bên cạnh llvm-as hoặc trong PATH, rồi x�
 [diagnostics.PKG001.issues.llvm_host_link_failed]
 message = "clang liên kết {path} thất bại: {detail}"
 help = "hãy kiểm tra clang hoạt động và kho lưu trữ runtime khớp với trình biên dịch này; chi tiết là đầu ra của chính clang"
+
+# Sink contract diagnostics: item typing, receiver shape, and retired syntax.
+
+[diagnostics.SEM010.issues.sink_into_item_type_mismatch]
+message = "mục sau '⇜' phải đúng chính xác kiểu 'T' của sink"
+help = "hãy chuyển đổi mục một cách tường minh: 'console.out ⇜ \"§\"(n)', không phải 'console.out ⇜ n'"
+
+[diagnostics.SEM010.issues.sink_into_value_used]
+message = "câu lệnh '⇜' không có giá trị"
+help = "viết sink thành câu lệnh riêng; '⇜' chuyển một mục và không tạo ra kết quả"
+
+[diagnostics.SEM011.issues.sink_into_receiver_not_sink]
+message = "vế trái của '⇜' phải tuân theo hợp đồng sinking"
+help = "'⇜' chuyển một mục vào giá trị 'Sink<T>'; tensor, vector và matrix được ghi bằng '⇇'"
+
+[diagnostics.SEM012.issues.transfer_sink_retired]
+message = "dạng 'sink ⇇ value' (với vế trái có thể gọi) đã bị loại bỏ"
+help = "'⇇' hiện sao chép các giá trị ở vế phải vào vùng lưu trữ tensor hiện có ở vế trái; hãy gọi hàm trực tiếp thay thế"
+
+[diagnostics.SEM018.issues.radix_contract_sinking_shape]
+message = "hợp đồng sinking phải khai báo chính xác `sink(T) → vacuum ⇥ E` và `flush() → vacuum ⇥ E` với một tham số kiểu"
+help = "khai báo `{implendum} Sink<T>` với `{functio} sink(T res) → vacuum ⇥ E` và `{functio} flush() → vacuum ⇥ E`"

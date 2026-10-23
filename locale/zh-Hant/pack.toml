@@ -4064,3 +4064,25 @@ help = "請將 LLVM 的 opt 安裝在 llvm-as 旁或 PATH 中，然後重新建�
 [diagnostics.PKG001.issues.llvm_host_link_failed]
 message = "clang 連結 {path} 失敗：{detail}"
 help = "請確認 clang 可正常運作且執行階段封存檔與本編譯器相符；詳情為 clang 自身的輸出"
+
+# Sink contract diagnostics: item typing, receiver shape, and retired syntax.
+
+[diagnostics.SEM010.issues.sink_into_item_type_mismatch]
+message = "'⇜' 後的項目必須與 sink 的 'T' 型別完全一致"
+help = "明確轉換項目：'console.out ⇜ \"§\"(n)'，不要寫 'console.out ⇜ n'"
+
+[diagnostics.SEM010.issues.sink_into_value_used]
+message = "'⇜' 陳述式沒有值"
+help = "將 sink 單獨寫成一個陳述式；'⇜' 傳遞一個項目，不會產生結果"
+
+[diagnostics.SEM011.issues.sink_into_receiver_not_sink]
+message = "'⇜' 左側必須符合 sinking 合約"
+help = "'⇜' 將項目傳給 'Sink<T>' 值；tensor、vector 和 matrix 使用 '⇇' 寫入"
+
+[diagnostics.SEM012.issues.transfer_sink_retired]
+message = "'sink ⇇ value' 形式（左側為可呼叫物件）已廢止"
+help = "'⇇' 現在會將右側的值複製到左側現有的 tensor 儲存區；請直接呼叫函式"
+
+[diagnostics.SEM018.issues.radix_contract_sinking_shape]
+message = "sinking 合約必須在一個型別參數上準確宣告 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
+help = "宣告 `{implendum} Sink<T>`，並包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
