@@ -1,0 +1,35 @@
++++
+term = "adfirma"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "adfirma_stmt", "expression", "literal", "comparison", "equality_tail", "proba_stmt"]
+category = "testing"
+canonical = false
+summary = "A failed assert aborts the process: the run prints its earlier stdout and exits non-zero."
+syntax = "adfirma <expression> [mori <expression>]"
+related = ["adfirma", "mori", "proba"]
+locale = "en"
++++
+# =============================================================================
+# adfirma — A failed assert aborts the process: the run prints its earlier stdout and exits non-zero.
+# =============================================================================
+#
+# What this teaches:
+#   • A failed `assert` (the en alias of `adfirma`) is a fatal abort — the run
+#     ends on it and the exit code is non-zero
+#   • Output ordering — statements before the failed assertion print normally;
+#     nothing after it executes
+#   • The `panic "message"` arm supplies the abort message
+#
+# Common mistakes:
+#   • Expecting `assert` to return a value or be recoverable — it is not part of
+#     the `catch` channel; use `throw`/`iace` for recoverable failure paths, or
+#     `assert x.err() == none` style probes for a check that must not abort
+#
+# See also: adfirma, mori, proba
+# =============================================================================
+
+main {
+    print "before"
+    assert 1 ≡ 2 panic "values differ"
+    print "after"
+}
