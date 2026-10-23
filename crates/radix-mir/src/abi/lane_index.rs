@@ -134,7 +134,9 @@ pub struct LaneIndexProof<'a> {
     function: &'a MirFunction,
     validation: &'a MirValidationContext<'a>,
     defs: Defs<'a>,
-    lane: MirLocalId,
+    /// The lane-form kernel's lane id, or `None` for a whole-grid reduction
+    /// term (which has no grid guard).
+    lane: Option<MirLocalId>,
     /// Factors of the grid guard total, sorted.
     guard_factors: Vec<Sym>,
 }
@@ -245,7 +247,7 @@ impl<'a> LaneIndexProof<'a> {
             function,
             validation,
             defs: collect_writes(function),
-            lane,
+            lane: Some(lane),
             guard_factors: Vec::new(),
         };
         let total = proof.guard_total(condition)?;
@@ -286,7 +288,7 @@ impl<'a> LaneIndexProof<'a> {
         }
         match self.defs.single.get(&key) {
             Some(value) => self.eval_value(&value.kind, depth + 1),
-            None if key == BaseKey::Local(self.lane.0) => Sym::Lane,
+            None if self.lane.is_some_and(|lane| key == BaseKey::Local(lane.0)) => Sym::Lane,
             None => Sym::Opaque,
         }
     }
