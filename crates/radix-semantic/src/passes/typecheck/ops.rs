@@ -1344,7 +1344,7 @@ impl TypeChecker<'_> {
     ///
     /// This is where call/access-independent control-flow values are shaped:
     /// comparisons become `bivalens`, arithmetic preserves exact numeric widths,
-    /// text `+` requires both operands to be `textus`, and coalescing encodes the local
+    /// text `+` requires both operands to be cord text, and coalescing encodes the local
     /// optional/`nihil` result contract.
     pub fn check_binary(
         &mut self,
@@ -1363,8 +1363,8 @@ impl TypeChecker<'_> {
                 if let Some(result) = self.bits_binary(op, lhs_ty, rhs_ty, lhs.span) {
                     return result;
                 }
-                let lhs_text = self.is_textus(lhs_ty) || self.is_ascii(lhs_ty);
-                let rhs_text = self.is_textus(rhs_ty) || self.is_ascii(rhs_ty);
+                let lhs_text = self.is_cord_text(lhs_ty);
+                let rhs_text = self.is_cord_text(rhs_ty);
                 if self.is_infer(self.resolve_inferred_type(lhs_ty)) && rhs_text {
                     let textus = self.textus_type();
                     self.unify_assign_issue(lhs_ty, textus, lhs.span, STRING_OPERANDS_REQUIRED);
@@ -1696,8 +1696,13 @@ impl TypeChecker<'_> {
         }
         if self.is_instans(lhs_ty) && self.is_instans(rhs_ty) {
             self.instans_join(lhs_ty, rhs_ty, lhs.span);
-        } else if self.is_textus(lhs_ty) && self.is_textus(rhs_ty) {
-            // D1.6: whole-string `textus` order is Unicode code-point order.
+        } else if (self.is_textus(lhs_ty) || self.is_bounded_textus(lhs_ty))
+            && (self.is_textus(rhs_ty) || self.is_bounded_textus(rhs_ty))
+            || (self.is_ascii(lhs_ty) || self.is_bounded_ascii(lhs_ty))
+                && (self.is_ascii(rhs_ty) || self.is_bounded_ascii(rhs_ty))
+        {
+            // D1.6: whole-string text order is Unicode code-point order; bounded cords
+            // use the same law as their unbounded carrier.
         } else if self.scalar_ordered_text_bin(lhs, rhs, lhs_ty, rhs_ty, lhs.span) {
             // Single-scalar Unicode order (Seam B); not lexicographic cord compare.
         } else if self.word_pair(lhs, rhs) {

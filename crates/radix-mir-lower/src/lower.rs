@@ -4213,7 +4213,7 @@ impl<'a> FunctionBuilder<'a> {
         // GT-1: the decimal d64-scale join is the shared comparison join —
         // ordering (mixed-ordering-join) and the ≅/≈ value-equality tiers both
         // widen decimal operands at the d64 carrier before the bool op.
-        let (lhs, rhs) = if matches!(
+        let (mut lhs_value, mut rhs_value) = if matches!(
             op,
             HirBinOp::Lt
                 | HirBinOp::Gt
@@ -4230,9 +4230,46 @@ impl<'a> FunctionBuilder<'a> {
         } else {
             (self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?)
         };
+        if matches!(
+            op,
+            HirBinOp::Add | HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq
+        ) {
+            lhs_value = self.widen_bounded_cord_operand(lhs_value, lhs)?;
+            rhs_value = self.widen_bounded_cord_operand(rhs_value, rhs)?;
+        }
         let ty = self.expr_ty(expr)?;
 
-        Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
+        Some(self.assign_temp(
+            MirValueKind::Binary { op: mir_op, lhs: lhs_value, rhs: rhs_value },
+            ty,
+            expr.span,
+        ))
+    }
+
+    /// Widen bounded text operands to the unbounded textus carrier required by MIR.
+    fn widen_bounded_cord_operand(&mut self, operand: MirOperand, expr: &HirExpression) -> Option<MirOperand> {
+        let source_ty = self.expr_ty(expr)?;
+        if !matches!(
+            self.normalized_type(source_ty.semantic_id()),
+            Type::BoundedTextus { .. } | Type::BoundedAscii { .. }
+        ) {
+            return Some(operand);
+        }
+        let target_ty = MirType::semantic(self.types.primitive(Primitive::Textus));
+        Some(self.runtime_call_value(
+            MirIntrinsic::Convert(MirConversion {
+                store: None,
+                flavor: MirConversionFlavor::Runtime,
+                source_ty,
+                target_ty,
+                params: Vec::new(),
+                recovery: None,
+                struct_defaults: Vec::new(),
+            }),
+            vec![operand],
+            target_ty,
+            expr.span,
+        ))
     }
 
     /// Lower an `ordo` ordering comparison by converting both operands to their
