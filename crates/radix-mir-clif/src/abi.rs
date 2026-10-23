@@ -1058,7 +1058,9 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     SERMO_OPEN,
     SERMO_SET_OPENER_NIL,
     SERMO_SET_OPENER_I64,
+    SERMO_SET_OPENER_VALOR,
     SERMO_MATERIALIZE_I64,
+    SERMO_DRAIN,
     SERMO_FAILED,
     SERMO_FAULT_KIND,
     SERMO_FAULT_PATH,
@@ -1330,12 +1332,26 @@ pub const SERMO_SET_OPENER_I64: RuntimeSymbol = RuntimeSymbol {
     params: &[I64, I64],
     ret: None,
 };
+/// Reopen a conversation on a `valor` opener: (handle, boxed payload) -> unit.
+/// A null or unsupported value becomes `nihil`; an unknown handle is a no-op.
+pub const SERMO_SET_OPENER_VALOR: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_set_opener_valor",
+    params: &[I64, Ptr],
+    ret: None,
+};
 /// Materialize a conversation as a `numerus`: (handle, fallback) -> the leaf
 /// value, or `fallback` when the leaf faults or the handle is unknown.
 pub const SERMO_MATERIALIZE_I64: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_sermo_materialize_i64",
     params: &[I64, I64],
     ret: Some(I64),
+};
+/// Drain a conversation as a raw unit reply: (handle) -> unit, with no reply
+/// value. A leaf fault is recorded on the slot; an unknown handle is a no-op.
+pub const SERMO_DRAIN: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_sermo_drain",
+    params: &[I64],
+    ret: None,
 };
 /// Whether a conversation is in a failed state: (handle) -> 1 when its slot
 /// recorded a fault or the handle is unknown, else 0.

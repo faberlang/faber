@@ -2,9 +2,9 @@
   "targets": {
     "clif": {
       "outcome": "known-fail",
-      "phase": "emit",
+      "phase": "build",
       "diagnostic_contains": "clif-subset",
-      "reason": "The clif package emitter declines this case at emit: the MIR capability classifier reports the `clif-subset` issue before any code is generated, so the clock leaf (`tempus`) is never lowered and the object is never linked. The clif lane carries no leaf port for `tempus` yet; re-measure this row when that port lands."
+      "reason": "The clif package build declines this case: the pre-emission capability classifier has no arm for leaf runtime calls, so the clock leaf calls (`time.sleep`, `time.monotonic`) report the `clif-subset` issue at the build phase, before any lowering or linking. The clif lane still carries no leaf port for `tempus`; re-measure this row when that port lands."
     },
     "c": {
       "outcome": "known-fail",

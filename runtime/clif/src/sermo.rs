@@ -82,7 +82,11 @@ impl Fault {
     fn from_leaf(error: &LeafError) -> Self {
         Self {
             kind: error.kind(),
-            path: error.path().to_owned(),
+            path: if error.path().is_empty() {
+                error.route().to_owned()
+            } else {
+                error.path().to_owned()
+            },
         }
     }
 
@@ -322,6 +326,42 @@ pub extern "C" fn __faber_clif_v1_sermo_set_opener_i64(handle: i64, value: i64) 
     }
 }
 
+/// Reopen conversation `handle` with the `valor` payload as its only opener
+/// value. A null or unsupported value becomes `nihil`. An unknown handle is a
+/// no-op.
+///
+/// # Safety
+///
+/// `boxed` is null or points to a live `Present`; a `TAG_TEXT` payload must
+/// point to a well-formed runtime text.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_sermo_set_opener_valor(
+    handle: i64,
+    boxed: *const super::Present,
+) {
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let Some(open) = slot(&mut table, handle) else {
+        return;
+    };
+    let opener = if boxed.is_null() {
+        Opener::Nil
+    } else {
+        let present = unsafe { &*boxed };
+        match present.tag {
+            super::TAG_INT => Opener::Int(present.bits),
+            super::TAG_BOOL => Opener::Bool(present.bits != 0),
+            super::TAG_TEXT => Opener::Str(
+                unsafe { super::text_str(super::text_bytes(present.bits as *const u8)) }
+                    .into_owned(),
+            ),
+            _ => Opener::Nil,
+        }
+    };
+    reopen(open, &[opener]);
+}
+
 /// Materialize conversation `handle` as a `numerus`, or reply `fallback`.
 ///
 /// `fallback` is the bottom-recovery value a caller wants when the leaf
@@ -345,6 +385,23 @@ pub extern "C" fn __faber_clif_v1_sermo_materialize_i64(handle: i64, fallback: i
             open.fault = Some(fault);
             fallback
         }
+    }
+}
+
+/// Drain conversation `handle` as a raw unit reply. A successful call clears
+/// any recorded fault; a leaf fault is recorded on the slot. An unknown handle
+/// is a no-op and records nothing.
+#[unsafe(no_mangle)]
+pub extern "C" fn __faber_clif_v1_sermo_drain(handle: i64) {
+    let mut table = CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let Some(open) = slot(&mut table, handle) else {
+        return;
+    };
+    match open.conversation.unit() {
+        Ok(()) => open.fault = None,
+        Err(fault) => open.fault = Some(fault),
     }
 }
 

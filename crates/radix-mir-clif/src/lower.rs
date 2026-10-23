@@ -3831,8 +3831,9 @@ impl FunctionLower<'_, '_> {
                 self.define_result(destination, handle, Rep::Record)
             }
             // The opener a conversation reopens on: `nihil` clears it, a
-            // `numerus` passes itself, and no other representation has a leaf
-            // symbol. The call answers nothing, so nothing is stored.
+            // `numerus` passes itself, a boxed `valor` passes its tagged
+            // payload, and no other representation has a leaf symbol. The
+            // call answers nothing, so nothing is stored.
             MirIntrinsic::SermoSetOpener => {
                 let [handle, opener] = call.args.as_slice() else {
                     return Err(Decline::new("sermo opener shape"));
@@ -3848,6 +3849,9 @@ impl FunctionLower<'_, '_> {
                     (Some(value), Rep::Int) => {
                         let value = self.narrow(value)?;
                         self.call_runtime(&abi::SERMO_SET_OPENER_I64, &[handle, value])?;
+                    }
+                    (Some(value), Rep::Opt) => {
+                        self.call_runtime(&abi::SERMO_SET_OPENER_VALOR, &[handle, value])?;
                     }
                     _ => return Err(Decline::new("sermo opener representation")),
                 }
@@ -4138,10 +4142,20 @@ impl FunctionLower<'_, '_> {
         let [argument] = args else {
             return Err(Decline::new("conversion arity"));
         };
+        // A unit conversation is consumed for effects and has no result value.
+        if conversion.store.is_none()
+            && self.state.is_sermo_handle(conversion.source_ty)
+            && matches!(
+                resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Vacuum)
+            )
+        {
+            let (handle, _rep) = self.scalar(argument)?;
+            self.call_runtime(&abi::SERMO_DRAIN, &[handle])?;
+            return self.define_result(destination, None, Rep::Unit);
+        }
         // The sync conversation's `sermo ↦ numerus` route materializes the
-        // opened conversation's leaf value. Only `numerus` has a CLIF
-        // materialize symbol; every other target falls through to the decline
-        // paths below rather than widen the capability.
+        // opened conversation's leaf value as an integer.
         if conversion.store.is_none()
             && self.state.is_sermo_handle(conversion.source_ty)
             && matches!(
@@ -4156,6 +4170,35 @@ impl FunctionLower<'_, '_> {
             };
             let value = self.call_runtime(&abi::SERMO_MATERIALIZE_I64, &[handle, fallback])?;
             return self.define_result(destination, value, Rep::Int);
+        }
+        // A conversation can also materialize its leaf's integer epoch as an
+        // instant at the target type's precision.
+        if conversion.store.is_none()
+            && self.state.is_sermo_handle(conversion.source_ty)
+            && matches!(
+                resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Instans) | Type::SizedInstans(_)
+            )
+        {
+            let (handle, _rep) = self.scalar(argument)?;
+            let fallback = match &conversion.recovery {
+                Some(recovery) => self.scalar(recovery)?.0,
+                None => self.builder.ins().iconst(types::I64, 0),
+            };
+            let epoch = self
+                .call_runtime(&abi::SERMO_MATERIALIZE_I64, &[handle, fallback])?
+                .ok_or_else(|| Decline::new("sermo materialize result"))?;
+            let convert::Num::Ins(code) =
+                convert::num_of(self.state.input.types, conversion.target_ty.semantic_id())
+                    .ok_or_else(|| Decline::new("sermo instant precision"))?
+            else {
+                return Err(Decline::new("sermo instant precision"));
+            };
+            let code = self.builder.ins().iconst(types::I32, code);
+            let instant = self
+                .call_runtime(&abi::INS_FROM_EPOCH, &[epoch, code])?
+                .ok_or_else(|| Decline::new("instant result"))?;
+            return self.define_result(destination, Some(instant), Rep::Ins);
         }
         // Every other target from a conversation handle has no CLIF materialize
         // symbol; decline it rather than let the handle render as a record.
@@ -5827,6 +5870,84 @@ mod sermo_lower_test {
     }
 
     #[test]
+    fn sermo_lower_valor_opener_emits_the_tagged_set_opener() {
+        let mut types = TypeTable::new();
+        let handle = sermo_handle(&mut types);
+        let numerus = ty(&types, Primitive::Numerus);
+        let valor = ty(&types, Primitive::Valor);
+        let vacuum = ty(&types, Primitive::Vacuum);
+        let mut interner = Interner::new();
+        let route = interner.intern("tempus:dormiet");
+        let program = single_function(FunctionShape {
+            params: Vec::new(),
+            locals: vec![local(0, handle)],
+            temps: vec![MirTemp {
+                id: MirTempId(0),
+                ty: valor,
+                span: sample_span(),
+            }],
+            statements: vec![
+                runtime_call(
+                    MirIntrinsic::SermoOpen,
+                    vec![MirOperand::Constant(MirConstant::String(route))],
+                    Some(MirPlace::local(MirLocalId(0))),
+                    handle,
+                ),
+                runtime_call(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty: numerus,
+                        target_ty: valor,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![MirOperand::Constant(MirConstant::Int(7))],
+                    Some(MirPlace::temp(MirTempId(0))),
+                    valor,
+                ),
+                runtime_call(
+                    MirIntrinsic::SermoSetOpener,
+                    vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                        MirOperand::Temp(MirTempId(0)),
+                    ],
+                    None,
+                    vacuum,
+                ),
+            ],
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        });
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the boxed valor opener lowers");
+
+        let valor_name = b"__faber_clif_v1_sermo_set_opener_valor";
+        let named = object
+            .bytes
+            .windows(valor_name.len())
+            .any(|window| window == valor_name);
+        assert!(named, "the object names the tagged set-opener call");
+        let i64_name = b"__faber_clif_v1_sermo_set_opener_i64";
+        let untagged = object
+            .bytes
+            .windows(i64_name.len())
+            .any(|window| window == i64_name);
+        assert!(!untagged, "the object names no untagged set-opener call");
+    }
+
+    #[test]
     fn sermo_lower_scalar_materialization_emits_the_leaf_call() {
         let (program, types, interner) = open_then_convert(Primitive::Numerus);
         let object = emit_program(
@@ -5845,6 +5966,52 @@ mod sermo_lower_test {
             .windows(name.len())
             .any(|window| window == name);
         assert!(named, "the object names the materialize call");
+    }
+
+    #[test]
+    fn sermo_lower_unit_materialization_emits_the_drain_call() {
+        let (program, types, interner) = open_then_convert(Primitive::Vacuum);
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the sync unit materialization lowers");
+
+        let name = b"__faber_clif_v1_sermo_drain";
+        let named = object
+            .bytes
+            .windows(name.len())
+            .any(|window| window == name);
+        assert!(named, "the object names the drain call");
+    }
+
+    #[test]
+    fn sermo_lower_instant_materialization_emits_from_epoch() {
+        let (program, types, interner) = open_then_convert(Primitive::Instans);
+        let object = emit_program(
+            &program,
+            &types,
+            &interner,
+            Some(MirFunctionId(0)),
+            ["true", "false", "none", "tuple"].map(str::to_owned),
+            &StructMeta::default(),
+        )
+        .expect("the sync instant materialization lowers");
+
+        for name in [
+            "__faber_clif_v1_sermo_materialize_i64",
+            "__faber_clif_v1_ins_from_epoch",
+        ] {
+            let named = object
+                .bytes
+                .windows(name.len())
+                .any(|window| window == name.as_bytes());
+            assert!(named, "the object names {name}");
+        }
     }
 
     #[test]
