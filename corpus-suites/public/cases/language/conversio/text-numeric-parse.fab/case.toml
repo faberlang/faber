@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/conversio/text-numeric-parse.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/text-numeric-parse.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
