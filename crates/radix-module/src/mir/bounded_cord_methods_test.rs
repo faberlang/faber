@@ -76,3 +76,14 @@ fn bounded_cord_textus_replace_widens_to_textus() {
 fn bounded_cord_textus_escape_widens_to_textus() {
     assert_eq!(ok("sit textus<8> s ← \"ab\" ↦ textus<8>\nnota s.munita()"), ["ab"]);
 }
+
+#[test]
+fn bounded_cord_textus_range_window_reads_a_textus_window() {
+    assert_eq!(ok("sit textus<8> s ← \"abcdef\" ↦ textus<8>\nnota s[1‥3]"), ["bc"]);
+    assert_eq!(ok("sit textus<8> s ← \"abcdef\" ↦ textus<8>\nnota s[1 usque 3]"), ["bcd"]);
+}
+
+#[test]
+fn bounded_cord_ascii_range_window_reads_a_textus_window() {
+    assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a[0‥2]"), ["ab"]);
+}

@@ -344,6 +344,17 @@ impl Validator<'_, '_> {
             // scalar read routes through `project_octeti_index` with the
             // element-type tables.
             Type::BoundedAscii { .. } | Type::BoundedTextus { .. } => {
+                if let Some((_, index_ty)) = index
+                    && let Some(bound) = self.intervallum_bound(index_ty)
+                {
+                    self.require_assignable(
+                        MirType::semantic(bound),
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "bounded cord index range bounds are not numerus",
+                    );
+                    return Some(self.primitive(Primitive::Textus));
+                }
                 self.require_numerus_index(index, span, "bounded buffer index is not numerus");
                 match crate::ty::index_projection_result_ty(base_ty, self.context.types.as_table())
                 {
