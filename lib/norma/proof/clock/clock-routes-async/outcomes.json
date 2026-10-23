@@ -6,12 +6,6 @@
       "diagnostic_contains": "destination type mismatch",
       "reason": "The runner rejects the async sleep_async wrapper during MIR lowering: awaiting the tempus:dormiet future fails to type its destination, the same runner gap pinned for corpus/ad/async-tempus-dormiet.fab."
     },
-    "clif": {
-      "outcome": "known-fail",
-      "phase": "emit",
-      "diagnostic_contains": "clif-subset",
-      "reason": "The clif package emitter declines this case at emit: the MIR capability classifier reports the `clif-subset` issue before any code is generated, so the clock leaf (`tempus`) is never lowered and the object is never linked. The clif lane carries no leaf port for `tempus` yet; re-measure this row when that port lands."
-    },
     "c": {
       "outcome": "known-fail",
       "phase": "emit",
