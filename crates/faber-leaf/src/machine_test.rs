@@ -529,18 +529,7 @@ fn late_result_renders_intervals_against_previous_snapshot() {
         0,
         super::Collected {
             taken_at: std::time::Instant::now(),
-            cores: vec![
-                super::CoreTicks {
-                    name: "cpu0".to_owned(),
-                    busy_ns: 100,
-                    total_ns: 400,
-                },
-                super::CoreTicks {
-                    name: "cpu1".to_owned(),
-                    busy_ns: 50,
-                    total_ns: 200,
-                },
-            ],
+            cores: vec![core_ticks("cpu0", 100, 400), core_ticks("cpu1", 50, 200)],
             used_bytes: 111,
             total_bytes: 1000,
             procs: vec![proc_ticks(7, 1000, 500), proc_ticks(8, 2000, 600)],
@@ -560,18 +549,7 @@ fn late_result_renders_intervals_against_previous_snapshot() {
             .expect("release reader");
         Ok(super::Collected {
             taken_at: std::time::Instant::now(),
-            cores: vec![
-                super::CoreTicks {
-                    name: "cpu0".to_owned(),
-                    busy_ns: 160,
-                    total_ns: 500,
-                },
-                super::CoreTicks {
-                    name: "cpu1".to_owned(),
-                    busy_ns: 80,
-                    total_ns: 260,
-                },
-            ],
+            cores: vec![core_ticks("cpu0", 160, 500), core_ticks("cpu1", 80, 260)],
             used_bytes: 222,
             total_bytes: 1000,
             procs: vec![
