@@ -1,0 +1,40 @@
++++
+term = "¶"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "¶ is closed to built-in numeric and text subjects; a bool has no format spec."
+syntax = "<bool> ¶ \"5\" — rejected"
+aliases = ["format"]
+related = ["scriptum", "textus", "instans"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:format_type_unsupported"
++++
+# =============================================================================
+# ¶ — a bool subject is unsupported
+# =============================================================================
+#
+# What this teaches:
+#   • `¶` covers the built-in numeric and text subjects only: integers, floats,
+#     decimals, `textus`, and `instans` with its named presets.
+#   • `bool` is not one of them, so formatting one is a compile error rather
+#     than a guess about how truth renders.
+#
+# Common mistakes:
+#   • formatting a bool directly — render the branch text yourself, e.g.
+#     `if viget { "yes" } else { "no" }`.
+#   • reaching for `¶` on your own types — write a function instead.
+#
+# See also: format, adfirma, scriptum
+# =============================================================================
+
+# format reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let bool viget ← true
+    print viget ¶ "5"
+}

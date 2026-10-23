@@ -1,0 +1,42 @@
++++
+term = "¶"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "A spec part can be well-formed and still not fit the subject: radix kinds need integers, and text takes no sign."
+syntax = "<float> ¶ \"x\" and <textus> ¶ \"+5\" — rejected"
+aliases = ["format"]
+related = ["scriptum", "textus", "instans"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:format_spec_part_invalid"
++++
+# =============================================================================
+# ¶ — a spec part the subject does not take
+# =============================================================================
+#
+# What this teaches:
+#   • Parsing and validating are two steps: the spec text may match the
+#     pattern and still name a part its subject has no use for.
+#   • The radix kinds `x` `b` `o` belong to integers, so a float refuses them.
+#   • `textus` takes fill, align, width and precision only — a sign (`+`) is
+#     for numbers and is refused on text.
+#
+# Common mistakes:
+#   • copying an integer spec onto a float — drop the kind, keep `".2"`.
+#   • signing a text subject instead of formatting a number.
+#
+# See also: format, textus, instans
+# =============================================================================
+
+# format reject case — expected compile failure
+#
+# This exemplum intentionally fails to compile.
+
+main {
+    let float x ← 1.5
+    print x ¶ "x"
+    let string nomen ← "Aurelia"
+    print nomen ¶ "+5"
+}

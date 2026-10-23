@@ -1,0 +1,36 @@
++++
+term = "¶"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "incipit_stmt", "block_stmt", "fixum_decl", "figendum_decl", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "format"
+summary = "The format spec must be a string literal; a computed spec is a parse error."
+syntax = "<value> ¶ <identifier>"
+aliases = ["format"]
+related = ["scriptum", "textus", "instans"]
+locale = "en"
+canonical = false
+no_expected = "rejects"
+diagnostic = "PARSE030:format_spec_not_literal"
++++
+# =============================================================================
+# ¶ — the format spec is a literal, never a computed value
+# =============================================================================
+#
+# What this teaches:
+#   • `value ¶ "spec"` takes the spec as a string literal written at the call.
+#   • A variable or expression in the spec position has no reading, so it is a
+#     parse error: the spec is fixed before checking begins.
+#
+# Common mistakes:
+#   • building the spec in a variable and passing it (PARSE030); write the
+#     literal, or branch on the value and write one literal per branch
+#
+# See also: scriptum, textus, instans
+# =============================================================================
+
+# This exemplum intentionally fails to compile: the spec is a variable, not a literal.
+main {
+    let int n ← 42
+    let string spec ← ".2"
+    print n ¶ spec
+}

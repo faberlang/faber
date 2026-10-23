@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/format/integer-extremes.fab"
+group = "language"
+input_root = "corpus"
+input = "format/integer-extremes.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

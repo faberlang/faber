@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/scriptum/template-arity-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "scriptum/template-arity-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "template_application_arity_mismatch"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "template_application_arity_mismatch"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "template_application_arity_mismatch"
