@@ -6,7 +6,7 @@ use crate::cli::{TestArgs, TestOutputFormat};
 use faber_cli::input_shape::locale_without_package_error;
 use faber_cli::package;
 use proba::{
-    CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection, format_summary,
+    CaseKernels, CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection, format_summary,
     has_solum_cases, inventory_cases, run_proba_on_validated,
     run_proba_on_validated_with_function_ids, source_skip_reason,
 };
@@ -33,9 +33,17 @@ struct TestRunOptions {
     default_timeout_secs: Option<u64>,
     /// Arm the interpreter diagnostic meter for each executed case.
     collect_stats: bool,
-    /// Whether the runner executes `@ kernel` functions. `Execute` only under
-    /// `--device cpu` (rule 16.3 oracle mode); every other route refuses.
+    /// Whether the runner executes `@ kernel` functions. `Execute` under
+    /// `--device reference` and `--device cpu` (host form); every other route
+    /// refuses. A package's kernels under the CPU device session
+    /// (`cpu_session`) are dispatched instead.
     kernel_policy: RunnerKernelPolicy,
+    /// Run a package's kernels on the CPU device session (`--device cpu`,
+    /// gpu-reset rule 16.9) instead of in host form on the runner.
+    cpu_session: bool,
+    /// The CPU device worker count: `--threads` > manifest `[device]
+    /// threads`; `None` is the device default (half the cores).
+    cpu_workers: Option<std::num::NonZeroU32>,
 }
 
 #[derive(Debug, Default)]
@@ -88,6 +96,17 @@ pub(super) fn cmd_test(args: &TestArgs) {
         eprintln!("{message}");
         std::process::exit(2);
     }
+    // Rule 16.9: `--threads` > manifest `[device] threads` > half the cores;
+    // the flag is valid only with the CPU device.
+    let cpu_workers = match package::resolve_cpu_threads(args.threads, selection, &input_path) {
+        Ok(workers) => workers,
+        Err(diag) => {
+            eprintln!("error: {}", diag.message);
+            std::process::exit(1);
+        }
+    };
+    let input_route = package::test_input_route(&input_path, args.no_package);
+    let cpu_session = cpu_session_route(selection, input_route);
 
     let mut filters = args.filter_flag.clone();
     if let Some(filter) = args.filter.clone() {
@@ -107,6 +126,8 @@ pub(super) fn cmd_test(args: &TestArgs) {
         default_timeout_secs: args.test_timeout,
         collect_stats: args.stats || args.stats_file.is_some(),
         kernel_policy: selection.kernel_policy(),
+        cpu_session,
+        cpu_workers,
     };
 
     // A named `.proba` argument is the source selection. `--include` on
@@ -168,46 +189,48 @@ pub(super) fn cmd_test(args: &TestArgs) {
             std::process::exit(1);
         }
     };
-    // Rule 16.3: `reference` and `cpu` lower `@ kernel` functions as ordinary host functions;
-    // the runner policy in `options` then executes them.
-    let config = if matches!(selection, DeviceSelection::Cpu | DeviceSelection::Reference) {
-        config.with_host_kernels()
-    } else {
-        config
-    };
+    // Rule 16.3: `reference` (and `cpu` outside the CPU session) lower `@
+    // kernel` functions as ordinary host functions; the runner policy in
+    // `options` then executes them. The CPU session keeps device-form
+    // kernels: its image is built from them.
+    let config =
+        if !cpu_session && matches!(selection, DeviceSelection::Cpu | DeviceSelection::Reference) {
+            config.with_host_kernels()
+        } else {
+            config
+        };
 
     let started = Instant::now();
-    let (report, unmatched_include, metadata) =
-        match package::test_input_route(&input_path, args.no_package) {
-            package::TestInputRoute::SingleFile => {
-                let (report, metadata) = run_single_file_with_options(
-                    &config,
-                    &input_path,
-                    &options,
-                    args.include_ignored,
-                    args.focused,
-                );
-                (report, false, metadata)
-            }
-            package::TestInputRoute::Package => match run_package_with_options(
+    let (report, unmatched_include, metadata) = match input_route {
+        package::TestInputRoute::SingleFile => {
+            let (report, metadata) = run_single_file_with_options(
                 &config,
                 &input_path,
                 &options,
-                proba_filter.as_ref(),
                 args.include_ignored,
                 args.focused,
-            ) {
-                Ok(run) => run,
-                Err(failure) => {
-                    eprintln!("{failure}");
-                    std::process::exit(1);
-                }
-            },
-            package::TestInputRoute::ManifestLessDirectory => {
-                eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
+            );
+            (report, false, metadata)
+        }
+        package::TestInputRoute::Package => match run_package_with_options(
+            &config,
+            &input_path,
+            &options,
+            proba_filter.as_ref(),
+            args.include_ignored,
+            args.focused,
+        ) {
+            Ok(run) => run,
+            Err(failure) => {
+                eprintln!("{failure}");
                 std::process::exit(1);
             }
-        };
+        },
+        package::TestInputRoute::ManifestLessDirectory => {
+            eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
+            std::process::exit(1);
+        }
+    };
 
     if report.results.is_empty() {
         let detail = empty_run_detail(unmatched_include);
@@ -226,6 +249,16 @@ pub(super) fn cmd_test(args: &TestArgs) {
     let code = i32::from(!report.success());
     emit_test_stats_if_requested(args, &input_path, &report, &metadata, started, code);
     std::process::exit(code);
+}
+
+/// Whether `faber test` runs a package's kernels on the CPU device session:
+/// `--device cpu` over a package, in a build with the device runtime. A
+/// single file outside a package keeps the reference route, as `faber run`
+/// does.
+fn cpu_session_route(selection: DeviceSelection, route: package::TestInputRoute) -> bool {
+    cfg!(feature = "device-runtime")
+        && selection == DeviceSelection::Cpu
+        && route == package::TestInputRoute::Package
 }
 
 /// The fail-closed message for a device selection `faber test` does not serve
@@ -606,34 +639,79 @@ fn run_package_test_unit_with_options(
         .collect();
     let scope = radix::program::mir::TestPackageScope::for_program(&package, functions);
 
+    let mut run_cases = |validated: &radix::module::mir::ValidatedMir<'_>,
+                         function_ids: &radix::program::mir::TestFunctionIds,
+                         kernels: CaseKernels<'_>| {
+        let mut report = ProbaReport::default();
+        for case in &cases {
+            let started = Instant::now();
+            let one = run_proba_on_validated_with_function_ids(
+                validated,
+                unit_path,
+                std::slice::from_ref(case),
+                function_ids,
+                &TestSelection::default(),
+                None,
+                false,
+                include_ignored,
+                options.default_timeout_secs,
+                options.collect_stats,
+                kernels,
+            );
+            let elapsed = started.elapsed().as_millis();
+            let stop = record_case_results(&mut report, metadata, one, unit_path, elapsed);
+            if options.fail_fast && stop {
+                break;
+            }
+        }
+        report
+    };
+
+    #[cfg(feature = "device-runtime")]
+    if options.cpu_session {
+        use faber_cli::package::mir::cpu_proba;
+        return cpu_proba::with_linked_test_package_lowered_mir(
+            package,
+            &scope,
+            config,
+            |lowered, function_ids| {
+                if !cpu_proba::declares_kernels(lowered) {
+                    return run_cases(
+                        &lowered.validated,
+                        function_ids,
+                        CaseKernels::Runner(options.kernel_policy),
+                    );
+                }
+                let open = || {
+                    cpu_proba::open_case_dispatcher(input, lowered, options.cpu_workers).map_err(
+                        |diagnostics| {
+                            diagnostics
+                                .iter()
+                                .map(|diagnostic| diagnostic.message.clone())
+                                .collect::<Vec<_>>()
+                                .join("; ")
+                        },
+                    )
+                };
+                run_cases(
+                    &lowered.validated,
+                    function_ids,
+                    CaseKernels::Dispatch(&open),
+                )
+            },
+        );
+    }
+
     package::mir::with_linked_test_package_mir(
         package,
         &scope,
         config,
         |validated, function_ids| {
-            let mut report = ProbaReport::default();
-            for case in &cases {
-                let started = Instant::now();
-                let one = run_proba_on_validated_with_function_ids(
-                    validated,
-                    unit_path,
-                    std::slice::from_ref(case),
-                    function_ids,
-                    &TestSelection::default(),
-                    None,
-                    false,
-                    include_ignored,
-                    options.default_timeout_secs,
-                    options.collect_stats,
-                    options.kernel_policy,
-                );
-                let elapsed = started.elapsed().as_millis();
-                let stop = record_case_results(&mut report, metadata, one, unit_path, elapsed);
-                if options.fail_fast && stop {
-                    break;
-                }
-            }
-            report
+            run_cases(
+                validated,
+                function_ids,
+                CaseKernels::Runner(options.kernel_policy),
+            )
         },
     )
 }

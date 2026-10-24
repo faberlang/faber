@@ -90,7 +90,7 @@ pub(super) fn coordinate_type(body: &HirBlock, def: DefId) -> Option<TypeId> {
     reduction_coordinate_type(Some(body), None, def)
 }
 
-fn reduction_coordinate_type(body: Option<&HirBlock>, group: Option<&HirExpression>, def: DefId) -> Option<TypeId> {
+pub(super) fn reduction_coordinate_type(body: Option<&HirBlock>, group: Option<&HirExpression>, def: DefId) -> Option<TypeId> {
     struct Find {
         def: DefId,
         ty: Option<TypeId>,
@@ -111,6 +111,90 @@ fn reduction_coordinate_type(body: Option<&HirBlock>, group: Option<&HirExpressi
         find.visit_expr(group);
     }
     find.ty
+}
+
+fn group_index_coordinates(index: &HirExpression) -> Option<Vec<DefId>> {
+    match &index.kind {
+        HirExpressionKind::Array(elements) => elements
+            .iter()
+            .map(|element| match element {
+                radix_hir::HirArrayElement::Expr(expr) => match &expr.kind {
+                    HirExpressionKind::Path(def_id) => Some(*def_id),
+                    _ => None,
+                },
+                radix_hir::HirArrayElement::Spread(_) | radix_hir::HirArrayElement::Infer(_) => None,
+            })
+            .collect(),
+        HirExpressionKind::Path(def_id) => Some(vec![*def_id]),
+        _ => None,
+    }
+}
+
+fn shape_axes(types: &TypeTable, shape: IndexId) -> Vec<IndexExpr> {
+    match types.get_index(shape) {
+        IndexExpr::Tuple(axes) => axes
+            .iter()
+            .map(|axis| types.get_index(*axis).clone())
+            .collect(),
+        other => vec![other.clone()],
+    }
+}
+
+pub(super) fn grouped_key_tensor_reads_are_proven(
+    types: &TypeTable,
+    source: &HirExpression,
+    coordinates: &[(DefId, Symbol)],
+    group: &HirExpression,
+) -> bool {
+    let Some(source_ty) = source.ty.map(|ty| types.peel_access_marker(ty).1) else {
+        return false;
+    };
+    let Type::Tensor(_, source_shape) = types.get(source_ty) else {
+        return false;
+    };
+    let source_axes = shape_axes(types, *source_shape);
+    struct Reads<'a> {
+        types: &'a TypeTable,
+        coordinates: &'a [(DefId, Symbol)],
+        source_axes: &'a [IndexExpr],
+        safe: bool,
+    }
+    impl HirVisitor for Reads<'_> {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Index(receiver, index) = &expr.kind
+                && let Some(receiver_ty) = receiver.ty.map(|ty| self.types.peel_access_marker(ty).1)
+                && let Type::Tensor(_, shape) = self.types.get(receiver_ty)
+            {
+                let target_axes = shape_axes(self.types, *shape);
+                let Some(index_ids) = group_index_coordinates(index) else {
+                    self.safe = false;
+                    radix_hir::visit::walk_expr(self, expr);
+                    return;
+                };
+                if target_axes.len() != index_ids.len() {
+                    self.safe = false;
+                } else {
+                    for (axis, coordinate) in target_axes.iter().zip(index_ids) {
+                        let Some(source_axis) = self
+                            .coordinates
+                            .iter()
+                            .position(|(id, _)| *id == coordinate)
+                        else {
+                            self.safe = false;
+                            continue;
+                        };
+                        if self.source_axes.get(source_axis) != Some(axis) {
+                            self.safe = false;
+                        }
+                    }
+                }
+            }
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut reads = Reads { types, coordinates, source_axes: &source_axes, safe: true };
+    reads.visit_expr(group);
+    reads.safe
 }
 
 fn mir_reduce_op(op: radix_hir::HirReductionOp) -> MirReduceOp {
@@ -137,6 +221,8 @@ struct FilumTermFunction<'a> {
     element_ty: TypeId,
     /// The source, extents, and optional identity operands so far.
     args: Vec<MirOperand>,
+    group: Option<MirFilumGroupOp>,
+    group_args: Vec<MirOperand>,
     result_mir_ty: MirType,
     expr: &'a HirExpression,
 }
@@ -272,6 +358,7 @@ pub(super) struct FilumReduceLowering<'a> {
     pub(super) op: radix_hir::HirReductionOp,
     pub(super) form: MirFilumForm,
     pub(super) source: &'a HirExpression,
+    pub(super) group: Option<&'a HirExpression>,
     pub(super) coordinates: &'a [(DefId, Symbol)],
     pub(super) filum: &'a (DefId, Symbol),
     pub(super) binding: Option<&'a (DefId, Symbol)>,
@@ -1163,9 +1250,8 @@ impl FunctionBuilder<'_> {
     /// plan entry (SFR-5): a `FilumSum` runtime call carrying the filum
     /// metadata, the captured term-body MIR, and the coordinate facts —
     /// the plan pass resolves it to `DistributedSum`, never inline MIR.
-    /// Every other `filum` reduction (other operators, grouped sums) lowers as
-    /// this same sequential fold; the lane binder is declared metadata only,
-    /// exactly as on the `filum` loop, and is not bound inside the body.
+    /// Other operators retain the same sequential fold; grouped sum/count
+    /// lane reductions carry their keys as typed helpers in the grid node.
     /// Sequential row-major reduction; each bucket owns exact running temps.
     pub(super) fn lower_reduction_expr(
         &mut self,
@@ -1186,8 +1272,8 @@ impl FunctionBuilder<'_> {
         // Host kernel lowering has no device recipe at all: the `sum` is the
         // same plain fold, the sequential meaning of the `filum` clause.
         if let Some(filum) = filum
-            && group.is_none()
             && self.is_device_lowering()
+            && (group.is_none() || matches!(op, Op::Sum | Op::Count))
         {
             if self.is_lane_region(expr) {
                 return self.lower_filum_reduce_expr(
@@ -1195,6 +1281,7 @@ impl FunctionBuilder<'_> {
                         op,
                         form: MirFilumForm::Grid,
                         source,
+                        group,
                         coordinates,
                         filum,
                         binding,
@@ -1214,6 +1301,13 @@ impl FunctionBuilder<'_> {
                 return None;
             }
         }
+        if self.is_device_lowering() && filum.is_some() && group.is_some() {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "grouped grid reduction must be the top-level lane region",
+            ));
+            return None;
+        }
         if let Some(filum) = filum
             && op == Op::Sum
             && group.is_none()
@@ -1224,6 +1318,7 @@ impl FunctionBuilder<'_> {
                     op,
                     form: MirFilumForm::Declared,
                     source,
+                    group: None,
                     coordinates,
                     filum,
                     binding,
@@ -1849,7 +1944,7 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    fn combine_reduction_bucket(
+    pub(super) fn combine_reduction_bucket(
         &mut self,
         fold: &ReductionFoldContext,
         bucket: &ReductionBucket,
@@ -1962,7 +2057,8 @@ impl FunctionBuilder<'_> {
         request: FilumReduceLowering<'_>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        let FilumReduceLowering { op, form, source, coordinates, filum, binding, body, identity } = request;
+        use radix_hir::HirReductionOp as Op;
+        let FilumReduceLowering { op, form, source, group, coordinates, filum, binding, body, identity } = request;
         let grid = form == MirFilumForm::Grid;
         let Some(result_ty) = expr.ty else {
             self.errors
@@ -1970,10 +2066,19 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let result_mir_ty = MirType::semantic(result_ty);
+        let (group_payload, group_args) = match group {
+            Some(group) => {
+                let (group_payload, group_args) =
+                    self.lower_filum_group_keys(group, source, coordinates, result_ty, expr.span)?;
+                (Some(group_payload), group_args)
+            }
+            None => (None, Vec::new()),
+        };
         match self.types.get(result_ty) {
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {}
             Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {}
             Type::Primitive(Primitive::Bivalens) if grid => {}
+            Type::Tensor(_, _) if grid && group.is_some() && matches!(op, Op::Sum | Op::Count) => {}
             _ => {
                 self.errors.push(MirError::unsupported(
                     expr.span,
@@ -2015,6 +2120,8 @@ impl FunctionBuilder<'_> {
                     body,
                     element_ty,
                     args,
+                    group: group_payload,
+                    group_args,
                     result_mir_ty,
                     expr,
                 });
@@ -2118,10 +2225,184 @@ impl FunctionBuilder<'_> {
             term_captures: None,
             term_result,
             term_ty: term_mir_ty,
+            group: group_payload,
         };
+        args.extend(group_args);
         let call = self.runtime_call_value(MirIntrinsic::FilumReduce(declaration), args, result_mir_ty, expr.span);
         let result = self.materialize_operand_place(call, result_mir_ty, expr.span);
         Some(MirOperand::Place(result))
+    }
+
+    /// Lower each grouped key as a typed scalar helper. The key expressions
+    /// run once per source element and keep each result axis distinct until
+    /// the device checks its own bound.
+    fn lower_filum_group_keys(
+        &mut self,
+        group: &HirExpression,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        result_ty: TypeId,
+        span: Span,
+    ) -> Option<(MirFilumGroupOp, Vec<MirOperand>)> {
+        let (result_element_ty, shape) = match self.normalized_type(result_ty) {
+            Type::Tensor(element, shape) => (*element, *shape),
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    span,
+                    "grouped grid reduction result before tensor lowering",
+                ));
+                return None;
+            }
+        };
+        let Some(literal_dimensions) = i64s_from_literal_index(shape, self.types) else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "grouped grid reduction requires literal result extents",
+            ));
+            return None;
+        };
+        let Ok(dimensions) = literal_dimensions
+            .into_iter()
+            .map(u64::try_from)
+            .collect::<Result<Vec<_>, _>>()
+        else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "grouped grid reduction result extent is outside u64",
+            ));
+            return None;
+        };
+        let keys = radix_hir::reduction_group_keys(group);
+        if dimensions.len() != keys.len() {
+            self.errors
+                .push(MirError::unsupported(span, "grouped grid reduction shape/key rank mismatch"));
+            return None;
+        }
+        if !grouped_key_tensor_reads_are_proven(self.types, source, coordinates, group) {
+            self.errors.push(MirError {
+                message: "a grouped reduction key tensor read is not proven in range for every source coordinate"
+                    .to_owned(),
+                issue: "grouped_grid_reduction_key_index_unproven".to_owned(),
+                span,
+                definition_span: None,
+            });
+            return None;
+        }
+        let excluded = coordinates.iter().map(|(def_id, _)| *def_id).collect();
+        let captures = self.collect_expression_captures(excluded, group);
+        if captures
+            .iter()
+            .any(|capture| capture.mode == MirCaptureMode::Shared)
+        {
+            self.errors
+                .push(MirError::unsupported(span, "grouped grid reduction key captures shared state"));
+            return None;
+        }
+        let mut args = Vec::new();
+        let mut key_plans = Vec::with_capacity(keys.len());
+        for key in keys {
+            let key_ty = MirType::semantic(key.ty?);
+            let function = self.lower_filum_group_key_function(key, group, coordinates, &captures, key_ty, span)?;
+            args.extend(
+                captures
+                    .iter()
+                    .map(|capture| MirOperand::Place(capture.source_place.clone())),
+            );
+            args.push(MirOperand::Constant(MirConstant::Function(function)));
+            key_plans.push(MirFilumGroupKey { captures: u32::try_from(captures.len()).ok()?, key_ty });
+        }
+        Some((
+            MirFilumGroupOp { dimensions, result_element_ty: MirType::semantic(result_element_ty), keys: key_plans },
+            args,
+        ))
+    }
+
+    fn lower_filum_group_key_function(
+        &mut self,
+        key: &HirExpression,
+        group: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        captures: &[MirClosureCapture],
+        key_ty: MirType,
+        span: Span,
+    ) -> Option<MirFunctionId> {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            None,
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        for capture in captures {
+            nested.add_param(
+                capture.source,
+                capture.name,
+                capture.ty.semantic_id(),
+                HirParamMode::Owned,
+                span,
+            );
+        }
+        for (def_id, name) in coordinates {
+            let ty = reduction_coordinate_type(None, Some(group), *def_id)
+                .unwrap_or_else(|| self.types.primitive(Primitive::Numerus));
+            nested.add_param(*def_id, *name, ty, HirParamMode::Owned, span);
+        }
+        let entry = nested.fresh_block(span);
+        nested.switch_to(entry);
+        nested.emit_copy_param_entries();
+        let Some(value) = nested.lower_expr_value(key) else {
+            self.errors.extend(nested.errors);
+            return None;
+        };
+        nested.terminate_current(MirTerminatorKind::Return(Some(value)), span);
+        let blocks = nested.finish_blocks();
+        let nested_synthetics = nested.take_synthetic_functions();
+        let nested_environments = nested.take_closure_environments();
+        let nested_metadata = nested.take_device_function_metadata();
+        let nested_error_count = nested.errors.len();
+        self.errors.extend(nested.errors);
+        if nested_error_count > 0 {
+            return None;
+        }
+        self.synthetic_functions.push(MirFunction {
+            id,
+            source: None,
+            name: None,
+            params: nested.params,
+            locals: nested.locals,
+            temps: nested.temps,
+            blocks,
+            return_ty: key_ty,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        });
+        self.synthetic_functions.extend(nested_synthetics);
+        self.closure_environments.extend(nested_environments);
+        self.device_function_metadata.extend(nested_metadata);
+        self.device_function_metadata.insert(
+            id,
+            MirDeviceFunctionMetadata {
+                identity: MirSyntheticFunctionIdentity {
+                    parent: self.parent_function_id,
+                    ordinal: id.0 - self.parent_function_id.0,
+                },
+                role: MirDeviceRole::Kernel,
+                shader_stage: MirKernelShaderStage::Compute,
+                visibility: MirFunctionVisibility::Private,
+                origin: MirFunctionOrigin::SyntheticKernelClosure,
+                lane_domain_local: None,
+            },
+        );
+        Some(id)
     }
 
     /// Lower a grid-form term body into its own MIR function (C4-8 U5): the
@@ -2129,8 +2410,19 @@ impl FunctionBuilder<'_> {
     /// coordinate binders, and the element binder; it returns the term value.
     /// The reduction node names the function through its last argument.
     fn lower_filum_term_function(&mut self, request: FilumTermFunction<'_>) -> Option<MirOperand> {
-        let FilumTermFunction { op, coordinates, filum, binding, body, element_ty, mut args, result_mir_ty, expr } =
-            request;
+        let FilumTermFunction {
+            op,
+            coordinates,
+            filum,
+            binding,
+            body,
+            element_ty,
+            mut args,
+            group,
+            group_args,
+            result_mir_ty,
+            expr,
+        } = request;
         let span = expr.span;
         let term_ty = filum_term_type(body)?;
         let mut excluded = FxHashSet::default();
@@ -2211,6 +2503,7 @@ impl FunctionBuilder<'_> {
                 .map(|capture| MirOperand::Place(capture.source_place.clone())),
         );
         args.push(MirOperand::Constant(MirConstant::Function(id)));
+        args.extend(group_args);
         self.synthetic_functions.push(MirFunction {
             id,
             source: None,
@@ -2243,6 +2536,7 @@ impl FunctionBuilder<'_> {
                 shader_stage: MirKernelShaderStage::Compute,
                 visibility: MirFunctionVisibility::Private,
                 origin: MirFunctionOrigin::SyntheticKernelClosure,
+                lane_domain_local: None,
             },
         );
         let declaration = MirFilumReduceOp {
@@ -2257,6 +2551,7 @@ impl FunctionBuilder<'_> {
             term_captures: Some(u32::try_from(captures.len()).ok()?),
             term_result: binder_local,
             term_ty,
+            group,
         };
         let call = self.runtime_call_value(MirIntrinsic::FilumReduce(declaration), args, result_mir_ty, span);
         let result = self.materialize_operand_place(call, result_mir_ty, span);

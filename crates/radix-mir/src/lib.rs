@@ -30,6 +30,7 @@ pub mod inference_blocker_matrix;
 pub mod kernel_decomposition;
 pub mod kernel_module;
 pub mod kernel_plan;
+mod kernel_shift_view;
 pub mod lane_op;
 pub mod layout;
 pub mod literal_indexed_access;
@@ -108,9 +109,10 @@ pub use abi::{
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor,
     MirWebGpuDispatchWorkgroups, MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor,
     MirWebGpuVertexAttributeDescriptor, MirWebGpuVertexBufferLayoutDescriptor,
-    MirWebGpuVertexStepMode, MirWorkgroupSize, ThrowSite, UnprovenIndex,
+    MirWebGpuVertexStepMode, MirWorkgroupSize, ThrowSite, UnprovenIndex, UnprovenVectorIndex,
     collection_op_workgroup_count, rank_extension_broadcast_fact, reject_kernel_matrix_abi,
-    throw_sites, unproven_indexes, validate_varying_consistency,
+    resolve_parameter_alias, throw_sites, unproven_indexes, unproven_vector_indexes,
+    validate_varying_consistency,
 };
 pub use ai_workbench_stage5::{
     AiWorkbenchStage5Facet, AiWorkbenchStage5Row, AiWorkbenchStage5Status,
@@ -253,10 +255,11 @@ pub use ty::{
     option_payload_ty, place_base_ty,
 };
 pub use validate::{
-    DEFERRED_VECTOR_OP_SURVIVED, INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL,
-    INTEGER_PAYLOAD_U64_SENTINEL, MirEnumRepresentation, MirFunctionSignature, MirInterner,
-    MirParamSignature, MirScalarValueDomain, MirTypeTable, MirValidationContext,
-    MirValidationError, ValidatedMir, validate_program, validate_program_with_device_roles,
+    DEFERRED_VECTOR_OP_SURVIVED, DetachedMir, INTEGER_PAYLOAD_I64_SENTINEL,
+    INTEGER_PAYLOAD_U8_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL, MirEnumRepresentation,
+    MirFunctionSignature, MirInterner, MirParamSignature, MirScalarValueDomain, MirTypeTable,
+    MirValidationContext, MirValidationError, ValidatedMir, validate_program,
+    validate_program_with_device_roles,
 };
 pub use visit::{
     terminator_successors, walk_operand, walk_place, walk_stmt, walk_terminator, walk_value,

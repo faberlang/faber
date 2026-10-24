@@ -1592,6 +1592,41 @@ fn resolve_expr(
             }
             resolver.exit_scope();
         }
+        ExprKind::Scan(expr) => {
+            resolve_expr(resolver, interner, &expr.source, errors);
+            resolver.enter_scope(ScopeKind::Block);
+            for coordinate in &expr.apud {
+                define_symbol(
+                    resolver,
+                    coordinate.name,
+                    coordinate.span,
+                    SymbolKind::Local,
+                    false,
+                    errors,
+                );
+            }
+            if let Some(group) = &expr.group {
+                resolve_expr(resolver, interner, group, errors);
+            }
+            define_symbol(
+                resolver,
+                expr.filum.name,
+                expr.filum.span,
+                SymbolKind::Local,
+                false,
+                errors,
+            );
+            define_symbol(
+                resolver,
+                expr.binding.name,
+                expr.binding.span,
+                SymbolKind::Local,
+                false,
+                errors,
+            );
+            resolve_block(resolver, interner, &expr.body, errors);
+            resolver.exit_scope();
+        }
         ExprKind::Sort(expr) => {
             resolve_expr(resolver, interner, &expr.source, errors);
             resolver.enter_scope(ScopeKind::Block);

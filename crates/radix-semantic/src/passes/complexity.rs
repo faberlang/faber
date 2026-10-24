@@ -28,12 +28,12 @@ const ISSUE_COMPLEXITY_BUDGET_EXCEEDED: &str = "complexity_budget_exceeded";
 pub const DEFAULT_COMPLEXITY_BUDGET: u32 = 12;
 
 /// Baked complexity budget for `@ nucleum` kernel entries
-/// ([`HirFunction::is_kernel`]), fixed by the CC-U4 census kernel subset:
-/// `docs/archived/complexity-diagnostics/census-report.md` recommends 2 —
-/// all 84 measured kernel functions score ≤ 2 (six at 2), so the budget
-/// fires on nothing today and trips any future kernel scoring 3+.
-/// Advisory-only: it warns, it never gates kernel admission.
-pub const DEFAULT_KERNEL_COMPLEXITY_BUDGET: u32 = 2;
+/// ([`HirFunction::is_kernel`]): the same as [`DEFAULT_COMPLEXITY_BUDGET`]
+/// (operator, 2026-10-23). The earlier 2 came from the CC-U4 census when
+/// every measured kernel was trivial (all 84 scored ≤ 2), and ordinary
+/// numerical helpers such as a `minmod` with one `si` and one select tripped
+/// it. Advisory-only: it warns, it never gates kernel admission.
+pub const DEFAULT_KERNEL_COMPLEXITY_BUDGET: u32 = DEFAULT_COMPLEXITY_BUDGET;
 
 /// Cyclomatic score of one declared function, or `None` when it has no body
 /// (bodyless interface methods are skipped, not scored).
@@ -80,6 +80,7 @@ impl HirVisitor for DecisionPointCounter {
             HirExpressionKind::Reduction { body, identity, .. } => {
                 self.0 += u32::from(body.is_some()) + u32::from(identity.is_some());
             }
+            HirExpressionKind::Scan { .. } => self.0 += 1,
             // Conversion recovery tails: +1 only when the `⊥` fallback is present.
             HirExpressionKind::ConversioAssign { recovery, .. }
             | HirExpressionKind::Conversio { recovery, .. } => {

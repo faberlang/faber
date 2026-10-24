@@ -360,7 +360,7 @@ test "double" {
                         false,
                         None,
                         false,
-                        radix_mir_runner::RunnerKernelPolicy::Refuse,
+                        proba::CaseKernels::Runner(radix_mir_runner::RunnerKernelPolicy::Refuse),
                     )
                     .results,
                 );
@@ -660,7 +660,7 @@ fn linked_package_report(package: radix::program::analyze::AnalyzedProgram) -> p
                         false,
                         None,
                         false,
-                        radix_mir_runner::RunnerKernelPolicy::Refuse,
+                        proba::CaseKernels::Runner(radix_mir_runner::RunnerKernelPolicy::Refuse),
                     )
                     .results,
                 );
@@ -849,7 +849,7 @@ test "cpu" {
                         false,
                         None,
                         false,
-                        kernel_policy,
+                        proba::CaseKernels::Runner(kernel_policy),
                     )
                     .results,
                 );

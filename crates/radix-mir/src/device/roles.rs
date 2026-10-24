@@ -2,7 +2,7 @@
 
 use crate::{
     MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage,
-    MirProgram, MirSyntheticFunctionIdentity,
+    MirLocalId, MirProgram, MirSyntheticFunctionIdentity,
 };
 use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
 use radix_lexer::Interner;
@@ -19,6 +19,10 @@ pub struct MirDeviceFunctionMetadata {
     pub shader_stage: MirKernelShaderStage,
     pub visibility: MirFunctionVisibility,
     pub origin: MirFunctionOrigin,
+    /// The exact tensor local used as the source of a top-level lane-form
+    /// region. `None` for functions without a lane-form source or when the
+    /// source is not a local place that can resolve to an ABI resource.
+    pub lane_domain_local: Option<MirLocalId>,
 }
 
 impl MirDeviceFunctionMetadata {
@@ -137,6 +141,24 @@ impl MirDeviceContext {
     #[must_use]
     pub fn roles_by_def(&self) -> &FxHashMap<DefId, MirDeviceRole> {
         &self.by_def_id
+    }
+
+    /// This context with no role for any of `functions`: their explicit
+    /// function facts are dropped, and so is the declared role of their
+    /// source definitions. A backend whose own emitter is the fail-closed
+    /// authority for those functions (a lane emitter) gates the rest of the
+    /// program through the shared classifier with this context.
+    #[must_use]
+    pub fn without_functions(&self, functions: &[&MirFunction]) -> Self {
+        let mut context = self.clone();
+        for function in functions {
+            context.by_function_id.remove(&function.id);
+            context.by_function_metadata.remove(&function.id);
+            if let Some(def_id) = function.source {
+                context.by_def_id.remove(&def_id);
+            }
+        }
+        context
     }
 
     #[must_use]

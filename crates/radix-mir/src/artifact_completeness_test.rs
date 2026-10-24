@@ -74,6 +74,7 @@ fn fixture_metadata(program: &MirProgram) -> MirDeviceFunctionMetadataMap {
                     shader_stage: MirKernelShaderStage::Compute,
                     visibility: MirFunctionVisibility::Public,
                     origin: MirFunctionOrigin::Source,
+                    lane_domain_local: None,
                 },
             )
         })

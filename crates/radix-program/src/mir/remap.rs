@@ -276,6 +276,7 @@ pub(super) fn remap_runtime_call_text_symbols(
         MirIntrinsic::Diagnostic(_)
         | MirIntrinsic::Assert
         | MirIntrinsic::Collection(_)
+        | MirIntrinsic::Scan(_)
         | MirIntrinsic::Atomic(_)
         | MirIntrinsic::Panic
         | MirIntrinsic::Sermo(_)

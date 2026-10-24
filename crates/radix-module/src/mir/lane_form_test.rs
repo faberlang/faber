@@ -5,8 +5,8 @@ use crate::driver::{AnalyzedModule, Config, Session};
 use crate::mir::lower::lane_form::{LANE_FORM_POST_LOOP_ISSUE, LANE_FORM_SECOND_REGION_ISSUE};
 use crate::mir::{KernelLowering, MirError, MirLoweringOptions, lower_analyzed_unit};
 use crate::program::analyze_prepared_program_name;
-use radix_mir::MirParamMode;
 use radix_mir::dump::dump_program;
+use radix_mir::{MirLocalId, MirParamMode};
 
 fn english(source: &str) -> String {
     format!("+++\nlocale = \"en\"\n+++\n{source}")
@@ -100,6 +100,33 @@ fn copy_lowers_to_the_lane_form() {
     ];
     assert_eq!(blocks_of_f0(&dump), expected, "{dump}");
     assert!(!dump.contains("tensor_get") && !dump.contains("tensor_shape"), "{dump}");
+}
+
+#[test]
+fn lowered_lane_metadata_keeps_the_for_from_source_local() {
+    let unit = analyze(
+        r#"
+@ kernel
+@ public
+fn copy(tensor<f32, [3]> other, tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
+    for from src at [i, j] thread lane let v {
+        dst[[i, j]] ← v + other[0]
+    }
+}
+main {}
+"#,
+    );
+    let lowered = lower_analyzed_unit(
+        unit.application_view(),
+        MirLoweringOptions { kernel_lowering: KernelLowering::Device, ..Default::default() },
+    )
+    .expect("device lane form lowers");
+    let function = &lowered.validated.program().functions[0];
+    let metadata = lowered
+        .device_function_metadata
+        .get(&function.id)
+        .expect("device metadata");
+    assert_eq!(metadata.lane_domain_local, Some(MirLocalId(1)));
 }
 
 #[test]

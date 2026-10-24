@@ -1616,6 +1616,7 @@ fn synthetic_row(function_id: u32, parent: u32, ordinal: u32) -> (MirFunctionId,
             shader_stage: MirKernelShaderStage::Compute,
             visibility: MirFunctionVisibility::Private,
             origin: MirFunctionOrigin::SyntheticKernelClosure,
+            lane_domain_local: None,
         },
     )
 }

@@ -437,7 +437,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [213] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [214] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | 'ตัวฉัน' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [215] ad_expr
 ad_expr ::= 'ถึง' ASCII_STRING ad_opener?
 # [216] ad_opener
@@ -496,87 +496,95 @@ reducta_group ::= 'ตาม' expression
 reducta_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
 # [243] reducta_identity
 reducta_identity ::= 'หรือว่าง' expression
-# [244] sort_expr
+# [244] scan_expr
+scan_expr ::= 'scan' 'ผ่านทาง' scan_op ('total' ('inclusive' | 'exclusive'))? 'ออก' expression apud_clause scan_group? scan_order_clause? filum_clause 'กำหนด' IDENTIFIER block_stmt
+# [245] scan_op
+scan_op ::= 'ผลรวม' | 'ผลคูณ' | 'สูงสุด' | 'ต่ำสุด' | 'ทั้งหมด' | 'ใดก็ได้' | 'นับ'
+# [246] scan_group
+scan_group ::= 'ตาม' expression
+# [247] scan_order_clause
+scan_order_clause ::= 'order' ('น้อยไปมาก' | 'มากไปน้อย')
+# [248] sort_expr
 sort_expr ::= 'เรียง' 'ผ่านทาง' sort_direction ('ออก' | 'จาก') expression sort_body?
-# [245] sort_direction
+# [249] sort_direction
 sort_direction ::= 'น้อยไปมาก' | 'มากไปน้อย'
-# [246] sort_body
+# [250] sort_body
 sort_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
-# [247] filum_clause
+# [251] filum_clause
 filum_clause ::= 'เส้นใย' IDENTIFIER
-# [248] capta_expr
+# [252] capta_expr
 capta_expr ::= 'ดัก' block_stmt
-# [249] object_pattern
+# [253] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [250] pattern_property
+# [254] pattern_property
 pattern_property ::= 'ที่เหลือ'? IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [251] array_pattern
+# [255] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [252] array_pattern_element
+# [256] array_pattern_element
 array_pattern_element ::= '_' | 'ที่เหลือ'? IDENTIFIER
-# [253] nota_stmt
+# [257] nota_stmt
 nota_stmt ::= ('บันทึก' | 'ดู' | 'เตือน' | 'เขียน') expression (',' expression)*
-# [254] entry_header
+# [258] entry_header
 entry_header ::= ('อาร์กิวเมนต์' IDENTIFIER)? ('ทางออก' expression)?
-# [255] incipit_stmt
+# [259] incipit_stmt
 incipit_stmt ::= 'เริ่ม' entry_header block_stmt
-# [256] incipiet_stmt
+# [260] incipiet_stmt
 incipiet_stmt ::= 'เริ่มอะซิงก์' entry_header block_stmt
-# [257] probandum_decl
+# [261] probandum_decl
 probandum_decl ::= 'ทดสอบชุด' STRING proba_modifier* '{' probandum_body '}'
-# [258] probandum_body
+# [262] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [259] proba_stmt
+# [263] proba_stmt
 proba_stmt ::= 'ทดสอบ' STRING proba_modifier* block_stmt
-# [260] proba_modifier
+# [264] proba_modifier
 proba_modifier ::= 'คาดหวัง_ล้มเหลว' | 'ละเว้น' STRING | 'ค้าง' STRING | 'เฉพาะ' | 'แท็ก' STRING | 'เวลา' NATURAL | 'วัด' | 'ทำซ้ำ' NATURAL | 'เปราะบาง' NATURAL | 'เฉพาะใน' STRING
-# [261] praepara_block
+# [265] praepara_block
 praepara_block ::= ('เตรียม' | 'จะเตรียม' | 'หลังเตรียม' | 'จะหลังเตรียม') 'ทั้งหมด'? block_stmt
-# [262] fac_stmt
+# [266] fac_stmt
 fac_stmt ::= 'ทำ' block_stmt cape_clause? ('ขณะ' expression)?
-# [263] IDENTIFIER
+# [267] IDENTIFIER
 IDENTIFIER ::=
-# [264] NUMBER
+# [268] NUMBER
 NUMBER ::=
-# [265] NATURAL
+# [269] NATURAL
 NATURAL ::=
-# [266] STRING
+# [270] STRING
 STRING ::=
-# [267] ASCII_STRING
+# [271] ASCII_STRING
 ASCII_STRING ::=
-# [268] BACKTICK_STRING
+# [272] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [269] OCTETI_STRING
+# [273] OCTETI_STRING
 OCTETI_STRING ::=
-# [270] REGEX_TYPE_WORD
+# [274] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [271] REGEX_BODY
+# [275] REGEX_BODY
 REGEX_BODY ::=
-# [272] NEWLINE
+# [276] NEWLINE
 NEWLINE ::=
-# [273] WIDTH_MARKER
+# [277] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [274] LISTA_WIDTH_SUGAR
+# [278] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [275] TENSOR_WIDTH_SUGAR
+# [279] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [276] SPARSA_WIDTH_SUGAR
+# [280] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [277] VECTOR_WIDTH_SUGAR
+# [281] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [278] MATRIX_WIDTH_SUGAR
+# [282] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [279] FRONTMATTER_DELIMITER
+# [283] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [280] TOML_LINES
+# [284] TOML_LINES
 TOML_LINES ::=
-# [281] ANNOTATION_NAME
+# [285] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [282] ANNOTATION_FIELD_NAME
+# [286] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [283] NON_NEWLINE_TOKEN
+# [287] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [284] NO_NEWLINE
+# [288] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -849,6 +857,10 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#ลดรูป-group` | live |
 | [`reducta_body`](#reducta-body) | `#ลดรูป-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#ลดรูป-identity` | live |
+| [`scan_expr`](#scan-expr) | `#scan-expr` | live |
+| [`scan_op`](#scan-op) | `#scan-op` | live |
+| [`scan_group`](#scan-group) | `#scan-group` | live |
+| [`scan_order_clause`](#scan-order-clause) | `#scan-order-clause` | live |
 | [`sort_expr`](#sort-expr) | `#sort-expr` | live |
 | [`sort_direction`](#sort-direction) | `#sort-direction` | live |
 | [`sort_body`](#sort-body) | `#sort-body` | live |
@@ -1019,6 +1031,11 @@ productions. It is not a second keyword authority.
 | Testing | `ทำซ้ำ` | repeat |
 | Error | `ต้องการ` | require |
 | Control | `หยุด` | break |
+| Expression | `scan` | ordered prefix-scan head (shared source spelling; contextual) |
+| Expression | `exclusive` | exclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `inclusive` | inclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `order` | scan order-clause introducer (shared source spelling; contextual) |
+| Expression | `total` | prefix-scan total-mode introducer (shared source spelling; contextual) |
 | Declarations | `สคีมา` | relational heading (experimental; census-types) |
 | Diagnostics | `เขียน` | diagnostic channel |
 | Builtin | `จารึก` | write |
@@ -1044,7 +1061,7 @@ productions. It is not a second keyword authority.
 | Async | `รอแปร` | await-bind mutable |
 | Boolean | `หรือว่าง` | nullable default / explicit reduction identity |
 | Boolean | `จริง` | true |
-| Conversion | `ผ่านทาง` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
+| Conversion | `ผ่านทาง` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 | Diagnostics | `ดู` | debug |
 | Declarations | `visibilitas` | visibility field |
 

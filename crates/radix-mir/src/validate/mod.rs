@@ -33,3 +33,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../validate_ref_param_test.rs"]
 mod ref_param_tests;
+
+#[cfg(test)]
+#[path = "../validate_detach_test.rs"]
+mod detach_tests;

@@ -3,7 +3,7 @@
 //! per-category check modules (`stmt`, `value`, `intrinsic`, `aggregate`,
 //! `type_checks`).
 
-use super::context::MirValidationContext;
+use super::context::{MirInterner, MirTypeTable, MirValidationContext};
 use super::error::{MirFunctionSignature, MirParamSignature, MirValidationError};
 use crate::device::{
     MirDeviceContext, MirDeviceFunctionMetadataMap, MirDeviceRole,
@@ -42,6 +42,110 @@ pub struct ValidatedMir<'a> {
     program: MirProgram,
     function_index: MirFunctionIndex,
     validation: MirValidationContext<'a>,
+}
+
+/// An owned, thread-movable form of a [`ValidatedMir`].
+///
+/// A `ValidatedMir` is not `Send` because its context may hold the type table
+/// behind an `Rc`. [`ValidatedMir::detach`] deep-clones the program and the
+/// context into a `DetachedMir` that is `Send`, so a worker thread can own its
+/// own validated MIR without re-lowering the package; [`Self::attach`] turns it
+/// back into a `ValidatedMir` on the receiving thread.
+///
+/// A `DetachedMir` is deliberately not `Sync`, has no accessors and is not
+/// `Clone`: the only thing that can be done with it is move it and attach it.
+pub struct DetachedMir {
+    program: MirProgram,
+    context: MirValidationContext<'static>,
+}
+
+// SAFETY: the only non-`Send` data reachable from a `DetachedMir` is the
+// `Rc<TypeTable>` in `context.types`. `ValidatedMir::detach` creates that `Rc`
+// itself from a fresh `TypeTable` clone and asserts it is the sole strong
+// reference with no weak references; the field is private, the type has no
+// accessor and no `Clone`, so no other handle to the `Rc` can exist or be
+// created while the value is detached. Moving the whole value to another thread
+// therefore moves the unique owner of the allocation (and `TypeTable` itself is
+// `Send`). Every other context field is `Send`, checked by
+// `detached_fields_are_send` below: the interner is an `Arc` or
+// absent (a borrowed interner is refused by `detach`).
+unsafe impl Send for DetachedMir {}
+
+/// Compile-time proof behind the `unsafe impl Send for DetachedMir` above.
+///
+/// Destructures [`MirValidationContext`] exhaustively (no `..`), so adding a
+/// field fails the build until it is classified here: `types` is covered by the
+/// uniqueness argument, every other field must be `Send`.
+#[allow(dead_code)]
+fn detached_fields_are_send(context: MirValidationContext<'static>, program: MirProgram) {
+    fn assert_send<T: Send>(_: &T) {}
+    assert_send(&program);
+    let MirValidationContext {
+        types: _,
+        layouts,
+        interner,
+        functions,
+        method_defs,
+        external_function_identities,
+        package_product,
+        struct_fields,
+        struct_field_order,
+        variant_field_order,
+        display_names,
+        display_tokens,
+        struct_type_params,
+        struct_contracts,
+        enum_type_params,
+        optional_struct_fields,
+        nullable_struct_fields,
+        opaque_structs,
+        json_struct_field_keys,
+        variant_parents,
+        enum_variants,
+        variant_positions,
+        variant_fields,
+        scalar_value_domains,
+        closure_environments,
+        ad_routes,
+    } = context;
+    assert_send(&layouts);
+    assert_send(&interner);
+    assert_send(&functions);
+    assert_send(&method_defs);
+    assert_send(&external_function_identities);
+    assert_send(&package_product);
+    assert_send(&struct_fields);
+    assert_send(&struct_field_order);
+    assert_send(&variant_field_order);
+    assert_send(&display_names);
+    assert_send(&display_tokens);
+    assert_send(&struct_type_params);
+    assert_send(&struct_contracts);
+    assert_send(&enum_type_params);
+    assert_send(&optional_struct_fields);
+    assert_send(&nullable_struct_fields);
+    assert_send(&opaque_structs);
+    assert_send(&json_struct_field_keys);
+    assert_send(&variant_parents);
+    assert_send(&enum_variants);
+    assert_send(&variant_positions);
+    assert_send(&variant_fields);
+    assert_send(&scalar_value_domains);
+    assert_send(&closure_environments);
+    assert_send(&ad_routes);
+}
+
+impl DetachedMir {
+    /// Re-create a [`ValidatedMir`] from the detached parts.
+    ///
+    /// `detach` only deep-clones a program and context that already passed
+    /// validation, so this goes through the same private constructor as
+    /// [`ValidatedMir::patch_program`]'s restored token and does not re-run
+    /// validation: a `ValidatedMir` still only ever comes from validated data.
+    #[must_use]
+    pub fn attach(self) -> ValidatedMir<'static> {
+        ValidatedMir::from_validated(self.program, self.context)
+    }
 }
 
 /// Failure from a consuming [`ValidatedMir::patch_program`] transition.
@@ -152,6 +256,41 @@ impl<'a> ValidatedMir<'a> {
             function_index,
             validation: context,
         }
+    }
+
+    /// Deep-clone this validated MIR into a `Send`-able [`DetachedMir`].
+    ///
+    /// The type table is always cloned into a freshly allocated, uniquely
+    /// owned `Rc`, whether the context borrowed or owned it. The interner must
+    /// be owned or absent.
+    ///
+    /// # Errors
+    /// Returns a message when the context carries a borrowed interner, which
+    /// cannot outlive its owner.
+    pub fn detach(&self) -> Result<DetachedMir, String> {
+        let interner = match &self.validation.interner {
+            MirInterner::Absent => MirInterner::Absent,
+            MirInterner::Owned(interner) => MirInterner::Owned(std::sync::Arc::clone(interner)),
+            MirInterner::Borrowed(_) => {
+                return Err(
+                    "cannot detach validated MIR: the context borrows its interner".to_string(),
+                );
+            }
+        };
+        let types = std::rc::Rc::new(self.validation.types.as_table().clone());
+        assert!(
+            std::rc::Rc::strong_count(&types) == 1 && std::rc::Rc::weak_count(&types) == 0,
+            "detached type table must be uniquely owned"
+        );
+        let context = MirValidationContext {
+            types: MirTypeTable::Owned(types),
+            interner,
+            ..self.validation.clone()
+        };
+        Ok(DetachedMir {
+            program: self.program.clone(),
+            context,
+        })
     }
 
     /// The validated inner program.

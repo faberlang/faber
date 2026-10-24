@@ -199,12 +199,27 @@ pub enum KeywordOwner {
     /// Grouping word after the source and optional `apud` clause (`pro`).
     ReductionGroup,
 
+    /// Grouping word in an ordered prefix scan (`pro`).
+    ScanGroup,
+
     /// Head of the `ordinata via Dir ex source …` sort expression
     /// (`ordinata`, with `via` as the mandatory direction introducer).
     SortHead,
 
     /// Direction word after `ordinata via` (`ascendens` / `descendens`).
     SortDirection,
+
+    /// Head of the ordered `scan` expression.
+    ScanHead,
+
+    /// Inclusive/exclusive mode introducer in a scan expression.
+    ScanTotal,
+
+    /// Inclusive or exclusive scan mode after `total`.
+    ScanTotalMode,
+
+    /// Ordering clause introducer in a scan expression.
+    ScanOrder,
 }
 
 /// Keyword grouping used by diagnostics, explain data, and registry consumers.
@@ -366,17 +381,25 @@ const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroduce
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
 const REDUCTION_HEAD: &[KeywordOwner] = &[KeywordOwner::ReductionHead];
 const REDUCTION_OPERATOR: &[KeywordOwner] = &[KeywordOwner::ReductionOperator];
-const REDUCTION_GROUP: &[KeywordOwner] = &[KeywordOwner::ReductionGroup];
+const REDUCTION_SCAN_GROUP: &[KeywordOwner] =
+    &[KeywordOwner::ReductionGroup, KeywordOwner::ScanGroup];
 const SORT_HEAD: &[KeywordOwner] = &[KeywordOwner::SortHead];
 const SORT_DIRECTION: &[KeywordOwner] = &[KeywordOwner::SortDirection];
+const SCAN_HEAD: &[KeywordOwner] = &[KeywordOwner::ScanHead];
+const SCAN_TOTAL: &[KeywordOwner] = &[KeywordOwner::ScanTotal];
+const SCAN_TOTAL_MODE: &[KeywordOwner] = &[KeywordOwner::ScanTotalMode];
+const SCAN_ORDER: &[KeywordOwner] = &[KeywordOwner::ScanOrder];
 // WHY: `omnia` keeps its declaration-marker owner and `via` keeps its
 // convert-hint owner. Each also gains the reduction owner for its new slot.
 const DECLARATION_MARKER_OR_REDUCTION_OPERATOR: &[KeywordOwner] = &[
     KeywordOwner::DeclarationMarker,
     KeywordOwner::ReductionOperator,
 ];
-const CONVERSION_HINT_OR_REDUCTION_HEAD: &[KeywordOwner] =
-    &[KeywordOwner::ConversionHint, KeywordOwner::ReductionHead];
+const CONVERSION_HINT_REDUCTION_SCAN_HEAD: &[KeywordOwner] = &[
+    KeywordOwner::ConversionHint,
+    KeywordOwner::ReductionHead,
+    KeywordOwner::ScanHead,
+];
 // WHY: `ad` opens the route expression and names the compiler-owned
 // `@ ad '<route>'` handler annotation; claiming the annotation slot seals the
 // locale surface (`@ ad` under an en reader is `wrong_locale_annotation`).
@@ -903,7 +926,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "pro",
         token_kind: None,
-        scope: KeywordScope::Contextual(REDUCTION_GROUP),
+        scope: KeywordScope::Contextual(REDUCTION_SCAN_GROUP),
         category: KeywordKind::Misc,
     },
     KeywordSpec {
@@ -956,6 +979,39 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         text: "descendens",
         token_kind: None,
         scope: KeywordScope::Contextual(SORT_DIRECTION),
+        category: KeywordKind::Misc,
+    },
+    // === Keywords: Ordered prefix scan ===
+    // The scan mode words are shared as source spellings by all reader packs;
+    // they remain contextual in the scan grammar slots.
+    KeywordSpec {
+        text: "scan",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SCAN_HEAD),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "scan_total",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SCAN_TOTAL),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "scan_inclusive",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SCAN_TOTAL_MODE),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "scan_exclusive",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SCAN_TOTAL_MODE),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "scan_order",
+        token_kind: None,
+        scope: KeywordScope::Contextual(SCAN_ORDER),
         category: KeywordKind::Misc,
     },
     // === Keywords: First-match selection ===
@@ -1177,7 +1233,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "via",
         token_kind: Some(TokenKind::Via),
-        scope: KeywordScope::Contextual(CONVERSION_HINT_OR_REDUCTION_HEAD),
+        scope: KeywordScope::Contextual(CONVERSION_HINT_REDUCTION_SCAN_HEAD),
         category: KeywordKind::Misc,
     },
     // === Keywords: Ranges ===
@@ -1629,8 +1685,13 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::ReductionHead
         | KeywordOwner::ReductionOperator
         | KeywordOwner::ReductionGroup
+        | KeywordOwner::ScanGroup
         | KeywordOwner::SortHead
-        | KeywordOwner::SortDirection => false,
+        | KeywordOwner::SortDirection
+        | KeywordOwner::ScanHead
+        | KeywordOwner::ScanTotal
+        | KeywordOwner::ScanTotalMode
+        | KeywordOwner::ScanOrder => false,
     }
 }
 

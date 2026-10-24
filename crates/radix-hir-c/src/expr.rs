@@ -2508,6 +2508,7 @@ pub(crate) fn construct_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::IteraLockstep { .. } => "lockstep iteration loop",
         HirExpressionKind::IteraRange { .. } => "range-product iteration loop",
         HirExpressionKind::Reduction { .. } => "reduction",
+        HirExpressionKind::Scan { .. } => "scan",
         HirExpressionKind::Sort { .. } => "sort expression",
         HirExpressionKind::FirstMatch { .. } => "first-match selection",
         HirExpressionKind::Intervallum { .. } => "range value",

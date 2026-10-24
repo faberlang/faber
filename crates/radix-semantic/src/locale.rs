@@ -1358,9 +1358,18 @@ pub fn latin_locale_pack() -> LocalePack {
     // installed `la` pack is authoritative for these (ruling 2026-09-30): the
     // registry keeps the English `own` / `copy` identity text while the Latin
     // reader surface spells them `penes` / `exemplum`. The mut parameter
-    // marker `in` shares the writable-cell word `varia`.
-    const LATIN_KEYWORD_SPELLINGS: &[(&str, &str)] =
-        &[("own", "penes"), ("copy", "exemplum"), ("in", "varia")];
+    // marker `in` shares the writable-cell word `varia`. Scan terms are shared
+    // source spellings in every pack under the authorized scan surface.
+    const LATIN_KEYWORD_SPELLINGS: &[(&str, &str)] = &[
+        ("own", "penes"),
+        ("copy", "exemplum"),
+        ("in", "varia"),
+        ("scan", "scan"),
+        ("scan_order", "order"),
+        ("scan_total", "total"),
+        ("scan_inclusive", "inclusive"),
+        ("scan_exclusive", "exclusive"),
+    ];
 
     let keywords = keyword_specs()
         .iter()

@@ -9,7 +9,7 @@ use crate::device_program::{
 use crate::kernel_plan::{
     CollectionKernelPlan, F32_ELEMENT_BYTE_WIDTH, MATMUL_SHARED_A_BUFFER_NAME,
     MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy,
-    SharedMemoryLayout, TRANSPOSE_WORKGROUP_X, TransposePlan,
+    ReduceOp, ReductionPlan, SharedMemoryLayout, TRANSPOSE_WORKGROUP_X, TransposePlan,
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::{MirFunctionId, MirScalarLayout, MirType};
@@ -402,6 +402,7 @@ fn grid_reduce_unit() -> KernelUnit {
         CollectionKernelPlan::GridReduce {
             source_resource: 0,
             rank: 1,
+            group_shape: None,
             workgroup: 256,
             partials_cap: 1024,
             partial_layout: crate::kernel_plan::GridReducePartialLayout::for_op(
@@ -418,7 +419,9 @@ fn stages(n: u64) -> [CallGeometry; 2] {
     let unit = grid_reduce_unit();
     match launch_stages_for_call(&unit, &[vec![n], vec![24]]).expect("stages") {
         LaunchStages::Staged(stages) => stages,
-        LaunchStages::Single(_) => panic!("a GridReduce call is two stages"),
+        LaunchStages::Single(_) | LaunchStages::Scan(_) => {
+            panic!("a GridReduce call is two stages")
+        }
     }
 }
 
@@ -466,6 +469,7 @@ fn grid_reduce_n_is_the_source_tensor_not_the_destination() {
         } => CollectionKernelPlan::GridReduce {
             source_resource: 0,
             rank: 2,
+            group_shape: None,
             workgroup,
             partials_cap,
             partial_layout,
@@ -679,4 +683,179 @@ fn runtime_batched_matmul_geometry_keeps_the_outer_update_refusal() {
     let shapes = vec![vec![2, 5, 1], vec![2, 1, 7], vec![2, 5, 7]];
     let error = geometry_for_call(&batched_matmul(), &shapes).expect_err("K == 1 outer update");
     assert_eq!(error.code, GEOMETRY_SHAPE_NOT_COVERED);
+}
+
+fn grouped_grid_reduce_unit(group_shape: Vec<u64>) -> KernelUnit {
+    use MirKernelResourceAccess::{Read, Write};
+    unit(
+        CollectionKernelPlan::GridReduce {
+            source_resource: 0,
+            rank: 1,
+            group_shape: Some(group_shape.clone()),
+            workgroup: 4,
+            partials_cap: 8,
+            partial_layout: crate::kernel_plan::GridReducePartialLayout {
+                value_bytes: 4,
+                coordinates: 0,
+                seen: false,
+            },
+        },
+        vec![
+            resource(0, Read, None),
+            resource(1, Read, None),
+            resource(2, Write, Some(group_shape)),
+        ],
+    )
+}
+
+#[test]
+fn grouped_grid_reduce_stages_are_source_workgroups_times_buckets() {
+    let unit = grouped_grid_reduce_unit(vec![4]);
+    assert_eq!(unit.plan.group_count(), Some(4));
+    assert_eq!(unit.plan.grid_reduce_partial_slots(), Some(32));
+
+    // Nine source elements give P=3 with W=4; G=4 buckets gives P*G=12
+    // stage-one workgroups and G=4 stage-two workgroups.
+    let shapes = [vec![9], vec![9], vec![4]];
+    let LaunchStages::Staged([stage1, stage2]) =
+        launch_stages_for_call(&unit, &shapes).expect("grouped stages")
+    else {
+        panic!("GridReduce remains a two-stage plan");
+    };
+    assert_eq!(
+        stage1,
+        CallGeometry {
+            grid: [12, 1, 1],
+            block: [4, 1, 1],
+        }
+    );
+    assert_eq!(
+        stage2,
+        CallGeometry {
+            grid: [4, 1, 1],
+            block: [4, 1, 1],
+        }
+    );
+}
+
+#[test]
+fn grouped_grid_reduce_requires_the_output_shape_to_match_its_buckets() {
+    let mut unit = grouped_grid_reduce_unit(vec![4]);
+    unit.resources[2].version.shape = Some(vec![2, 2]);
+    // Equal element counts do not make a rank-2 output the same bucket shape.
+    let error = launch_stages_for_call(&unit, &[vec![9], vec![9], vec![2, 2]])
+        .expect_err("output domain must match group shape");
+    assert_eq!(error.code, GEOMETRY_SHAPE_NOT_COVERED);
+}
+
+#[test]
+fn grouped_partial_rows_keep_stage_one_below_two_to_the_thirty_two_lanes() {
+    use crate::kernel_plan::{
+        GRID_REDUCE_PARTIALS_CAP, GRID_REDUCE_WORKGROUP, grouped_partial_rows,
+    };
+    let rows =
+        |buckets| grouped_partial_rows(GRID_REDUCE_PARTIALS_CAP, GRID_REDUCE_WORKGROUP, buckets);
+    // 1024 rows * 16383 buckets * 256 lanes still fits a 32-bit lane index;
+    // 16384 buckets is exactly 2^32 lanes at 1024 rows, so one row goes.
+    assert_eq!(rows(1), 1024);
+    assert_eq!(rows(16_383), 1024);
+    assert_eq!(rows(16_384), 1023);
+    assert_eq!(rows(65_536), 255);
+    assert_eq!(rows(1 << 30), 1, "never zero rows");
+}
+
+#[test]
+fn grouped_grid_reduce_with_many_buckets_shrinks_its_source_rows() {
+    use MirKernelResourceAccess::{Read, Write};
+    let buckets = 16_384u64;
+    let unit = unit(
+        CollectionKernelPlan::GridReduce {
+            source_resource: 0,
+            rank: 1,
+            group_shape: Some(vec![buckets]),
+            workgroup: 256,
+            partials_cap: 1024,
+            partial_layout: crate::kernel_plan::GridReducePartialLayout {
+                value_bytes: 4,
+                coordinates: 0,
+                seen: false,
+            },
+        },
+        vec![
+            resource(0, Read, None),
+            resource(1, Read, None),
+            resource(2, Write, Some(vec![buckets])),
+        ],
+    );
+    // 2^20 source elements would give 1024 rows; the launch keeps 1023.
+    let shapes = [vec![1 << 20], vec![1 << 20], vec![buckets]];
+    let LaunchStages::Staged([stage1, _]) =
+        launch_stages_for_call(&unit, &shapes).expect("grouped stages")
+    else {
+        panic!("GridReduce remains a two-stage plan");
+    };
+    assert_eq!(stage1.grid, [1023 * 16_384, 1, 1]);
+    assert!(u64::from(stage1.grid[0]) * u64::from(stage1.block[0]) <= u64::from(u32::MAX));
+}
+
+fn tree_reduction(partials: u64, workgroup_x: u32) -> KernelUnit {
+    use MirKernelResourceAccess::{Read, Write};
+    let plan = CollectionKernelPlan::TreeReduction(ReductionPlan {
+        op: ReduceOp::Sum,
+        length: partials.saturating_mul(u64::from(workgroup_x)),
+        workgroup_x,
+        partials,
+        shared_memory: SharedMemoryLayout {
+            element_byte_width: F32_ELEMENT_BYTE_WIDTH,
+            slot_count: workgroup_x,
+            buffer_name: "partials".to_owned(),
+        },
+        barriers: Vec::new(),
+        oob_padding: OobPaddingPolicy::ZeroFill,
+    });
+    unit(
+        plan,
+        vec![resource(0, Read, None), resource(1, Write, None)],
+    )
+}
+
+#[test]
+fn tree_reduction_launches_one_workgroup_per_partial() {
+    for (partials, workgroup_x) in [(1_u64, 256_u32), (2, 256), (3, 64), (1024, 128)] {
+        let unit = tree_reduction(partials, workgroup_x);
+        // The dispatch is `partials * workgroup_x` threads, so the shared
+        // ceil rule yields exactly `partials` workgroups of `workgroup_x`.
+        assert_eq!(
+            geometry_for_call(
+                &unit,
+                &[vec![partials * u64::from(workgroup_x)], vec![partials]]
+            ),
+            Ok(CallGeometry {
+                grid: [partials as u32, 1, 1],
+                block: [workgroup_x, 1, 1],
+            }),
+            "partials {partials}, workgroup {workgroup_x}"
+        );
+    }
+}
+
+#[test]
+fn tree_reduction_dispatch_overflow_is_an_extent_overflow() {
+    let unit = tree_reduction(u64::MAX, 2);
+    let result = geometry_for_call(&unit, &[vec![8], vec![1]]);
+    assert_eq!(
+        result.map_err(|error| error.code),
+        Err(GEOMETRY_EXTENT_OVERFLOW)
+    );
+}
+
+#[test]
+fn tree_reduction_grid_past_u32_is_an_extent_overflow() {
+    // The product fits u64, but the workgroup count does not fit a grid axis.
+    let unit = tree_reduction(u64::from(u32::MAX) + 1, 1);
+    let result = geometry_for_call(&unit, &[vec![8], vec![1]]);
+    assert_eq!(
+        result.map_err(|error| error.code),
+        Err(GEOMETRY_EXTENT_OVERFLOW)
+    );
 }

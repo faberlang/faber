@@ -834,7 +834,7 @@ pub(super) fn classify_static_index_range(
         }
         return StaticIndexRange::InRange;
     }
-    let Some(indices) = static_index_literals(index) else {
+    let Some(indices) = static_index_values(checker, index) else {
         return StaticIndexRange::Unknown;
     };
     if indices.len() != bounds.len() {
@@ -1571,7 +1571,7 @@ pub(super) fn warn_unproven_kernel_index(
         return warn_kernel_index(checker, index.span);
     }
     let proven = components.iter().zip(&extents).all(|(component, extent)| {
-        if let Some(value) = static_signed_numerus_literal(component) {
+        if let Some(value) = static_index_value(checker, component) {
             return matches!(extent, IndexExpr::Literal(bound)
                 if u128::try_from(value).is_ok_and(|v| v < u128::from(*bound)));
         }
@@ -1657,16 +1657,42 @@ fn static_tensor_bounds(checker: &mut TypeChecker<'_>, shape: IndexId) -> Vec<u6
     }
 }
 
-fn static_index_literals(expr: &HirExpression) -> Option<Vec<i128>> {
+/// The compile-time value of each index component: a literal, or a name or
+/// expression that folds to a compile-time integer (a module constant, a
+/// local `const T K = e`, `K + 1`). A constant index is proven or refused
+/// exactly like the literal it stands for; a run-time binding (`let`) stays a
+/// run-time index even when its initializer is a literal.
+fn static_index_values(checker: &TypeChecker<'_>, expr: &HirExpression) -> Option<Vec<i128>> {
     match &expr.kind {
         HirExpressionKind::Array(elements) => elements
             .iter()
             .map(|element| match element {
-                HirArrayElement::Expr(inner) => static_signed_numerus_literal(inner),
+                HirArrayElement::Expr(inner) => static_index_value(checker, inner),
                 HirArrayElement::Spread(_) | HirArrayElement::Infer(_) => None,
             })
             .collect(),
-        _ => Some(vec![static_signed_numerus_literal(expr)?]),
+        _ => Some(vec![static_index_value(checker, expr)?]),
+    }
+}
+
+fn static_index_value(checker: &TypeChecker<'_>, expr: &HirExpression) -> Option<i128> {
+    if !names_only_compile_time_values(checker, expr) {
+        return None;
+    }
+    super::integer_range::const_int_value_resolved(expr, &checker.const_int_values)
+}
+
+/// Whether every name `expr` reads is a compile-time binding.
+fn names_only_compile_time_values(checker: &TypeChecker<'_>, expr: &HirExpression) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Path(def_id) => {
+            checker.module_const_ints.contains(def_id) || checker.compile_time_locals.contains(def_id)
+        }
+        HirExpressionKind::Unary(_, inner) => names_only_compile_time_values(checker, inner),
+        HirExpressionKind::Binary(_, lhs, rhs) => {
+            names_only_compile_time_values(checker, lhs) && names_only_compile_time_values(checker, rhs)
+        }
+        _ => true,
     }
 }
 

@@ -96,7 +96,7 @@ pub(crate) use cargo::{
 #[cfg(test)]
 pub use cargo::emit_generated_crate;
 pub use cmd::{
-    CHECKS_BUT_DOES_NOT_LOWER, cmd_build, cmd_check_package, cmd_emit_package,
+    CHECKS_BUT_DOES_NOT_LOWER, DeviceAdviceRequest, cmd_build, cmd_check_package, cmd_emit_package,
     should_treat_as_package_from_args, use_package_compiler_from_args,
 };
 #[cfg(feature = "hir-go")]
@@ -116,7 +116,7 @@ pub use manifest::{
     read_manifest,
 };
 #[cfg(feature = "runner")]
-pub use manifest::{manifest_device_choice, resolve_device_selection};
+pub use manifest::{manifest_device_choice, resolve_cpu_threads, resolve_device_selection};
 #[cfg(feature = "runner")]
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "runner")]

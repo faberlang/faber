@@ -942,6 +942,30 @@ impl TypeChecker<'_> {
                     expr.span,
                 )
             }
+            HirExpressionKind::Scan {
+                op,
+                total,
+                source,
+                coordinates,
+                group,
+                group_domain,
+                filum,
+                binding,
+                body,
+                ..
+            } => super::scan::check_scan_expr(
+                self,
+                *op,
+                *total,
+                source,
+                coordinates,
+                group.as_mut(),
+                group_domain,
+                *filum,
+                *binding,
+                body,
+                expr.span,
+            ),
             HirExpressionKind::FirstMatch {
                 source,
                 coordinates,

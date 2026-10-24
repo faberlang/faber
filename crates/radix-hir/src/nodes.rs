@@ -1700,6 +1700,20 @@ pub enum HirExpressionKind {
         identity: Option<Box<HirExpression>>,
         mutable: bool,
     },
+    /// Source-shaped ordered prefix scan. `group_domain` is populated only
+    /// after typecheck proves each grouping key lies in a finite integer range.
+    Scan {
+        op: HirReductionOp,
+        total: HirScanTotal,
+        source: Box<HirExpression>,
+        coordinates: Vec<(DefId, Symbol)>,
+        group: Option<Box<HirExpression>>,
+        group_domain: Option<HirScanGroupDomain>,
+        order: HirSortDirection,
+        filum: (DefId, Symbol),
+        binding: (DefId, Symbol),
+        body: HirBlock,
+    },
     /// Sort expression `sort via asc|desc from|ref source [body]`.
     ///
     /// Source-shaped like `Reduction`: `binding` and `body` are jointly
@@ -1761,6 +1775,40 @@ pub enum HirReductionOp {
     All,
     Any,
     Count,
+}
+
+/// Whether a prefix output includes its own input element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirScanTotal {
+    Inclusive,
+    Exclusive,
+}
+
+impl HirScanTotal {
+    #[must_use]
+    pub const fn keyword_key(self) -> &'static str {
+        match self {
+            Self::Inclusive => "scan_inclusive",
+            Self::Exclusive => "scan_exclusive",
+        }
+    }
+}
+
+/// Compiler-proven finite domain for a grouped scan's key components.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirScanGroupDomain {
+    pub key_domains: Vec<HirScanKeyDomain>,
+}
+
+/// Finite integer domain proven for one grouped-scan key component.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirScanKeyDomain {
+    /// Inclusive range proved from a literal or source-coordinate extent.
+    /// `max < min` represents an empty coordinate extent.
+    IntegerRange { min: i128, max: i128 },
+    /// The complete finite domain of a sized integer type. Device planners
+    /// may reject a width whose dense state exceeds their resource limit.
+    IntegerWidth(radix_types::NumericWidth),
 }
 
 impl HirReductionOp {

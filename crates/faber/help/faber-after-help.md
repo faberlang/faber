@@ -57,13 +57,18 @@ Common flows:
     faber run --device reference <input>        # plain sequential code on the MIR
                                                 # runner; the oracle device
                                                 # results are checked against
-    faber run --device cpu   <input>            # processor cores as a device
-                                                # (until the worker device lands
-                                                # this is the same route as
-                                                # reference)
+    faber run --device cpu   <input>            # processor cores as one device:
+                                                # kernels run on --threads N
+                                                # workers, same result at any
+                                                # worker count
+    faber run --device cpu --partitions 3 --threads 6 <input>
+                                                # one logical device over 3 core
+                                                # sets of 2 workers; same result
+                                                # at any partition count
 
     `--device` takes auto|reference|cpu|metal|cuda. Precedence: `--device` > manifest
-    `[device] device` > auto.
+    `[device] device` > auto. The cpu worker count: `--threads N` > manifest
+    `[device] threads = N` > half the cores.
 
     A device-capable package declares at least one `@ kernel` function; a
     `[device]` manifest table is configuration, not a requirement. `metal` and
@@ -97,6 +102,8 @@ Common flows:
     faber test . --name my_case
     faber test . --suite suite/path
     faber test . --tag slow
+    faber test . --device cpu --threads 4    # kernels on the cpu device
+    faber test . --device reference          # kernels in sequence (oracle)
 
   Explain corpus:
     faber explain --list

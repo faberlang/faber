@@ -1156,6 +1156,8 @@ pub enum ExprKind {
     Construct(TypeExpr),
     /// Owned reduction expression: `reducta via Op ex source ...`.
     Reducta(Box<ReductaExpr>),
+    /// Ordered prefix expression: `scan via Op [total inclusive|exclusive] ...`.
+    Scan(Box<ScanExpr>),
     /// Owned sort expression: `ordinata via ascendens ex source [fixum x { key }]`.
     Sort(Box<SortExpr>),
     /// Dedicated first-match selection: `primus_quem(source, ubi binder { predicate })`.
@@ -1265,6 +1267,29 @@ pub struct ReductaExpr {
     pub binding: Option<Ident>,
     pub body: Option<BlockStmt>,
     pub identity: Option<Box<Expr>>,
+}
+
+/// Source-owned clauses for the ordered prefix family. The final `vel` tail
+/// remains an ordinary outer coalesce expression; it is never an accumulator
+/// identity.
+#[derive(Debug)]
+pub struct ScanExpr {
+    pub op: ReductaOp,
+    pub total: ScanTotal,
+    pub source: Box<Expr>,
+    pub apud: Vec<Ident>,
+    pub group: Option<Box<Expr>>,
+    pub order: SortDirection,
+    pub filum: Ident,
+    pub binding: Ident,
+    pub body: BlockStmt,
+}
+
+/// Whether each output element includes its own source value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScanTotal {
+    Inclusive,
+    Exclusive,
 }
 
 /// The nine operations; surface spellings belong to the active locale pack.

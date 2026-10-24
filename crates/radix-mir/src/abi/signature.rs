@@ -1,10 +1,10 @@
 use crate::{
     MirAggregateFields, MirAggregateItem, MirAggregateKind, MirFunction, MirLayoutKind, MirLocalId,
     MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirScalarLayout, MirStatementKind,
-    MirTerminatorKind, MirType, MirValidationContext,
+    MirTerminatorKind, MirType, MirValidationContext, MirScanOp,
 };
 use radix_lexer::Interner;
-use radix_types::{NumericWidth, Primitive, Type, TypeId};
+use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
 use super::{
     CollectionOpContract, DEFAULT_KERNEL_RESOURCE_GROUP, DEFAULT_STORAGE_BUFFER_LIMIT,
@@ -15,7 +15,7 @@ use super::{
     ERR_KERNEL_TENSOR_EXTENT_U32, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
     MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
-    StorageBufferLimitRecord, apply_collection_op_contract, buffer_element_count,
+    RUNTIME_SHAPED_ELEMENT_COUNT, StorageBufferLimitRecord, apply_collection_op_contract, buffer_element_count,
     buffer_element_type, builtin_input_for_index_param, builtin_inputs_for_named_params,
     called_builtins_for_function, collection_op_contract, combined_builtin_dependencies,
     device_view_element_count, device_view_element_count_or_runtime, device_view_element_type,
@@ -189,6 +189,67 @@ fn next_free_binding(signature: &MirKernelSignature) -> u32 {
         .map_or(0, |binding| binding + 1)
 }
 
+fn scan_tensor_rank(shape: radix_types::IndexId, types: &TypeTable) -> Option<usize> {
+    Some(match types.get_index(shape) {
+        radix_types::IndexExpr::Tuple(axes) => axes.len(),
+        radix_types::IndexExpr::Literal(_)
+        | radix_types::IndexExpr::Param(_)
+        | radix_types::IndexExpr::Runtime(_)
+        | radix_types::IndexExpr::Affine { .. }
+        | radix_types::IndexExpr::Divide { .. } => 1,
+        radix_types::IndexExpr::Infer(_) | radix_types::IndexExpr::Unspecified => return None,
+    })
+}
+
+fn scan_tensor_shape(ty: MirType, validation: &MirValidationContext<'_>) -> Option<radix_types::IndexId> {
+    let ty = validation.types.peel_access_marker(ty.semantic_id()).1;
+    match validation.types.get(ty) {
+        Type::Tensor(_, shape) => Some(*shape),
+        Type::Alias(_, inner) => scan_tensor_shape(MirType::semantic(*inner), validation),
+        _ => None,
+    }
+}
+
+/// Scan signatures preserve a literal empty shape in their resources, but
+/// keep a nonzero placeholder dispatch extent. The device session returns the
+/// empty output before allocating scratch or launching a stage.
+fn scan_tensor_element_count(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<u64, MirAbiError> {
+    let shape = scan_tensor_shape(ty, validation)
+        .ok_or_else(|| MirAbiError::new("scan source/return must be a tensor"))?;
+    let axes: Vec<radix_types::IndexId> = match validation.types.get_index(shape) {
+        radix_types::IndexExpr::Tuple(axes) => axes.clone(),
+        radix_types::IndexExpr::Literal(_)
+        | radix_types::IndexExpr::Param(_)
+        | radix_types::IndexExpr::Runtime(_)
+        | radix_types::IndexExpr::Affine { .. }
+        | radix_types::IndexExpr::Divide { .. } => vec![shape],
+        radix_types::IndexExpr::Infer(_) | radix_types::IndexExpr::Unspecified => {
+            return Ok(RUNTIME_SHAPED_ELEMENT_COUNT);
+        }
+    };
+    let extents = axes
+        .iter()
+        .map(|axis| {
+            radix_types::evaluate_index_dimension(*axis, &validation.types)
+                .map_err(|error| MirAbiError::new(format!("scan tensor extent: {error:?}")))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if extents.iter().any(|extent| *extent == Some(0)) {
+        return Ok(0);
+    }
+    if extents.iter().any(Option::is_none) {
+        return Ok(RUNTIME_SHAPED_ELEMENT_COUNT);
+    }
+    extents
+        .into_iter()
+        .flatten()
+        .try_fold(1_u64, |count, extent| count.checked_mul(extent))
+        .ok_or_else(|| MirAbiError::new("scan tensor element count overflows u64"))
+}
+
 /// Append a runtime-extent count resource when the kernel is scalar-shaped.
 ///
 /// "Where the runtime extent applies" (U2): a kernel whose static IO element
@@ -258,6 +319,138 @@ pub(crate) fn grid_reduce_node(
         })
 }
 
+/// The whole-source scan node and its source parameter (alias-resolved).
+pub(crate) fn scan_node(function: &MirFunction) -> Option<(&MirScanOp, MirLocalId)> {
+    function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| {
+            let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return None;
+            };
+            let crate::MirIntrinsic::Scan(scan) = &call.intrinsic else {
+                return None;
+            };
+            let Some(MirOperand::Place(place)) = call.args.first() else {
+                return None;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                return None;
+            };
+            Some((scan, resolve_parameter_alias(function, local)))
+        })
+}
+
+/// Layout used by each scan summary. Count and boolean scans carry a u32
+/// summary; extrema carry the output value plus the existing `seen` flag.
+pub(crate) fn scan_partial_layout(
+    scan: &MirScanOp,
+    validation: &MirValidationContext<'_>,
+) -> Result<crate::kernel_plan::GridReducePartialLayout, MirAbiError> {
+    let partial_ty = scan_partial_type(scan, validation)?;
+    let value_bytes = match validation.layouts.layout_for_type(partial_ty) {
+        Ok(layout) => match layout.kind {
+            MirLayoutKind::Scalar(scalar) => {
+                u32::from(kernel_element_byte_width(scalar).unwrap_or(4))
+            }
+            _ => return Err(MirAbiError::new("scan result element is not scalar")),
+        },
+        Err(_) => return Err(MirAbiError::new("scan result element layout is unavailable")),
+    };
+    Ok(crate::kernel_plan::GridReducePartialLayout::for_op(
+        scan.op,
+        value_bytes,
+        scan.rank,
+    ))
+}
+
+/// Append the dispatcher-owned prefix and summary scratch resources after
+/// declared parameters and before runtime extents. Every scan stage uses the
+/// same binding order.
+fn append_scan_scratch_resources(
+    function: &MirFunction,
+    signature: &mut MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> Result<(), MirAbiError> {
+    let Some((scan, _)) = scan_node(function) else {
+        return Ok(());
+    };
+    let group_count = scan.group.as_ref().map_or(Some(1_u64), |group| {
+        group
+            .axes
+            .iter()
+            .try_fold(1_u64, |count, axis| count.checked_mul(axis.extent))
+    });
+    let group_count = group_count.ok_or_else(|| MirAbiError::new("scan group count overflows"))?;
+    if group_count == 0 {
+        return Err(MirAbiError::new("scan group count is empty"));
+    }
+    let group_count = u32::try_from(group_count)
+        .map_err(|_| MirAbiError::new("scan group count exceeds u32"))?;
+    let layout = scan_partial_layout(scan, validation)?;
+    let partial_ty = scan_partial_type(scan, validation)?;
+    let blocks_cap = crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP;
+    let partial_slots = u64::from(blocks_cap)
+        .checked_mul(u64::from(group_count))
+        .and_then(|slots| u32::try_from(slots).ok())
+        .ok_or_else(|| MirAbiError::new("scan summary slot count overflows u32"))?;
+    let element_bytes = match validation.layouts.layout_for_type(scan.result_element_ty) {
+        Ok(layout) => match layout.kind {
+            MirLayoutKind::Scalar(scalar) => {
+                u32::from(kernel_element_byte_width(scalar).unwrap_or(4))
+            }
+            _ => return Err(MirAbiError::new("scan result element is not scalar")),
+        },
+        Err(_) => return Err(MirAbiError::new("scan result element layout is unavailable")),
+    };
+    let prefix_binding = next_free_binding(signature);
+    signature.extra_inputs.push(MirKernelResource {
+        group: DEFAULT_KERNEL_RESOURCE_GROUP,
+        binding: prefix_binding,
+        kind: MirKernelResourceKind::PrefixScratch { element_bytes },
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::ReadWrite,
+        element_ty: scan.result_element_ty,
+        // Live capacity comes from the source length and plan at dispatch.
+        element_count: 0,
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    });
+    let partial_binding = next_free_binding(signature);
+    signature.extra_inputs.push(MirKernelResource {
+        group: DEFAULT_KERNEL_RESOURCE_GROUP,
+        binding: partial_binding,
+        kind: MirKernelResourceKind::PartialsScratch {
+            cap: partial_slots,
+            element_bytes: layout.element_bytes(),
+        },
+        role: MirKernelResourceRole::Input,
+        access: MirKernelResourceAccess::ReadWrite,
+        element_ty: partial_ty,
+        element_count: u64::from(partial_slots),
+        source_local: None,
+        source_name: None,
+        reduced_projection: None,
+    });
+    Ok(())
+}
+
+fn scan_partial_type(
+    scan: &MirScanOp,
+    validation: &MirValidationContext<'_>,
+) -> Result<MirType, MirAbiError> {
+    if matches!(scan.op, crate::MirReduceOp::Count | crate::MirReduceOp::All | crate::MirReduceOp::Any) {
+        return validation
+            .types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+            .map(MirType::semantic)
+            .ok_or_else(|| MirAbiError::new("scan boolean/count summary requires a u32 carrier"));
+    }
+    Ok(scan.result_element_ty)
+}
+
 /// The partial layout of a grid reduction node.
 pub(crate) fn grid_reduce_partial_layout(
     filum: &crate::MirFilumReduceOp,
@@ -265,7 +458,17 @@ pub(crate) fn grid_reduce_partial_layout(
 ) -> Result<crate::kernel_plan::GridReducePartialLayout, MirAbiError> {
     let rank = u8::try_from(filum.coordinates.len())
         .map_err(|_| MirAbiError::new("grid reduce rank exceeds 255"))?;
-    let value_bytes = match validation.layouts.layout_for_type(filum.term_ty) {
+    let partial_ty = match (filum.group.as_ref(), filum.op) {
+        (Some(group), crate::MirReduceOp::Sum) => group.result_element_ty,
+        (Some(_), crate::MirReduceOp::Count) => MirType::semantic(
+            validation
+                .types
+                .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+                .ok_or_else(|| MirAbiError::new("grouped count needs a u32 partial carrier"))?,
+        ),
+        _ => filum.term_ty,
+    };
+    let value_bytes = match validation.layouts.layout_for_type(partial_ty) {
         Ok(layout) => match layout.kind {
             MirLayoutKind::Scalar(scalar) => {
                 u32::from(kernel_element_byte_width(scalar).unwrap_or(4))
@@ -293,18 +496,42 @@ fn append_partials_scratch_resource(
         return Ok(());
     };
     let layout = grid_reduce_partial_layout(filum, validation)?;
+    let group_count = filum
+        .group
+        .as_ref()
+        .map_or(Some(1), |group| {
+            group
+                .dimensions
+                .iter()
+                .try_fold(1_u64, |count, extent| count.checked_mul(*extent))
+        })
+        .ok_or_else(|| MirAbiError::new("grid reduction bucket count overflows"))?;
+    let partial_slots = u64::from(crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP)
+        .checked_mul(group_count)
+        .and_then(|slots| u32::try_from(slots).ok())
+        .ok_or_else(|| MirAbiError::new("grid reduction partial slot count overflows u32"))?;
+    let partial_ty = match (filum.group.as_ref(), filum.op) {
+        (Some(group), crate::MirReduceOp::Sum) => group.result_element_ty,
+        (Some(_), crate::MirReduceOp::Count) => MirType::semantic(
+            validation
+                .types
+                .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+                .ok_or_else(|| MirAbiError::new("grouped count needs a u32 partial carrier"))?,
+        ),
+        _ => filum.term_ty,
+    };
     let binding = next_free_binding(signature);
     signature.extra_inputs.push(MirKernelResource {
         group: DEFAULT_KERNEL_RESOURCE_GROUP,
         binding,
         kind: MirKernelResourceKind::PartialsScratch {
-            cap: crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP,
+            cap: partial_slots,
             element_bytes: layout.element_bytes(),
         },
         role: MirKernelResourceRole::Input,
         access: MirKernelResourceAccess::ReadWrite,
-        element_ty: filum.term_ty,
-        element_count: u64::from(crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP),
+        element_ty: partial_ty,
+        element_count: u64::from(partial_slots),
         source_local: None,
         source_name: None,
         reduced_projection: None,
@@ -343,7 +570,7 @@ impl crate::visit::MirVisitor for TensorExtentReads {
 /// `callee_param = caller_value`; a tensor or genus parameter copied that way
 /// is one storage, so everything that asks which buffer a local names resolves
 /// through the copy.
-pub(crate) fn resolve_parameter_alias(function: &MirFunction, local: MirLocalId) -> MirLocalId {
+pub fn resolve_parameter_alias(function: &MirFunction, local: MirLocalId) -> MirLocalId {
     let mut current = local;
     // Bounded by the number of locals: a copy chain cannot be longer.
     for _ in 0..function.locals.len() + function.params.len() {
@@ -404,7 +631,8 @@ fn append_tensor_extent_resources(
     if collected.non_parameter_operand {
         return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
     }
-    if collected.reads.is_empty() {
+    let scan = scan_node(function);
+    if collected.reads.is_empty() && scan.is_none() {
         return Ok(());
     }
     let mut ordered = std::collections::BTreeSet::new();
@@ -422,6 +650,54 @@ fn append_tensor_extent_resources(
         };
         ordered.insert((parameter, local, axis));
     }
+    // A scan's shape belongs to its source even though the typed declaration
+    // deliberately keeps the source/helper operands compact. Record each axis
+    // extent explicitly so all three scan stages bind one identical ABI.
+    if let Some((scan, local)) = scan {
+        let parameter = function
+            .params
+            .iter()
+            .position(|param| param.local == local)
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+        for axis in 0..u32::from(scan.rank) {
+            ordered.insert((parameter, local, axis));
+        }
+        let call = function.blocks.iter().flat_map(|block| &block.statements).find_map(|statement| {
+            let crate::MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                return None;
+            };
+            matches!(&call.intrinsic, crate::MirIntrinsic::Scan(_)).then_some(call)
+        }).ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+        let term_captures = usize::try_from(scan.term_captures)
+            .map_err(|_| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+        let term_end = 1_usize
+            .checked_add(term_captures)
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+        for operand in call.args.get(1..term_end)
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?
+        {
+            append_scan_capture_extents(operand, function, validation, &mut ordered)?;
+        }
+        let group = scan.group.as_ref();
+        if let Some(group) = group {
+            let mut position = term_end + 1;
+            for axis in &group.axes {
+                let captures = usize::try_from(axis.captures)
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+                let end = position
+                    .checked_add(captures)
+                    .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+                for operand in call.args.get(position..end)
+                    .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?
+                {
+                    append_scan_capture_extents(operand, function, validation, &mut ordered)?;
+                }
+                position = end
+                    .checked_add(1)
+                    .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+            }
+        }
+    }
     for (_, local, axis) in ordered {
         let tensor_binding = signature
             .resources()
@@ -432,6 +708,78 @@ fn append_tensor_extent_resources(
             .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?
             .binding;
         push_axis_extent_resource(signature, tensor_binding, axis, validation)?;
+    }
+    Ok(())
+}
+
+/// Scan helper captures can read tensor parameters through the generated term
+/// and key functions. Bind their axis extents in the enclosing kernel so the
+/// Metal helper can receive the same buffer and shape facts as its caller.
+fn append_scan_capture_extents(
+    operand: &MirOperand,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    ordered: &mut std::collections::BTreeSet<(usize, MirLocalId, u32)>,
+) -> Result<(), MirAbiError> {
+    let (parameter, local, ty) = match operand {
+        MirOperand::Place(place) if place.projections.is_empty() => match place.base {
+            MirPlaceBase::Local(local) => {
+                let root = resolve_parameter_alias(function, local);
+                if let Some((position, parameter)) = function
+                    .params
+                    .iter()
+                    .enumerate()
+                    .find(|(_, parameter)| parameter.local == root)
+                {
+                    (Some(position), Some(root), Some(parameter.ty))
+                } else {
+                    let ty = function.locals.iter().find(|decl| decl.id == local)
+                        .map(|decl| decl.ty);
+                    (None, Some(local), ty)
+                }
+            }
+            MirPlaceBase::Temp(temp) => {
+                let ty = function.temps.iter().find(|candidate| candidate.id == temp)
+                    .map(|temp| temp.ty);
+                (None, None, ty)
+            }
+        },
+        MirOperand::Temp(temp) => {
+            let ty = function
+                .temps
+                .iter()
+                .find(|candidate| candidate.id == *temp)
+                .map(|temp| temp.ty);
+            (None, None, ty)
+        }
+        _ => return Ok(()),
+    };
+    let Some(ty) = ty else {
+        return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
+    };
+    let Type::Tensor(_, shape) = validation.types.get(ty.semantic_id()) else {
+        return Ok(());
+    };
+    let rank = match validation.types.get_index(*shape) {
+        radix_types::IndexExpr::Tuple(axes) => axes.len(),
+        radix_types::IndexExpr::Literal(_)
+        | radix_types::IndexExpr::Param(_)
+        | radix_types::IndexExpr::Runtime(_)
+        | radix_types::IndexExpr::Affine { .. }
+        | radix_types::IndexExpr::Divide { .. } => 1,
+        radix_types::IndexExpr::Infer(_) | radix_types::IndexExpr::Unspecified => {
+            return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
+        }
+    };
+    let (Some(parameter), Some(local)) = (parameter, local) else {
+        return Err(MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND));
+    };
+    for axis in 0..rank {
+        ordered.insert((
+            parameter,
+            local,
+            u32::try_from(axis).map_err(|_| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?,
+        ));
     }
     Ok(())
 }
@@ -639,18 +987,26 @@ pub(crate) fn append_matmul_runtime_extent_resources(
 /// resource, one count-one `u32` [`MirKernelResourceKind::TensorElementCount`]
 /// per indexed tensor with an unproven index (tensor parameter declaration
 /// order) and then ONE [`MirKernelResourceKind::FaultRecord`] with a slot per
-/// fault site, LAST. One fatal site per unproven index form (tensor, load or
-/// store). U9-6 adds one more slot per constant throw (see
-/// [`super::throw_sites`]), after the index sites. A kernel whose every index
-/// is proven and that throws nothing is untouched.
+/// fault site, LAST. Sites are tensor index forms (loads before stores), then
+/// distinct run-time vector index operands in first-use MIR order, then one
+/// grouped-key validity slot per output axis, then one slot per constant throw
+/// (see [`super::throw_sites`]). A kernel whose every
+/// tensor index is proven and that has no vector index or throw is untouched.
 fn append_fault_resources(
     function: &MirFunction,
     signature: &mut MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) -> Result<(), MirAbiError> {
     let forms = super::unproven_indexes(function, validation);
+    let vector_forms = super::unproven_vector_indexes(function, validation);
     let throws = super::throw_sites(function, &validation.types).map_or(0, |throws| throws.len());
-    if forms.is_empty() && throws == 0 {
+    let group_axes = grid_reduce_node(function)
+        .and_then(|(filum, _)| filum.group.as_ref())
+        .map_or(0, |group| group.keys.len())
+        + scan_node(function)
+            .and_then(|(scan, _)| scan.group.as_ref())
+            .map_or(0, |group| group.axes.len());
+    if forms.is_empty() && vector_forms.is_empty() && group_axes == 0 && throws == 0 {
         return Ok(());
     }
     let word = validation
@@ -687,7 +1043,7 @@ fn append_fault_resources(
         });
         next_binding += 1;
     }
-    let sites = u32::try_from(forms.len() + throws)
+    let sites = u32::try_from(forms.len() + vector_forms.len() + group_axes + throws)
         .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
     signature.extra_inputs.push(MirKernelResource {
         group: DEFAULT_KERNEL_RESOURCE_GROUP,
@@ -876,6 +1232,20 @@ impl MirKernelSignature {
                     interner,
                     allow_host_owned_tensor_entry,
                 )?
+            } else if let Some(signature) = Self::scan_return_kernel(
+                function,
+                validation,
+                interner,
+                allow_host_owned_tensor_entry,
+            )? {
+                signature
+            } else if let Some(signature) = Self::grouped_grid_reduce_return_kernel(
+                function,
+                validation,
+                interner,
+                allow_host_owned_tensor_entry,
+            )? {
+                signature
             } else if let Some(interner) = interner {
                 if let Some(signature) = Self::source_named_indexed_view_kernel(
                     function,
@@ -901,6 +1271,7 @@ impl MirKernelSignature {
                 )?
             };
         let mut signature = signature;
+        append_scan_scratch_resources(function, &mut signature, validation)?;
         append_partials_scratch_resource(function, &mut signature, validation)?;
         append_tensor_extent_resources(function, &mut signature, validation)?;
         append_fault_resources(function, &mut signature, validation)?;
@@ -919,6 +1290,276 @@ impl MirKernelSignature {
             return Err(storage_buffer_limit_error(buffer_count, limit));
         }
         Ok(signature)
+    }
+
+    /// A scan returns one value per source cell. Its output keeps the source
+    /// shape but may have a different element type (count returns numerus;
+    /// all/any return bivalens), so it must be selected before the generic
+    /// same-element return-buffer rules.
+    fn scan_return_kernel(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        interner: Option<&Interner>,
+        allow_host_owned_tensor_entry: bool,
+    ) -> Result<Option<Self>, MirAbiError> {
+        let Some((scan, source_local)) = scan_node(function) else {
+            return Ok(None);
+        };
+        let Some(source_param) = function.params.iter().find(|param| param.local == source_local) else {
+            return Err(MirAbiError::new("scan source does not resolve to a kernel input"));
+        };
+        if source_param.mode == MirParamMode::MutRef {
+            return Err(MirAbiError::new("scan source must be a read-only kernel input"));
+        }
+        let source_shape = scan_tensor_shape(source_param.ty, validation)
+            .ok_or_else(|| MirAbiError::new("scan source must be a tensor kernel input"))?;
+        let result_shape = scan_tensor_shape(function.return_ty, validation)
+            .ok_or_else(|| MirAbiError::new("scan return must be a source-shaped tensor"))?;
+        if !validation.types.index_equals(source_shape, result_shape) {
+            return Err(MirAbiError::new("scan return shape differs from its source"));
+        }
+        if let Some(rank) = scan_tensor_rank(source_shape, &validation.types)
+            && rank != usize::from(scan.rank)
+        {
+            return Err(MirAbiError::new("scan rank differs from its source tensor"));
+        }
+        let source_element_count = scan_tensor_element_count(source_param.ty, validation)?;
+        let return_element_count = scan_tensor_element_count(function.return_ty, validation)?;
+        if source_element_count != return_element_count {
+            return Err(MirAbiError::new("scan return element count differs from its source"));
+        }
+        let return_element_ty = buffer_element_type(
+            function.return_ty,
+            validation,
+            allow_host_owned_tensor_entry,
+        )?;
+        let mut resources = Vec::new();
+        for param in function.params.iter().filter(|param| param.mode != MirParamMode::Lane) {
+            if param.mode == MirParamMode::MutRef {
+                return Err(MirAbiError::new("scan kernels require read-only capture parameters"));
+            }
+            if is_vacuum(param.ty, validation) {
+                continue;
+            }
+            if let Some(genus) = genus_param_layout(param.ty, validation)? {
+                resources.push(MirKernelResource {
+                    group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                    binding: u32::try_from(resources.len())
+                        .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                    kind: MirKernelResourceKind::GenusParam {
+                        size_bytes: u32::try_from(genus.size)
+                            .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                    },
+                    role: MirKernelResourceRole::Input,
+                    access: MirKernelResourceAccess::Read,
+                    element_ty: param.ty,
+                    element_count: 1,
+                    source_local: Some(param.local),
+                    source_name: param_source_name(param, interner),
+                    reduced_projection: None,
+                });
+                continue;
+            }
+            let element_ty = buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?;
+            let element_count = if param.local == source_local {
+                source_element_count
+            } else if Self::is_kernel_scalar_input(param.ty, validation)? {
+                buffer_element_count(param.ty, validation)?
+            } else {
+                device_view_element_count_or_runtime(param.ty, validation)?
+            };
+            resources.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: u32::try_from(resources.len())
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count,
+                source_local: Some(param.local),
+                source_name: param_source_name(param, interner),
+                reduced_projection: None,
+            });
+        }
+        let input = resources
+            .first()
+            .cloned()
+            .ok_or_else(|| MirAbiError::new(ERR_INDEXED_VIEW_REQUIRES_INPUT))?;
+        let output_binding = u32::try_from(resources.len())
+            .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
+        let extra_inputs = resources.into_iter().skip(1).collect();
+        let builtin_inputs = function.params.iter()
+            .filter(|param| param.mode == MirParamMode::Lane)
+            .map(|param| MirKernelBuiltinInput {
+                local: param.local,
+                source_name: param_source_name(param, interner),
+                builtin: MirKernelBuiltin::GlobalInvocationX,
+                ty: param.ty,
+            })
+            .collect();
+        let mut called_builtins = vec![MirKernelBuiltin::GlobalInvocationX];
+        called_builtins.extend(called_builtins_for_function(function));
+        Ok(Some(Self {
+            function: function.id,
+            input,
+            extra_inputs,
+            output: MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: output_binding,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty: return_element_ty,
+                element_count: return_element_count,
+                source_local: None,
+                source_name: None,
+                reduced_projection: None,
+            },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
+            builtin_inputs,
+            called_builtins,
+            workgroup: MirWorkgroupSize {
+                x: crate::kernel_plan::GRID_REDUCE_WORKGROUP,
+                y: 1,
+                z: 1,
+            },
+            dispatch_size: MirKernelDispatchSize {
+                x: if source_element_count == 0
+                    || source_element_count == RUNTIME_SHAPED_ELEMENT_COUNT
+                {
+                    1
+                } else {
+                    source_element_count
+                },
+                y: 1,
+                z: 1,
+            },
+        }))
+    }
+
+    /// A grouped grid reduction returns one value per literal bucket. Its
+    /// output extent is the grouped result shape, independent of the reduced
+    /// source length, so it uses a fresh output resource instead of the
+    /// elementwise equal-count return-buffer contract.
+    fn grouped_grid_reduce_return_kernel(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+        interner: Option<&Interner>,
+        allow_host_owned_tensor_entry: bool,
+    ) -> Result<Option<Self>, MirAbiError> {
+        let Some((filum, _)) = grid_reduce_node(function) else {
+            return Ok(None);
+        };
+        let Some(group) = filum.group.as_ref() else {
+            return Ok(None);
+        };
+        let Type::Tensor(_, result_shape) = validation.types.get(function.return_ty.semantic_id())
+        else {
+            return Ok(None);
+        };
+        let returned = radix_types::i64s_from_literal_index(*result_shape, &validation.types)
+            .and_then(|shape| {
+                shape
+                    .into_iter()
+                    .map(u64::try_from)
+                    .collect::<Result<Vec<_>, _>>()
+                    .ok()
+            });
+        if returned.as_deref() != Some(group.dimensions.as_slice()) {
+            return Err(MirAbiError::new(
+                "grouped grid reduction return shape differs from its literal bucket shape",
+            ));
+        }
+        let builtin_inputs = function
+            .params
+            .iter()
+            .filter(|param| param.mode == MirParamMode::Lane)
+            .map(|param| MirKernelBuiltinInput {
+                local: param.local,
+                source_name: param_source_name(param, interner),
+                builtin: MirKernelBuiltin::GlobalInvocationX,
+                ty: param.ty,
+            })
+            .collect();
+        let params: Vec<_> = function
+            .params
+            .iter()
+            .filter(|param| param.mode != MirParamMode::Lane)
+            .collect();
+        if params.is_empty()
+            || params
+                .iter()
+                .any(|param| param.mode == MirParamMode::MutRef)
+        {
+            return Err(MirAbiError::new(
+                "grouped grid reduction return requires read-only input parameters",
+            ));
+        }
+        let return_element_ty = buffer_element_type(
+            function.return_ty,
+            validation,
+            allow_host_owned_tensor_entry,
+        )?;
+        let return_element_count = buffer_element_count(function.return_ty, validation)?;
+        let mut inputs = Vec::with_capacity(params.len());
+        for (binding, param) in params.iter().enumerate() {
+            let element_ty =
+                buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?;
+            let element_count = buffer_element_count(param.ty, validation)?;
+            inputs.push(MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: u32::try_from(binding)
+                    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Input,
+                access: MirKernelResourceAccess::Read,
+                element_ty,
+                element_count,
+                source_local: Some(param.local),
+                source_name: param_source_name(param, interner),
+                reduced_projection: None,
+            });
+        }
+        let input = inputs
+            .first()
+            .cloned()
+            .ok_or_else(|| MirAbiError::new(ERR_INDEXED_VIEW_REQUIRES_INPUT))?;
+        let extra_inputs = inputs.into_iter().skip(1).collect();
+        let output_binding = u32::try_from(params.len())
+            .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
+        Ok(Some(Self {
+            function: function.id,
+            input,
+            extra_inputs,
+            output: MirKernelResource {
+                group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                binding: output_binding,
+                kind: MirKernelResourceKind::StorageBuffer,
+                role: MirKernelResourceRole::Output,
+                access: MirKernelResourceAccess::Write,
+                element_ty: return_element_ty,
+                element_count: return_element_count,
+                source_local: None,
+                source_name: None,
+                reduced_projection: None,
+            },
+            extra_outputs: Vec::new(),
+            accumulation_buffers: Vec::new(),
+            builtin_inputs,
+            called_builtins: called_builtins_for_function(function),
+            workgroup: MirWorkgroupSize {
+                x: crate::kernel_plan::GRID_REDUCE_WORKGROUP,
+                y: 1,
+                z: 1,
+            },
+            dispatch_size: MirKernelDispatchSize {
+                x: return_element_count,
+                y: 1,
+                z: 1,
+            },
+        }))
     }
 
     /// The single-input / multi-input / indexed-view kernel shape dispatch —

@@ -719,6 +719,20 @@ pub enum PlanValidationError {
     DistributedSumZeroLength,
     /// A grid reduction needs at least one partial slot (C4-8).
     GridReduceZeroPartialsCap,
+    /// A grouped grid reduction must carry one literal extent per key axis.
+    GridReduceEmptyGroupShape,
+    /// The product of a grouped grid reduction's literal extents overflows.
+    GridReduceGroupCountOverflow,
+    /// The workgroup-by-bucket partial slot count overflows.
+    GridReducePartialSlotsOverflow,
+    /// A scan must retain at least one possible source block.
+    ScanZeroBlocksCap,
+    /// A scan's finite group domain must contain at least one group.
+    ScanZeroGroupCount,
+    /// The scan's prefix values must occupy at least one byte.
+    ScanZeroElementBytes,
+    /// The scan's block-by-group summary allocation overflows.
+    ScanPartialSlotsOverflow,
 }
 
 impl fmt::Display for PlanValidationError {
@@ -895,6 +909,22 @@ impl fmt::Display for PlanValidationError {
             Self::GridReduceZeroPartialsCap => {
                 write!(f, "grid reduction requires at least one partial slot")
             }
+            Self::GridReduceEmptyGroupShape => {
+                write!(
+                    f,
+                    "grouped grid reduction shape must have at least one axis"
+                )
+            }
+            Self::GridReduceGroupCountOverflow => {
+                write!(f, "grouped grid reduction bucket count overflows u64")
+            }
+            Self::GridReducePartialSlotsOverflow => {
+                write!(f, "grouped grid reduction partial slot count overflows u64")
+            }
+            Self::ScanZeroBlocksCap => write!(f, "scan requires at least one source block"),
+            Self::ScanZeroGroupCount => write!(f, "scan requires at least one group"),
+            Self::ScanZeroElementBytes => write!(f, "scan prefix values require a positive byte width"),
+            Self::ScanPartialSlotsOverflow => write!(f, "scan summary allocation overflows u64"),
         }
     }
 }

@@ -1967,6 +1967,9 @@ mod summa_disambiguation_test;
 #[path = "reducta_test.rs"]
 mod reducta_test;
 #[cfg(test)]
+#[path = "scan_test.rs"]
+mod scan_test;
+#[cfg(test)]
 #[path = "sort_test.rs"]
 mod sort_test;
 

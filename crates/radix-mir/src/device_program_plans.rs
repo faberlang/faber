@@ -191,6 +191,11 @@ pub fn kernel_plan_for_function_with_limit(
             storage_buffer_limit_error(buffer_count, limit).message,
         ));
     }
+    if let Some(plan) =
+        scan_plan(function, signature, validation).map_err(PlanMappingError::mapping)?
+    {
+        return Ok(Some(plan));
+    }
     // A lane-form kernel (it carries the compiler-internal `Lane` builtin) is
     // one launch grid of independent scalar bodies; its `abs`/`maximum`/`sqrt`
     // collection-op statements are scalar math, not tensor recipes, so the
@@ -641,6 +646,8 @@ pub enum RecipeKind {
     /// Whole-grid reduction (gpu-reset C4-8): two launches through a
     /// dispatcher-owned partials scratch.
     GridReduce,
+    /// Ordered three-stage prefix collective.
+    Scan,
 }
 
 impl RecipeKind {
@@ -671,6 +678,7 @@ impl RecipeKind {
             CollectionKernelPlan::LaneGrid { .. } => Self::LaneGrid,
             CollectionKernelPlan::SingleLane => Self::SingleLane,
             CollectionKernelPlan::GridReduce { .. } => Self::GridReduce,
+            CollectionKernelPlan::Scan { .. } => Self::Scan,
         }
     }
 }
@@ -2162,6 +2170,7 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         | CollectionKernelPlan::LaneGrid { .. }
         | CollectionKernelPlan::SingleLane
         | CollectionKernelPlan::GridReduce { .. }
+        | CollectionKernelPlan::Scan { .. }
         | CollectionKernelPlan::DistributedSum(_) => (vec![output_extent.max(1)], BindLayout::Flat),
     }
 }
@@ -2522,6 +2531,8 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
             partial_layout,
             ..
         } => u64::from(*workgroup) * u64::from(partial_layout.element_bytes()),
+        CollectionKernelPlan::Scan { workgroup, partial_layout, .. } =>
+            2 * u64::from(*workgroup) * u64::from(partial_layout.element_bytes()),
         CollectionKernelPlan::TreeReduction(plan) => {
             shared_memory_layout_bytes(&plan.shared_memory)
         }
@@ -4705,3 +4716,58 @@ fn matmul_return_ty(function: &MirFunction) -> Result<MirType, PlanMappingError>
 #[cfg(test)]
 #[path = "device_program_plans_test.rs"]
 pub(crate) mod tests;
+
+/// The source and scratch contract of one typed prefix collective.
+pub(crate) fn scan_plan(
+    function: &MirFunction,
+    signature: &MirKernelSignature,
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<CollectionKernelPlan>, String> {
+    let Some((scan, source)) = crate::abi::scan_node(function) else {
+        return Ok(None);
+    };
+    let source_resource = signature
+        .resources_by_binding()
+        .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+        .position(|resource| resource.source_local == Some(source))
+        .ok_or_else(|| "scan source has no storage-buffer resource".to_owned())?;
+    let groups = scan
+        .group
+        .as_ref()
+        .map_or(Some(1u64), |group| {
+            group
+                .axes
+                .iter()
+                .try_fold(1u64, |n, axis| n.checked_mul(axis.extent))
+        })
+        .and_then(|n| u32::try_from(n).ok())
+        .filter(|n| *n > 0)
+        .ok_or_else(|| "scan group domain exceeds device capacity".to_owned())?;
+    let element_bytes = signature
+        .resources_by_binding()
+        .find(|resource| {
+            resource.access != MirKernelResourceAccess::Read && resource.source_local.is_some()
+        })
+        .or(Some(&signature.output))
+        .and_then(|resource| validation.layouts.layout_for_type(resource.element_ty).ok())
+        .and_then(|layout| match layout.kind {
+            crate::MirLayoutKind::Scalar(scalar) => {
+                crate::abi::kernel_element_byte_width(scalar).ok()
+            }
+            _ => None,
+        })
+        .map(u32::from)
+        .ok_or_else(|| "scan output element width is unsupported".to_owned())?;
+    let partial_layout =
+        crate::abi::scan_partial_layout(scan, validation).map_err(|error| error.message)?;
+    Ok(Some(CollectionKernelPlan::Scan {
+        source_resource,
+        rank: scan.rank,
+        workgroup: crate::kernel_plan::GRID_REDUCE_WORKGROUP,
+        blocks_cap: crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP,
+        group_count: groups,
+        partial_layout,
+        element_bytes,
+        reverse: scan.reverse,
+    }))
+}

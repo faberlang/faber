@@ -159,6 +159,13 @@ tacebit = "tacebit"
 vacua = "vacua"
 primus_quem = "primus_quem"
 ubi = "ubi"
+# Prefix-scan expression surface. These clause words are shared verbatim by
+# all reader packs; `scan` is the industry term used by the source contract.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
 # Sum-reduce expression surface stays Latin-identity.
 summa = "summa"
 filum = "filum"
@@ -4955,6 +4962,14 @@ help = "fac ut unaquaeque alternativa aut eadem nomina eisdem generibus liget"
 message = "independentia iterationis filum probari non potest: {reason}"
 help = "utere iteratione ordinaria, aut scribe et lege repositorium scriptum tantum apud coordinatam propriam; ne muta locales exteriores nec voca effectus non probatos"
 
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "`{rumpe}` ciclum `{filum}` finire non potest"
+help = "`{rumpe}` ciclum `{filum}` sistere non potest: semitae seorsum currunt. Primum congruens invenire: `{reducta} {via} {argminima} …`; ad terminum sistere: terminum prius computa et usque ad eum itera."
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "`{redde}` ex ciclo `{filum}` exire non potest"
+help = "`{redde}` ex ciclo `{filum}` exire non potest: semitae seorsum currunt. Unum valorem ex semitis capere: `{reducta}`; ad terminum sistere: terminum prius computa et usque ad eum itera."
+
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "corpus reductionis vocare potest tantum intrinseca machinae, fragmenta, et adiutores nuclei privatos: {reason}"
 help = "voca extra reductionem, aut voca adiutorem nuclei privatum"
@@ -5330,3 +5345,25 @@ help = "opt LLVM iuxta llvm-as aut in PATH instrue, deinde iterum aedifica"
 [diagnostics.PKG001.issues.llvm_host_link_failed]
 message = "clang {path} nectere non potuit: {detail}"
 help = "vide ut clang operetur et archivum runtime cum hoc compilatore congruat; detail est exitus ipsius clang"
+
+# Advice rows (info severity, never an error): "serialized by the backend".
+# `faber check --device D [--partitions N]` names each kernel D runs
+# serialized; `kernel`, `entry`, `device`, `partitions` and `reason` are args.
+# The text is English, pending a Latin translation.
+[diagnostics.INFO001]
+message = "kernel `{kernel}` runs serialized on the {device} device"
+
+[diagnostics.INFO001.issues.single_lane]
+message = "kernel `{kernel}` runs on one lane"
+
+[diagnostics.INFO001.issues.not_split]
+message = "kernel `{kernel}` runs on one of the {partitions} partitions: {reason}"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "kernel `{kernel}`: whether it splits across the {partitions} partitions depends on run-time shapes"
+
+[diagnostics.INFO001.issues.whole_call]
+message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
+
+[diagnostics.INFO001.issues.not_placed]
+message = "kernel `{kernel}` is not placed on the {device} device: {reason}"

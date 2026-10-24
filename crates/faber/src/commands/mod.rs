@@ -411,6 +411,10 @@ fn cmd_check(args: crate::cli::CheckArgs) {
         eprintln!("error: `check --lower` needs a file or package path, not stdin");
         std::process::exit(1);
     }
+    if args.device.is_some() && !package_shaped {
+        eprintln!("error: `check --device` needs a file or package path, not stdin");
+        std::process::exit(1);
+    }
     if args.air {
         // ALA-1: the advisory AIR report is single-file only. Plain
         // `check` routes bare `.fab` files through the package loader;
@@ -460,6 +464,10 @@ fn cmd_check(args: crate::cli::CheckArgs) {
             args.complexity_budget,
             args.kernel_complexity_budget,
             args.lower,
+            args.device.map(|device| package::DeviceAdviceRequest {
+                device,
+                partitions: args.partitions,
+            }),
         );
     } else {
         cmd_check_file(

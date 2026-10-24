@@ -47,7 +47,15 @@ impl KeywordPack for LatinTestPack {
     }
 
     fn keyword_latin_key(&self, text: &str) -> Option<&str> {
-        const ALIASES: [(&str, &str); 2] = [("penes", "own"), ("exemplum", "copy")];
+        const ALIASES: [(&str, &str); 7] = [
+            ("penes", "own"),
+            ("exemplum", "copy"),
+            ("scan", "scan"),
+            ("total", "scan_total"),
+            ("inclusive", "scan_inclusive"),
+            ("exclusive", "scan_exclusive"),
+            ("order", "scan_order"),
+        ];
         if let Some(latin_key) = ALIASES
             .iter()
             .find_map(|(alias, latin_key)| (*alias == text).then_some(*latin_key))

@@ -163,6 +163,12 @@ pub enum MirKernelResourceKind {
         cap: u32,
         element_bytes: u32,
     },
+    /// Ordered scan prefix storage, written in stage 1 and read by stage 3.
+    /// The dispatcher allocates `P * chunk` elements from the launch's source
+    /// extent; the final partial chunk is padded only within this allocation.
+    PrefixScratch {
+        element_bytes: u32,
+    },
     /// The element count of a tensor parameter (gpu-reset U9-2): a count-one
     /// `u32` input resource the index bounds compare reads, sibling of
     /// [`Self::TensorAxisExtent`]. The host supplies the product of the
@@ -191,6 +197,7 @@ impl MirKernelResourceKind {
             Self::TensorAxisExtent { .. } => "tensor-axis-extent",
             Self::GenusParam { .. } => "genus-param",
             Self::PartialsScratch { .. } => "partials-scratch",
+            Self::PrefixScratch { .. } => "prefix-scratch",
             Self::TensorElementCount { .. } => "tensor-element-count",
             Self::FaultRecord { .. } => "fault-record",
         }
@@ -473,6 +480,34 @@ pub fn kernel_param_shape(
     let local = source_local?;
     let param = function.params.iter().find(|param| param.local == local)?;
     tensor_param_shape_dims(param.ty, validation)
+}
+
+/// The concrete shape vector of one element of a function's tuple result:
+/// the element type's literal dims. A single-value return falls back to
+/// [`kernel_result_shape`].
+pub fn kernel_result_slot_shape(
+    function: &MirFunction,
+    index: u32,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<u64>> {
+    match validation.types.get(function.return_ty.semantic_id()) {
+        Type::Tuple(elements) => {
+            let ty = *elements.get(index as usize)?;
+            tensor_param_shape_dims(MirType::semantic(ty), validation)
+        }
+        _ => kernel_result_shape(function, validation),
+    }
+}
+
+/// The concrete shape vector of one MIR local's tensor type: a subchain
+/// output's shape, which no parameter carries.
+pub fn kernel_local_shape(
+    function: &MirFunction,
+    local: MirLocalId,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<u64>> {
+    let local = function.locals.iter().find(|candidate| candidate.id == local)?;
+    tensor_param_shape_dims(local.ty, validation)
 }
 
 /// The concrete shape vector of a kernel's declared tensor result: the
@@ -896,6 +931,12 @@ pub(crate) fn kernel_element_byte_width(layout: MirScalarLayout) -> Result<u16, 
             "kernel scalar layout {}",
             layout.spelling()
         )));
+    }
+    // Tensor booleans use one byte per cell in device buffers. `Bool` remains
+    // a one-bit scalar in the language/layout algebra; the buffer codec stores
+    // canonical zero/one byte values.
+    if layout == MirScalarLayout::Bool {
+        return Ok(1);
     }
     let size_bits = layout.size_bits();
     if !size_bits.is_multiple_of(8) {

@@ -247,8 +247,9 @@ pub enum DeviceSelection {
     /// device program, no lanes. The oracle device results are checked
     /// against. Never a silent fallback of another selection.
     Reference,
-    /// Select the CPU device explicitly: processor cores as a device. Until
-    /// the worker device lands this is the same route as [`Self::Reference`]
+    /// Select the CPU device explicitly: processor cores as a device. The
+    /// faber CLI serves it on the CPU device session (kernels on worker
+    /// threads); the package-MIR routes here run it as [`Self::Reference`]
     /// (kernels lower as ordinary functions and run single-threaded on the
     /// MIR runner). Never a silent fallback of another selection.
     Cpu,
@@ -648,6 +649,9 @@ pub use driver::with_check_lowered_package_mir;
 /// device tests and the radix-program mir tests use it; exposed as a normal
 /// entry so dependency crates can reach it.
 pub use driver::with_interpreted_lowered_package_mir;
+/// [`with_linked_test_package_mir`] with the whole lowered unit (device
+/// session test routes).
+pub use driver::with_linked_test_package_lowered_mir;
 /// Link an already-analyzed package's explicit test roots into one validated
 /// MIR program and hand back the original-test identity map.
 pub use driver::with_linked_test_package_mir;
@@ -751,6 +755,10 @@ mod generic_field_argument_link_tests;
 #[cfg(test)]
 #[path = "local_module_device_metadata_test.rs"]
 mod local_module_device_metadata_tests;
+
+#[cfg(test)]
+#[path = "helper_order_device_test.rs"]
+mod helper_order_device_tests;
 
 #[cfg(test)]
 #[path = "sibling_generic_device_entry_test.rs"]

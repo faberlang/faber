@@ -507,6 +507,21 @@ impl FunctionBuilder<'_> {
         }
     }
 
+    pub(super) fn collect_expression_captures(
+        &self,
+        excluded: FxHashSet<DefId>,
+        body: &HirExpression,
+    ) -> Vec<MirClosureCapture> {
+        let mut collector = ClosureCaptureCollector {
+            parent: self,
+            params: excluded,
+            seen: FxHashSet::default(),
+            captures: Vec::new(),
+        };
+        collector.visit_expr(body);
+        collector.captures
+    }
+
     fn collect_closure_captures(&self, params: &[radix_hir::HirParam], body: &HirExpression) -> Vec<MirClosureCapture> {
         let params = params.iter().map(|param| param.def_id).collect();
         let mut collector =

@@ -453,7 +453,7 @@ fn intrinsic(value: &MirIntrinsic) -> String {
         }
         MirIntrinsic::TensorLimes(policy) => format!("tensor_limes {}", edge_policy(policy)),
         MirIntrinsic::FilumReduce(op) => format!(
-            "filum_reduce op={} form={} lane_width={} term_binder={} coordinates={}{}",
+            "filum_reduce op={} form={} lane_width={} term_binder={} coordinates={}{}{}",
             op.op.name(),
             op.form.name(),
             op.lane_width,
@@ -462,7 +462,27 @@ fn intrinsic(value: &MirIntrinsic) -> String {
             op.term_captures
                 .map_or_else(String::new, |captures| format!(
                     " term_fn_captures={captures}"
-                ))
+                )),
+            op.group.as_ref().map_or_else(String::new, |group| format!(
+                " group_shape={:?} group_key_captures={:?}",
+                group.dimensions,
+                group
+                    .keys
+                    .iter()
+                    .map(|key| key.captures)
+                    .collect::<Vec<_>>()
+            ))
+        ),
+        MirIntrinsic::Scan(op) => format!(
+            "scan op={} total={:?} reverse={} rank={} term_ty={} result_ty={} term_captures={} group_axes={}",
+            op.op.name(),
+            op.total,
+            op.reverse,
+            op.rank,
+            op.term_ty.semantic_id().0,
+            op.result_element_ty.semantic_id().0,
+            op.term_captures,
+            op.group.as_ref().map_or(0, |group| group.axes.len())
         ),
         MirIntrinsic::Duplicate => "duplicate".to_owned(),
         MirIntrinsic::Pow => "pow".to_owned(),

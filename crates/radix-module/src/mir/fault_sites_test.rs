@@ -1,4 +1,4 @@
-//! Index fault sites of a lane-form kernel (gpu-reset U9-2): the proven-index
+//! Index fault sites of a lane-form or single-lane kernel (gpu-reset U9-2): the proven-index
 //! analysis, the `TensorElementCount` and `FaultRecord` resources, and the
 //! reflection's `fault_sites`. Only a kernel with an UNPROVEN index carries
 //! them.
@@ -131,6 +131,189 @@ main args args {
 }
 
 #[test]
+fn a_run_time_register_vector_index_gets_a_fault_site_without_a_tensor_count() {
+    let source = r#"
+@ kernel
+@ public
+fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, i32 pick, mut tensor<f32, [H, W]> depth) → void {
+    for from state at [i, j] thread lane let c {
+        depth[[i, j]] ← c[pick]
+    }
+}
+
+main {
+    mut tensor<vector<f32, 4>, [2, 2]> state ← tensor<vector<f32, 4>, [2, 2]> {}
+    mut tensor<f32, [2, 2]> depth ← tf32[2, 2] {}
+    k(state, 1, mut depth)
+}
+"#;
+    let (signature, reflection) = kernel(source);
+    let resource_kinds = kinds(&signature);
+    assert!(
+        resource_kinds
+            .iter()
+            .all(|(_, kind)| !matches!(kind, Kind::TensorElementCount { .. })),
+        "a vector-width guard does not need tensor counts: {resource_kinds:?}"
+    );
+    assert_eq!(
+        resource_kinds.last().map(|(_, kind)| *kind),
+        Some(Kind::FaultRecord { sites: 1 }),
+        "the run-time vector index has one fatal site: {resource_kinds:?}"
+    );
+    assert_eq!(
+        reflection
+            .fault_sites
+            .iter()
+            .map(|site| (site.id, site.kind, site.text.as_str()))
+            .collect::<Vec<_>>(),
+        [(0, MirFaultKind::Fatal, INDEX_FAULT_TEXT)]
+    );
+}
+
+#[test]
+fn a_single_lane_run_time_vector_index_uses_the_same_fault_channel() {
+    let source = r#"
+@ kernel
+@ public
+fn poke(i32 pick, mut tensor<f32, [1]> dst) → void {
+    let vector<f32, 4> value ← [0.0, 1.0, 2.0, 3.0] ↦ vector<f32, 4>
+    dst[0] ← value[pick]
+}
+
+main {
+    mut tensor<f32, [1]> dst ← tf32[1] {}
+    poke(-1, mut dst)
+}
+"#;
+    let (signature, reflection) = kernel(source);
+    let resource_kinds = kinds(&signature);
+    assert_eq!(
+        resource_kinds.last().map(|(_, kind)| *kind),
+        Some(Kind::FaultRecord { sites: 1 }),
+        "the single-lane vector index has one fatal site: {resource_kinds:?}"
+    );
+    assert!(
+        resource_kinds
+            .iter()
+            .all(|(_, kind)| !matches!(kind, Kind::TensorElementCount { .. })),
+        "only the vector width is checked: {resource_kinds:?}"
+    );
+    assert_eq!(reflection.fault_sites.len(), 1);
+    assert_eq!(reflection.fault_sites[0].text, INDEX_FAULT_TEXT);
+}
+
+#[test]
+fn a_single_lane_run_time_vector_store_gets_a_fault_site() {
+    let source = r#"
+@ kernel
+@ public
+fn poke(i32 pick, mut tensor<f32, [1]> dst) → void {
+    mut vector<f32, 4> value ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    value[pick] ← 9.0
+    dst[0] ← value[0] + value[1] + value[2] + value[3]
+}
+
+main {
+    mut tensor<f32, [1]> dst ← tf32[1] {}
+    poke(3, mut dst)
+}
+"#;
+    let (signature, reflection) = kernel(source);
+    let resource_kinds = kinds(&signature);
+    assert_eq!(
+        resource_kinds.last().map(|(_, kind)| *kind),
+        Some(Kind::FaultRecord { sites: 1 }),
+        "the vector store has one fatal site: {resource_kinds:?}"
+    );
+    assert!(
+        resource_kinds
+            .iter()
+            .all(|(_, kind)| !matches!(kind, Kind::TensorElementCount { .. })),
+        "a register-vector store checks its width directly: {resource_kinds:?}"
+    );
+    assert_eq!(reflection.fault_sites.len(), 1);
+    assert_eq!(reflection.fault_sites[0].text, INDEX_FAULT_TEXT);
+}
+
+fn nested_vector_store_source(width: u8, tensor_index: &str, vector_index: &str) -> String {
+    format!(
+        r#"
+@ kernel
+@ public
+fn poke(i32 row, i32 pick, mut tensor<vector<f32, {width}>, [3]> src) → void {{
+    src[{tensor_index}][{vector_index}] ← 9.0
+}}
+
+main {{
+    mut tensor<vector<f32, {width}>, [3]> src ← tensor<vector<f32, {width}>, [3]> {{}}
+    poke(0, 1, mut src)
+}}
+"#
+    )
+}
+
+#[test]
+fn nested_tensor_vector_store_fault_sites_cover_index_combinations() {
+    for (width, tensor_index, vector_index, expected_faults) in [
+        (2, "0", "1", 0_usize),
+        (2, "row", "1", 1),
+        (4, "0", "pick", 1),
+        (4, "row", "pick", 2),
+    ] {
+        let source = nested_vector_store_source(width, tensor_index, vector_index);
+        let (signature, reflection) = kernel(&source);
+        let resources = kinds(&signature);
+        let actual_faults = resources.iter().find_map(|(_, kind)| match kind {
+            Kind::FaultRecord { sites } => Some(*sites as usize),
+            _ => None,
+        });
+        assert_eq!(
+            actual_faults,
+            (expected_faults > 0).then_some(expected_faults),
+            "width {width}, src[{tensor_index}][{vector_index}]: {resources:?}"
+        );
+        assert_eq!(
+            resources
+                .iter()
+                .filter(|(_, kind)| matches!(kind, Kind::TensorElementCount { .. }))
+                .count(),
+            if tensor_index == "row" { 1 } else { 0 },
+            "only a dynamic tensor index needs an element count"
+        );
+        assert_eq!(reflection.fault_sites.len(), expected_faults);
+    }
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn nested_tensor_vector_store_guards_each_unproven_index_in_metal_text() {
+    for (width, tensor_index, vector_index, expected_faults) in [
+        (2, "0", "1", 0_usize),
+        (2, "row", "1", 1),
+        (4, "0", "pick", 1),
+        (4, "row", "pick", 2),
+    ] {
+        let source = nested_vector_store_source(width, tensor_index, vector_index);
+        let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
+        let text =
+            super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+        if expected_faults == 0 {
+            assert!(!text.contains("u9_fault["), "{text}");
+        } else {
+            for site in 0..expected_faults {
+                assert!(text.contains(&format!("u9_fault[{site}]")), "missing fault site {site}: {text}");
+            }
+        }
+        if vector_index == "pick" {
+            assert!(
+                text.contains(&format!("(ulong)({width}u)")),
+                "the vector guard uses its declared width: {text}"
+            );
+        }
+    }
+}
+
+#[test]
 fn a_shifted_load_counts_the_loaded_tensor_only_and_the_record_is_last() {
     let (signature, reflection) =
         kernel(&program(THREE, "dst[[i, j]] ← x + other[[i, j + 1]]", "k(src, other, mut dst)"));
@@ -193,4 +376,252 @@ fn two_unproven_tensors_get_two_counts_and_two_sites() {
     assert_eq!(kinds.last().map(|(_, kind)| *kind), Some(Kind::FaultRecord { sites: 2 }));
     let ids: Vec<u32> = reflection.fault_sites.iter().map(|site| site.id).collect();
     assert_eq!(ids, [0, 1], "ids are dense from 0");
+}
+
+/// A single-lane kernel `poke` (no `thread lane` loop, the SingleLane plan):
+/// `src[k + read]` and `dst[k + write]` are unproven, `dst[0]` is a literal
+/// and `body` is the loop body.
+fn single_lane(body: &str, tail: &str) -> String {
+    format!(
+        r#"
+@ kernel
+@ public
+fn poke(tensor<f32, [4]> src, i32 read, i32 write, mut tensor<f32, [8]> dst) → void {{
+    let i32 k_lo ← 0
+    let i32 k_hi ← 4
+    for range k_lo‥k_hi let k {{
+        {body}
+    }}
+    {tail}
+}}
+
+main {{
+    mut tensor<f32, [4]> src ← tf32[4] {{}}
+    mut tensor<f32, [8]> dst ← tf32[8] {{}}
+    poke(src, 0, 0, mut dst)
+}}
+"#
+    )
+}
+
+#[test]
+fn a_single_lane_kernel_with_unproven_indexes_carries_a_fault_channel() {
+    let (signature, reflection) = kernel(&single_lane("dst[k + write] ← src[k + read] * 2.0", "dst[0] ← dst[0] + 0.5"));
+    let kinds = kinds(&signature);
+    let counts: Vec<Kind> = kinds
+        .iter()
+        .map(|(_, kind)| *kind)
+        .filter(|kind| matches!(kind, Kind::TensorElementCount { .. }))
+        .collect();
+    // `src` is binding 0 and `dst` binding 3: one count each, then the record
+    // with a load site (src) and a store site (dst). The literal `dst[0]` adds
+    // no site.
+    assert_eq!(
+        counts,
+        [
+            Kind::TensorElementCount { tensor_binding: 0 },
+            Kind::TensorElementCount { tensor_binding: 3 }
+        ],
+        "{kinds:?}"
+    );
+    assert_eq!(
+        kinds.last().map(|(_, kind)| *kind),
+        Some(Kind::FaultRecord { sites: 2 }),
+        "{kinds:?}"
+    );
+    let sites: Vec<_> = reflection
+        .fault_sites
+        .iter()
+        .map(|site| (site.id, site.kind, site.text.as_str()))
+        .collect();
+    assert_eq!(
+        sites,
+        [
+            (0, MirFaultKind::Fatal, INDEX_FAULT_TEXT),
+            (1, MirFaultKind::Fatal, INDEX_FAULT_TEXT)
+        ]
+    );
+}
+
+#[test]
+fn a_single_lane_kernel_with_only_literal_indexes_carries_no_fault_channel() {
+    let (signature, reflection) = kernel(&single_lane("dst[1] ← src[3] * 2.0", "dst[0] ← dst[7] + 0.5"));
+    assert!(!has_fault_channel(&signature), "{:?}", kinds(&signature));
+    assert!(reflection.fault_sites.is_empty());
+}
+
+#[test]
+fn a_sequential_tensor_iteration_proves_its_coordinate_binder() {
+    // `for from src at [k]` with no `thread lane` is a counter loop over
+    // `src`'s extent: `src[k]` and the same-shaped `dst[k]` are proven, as the
+    // checker proves them; `src[k + 1]` is not.
+    let source = |body: &str| {
+        format!(
+            r#"
+@ kernel
+@ public
+fn scale(tensor<f32, [8]> src, mut tensor<f32, [8]> dst) → void {{
+    for from src at [k] let _ {{
+        {body}
+    }}
+}}
+
+main {{
+    mut tensor<f32, [8]> src ← tf32[8] {{}}
+    mut tensor<f32, [8]> dst ← tf32[8] {{}}
+    scale(src, mut dst)
+}}
+"#
+        )
+    };
+    let (signature, _) = kernel(&source("dst[k] ← src[k] * 2.0"));
+    assert!(!has_fault_channel(&signature), "{:?}", kinds(&signature));
+    let (signature, reflection) = kernel(&source("dst[k] ← src[k + 1] * 2.0"));
+    assert_eq!(
+        kinds(&signature).last().map(|(_, kind)| *kind),
+        Some(Kind::FaultRecord { sites: 1 }),
+        "{:?}",
+        kinds(&signature)
+    );
+    assert_eq!(reflection.fault_sites.len(), 1);
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_single_lane_kernel_guards_its_unproven_indexes_in_metal_text() {
+    let source = format!(
+        "+++\nlocale = \"en\"\n+++\n{}",
+        single_lane("dst[k + write] ← src[k + read] * 2.0", "dst[0] ← dst[0] + 0.5")
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert!(text.contains("device atomic_uint* u9_fault"), "{text}");
+    // The load guard (site 0, against `src`'s count) precedes the `src`
+    // read, the store guard (site 1, against `dst`'s count) the `dst` write.
+    let line = |needle: &str| {
+        text.lines()
+            .position(|line| line.contains(needle))
+            .unwrap_or_else(|| panic!("no line with {needle}: {text}"))
+    };
+    assert!(line("b0_count[0])) {") < line("b0[t"), "{text}");
+    assert!(line("&u9_fault[0]") == line("b0_count[0])) {"), "{text}");
+    assert!(line("b3_count[0])) {") < line("b3[t"), "{text}");
+    assert!(line("&u9_fault[1]") == line("b3_count[0])) {"), "{text}");
+    // The literal `dst[0]` store is proven: its line carries no compare.
+    let literal = text
+        .lines()
+        .find(|line| line.trim_start().starts_with("b3[0] ="))
+        .expect("the literal store");
+    assert!(!literal.contains("u9_fault"), "{literal}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_runtime_vector_index_guards_its_width_and_records_the_fault_in_metal_text() {
+    let source = r#"
+@ kernel
+@ public
+fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, i32 pick, mut tensor<f32, [H, W]> depth) → void {
+    for from state at [i, j] thread lane let c {
+        depth[[i, j]] ← c[pick]
+    }
+}
+
+main {
+    mut tensor<vector<f32, 4>, [2, 2]> state ← tensor<vector<f32, 4>, [2, 2]> {}
+    mut tensor<f32, [2, 2]> depth ← tf32[2, 2] {}
+    k(state, 1, mut depth)
+}
+"#;
+    let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert!(text.contains("device atomic_uint* u9_fault"), "{text}");
+    assert!(text.contains("u9_fault[0]"), "the vector fault uses site 0: {text}");
+    assert!(text.contains("(ulong)(4u)"), "the guard uses the vector width: {text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn scalar_metal_extrema_propagate_nan_and_order_signed_zero() {
+    let source = r#"
+@ kernel
+@ public
+fn extrema(f32 left, f32 right, mut tensor<f32, [2]> output) → void {
+    output[0] ← left.minimum(right)
+    output[1] ← left.maximum(right)
+}
+
+main {
+    mut tensor<f32, [2]> output ← tf32[2] {}
+    extrema(0.0, 1.0, mut output)
+}
+"#;
+    let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(text.matches("isnan(").count(), 4, "{text}");
+    assert!(text.contains("as_type<uint>"), "signed zero is ordered explicitly: {text}");
+    assert!(!text.contains("fmin("), "MSL fmin does not define the language NaN law: {text}");
+    assert!(!text.contains("fmax("), "MSL fmax does not define the language NaN law: {text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_run_time_vector_store_guards_its_width_in_metal_text() {
+    let source = r#"
+@ kernel
+@ public
+fn poke(i32 pick, mut tensor<f32, [1]> dst) → void {
+    mut vector<f32, 4> value ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    value[pick] ← 9.0
+    dst[0] ← value[0] + value[1] + value[2] + value[3]
+}
+
+main {
+    mut tensor<f32, [1]> dst ← tf32[1] {}
+    poke(3, mut dst)
+}
+"#;
+    let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert!(text.contains("device atomic_uint* u9_fault"), "{text}");
+    assert!(text.contains("u9_fault[0]"), "the vector store uses site 0: {text}");
+    assert!(text.contains("(ulong)(4u)"), "the store guard uses the vector width: {text}");
+}
+
+/// A lane kernel reading one element of a rank-1 parameter at a literal, or at
+/// a module constant, or at a constant expression: each folds to its value
+/// and is proven like the literal it is, so the kernel carries no fault
+/// channel.
+fn constant_index(index: &str) -> String {
+    format!(
+        r#"
+const i32 K = 2
+
+@ kernel
+@ public
+fn k<size H, size W>(tensor<f32, [H, W]> src, tensor<f32, [24]> clock, mut tensor<f32, [H, W]> dst) → void {{
+    for from src at [i, j] thread lane let x {{
+        dst[[i, j]] ← x + clock[{index}]
+    }}
+}}
+
+main {{
+    mut tensor<f32, [2, 2]> src ← tf32[2, 2] {{}}
+    mut tensor<f32, [24]> clock ← tf32[24] {{}}
+    mut tensor<f32, [2, 2]> dst ← tf32[2, 2] {{}}
+    k(src, clock, mut dst)
+}}
+"#
+    )
+}
+
+#[test]
+fn a_literal_or_constant_index_carries_no_fault_channel() {
+    for index in ["2", "K", "K + 1", "[K]"] {
+        let (signature, reflection) = kernel(&constant_index(index));
+        assert!(!has_fault_channel(&signature), "clock[{index}]: {:?}", kinds(&signature));
+        assert!(reflection.fault_sites.is_empty(), "clock[{index}]");
+    }
+    // The control: a lane coordinate is not proven against `clock`'s extent.
+    let (signature, _) = kernel(&constant_index("j"));
+    assert!(has_fault_channel(&signature), "{:?}", kinds(&signature));
 }

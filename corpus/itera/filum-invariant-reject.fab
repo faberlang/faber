@@ -1,0 +1,28 @@
++++
+locale = "en"
+term = "itera-filum-invariant-reject"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "apud_clause", "filum_clause", "assignment", "place", "expression"]
+canonical = false
+summary = "A `thread` write whose index has no lane coordinate is refused: every lane would write the same cell."
+no_expected = "rejects"
+diagnostic = "SEM010:filum_independence_unproven"
++++
+
+# This exemplum intentionally fails to compile: `cache[[pos, 0]]` is the same
+# for every lane, so all lanes write one cell and the result would depend on
+# which lane ran last. A shared component is allowed only beside the lane's own
+# coordinate: write `cache[[pos, j]]` to fill the row, one cell per lane.
+fn set_cell(mut tf32[3, 4] cache, tf32[4] row, i32 pos) → void {
+    for from row at [j] thread lane let v {
+        cache[[pos, 0]] ← v
+    }
+}
+
+main {
+    mut tf32[3, 4] cache ← tf32[3, 4] {}
+    let tf32[4] row ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
+    set_cell(mut cache, row, 1)
+    print cache
+}

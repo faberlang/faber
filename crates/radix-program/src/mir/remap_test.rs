@@ -55,6 +55,7 @@ fn filum_declaration_symbols_keep_their_text_after_module_merge() {
             op: radix_mir::MirReduceOp::Sum,
             form: radix_mir::MirFilumForm::Declared,
             term_ty: radix_mir::MirType::semantic(radix_types::TypeId(0)),
+            group: None,
             filum_binder: Some(filum_binder),
             term_binder: MirLocalId(0),
             term_binder_name: Some(term_binder_name),

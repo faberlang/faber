@@ -120,6 +120,34 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
     }
 }
 
+#[test]
+fn scan_surface_round_trips_with_total_order_and_thread_body() {
+    let source = "+++\nlocale = \"la\"\n+++\n@ nucleum\nfunctio prefix(tensor<f32, [4]> xs) → tensor<f32, [4]> {\n    redde scan via summa total exclusive ex xs apud [i] order descendens filum lane sit value { redde value }\n}\n";
+    let session = Session::new(Config::default().with_dev_locale_root().with_latin_locale());
+    let pack = crate::locale::latin_locale_pack();
+    let emit = |input: &str| {
+        let result = reemit_faber(&session, &pack, "scan.fab", input);
+        assert!(
+            result.success(),
+            "compile failed: {:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+                .collect::<Vec<_>>()
+        );
+        result.output.expect("emit should produce output").code
+    };
+    let emitted = emit(source);
+    assert_eq!(emit(&emitted), emitted, "scan output is not idempotent");
+    assert!(
+        emitted.contains(
+            "scan via summa total exclusive ex xs apud [i] order descendens filum lane sit value"
+        ),
+        "canonical scan form missing from output: {emitted}"
+    );
+}
+
 /// `ordinata via Dir (ex | de) source [body]` re-emits at the source locale,
 /// the loop binder stays the loop's, the words stay plain identifiers
 /// elsewhere, and every target types the node.

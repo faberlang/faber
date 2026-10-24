@@ -44,7 +44,9 @@ impl super::FaberCodegen<'_> {
             // heads an output statement (`scribe (…)` is the retired
             // `print(x)` form) and fails re-analysis. 14 is the postfix level
             // the numeric-twin arm above uses; only a prec-13 owner changes.
-            HirExpressionKind::Binary(..) | HirExpressionKind::Reduction { .. }
+            HirExpressionKind::Binary(..)
+            | HirExpressionKind::Reduction { .. }
+            | HirExpressionKind::Scan { .. }
                 if self.axis_sugar_call(expr).is_some() =>
             {
                 14
@@ -54,7 +56,8 @@ impl super::FaberCodegen<'_> {
             // and value are complete ternaries (parser locks it just above
             // assignment), so it shares the Si/Conversio level.
             //
-            // `reducta via … ex <source>` and `ordinata via … ex <source>` end
+            // `reducta via … ex <source>`, `scan via … ex <source>`, and
+            // `ordinata via … ex <source>` end
             // in an open tail (the source, then `vel <identity>`): a following
             // operator or postfix member would be absorbed into that tail
             // (`reduce via sum from a / 4.0` re-parses as a sum of `a / 4.0`).
@@ -65,6 +68,7 @@ impl super::FaberCodegen<'_> {
             | HirExpressionKind::CallDefault { .. }
             | HirExpressionKind::CopyInto { .. }
             | HirExpressionKind::Reduction { .. }
+            | HirExpressionKind::Scan { .. }
             | HirExpressionKind::Sort { .. } => 2,
             HirExpressionKind::Binary(op, _, _) => self.binop_precedence(*op),
             // TypeCheck (`expr est <type>`) behaves like Is (precedence 4):

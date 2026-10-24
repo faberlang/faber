@@ -126,6 +126,7 @@ pub(super) fn collect_runtime_call_requirement(
         | MirIntrinsic::TensorShapeSize(_)
         | MirIntrinsic::TensorLimes(_)
         | MirIntrinsic::FilumReduce(_)
+        | MirIntrinsic::Scan(_)
         | MirIntrinsic::TensorLift(_)
         | MirIntrinsic::Pow
         | MirIntrinsic::VectorOp(_)

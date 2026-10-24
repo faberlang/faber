@@ -64,3 +64,16 @@ pub fn package_diagnostic_spec() -> DiagnosticSpec {
         help: None,
     }
 }
+
+/// Return the stable diagnostic spec for "serialized by the backend" advice
+/// (`INFO001`, [`Severity::Info`](crate::Severity::Info)): a kernel a target
+/// runs on one lane, on one partition, as one sequential call, or not at all.
+/// Each case names itself by `issue` arg; `kernel` and `reason` are data.
+/// Advice is never promoted to an error.
+#[must_use]
+pub fn serialized_by_backend_spec() -> DiagnosticSpec {
+    DiagnosticSpec {
+        code: "INFO001",
+        help: None,
+    }
+}

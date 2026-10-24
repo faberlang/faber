@@ -437,7 +437,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [213] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [214] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [215] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
 # [216] ad_opener
@@ -496,87 +496,95 @@ reducta_group ::= 'حسب' expression
 reducta_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
 # [243] reducta_identity
 reducta_identity ::= 'عوض' expression
-# [244] sort_expr
+# [244] scan_expr
+scan_expr ::= 'scan' 'عبر' scan_op ('total' ('inclusive' | 'exclusive'))? 'من' expression apud_clause scan_group? scan_order_clause? filum_clause 'ليكن' IDENTIFIER block_stmt
+# [245] scan_op
+scan_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'الأدنى' | 'الكل' | 'أي' | 'العدّ'
+# [246] scan_group
+scan_group ::= 'حسب' expression
+# [247] scan_order_clause
+scan_order_clause ::= 'order' ('تصاعدي' | 'تنازلي')
+# [248] sort_expr
 sort_expr ::= 'رتب' 'عبر' sort_direction ('من' | 'عن') expression sort_body?
-# [245] sort_direction
+# [249] sort_direction
 sort_direction ::= 'تصاعدي' | 'تنازلي'
-# [246] sort_body
+# [250] sort_body
 sort_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
-# [247] filum_clause
+# [251] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
-# [248] capta_expr
+# [252] capta_expr
 capta_expr ::= 'فخ' block_stmt
-# [249] object_pattern
+# [253] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [250] pattern_property
+# [254] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
-# [251] array_pattern
+# [255] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [252] array_pattern_element
+# [256] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
-# [253] nota_stmt
+# [257] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
-# [254] entry_header
+# [258] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
-# [255] incipit_stmt
+# [259] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
-# [256] incipiet_stmt
+# [260] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
-# [257] probandum_decl
+# [261] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
-# [258] probandum_body
+# [262] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [259] proba_stmt
+# [263] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
-# [260] proba_modifier
+# [264] proba_modifier
 proba_modifier ::= 'توقع_الفشل' | 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NATURAL | 'قس' | 'معاد' NATURAL | 'هش' NATURAL | 'حصري' STRING
-# [261] praepara_block
+# [265] praepara_block
 praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'الكل'? block_stmt
-# [262] fac_stmt
+# [266] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [263] IDENTIFIER
+# [267] IDENTIFIER
 IDENTIFIER ::=
-# [264] NUMBER
+# [268] NUMBER
 NUMBER ::=
-# [265] NATURAL
+# [269] NATURAL
 NATURAL ::=
-# [266] STRING
+# [270] STRING
 STRING ::=
-# [267] ASCII_STRING
+# [271] ASCII_STRING
 ASCII_STRING ::=
-# [268] BACKTICK_STRING
+# [272] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [269] OCTETI_STRING
+# [273] OCTETI_STRING
 OCTETI_STRING ::=
-# [270] REGEX_TYPE_WORD
+# [274] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [271] REGEX_BODY
+# [275] REGEX_BODY
 REGEX_BODY ::=
-# [272] NEWLINE
+# [276] NEWLINE
 NEWLINE ::=
-# [273] WIDTH_MARKER
+# [277] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [274] LISTA_WIDTH_SUGAR
+# [278] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [275] TENSOR_WIDTH_SUGAR
+# [279] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [276] SPARSA_WIDTH_SUGAR
+# [280] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [277] VECTOR_WIDTH_SUGAR
+# [281] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [278] MATRIX_WIDTH_SUGAR
+# [282] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [279] FRONTMATTER_DELIMITER
+# [283] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [280] TOML_LINES
+# [284] TOML_LINES
 TOML_LINES ::=
-# [281] ANNOTATION_NAME
+# [285] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [282] ANNOTATION_FIELD_NAME
+# [286] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [283] NON_NEWLINE_TOKEN
+# [287] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [284] NO_NEWLINE
+# [288] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -849,6 +857,10 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#اختزل-group` | live |
 | [`reducta_body`](#reducta-body) | `#اختزل-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#اختزل-identity` | live |
+| [`scan_expr`](#scan-expr) | `#scan-expr` | live |
+| [`scan_op`](#scan-op) | `#scan-op` | live |
+| [`scan_group`](#scan-group) | `#scan-group` | live |
+| [`scan_order_clause`](#scan-order-clause) | `#scan-order-clause` | live |
 | [`sort_expr`](#sort-expr) | `#sort-expr` | live |
 | [`sort_direction`](#sort-direction) | `#sort-direction` | live |
 | [`sort_body`](#sort-body) | `#sort-body` | live |
@@ -1019,6 +1031,11 @@ productions. It is not a second keyword authority.
 | Testing | `معاد` | repeat |
 | Error | `يتطلب` | require |
 | Control | `اكسر` | break |
+| Expression | `scan` | ordered prefix-scan head (shared source spelling; contextual) |
+| Expression | `exclusive` | exclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `inclusive` | inclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `order` | scan order-clause introducer (shared source spelling; contextual) |
+| Expression | `total` | prefix-scan total-mode introducer (shared source spelling; contextual) |
 | Declarations | `مخطط` | relational heading (experimental; census-types) |
 | Diagnostics | `اكتب` | diagnostic channel |
 | Builtin | `حرر` | write |
@@ -1044,7 +1061,7 @@ productions. It is not a second keyword authority.
 | Async | `انتظر_متغير` | await-bind mutable |
 | Boolean | `عوض` | nullable default / explicit reduction identity |
 | Boolean | `صواب` | true |
-| Conversion | `عبر` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
+| Conversion | `عبر` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 | Diagnostics | `شاهد` | debug |
 | Declarations | `visibilitas` | visibility field |
 

@@ -656,6 +656,22 @@ impl HirVisitor for DefiniteAssignmentChecker<'_> {
                     self.visit_block(body);
                 }
             }
+            HirExpressionKind::Scan {
+                source,
+                group,
+                binding,
+                body,
+                ..
+            } => {
+                self.visit_expr(source);
+                if let Some(group) = group {
+                    self.visit_expr(group);
+                }
+                self.track_binding(binding.0);
+                self.write_once.insert(binding.0);
+                self.mark_assigned(binding.0);
+                self.visit_block(body);
+            }
             HirExpressionKind::Sort {
                 source,
                 binding,

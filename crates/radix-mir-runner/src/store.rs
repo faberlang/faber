@@ -342,7 +342,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     pub(crate) fn operand_plain_type(&self, operand: &radix_mir::MirOperand) -> Option<TypeId> {
         use radix_mir::{MirOperand, MirPlaceBase};
         let function_id = self.frames.last()?.function;
-        let slots = self.slot_types.get(&function_id)?;
+        let slots = self.prepared.slot_types.get(&function_id)?;
         let ty = match operand {
             MirOperand::Temp(id) => slots.temp_ty(*id),
             MirOperand::Place(place) if place.projections.is_empty() => match place.base {
@@ -350,6 +350,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 MirPlaceBase::Local(id) => slots.local_ty(id),
             },
             MirOperand::Value(id) => self
+                .prepared
                 .value_types
                 .get(&(function_id, *id))
                 .map(|ty| ty.semantic_id()),

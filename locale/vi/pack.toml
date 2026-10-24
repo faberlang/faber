@@ -167,6 +167,13 @@ ordinata = "sắp_xếp"
 ascendens = "tăng_dần"
 descendens = "giảm_dần"
 
+# Prefix-scan mode words use the shared source spelling in every reader pack.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
+
 [types]
 ascii = "ascii"
 textus = "văn_bản"
@@ -3695,6 +3702,14 @@ help = "hãy để mỗi lựa chọn aut liên kết cùng tên với cùng ki�
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "không thể chứng minh tính độc lập của vòng lặp luồng: {reason}"
 help = "dùng vòng lặp thường, hoặc chỉ ghi tại tọa độ của lượt và đọc vùng đã ghi tại cùng tọa độ; không sửa biến ngoài hay gọi hiệu ứng chưa được chứng minh"
+
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "`{rumpe}` không thể kết thúc vòng lặp `{filum}`"
+help = "`{rumpe}` không thể dừng vòng lặp `{filum}`: các làn chạy độc lập. Để tìm kết quả khớp đầu tiên, dùng `{reducta} {via} {argminima} …`; để dừng ở một ngưỡng, hãy tính ngưỡng trước rồi lặp đến ngưỡng đó."
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "`{redde}` không thể rời vòng lặp `{filum}`"
+help = "`{redde}` không thể rời vòng lặp `{filum}`: các làn chạy độc lập. Để lấy một giá trị từ các làn, dùng `{reducta}`; để dừng ở một ngưỡng, hãy tính ngưỡng trước rồi lặp đến ngưỡng đó."
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "thân phép rút gọn chỉ được gọi hàm nội tại của thiết bị, đoạn mã và hàm trợ giúp nhân riêng: {reason}"

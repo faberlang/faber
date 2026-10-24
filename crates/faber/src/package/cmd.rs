@@ -835,11 +835,13 @@ pub fn cmd_check_package(
     complexity_budget: Option<u32>,
     kernel_complexity_budget: Option<u32>,
     lower: bool,
+    device: Option<DeviceAdviceRequest>,
 ) {
     if command.input.is_empty() || command.input[0] == "-" {
         eprintln!("error: package checking requires a path input");
         std::process::exit(1);
     }
+    let advice_target = device.map(advice_target);
 
     let input_path = super::absolutize_path(std::path::Path::new(&command.input[0]));
 
@@ -960,6 +962,19 @@ pub fn cmd_check_package(
         );
     }
 
+    if fatal_errors == 0
+        && let Some((device, partitions)) = advice_target
+    {
+        print_device_advice(
+            &config,
+            &input_path,
+            device,
+            partitions,
+            command.diagnostic_mode,
+            locale_pack.as_ref(),
+        );
+    }
+
     if fatal_errors == 0 {
         eprintln!("ok: {}", input_path.display());
     } else {
@@ -998,21 +1013,32 @@ fn lower_checked_package(
     if diagnostics.is_empty() {
         return;
     }
+    exit_does_not_lower(&diagnostics, input_path, mode, locale_pack);
+}
+
+/// Print the diagnostics of a checked package that does not lower and exit 1
+/// with [`CHECKS_BUT_DOES_NOT_LOWER`].
+#[cfg(feature = "runner")]
+fn exit_does_not_lower(
+    diagnostics: &[radix::module::diagnostics::Diagnostic],
+    input_path: &Path,
+    mode: DiagnosticMode,
+    locale_pack: Option<&radix::module::locale::LocalePack>,
+) -> ! {
     if mode == DiagnosticMode::Diagnostics {
         let rendered = match locale_pack {
-            Some(pack) => radix::module::diagnostics::render_expanded_diagnostics_with_pack(
-                &diagnostics,
-                pack,
-            )
-            .unwrap_or_else(|err| {
-                eprintln!("error: failed to render reader-pack diagnostics: {err}");
-                std::process::exit(1);
-            }),
-            None => radix::module::diagnostics::render_expanded_diagnostics(&diagnostics),
+            Some(pack) => {
+                radix::module::diagnostics::render_expanded_diagnostics_with_pack(diagnostics, pack)
+                    .unwrap_or_else(|err| {
+                        eprintln!("error: failed to render reader-pack diagnostics: {err}");
+                        std::process::exit(1);
+                    })
+            }
+            None => radix::module::diagnostics::render_expanded_diagnostics(diagnostics),
         };
         eprintln!("{rendered}");
     } else {
-        for diag in &diagnostics {
+        for diag in diagnostics {
             eprintln!("{}", radix::module::diagnostics::render_plain(diag));
         }
     }
@@ -1021,6 +1047,111 @@ fn lower_checked_package(
         input_path.display()
     );
     std::process::exit(1);
+}
+
+/// What `faber check --device D [--partitions N]` asked for: advice on where
+/// the package's kernels run serialized on that device.
+#[derive(Debug, Clone, Copy)]
+pub struct DeviceAdviceRequest {
+    pub device: super::DeviceChoice,
+    pub partitions: Option<u32>,
+}
+
+/// The device and partition count of an advice request. Fails closed (exit 1)
+/// on a selection that is not a device (`auto`, `reference`) and on
+/// `--partitions` with a device that cannot span (the `faber run` rule).
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn advice_target(request: DeviceAdviceRequest) -> (super::device::AdviceDevice, u32) {
+    use super::DeviceChoice;
+    use super::device::AdviceDevice;
+    let device = match request.device {
+        DeviceChoice::Cpu => AdviceDevice::Cpu,
+        DeviceChoice::Metal => AdviceDevice::Metal,
+        DeviceChoice::Cuda => AdviceDevice::Cuda,
+        DeviceChoice::Auto | DeviceChoice::Reference => {
+            eprintln!("error: `check --device` names the device to advise for: cpu, metal or cuda");
+            std::process::exit(1);
+        }
+    };
+    if request.partitions.is_some() && device == AdviceDevice::Cuda {
+        eprintln!("error: `--partitions` is valid only with `--device cpu` or `--device metal`");
+        std::process::exit(1);
+    }
+    (device, request.partitions.unwrap_or(1))
+}
+
+#[cfg(not(all(feature = "runner", feature = "device-runtime")))]
+fn advice_target(_: DeviceAdviceRequest) -> ((), u32) {
+    eprintln!("error: `check --device` needs a faber built with the device runtime");
+    std::process::exit(1);
+}
+
+/// Print the "serialized by the backend" advice (`INFO001`) of the checked
+/// package on `device` over `partitions` partitions. Advice is `info`: it
+/// never changes the exit status. A package that does not lower, or whose
+/// kernels do not build into one device image, exits 1 as `check --lower`
+/// does.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn print_device_advice(
+    config: &radix::module::Config,
+    input_path: &Path,
+    device: super::device::AdviceDevice,
+    partitions: u32,
+    mode: DiagnosticMode,
+    locale_pack: Option<&radix::module::locale::LocalePack>,
+) {
+    let mut advice = Vec::new();
+    let mut failures = Vec::new();
+    for unit in lowering_units(config, input_path) {
+        match super::mir::with_check_lowered_package_mir(config, &unit, |lowered| {
+            super::device::split_advice(lowered, device, partitions)
+        }) {
+            Ok(Ok(rows)) => advice.extend(rows),
+            Ok(Err(errors)) | Err(errors) => failures.extend(errors),
+        }
+    }
+    if !failures.is_empty() {
+        exit_does_not_lower(&failures, input_path, mode, locale_pack);
+    }
+    // A library's modules lower one by one and may share kernels.
+    advice.sort_by(|a, b| a.kernel.cmp(&b.kernel));
+    advice.dedup();
+    let file = input_path.display().to_string();
+    let diagnostics: Vec<_> = advice
+        .iter()
+        .map(|row| super::device::advice_diagnostic(row, device, partitions, &file))
+        .collect();
+    if mode == DiagnosticMode::Diagnostics {
+        if !diagnostics.is_empty() {
+            let rendered = match locale_pack {
+                Some(pack) => radix::module::diagnostics::render_expanded_diagnostics_with_pack(
+                    &diagnostics,
+                    pack,
+                )
+                .unwrap_or_else(|err| {
+                    eprintln!("error: failed to render reader-pack diagnostics: {err}");
+                    std::process::exit(1);
+                }),
+                None => radix::module::diagnostics::render_expanded_diagnostics(&diagnostics),
+            };
+            eprintln!("{rendered}");
+        }
+    } else {
+        for diag in &diagnostics {
+            eprintln!("{}", radix::module::diagnostics::render_plain(diag));
+        }
+    }
+}
+
+#[cfg(not(all(feature = "runner", feature = "device-runtime")))]
+fn print_device_advice(
+    _: &radix::module::Config,
+    _: &Path,
+    _: (),
+    _: u32,
+    _: DiagnosticMode,
+    _: Option<&radix::module::locale::LocalePack>,
+) {
 }
 
 /// What `check --lower` hands to the package-MIR driver: the input itself,

@@ -26,6 +26,7 @@ fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
         diagnostics_locale: None,
         device,
         threads: None,
+        partitions: None,
         stats: false,
         stats_file: None,
         shuffle_seed: None,
@@ -407,17 +408,45 @@ fn run_threads_passes_on_the_cpu_route() {
     );
 }
 
+// ── `--partitions` route contract (rule 18 CPU spanning) ──────────────────
+
 #[test]
-fn threads_no_effect_note_marks_only_the_accepted_cpu_count() {
-    assert_eq!(
-        threads_no_effect_note(Some(4), DeviceSelection::Cpu),
-        Some(THREADS_NO_EFFECT_NOTE)
+fn run_partitions_requires_the_cpu_route() {
+    let dir = temp_dir("partitions-requires-cpu");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let mut args = run_args(dir.clone(), Some(DeviceChoice::Reference));
+    args.partitions = Some(2);
+    let err = resolve_route_selection(&args, &dir)
+        .expect_err("partitions with reference must fail closed");
+    assert_eq!(err.issue(), Some("E_PARTITIONS_REQUIRES_CPU"));
+    assert!(
+        err.args
+            .contains(&DiagnosticArg::new("device", "reference"))
     );
-    assert_eq!(threads_no_effect_note(None, DeviceSelection::Cpu), None);
+}
+
+#[test]
+fn run_partitions_pass_on_the_cpu_route_and_shape_the_device() {
+    let dir = temp_dir("partitions-cpu-route");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let mut args = run_args(dir.clone(), Some(DeviceChoice::Cpu));
     assert_eq!(
-        threads_no_effect_note(Some(4), DeviceSelection::Reference),
-        None
+        cpu_device_shape(&args, None),
+        package::mir::CpuDeviceShape::default(),
+        "no flags: the route default workers over one partition"
     );
+    args.threads = Some(6);
+    args.partitions = Some(3);
+    assert_eq!(
+        resolve_route_selection(&args, &dir).expect("partitions with cpu passes"),
+        DeviceSelection::Cpu
+    );
+    // No manifest key here, so the resolved count is the flag's.
+    let shape = cpu_device_shape(&args, args.threads);
+    assert_eq!(shape.workers, std::num::NonZeroU32::new(6));
+    assert_eq!(shape.partitions.get(), 3);
 }
 
 #[test]

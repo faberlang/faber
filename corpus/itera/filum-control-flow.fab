@@ -1,0 +1,73 @@
++++
+locale = "en"
+term = "itera-filum-control-flow"
+kind = "keyword"
+category = "control-flow"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "itera_stmt", "apud_clause", "filum_clause", "perge_stmt", "rumpe_stmt", "redde_stmt", "functio_decl", "annotation", "reducta_expr", "expression", "nota_stmt"]
+canonical = false
+summary = "In a `thread` loop `continue` skips one lane; `break` and `return` that would end the whole loop are refused."
+syntax = "for from src at [i, j] thread lane let v { if skip then continue … }"
+related = ["apud", "itera", "filum", "thread", "perge", "rumpe"]
++++
+
+# =============================================================================
+# thread loops — which control-flow statements a lane may use
+# =============================================================================
+#
+# What this teaches:
+#   • `continue` (la `perge`) skips one lane and is allowed
+#   • `break` or `return` written directly in a `thread` body would end the
+#     whole loop; run in order that stops every later lane, run in parallel only
+#     its own, so both are refused (`break_in_thread_body`,
+#     `return_in_thread_body`)
+#   • `break` and `continue` inside a plain loop nested in the lane target that
+#     inner loop and are allowed; so is `break` in a plain loop that holds a
+#     `thread` loop, because it targets the outer loop
+#   • `return` in a reduction term body returns the term's value, not from the
+#     function, and is allowed
+#
+# Common mistakes:
+#   • stopping at the first match with `break` — use `reduce via argmin …`
+#   • stopping at a cutoff — compute the cutoff first and loop to it
+#
+# See also: itera, filum, thread, perge, rumpe
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   the 2×2 grid after the lanes ran, with the lane over 2.5 skipped (left 0)
+#   and every other lane written as its value plus 2 (the inner loop stops at 2).
+
+@ kernel
+fn lane_total(tf32[32] a) → f32 {
+    return reduce via sum from a at [i] thread lane let v { return v }
+}
+
+@ kernel
+@ public
+fn entry(tf32[32] a, mut tensor<f32, [1]> out) → void {
+    out[0] ← lane_total(a)
+}
+
+main {
+    let tf32[2, 2] src ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    mut tf32[2, 2] dst ← tf32[2, 2] {}
+    for range 0‥3 let round {
+        for from src at [i, j] thread lane let v {
+            if v ≻ 2.5 {
+                continue
+            }
+            mut int k ← 0
+            for range 0‥5 let n {
+                if n ≡ 2 {
+                    break
+                }
+                k ← k + 1
+            }
+            dst[[i, j]] ← v + (k ↦ f32)
+        }
+        if round ≡ 0 {
+            break
+        }
+    }
+    print dst
+}

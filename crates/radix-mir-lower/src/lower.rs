@@ -47,16 +47,17 @@ use radix_mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId,
     MirBuiltinEdgePolicy, MirCallee, MirCaptureMode, MirClosureCallee, MirClosureCapture, MirClosureEnvironment,
     MirClosureEnvironmentId, MirClosureValue, MirConstant, MirConversion, MirConversionFlavor, MirDeviceRole,
-    MirDiagnosticKind, MirEdgePolicy, MirFilumCoordinate, MirFilumForm, MirFilumReduceOp, MirFunction, MirFunctionId,
-    MirFunctionOrigin, MirFunctionVisibility, MirGenericBindings, MirIntrinsic, MirKernelShaderStage,
-    MirKeyValueOperand, MirLaneOp, MirLayoutTable, MirLiftOp, MirLocal as MirLocalDecl, MirLocalId,
-    MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam,
-    MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider, MirProviderKind, MirReduceOp,
-    MirRuntimeCall, MirShapeBinding, MirShapeCheck, MirShapeExpr, MirShapeRelation, MirStatement, MirStatementKind,
-    MirStructFieldDefaults, MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator,
-    MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
-    MirVectorOp, ValidatedMir, dump_program, instantiate_existing_generic_type, terminator_successors,
-    type_contains_param,
+    MirDiagnosticKind, MirEdgePolicy, MirFilumCoordinate, MirFilumForm, MirFilumGroupKey, MirFilumGroupOp,
+    MirFilumReduceOp, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirGenericBindings,
+    MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLaneOp, MirLayoutTable, MirLiftOp,
+    MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
+    MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirProvider, MirProviderKind, MirReduceOp, MirRuntimeCall, MirShapeBinding, MirShapeCheck, MirShapeExpr,
+    MirShapeRelation, MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase,
+    MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp,
+    MirScanGroupAxis, MirScanGroupOp, MirScanOp, MirScanTotal, MirUnOp, MirValidationContext, MirValue,
+    MirValueId, MirValueKind, MirVectorOp, ValidatedMir, dump_program,
+    instantiate_existing_generic_type, terminator_successors, type_contains_param,
 };
 use radix_semantic::analyzed_application::AnalyzedModuleApplicationView;
 use radix_semantic::cli::{CliDefault, CliOperand, CliOption, CliType};
@@ -77,6 +78,8 @@ mod collection_higher_order;
 
 mod context;
 mod control;
+mod scan;
+mod scan_device;
 mod conversio_route;
 pub mod expr;
 mod fractus_potentia;
@@ -706,6 +709,7 @@ pub fn lower_analyzed_unit(
     // The snapshot carries only the arena; the ordering-contract fact (D1.4)
     // rides along for monomorphization's bound dispatch.
     types.ordering_contract = unit.types.ordering_contract;
+    scan::ensure_scan_types(unit.hir, &mut types);
     ensure_map_iteration_array_types(&mut types);
     ensure_itera_coordinate_array_types(unit.hir, &mut types);
     ensure_enum_iteration_array_types(unit.hir, &mut types);
@@ -1362,7 +1366,7 @@ fn ensure_itera_coordinate_array_types(hir: &radix_hir::HirModule, types: &mut T
                 HirExpressionKind::Itera { iter, .. } => {
                     self.collect_shaped_element(iter);
                 }
-                HirExpressionKind::Reduction { source, .. } => {
+                HirExpressionKind::Reduction { source, .. } | HirExpressionKind::Scan { source, .. } => {
                     self.collect_shaped_element(source);
                     self.collect_shaped_element(expr);
                 }
@@ -1628,6 +1632,7 @@ struct CallableLoweringParts {
     synthetics: Vec<MirFunction>,
     closure_environments: Vec<MirClosureEnvironment>,
     device_function_metadata: MirDeviceFunctionMetadataMap,
+    lane_domain_local: Option<MirLocalId>,
 }
 
 struct CallableLoweringConfig<'input> {
@@ -1927,6 +1932,7 @@ impl<'a> MirLowerer<'a> {
             synthetics,
             closure_environments,
             device_function_metadata,
+            lane_domain_local,
         } = self.lower_callable_body(
             body_ctx,
             CallableLoweringConfig { error_ty, parent_function_id, device_role, target, def_id },
@@ -1955,6 +1961,7 @@ impl<'a> MirLowerer<'a> {
                         MirFunctionVisibility::Private
                     },
                     origin: MirFunctionOrigin::Source,
+                    lane_domain_local,
                 },
             );
         }
@@ -2087,6 +2094,7 @@ impl<'a> MirLowerer<'a> {
         let synthetics = builder.take_synthetic_functions();
         let closure_environments = builder.take_closure_environments();
         let device_function_metadata = builder.take_device_function_metadata();
+        let lane_domain_local = builder.lane_region.and_then(|region| region.source_local);
         CallableLoweringParts {
             params: builder.params,
             locals: builder.locals,
@@ -2096,6 +2104,7 @@ impl<'a> MirLowerer<'a> {
             synthetics,
             closure_environments,
             device_function_metadata,
+            lane_domain_local,
         }
     }
 
@@ -5510,6 +5519,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
             "range-product itera before ordered-walk MIR lowering"
         }
         HirExpressionKind::Reduction { .. } => "reducta_not_lowered",
+        HirExpressionKind::Scan { .. } => "scan_not_lowered",
         HirExpressionKind::Sort { .. } => "sort_expression_not_lowered",
         // Unreachable from the lowering dispatcher (first-match lowers through
         // `collection_higher_order`); kept so this naming match stays exhaustive.

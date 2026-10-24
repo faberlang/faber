@@ -54,6 +54,7 @@ fn synthetic_device_metadata_attaches_to_source_less_functions() {
             shader_stage: MirKernelShaderStage::Compute,
             visibility: MirFunctionVisibility::Private,
             origin: MirFunctionOrigin::SyntheticKernelClosure,
+            lane_domain_local: None,
         },
     )]
     .into_iter()

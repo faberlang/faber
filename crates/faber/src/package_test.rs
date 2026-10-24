@@ -388,6 +388,7 @@ fn manifest_target_command_probe() {
             None,
             None,
             false,
+            None,
         ),
         "build" | "build-explicit" => super::cmd_build(
             radix::services::BuildCommand {

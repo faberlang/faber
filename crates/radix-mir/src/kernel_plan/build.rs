@@ -748,6 +748,7 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::GridReduce {
                 workgroup,
                 partials_cap,
+                group_shape,
                 ..
             } => {
                 if *workgroup == 0 || !workgroup.is_power_of_two() {
@@ -758,6 +759,51 @@ impl CollectionKernelPlan {
                 if *partials_cap == 0 {
                     return Err(PlanValidationError::GridReduceZeroPartialsCap);
                 }
+                if group_shape.as_ref().is_some_and(Vec::is_empty) {
+                    return Err(PlanValidationError::GridReduceEmptyGroupShape);
+                }
+                let group_count = group_shape
+                    .as_ref()
+                    .map_or(Some(1), |shape| {
+                        shape
+                            .iter()
+                            .try_fold(1_u64, |n, extent| n.checked_mul(*extent))
+                    })
+                    .ok_or(PlanValidationError::GridReduceGroupCountOverflow)?;
+                u64::from(*partials_cap)
+                    .checked_mul(group_count)
+                    .ok_or(PlanValidationError::GridReducePartialSlotsOverflow)?;
+                Ok(())
+            }
+            CollectionKernelPlan::Scan {
+                workgroup,
+                blocks_cap,
+                group_count,
+                partial_layout,
+                element_bytes,
+                ..
+            } => {
+                if *workgroup == 0 || !workgroup.is_power_of_two() {
+                    return Err(PlanValidationError::NonPowerOfTwoWorkgroup {
+                        workgroup_x: *workgroup,
+                    });
+                }
+                if *blocks_cap == 0 {
+                    return Err(PlanValidationError::ScanZeroBlocksCap);
+                }
+                if *group_count == 0 {
+                    return Err(PlanValidationError::ScanZeroGroupCount);
+                }
+                if *element_bytes == 0 {
+                    return Err(PlanValidationError::ScanZeroElementBytes);
+                }
+                let slots = u64::from(*blocks_cap)
+                    .checked_mul(u64::from(*group_count))
+                    .ok_or(PlanValidationError::ScanPartialSlotsOverflow)?;
+                u32::try_from(slots).map_err(|_| PlanValidationError::ScanPartialSlotsOverflow)?;
+                slots
+                    .checked_mul(u64::from(partial_layout.element_bytes()))
+                    .ok_or(PlanValidationError::ScanPartialSlotsOverflow)?;
                 Ok(())
             }
         }

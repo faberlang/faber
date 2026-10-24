@@ -40,7 +40,9 @@ fn pro_is_a_tokenless_contextual_row_that_lexes_as_an_identifier() {
     assert!(spec.token_kind.is_none(), "pro must stay tokenless");
     assert!(matches!(
         spec.scope,
-        KeywordScope::Contextual(owners) if owners == [KeywordOwner::ReductionGroup]
+        KeywordScope::Contextual(owners)
+            if owners.contains(&KeywordOwner::ReductionGroup)
+                && owners.contains(&KeywordOwner::ScanGroup)
     ));
 
     let result = lex("pro");

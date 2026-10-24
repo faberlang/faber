@@ -1046,15 +1046,16 @@ fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
 
 /// Arguments after the `faber` executable for one runner-target case.
 ///
-/// The runner target pins `--device cpu`: it verifies the MIR runner, so device
-/// selection must not depend on the host (`auto` routes kernel programs to Metal on a
-/// capable machine and fails closed elsewhere).
+/// The runner target pins `--device reference`: it verifies the sequential MIR
+/// runner, so device selection must not depend on the host (`auto` routes kernel
+/// programs to Metal on a capable machine and fails closed elsewhere, and `cpu`
+/// is the multi-worker CPU device).
 fn runner_run_args(case: &Case) -> Vec<String> {
     let mut args = vec![
         "run".to_owned(),
         case.input.display().to_string(),
         "--device".to_owned(),
-        "cpu".to_owned(),
+        "reference".to_owned(),
     ];
     if !case.args.is_empty() {
         args.push("--".to_owned());

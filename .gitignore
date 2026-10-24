@@ -81,6 +81,9 @@ docs/**/comparator.stdout
 docs/**/comparator.stderr
 docs/**/faber.stdout
 docs/**/faber.stderr
+# Raw device output (A2 depth fields are 5.4 MB each). Receipts record the
+# SHA-256; the bytes stay out of the tree.
+docs/**/*.f32
 
 # Key material — generated at run time, never tracked.
 *.pem

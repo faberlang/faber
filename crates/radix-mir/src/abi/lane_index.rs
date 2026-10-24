@@ -1,4 +1,4 @@
-//! Proven-index analysis of a lane-form kernel (gpu-reset U9-2).
+//! Proven-index analysis of a lane-form or single-lane kernel (gpu-reset U9-2).
 //!
 //! A lane-form kernel (`MirParamMode::Lane` parameter) starts with the grid
 //! guard `if lane >= E_0 * E_1 * ... { return }`, so every other block runs
@@ -32,18 +32,38 @@
 //! no extent of its own. A coordinate proven by the lane binders stays
 //! unguarded. A form whose recombination cannot be recovered keeps the flat
 //! compare.
+//!
+//! # Single-lane kernels
+//!
+//! A single-lane kernel ([`MirKernelSignature::is_single_lane_form`]: no
+//! `thread lane` loop, one sequential lane) has no lane and no grid guard, so
+//! no index is proven by the lane binders. It still gets a proof: every index
+//! is unproven except a literal or counter coordinate (below), so its unproven
+//! indexes are checked at run time through the same fault sites as a lane
+//! kernel's, as the checker's WARN033 promises.
+//!
+//! # Literal coordinates and sequential counters
+//!
+//! As the checker proves them, in every kernel form: a coordinate that is an
+//! integer constant `0 <= n < e` on an axis of literal extent `e`, and a
+//! coordinate read from a sequential counter (a `for from t at [i]` loop with
+//! no `thread lane`) whose every read lies below the axis extent (see
+//! the `counter` submodule).
 
 use std::collections::BTreeMap;
 
 use radix_types::{IndexExpr, Type};
 
 use crate::{
-    MirBinOp, MirConstant, MirFunction, MirLocalId, MirOperand, MirParamMode, MirPlace,
-    MirPlaceBase, MirProjection, MirStatement, MirStatementKind, MirTerminatorKind, MirType,
-    MirValidationContext, MirValueKind, visit::MirVisitor,
+    MirBinOp, MirConstant, MirFunction, MirKernelSignature, MirLocalId, MirOperand, MirParamMode,
+    MirPlace, MirPlaceBase, MirProjection, MirStatement, MirStatementKind, MirTerminatorKind,
+    MirType, MirValidationContext, MirValueKind, visit::MirVisitor,
 };
 
 use super::signature::resolve_parameter_alias;
+
+#[path = "lane_index_counter.rs"]
+mod counter;
 
 /// One axis extent of a tensor type: a literal, or a symbolic dimension named
 /// by its interned index expression.
@@ -67,6 +87,15 @@ pub struct UnprovenIndex {
     pub tensor: MirLocalId,
     /// `true` for a store destination, `false` for a load.
     pub store: bool,
+}
+
+/// The run-time index operand of a register-vector projection that needs a
+/// fatal bounds-fault site. Equal operands share one site because all such
+/// faults have the same fatal identity and are resolved by lowest lane.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnprovenVectorIndex {
+    /// The index operand used by each guarded vector projection in this form.
+    pub index: MirOperand,
 }
 
 /// One device bounds compare an unproven `Index` place needs.
@@ -139,6 +168,9 @@ pub struct LaneIndexProof<'a> {
     lane: Option<MirLocalId>,
     /// Factors of the grid guard total, sorted.
     guard_factors: Vec<Sym>,
+    /// The sequential counters every read of which lies below each listed
+    /// bound (see the `counter` submodule).
+    counters: BTreeMap<BaseKey, std::collections::BTreeSet<Sym>>,
 }
 
 /// The `Index`-bearing places of a function, with whether each is a store.
@@ -214,20 +246,37 @@ fn collect_writes(function: &MirFunction) -> Defs<'_> {
 }
 
 impl<'a> LaneIndexProof<'a> {
-    /// The proof state of `function`, or `None` when it is not a guarded
-    /// lane-form kernel (no `Lane` parameter, a whole-grid reduction, or a
-    /// grid guard that is not the entry block's branch): such a kernel carries
-    /// no fault sites.
+    /// The proof state of `function`: a guarded lane-form kernel, or a
+    /// single-lane kernel (no lane: only literal and counter coordinates are
+    /// proven).
+    /// `None` for any other function (a lane-form kernel whose grid guard is
+    /// not the entry block's branch, such as a whole-grid reduction): such a
+    /// kernel carries no fault sites.
     #[must_use]
     pub fn new(
         function: &'a MirFunction,
         validation: &'a MirValidationContext<'a>,
     ) -> Option<Self> {
-        let lane = function
+        let Some(lane) = function
             .params
             .iter()
-            .find(|param| param.mode == MirParamMode::Lane)?
-            .local;
+            .find(|param| param.mode == MirParamMode::Lane)
+            .map(|param| param.local)
+        else {
+            if !MirKernelSignature::is_single_lane_form(function, validation) {
+                return None;
+            }
+            let mut proof = Self {
+                function,
+                validation,
+                defs: collect_writes(function),
+                lane: None,
+                guard_factors: Vec::new(),
+                counters: BTreeMap::new(),
+            };
+            proof.counters = counter::bounded_counters(&proof);
+            return Some(proof);
+        };
         let entry = function.blocks.first()?;
         let MirTerminatorKind::Branch {
             condition,
@@ -249,9 +298,11 @@ impl<'a> LaneIndexProof<'a> {
             defs: collect_writes(function),
             lane: Some(lane),
             guard_factors: Vec::new(),
+            counters: BTreeMap::new(),
         };
         let total = proof.guard_total(condition)?;
         proof.guard_factors = factors(&total);
+        proof.counters = counter::bounded_counters(&proof);
         Some(proof)
     }
 
@@ -302,6 +353,15 @@ impl<'a> LaneIndexProof<'a> {
                 if lhs == Sym::Opaque || rhs == Sym::Opaque {
                     return Sym::Opaque;
                 }
+                // Constants fold, so a literal coordinate list recombines to
+                // literals the per-axis proof can read.
+                if let (Sym::Const(a), Sym::Const(b)) = (&lhs, &rhs) {
+                    match op {
+                        MirBinOp::Add => return a.checked_add(*b).map_or(Sym::Opaque, Sym::Const),
+                        MirBinOp::Mul => return a.checked_mul(*b).map_or(Sym::Opaque, Sym::Const),
+                        _ => {}
+                    }
+                }
                 match op {
                     MirBinOp::Add => simplify_add(lhs, rhs),
                     MirBinOp::Mul => Sym::Mul(Box::new(lhs), Box::new(rhs)),
@@ -351,10 +411,30 @@ impl<'a> LaneIndexProof<'a> {
         let Some((tensor, index)) = self.addressed_tensor(place) else {
             return Vec::new();
         };
+        self.index_guards(tensor, index, store)
+    }
+
+    /// The bounds compares an `Index` of tensor parameter `tensor` at flat
+    /// `index` needs (a store when `store`); empty when it is proven. A view
+    /// read that addresses its base parameter's shape asks this before the
+    /// view is resolved onto the base.
+    #[must_use]
+    pub fn index_guards(
+        &self,
+        tensor: MirLocalId,
+        index: &MirOperand,
+        store: bool,
+    ) -> Vec<IndexGuard> {
         let Some(dims) = self.tensor_dims(tensor) else {
             return Vec::new();
         };
         let covers_grid = factor_product(&dims) == self.guard_factors;
+        if let [extent] = dims.as_slice()
+            && (literal_in_range(&self.eval_operand(index, 0), extent)
+                || self.counter_below(index, extent))
+        {
+            return Vec::new();
+        }
         if self.eval_operand(index, 0) == Sym::Lane {
             if store || covers_grid {
                 return Vec::new();
@@ -434,6 +514,11 @@ impl<'a> LaneIndexProof<'a> {
         dims: &[Sym],
         covers_grid: bool,
     ) -> bool {
+        if literal_in_range(&self.eval_operand(coordinate, 0), &dims[axis])
+            || self.counter_below(coordinate, &dims[axis])
+        {
+            return true;
+        }
         if axis == 0 && !covers_grid {
             return false;
         }
@@ -447,18 +532,45 @@ impl<'a> LaneIndexProof<'a> {
         self.eval_operand(coordinate, 0) == expected
     }
 
-    /// The tensor parameter and the index operand of a one-`Index` place on a
-    /// tensor parameter (a vector-element tensor's lane component follows the
-    /// `Index`, and does not change what is bounds-checked); `None` for any
-    /// other place (not a bounds-checked device storage index).
+    /// Whether `operand` reads (directly or through single-definition copies)
+    /// a sequential counter bounded by `extent`.
+    fn counter_below(&self, operand: &MirOperand, extent: &Sym) -> bool {
+        let mut current = operand;
+        for _ in 0..64 {
+            let Some(key) = operand_key(current) else {
+                return false;
+            };
+            if self
+                .counters
+                .get(&key)
+                .is_some_and(|bounds| bounds.contains(extent))
+            {
+                return true;
+            }
+            if self.defs.multi.contains(&key) {
+                return false;
+            }
+            match self.defs.single.get(&key).map(|value| &value.kind) {
+                Some(MirValueKind::Operand(next)) => current = next,
+                _ => return false,
+            }
+        }
+        false
+    }
+
+    /// The tensor parameter and the index operand of a tensor access. A
+    /// vector-element tensor may then have a constant `VectorLane` or one
+    /// run-time vector `Index`; those projections do not change which tensor
+    /// coordinate is bounds-checked. `None` for other places.
     fn addressed_tensor<'p>(&self, place: &'p MirPlace) -> Option<(MirLocalId, &'p MirOperand)> {
         let (MirProjection::Index(index), rest) = place.projections.split_first()? else {
             return None;
         };
-        if !rest
+        let vector_lane = rest
             .iter()
-            .all(|projection| matches!(projection, MirProjection::VectorLane(_)))
-        {
+            .all(|projection| matches!(projection, MirProjection::VectorLane(_)));
+        let vector_index = matches!(rest, [MirProjection::Index(_)]);
+        if !vector_lane && !vector_index {
             return None;
         }
         let MirPlaceBase::Local(local) = &place.base else {
@@ -499,14 +611,103 @@ impl<'a> LaneIndexProof<'a> {
     }
 }
 
-/// The unproven index forms of `function`; empty for a kernel that is not
-/// guarded lane form.
+/// The unproven index forms of `function`; empty for a kernel that is neither
+/// guarded lane form nor single-lane form.
 #[must_use]
 pub fn unproven_indexes(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
 ) -> Vec<UnprovenIndex> {
     LaneIndexProof::new(function, validation).map_or_else(Vec::new, |proof| proof.unproven())
+}
+
+/// The distinct run-time register-vector indexes of a guarded lane-form or
+/// single-lane kernel, in first-use MIR order. A vector projection has no
+/// tensor element-count resource; its width is known from the vector type and
+/// the backend compares the operand directly with that width.
+#[must_use]
+pub fn unproven_vector_indexes(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Vec<UnprovenVectorIndex> {
+    if LaneIndexProof::new(function, validation).is_none() {
+        return Vec::new();
+    }
+    let mut places = VectorIndexPlaces {
+        function,
+        validation,
+        found: Vec::new(),
+    };
+    places.visit_function(function);
+    places
+        .found
+        .into_iter()
+        .map(|index| UnprovenVectorIndex { index })
+        .collect()
+}
+
+/// The register-vector `Index` operands found while walking one function.
+struct VectorIndexPlaces<'a, 'v> {
+    function: &'a MirFunction,
+    validation: &'a MirValidationContext<'v>,
+    found: Vec<MirOperand>,
+}
+
+impl MirVisitor for VectorIndexPlaces<'_, '_> {
+    fn visit_place(&mut self, place: &MirPlace) {
+        let mut ty = match &place.base {
+            MirPlaceBase::Local(local) => crate::local_ty::local_ty(self.function, *local),
+            MirPlaceBase::Temp(temp) => self.function.temp_ty(*temp),
+        };
+        for projection in &place.projections {
+            if let (Some(base_ty), MirProjection::Index(index)) = (ty, projection)
+                && matches!(
+                    self.validation
+                        .layouts
+                        .layout_for_type(base_ty)
+                        .map(|layout| layout.kind),
+                    Ok(crate::MirLayoutKind::DeviceVector(_))
+                )
+                && !self.found.contains(index)
+            {
+                self.found.push(index.clone());
+            }
+            ty = ty.and_then(|base_ty| projected_index_type(base_ty, projection, self.validation));
+        }
+        crate::visit::walk_place(self, place);
+    }
+}
+
+/// The type after an index or constant vector-lane projection. Other
+/// projections stop this small shape walk; the lane backends only admit the
+/// supported vector/index projection forms they can emit.
+fn projected_index_type(
+    ty: MirType,
+    projection: &MirProjection,
+    validation: &MirValidationContext<'_>,
+) -> Option<MirType> {
+    if !matches!(
+        projection,
+        MirProjection::Index(_) | MirProjection::VectorLane(_)
+    ) {
+        return None;
+    }
+    let mut ty = ty;
+    loop {
+        match validation.types.get(ty.semantic_id()) {
+            Type::Alias(_, target) => ty = MirType::semantic(*target),
+            Type::Tensor(element, _) | Type::Vector(element, _) => {
+                return Some(MirType::semantic(*element));
+            }
+            _ => return None,
+        }
+    }
+}
+
+/// Whether `coordinate` is a literal `n` with `0 <= n < extent` on a literal
+/// `extent`.
+fn literal_in_range(coordinate: &Sym, extent: &Sym) -> bool {
+    matches!((coordinate, extent), (Sym::Const(n), Sym::Const(e)) if (0..*e).contains(n))
 }
 
 /// `Add(Mul(Div(x, e), e), Mod(x, e))` is `x` (row-major recombination).
@@ -579,3 +780,7 @@ fn tensor_type_dims(ty: MirType, validation: &MirValidationContext<'_>) -> Optio
         _ => None,
     }
 }
+
+#[path = "lane_index_write_map.rs"]
+mod write_map;
+pub use write_map::{LaneWriteMap, LaneWriteSelector, lane_write_maps};

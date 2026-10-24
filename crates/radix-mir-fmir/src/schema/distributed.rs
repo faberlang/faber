@@ -653,6 +653,20 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             rank: plan.rank,
         },
         WireCollectionKernelPlan::GridReduce(plan) => wire_grid_reduce_plan(plan),
+        WireCollectionKernelPlan::Scan(plan) => CollectionKernelPlan::Scan {
+            source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
+            rank: plan.rank,
+            workgroup: plan.workgroup,
+            blocks_cap: plan.blocks_cap,
+            group_count: plan.group_count,
+            partial_layout: radix_mir::kernel_plan::GridReducePartialLayout {
+                value_bytes: plan.partial_value_bytes,
+                coordinates: plan.partial_coordinates,
+                seen: plan.partial_seen,
+            },
+            element_bytes: plan.element_bytes,
+            reverse: plan.reverse,
+        },
     }
 }
 
@@ -837,6 +851,7 @@ fn wire_grid_reduce_plan(plan: &super::wire::WireGridReducePlan) -> CollectionKe
     CollectionKernelPlan::GridReduce {
         source_resource: usize::try_from(plan.source_resource).unwrap_or(usize::MAX),
         rank: plan.rank,
+        group_shape: plan.group_shape.clone(),
         workgroup: plan.workgroup,
         partials_cap: plan.partials_cap,
         partial_layout: radix_mir::kernel_plan::GridReducePartialLayout {

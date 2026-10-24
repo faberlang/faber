@@ -4846,6 +4846,7 @@ fn filum_declaration(lane_width: u32) -> crate::MirFilumReduceOp {
         op: crate::MirReduceOp::Sum,
         form: crate::MirFilumForm::Declared,
         term_ty: MirType::semantic(radix_types::TypeId(0)),
+        group: None,
         filum_binder: None,
         term_binder: MirLocalId(2),
         term_binder_name: None,

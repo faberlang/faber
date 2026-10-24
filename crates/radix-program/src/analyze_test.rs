@@ -575,6 +575,80 @@ fn add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<
     let _ = fs::remove_dir_all(&dir);
 }
 
+/// The reported local-import failure is a cascade from the provider's
+/// intentional private-generic-kernel orphan rejection. Keep that source
+/// diagnostic as the package's explanation. Its importer cannot be analyzed
+/// without the missing interface, but a second PKG001 would misclassify the
+/// provider rejection as an import-order defect.
+#[test]
+fn failed_private_kernel_provider_does_not_cascade_as_missing_local_interface() {
+    let dir = temp_root("failed-private-kernel-provider");
+    fs::write(
+        dir.join("main.fab"),
+        r#"
+import from "./k" k
+import from "./independent" independent
+
+main {
+  print k.fetch_cluster_scalar()
+  print independent.independent_probe()
+}
+"#,
+    )
+    .expect("write entry");
+    fs::write(
+        dir.join("k.fab"),
+        r#"
+@ public
+fn fetch_cluster_scalar() → int {
+  return 1
+}
+
+@ kernel
+@ private
+fn helper<size H, size W>(tensor<f32, [H, W]> src) → tensor<f32, [H, W]> {
+  return src
+}
+"#,
+    )
+    .expect("write provider");
+    fs::write(
+        dir.join("independent.fab"),
+        r#"
+@ public
+fn independent_probe() → int {
+  return missing_independent_symbol
+}
+"#,
+    )
+    .expect("write independent dependency");
+
+    let diagnostics =
+        match analyze_package(&Config::default(), &dir.join("main.fab"), &test_seams()) {
+            Err(diagnostics) => diagnostics,
+            Ok(_) => panic!("the unexported generic kernel must remain orphaned"),
+        };
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("nucleum_orphaned_annotation")),
+        "the provider's ADM001 must remain authoritative: {diagnostics:?}"
+    );
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == Some("PKG001")),
+        "the importer must not add a secondary missing-interface PKG001: {diagnostics:?}"
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.file.ends_with("independent.fab")),
+        "the package must still analyze independent modules: {diagnostics:?}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
 /// Resolver whose only provider (`web`) is locked to an empty interface root,
 /// so `web:nope` deterministically yields `PKG001:unknown_library_module`
 /// without touching a library home.

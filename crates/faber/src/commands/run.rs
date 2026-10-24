@@ -63,12 +63,14 @@ pub(super) fn cmd_run(args: RunArgs) {
             std::process::exit(1);
         }
     };
-
-    // The flag is accepted on the CPU route; say once, before launch, that
-    // the count cannot configure anything yet.
-    if let Some(note) = threads_no_effect_note(args.threads, selection) {
-        eprintln!("{note}");
-    }
+    // Rule 16.9: `--threads` > manifest `[device] threads` > half the cores.
+    let threads = match package::resolve_cpu_threads(args.threads, selection, &input_path) {
+        Ok(threads) => threads.map(std::num::NonZeroU32::get),
+        Err(diagnostic) => {
+            eprint_route_diagnostics(&[*diagnostic]);
+            std::process::exit(1);
+        }
+    };
 
     interpret_path(
         &input_path,
@@ -76,6 +78,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         args.locale.as_deref(),
         args.diagnostics_locale.as_deref(),
         selection,
+        cpu_device_shape(&args, threads),
         args.stats,
         args.stats_file.as_ref(),
     );
@@ -90,9 +93,12 @@ fn interpret_path(
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
     selection: DeviceSelection,
+    cpu: package::mir::CpuDeviceShape,
     stats: bool,
     stats_file: Option<&std::path::PathBuf>,
 ) {
+    #[cfg(not(feature = "device-runtime"))]
+    let _ = cpu;
     let stats_requested = stats || stats_file.is_some();
     if super::archive::is_zip_archive(path) {
         let archive = match super::archive::extract_package_archive(path) {
@@ -116,6 +122,7 @@ fn interpret_path(
             &config,
             archive.package_input(),
             selection,
+            cpu,
             &mut host,
             stats,
             stats_file,
@@ -205,7 +212,7 @@ fn interpret_path(
         // session; no child process, no `[device]` table needed.
         #[cfg(feature = "device-runtime")]
         if let Some(result) =
-            try_device_session(&config, path, selection, &mut host, stats, stats_file)
+            try_device_session(&config, path, selection, cpu, &mut host, stats, stats_file)
         {
             if let Err(diagnostics) = result {
                 eprint_route_diagnostics(&diagnostics);
@@ -313,6 +320,7 @@ fn interpret_path(
             &config,
             path,
             selection,
+            cpu,
             &mut device_host,
             stats,
             stats_file,
@@ -439,11 +447,12 @@ pub(super) fn is_single_fab_file(path: &Path) -> bool {
     path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("fab")
 }
 
-/// Whether this run takes the in-process device session: an explicit GPU, or
-/// `auto` over a package that declares kernels (a GPU is admitted, or the run
-/// fails closed with `E_DEVICE_NONE_ADMITTED`; `auto` never picks the CPU for
-/// a kernel package). `auto` over a package without kernels, and `reference` / `cpu`, run
-/// the CPU route.
+/// Whether this run takes the in-process device session: an explicit GPU,
+/// `cpu` over a package that declares kernels (the CPU device, gpu-reset rule
+/// 16.9), or `auto` over a package that declares kernels (a GPU is admitted,
+/// or the run fails closed with `E_DEVICE_NONE_ADMITTED`; `auto` never picks
+/// the CPU device). `reference`, and `auto` / `cpu` over a package without
+/// kernels, run the sequential reference route.
 ///
 /// The `auto` answer prepares the whole package, so it is a stand-alone
 /// question only on the fallback paths of [`run_auto_on_device_session_with`];
@@ -456,30 +465,42 @@ fn device_session_selected(
 ) -> bool {
     match selection {
         DeviceSelection::Metal | DeviceSelection::Cuda => true,
-        DeviceSelection::Reference | DeviceSelection::Cpu => false,
-        DeviceSelection::Auto => {
+        DeviceSelection::Reference => false,
+        DeviceSelection::Auto | DeviceSelection::Cpu => {
             package::mir::package_declares_kernels(config, input).unwrap_or(false)
         }
     }
 }
 
 /// Run `input` on the in-process device session when `selection` takes it
-/// ([`device_session_selected`]); `None` means the CPU route runs instead.
-/// `auto` prepares the package once: the lowered unit that proves it declares
-/// kernels is the one the device run executes.
+/// ([`device_session_selected`]); `None` means the reference route runs
+/// instead. `auto` and `cpu` prepare the package once: the lowered unit that
+/// proves it declares kernels is the one the device run executes. `cpu` is
+/// the CPU device shape (`--threads N`, `--partitions N`).
 #[cfg(feature = "device-runtime")]
+#[allow(clippy::too_many_arguments)]
 fn try_device_session(
     config: &radix::module::driver::Config,
     input: &Path,
     selection: DeviceSelection,
+    cpu: package::mir::CpuDeviceShape,
     host: &mut StdioHost,
     stats: bool,
     stats_file: Option<&std::path::PathBuf>,
 ) -> Option<Result<(), Vec<Diagnostic>>> {
     match selection {
-        DeviceSelection::Reference | DeviceSelection::Cpu => None,
+        DeviceSelection::Reference => None,
+        DeviceSelection::Cpu => run_cpu_on_device_session_with(
+            config,
+            input,
+            cpu,
+            host,
+            stats,
+            stats_file,
+            &mut io::stdout(),
+        ),
         DeviceSelection::Metal | DeviceSelection::Cuda => Some(run_on_device_session(
-            config, input, selection, host, stats, stats_file,
+            config, input, selection, cpu, host, stats, stats_file,
         )),
         DeviceSelection::Auto => {
             let mut registry = package::mir::system_device_registry();
@@ -533,9 +554,49 @@ fn run_auto_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
     ) {
         Ok(None) => None,
         Ok(Some(run)) => Some(finish_device_run(
-            run, metadata, started, stats, stats_file, out,
+            run, metadata, started, stats, stats_file, out, 0,
         )),
-        Err(diagnostics) => Some(Err(diagnostics)),
+        Err(failure) => Some(Err(finish_failed_device_run(
+            failure, metadata, started, stats, stats_file, out,
+        ))),
+    }
+}
+
+/// [`try_device_session`] for `cpu`: the CPU device session of shape `cpu`
+/// (workers and partitions) when the package declares kernels, else `None`
+/// (the reference route runs it).
+#[cfg(feature = "device-runtime")]
+fn run_cpu_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
+    config: &radix::module::driver::Config,
+    input: &Path,
+    cpu: package::mir::CpuDeviceShape,
+    host: &mut H,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+    out: &mut dyn io::Write,
+) -> Option<Result<(), Vec<Diagnostic>>> {
+    let stats_requested = stats || stats_file.is_some();
+    let metadata = if stats_requested {
+        match run_stats::package_metadata(input) {
+            Ok(metadata) => Some(metadata),
+            Err(diagnostic) => {
+                return device_session_selected(config, input, DeviceSelection::Cpu)
+                    .then(|| Err(vec![*diagnostic]));
+            }
+        }
+    } else {
+        None
+    };
+    let started = Instant::now();
+    match package::mir::run_package_on_cpu_device_session(config, input, cpu, host, stats_requested)
+    {
+        Ok(None) => None,
+        Ok(Some(run)) => Some(finish_device_run(
+            run, metadata, started, stats, stats_file, out, 0,
+        )),
+        Err(failure) => Some(Err(finish_failed_device_run(
+            failure, metadata, started, stats, stats_file, out,
+        ))),
     }
 }
 
@@ -552,12 +613,18 @@ fn run_on_device_session(
     config: &radix::module::driver::Config,
     input: &Path,
     selection: DeviceSelection,
+    shape: package::mir::CpuDeviceShape,
     host: &mut StdioHost,
     stats: bool,
     stats_file: Option<&std::path::PathBuf>,
 ) -> Result<(), Vec<Diagnostic>> {
-    let mut registry = package::mir::system_device_registry();
-    run_on_device_session_with(
+    let metal_span = if shape.partitions.get() > 1 {
+        package::mir::MetalSpan::Shared
+    } else {
+        package::mir::MetalSpan::Unspanned
+    };
+    let mut registry = package::mir::system_device_registry_spanning(metal_span);
+    run_on_device_session_shaped_with(
         config,
         input,
         selection,
@@ -566,12 +633,17 @@ fn run_on_device_session(
         stats,
         stats_file,
         &mut io::stdout(),
+        package::mir::CpuDeviceShape {
+            workers: None,
+            ..shape
+        },
     )
 }
 
 /// [`run_on_device_session`] over an injected registry and marker sink.
 #[cfg(feature = "device-runtime")]
 #[allow(clippy::too_many_arguments)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
     config: &radix::module::driver::Config,
     input: &Path,
@@ -582,6 +654,33 @@ fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
     stats_file: Option<&std::path::PathBuf>,
     out: &mut dyn io::Write,
 ) -> Result<(), Vec<Diagnostic>> {
+    run_on_device_session_shaped_with(
+        config,
+        input,
+        selection,
+        registry,
+        host,
+        stats,
+        stats_file,
+        out,
+        package::mir::CpuDeviceShape::default(),
+    )
+}
+
+/// [`run_on_device_session_with`] over a device shape (`--partitions`).
+#[cfg(feature = "device-runtime")]
+#[allow(clippy::too_many_arguments)]
+fn run_on_device_session_shaped_with<H: radix_mir_runner::Host + ?Sized>(
+    config: &radix::module::driver::Config,
+    input: &Path,
+    selection: DeviceSelection,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    host: &mut H,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+    out: &mut dyn io::Write,
+    shape: package::mir::CpuDeviceShape,
+) -> Result<(), Vec<Diagnostic>> {
     let stats_requested = stats || stats_file.is_some();
     let metadata = if stats_requested {
         Some(run_stats::package_metadata(input).map_err(|diagnostic| vec![*diagnostic])?)
@@ -589,19 +688,47 @@ fn run_on_device_session_with<H: radix_mir_runner::Host + ?Sized>(
         None
     };
     let started = Instant::now();
-    let run = package::mir::run_package_on_device_session_with_stats(
+    match package::mir::run_package_on_device_session_shaped(
         config,
         input,
         selection,
         registry,
         host,
         stats_requested,
-    )?;
-    finish_device_run(run, metadata, started, stats, stats_file, out)
+        shape,
+    ) {
+        Ok(run) => finish_device_run(run, metadata, started, stats, stats_file, out, 0),
+        Err(failure) => Err(finish_failed_device_run(
+            failure, metadata, started, stats, stats_file, out,
+        )),
+    }
+}
+
+/// A device run that failed after it started executing still emits its stats
+/// artifact (exit 1, the host meter and device receipt up to the failure), as
+/// a failing run does on the reference route; the caller then reports the
+/// returned diagnostics. A failure before launch has nothing to report.
+#[cfg(feature = "device-runtime")]
+fn finish_failed_device_run(
+    failure: package::mir::DeviceSessionFailure,
+    metadata: Option<run_stats::PackageMetadata>,
+    started: Instant,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
+    out: &mut dyn io::Write,
+) -> Vec<Diagnostic> {
+    let package::mir::DeviceSessionFailure { diagnostics, run } = failure;
+    if let Some(run) = run {
+        // The run's own failure is the one reported: `finish_device_run`
+        // exits the process itself when the artifact cannot be written.
+        let _ = finish_device_run(run, metadata, started, stats, stats_file, out, 1);
+    }
+    diagnostics
 }
 
 /// Emit the host stats and device receipt in [`DEVICE_STATS_MARKER`] format
-/// for a finished device run that was asked to collect stats.
+/// for a finished device run that was asked to collect stats; `exit` is the
+/// run's recorded exit code (1 for a run that failed).
 #[cfg(feature = "device-runtime")]
 fn finish_device_run(
     run: package::mir::DeviceSessionRun,
@@ -610,6 +737,7 @@ fn finish_device_run(
     stats: bool,
     stats_file: Option<&std::path::PathBuf>,
     out: &mut dyn io::Write,
+    exit: i32,
 ) -> Result<(), Vec<Diagnostic>> {
     let package::mir::DeviceSessionRun {
         stats: run_stats_value,
@@ -634,7 +762,7 @@ fn finish_device_run(
             writeln!(out, "{peak_note}").ok();
         }
         let mut artifact =
-            RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), 0)
+            RunStatsArtifact::new(metadata, runner_stats, elapsed_wall_ms(started), exit)
                 .with_cold_start(run_stats::ColdStartMetadata {
                     image_build_ns: phases.image_build_ns,
                     emission_ns: phases.image_emission_ns,
@@ -653,56 +781,55 @@ fn finish_device_run(
 
 /// Resolve the effective device selection for `faber run`: the shared
 /// precedence (CLI > manifest > `auto`) lives in
-/// [`package::resolve_device_selection`], then the `--threads` route contract
-/// is enforced (need, CD-1): a worker count is valid only when the
-/// resolved selection is the CPU device. Any other route fails closed before
-/// launch rather than silently ignoring the count; there is no `[device]
-/// threads` manifest key. A stats request is permitted with any selection: a
-/// dispatching run reports host rows and a device receipt.
+/// [`package::resolve_device_selection`], then the worker-count contract of
+/// [`package::resolve_cpu_threads`] is checked (need, CD-1;
+/// gpu-reset rule 16.9): `--threads N` is valid only when the resolved
+/// selection is the CPU device, and a manifest `[device] threads` must be a
+/// positive count beside a `cpu` (or absent) `[device] device`. Any other
+/// combination fails closed before launch rather than silently ignoring the
+/// count. A stats request is permitted with any selection: a dispatching run
+/// reports host rows and a device receipt.
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
 ) -> Result<DeviceSelection, Box<Diagnostic>> {
     let selection = package::resolve_device_selection(args.device, input_path)?;
-    ensure_threads_cpu_route(args.threads, selection)?;
+    package::resolve_cpu_threads(args.threads, selection, input_path)?;
+    ensure_partitions_cpu_route(args.partitions, selection)?;
     Ok(selection)
 }
 
-/// The stderr note printed once per run when `--threads N` is accepted on
-/// the CPU device but cannot configure anything yet: the CPU device runs on
-/// the reference route until the worker device lands.
-const THREADS_NO_EFFECT_NOTE: &str =
-    "note: --threads has no effect yet: the cpu device runs on the reference route";
-
-/// Decide the one visibility note for an accepted `--threads N` on the CPU
-/// route. Pure so the rule is testable without launching a program: a count
-/// reaches here only with the CPU selection ([`ensure_threads_cpu_route`]
-/// fails closed everywhere else), where the reference route ignores it.
-fn threads_no_effect_note(
-    threads: Option<u32>,
-    selection: DeviceSelection,
-) -> Option<&'static str> {
-    if threads.is_some() && selection == DeviceSelection::Cpu {
-        return Some(THREADS_NO_EFFECT_NOTE);
+/// The CPU device shape: the worker count resolved by
+/// [`package::resolve_cpu_threads`] (`--threads`, then manifest `[device]
+/// threads`, then the route default when `None`) and `--partitions N` (one
+/// partition when absent). Only the CPU route reads it:
+/// [`resolve_route_selection`] refuses `--partitions` on any other route.
+fn cpu_device_shape(args: &RunArgs, threads: Option<u32>) -> package::mir::CpuDeviceShape {
+    package::mir::CpuDeviceShape {
+        workers: threads.and_then(std::num::NonZeroU32::new),
+        partitions: args
+            .partitions
+            .and_then(std::num::NonZeroU32::new)
+            .unwrap_or(std::num::NonZeroU32::MIN),
     }
-    None
 }
 
-/// Fail closed when `--threads N` is given with a resolved selection other
-/// than the CPU device (need, CD-1). The count configures CPU
-/// workers only; it is never silently ignored, and there is no `[device]
-/// threads` manifest key.
-fn ensure_threads_cpu_route(
-    threads: Option<u32>,
+/// Fail closed when `--partitions N` is given with a resolved selection
+/// other than the CPU or the Metal device: those two span one logical device
+/// over several partitions (rule 18), and the flag is never silently ignored.
+fn ensure_partitions_cpu_route(
+    partitions: Option<u32>,
     selection: DeviceSelection,
 ) -> Result<(), Box<Diagnostic>> {
-    if threads.is_none() || selection == DeviceSelection::Cpu {
+    if partitions.is_none() || matches!(selection, DeviceSelection::Cpu | DeviceSelection::Metal) {
         return Ok(());
     }
     Err(Box::new(
-        faber_cli::package_diagnostic_error("`--threads` is valid only with `--device cpu`")
-            .with_arg("issue", "E_THREADS_REQUIRES_CPU")
-            .with_arg("device", selection.spelling()),
+        faber_cli::package_diagnostic_error(
+            "`--partitions` is valid only with `--device cpu` or `--device metal`",
+        )
+        .with_arg("issue", "E_PARTITIONS_REQUIRES_CPU")
+        .with_arg("device", selection.spelling()),
     ))
 }
 
@@ -719,6 +846,7 @@ fn eprint_route_diagnostics(diagnostics: &[Diagnostic]) {
                     if code.starts_with("E_DEVICE_")
                         || code.starts_with("E_BACKEND_")
                         || code.starts_with("E_THREADS_")
+                        || code.starts_with("E_PARTITIONS_")
                         || code.starts_with("E_NO_") =>
                 {
                     eprintln!("error: {code}: {}", diag.message);

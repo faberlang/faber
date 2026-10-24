@@ -729,6 +729,20 @@ impl HirVisitor for ReductionTerms<'_> {
                 owned.defs.extend(binding.iter().map(|(def, _)| *def));
                 self.term(body, owned.defs);
             }
+            HirExpressionKind::Scan {
+                coordinates,
+                filum,
+                binding,
+                body,
+                ..
+            } => {
+                walk_expr(self, expr);
+                let mut owned = Owned::default();
+                owned.visit_block(body);
+                owned.defs.extend(coordinates.iter().map(|(def, _)| *def));
+                owned.defs.extend([filum.0, binding.0]);
+                self.term(body, owned.defs);
+            }
             _ => walk_expr(self, expr),
         }
     }

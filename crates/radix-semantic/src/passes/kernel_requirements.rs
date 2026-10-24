@@ -1735,6 +1735,24 @@ impl BodyFacts<'_> {
                 body,
                 identity,
             ),
+            HirExpressionKind::Scan {
+                op,
+                source,
+                coordinates,
+                group,
+                filum: _,
+                binding,
+                body,
+                ..
+            } => self.evaluate_scan(
+                expr,
+                *op,
+                source,
+                coordinates,
+                group,
+                *binding,
+                body,
+            ),
             HirExpressionKind::Array(elements) => self.evaluate_array_elements(expr.id, elements),
             HirExpressionKind::Si {
                 cond,
@@ -2058,6 +2076,48 @@ impl BodyFacts<'_> {
             }
             _ => declared.clone(),
         }
+    }
+
+    fn evaluate_scan(
+        &mut self,
+        expr: &HirExpression,
+        op: radix_hir::HirReductionOp,
+        source: &HirExpression,
+        coordinates: &[(DefId, Symbol)],
+        group: &Option<Box<HirExpression>>,
+        binding: (DefId, Symbol),
+        body: &HirBlock,
+    ) -> AbstractRange {
+        self.visit_tensor_loop(source, coordinates, binding.0, body, group.as_deref());
+        let declared = expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+            AbstractRange::from_type(ty, self.types)
+        });
+        if op == radix_hir::HirReductionOp::Count {
+            let dims = source
+                .ty
+                .map_or_else(Vec::new, |ty| shape_dimensions(ty, self.types));
+            let total = dims
+                .into_iter()
+                .try_fold(KernelRangeExpr::Constant(1), |total, dim| {
+                    let extent = match evaluate_index_dimension(dim, self.types) {
+                        Ok(Some(extent)) => KernelRangeExpr::Constant(i128::from(extent)),
+                        Ok(None) => KernelRangeExpr::Shape(dim),
+                        Err(_) => return None,
+                    };
+                    Some(multiply(total, extent))
+                });
+            if let Some(element) = expr.ty.and_then(|ty| tensor_element(ty, self.types)) {
+                self.check_store(
+                    expr.span,
+                    element,
+                    AbstractRange(total.map(|total| KernelValueRange {
+                        minimum: KernelRangeExpr::Constant(0),
+                        maximum: total,
+                    })),
+                );
+            }
+        }
+        declared
     }
 
     /// Evaluate an array literal's elements and record its per-axis ranges.
@@ -2746,6 +2806,16 @@ impl BodyFacts<'_> {
         }
     }
 
+    fn range_proven_scan(&self, expr: &HirExpression) -> bool {
+        let HirExpressionKind::Scan { op, source, .. } = &expr.kind else {
+            return false;
+        };
+        *op == radix_hir::HirReductionOp::Count
+            && source
+                .ty
+                .is_some_and(|ty| !shape_dimensions(ty, self.types).is_empty())
+    }
+
     fn range_only_expression(&self, expr: &HirExpression) -> bool {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.range_only_bindings.contains(def_id),
@@ -2775,6 +2845,7 @@ impl BodyFacts<'_> {
                     && receiver.ty.is_some_and(|ty| is_tensor_type(ty, self.types))
             }
             HirExpressionKind::Reduction { .. } => self.range_proven_reduction(expr),
+            HirExpressionKind::Scan { .. } => self.range_proven_scan(expr),
             // An imported module constant folds to its interface value: it is a
             // compile-time number, not an i64 cell on the device.
             HirExpressionKind::Field(object, member) => match &object.kind {

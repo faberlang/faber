@@ -13,6 +13,10 @@ mod decimal;
 pub mod dense;
 mod device_block;
 mod exact_int;
+mod filum_grid;
+#[cfg(test)]
+#[path = "filum_grid_test.rs"]
+mod filum_grid_tests;
 mod host;
 pub mod inf;
 pub mod kernel_dispatch;
@@ -26,6 +30,7 @@ mod regex_program;
 mod routes;
 mod run_tier;
 mod runtime;
+mod scan;
 pub mod sermo;
 #[cfg(test)]
 mod shape_size_test;
@@ -613,9 +618,96 @@ pub struct RunnerRunOutcome {
 
 type RegexLiteralMap = FxHashMap<(Symbol, Option<Symbol>), Rc<RegexProgram>>;
 
+/// The immutable whole-program indexes a [`Runner`] reads: the block cache,
+/// function and definition indexes, value and slot types, and the field
+/// display indexes.
+///
+/// Building them costs time proportional to the whole program (every block is
+/// cloned into the cache). A caller that runs one program many times, such as
+/// a device worker launching a kernel chunk after chunk, builds this once and
+/// runs every runner over it (see
+/// [`kernel_lanes::run_device_form_lanes_prepared`]).
+///
+/// A prepared value is valid only for the `(program, context, types)` it was
+/// built from; it holds `Rc` blocks, so it is per thread.
+pub struct RunnerPrepared {
+    function_index: MirFunctionIndex,
+    /// `DefId` → `MirFunctionId` index (BO-M-6).
+    def_to_function: FxHashMap<DefId, MirFunctionId>,
+    /// Per-step block share: one clone at construct, `Rc` bump in the loop (BO-M-1).
+    block_cache: FxHashMap<(MirFunctionId, MirBlockId), Rc<MirBlock>>,
+    /// Value-id static types per function (`MirStatementKind::Assign`), for
+    /// display-width resolution at diagnostics.
+    value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
+    /// Functions whose body reads a `MirOperand::Value`; only their frames
+    /// record `Assign` results.
+    value_reading_functions: FxHashSet<MirFunctionId>,
+    /// Declared local/temp slot types per function (O(1) id lookups).
+    slot_types: FxHashMap<MirFunctionId, FunctionSlots>,
+    /// Declared non-f64 float widths of struct fields, for width-aware display.
+    field_float_widths: value::FieldFloatWidths,
+    /// Struct and variant fields holding a `littera`, so display quotes them
+    /// as chars and every other ascii-carried text as text (pr4).
+    field_char_set: value::FieldCharSet,
+    field_bits_widths: value::FieldBitsWidths,
+    /// Struct and variant fields whose declared type holds a tuple, so display
+    /// prints them as `iuncta [..]` at their element widths.
+    field_tuple_parts: value::FieldTupleParts,
+}
+
+impl RunnerPrepared {
+    /// Index `program` once for any number of runners.
+    #[must_use]
+    pub fn new(
+        program: &MirProgram,
+        context: &MirValidationContext<'_>,
+        types: &TypeTable,
+    ) -> Self {
+        let mut def_to_function = FxHashMap::default();
+        let mut block_cache = FxHashMap::default();
+        for function in &program.functions {
+            if let Some(def_id) = function.source {
+                def_to_function.insert(def_id, function.id);
+            }
+            for block in &function.blocks {
+                block_cache.insert((function.id, block.id), Rc::new(block.clone()));
+            }
+        }
+        Self {
+            function_index: program.function_index(),
+            def_to_function,
+            block_cache,
+            value_types: index_value_types(program),
+            value_reading_functions: index_value_reading_functions(program),
+            slot_types: index_slot_types(program, types),
+            field_float_widths: index_field_float_widths(context, types),
+            field_char_set: index_field_char_set(context, types),
+            field_bits_widths: index_field_bits_widths(context, types),
+            field_tuple_parts: index_field_tuple_parts(context, types),
+        }
+    }
+}
+
+/// A runner's indexes: built for it alone, or shared with other runners.
+enum PreparedRef<'a> {
+    Owned(Box<RunnerPrepared>),
+    Borrowed(&'a RunnerPrepared),
+}
+
+impl std::ops::Deref for PreparedRef<'_> {
+    type Target = RunnerPrepared;
+
+    fn deref(&self) -> &RunnerPrepared {
+        match self {
+            Self::Owned(prepared) => prepared,
+            Self::Borrowed(prepared) => prepared,
+        }
+    }
+}
+
 pub(crate) struct Runner<'a, H: Host + ?Sized> {
     program: &'a MirProgram,
-    function_index: MirFunctionIndex,
+    prepared: PreparedRef<'a>,
     context: &'a MirValidationContext<'a>,
     types: &'a TypeTable,
     interner: &'a Interner,
@@ -639,10 +731,6 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// While set, `run_until_depth` parks the generator frame after the
     /// yielding statement and stops; the pulling cursor takes the item.
     yielded: Option<Value>,
-    /// `DefId` → `MirFunctionId` index built once at construction (BO-M-6).
-    def_to_function: FxHashMap<DefId, MirFunctionId>,
-    /// Per-step block share: one clone at construct, `Rc` bump in the loop (BO-M-1).
-    block_cache: FxHashMap<(MirFunctionId, MirBlockId), Rc<MirBlock>>,
     /// Opaque gradient-handle storage: handle id → accumulated gradient
     /// tensor (`MirIntrinsic::Gradient` dispatch). Clean-break internal
     /// contract mirroring the host LLVM gradient ABI; in-process only.
@@ -655,14 +743,6 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     textus_literals: RefCell<FxHashMap<Symbol, String>>,
     /// Owned ASCII literals, keyed by interned source symbol.
     ascii_literals: RefCell<FxHashMap<Symbol, String>>,
-    /// Value-id static types per function (`MirStatementKind::Assign`), for
-    /// display-width resolution at diagnostics.
-    value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
-    /// Functions whose body reads a `MirOperand::Value`; only their frames
-    /// record `Assign` results.
-    value_reading_functions: FxHashSet<MirFunctionId>,
-    /// Declared local/temp slot types per function (O(1) id lookups).
-    slot_types: FxHashMap<MirFunctionId, FunctionSlots>,
     /// Whether a call to a compute-stage (`@ kernel`) function runs or stops
     /// the run. Defaults to [`RunnerKernelPolicy::Refuse`].
     kernel_policy: RunnerKernelPolicy,
@@ -678,19 +758,14 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Router slots held by open conversations (D8.3); each conversation
     /// gives its slot back at its release point.
     conversation_slots: Rc<sermo::ConversationSlots>,
-    /// Declared non-f64 float widths of struct fields, for width-aware display.
-    field_float_widths: value::FieldFloatWidths,
-    /// Struct and variant fields holding a `littera`, so display quotes them
-    /// as chars and every other ascii-carried text as text (pr4).
-    field_char_set: value::FieldCharSet,
-    field_bits_widths: value::FieldBitsWidths,
-    /// Struct and variant fields whose declared type holds a tuple, so display
-    /// prints them as `iuncta [..]` at their element widths.
-    field_tuple_parts: value::FieldTupleParts,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
     /// Build a runner with O(1) lookup indexes for functions, defs, and blocks.
+    ///
+    /// The indexes are built for this runner alone; callers that start many
+    /// runners on one program build a [`RunnerPrepared`] once and use
+    /// [`Runner::with_prepared`].
     pub(crate) fn new(
         program: &'a MirProgram,
         context: &'a MirValidationContext<'a>,
@@ -698,22 +773,40 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
         interner: &'a Interner,
         host: &'a mut H,
     ) -> Self {
-        let mut def_to_function = FxHashMap::default();
-        let mut block_cache = FxHashMap::default();
-        for function in &program.functions {
-            if let Some(def_id) = function.source {
-                def_to_function.insert(def_id, function.id);
-            }
-            for block in &function.blocks {
-                block_cache.insert((function.id, block.id), Rc::new(block.clone()));
-            }
-        }
-        let field_float_widths = index_field_float_widths(context, types);
-        let field_char_set = index_field_char_set(context, types);
-        let field_bits_widths = index_field_bits_widths(context, types);
-        let field_tuple_parts = index_field_tuple_parts(context, types);
+        let prepared = PreparedRef::Owned(Box::new(RunnerPrepared::new(program, context, types)));
+        Self::from_prepared(program, context, types, interner, host, prepared)
+    }
+
+    /// Build a runner over indexes prepared earlier for the same
+    /// `(program, context, types)`.
+    pub(crate) fn with_prepared(
+        prepared: &'a RunnerPrepared,
+        program: &'a MirProgram,
+        context: &'a MirValidationContext<'a>,
+        types: &'a TypeTable,
+        interner: &'a Interner,
+        host: &'a mut H,
+    ) -> Self {
+        Self::from_prepared(
+            program,
+            context,
+            types,
+            interner,
+            host,
+            PreparedRef::Borrowed(prepared),
+        )
+    }
+
+    fn from_prepared(
+        program: &'a MirProgram,
+        context: &'a MirValidationContext<'a>,
+        types: &'a TypeTable,
+        interner: &'a Interner,
+        host: &'a mut H,
+        prepared: PreparedRef<'a>,
+    ) -> Self {
         Self {
-            function_index: program.function_index(),
+            prepared,
             program,
             context,
             types,
@@ -728,26 +821,17 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             return_value: None,
             return_error: None,
             yielded: None,
-            def_to_function,
-            block_cache,
             gradient_handles: FxHashMap::default(),
             next_gradient_handle: 0,
             regex_literals: RefCell::new(FxHashMap::default()),
             textus_literals: RefCell::new(FxHashMap::default()),
             ascii_literals: RefCell::new(FxHashMap::default()),
-            value_types: index_value_types(program),
-            value_reading_functions: index_value_reading_functions(program),
-            slot_types: index_slot_types(program, types),
             kernel_policy: RunnerKernelPolicy::Refuse,
             kernel_dispatcher: None,
             next_block_id: 1,
             carried_fault: None,
             next_conversation_id: 0,
             conversation_slots: Rc::default(),
-            field_float_widths,
-            field_char_set,
-            field_bits_widths,
-            field_tuple_parts,
         }
     }
 
@@ -767,11 +851,11 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
         value::FieldOrder {
             structs: &self.context.struct_field_order,
             variants: &self.context.variant_field_order,
-            float_widths: &self.field_float_widths,
-            char_fields: &self.field_char_set,
-            tuple_fields: &self.field_tuple_parts,
+            float_widths: &self.prepared.field_float_widths,
+            char_fields: &self.prepared.field_char_set,
+            tuple_fields: &self.prepared.field_tuple_parts,
             tuple: None,
-            bits_fields: &self.field_bits_widths,
+            bits_fields: &self.prepared.field_bits_widths,
             bits: None,
             interval: false,
             char_text: false,
@@ -1441,6 +1525,36 @@ pub fn run_function_with_kernel_dispatcher_and_stats<H: Host + ?Sized>(
     )
 }
 
+/// [`run_function_with_kernel_dispatcher`] under the test-path limits of
+/// [`run_function_with_limits`] (`None` step budget applies
+/// [`DEFAULT_TEST_STEP_BUDGET`]; an optional wall-clock deadline), with the
+/// diagnostic meter armed when `collect_stats` is set. The proba route of a
+/// device session (`faber test --device cpu`) enters here.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be started.
+pub fn run_function_with_limits_and_kernel_dispatcher<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: Option<u64>,
+    deadline: Option<Instant>,
+    collect_stats: bool,
+    dispatcher: &kernel_dispatch::ResidencyHook,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_dispatching(
+        validated,
+        function_id,
+        host,
+        Some(step_budget.unwrap_or(DEFAULT_TEST_STEP_BUDGET)),
+        deadline,
+        collect_stats,
+        RunnerKernelPolicy::Dispatch,
+        Some(Rc::clone(dispatcher)),
+    )
+}
+
 fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,
@@ -1505,7 +1619,11 @@ fn run_function_dispatching<H: Host + ?Sized>(
     runner.close_all_frames();
     // Program end is a delivery point: complete device work and surface a
     // deferred fault after any error already recorded (first in program order).
-    if let Err(error) = runner.finish_dispatcher() {
+    // A fault a host read already surfaced is also kept as the dispatcher's
+    // deferred error; it is the same fault, reported once.
+    if let Err(error) = runner.finish_dispatcher()
+        && !runner.errors.contains(&error)
+    {
         runner.errors.push(error);
     }
     let result = if runner.errors.is_empty() {
@@ -1719,7 +1837,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn new_frame(&self, function_id: MirFunctionId, entry_block: MirBlockId) -> Frame {
-        let (mut locals, temps_len) = match self.slot_types.get(&function_id) {
+        let (mut locals, temps_len) = match self.prepared.slot_types.get(&function_id) {
             Some(slots) => {
                 let mut locals = vec![None; slots.locals.len()];
                 for param in slots.param_locals.iter().copied() {
@@ -1739,7 +1857,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             mut_writebacks: Vec::new(),
             temps: vec![None; temps_len],
             values: FxHashMap::default(),
-            records_values: self.value_reading_functions.contains(&function_id),
+            records_values: self.prepared.value_reading_functions.contains(&function_id),
             block: entry_block,
             resume_at: 0,
             resumed: false,
@@ -1769,7 +1887,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     fn function_by_id(&self, id: MirFunctionId, span: Span) -> Result<&MirFunction, RunnerError> {
         // Use the immutable function-id index captured at runner construction.
         self.program
-            .indexed_function(&self.function_index, id)
+            .indexed_function(&self.prepared.function_index, id)
             .ok_or_else(|| RunnerError::internal(span, format!("missing function f{}", id.0)))
     }
 
@@ -2161,7 +2279,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         block_id: MirBlockId,
     ) -> Result<Rc<MirBlock>, RunnerError> {
         // BO-M-1: share a pre-cloned block via Rc instead of deep-cloning per step.
-        self.block_cache
+        self.prepared
+            .block_cache
             .get(&(function_id, block_id))
             .cloned()
             .ok_or_else(|| {
@@ -2400,10 +2519,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         };
         let error_place_ty = match &error_place.base {
             MirPlaceBase::Local(id) => self
+                .prepared
                 .slot_types
                 .get(&frame.function)
                 .and_then(|slots| slots.local_ty(*id)),
             MirPlaceBase::Temp(id) => self
+                .prepared
                 .slot_types
                 .get(&frame.function)
                 .and_then(|slots| slots.temp_ty(*id)),
@@ -2554,7 +2675,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.return_value = None;
         self.return_error = None;
         self.push_frame(func_id, MirBlockId(0));
-        let callee_slots = self.slot_types.get(&func_id);
+        let callee_slots = self.prepared.slot_types.get(&func_id);
         let mut mut_writebacks: Vec<(usize, MirPlace, MirLocalId)> = Vec::new();
         if let Some(frame) = self.frames.last_mut() {
             if let Some((local, value)) = closure_environment {
@@ -2646,9 +2767,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
 
     fn resolve_definition(&self, def_id: DefId, span: Span) -> Result<MirFunctionId, RunnerError> {
         // BO-M-6: O(1) DefId → MirFunctionId via construction-time index.
-        self.def_to_function.get(&def_id).copied().ok_or_else(|| {
-            RunnerError::internal(span, format!("missing MIR function for def#{def_id:?}"))
-        })
+        self.prepared
+            .def_to_function
+            .get(&def_id)
+            .copied()
+            .ok_or_else(|| {
+                RunnerError::internal(span, format!("missing MIR function for def#{def_id:?}"))
+            })
     }
 
     fn eval_value(&mut self, value: &MirValue, span: Span) -> Result<Value, RunnerError> {
@@ -2755,20 +2880,26 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     fn operand_static_type(&self, operand: &MirOperand) -> Option<TypeId> {
         let function = || {
             self.program
-                .indexed_function(&self.function_index, self.frames.last()?.function)
+                .indexed_function(&self.prepared.function_index, self.frames.last()?.function)
         };
+        // WHY: the prepared slot table answers temps and non-parameter locals
+        // in O(1); a linear scan per operand dominated device-form lane runs.
+        // A parameter local keeps the declared-locals-only lookup, which the
+        // table (params fill unset local slots) does not reproduce.
+        let slots = || self.prepared.slot_types.get(&self.frames.last()?.function);
         let ty = match operand {
-            MirOperand::Temp(id) => function()?.temps.iter().find(|t| t.id == *id).map(|t| t.ty),
+            MirOperand::Temp(id) => slots()?.temp_ty(*id)?,
             MirOperand::Place(place) => {
                 let base = match place.base {
-                    MirPlaceBase::Temp(id) => {
-                        function()?.temps.iter().find(|t| t.id == id).map(|t| t.ty)
-                    }
-                    MirPlaceBase::Local(id) => {
-                        function()?.locals.iter().find(|l| l.id == id).map(|l| l.ty)
-                    }
+                    MirPlaceBase::Temp(id) => slots()?.temp_ty(id),
+                    MirPlaceBase::Local(id) if slots()?.param_locals.contains(&id) => function()?
+                        .locals
+                        .iter()
+                        .find(|l| l.id == id)
+                        .map(|l| l.ty.semantic_id()),
+                    MirPlaceBase::Local(id) => slots()?.local_ty(id),
                 }?;
-                let mut ty = base.semantic_id();
+                let mut ty = base;
                 for projection in &place.projections {
                     ty = match projection {
                         MirProjection::Field(field) => {
@@ -2801,12 +2932,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 return Some(ty);
             }
             MirOperand::Value(id) => self
+                .prepared
                 .value_types
                 .get(&(self.frames.last()?.function, *id))
-                .copied(),
-            MirOperand::Constant(_) => None,
-        }?;
-        Some(ty.semantic_id())
+                .map(|ty| ty.semantic_id())?,
+            MirOperand::Constant(_) => return None,
+        };
+        Some(ty)
     }
 
     fn element_display_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
@@ -3265,6 +3397,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         // `f32` cell rounds to the nearest binary32 (ties to even).
         let narrows_to_f32 = matches!(value, Value::Float(_))
             && self
+                .prepared
                 .slot_types
                 .get(&frame.function)
                 .is_some_and(|slots| match base {

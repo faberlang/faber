@@ -112,7 +112,12 @@ fn reduction_words_are_tokenless_contextual_rows_with_reduction_owners() {
         let KeywordScope::Contextual(owners) = spec.scope else {
             panic!("'{text}' must be contextual");
         };
-        assert_eq!(owners, [owner], "'{text}' owner");
+        assert!(owners.contains(&owner), "'{text}' owner");
+        if text == "pro" {
+            assert!(owners.contains(&KeywordOwner::ScanGroup), "'pro' also owns scan grouping");
+        } else {
+            assert_eq!(owners, [owner], "'{text}' owner");
+        }
 
         let result = crate::lex(text);
         assert!(result.success(), "'{text}' must lex cleanly");
@@ -130,6 +135,34 @@ fn sort_words_are_tokenless_contextual_rows_with_sort_owners() {
         ("ordinata", KeywordOwner::SortHead),
         ("ascendens", KeywordOwner::SortDirection),
         ("descendens", KeywordOwner::SortDirection),
+    ];
+    for &(text, owner) in rows {
+        let spec =
+            lookup_keyword_spec(text).unwrap_or_else(|| panic!("'{text}' needs a registry row"));
+        assert!(spec.token_kind.is_none(), "'{text}' must be tokenless");
+        let KeywordScope::Contextual(owners) = spec.scope else {
+            panic!("'{text}' must be contextual");
+        };
+        assert_eq!(owners, [owner], "'{text}' owner");
+
+        let result = crate::lex(text);
+        assert!(result.success(), "'{text}' must lex cleanly");
+        assert!(
+            matches!(result.tokens[0].kind, crate::TokenKind::Ident(_)),
+            "'{text}' must lex as a plain identifier, got {:?}",
+            result.tokens[0].kind
+        );
+    }
+}
+
+#[test]
+fn scan_words_are_tokenless_contextual_rows_with_scan_owners() {
+    let rows: &[(&str, KeywordOwner)] = &[
+        ("scan", KeywordOwner::ScanHead),
+        ("scan_total", KeywordOwner::ScanTotal),
+        ("scan_inclusive", KeywordOwner::ScanTotalMode),
+        ("scan_exclusive", KeywordOwner::ScanTotalMode),
+        ("scan_order", KeywordOwner::ScanOrder),
     ];
     for &(text, owner) in rows {
         let spec =
@@ -173,6 +206,11 @@ fn existing_rows_gain_the_reduction_owner_and_keep_their_old_one() {
         assert!(owners.contains(&old), "'{text}' keeps {old:?}");
         assert!(owners.contains(&new), "'{text}' gains {new:?}");
     }
+    let via = lookup_keyword_spec("via").expect("via registry row");
+    let KeywordScope::Contextual(owners) = via.scope else {
+        panic!("via must be contextual");
+    };
+    assert!(owners.contains(&KeywordOwner::ScanHead), "via gains scan-head use");
 }
 
 #[test]

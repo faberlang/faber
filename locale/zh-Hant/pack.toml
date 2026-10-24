@@ -167,6 +167,13 @@ ordinata = "排序"
 ascendens = "升序"
 descendens = "降序"
 
+# Prefix-scan mode words use the shared source spelling in every reader pack.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
+
 [types]
 ascii = "ascii"
 textus = "文字"
@@ -3735,6 +3742,14 @@ help = "讓每個 aut 分支以相同型別繫結相同名稱"
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "無法證明執行緒迭代的獨立性：{reason}"
 help = "使用普通迴圈，或僅寫入本次迭代的座標，並僅在同一座標讀取已寫入的儲存；不要修改外部區域變數或呼叫未經證明的副作用"
+
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "`{rumpe}` 不能結束 `{filum}` 迴圈"
+help = "`{rumpe}` 不能停止 `{filum}` 迴圈：各通道相互獨立執行。要找第一個符合項，請用 `{reducta} {via} {argminima} …`；要在某個界限處停止，請先算出該界限，再迴圈到該界限。"
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "`{redde}` 不能離開 `{filum}` 迴圈"
+help = "`{redde}` 不能離開 `{filum}` 迴圈：各通道相互獨立執行。要從各通道得到一個值，請用 `{reducta}`；要在某個界限處停止，請先算出該界限，再迴圈到該界限。"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "歸約體只能呼叫裝置內建函式、片段與私有核心輔助函式：{reason}"

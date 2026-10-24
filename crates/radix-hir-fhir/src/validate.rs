@@ -1933,6 +1933,26 @@ fn collect_expr_defs(
                 collect_expr_defs(identity, registry);
             }
         }
+        HirExpressionKind::Scan {
+            source,
+            coordinates,
+            group,
+            filum,
+            binding,
+            body,
+            ..
+        } => {
+            collect_expr_defs(source, registry);
+            for (id, _) in coordinates {
+                registry.insert(*id);
+            }
+            registry.insert(filum.0);
+            registry.insert(binding.0);
+            if let Some(group) = group {
+                collect_expr_defs(group, registry);
+            }
+            collect_block_defs(body, registry);
+        }
         HirExpressionKind::Sort {
             source,
             binding,
@@ -2326,6 +2346,15 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 if let Some(identity) = identity {
                     collect_expr(identity, registry);
                 }
+            }
+            HirExpressionKind::Scan {
+                source, group, body, ..
+            } => {
+                collect_expr(source, registry);
+                if let Some(group) = group {
+                    collect_expr(group, registry);
+                }
+                collect_block(body, registry);
             }
             HirExpressionKind::Sort { source, body, .. } => {
                 collect_expr(source, registry);
@@ -3294,6 +3323,29 @@ pub(crate) fn validate_referential_integrity(
                 if let Some(identity) = identity {
                     validate_expr(identity, checks)?;
                 }
+            }
+            HirExpressionKind::Scan {
+                source,
+                coordinates,
+                group,
+                filum,
+                binding,
+                body,
+                ..
+            } => {
+                validate_expr(source, checks)?;
+                for (id, name) in coordinates {
+                    checks.check_def(*id)?;
+                    checks.check_symbol(*name)?;
+                }
+                checks.check_def(filum.0)?;
+                checks.check_symbol(filum.1)?;
+                checks.check_def(binding.0)?;
+                checks.check_symbol(binding.1)?;
+                if let Some(group) = group {
+                    validate_expr(group, checks)?;
+                }
+                validate_block(body, checks)?;
             }
             HirExpressionKind::Sort {
                 source,

@@ -1,12 +1,12 @@
 use super::*;
 
 #[test]
-fn artifact_version_is_7_for_the_device_artifact_packet_schema() {
-    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
+fn artifact_version_is_8_for_the_scan_mir_payload() {
+    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 8);
 }
 
 #[test]
-fn device_program_wire_version_is_12_after_the_wire_shape_widening() {
+fn device_program_wire_version_is_14_after_scan_plan_mirror() {
     // Stage 3R U1 bumped the nested device-program wire version 3 → 4
     // (S1); S5-U5b bumps it 4 → 5 (the declared RepeatingStep step count
     // rides the lifetime variant); S5A-U1 bumps it 5 → 6 (every result
@@ -30,7 +30,7 @@ fn device_program_wire_version_is_12_after_the_wire_shape_widening() {
     // it currently does NOT coincide numerically with
     // `PACKAGE_MIR_ARTIFACT_VERSION`; the two are admitted by separate
     // gates.
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 14);
 }
 
 #[test]
@@ -41,8 +41,8 @@ fn distributed_section_versions_leave_the_accepted_wire_untouched() {
     // section's own version are admitted by separate gates; none of the
     // frozen version constants changes with the distributed section.
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
-    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 14);
+    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 8);
 }
 
 #[test]

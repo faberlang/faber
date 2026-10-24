@@ -15,6 +15,7 @@ fn synthetic_row(parent: u32, ordinal: u32) -> MirDeviceFunctionMetadata {
         shader_stage: MirKernelShaderStage::Compute,
         visibility: MirFunctionVisibility::Private,
         origin: MirFunctionOrigin::SyntheticKernelClosure,
+        lane_domain_local: None,
     }
 }
 

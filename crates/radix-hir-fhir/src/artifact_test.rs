@@ -205,8 +205,9 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // `t.sum(axis n)` / `t.mean(axis n)` calls typecheck expanded);
     // schema 46 carries `HirArtifact::conversation_constructor` (the
     // compiler-owned `sermo` definition the authored-form validator pairs a
-    // bare carrier with).
-    assert_eq!(SCHEMA_VERSION, 46);
+    // bare carrier with); schema 47 adds source-shaped scans and their key
+    // domain evidence.
+    assert_eq!(SCHEMA_VERSION, 47);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

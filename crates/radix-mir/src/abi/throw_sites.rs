@@ -9,12 +9,12 @@
 //!
 //! # Site numbering
 //!
-//! A kernel's fault sites are numbered dense from 0 in one list: first its
-//! unproven index sites (the [`super::LaneIndexProof::unproven`] order, all
-//! `Fatal`), then its throw sites in function block order (all `Recoverable`).
-//! This module numbers only the throws, by ORDINAL `0..n`; the ABI adds the
-//! index-site count to get the record slot. [`crate::Region::Fault`] carries
-//! the ordinal.
+//! A kernel's fault sites are numbered dense from 0 in one list: tensor index
+//! sites (the [`super::LaneIndexProof::unproven`] order), then distinct
+//! register-vector index operands in first-use order (both groups `Fatal`),
+//! then throw sites in function block order (`Recoverable`). This module
+//! numbers only the throws, by ORDINAL `0..n`; the ABI adds both index-site
+//! counts to get the record slot. [`crate::Region::Fault`] carries the ordinal.
 
 use std::collections::BTreeMap;
 

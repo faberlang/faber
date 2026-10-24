@@ -1,0 +1,28 @@
++++
+locale = "en"
+term = "itera-filum-break-reject"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "apud_clause", "filum_clause", "rumpe_stmt", "expression"]
+canonical = false
+summary = "A `break` that targets a `thread` loop is refused: lanes run independently, so it cannot stop the others."
+no_expected = "rejects"
+diagnostic = "SEM010:break_in_thread_body"
++++
+
+# This exemplum intentionally fails to compile: run in order, `break` stops
+# every later iteration; run in parallel it would stop only its own lane. Which
+# cells get written would depend on placement, so the loop is refused by name.
+# To find the first match use `reduce via argmin …`; to stop at a cutoff,
+# compute it first and loop to it.
+main {
+    let tf32[2, 2] src ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    mut tf32[2, 2] dst ← tf32[2, 2] {}
+    for from src at [i, j] thread lane let v {
+        if v ≻ 1.0 {
+            break
+        }
+        dst[[i, j]] ← v
+    }
+    print dst
+}

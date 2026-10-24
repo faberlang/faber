@@ -569,6 +569,8 @@ pub enum WireCollectionKernelPlan {
     /// Whole-grid reduction (gpu-reset C4-8). Mirrors
     /// `kernel_plan::CollectionKernelPlan::GridReduce`.
     GridReduce(WireGridReducePlan),
+    /// Ordered scan's three launch stages and scratch layout.
+    Scan(WireScanPlan),
 }
 
 /// Axis-reduction recipe plan (wire mirror of `kernel_plan::AxisReductionPlan`,
@@ -998,6 +1000,9 @@ pub struct WireGridReducePlan {
     pub source_resource: u64,
     /// Number of source axes.
     pub rank: u8,
+    /// Literal grouped-result axes; absent for scalar reduction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_shape: Option<Vec<u64>>,
     /// Workgroup lane count of both stages.
     pub workgroup: u32,
     /// Maximum partial slots in the dispatcher-owned scratch.
@@ -1008,6 +1013,34 @@ pub struct WireGridReducePlan {
     pub partial_coordinates: u8,
     /// Whether a `u32` `seen` flag follows.
     pub partial_seen: bool,
+}
+
+/// Scan plan (cluster-scan): mirrors the three-stage
+/// `CollectionKernelPlan::Scan` recipe. The nested section version is bumped
+/// whenever this shape changes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireScanPlan {
+    /// Index of the resource holding the scanned source tensor.
+    pub source_resource: u64,
+    /// Number of source axes.
+    pub rank: u8,
+    /// Lane count of each scan workgroup.
+    pub workgroup: u32,
+    /// Maximum source chunks.
+    pub blocks_cap: u32,
+    /// Finite group count; one for ungrouped scans.
+    pub group_count: u32,
+    /// Byte width of one summary value.
+    pub partial_value_bytes: u32,
+    /// Coordinate payload after the summary value.
+    pub partial_coordinates: u8,
+    /// Whether a summary `seen` flag follows the value.
+    pub partial_seen: bool,
+    /// Prefix scratch element width.
+    pub element_bytes: u32,
+    /// Whether source traversal runs backwards.
+    pub reverse: bool,
 }
 
 /// Rank-2 transpose recipe (`[M,N] → [N,M]`), the wire mirror of
@@ -1207,8 +1240,9 @@ pub enum WireReduceOp {
 // The versioned cadence/session wire revision (GI4-2; CTO S12; lane queue
 // §2/§5): the GI4-1-frozen session facts ride the accepted wire version as a
 // versioned session surface with its own ratchet + admission — the MD2-W1
-// sibling-field precedent. `WIRE_DEVICE_PROGRAM_VERSION` and the outer
-// `PACKAGE_MIR_ARTIFACT_VERSION = 6` stay untouched; the MD2 `distributed`
+// sibling-field precedent. At introduction, the GI4-2 section did not change
+// the then-current nested device-program or outer package versions; later
+// independent clean breaks may advance either version. The MD2 `distributed`
 // section files are never co-edited. The wire types here mirror the GI4-1
 // frozen public faber crate facts field-for-field (the `session.rs` / `kv_cache.rs`
 // types): the per-invocation input cadence, the workload modes, the session

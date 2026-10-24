@@ -99,11 +99,9 @@ fn is_structurizable_single_lane(
         && crate::structurize::structurize_duplicating_tails(function).is_ok()
 }
 
-/// C4-8 U5: the functions a whole-grid reduction names as its term (the
-/// `MirConstant::Function` last operand of a function-term `FilumReduce`
-/// node). A term function runs inside the lane region, so it has the lane
-/// form's admissions (64-bit coordinate binders, genus parameter reads) and
-/// the structured-CFG emission, with no Lane parameter of its own.
+/// Functions a whole-grid reduction or scan runs inside its lane region: the
+/// term helper and each grouped-key helper. They inherit lane-form admissions
+/// and structured-CFG emission without receiving their own Lane parameter.
 fn reduction_term_functions(
     program: &crate::MirProgram,
 ) -> rustc_hash::FxHashSet<crate::MirFunctionId> {
@@ -123,15 +121,108 @@ fn reduction_term_functions(
                 else {
                     continue;
                 };
+                let Some(group_operands) = group_operand_count(filum) else {
+                    continue;
+                };
+                let Some(group_start) = args.len().checked_sub(group_operands) else {
+                    continue;
+                };
                 if filum.term_captures.is_some()
-                    && let Some(MirOperand::Constant(MirConstant::Function(term))) = args.last()
+                    && let Some(position) = group_start.checked_sub(1)
+                    && let Some(MirOperand::Constant(MirConstant::Function(term))) =
+                        args.get(position)
                 {
                     terms.insert(*term);
+                }
+                if let Some(group) = &filum.group {
+                    let mut position = group_start;
+                    for key in &group.keys {
+                        let function_position = match position.checked_add(key.captures as usize) {
+                            Some(position) => position,
+                            None => continue,
+                        };
+                        if let Some(MirOperand::Constant(MirConstant::Function(helper))) =
+                            args.get(function_position)
+                        {
+                            terms.insert(*helper);
+                        }
+                        position = match function_position.checked_add(1) {
+                            Some(position) => position,
+                            None => continue,
+                        };
+                    }
+                }
+            }
+            for statement in &block.statements {
+                let MirStatementKind::RuntimeCall {
+                    call:
+                        MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Scan(scan),
+                            args,
+                            ..
+                        },
+                    ..
+                } = &statement.kind
+                else {
+                    continue;
+                };
+                let group_operands = scan.group.as_ref().map_or(Some(0), |group| {
+                    group.axes.iter().try_fold(0_usize, |count, axis| {
+                        count.checked_add(usize::try_from(axis.captures).ok()?.checked_add(1)?)
+                    })
+                });
+                let Some(group_operands) = group_operands else {
+                    continue;
+                };
+                let Some(group_start) = args.len().checked_sub(group_operands) else {
+                    continue;
+                };
+                let term_captures = match usize::try_from(scan.term_captures) {
+                    Ok(count) => count,
+                    Err(_) => continue,
+                };
+                let term_position = match 1_usize.checked_add(term_captures) {
+                    Some(position) => position,
+                    None => continue,
+                };
+                if term_position < group_start
+                    && let Some(MirOperand::Constant(MirConstant::Function(term))) =
+                    args.get(term_position)
+                {
+                    terms.insert(*term);
+                }
+                if let Some(group) = &scan.group {
+                    let mut position = group_start;
+                    for axis in &group.axes {
+                        let Ok(captures) = usize::try_from(axis.captures) else {
+                            continue;
+                        };
+                        let Some(function_position) = position.checked_add(captures) else {
+                            continue;
+                        };
+                        if let Some(MirOperand::Constant(MirConstant::Function(helper))) =
+                            args.get(function_position)
+                        {
+                            terms.insert(*helper);
+                        }
+                        position = match function_position.checked_add(1) {
+                            Some(position) => position,
+                            None => continue,
+                        };
+                    }
                 }
             }
         }
     }
     terms
+}
+
+fn group_operand_count(filum: &crate::MirFilumReduceOp) -> Option<usize> {
+    filum.group.as_ref().map_or(Some(0), |group| {
+        group.keys.iter().try_fold(0_usize, |count, key| {
+            count.checked_add(usize::try_from(key.captures).ok()?.checked_add(1)?)
+        })
+    })
 }
 
 const SHAPE_FAILABLE_DEVICE_FN: &str = "failable device function";
@@ -335,6 +426,18 @@ impl<'a> DeviceSafeClassifier<'a> {
 
     /// Whether `call` is a `Convert` between two numeric scalar types with no
     /// store site and no recovery operand.
+    fn is_scalar_extremum(&self, call: &MirRuntimeCall) -> bool {
+        matches!(
+            call.intrinsic,
+            MirIntrinsic::Collection(MirCollectionOp::Minimum | MirCollectionOp::Maximum)
+        ) && call.args.len() == 2
+            && matches!(
+                self.types.get(call.return_ty.semantic_id()),
+                Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                    | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+            )
+    }
+
     fn is_plain_scalar_conversion(&self, call: &MirRuntimeCall) -> bool {
         let MirIntrinsic::Convert(conversion) = &call.intrinsic else {
             return false;
@@ -1007,7 +1110,8 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                     | MirCollectionOp::TensorRelu
                                     | MirCollectionOp::TensorGelu,
                             )
-                            | MirIntrinsic::FilumReduce(_),
+                            | MirIntrinsic::FilumReduce(_)
+                            | MirIntrinsic::Scan(_),
                         ..
                     },
                 ..
@@ -1046,6 +1150,15 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirStatementKind::RuntimeCall { call, .. }
                 if (self.in_lane_form_function || self.in_single_lane_function)
                     && self.is_plain_scalar_conversion(call) =>
+            {
+                crate::visit::walk_stmt(self, stmt);
+            }
+            // A lane-form kernel's scalar `⤓` / `⤒` (and the clamps a shift
+            // view resolves to) is a per-lane `min` / `max` the lane emitters
+            // lower; the operand layouts are still walked and checked.
+            MirStatementKind::RuntimeCall { call, .. }
+                if (self.in_lane_form_function || self.in_single_lane_function)
+                    && self.is_scalar_extremum(call) =>
             {
                 crate::visit::walk_stmt(self, stmt);
             }

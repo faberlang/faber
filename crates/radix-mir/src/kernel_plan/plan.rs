@@ -136,8 +136,8 @@ pub enum CollectionKernelPlan {
     DistributedSum(DistributedSumPlan),
     /// Lane-form kernel (gpu-reset C4): a compute function with a `Lane`
     /// builtin parameter and a written tensor resource, one thread per lane
-    /// of the lane domain. The domain is the call-site shape of resource
-    /// `source_resource` (the first read tensor), `rank` axes; the launch
+    /// of the lane domain. The domain is the call-site shape of the exact
+    /// source resource `source_resource`, `rank` axes; the launch
     /// geometry is the generic 1-D workgroup rule over its element count.
     LaneGrid { source_resource: usize, rank: u8 },
     /// Single-lane kernel (gpu-reset A2 rung 3): a compute function with no
@@ -160,13 +160,57 @@ pub enum CollectionKernelPlan {
     GridReduce {
         source_resource: usize,
         rank: u8,
+        /// Literal output bucket shape for grouped sum/count. `None` keeps
+        /// the scalar whole-grid reduction layout.
+        group_shape: Option<Vec<u64>>,
         /// Workgroup lane count of both stages (a power of two).
         workgroup: u32,
-        /// Maximum partial slots the scratch holds.
+        /// Maximum source workgroups; scratch holds this many records per bucket.
         partials_cap: u32,
         /// The byte layout of one partial.
         partial_layout: GridReducePartialLayout,
     },
+    /// Ordered prefix scan. Stage 1 writes chunk-local prefixes and summaries,
+    /// stage 2 turns summaries into carries, and stage 3 applies each carry
+    /// into a fresh source-shaped result tensor.
+    Scan {
+        source_resource: usize,
+        rank: u8,
+        workgroup: u32,
+        blocks_cap: u32,
+        group_count: u32,
+        partial_layout: GridReducePartialLayout,
+        /// Byte width of one output prefix value in `PrefixScratch`.
+        element_bytes: u32,
+        reverse: bool,
+    },
+}
+
+impl CollectionKernelPlan {
+    /// Number of buckets in a whole-grid reduction or scan.
+    #[must_use]
+    pub fn group_count(&self) -> Option<u64> {
+        match self {
+            CollectionKernelPlan::GridReduce { group_shape, .. } => match group_shape {
+                None => Some(1),
+                Some(shape) => shape
+                    .iter()
+                    .try_fold(1_u64, |count, extent| count.checked_mul(*extent)),
+            },
+            CollectionKernelPlan::Scan { group_count, .. } => Some(u64::from(*group_count)),
+            _ => None,
+        }
+    }
+
+    /// Total partial records in a whole-grid reduction's workgroup-by-bucket
+    /// scratch. The multiplication is checked before a dispatcher allocates.
+    #[must_use]
+    pub fn grid_reduce_partial_slots(&self) -> Option<u64> {
+        let CollectionKernelPlan::GridReduce { partials_cap, .. } = self else {
+            return None;
+        };
+        u64::from(*partials_cap).checked_mul(self.group_count()?)
+    }
 }
 
 /// Workgroup lane count of a [`CollectionKernelPlan::GridReduce`] (both
@@ -175,6 +219,19 @@ pub const GRID_REDUCE_WORKGROUP: u32 = 256;
 
 /// Partial slots in the [`CollectionKernelPlan::GridReduce`] scratch.
 pub const GRID_REDUCE_PARTIALS_CAP: u32 = 1024;
+
+/// Source workgroups (partial rows) of a grouped grid reduction's first
+/// stage. That stage launches `rows * buckets` workgroups of `workgroup`
+/// lanes, and Metal addresses a lane's grid position as a 32-bit integer, so
+/// the rows shrink until the launch stays below 2^32 lanes. Host geometry and
+/// every device emitter use this one value; the scratch keeps `cap * buckets`
+/// slots, of which the first `rows * buckets` are used.
+#[must_use]
+pub fn grouped_partial_rows(cap: u32, workgroup: u32, buckets: u64) -> u32 {
+    let per_row = u64::from(workgroup.max(1)).saturating_mul(buckets.max(1));
+    let rows = u64::from(u32::MAX) / per_row;
+    u32::try_from(rows).unwrap_or(u32::MAX).clamp(1, cap.max(1))
+}
 
 /// The byte layout of one partial of a [`CollectionKernelPlan::GridReduce`].
 ///

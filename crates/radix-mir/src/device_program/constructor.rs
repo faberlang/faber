@@ -21,7 +21,7 @@ use crate::device::{MirCompanionMap, MirDeviceFunctionMetadataMap};
 use crate::device_plan_compiler::LibraryOperation;
 use crate::device_program_plans::{
     elementwise_subchain_signature_for_emission, is_transformer_recipe_op,
-    kernel_plan_for_function, subchain_has_runtime_shaped_buffer,
+    kernel_plan_for_function, scan_plan, subchain_has_runtime_shaped_buffer,
     subchain_signature_for_emission_with_source,
     transformer_subchain_signature_for_emission_with_source,
 };
@@ -546,6 +546,7 @@ pub fn build_device_program(
     let mut builder = KernelBuilder::new(
         interner,
         folded_program,
+        device_function_metadata,
         folded.validation(),
         companions,
         training,
@@ -776,6 +777,8 @@ struct KernelBuilder<'a> {
     interner: &'a Interner,
     /// The folded program: the scope kernel entry names are unique within.
     program: &'a crate::MirProgram,
+    /// Explicit device facts indexed by concrete MIR function identity.
+    device_function_metadata: &'a MirDeviceFunctionMetadataMap,
     validation: &'a crate::MirValidationContext<'a>,
     /// `(function, local)` origins that persist across repeating steps.
     persistent_locals: BTreeSet<(MirFunctionId, MirLocalId)>,
@@ -810,6 +813,7 @@ impl<'a> KernelBuilder<'a> {
     fn new(
         interner: &'a Interner,
         program: &'a crate::MirProgram,
+        device_function_metadata: &'a MirDeviceFunctionMetadataMap,
         validation: &'a crate::MirValidationContext<'a>,
         companions: &MirCompanionMap,
         training: Option<&DeviceTrainingFacts>,
@@ -842,6 +846,7 @@ impl<'a> KernelBuilder<'a> {
         Self {
             interner,
             program,
+            device_function_metadata,
             validation,
             persistent_locals,
             param_updates,
@@ -893,13 +898,28 @@ impl<'a> KernelBuilder<'a> {
         {
             let plan = match plan {
                 Some(plan) => plan,
-                None => lane_grid_plan(function, signature, self.validation)
+                None => match scan_plan(function, signature, self.validation).map_err(|detail| {
+                    DeviceProgramBuildError::KernelAbi {
+                        function: function.id,
+                        detail,
+                    }
+                })? {
+                    Some(plan) => plan,
+                    None => lane_grid_plan(
+                        function,
+                        signature,
+                        self.validation,
+                        self.device_function_metadata
+                            .get(&function.id)
+                            .and_then(|metadata| metadata.lane_domain_local),
+                    )
                     .map_err(|detail| DeviceProgramBuildError::KernelAbi {
                         function: function.id,
                         detail,
                     })?
                     .or_else(|| single_lane_plan(function, self.validation))
                     .unwrap_or(CollectionKernelPlan::Elementwise),
+                },
             };
             return self.emit_subchain(
                 function,
@@ -1218,10 +1238,33 @@ impl<'a> KernelBuilder<'a> {
             // output has no parameter to carry one). Only when the product
             // agrees with the slot's element count.
             let shape = shape.or_else(|| {
-                if !whole_result || output_index != Some(0) {
+                // A whole-result output takes the source function's result
+                // shape. A subchain output returns its own synthetic result,
+                // so its shape is that synthetic return type's shape — the
+                // dispatcher needs it to allocate the intermediate buffer.
+                if resource.role != MirKernelResourceRole::Output {
                     return None;
                 }
-                crate::abi::kernel_result_shape(kernel_source, self.validation).filter(|dims| {
+                let result_shape = if whole_result {
+                    match output_index {
+                        Some(index) => crate::abi::kernel_result_slot_shape(
+                            kernel_source,
+                            index,
+                            self.validation,
+                        ),
+                        None => crate::abi::kernel_result_shape(kernel_source, self.validation),
+                    }
+                } else {
+                    resource
+                        .source_local
+                        .and_then(|local| {
+                            crate::abi::kernel_local_shape(synthetic, local, self.validation)
+                        })
+                        .or_else(|| {
+                            crate::abi::kernel_result_shape(synthetic, self.validation)
+                        })
+                };
+                result_shape.filter(|dims| {
                     dims.iter().try_fold(1u64, |acc, d| acc.checked_mul(*d))
                         == Some(resource.element_count)
                 })
@@ -1980,15 +2023,16 @@ fn semantic_facts(
 }
 
 /// The lane-form plan of a function (gpu-reset C4-1), selected by structure:
-/// a [`MirParamMode::Lane`] parameter plus a written tensor resource. The
-/// lane domain is the first read tensor resource's call-site shape; its rank
-/// is that parameter's static rank. `Ok(None)` for a function with no Lane
-/// parameter; a Lane function with no readable source tensor, no written
-/// resource, or an unranked source fails closed.
+/// a [`MirParamMode::Lane`] parameter plus a written tensor resource. Its
+/// domain is the exact source local carried by lane-form lowering, resolved
+/// through single-assignment parameter aliases to the matching ABI resource.
+/// `Ok(None)` for a function with no Lane parameter; a Lane function with no
+/// carried source, no written resource, or an unranked source fails closed.
 fn lane_grid_plan(
     function: &MirFunction,
     signature: &MirKernelSignature,
     validation: &MirValidationContext<'_>,
+    lane_domain_local: Option<MirLocalId>,
 ) -> Result<Option<CollectionKernelPlan>, String> {
     if !function
         .params
@@ -2023,19 +2067,21 @@ fn lane_grid_plan(
         return Ok(Some(CollectionKernelPlan::GridReduce {
             source_resource,
             rank,
+            group_shape: filum.group.as_ref().map(|group| group.dimensions.clone()),
             workgroup: crate::kernel_plan::GRID_REDUCE_WORKGROUP,
             partials_cap: crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP,
             partial_layout,
         }));
     }
+    let lane_domain_local = lane_domain_local
+        .map(|local| crate::abi::resolve_parameter_alias(function, local))
+        .ok_or_else(|| "lane kernel has no carried lane-domain source identity".to_owned())?;
     let Some((source_resource, source)) = resources
         .iter()
         .enumerate()
-        .find(|(_, resource)| resource.access == MirKernelResourceAccess::Read)
+        .find(|(_, resource)| resource.source_local == Some(lane_domain_local))
     else {
-        return Err(
-            "lane kernel has no read tensor resource to take the lane domain from".to_owned(),
-        );
+        return Err("lane-domain source has no storage-buffer resource".to_owned());
     };
     let rank = source
         .source_local

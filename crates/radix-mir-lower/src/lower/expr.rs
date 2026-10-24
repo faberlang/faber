@@ -124,6 +124,7 @@ pub trait HirExpressionLoweringVisitor {
                     identity.as_deref(),
                     expr,
                 ),
+            HirExpressionKind::Scan { .. } => self.visit_scan_expr(expr),
             HirExpressionKind::FirstMatch { source, coordinates, binding, body } => {
                 self.visit_first_match_expr(source, coordinates, binding, body, expr)
             }
@@ -348,6 +349,8 @@ pub trait HirExpressionLoweringVisitor {
         identity: Option<&HirExpression>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
+    fn visit_scan_expr(&mut self, expr: &HirExpression) -> Option<MirOperand>;
+
     fn visit_first_match_expr(
         &mut self,
         source: &HirExpression,
@@ -846,6 +849,10 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         self.lower_reduction_expr(op, source, coordinates, group, filum, binding, body, identity, expr)
     }
+    fn visit_scan_expr(&mut self, expr: &HirExpression) -> Option<MirOperand> {
+        self.lower_scan_expr(expr)
+    }
+
     fn visit_first_match_expr(
         &mut self,
         source: &HirExpression,

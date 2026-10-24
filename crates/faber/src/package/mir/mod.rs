@@ -19,6 +19,8 @@
 
 #[cfg(feature = "runner")]
 pub(crate) mod bin_runner;
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub mod cpu_proba;
 #[cfg(feature = "runner")]
 mod manifest;
 
@@ -404,7 +406,9 @@ pub struct DeviceRunReceipt {
     /// Time spent compiling the image's modules onto the session, in
     /// nanoseconds.
     pub module_compile_ns: u64,
-    /// Time spent running the entry under kernel dispatch, in nanoseconds.
+    /// The session window: host interpretation of the entry plus device
+    /// execution, in nanoseconds. Not GPU time; the dispatcher's
+    /// [`RuntimeStats::gpu_busy_ns`] is the device-only figure.
     pub execution_ns: u64,
     /// The session's runtime counters.
     pub runtime: radix_device_core::runtime::RuntimeStats,
@@ -441,6 +445,28 @@ pub struct DeviceSessionRun {
     pub device: DeviceRunReceipt,
 }
 
+/// A failed in-process device run: the diagnostics, and, when the program had
+/// started executing, what the run measured up to the failure (the discovery
+/// receipt, the host meter when requested, the phase clocks and the device
+/// counters). `run` is `None` for a failure before launch (admission,
+/// preparation, image build), where nothing ran to measure.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+#[derive(Debug)]
+pub struct DeviceSessionFailure {
+    pub diagnostics: Vec<Diagnostic>,
+    pub run: Option<DeviceSessionRun>,
+}
+
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+impl From<Vec<Diagnostic>> for DeviceSessionFailure {
+    fn from(diagnostics: Vec<Diagnostic>) -> Self {
+        Self {
+            diagnostics,
+            run: None,
+        }
+    }
+}
+
 /// [`run_package_on_device_session`] with the opt-in host meter
 /// (`collect_stats`). Program arguments on `host` bind into the entry record
 /// and the package's declared CLI exit code is applied on success, as on the
@@ -457,21 +483,50 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
     host: &mut H,
     collect_stats: bool,
 ) -> Result<DeviceSessionRun, Vec<Diagnostic>> {
+    run_package_on_device_session_shaped(
+        config,
+        input,
+        selection,
+        registry,
+        host,
+        collect_stats,
+        CpuDeviceShape::default(),
+    )
+    .map_err(|failure| failure.diagnostics)
+}
+
+/// [`run_package_on_device_session_with_stats`] over a device shape:
+/// `--partitions N` on an explicit Metal selection spans the GPU (rule 18).
+/// A failure also carries what a run that had started executing measured
+/// before it failed ([`DeviceSessionFailure::run`]).
+///
+/// # Errors
+/// As [`run_package_on_device_session_with_stats`].
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn run_package_on_device_session_shaped<H: radix_mir_runner::Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: DeviceSelection,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    host: &mut H,
+    collect_stats: bool,
+    shape: CpuDeviceShape,
+) -> Result<DeviceSessionRun, DeviceSessionFailure> {
     // Admission first: an unavailable explicit device fails before lowering
     // work is spent on it.
-    let admitted = admit_device_session(input, selection, registry)?;
+    let admitted = admit_device_session(input, selection, registry, shape)?;
     let receipt = admitted.receipt.clone();
     // WHY: taken here, before the preparation call, so the closure can read
     // the analysis/lowering time before any device work starts.
     let route_start = std::time::Instant::now();
-    let (stats, phases) = radix::program::mir::with_interpreted_bound_package_mir(
+    let outcome = radix::program::mir::with_interpreted_bound_package_mir(
         config,
         input,
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
             let prepare_ns = route_start.elapsed().as_nanos() as u64;
-            run_admitted_device_session(
+            Ok(run_admitted_device_session(
                 input,
                 admitted,
                 lowered,
@@ -480,15 +535,12 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
                 host,
                 collect_stats,
                 prepare_ns,
-            )
+            ))
         },
     )?;
-    Ok(DeviceSessionRun {
-        receipt,
-        stats,
-        device: phases.into_receipt(),
-        phases,
-    })
+    outcome
+        .map(|(stats, phases)| DeviceSessionRun::new(receipt.clone(), stats, phases))
+        .map_err(|failure| failure.into_session_failure(receipt))
 }
 
 /// [`run_package_on_device_session_with_stats`] for the `auto` selection: the
@@ -503,6 +555,9 @@ pub fn run_package_on_device_session_with_stats<H: radix_mir_runner::Host + ?Siz
 /// A failure of the bound preparation itself (for example program arguments
 /// that do not bind) carries no kernel answer; it falls back to the
 /// stand-alone question so the outcome is the one the two-pass route gave.
+/// A failure of the device run itself is returned as is, carrying what the run
+/// measured before it failed ([`DeviceSessionFailure::run`]); the package is
+/// never run again.
 ///
 /// # Errors
 /// As [`run_package_on_device_session_with_stats`].
@@ -513,7 +568,7 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
     registry: &mut radix_device_core::registry::DeviceRegistry,
     host: &mut H,
     collect_stats: bool,
-) -> Result<Option<DeviceSessionRun>, Vec<Diagnostic>> {
+) -> Result<Option<DeviceSessionRun>, DeviceSessionFailure> {
     // WHY: taken here, before the preparation call, so the closure can read
     // the analysis/lowering time before any device work starts.
     let route_start = std::time::Instant::now();
@@ -527,46 +582,68 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
             if !lowered_declares_kernels(lowered) {
                 return Ok(Ok(None));
             }
-            Ok(
-                admit_device_session(input, DeviceSelection::Auto, registry).and_then(|admitted| {
-                    let receipt = admitted.receipt.clone();
-                    run_admitted_device_session(
-                        input,
-                        admitted,
-                        lowered,
-                        validated,
-                        exit_code,
-                        host,
-                        collect_stats,
-                        prepare_ns,
-                    )
-                    .map(|(stats, phases)| {
-                        Some(DeviceSessionRun {
-                            receipt,
-                            stats,
-                            device: phases.into_receipt(),
-                            phases,
-                        })
-                    })
-                }),
-            )
+            Ok(run_declared_kernels_on_device_session(
+                input,
+                DeviceSelection::Auto,
+                registry,
+                CpuDeviceShape::default(),
+                lowered,
+                validated,
+                exit_code,
+                host,
+                collect_stats,
+                prepare_ns,
+            ))
         },
     );
     match prepared {
         Ok(outcome) => outcome,
         Err(_) if package_declares_kernels(config, input).unwrap_or(false) => {
-            run_package_on_device_session_with_stats(
+            run_package_on_device_session_shaped(
                 config,
                 input,
                 DeviceSelection::Auto,
                 registry,
                 host,
                 collect_stats,
+                CpuDeviceShape::default(),
             )
             .map(Some)
         }
         Err(_) => Ok(None),
     }
+}
+
+/// Admit `selection` over `registry` and run the lowered unit (which declares
+/// kernels) on it: the shared body of the `auto` and `cpu` device routes.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+#[allow(clippy::too_many_arguments)]
+fn run_declared_kernels_on_device_session<H: radix_mir_runner::Host + ?Sized>(
+    input: &Path,
+    selection: DeviceSelection,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    shape: CpuDeviceShape,
+    lowered: &radix::module::mir::LoweredMirUnit<'_>,
+    validated: &radix::module::mir::ValidatedMir<'_>,
+    exit_code: Option<i32>,
+    host: &mut H,
+    collect_stats: bool,
+    prepare_ns: u64,
+) -> Result<Option<DeviceSessionRun>, DeviceSessionFailure> {
+    let admitted = admit_device_session(input, selection, registry, shape)?;
+    let receipt = admitted.receipt.clone();
+    run_admitted_device_session(
+        input,
+        admitted,
+        lowered,
+        validated,
+        exit_code,
+        host,
+        collect_stats,
+        prepare_ns,
+    )
+    .map(|(stats, phases)| Some(DeviceSessionRun::new(receipt.clone(), stats, phases)))
+    .map_err(|failure| failure.into_session_failure(receipt))
 }
 
 /// An admitted, opened device session: the discovery receipt line has been
@@ -587,6 +664,21 @@ fn admit_device_session(
     input: &Path,
     selection: DeviceSelection,
     registry: &mut radix_device_core::registry::DeviceRegistry,
+    cpu: CpuDeviceShape,
+) -> Result<AdmittedDeviceSession, Vec<Diagnostic>> {
+    let admitted = open_device_session(input, selection, registry, cpu)?;
+    println!("{}", admitted.receipt);
+    Ok(admitted)
+}
+
+/// [`admit_device_session`] without printing the discovery receipt: a proba
+/// route opens one session per case and keeps its report clean.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn open_device_session(
+    input: &Path,
+    selection: DeviceSelection,
+    registry: &mut radix_device_core::registry::DeviceRegistry,
+    cpu: CpuDeviceShape,
 ) -> Result<AdmittedDeviceSession, Vec<Diagnostic>> {
     use super::device::DeviceImageBackend;
     use super::host_factory::{discovery_receipt, host_error_diagnostic, open_device_selection};
@@ -596,7 +688,7 @@ fn admit_device_session(
     use std::time::Instant;
 
     let admit_start = Instant::now();
-    let opened = open_device_selection(registry, selection, true, BudgetRequest::Derived)
+    let opened = open_device_selection(registry, selection, true, BudgetRequest::Derived, cpu)
         .map_err(|diagnostic| vec![diagnostic])?
         .ok_or_else(|| {
             vec![mir_diag(
@@ -606,26 +698,18 @@ fn admit_device_session(
         })?;
     let receipt = discovery_receipt(&opened);
     let backend = match receipt.class {
+        // A Metal device spanning several partitions takes the lane-range
+        // image (rule 18).
+        DeviceClass::Backend(DeviceBackend::Metal) if receipt.partitions > 1 => {
+            DeviceImageBackend::MetalSpanned
+        }
         DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
         DeviceClass::Backend(DeviceBackend::Cuda) => DeviceImageBackend::Cuda,
-        other => {
-            return Err(vec![
-                mir_issue_diag(
-                    input,
-                    "E_DEVICE_UNSUPPORTED",
-                    format!(
-                        "no per-kernel device image backend for `{}` yet",
-                        other.spelling()
-                    ),
-                )
-                .with_arg("code", "E_DEVICE_UNSUPPORTED".to_owned()),
-            ]);
-        }
+        DeviceClass::Cpu => DeviceImageBackend::Cpu,
     };
     let session =
         DeviceSession::from_opened(opened).map_err(|error| vec![host_error_diagnostic(&error)])?;
     let admit_ns = admit_start.elapsed().as_nanos() as u64;
-    receipt.print();
     Ok(AdmittedDeviceSession {
         session,
         backend,
@@ -686,28 +770,32 @@ impl DeviceRunPhases {
     }
 }
 
-/// Build the device image from the lowered unit and run the argument-bound
-/// entry on the MIR runner under kernel dispatch through the admitted session.
+/// A session kernel dispatcher built over one lowered unit, with the time its
+/// image build and module compile took.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
-fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
+struct SessionDispatcher {
+    dispatcher: std::rc::Rc<std::cell::RefCell<super::device::SessionKernelDispatcher>>,
+    image_build_ns: u64,
+    image_timing: super::device::DeviceImageTiming,
+    module_compile_ns: u64,
+}
+
+/// Build the device image from the lowered unit and the kernel dispatcher
+/// that launches it through the admitted session. A unit with no kernel that
+/// lowers to the device fails closed (`E_DEVICE_NONE_ADMITTED`).
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn session_dispatcher(
     input: &Path,
     admitted: AdmittedDeviceSession,
     lowered: &radix::module::mir::LoweredMirUnit<'_>,
     validated: &radix::module::mir::ValidatedMir<'_>,
-    exit_code: Option<i32>,
-    host: &mut H,
-    collect_stats: bool,
-    prepare_ns: u64,
-) -> Result<(Option<radix_mir_runner::RunnerStats>, DeviceRunPhases), Vec<Diagnostic>> {
+) -> Result<SessionDispatcher, Vec<Diagnostic>> {
     use super::device::{SessionKernelDispatcher, device_image_for_lowered};
     use super::host_factory::host_error_diagnostic;
     use std::time::Instant;
 
     let AdmittedDeviceSession {
-        session,
-        backend,
-        admit_ns,
-        ..
+        session, backend, ..
     } = admitted;
     let image_start = Instant::now();
     let (mut image, omitted, image_timing) = device_image_for_lowered(lowered, backend)?;
@@ -732,11 +820,6 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         .interner
         .as_interner()
         .ok_or_else(|| vec![mir_diag(input, "device run requires interner context")])?;
-    let names = radix_mir::names::MirNames::new(
-        validated.program(),
-        validated.validation().types.as_table(),
-        interner,
-    );
     let omissions: Vec<(radix_mir::MirFunctionId, String)> = omitted
         .iter()
         .map(|(id, reason)| {
@@ -753,14 +836,34 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
             )
         })
         .collect();
-    let entry = names
-        .explicit_entry_function()
-        .map(|function| function.id)
-        .ok_or_else(|| vec![mir_diag(input, radix_mir::names::NO_ENTRY_FUNCTION)])?;
+    // The CPU lane image must resolve before the session compiles its token.
+    if let Some(cpu) = &image.cpu {
+        super::device::CpuLaneEngine::shared().install(cpu);
+    }
     let extents = image.extents;
     let genus_layouts = image.genus_layouts;
     let fault_sites = image.fault_sites;
     let backward = std::mem::take(&mut image.backward);
+    let param_buffers = std::mem::take(&mut image.param_buffers);
+    let result_buffers = std::mem::take(&mut image.result_buffers);
+    let refusals: Vec<(radix_mir::MirFunctionId, String)> = std::mem::take(&mut image.refused)
+        .into_iter()
+        .map(|(id, reason)| {
+            let name = validated
+                .program()
+                .functions
+                .iter()
+                .find(|function| function.id == id)
+                .and_then(|function| function.name)
+                .map_or_else(|| id.0.to_string(), |s| interner.resolve(s).to_owned());
+            (
+                id,
+                format!("kernel `{name}` cannot run as a unit sequence: {reason}"),
+            )
+        })
+        .collect();
+    let lane_ranges = std::mem::take(&mut image.lane_ranges);
+    let write_maps = std::mem::take(&mut image.write_maps);
     let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher_start = Instant::now();
     let dispatcher = SessionKernelDispatcher::new(
@@ -772,10 +875,27 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
     let module_compile_ns = dispatcher_start.elapsed().as_nanos() as u64;
     dispatcher.borrow_mut().set_omissions(omissions);
+    dispatcher.borrow_mut().set_refusals(refusals);
+    dispatcher.borrow_mut().set_result_buffers(
+        result_buffers
+            .into_iter()
+            .map(|(function, row)| (function, row.into_iter().map(|id| id.0).collect()))
+            .collect(),
+    );
+    dispatcher.borrow_mut().set_param_buffers(
+        param_buffers
+            .into_iter()
+            .map(|(function, row)| (function, row.into_iter().map(|buffer| buffer.map(|id| id.0)).collect()))
+            .collect(),
+    );
     dispatcher
         .borrow_mut()
         .set_scalars_by_buffer(backend == super::device::DeviceImageBackend::Cuda);
     dispatcher.borrow_mut().set_extents(extents);
+    dispatcher.borrow_mut().set_write_maps(write_maps);
+    if backend == super::device::DeviceImageBackend::MetalSpanned {
+        dispatcher.borrow_mut().set_span(lane_ranges);
+    }
     dispatcher.borrow_mut().set_backward_functions(backward);
     super::device::install_fault_sites(&fault_sites, |entry, sites| {
         dispatcher.borrow_mut().set_fault_sites(entry, sites);
@@ -783,12 +903,64 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     dispatcher
         .borrow_mut()
         .set_genus_layouts(genus_layouts, interner.clone());
+    Ok(SessionDispatcher {
+        dispatcher,
+        image_build_ns,
+        image_timing,
+        module_compile_ns,
+    })
+}
+
+/// Build the device image from the lowered unit and run the argument-bound
+/// entry on the MIR runner under kernel dispatch through the admitted session.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
+    input: &Path,
+    admitted: AdmittedDeviceSession,
+    lowered: &radix::module::mir::LoweredMirUnit<'_>,
+    validated: &radix::module::mir::ValidatedMir<'_>,
+    exit_code: Option<i32>,
+    host: &mut H,
+    collect_stats: bool,
+    prepare_ns: u64,
+) -> Result<(Option<radix_mir_runner::RunnerStats>, DeviceRunPhases), DeviceRunFailure> {
+    use std::time::Instant;
+
+    let admit_ns = admitted.admit_ns;
+    let SessionDispatcher {
+        dispatcher,
+        image_build_ns,
+        image_timing,
+        module_compile_ns,
+    } = session_dispatcher(input, admitted, lowered, validated)?;
+    let interner = validated
+        .validation()
+        .interner
+        .as_interner()
+        .ok_or_else(|| vec![mir_diag(input, "device run requires interner context")])?;
+    let names = radix_mir::names::MirNames::new(
+        validated.program(),
+        validated.validation().types.as_table(),
+        interner,
+    );
+    let entry = names
+        .explicit_entry_function()
+        .map(|function| function.id)
+        .ok_or_else(|| vec![mir_diag(input, radix_mir::names::NO_ENTRY_FUNCTION)])?;
     let hook: radix_mir_runner::kernel_dispatch::ResidencyHook = dispatcher.clone();
     let runner_diagnostics = |errors: Vec<radix_mir_runner::RunnerError>| {
         errors
             .into_iter()
             .map(|error| {
-                mir_issue_diag(input, "device_run_failed", error.message)
+                // A device error keeps its stable `E_DEVICE_*` code as the
+                // diagnostic issue, so the terminal prints `error: <code>: ..`.
+                let issue = if error.issue.starts_with("E_DEVICE_") {
+                    error.issue.clone()
+                } else {
+                    "device_run_failed".to_owned()
+                };
+                mir_diag(input, error.message)
+                    .with_arg("issue", issue)
                     .with_arg("code", error.issue)
             })
             .collect::<Vec<_>>()
@@ -805,11 +977,27 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     )
     .map_err(runner_diagnostics)?;
     let execution_ns = execution_start.elapsed().as_nanos() as u64;
-    outcome.result.map_err(runner_diagnostics)?;
     // WHY: taken here, before the exit handling (`host.exit` panics in tests)
     // and while the dispatcher `Rc` is still alive; the receipt is dropped with
-    // the dispatcher at return otherwise.
+    // the dispatcher at return otherwise. A failed run keeps it too: the
+    // counters up to the fault are the failure's receipt.
     let dispatcher_receipt = dispatcher.borrow().receipt();
+    let phases = DeviceRunPhases {
+        admit_ns,
+        prepare_ns,
+        image_build_ns,
+        image_emission_ns: image_timing.emission_ns,
+        image_ptx_compile_ns: image_timing.ptx_compile_ns,
+        module_compile_ns,
+        execution_ns,
+        dispatcher: dispatcher_receipt,
+    };
+    if let Err(errors) = outcome.result {
+        return Err(DeviceRunFailure {
+            diagnostics: runner_diagnostics(errors),
+            partial: Some((collect_stats.then_some(outcome.stats), phases)),
+        });
+    }
     if let Some(radix_mir_runner::Value::Int(code)) = outcome.return_value {
         // WHY: a process exit status is `i32` while the Faber `numerus`
         // carrier is `i64`; truncate exactly as the trap path does.
@@ -819,19 +1007,53 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     } else if let Some(code) = exit_code {
         host.exit(code);
     }
-    Ok((
-        collect_stats.then_some(outcome.stats),
-        DeviceRunPhases {
-            admit_ns,
-            prepare_ns,
-            image_build_ns,
-            image_emission_ns: image_timing.emission_ns,
-            image_ptx_compile_ns: image_timing.ptx_compile_ns,
-            module_compile_ns,
-            execution_ns,
-            dispatcher: dispatcher_receipt,
-        },
-    ))
+    Ok((collect_stats.then_some(outcome.stats), phases))
+}
+
+/// A failed [`run_admitted_device_session`]: the diagnostics, and the host
+/// meter and phase clocks of a run that failed after it started executing.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+struct DeviceRunFailure {
+    diagnostics: Vec<Diagnostic>,
+    partial: Option<(Option<radix_mir_runner::RunnerStats>, DeviceRunPhases)>,
+}
+
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+impl From<Vec<Diagnostic>> for DeviceRunFailure {
+    fn from(diagnostics: Vec<Diagnostic>) -> Self {
+        Self {
+            diagnostics,
+            partial: None,
+        }
+    }
+}
+
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+impl DeviceRunFailure {
+    fn into_session_failure(self, receipt: String) -> DeviceSessionFailure {
+        DeviceSessionFailure {
+            diagnostics: self.diagnostics,
+            run: self
+                .partial
+                .map(|(stats, phases)| DeviceSessionRun::new(receipt, stats, phases)),
+        }
+    }
+}
+
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+impl DeviceSessionRun {
+    fn new(
+        receipt: String,
+        stats: Option<radix_mir_runner::RunnerStats>,
+        phases: DeviceRunPhases,
+    ) -> Self {
+        Self {
+            receipt,
+            stats,
+            device: phases.into_receipt(),
+            phases,
+        }
+    }
 }
 
 /// Whether the package lowers at least one `@ kernel` function: the `auto`
@@ -859,6 +1081,117 @@ fn lowered_declares_kernels(lowered: &radix::module::mir::LoweredMirUnit<'_>) ->
         .any(|function| function.shader_stage == Some(radix_mir::MirKernelShaderStage::Compute))
 }
 
+/// The registry of the `--device cpu` route: one CPU runtime over the
+/// process-wide lane engine ([`super::device::CpuLaneEngine`]). The worker
+/// budget is shared by all logical partitions. `auto` never uses this registry.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn cpu_device_registry(
+    workers: Option<std::num::NonZeroU32>,
+) -> radix_device_core::registry::DeviceRegistry {
+    let workers = workers
+        .or_else(default_cpu_workers)
+        .map_or(std::num::NonZeroUsize::MIN, |workers| {
+            std::num::NonZeroUsize::try_from(workers).unwrap_or(std::num::NonZeroUsize::MAX)
+        });
+    let mut registry = radix_device_core::registry::DeviceRegistry::new();
+    registry.register(Box::new(radix_device_cpu::CpuRuntime::new(
+        super::device::CpuLaneEngine::shared(),
+        workers,
+    )));
+    registry
+}
+
+/// Run `input` on the CPU device (gpu-reset rule 16.9): several worker
+/// threads behind one logical device, through the same device session as
+/// Metal and CUDA. `cpu.workers` is `--threads N`; absent, half the available
+/// cores, at least one. `cpu.partitions` is `--partitions N`: the logical
+/// device spans that many logical partitions sharing the worker pool (rule 18).
+/// `Ok(None)` means the package declares no kernel: nothing ran,
+/// and the reference route runs it, exactly as
+/// [`run_package_on_device_session_if_kernels`] answers for `auto`.
+///
+/// # Errors
+/// As [`run_package_on_device_session_with_stats`].
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn run_package_on_cpu_device_session<H: radix_mir_runner::Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    cpu: CpuDeviceShape,
+    host: &mut H,
+    collect_stats: bool,
+) -> Result<Option<DeviceSessionRun>, DeviceSessionFailure> {
+    let cpu = CpuDeviceShape {
+        workers: cpu.workers.or_else(default_cpu_workers),
+        ..cpu
+    };
+    let mut registry = cpu_device_registry(cpu.workers);
+    // WHY: taken here, before the preparation call, so the closure can read
+    // the analysis/lowering time before any device work starts.
+    let route_start = std::time::Instant::now();
+    let prepared = radix::program::mir::with_interpreted_bound_package_mir(
+        config,
+        input,
+        host,
+        &faber_mir_seams(),
+        |lowered, validated, exit_code, host| {
+            let prepare_ns = route_start.elapsed().as_nanos() as u64;
+            if !lowered_declares_kernels(lowered) {
+                return Ok(Ok(None));
+            }
+            Ok(run_declared_kernels_on_device_session(
+                input,
+                DeviceSelection::Cpu,
+                &mut registry,
+                cpu,
+                lowered,
+                validated,
+                exit_code,
+                host,
+                collect_stats,
+                prepare_ns,
+            ))
+        },
+    );
+    match prepared {
+        Ok(outcome) => outcome,
+        // A failed preparation of a package without kernels is reported by
+        // the reference route, as for `auto`.
+        Err(diagnostics) if package_declares_kernels(config, input).unwrap_or(false) => {
+            Err(diagnostics.into())
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+/// The shape of the `--device cpu` logical device: the total worker count
+/// (`--threads N`; `None` takes the route default) and the number of virtual
+/// partitions sharing the workers (`--partitions N`, default one).
+/// Other devices take the default shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CpuDeviceShape {
+    /// Total CPU workers across every partition.
+    pub workers: Option<std::num::NonZeroU32>,
+    /// Virtual partitions of the one logical CPU device.
+    pub partitions: std::num::NonZeroU32,
+}
+
+impl Default for CpuDeviceShape {
+    fn default() -> Self {
+        Self {
+            workers: None,
+            partitions: std::num::NonZeroU32::MIN,
+        }
+    }
+}
+
+/// The CPU device's default worker count: half the available cores, at
+/// least one.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn default_cpu_workers() -> Option<std::num::NonZeroU32> {
+    let cores = std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get);
+    std::num::NonZeroU32::new(u32::try_from(cores / 2).unwrap_or(u32::MAX).max(1))
+}
+
 /// Register the system device runtimes this machine provides: Metal on
 /// macOS when a Metal device opens, and CUDA wherever the CUDA driver
 /// library (`libcuda`, loaded at run time) is present. A machine without a
@@ -868,6 +1201,28 @@ fn lowered_declares_kernels(lowered: &radix::module::mir::LoweredMirUnit<'_>) ->
 /// when a device is opened, so a run without kernels does not pay for it.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub fn system_device_registry() -> radix_device_core::registry::DeviceRegistry {
+    system_device_registry_spanning(MetalSpan::Unspanned)
+}
+
+/// How logical Metal partitions share the physical device's memory.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MetalSpan {
+    /// One ordinary Metal runtime without a spanning wrapper.
+    Unspanned,
+    /// One allocation owner and queue shared by all logical partitions.
+    Shared,
+    /// Separate stores and queues for transport tests on one physical GPU.
+    PrivateCopies,
+}
+
+/// Register Metal with the requested partition-memory model. Shared mode
+/// uses one allocation owner and queue; Replicate and First execute once.
+/// Private copies keep separate stores and queues for transport tests.
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+pub fn system_device_registry_spanning(
+    metal_span: MetalSpan,
+) -> radix_device_core::registry::DeviceRegistry {
     let mut registry = radix_device_core::registry::DeviceRegistry::new();
     if radix_device_cuda::driver_library_present() {
         registry.register(Box::new(radix_device_cuda::system_runtime()));
@@ -876,7 +1231,33 @@ pub fn system_device_registry() -> radix_device_core::registry::DeviceRegistry {
     if let Some(info) = radix_device_metal::system_devices().into_iter().next()
         && let Ok(driver) = radix_device_metal::SystemMetalDriver::open(info.registry_id)
     {
-        registry.register(Box::new(radix_device_metal::MetalRuntime::new(driver)));
+        if metal_span == MetalSpan::PrivateCopies {
+            let registry_id = info.registry_id;
+            let mut first = Some(driver);
+            let factory: radix_device_core::span::ChildFactory = Box::new(move || {
+                let driver = match first.take() {
+                    Some(driver) => driver,
+                    None => radix_device_metal::SystemMetalDriver::open(registry_id).map_err(
+                        |error| {
+                            radix_device_core::HostError::invalid_args(format!(
+                                "a Metal partition driver did not open: {error:?}"
+                            ))
+                        },
+                    )?,
+                };
+                Ok(Box::new(radix_device_metal::MetalRuntime::new(driver))
+                    as Box<dyn radix_device_core::runtime::DeviceRuntime>)
+            });
+            if let Ok(spanning) = radix_device_core::span::SpanningRuntime::new(factory) {
+                registry.register(Box::new(spanning));
+            }
+        } else if metal_span == MetalSpan::Shared {
+            registry.register(Box::new(radix_device_core::span::SpanningRuntime::shared(
+                Box::new(radix_device_metal::MetalRuntime::new(driver)),
+            )));
+        } else {
+            registry.register(Box::new(radix_device_metal::MetalRuntime::new(driver)));
+        }
     }
     registry
 }

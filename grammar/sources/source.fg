@@ -757,6 +757,11 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Expression | `quilibet` | any reduction operator (en `any`; contextual) |
 # | Expression | `reducta` | reduction expression head (en `reduce`; contextual) |
 # | Expression | `summa` | sum reduction operator (en `sum`) |
+# | Expression | `scan` | ordered prefix-scan head (shared source spelling; contextual) |
+# | Expression | `scan_total` | prefix-scan total-mode introducer (shared source spelling; contextual) |
+# | Expression | `scan_inclusive` | inclusive prefix-scan mode (shared source spelling; contextual) |
+# | Expression | `scan_exclusive` | exclusive prefix-scan mode (shared source spelling; contextual) |
+# | Expression | `scan_order` | scan order-clause introducer (shared source spelling; contextual) |
 # | Objects | `clausura` | legacy closure |
 # | Objects | `ego` | self |
 # | Objects | `finge` | construct variant |
@@ -765,7 +770,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Objects | `praefixum` | prefix expression |
 # | Grammar | `primus_quem` | first-match selection head |
 # | Grammar | `ubi` | first-match predicate tail |
-# | Conversion | `via` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
+# | Conversion | `via` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
 # | Type | `in` | ownership in |
@@ -1532,6 +1537,7 @@ primary := IDENTIFIER | literal | regex_literal | 'ego'
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
          | first_match_expr
          | reducta_expr
+         | scan_expr
          | sort_expr
          | capta_expr
          | '(' expression ')'
@@ -1633,6 +1639,14 @@ reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminim
 reducta_group := 'pro' expression
 reducta_body := ('sit' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression
+# Ordered prefix scan. `vel` is parsed at the ordinary outer expression level,
+# so a trailing coalesce wraps the complete source-shaped scan result and is
+# never captured as an accumulator seed. The total mode defaults to inclusive;
+# grouped keys require a compiler-proven finite domain.
+scan_expr := 'scan' 'via' scan_op ('scan_total' ('scan_inclusive' | 'scan_exclusive'))? 'ex' expression apud_clause scan_group? scan_order_clause? filum_clause 'sit' IDENTIFIER block_stmt
+scan_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'omnia' | 'quilibet' | 'numeratio'
+scan_group := 'pro' expression
+scan_order_clause := 'scan_order' ('ascendens' | 'descendens')
 # Sort expression. `via` is mandatory and selects the direction; `ex` sorts a
 # list, set or map's values and `de` sorts a map's keys. The optional body is
 # the reduce body form and returns the sort key; without one the source

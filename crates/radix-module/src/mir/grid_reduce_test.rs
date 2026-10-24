@@ -221,12 +221,19 @@ fn the_plan_names_the_reduced_tensor_not_the_first_read_buffer() {
     use radix_mir::CollectionKernelPlan;
     let (program, _) = device_program(SECOND_SOURCE);
     assert_eq!(program.kernels.len(), 1);
-    let CollectionKernelPlan::GridReduce { source_resource, rank, workgroup, partials_cap, partial_layout } =
-        &program.kernels[0].plan
+    let CollectionKernelPlan::GridReduce {
+        source_resource,
+        rank,
+        group_shape,
+        workgroup,
+        partials_cap,
+        partial_layout,
+    } = &program.kernels[0].plan
     else {
         panic!("expected GridReduce, got {:?}", program.kernels[0].plan);
     };
     assert_eq!((*source_resource, *rank, *workgroup, *partials_cap), (1, 2, 256, 1024));
+    assert_eq!(*group_shape, None, "an ungrouped reduce keeps the scalar layout");
     assert_eq!(partial_layout.element_bytes(), 8, "f32 value plus the seen flag");
 }
 

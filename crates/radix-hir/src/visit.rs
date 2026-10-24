@@ -481,6 +481,26 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
                 visitor.visit_expr(identity);
             }
         }
+        HirExpressionKind::Scan {
+            source,
+            coordinates,
+            group,
+            filum,
+            binding,
+            body,
+            ..
+        } => {
+            for (id, name) in coordinates {
+                visitor.visit_def(*id, *name);
+            }
+            visitor.visit_def(filum.0, filum.1);
+            visitor.visit_def(binding.0, binding.1);
+            visitor.visit_expr(source);
+            if let Some(group) = group {
+                visitor.visit_expr(group);
+            }
+            visitor.visit_block(body);
+        }
         HirExpressionKind::Sort {
             source,
             binding,
@@ -1108,6 +1128,26 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             if let Some(identity) = identity {
                 visitor.visit_expr_mut(identity);
             }
+        }
+        HirExpressionKind::Scan {
+            source,
+            coordinates,
+            group,
+            filum,
+            binding,
+            body,
+            ..
+        } => {
+            for (id, name) in coordinates {
+                visitor.visit_def(*id, *name);
+            }
+            visitor.visit_def(filum.0, filum.1);
+            visitor.visit_def(binding.0, binding.1);
+            visitor.visit_expr_mut(source);
+            if let Some(group) = group {
+                visitor.visit_expr_mut(group);
+            }
+            visitor.visit_block_mut(body);
         }
         HirExpressionKind::Sort {
             source,

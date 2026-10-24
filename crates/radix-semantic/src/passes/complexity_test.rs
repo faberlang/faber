@@ -768,15 +768,12 @@ fn kernel_score_three_warns_with_kernel_arg() {
     assert_eq!(
         function_complexity(&function(kernel_body(2))),
         Some(3),
-        "fixture sanity: two sis score 3 (the first tripping score)"
+        "fixture sanity: two sis score 3 (the first tripping score at kernel budget 2)"
     );
     let (module, interner) = module_with_function_selected("dense", kernel_body(2), true);
-    let findings = complexity(
-        &module,
-        &interner,
-        DEFAULT_COMPLEXITY_BUDGET,
-        DEFAULT_KERNEL_COMPLEXITY_BUDGET,
-    );
+    // An explicit kernel budget of 2 (the baked default now equals the
+    // regular 12) isolates the kernel tier.
+    let findings = complexity(&module, &interner, DEFAULT_COMPLEXITY_BUDGET, 2);
     assert_eq!(findings.len(), 1, "exactly one finding");
 
     let finding = find_complexity_warning(&findings);
@@ -841,8 +838,8 @@ fn kernel_budget_selection_is_independent_of_the_regular_budget() {
 }
 
 #[test]
-fn kernel_budget_constant_is_census_recommendation() {
-    // Census kernel subset (84 kernel fns, max 2, six at 2): the budget is
-    // a future tripwire firing on nothing measured today.
-    assert_eq!(DEFAULT_KERNEL_COMPLEXITY_BUDGET, 2);
+fn kernel_budget_constant_equals_the_regular_budget() {
+    // Operator 2026-10-23: the census-era kernel budget of 2 fired on
+    // ordinary numerical helpers; kernels share the regular baked budget.
+    assert_eq!(DEFAULT_KERNEL_COMPLEXITY_BUDGET, DEFAULT_COMPLEXITY_BUDGET);
 }

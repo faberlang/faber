@@ -505,6 +505,7 @@ impl TypeChecker<'_> {
                     && let Some(stored) = self.stored_const_int(const_item.ty, value)
                 {
                     self.const_int_values.insert(item.def_id, stored);
+                    self.module_const_ints.insert(item.def_id);
                     progressed = true;
                 }
             }

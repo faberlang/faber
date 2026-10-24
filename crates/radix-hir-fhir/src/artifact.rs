@@ -631,8 +631,10 @@ pub struct FunctionProvenanceTableWire {
 /// Version 46 carries `HirArtifact::conversation_constructor`, the
 /// compiler-owned `sermo` definition the authored-form validator needs to pair
 /// a bare carrier witness with the authored `sermo<O, R>` type children;
-/// schema-v45 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 46;
+/// schema-v45 artifacts fail closed. Version 47 adds the source-shaped
+/// `HirExpressionKind::Scan` node and its proven grouped-key domain; schema-v46
+/// artifacts fail closed because the serialized HIR enum changed.
+pub const SCHEMA_VERSION: u32 = 47;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

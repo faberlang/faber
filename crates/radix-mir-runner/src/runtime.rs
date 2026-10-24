@@ -244,6 +244,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 self.eval_tensor_lift(*op, &call.args, call.return_ty, span)
             }
             MirIntrinsic::Pow => self.eval_float_pow(&call.args, span),
+            MirIntrinsic::Scan(op) => self.eval_scan(op, &call.args, span),
+            MirIntrinsic::FilumReduce(op) if op.form == radix_mir::MirFilumForm::Grid => {
+                self.eval_filum_grid_reduce(op, &call.args, call.return_ty, span)
+            }
             MirIntrinsic::Duplicate => {
                 let [source] = call.args.as_slice() else {
                     return Err(RunnerError::internal(span, "duplicate runtime arity"));
@@ -2711,7 +2715,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// by a lazy tensor edge callback. Arguments live in temporary caller
     /// value slots so the normal call path preserves step budgets, deadlines,
     /// frame accounting, and error propagation.
-    fn invoke_runtime_values(
+    pub(crate) fn invoke_runtime_values(
         &mut self,
         function: MirFunctionId,
         arguments: Vec<Value>,
@@ -4822,7 +4826,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let Some(frame) = self.frames.last() else {
             return Ok(None);
         };
-        let Some(slots) = self.slot_types.get(&frame.function) else {
+        let Some(slots) = self.prepared.slot_types.get(&frame.function) else {
             return Ok(None);
         };
         let ty = match &place.base {
@@ -5876,7 +5880,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return None;
         };
         let frame = self.frames.last()?;
-        let slots = self.slot_types.get(&frame.function)?;
+        let slots = self.prepared.slot_types.get(&frame.function)?;
         let ty = match place.base {
             radix_mir::MirPlaceBase::Local(id) => slots.local_ty(id),
             radix_mir::MirPlaceBase::Temp(id) => slots.temp_ty(id),

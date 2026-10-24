@@ -223,6 +223,17 @@ fn locale_pack_completeness_nominal_ascription_row_in_every_pack() {
     }
 }
 
+/// The thread-body exits are refused by their own named issues; every pack
+/// carries a row for each, or the issue falls back to the generic `SEM010` text.
+#[test]
+fn locale_pack_completeness_thread_body_exit_rows_in_every_pack() {
+    for locale in ["la", "en", "th-TH", "ar", "zh-Hans", "zh-Hant", "vi", "hi"] {
+        for issue in ["break_in_thread_body", "return_in_thread_body"] {
+            assert_issue_template(&owned_pack(locale), "SEM010", issue);
+        }
+    }
+}
+
 #[test]
 fn locale_pack_completeness_sinking_contract_row_in_la() {
     assert_issue_template(&owned_pack("la"), "SEM018", "radix_contract_sinking_shape");

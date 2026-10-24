@@ -493,6 +493,11 @@ fn analyze_package_spec_with_deadline(
         LibraryInterfaceCache::with_config(&session.config).with_locale_loader(seams.locale_loader);
     let mut nodes = BTreeMap::new();
     let mut analyzed_interfaces_by_path = BTreeMap::new();
+    // A failed provider already has an authoritative diagnostic. Importers
+    // that depend on it cannot be analyzed, but should not add the secondary
+    // "interface was not analyzed before importer" PKG001 that would hide the
+    // provider's actual failure.
+    let mut failed_interface_paths = BTreeSet::new();
     // Carriage minted per import target within this package run (ARCH-U4):
     // every edge to the same target shares one analyzed provider unit.
     let mut provider_carriage_minted: BTreeMap<PathBuf, CarriedProviderUnit> = BTreeMap::new();
@@ -554,6 +559,7 @@ fn analyze_package_spec_with_deadline(
             Ok(exports) => exports,
             Err(diag) => {
                 diagnostics.push(diag);
+                failed_interface_paths.insert(file.path.clone());
                 continue;
             }
         };
@@ -564,10 +570,16 @@ fn analyze_package_spec_with_deadline(
             library_resolver,
             &mut library_cache,
             &analyzed_interfaces_by_path,
+            &failed_interface_paths,
         ) {
-            Ok(interfaces) => interfaces,
+            Ok(Some(interfaces)) => interfaces,
+            Ok(None) => {
+                failed_interface_paths.insert(file.path.clone());
+                continue;
+            }
             Err(diag) => {
                 diagnostics.push(diag);
+                failed_interface_paths.insert(file.path.clone());
                 continue;
             }
         };
@@ -576,6 +588,7 @@ fn analyze_package_spec_with_deadline(
                 Ok(source) => source,
                 Err(diag) => {
                     diagnostics.push(diag);
+                    failed_interface_paths.insert(file.path.clone());
                     continue;
                 }
             };
@@ -590,6 +603,7 @@ fn analyze_package_spec_with_deadline(
             Ok(declarations) => declarations,
             Err(diag) => {
                 diagnostics.push(diag);
+                failed_interface_paths.insert(file.path.clone());
                 continue;
             }
         };
@@ -666,6 +680,7 @@ fn analyze_package_spec_with_deadline(
                     file.body_byte_offset,
                 );
                 diagnostics.extend(file_diagnostics);
+                failed_interface_paths.insert(file.path.clone());
                 continue;
             }
         };
@@ -678,6 +693,7 @@ fn analyze_package_spec_with_deadline(
             Some(&linked_library_crates),
         ) {
             diagnostics.push(diag);
+            failed_interface_paths.insert(file.path.clone());
             continue;
         }
 
@@ -710,6 +726,7 @@ fn analyze_package_spec_with_deadline(
             Ok(interface) => interface,
             Err(diag) => {
                 diagnostics.push(diag);
+                failed_interface_paths.insert(file.path.clone());
                 continue;
             }
         };
@@ -723,6 +740,7 @@ fn analyze_package_spec_with_deadline(
             file,
             &files_by_path,
             library_resolver,
+            &analyzed_interfaces_by_path,
         ));
         let module_id = ModuleId::for_spec(&spec, file.module_segments.clone());
 
@@ -781,12 +799,14 @@ fn analyze_package_spec_with_deadline(
             );
             if let Err(mut deferred_diagnostics) = deferred {
                 nodes.remove(&module_id);
+                analyzed_interfaces_by_path.remove(&file.path);
                 radix_module::driver::adjust_diagnostic_lines_for_body(
                     &mut deferred_diagnostics,
                     &file.raw_source,
                     file.body_byte_offset,
                 );
                 diagnostics.extend(deferred_diagnostics);
+                failed_interface_paths.insert(file.path.clone());
                 continue;
             }
             // ST2-2.8: later importers of this module must carry the analysis
@@ -810,6 +830,8 @@ fn analyze_package_spec_with_deadline(
                 Ok(interface) => interface,
                 Err(diag) => {
                     diagnostics.push(diag);
+                    analyzed_interfaces_by_path.remove(&file.path);
+                    failed_interface_paths.insert(file.path.clone());
                     continue;
                 }
             };
@@ -1103,14 +1125,23 @@ fn build_module_graph(
     graph
 }
 
+/// The package import identities of one file. A local import whose target
+/// exports a device function also records the target's interface in
+/// `device_interfaces`, as the compile path does (DFV2-3,
+/// `radix_module::program::compile`): lowering reads it to learn that a
+/// sibling module exports a `⇥` kernel, so handled blocks over that kernel
+/// deliver faults at the block instead of syncing on every call. Targets are
+/// analyzed before their importers, so `analyzed_interfaces` holds them.
 fn package_import_identities_for_file(
     spec: &PackageSpec,
     file: &PackageFile,
     files_by_path: &BTreeMap<PathBuf, &PackageFile>,
     library_resolver: &LibraryResolver,
+    analyzed_interfaces: &BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
 ) -> radix_module::driver::PackageImportIdentities {
     let product = crate::artifact_plan::package_id_from_spec(spec).name;
     let mut imports = BTreeMap::new();
+    let mut device_interfaces = BTreeMap::new();
     for stmt in &file.program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
@@ -1130,14 +1161,29 @@ fn package_import_identities_for_file(
         let Some(target_file) = files_by_path.get(&target).copied() else {
             continue;
         };
+        if let Some(interface) = analyzed_interfaces.get(&target)
+            && interface_bears_device(interface)
+        {
+            device_interfaces.insert(binding.clone(), interface.clone());
+        }
         imports.insert(binding, target_file.module_segments.clone());
     }
     radix_module::driver::PackageImportIdentities {
         product,
         module_segments: file.module_segments.clone(),
         imports,
-        device_interfaces: BTreeMap::new(),
+        device_interfaces,
     }
+}
+
+/// Whether `interface` exports a device function (the same test the compile
+/// path applies before recording a device interface).
+fn interface_bears_device(interface: &radix_module::file_interface::FileInterface) -> bool {
+    use radix_module::file_interface::FileExportKind;
+    interface
+        .exports
+        .values()
+        .any(|export| matches!(&export.kind, FileExportKind::Function(callable) if callable.device.is_some()))
 }
 
 /// Load a package's source graph as [`PackageFile`]s.
@@ -1629,6 +1675,14 @@ fn provider_carriage_for_file(
     view
 }
 
+/// Borrowed graph state shared by direct and transitive interface installs.
+struct LocalInterfaceInstallState<'a> {
+    analyzed_interfaces_by_path: &'a BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
+    failed_interface_paths: &'a BTreeSet<PathBuf>,
+    visited: &'a mut BTreeSet<PathBuf>,
+    interfaces: &'a mut BTreeMap<String, radix_module::file_interface::FileInterface>,
+}
+
 /// Resolve every import binding's cross-unit interface for a file.
 ///
 /// RP3: moved from `crates/faber/src/package/compile.rs`.
@@ -1639,9 +1693,16 @@ fn file_interfaces_for_file(
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
     analyzed_interfaces_by_path: &BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
-) -> Result<BTreeMap<String, radix_module::file_interface::FileInterface>, Diagnostic> {
+    failed_interface_paths: &BTreeSet<PathBuf>,
+) -> Result<Option<BTreeMap<String, radix_module::file_interface::FileInterface>>, Diagnostic> {
     let mut interfaces = BTreeMap::new();
     let mut transitive_visited: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut state = LocalInterfaceInstallState {
+        analyzed_interfaces_by_path,
+        failed_interface_paths,
+        visited: &mut transitive_visited,
+        interfaces: &mut interfaces,
+    };
     for stmt in &file.program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
@@ -1655,24 +1716,28 @@ fn file_interfaces_for_file(
         let import_path = file.interner.resolve(decl.path);
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(target) => {
-                let Some(interface) = analyzed_interfaces_by_path.get(&target).cloned() else {
+                if state.failed_interface_paths.contains(&target) {
+                    return Ok(None);
+                }
+                let Some(interface) = state.analyzed_interfaces_by_path.get(&target).cloned()
+                else {
                     return Err(crate::package_diagnostic_error(format!(
                         "local import `{import_path}` interface was not analyzed before importer"
                     ))
                     .with_file(file.path.display().to_string())
                     .with_span(decl.span));
                 };
-                interfaces.insert(binding, interface);
-                install_transitive_local_interfaces(
+                state.interfaces.insert(binding, interface);
+                if !install_transitive_local_interfaces(
                     spec,
                     &target,
                     files_by_path,
                     library_resolver,
                     library_cache,
-                    analyzed_interfaces_by_path,
-                    &mut transitive_visited,
-                    &mut interfaces,
-                )?;
+                    &mut state,
+                )? {
+                    return Ok(None);
+                }
             }
             ImportResolution::Library(module) => {
                 let Some(import) = library_import_binding(&file.interner, decl, module) else {
@@ -1681,7 +1746,7 @@ fn file_interfaces_for_file(
                 if library_interface_has_module(&import, library_cache)? {
                     continue;
                 }
-                interfaces.insert(
+                state.interfaces.insert(
                     binding,
                     library_cached_file_interface(&import, library_resolver, library_cache)?,
                 );
@@ -1693,12 +1758,12 @@ fn file_interfaces_for_file(
         if library_interface_has_module(import, library_cache)? {
             continue;
         }
-        interfaces.insert(
+        state.interfaces.insert(
             import.binding.clone(),
             library_cached_file_interface(import, library_resolver, library_cache)?,
         );
     }
-    Ok(interfaces)
+    Ok(Some(std::mem::take(state.interfaces)))
 }
 
 /// Install file interfaces for a local import target's own local imports,
@@ -1725,12 +1790,10 @@ fn install_transitive_local_interfaces(
     files_by_path: &BTreeMap<PathBuf, &PackageFile>,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
-    analyzed_interfaces_by_path: &BTreeMap<PathBuf, radix_module::file_interface::FileInterface>,
-    visited: &mut BTreeSet<PathBuf>,
-    interfaces: &mut BTreeMap<String, radix_module::file_interface::FileInterface>,
-) -> Result<(), Diagnostic> {
+    state: &mut LocalInterfaceInstallState<'_>,
+) -> Result<bool, Diagnostic> {
     let Some(target_file) = files_by_path.get(target).copied() else {
-        return Ok(());
+        return Ok(true);
     };
     for stmt in &target_file.program.statements {
         let StmtKind::Import(decl) = &stmt.kind else {
@@ -1747,9 +1810,9 @@ fn install_transitive_local_interfaces(
             ImportResolution::Local(inner) => inner,
             ImportResolution::Library(module) => {
                 if let Some(import) = library_import_binding(&target_file.interner, decl, module)
-                    && !interfaces.contains_key(&binding)
+                    && !state.interfaces.contains_key(&binding)
                 {
-                    interfaces.insert(
+                    state.interfaces.insert(
                         binding,
                         library_cached_file_interface(&import, library_resolver, library_cache)?,
                     );
@@ -1758,37 +1821,40 @@ fn install_transitive_local_interfaces(
             }
             ImportResolution::Unsupported | ImportResolution::Error(_) => continue,
         };
-        if !visited.insert(inner.clone()) {
+        if state.failed_interface_paths.contains(&inner) {
+            return Ok(false);
+        }
+        if !state.visited.insert(inner.clone()) {
             continue;
         }
-        let Some(interface) = analyzed_interfaces_by_path.get(&inner).cloned() else {
+        let Some(interface) = state.analyzed_interfaces_by_path.get(&inner).cloned() else {
             return Err(crate::package_diagnostic_error(format!(
                 "local import `{import_path}` interface was not analyzed before importer"
             ))
             .with_file(target_file.path.display().to_string())
             .with_span(decl.span));
         };
-        interfaces.entry(binding).or_insert(interface);
-        install_transitive_local_interfaces(
+        state.interfaces.entry(binding).or_insert(interface);
+        if !install_transitive_local_interfaces(
             spec,
             &inner,
             files_by_path,
             library_resolver,
             library_cache,
-            analyzed_interfaces_by_path,
-            visited,
-            interfaces,
-        )?;
+            state,
+        )? {
+            return Ok(false);
+        }
     }
     for import in &target_file.expanded_library_imports {
-        if !interfaces.contains_key(&import.binding) {
-            interfaces.insert(
+        if !state.interfaces.contains_key(&import.binding) {
+            state.interfaces.insert(
                 import.binding.clone(),
                 library_cached_file_interface(import, library_resolver, library_cache)?,
             );
         }
     }
-    Ok(())
+    Ok(true)
 }
 
 /// Resolve every import binding's exported namespace surface for a file.

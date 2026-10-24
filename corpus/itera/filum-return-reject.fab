@@ -1,0 +1,31 @@
++++
+locale = "en"
+term = "itera-filum-return-reject"
+kind = "reject"
+category = "control-flow"
+grammar = ["itera_stmt", "apud_clause", "filum_clause", "redde_stmt", "expression"]
+canonical = false
+summary = "A `return` written inside a `thread` loop body is refused: lanes run independently, so it cannot end the function for the others."
+no_expected = "rejects"
+diagnostic = "SEM010:return_in_thread_body"
++++
+
+# This exemplum intentionally fails to compile: `return` from the enclosing
+# function inside a `thread` body would stop every later iteration when run in
+# order, but only its own lane when run in parallel. To get one value out of the
+# lanes use `reduce`; to stop at a cutoff, compute it first and loop to it.
+fn run(tf32[2, 2] src, mut tf32[2, 2] dst) → void {
+    for from src at [i, j] thread lane let v {
+        if v ≻ 1.0 {
+            return
+        }
+        dst[[i, j]] ← v
+    }
+}
+
+main {
+    let tf32[2, 2] src ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
+    mut tf32[2, 2] dst ← tf32[2, 2] {}
+    run(src, mut dst)
+    print dst
+}

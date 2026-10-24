@@ -382,6 +382,10 @@ mod k8_filum_methods_test;
 mod filum_typed_zero_scratch_test;
 
 #[cfg(test)]
+#[path = "filum_ends_test.rs"]
+mod filum_ends_test;
+
+#[cfg(test)]
 #[path = "k8_filum_nested_test.rs"]
 mod k8_filum_nested_test;
 
@@ -392,6 +396,10 @@ mod k_for_range_test;
 #[cfg(test)]
 #[path = "k8_filum_storage_test.rs"]
 mod k8_filum_storage_test;
+
+#[cfg(test)]
+#[path = "k8_filum_invariant_test.rs"]
+mod k8_filum_invariant_test;
 
 #[cfg(test)]
 #[path = "borrow_own_arg_test.rs"]

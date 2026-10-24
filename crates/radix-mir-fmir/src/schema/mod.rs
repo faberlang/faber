@@ -106,10 +106,11 @@ mod host_execution_project_test;
 /// required features, ABI/schema version, canonical raw bytes, explicit
 /// text/binary payload encoding, the entrypoint symbol map, and the
 /// `content_sha256`/`packet_sha256` identity fields; FNV artifact provenance
-/// removed). The nested device-program wire version is untouched (no
-/// `DeviceProgram` semantic field changes). Old version-6 images fail closed
-/// with [`UnsupportedVersion`](crate::error::FmirImageError::VersionMismatch).
-pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
+/// removed). `7 → 8` adds the ordered `MirIntrinsic::Scan` payload to the
+/// serialized MIR program; old version-7 decoders cannot interpret that enum
+/// variant. Old images fail closed with
+/// [`UnsupportedVersion`](crate::error::FmirImageError::VersionMismatch).
+pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 8;
 
 /// The accepted artifact ABI/schema version of the `DeviceArtifact` packet
 /// (DDCP3-U0 (c) / CTO9-6 c): the **exact-match** admission set for an
@@ -160,7 +161,14 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// wire-10 without a ratchet; an older wire-10 consumer cannot interpret
 /// them, so the bump records them. A stale wire-10 device section fails
 /// nested admission before field interpretation — no compat projection.
-/// The current clean break is `11 → 12` (the wire-shape widening): every
+/// The current clean break is `13 → 14` (ordered Scan plans): Scan adds its
+/// three-stage workgroup/chunk/group geometry, summary layout, prefix element
+/// width, and traversal direction. A stale wire-13 consumer cannot interpret
+/// these stage semantics. The preceding clean break is `12 → 13` (grouped GridReduce shapes): a grouped
+/// reduction carries its literal bucket shape so its workgroup-by-bucket
+/// scratch and second-stage launch are checked from the wire facts. A stale
+/// wire-12 device section fails nested admission before field interpretation.
+/// The preceding clean break was `11 → 12` (the wire-shape widening): every
 /// buffer version carries the producer-stamped **parameter shape vector**
 /// (`shape: [dim, …]`, declaration-order literal dims) beside the flattened
 /// `element_count`, so consumers never reconstruct rank or dims from the
@@ -172,15 +180,16 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// [`admit_device_section`] rejects a mismatched nested version before any
 /// field-level interpretation, with a focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::DeviceProgramVersionMismatch)).
-pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 12;
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 14;
 
 /// The version ratchet of the optional distributed execution section
 /// (MD2-W1 A7). The section carries its OWN nested version, admitted
 /// fail-closed **before field interpretation** (the `admit_device_section`
 /// pattern, FC4) — independently of the nested device-program wire version
 /// and the outer image version. The first distributed-section shape is v1;
-/// the nested `WIRE_DEVICE_PROGRAM_VERSION` and the outer
-/// `PACKAGE_MIR_ARTIFACT_VERSION = 7` stay untouched (FC1).
+/// the nested `WIRE_DEVICE_PROGRAM_VERSION` and the outer package version
+/// stayed unchanged for that MD2 boundary (FC1); later clean breaks ratchet
+/// them independently.
 pub const WIRE_DISTRIBUTED_SECTION_VERSION: u32 = 1;
 
 /// Text image `target` tag.

@@ -21,6 +21,7 @@
 //! | `TiledMatMul` | tile grid `(ceil(N/tile), batch · ceil(M/tile))`, verbatim; the batch is `1` for a rank-2 contraction |
 //! | `LaneGrid` | generic 1-D over the element count of the source resource's call-site shape |
 //! | `Transpose` | `plan.workgroup_x` lanes over the input element count |
+//! | `TreeReduction` | `plan.partials` workgroups of `plan.workgroup_x` lanes |
 //! | `GridReduce` | two stages ([`LaunchStages::Staged`], via [`launch_stages_for_call`]): `p = min(ceil(n / workgroup), partials_cap)` workgroups, then one |
 //! | every other plan | [`GeometryError`] `geometry_plan_not_covered` |
 
@@ -49,6 +50,8 @@ pub enum LaunchStages {
     Single(CallGeometry),
     /// A `GridReduce` call: stage 1 then stage 2, in this order.
     Staged([CallGeometry; 2]),
+    /// Local prefixes, summary carries, then application to every output.
+    Scan([CallGeometry; 3]),
 }
 
 /// The entry-point name of a `GridReduce` kernel's stage 2, given the name of
@@ -110,6 +113,36 @@ pub fn geometry_for_call(
                 "GridReduce (two stages: use launch_stages_for_call)".to_owned(),
             )],
         )),
+        // A tree reduction launches one workgroup per partial slot. A single
+        // partial is the final value; combining several partials is a host
+        // step the dispatcher does not run (fail closed rather than return a
+        // partial as the reduction).
+        CollectionKernelPlan::TreeReduction(reduction) => {
+            // One workgroup per partial: the dispatch is the thread count, so
+            // the shared `ceil(dispatch / workgroup)` rule yields exactly
+            // `partials` workgroups.
+            let dispatch = reduction
+                .partials
+                .checked_mul(u64::from(reduction.workgroup_x))
+                .ok_or_else(|| {
+                    GeometryError::new(
+                        GEOMETRY_EXTENT_OVERFLOW,
+                        vec![("reason", "reduction dispatch overflows".to_owned())],
+                    )
+                })?;
+            finish(
+                MirKernelDispatchSize {
+                    x: dispatch,
+                    y: 1,
+                    z: 1,
+                },
+                MirWorkgroupSize {
+                    x: reduction.workgroup_x,
+                    y: 1,
+                    z: 1,
+                },
+            )
+        }
         CollectionKernelPlan::LaneGrid {
             source_resource,
             rank,
@@ -201,6 +234,46 @@ pub fn launch_stages_for_call(
     unit: &KernelUnit,
     shapes: &[Vec<u64>],
 ) -> Result<LaunchStages, GeometryError> {
+    if matches!(unit.plan, CollectionKernelPlan::Scan { .. }) {
+        let layout = scan_layout_for_call(unit, shapes)?;
+        let block = [layout.workgroup, 1, 1];
+        let narrow = |value: u64| {
+            u32::try_from(value).map_err(|_| {
+                GeometryError::new(
+                    GEOMETRY_EXTENT_OVERFLOW,
+                    vec![("reason", "scan grid exceeds u32".to_owned())],
+                )
+            })
+        };
+        return Ok(LaunchStages::Scan([
+            CallGeometry {
+                grid: [
+                    narrow(layout.blocks.checked_mul(layout.groups).ok_or_else(|| {
+                        GeometryError::new(GEOMETRY_EXTENT_OVERFLOW, Vec::new())
+                    })?)?,
+                    1,
+                    1,
+                ],
+                block,
+            },
+            CallGeometry {
+                grid: [
+                    narrow(layout.groups.div_ceil(u64::from(layout.workgroup)))?,
+                    1,
+                    1,
+                ],
+                block,
+            },
+            CallGeometry {
+                grid: [
+                    narrow(layout.elements.div_ceil(u64::from(layout.workgroup)))?,
+                    1,
+                    1,
+                ],
+                block,
+            },
+        ]));
+    }
     let CollectionKernelPlan::GridReduce {
         source_resource,
         rank,
@@ -242,7 +315,47 @@ pub fn launch_stages_for_call(
     if lanes == 0 {
         return Err(uncovered("zero workgroup"));
     }
-    let partials = n.div_ceil(lanes).min(u64::from(*partials_cap));
+    let groups = unit
+        .plan
+        .group_count()
+        .ok_or_else(|| uncovered("group count overflows"))?;
+    if groups == 0 {
+        return Err(uncovered("zero group count"));
+    }
+    let grouped = matches!(
+        &unit.plan,
+        CollectionKernelPlan::GridReduce {
+            group_shape: Some(_),
+            ..
+        }
+    );
+    let rows = if grouped {
+        crate::kernel_plan::grouped_partial_rows(*partials_cap, *workgroup, groups)
+    } else {
+        *partials_cap
+    };
+    let partials = n.div_ceil(lanes).min(u64::from(rows));
+    if let CollectionKernelPlan::GridReduce {
+        group_shape: Some(group_shape),
+        ..
+    } = &unit.plan
+    {
+        for (resource, shape) in unit.resources.iter().zip(shapes) {
+            if resource.access != MirKernelResourceAccess::Read && shape != group_shape {
+                return Err(uncovered(
+                    "grouped reduction output shape differs from group domain",
+                ));
+            }
+        }
+    }
+    let first_lanes = partials
+        .checked_mul(groups)
+        .and_then(|n| n.checked_mul(lanes))
+        .filter(|lanes| *lanes <= u64::from(u32::MAX))
+        .ok_or_else(|| uncovered("grouped reduction launch overflows"))?;
+    let combine_lanes = groups
+        .checked_mul(lanes)
+        .ok_or_else(|| uncovered("grouped combine launch overflows"))?;
     let block = MirWorkgroupSize {
         x: *workgroup,
         y: 1,
@@ -250,7 +363,7 @@ pub fn launch_stages_for_call(
     };
     let stage1 = finish(
         MirKernelDispatchSize {
-            x: partials * lanes,
+            x: first_lanes,
             y: 1,
             z: 1,
         },
@@ -258,7 +371,7 @@ pub fn launch_stages_for_call(
     )?;
     let stage2 = finish(
         MirKernelDispatchSize {
-            x: lanes,
+            x: combine_lanes,
             y: 1,
             z: 1,
         },
@@ -643,9 +756,110 @@ fn plan_name(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::LaneGrid { .. } => "LaneGrid",
         CollectionKernelPlan::SingleLane => "SingleLane",
         CollectionKernelPlan::GridReduce { .. } => "GridReduce",
+        CollectionKernelPlan::Scan { .. } => "Scan",
     }
 }
 
 #[cfg(test)]
 #[path = "launch_geometry_test.rs"]
 mod tests;
+
+/// Checked scratch/partition layout shared by scan launch and binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScanLayout {
+    pub elements: u64,
+    pub blocks: u64,
+    pub chunk_elements: u64,
+    pub groups: u64,
+    pub workgroup: u32,
+    pub prefix_bytes: u64,
+    pub partials_bytes: u64,
+}
+
+/// Resolve a scan's source-shaped result and fixed group/scratch capacities.
+pub fn scan_layout_for_call(
+    unit: &KernelUnit,
+    shapes: &[Vec<u64>],
+) -> Result<ScanLayout, GeometryError> {
+    let fail = |reason: &str| {
+        GeometryError::new(
+            GEOMETRY_SHAPE_NOT_COVERED,
+            vec![("reason", reason.to_owned())],
+        )
+    };
+    let CollectionKernelPlan::Scan {
+        source_resource,
+        rank,
+        workgroup,
+        blocks_cap,
+        group_count,
+        partial_layout,
+        element_bytes,
+        ..
+    } = &unit.plan
+    else {
+        return Err(fail("scan layout requested for another plan"));
+    };
+    if shapes.len() != unit.resources.len() {
+        return Err(fail("scan resource shape count"));
+    }
+    let source = shapes
+        .get(*source_resource)
+        .ok_or_else(|| fail("scan source resource"))?;
+    if source.len() != usize::from(*rank) {
+        return Err(fail("scan source rank"));
+    }
+    let elements = source
+        .iter()
+        .try_fold(1u64, |n, extent| n.checked_mul(*extent))
+        .ok_or_else(|| fail("scan source element count overflows"))?;
+    if elements > i32::MAX as u64 {
+        return Err(fail("scan source exceeds portable index width"));
+    }
+    for (resource, shape) in unit.resources.iter().zip(shapes) {
+        if resource.access != MirKernelResourceAccess::Read && shape != source {
+            return Err(fail("scan output shape differs from source"));
+        }
+    }
+    if *workgroup == 0 || *blocks_cap == 0 || *group_count == 0 || *element_bytes == 0 {
+        return Err(fail("scan layout has a zero width or capacity"));
+    }
+    // Stage 1 launches `blocks * groups` workgroups: the rows shrink with
+    // the group count exactly as in the emitted kernels.
+    let blocks = elements.div_ceil(u64::from(*workgroup)).min(u64::from(
+        crate::kernel_plan::grouped_partial_rows(*blocks_cap, *workgroup, u64::from(*group_count)),
+    ));
+    let chunk_elements = if blocks == 0 {
+        0
+    } else {
+        elements.div_ceil(blocks)
+    };
+    let groups = u64::from(*group_count);
+    let prefix_bytes = blocks
+        .checked_mul(chunk_elements)
+        .and_then(|n| n.checked_mul(u64::from(*element_bytes)))
+        .ok_or_else(|| fail("scan prefix scratch overflows"))?;
+    let partials_bytes = u64::from(*blocks_cap)
+        .checked_mul(groups)
+        .and_then(|n| n.checked_mul(u64::from(partial_layout.element_bytes())))
+        .ok_or_else(|| fail("scan summary scratch overflows"))?;
+    Ok(ScanLayout {
+        elements,
+        blocks,
+        chunk_elements,
+        groups,
+        workgroup: *workgroup,
+        prefix_bytes,
+        partials_bytes,
+    })
+}
+
+/// Companion entry names for the two stages after local scan prefixes.
+#[must_use]
+pub fn scan_carries_entry(entry: &str) -> String {
+    format!("{entry}_carries")
+}
+#[must_use]
+pub fn scan_apply_entry(entry: &str) -> String {
+    format!("{entry}_apply")
+}

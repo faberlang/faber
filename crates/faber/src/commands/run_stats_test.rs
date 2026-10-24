@@ -222,9 +222,12 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
         image_build_ns: 13,
         module_compile_ns: 14,
         execution_ns: 15,
+        gpu_busy_ns: 18,
         gpu_timing: "per-launch".to_owned(),
         timed_launches: 3,
         untimed_launches: 1,
+        gpu_timer_available: Some(true),
+        gpu_sample_launch_capacity: Some(1_024),
         host_encode_ns: 16,
         uploads: 2,
         downloads: 1,
@@ -241,6 +244,7 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
             peak_allocated_bytes: 256,
             host_to_device_bytes: 64,
             device_to_host_bytes: 32,
+            span: None,
         },
         entries: vec![
             run_stats::DeviceEntryMetadata {
@@ -257,11 +261,23 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     });
 
     let encoded = run_stats::encode(&artifact).expect("encode device artifact");
-    let value: Value = serde_json::from_str(&encoded).expect("device artifact JSON");
+    let mut value: Value = serde_json::from_str(&encoded).expect("device artifact JSON");
     assert!(value["device"].is_object());
     assert_eq!(value["device"]["entries"][0]["entry"], "quadratum");
+    assert_eq!(value["device"]["gpu_busy_ns"], 18);
+    assert_eq!(value["device"]["gpu_timer_available"], true);
+    assert_eq!(value["device"]["gpu_sample_launch_capacity"], 1_024);
     let decoded: RunStatsArtifact = serde_json::from_str(&encoded).expect("device schema");
     assert_eq!(decoded, artifact);
+
+    let device = value["device"].as_object_mut().expect("device object");
+    device.remove("gpu_timer_available");
+    device.remove("gpu_sample_launch_capacity");
+    let old_decoded: RunStatsArtifact =
+        serde_json::from_value(value).expect("old device artifact without sampling metadata");
+    let old_device = old_decoded.device.expect("old device metadata");
+    assert_eq!(old_device.gpu_timer_available, None);
+    assert_eq!(old_device.gpu_sample_launch_capacity, None);
 }
 
 #[test]
@@ -613,4 +629,63 @@ device = "metal"
         "refusal must emit no artifact: {}",
         stats_file.display()
     );
+}
+
+/// A spanned logical device (rule 18) reports its partition traffic and
+/// launch modes under `device.runtime.span`, with each fallback named; an
+/// unspanned device's artifact has no `span` key at all.
+#[cfg(feature = "device-runtime")]
+#[test]
+fn device_span_stats_appear_only_for_a_spanned_device() {
+    use radix_device_core::runtime::{SpanEntryStats, SpanFallback, SpanStats};
+    let span = SpanStats {
+        partitions: 3,
+        moved_bytes: 96,
+        transfers: 6,
+        replica_write_bytes: 32,
+        split_launches: 2,
+        replicated_launches: 1,
+        first_launches: 1,
+        entries: vec![
+            SpanEntryStats {
+                entry: "gradus".to_owned(),
+                split_launches: 2,
+                ..SpanEntryStats::default()
+            },
+            SpanEntryStats {
+                entry: "summa".to_owned(),
+                first_launches: 1,
+                fallback: Some(SpanFallback::WritesNotLaneLocal),
+                ..SpanEntryStats::default()
+            },
+        ],
+    };
+    let runtime = |span| run_stats::DeviceRuntimeMetadata {
+        launch_count: 4,
+        command_submit_count: 1,
+        blocking_wait_count: 1,
+        blocking_wait_ns: 0,
+        live_modules: 1,
+        live_buffers: 2,
+        allocated_bytes: 0,
+        peak_allocated_bytes: 0,
+        host_to_device_bytes: 16,
+        device_to_host_bytes: 8,
+        span,
+    };
+    let spanned = runtime(Some(run_stats::DeviceSpanMetadata::from_stats(&span)));
+    let value = serde_json::to_value(&spanned).expect("spanned JSON");
+    assert_eq!(value["span"]["moved_bytes"], 96);
+    assert_eq!(value["span"]["replica_write_bytes"], 32);
+    assert_eq!(value["span"]["replicated_launches"], 1);
+    assert_eq!(
+        value["span"]["entries"][1]["fallback"],
+        "writes-not-lane-local"
+    );
+    assert!(value["span"]["entries"][0].get("fallback").is_none());
+    let decoded: run_stats::DeviceRuntimeMetadata =
+        serde_json::from_value(value).expect("spanned schema");
+    assert_eq!(decoded, spanned);
+    let plain = serde_json::to_value(runtime(None)).expect("plain JSON");
+    assert!(plain.get("span").is_none(), "{plain}");
 }

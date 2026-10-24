@@ -57,10 +57,19 @@ pub(crate) struct DeviceMetadata {
     pub(crate) prepare_ns: u64,
     pub(crate) image_build_ns: u64,
     pub(crate) module_compile_ns: u64,
+    /// The session window: host interpretation plus device execution. This is
+    /// not GPU time; read `gpu_busy_ns` for that.
     pub(crate) execution_ns: u64,
+    /// GPU nanoseconds of completed command buffers (device time only). 0
+    /// when the driver cannot read a device clock.
+    pub(crate) gpu_busy_ns: u64,
     pub(crate) gpu_timing: String,
     pub(crate) timed_launches: u64,
     pub(crate) untimed_launches: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) gpu_timer_available: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) gpu_sample_launch_capacity: Option<u64>,
     pub(crate) host_encode_ns: u64,
     pub(crate) uploads: u64,
     pub(crate) downloads: u64,
@@ -83,6 +92,36 @@ pub(crate) struct DeviceRuntimeMetadata {
     pub(crate) peak_allocated_bytes: u64,
     pub(crate) host_to_device_bytes: u64,
     pub(crate) device_to_host_bytes: u64,
+    /// A logical device spanning several partitions (rule 18) only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) span: Option<DeviceSpanMetadata>,
+}
+
+/// Partition traffic and launch modes of a spanned logical device.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceSpanMetadata {
+    pub(crate) partitions: u64,
+    pub(crate) moved_bytes: u64,
+    pub(crate) transfers: u64,
+    pub(crate) replica_write_bytes: u64,
+    pub(crate) split_launches: u64,
+    pub(crate) replicated_launches: u64,
+    pub(crate) first_launches: u64,
+    pub(crate) entries: Vec<DeviceSpanEntryMetadata>,
+}
+
+/// How one entry's launches ran on a spanned logical device; `fallback`
+/// names why it ran on the first partition.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceSpanEntryMetadata {
+    pub(crate) entry: String,
+    pub(crate) split_launches: u64,
+    pub(crate) replicated_launches: u64,
+    pub(crate) first_launches: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) fallback: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -233,9 +272,12 @@ impl DeviceMetadata {
             image_build_ns: receipt.image_build_ns,
             module_compile_ns: receipt.module_compile_ns,
             execution_ns: receipt.execution_ns,
+            gpu_busy_ns: runtime.gpu_busy_ns,
             gpu_timing: receipt.gpu_timing.clone().as_str().to_owned(),
             timed_launches: runtime.timed_launch_count,
             untimed_launches: runtime.untimed_launch_count,
+            gpu_timer_available: runtime.gpu_timer_available,
+            gpu_sample_launch_capacity: runtime.gpu_sample_launch_capacity,
             host_encode_ns: receipt.host_encode_ns,
             uploads: receipt.uploads,
             downloads: receipt.downloads,
@@ -252,6 +294,7 @@ impl DeviceMetadata {
                 peak_allocated_bytes: runtime.peak_allocated_bytes,
                 host_to_device_bytes: runtime.host_to_device_bytes,
                 device_to_host_bytes: runtime.device_to_host_bytes,
+                span: runtime.span.as_ref().map(DeviceSpanMetadata::from_stats),
             },
             entries: runtime
                 .entry_gpu
@@ -260,6 +303,32 @@ impl DeviceMetadata {
                     entry: entry.entry.clone(),
                     launches: entry.launches,
                     gpu_us: entry.gpu_us,
+                })
+                .collect(),
+        }
+    }
+}
+
+#[cfg(feature = "device-runtime")]
+impl DeviceSpanMetadata {
+    pub(crate) fn from_stats(span: &radix_device_core::runtime::SpanStats) -> Self {
+        Self {
+            partitions: span.partitions,
+            moved_bytes: span.moved_bytes,
+            transfers: span.transfers,
+            replica_write_bytes: span.replica_write_bytes,
+            split_launches: span.split_launches,
+            replicated_launches: span.replicated_launches,
+            first_launches: span.first_launches,
+            entries: span
+                .entries
+                .iter()
+                .map(|entry| DeviceSpanEntryMetadata {
+                    entry: entry.entry.clone(),
+                    split_launches: entry.split_launches,
+                    replicated_launches: entry.replicated_launches,
+                    first_launches: entry.first_launches,
+                    fallback: entry.fallback.map(|reason| reason.as_str().to_owned()),
                 })
                 .collect(),
         }

@@ -167,6 +167,13 @@ ordinata = "เรียง"
 ascendens = "น้อยไปมาก"
 descendens = "มากไปน้อย"
 
+# Prefix-scan mode words use the shared source spelling in every reader pack.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
+
 [types]
 ascii = "ascii"
 textus = "ข้อความ"
@@ -3707,6 +3714,14 @@ help = "ให้ทุกทางเลือก aut ผูกชื่อเ�
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "ไม่สามารถพิสูจน์ความเป็นอิสระของรอบเธรดได้: {reason}"
 help = "ใช้ลูปธรรมดา หรือเขียนและอ่านพื้นที่ที่เขียนเฉพาะพิกัดของรอบนั้น อย่าแก้ตัวแปรภายนอกหรือเรียกผลกระทบที่ยังพิสูจน์ไม่ได้"
+
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "`{rumpe}` ไม่สามารถจบลูป `{filum}` ได้"
+help = "`{rumpe}` หยุดลูป `{filum}` ไม่ได้: แต่ละเลนทำงานอย่างเป็นอิสระ หากต้องการหาตัวแรกที่ตรงให้ใช้ `{reducta} {via} {argminima} …` หากต้องการหยุดที่ขีดจำกัด ให้คำนวณขีดจำกัดก่อนแล้ววนลูปถึงขีดจำกัดนั้น"
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "`{redde}` ไม่สามารถออกจากลูป `{filum}` ได้"
+help = "`{redde}` ออกจากลูป `{filum}` ไม่ได้: แต่ละเลนทำงานอย่างเป็นอิสระ หากต้องการค่าเดียวจากเลนให้ใช้ `{reducta}` หากต้องการหยุดที่ขีดจำกัด ให้คำนวณขีดจำกัดก่อนแล้ววนลูปถึงขีดจำกัดนั้น"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "เนื้อหาของการลดรูปเรียกได้เฉพาะอินทรินซิกของอุปกรณ์ ฟรากเมนต์ และตัวช่วยเคอร์เนลส่วนตัว: {reason}"

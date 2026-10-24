@@ -81,10 +81,10 @@ pub struct FaberManifest {
 
 /// The `faber run --device` / `[device] device` value set.
 ///
-/// `reference` and `cpu` are explicit choices: kernels lower as ordinary
-/// functions and run single-threaded on the MIR runner (until the worker
-/// device lands `cpu` is the same route as `reference`). Neither is ever
-/// substituted for another choice.
+/// `reference` and `cpu` are explicit choices: `reference` lowers kernels as
+/// ordinary functions and runs them single-threaded on the MIR runner; `cpu`
+/// runs them on the CPU device session by `[device] threads` / `--threads`
+/// workers. Neither is ever substituted for another choice.
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeviceChoice {
     /// Resolve against host capability probes; fail closed when the machine
@@ -93,8 +93,9 @@ pub enum DeviceChoice {
     /// Select the reference route explicitly: plain sequential code on the
     /// MIR runner; the oracle device results are checked against.
     Reference,
-    /// Select the CPU device explicitly: processor cores as a device (until
-    /// the worker device lands this is the same route as `reference`).
+    /// Select the CPU device explicitly: processor cores as one device, the
+    /// kernels run by `--threads` workers (split over `--partitions` core
+    /// sets) through the device session.
     Cpu,
     /// Select Metal explicitly; never silently falls back.
     Metal,
@@ -178,6 +179,15 @@ pub struct ManifestDevice {
     /// fails closed). `None` selects the portable default.
     #[serde(default)]
     pub steps: Option<u32>,
+
+    /// Worker count of the `cpu` device (gpu-reset rule 16.9): a positive
+    /// integer. It applies when the run selects `cpu`; `--threads N` wins
+    /// over it, and without either the device uses half the available cores,
+    /// at least one. Valid only when `device` is absent or `"cpu"`. Held as a
+    /// raw value so a negative or non-integer count is refused with a
+    /// diagnostic naming this key ([`manifest_device_threads`]).
+    #[serde(default)]
+    pub threads: Option<toml::Value>,
 }
 
 /// Configuration for shader artifact packaging.
@@ -390,6 +400,96 @@ pub fn resolve_device_selection(
     Ok(manifest_device.map_or(DeviceSelection::Auto, DeviceChoice::selection))
 }
 
+/// Map a manifest `[device] threads` value to a CPU worker count (gpu-reset
+/// rule 16.9). `None` when the key is absent: the caller applies the device
+/// default. A value that is not a positive integer, or a count beside a
+/// `[device] device` other than `cpu`, fails closed (never silently ignored).
+///
+/// # Errors
+/// Fails when the count is zero, negative, not an integer or above `u32::MAX`,
+/// when `[device] device` is unsupported, or when it names a device other
+/// than `cpu`.
+#[cfg(feature = "runner")]
+pub fn manifest_device_threads(
+    device: &ManifestDevice,
+    path: &Path,
+) -> Result<Option<std::num::NonZeroU32>, Box<Diagnostic>> {
+    let Some(value) = device.threads.as_ref() else {
+        return Ok(None);
+    };
+    let Some(count) = value
+        .as_integer()
+        .and_then(|count| u32::try_from(count).ok())
+        .and_then(std::num::NonZeroU32::new)
+    else {
+        return Err(Box::new(
+            crate::package_diagnostic_error(format!(
+                "faber.toml device.threads must be a positive integer, found {value}"
+            ))
+            .with_file(path.display().to_string())
+            .with_arg("issue", "package_device_threads_invalid")
+            .with_arg("key", "device.threads")
+            .with_arg("threads", value.to_string()),
+        ));
+    };
+    if let Some(choice) = manifest_device_choice(device.device.as_deref(), path)?
+        && choice != DeviceChoice::Cpu
+    {
+        let spelling = choice.selection().spelling();
+        return Err(Box::new(
+            crate::package_diagnostic_error(format!(
+                "faber.toml device.threads applies only to the cpu device, but device.device is '{spelling}'"
+            ))
+            .with_file(path.display().to_string())
+            .with_arg("issue", "package_device_threads_requires_cpu")
+            .with_arg("key", "device.threads")
+            .with_arg("device", spelling),
+        ));
+    }
+    Ok(Some(count))
+}
+
+/// Resolve the CPU device worker count for a route (gpu-reset rule 16.9):
+/// CLI `--threads N` > manifest `[device] threads` > `None` (the device
+/// default, half the available cores). One precedence for `faber run` and
+/// `faber test`. The flag is valid only when `selection` is the CPU device
+/// and fails closed otherwise (`E_THREADS_REQUIRES_CPU`, need); the
+/// manifest key is a package default that applies only when the run selects
+/// `cpu`, so `--device reference` over a package that sets it runs unchanged.
+///
+/// # Errors
+/// Fails when the flag is given for a selection other than `cpu`, when the
+/// discovered manifest cannot be read, or when its `[device] threads` value is
+/// invalid ([`manifest_device_threads`]).
+#[cfg(feature = "runner")]
+pub fn resolve_cpu_threads(
+    cli: Option<u32>,
+    selection: DeviceSelection,
+    input_path: &Path,
+) -> Result<Option<std::num::NonZeroU32>, Box<Diagnostic>> {
+    if let Some(threads) = cli {
+        if selection != DeviceSelection::Cpu {
+            return Err(Box::new(
+                crate::package_diagnostic_error("`--threads` is valid only with `--device cpu`")
+                    .with_arg("issue", "E_THREADS_REQUIRES_CPU")
+                    .with_arg("device", selection.spelling()),
+            ));
+        }
+        return Ok(std::num::NonZeroU32::new(threads));
+    }
+    if selection != DeviceSelection::Cpu {
+        return Ok(None);
+    }
+    let Ok(layout) = super::discover_build_layout(input_path) else {
+        return Ok(None);
+    };
+    if !layout.manifest_path.exists() {
+        return Ok(None);
+    }
+    let manifest = read_manifest(&layout.manifest_path)?;
+    manifest_device_threads(&manifest.device, &layout.manifest_path)
+}
+
 /// Map a manifest `[device] inputs` map to typed f32 host inputs (S1-6
 /// vertical slice). `None` when the key is absent. Values are flat f32
 /// element lists; f64 manifest values are converted to f32 (the campaign
@@ -498,6 +598,10 @@ pub(crate) fn validate_manifest(
     // ignored.
     #[cfg(feature = "runner")]
     manifest_device_choice(manifest.device.device.as_deref(), path)?;
+    // Rule 16.9: the `[device] threads` worker count is validated at package
+    // load too, so a bad count fails before any route runs.
+    #[cfg(feature = "runner")]
+    manifest_device_threads(&manifest.device, path)?;
 
     // S5-U5b: the `[device] steps` declared training step count is validated
     // at package load — a zero count is a contradiction (a RepeatingStep

@@ -1,0 +1,60 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "apud_clause", "filum_clause", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "A `thread` loop may write a row of a matrix in place: its index is the lane coordinate plus components every lane shares."
+syntax = "for from row at [j] thread lane let v { cache[[pos, j]] ← v }"
+related = ["apud", "itera", "ex", "filum", "thread"]
+locale = "en"
++++
+
+# =============================================================================
+# invariant row — a `thread` body writes its lane coordinate beside shared indices.
+# =============================================================================
+#
+# What this teaches:
+#   • a `thread` body writes distinct cells per lane: the index is the lane
+#     coordinates, each used once and unchanged, plus components that are the
+#     same for every lane — a parameter, a constant, or a local declared
+#     outside the loop
+#   • `cache[[pos, j]]` therefore fills row `pos` of the matrix in place, one
+#     cell per lane, and leaves every other cell as it was
+#   • the shared component may sit anywhere: `cache[[j, col]]` fills a column
+#
+# Common mistakes:
+#   • `cache[[pos, 0]]` — no lane coordinate, so every lane writes one cell
+#   • `cache[[j, j]]` or `cache[[pos, j + 1]]` — a coordinate used twice or
+#     shifted can collide with another lane
+#   • an index computed from the lane's value or from a local the lane body
+#     declares — it differs per lane
+#
+# See also: apud, itera, ex, filum, thread
+# =============================================================================
+
+fn set_row(mut tf32[3, 4] cache, tf32[4] row, i32 pos) → void {
+    for from row at [j] thread lane let v {
+        cache[[pos, j]] ← v
+    }
+}
+
+fn set_col(mut tf32[3, 4] cache, tf32[3] col, i32 at_col) → void {
+    for from col at [i] thread lane let v {
+        cache[[i, at_col]] ← v
+    }
+}
+
+# EXPECTED OUTPUT:
+#   the 3×4 matrix flat in row-major order, after row 1 and then column 3 are
+#   written; every other cell keeps its starting value.
+
+main {
+    mut tf32[3, 4] cache ← [[5.0, 5.0, 5.0, 5.0], [6.0, 6.0, 6.0, 6.0], [7.0, 7.0, 7.0, 7.0]] ↦ tf32[3, 4]
+    let tf32[4] row ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
+    let tf32[3] col ← [-1.0, -2.0, -3.0] ↦ tf32[3]
+    set_row(mut cache, row, 1)
+    print cache
+    set_col(mut cache, col, 3)
+    print cache
+}

@@ -138,6 +138,25 @@ pub fn with_linked_test_package_mir<R>(
     seams: &MirSeams,
     run: impl for<'a> FnOnce(&radix_mir::ValidatedMir<'a>, &TestFunctionIds) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
+    with_linked_test_package_lowered_mir(package, scope, config, seams, |lowered, ids| {
+        run(&lowered.validated, ids)
+    })
+}
+
+/// [`with_linked_test_package_mir`] handing the whole lowered unit to `run`:
+/// a device session route (`faber test --device cpu`) builds its device image
+/// from the unit's device-function metadata, not from the validated program
+/// alone.
+///
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
+pub fn with_linked_test_package_lowered_mir<R>(
+    package: AnalyzedProgram,
+    scope: &TestPackageScope,
+    config: &Config,
+    seams: &MirSeams,
+    run: impl for<'a> FnOnce(&LoweredMirUnit<'a>, &TestFunctionIds) -> R,
+) -> Result<R, Vec<Diagnostic>> {
     if package
         .diagnostics
         .iter()
@@ -147,7 +166,7 @@ pub fn with_linked_test_package_mir<R>(
     }
 
     let mut library_cache = (seams.library_cache_for_config)(config);
-    link_package_functions(package, scope, config, &mut library_cache, run)
+    link_package_lowered_functions(package, scope, config, &mut library_cache, run)
 }
 
 /// Link the test roots of an already-analyzed package into one validated MIR
@@ -158,11 +177,24 @@ pub fn with_linked_test_package_mir<R>(
 /// # Errors
 /// Returns an error when scoping, linking, lowering, or validation fails.
 pub(crate) fn link_package_functions<R>(
-    mut package: AnalyzedProgram,
+    package: AnalyzedProgram,
     scope: &TestPackageScope,
     config: &Config,
     library_cache: &mut LibraryInterfaceCache,
     run: impl for<'a> FnOnce(&radix_mir::ValidatedMir<'a>, &TestFunctionIds) -> R,
+) -> Result<R, Vec<Diagnostic>> {
+    link_package_lowered_functions(package, scope, config, library_cache, |lowered, ids| {
+        run(&lowered.validated, ids)
+    })
+}
+
+/// [`link_package_functions`] handing the whole lowered unit to `run`.
+fn link_package_lowered_functions<R>(
+    mut package: AnalyzedProgram,
+    scope: &TestPackageScope,
+    config: &Config,
+    library_cache: &mut LibraryInterfaceCache,
+    run: impl for<'a> FnOnce(&LoweredMirUnit<'a>, &TestFunctionIds) -> R,
 ) -> Result<R, Vec<Diagnostic>> {
     let library_resolver = package.library_resolver.clone();
     let anchor_id = apply_test_link_scope(&mut package, scope)?;
@@ -221,7 +253,7 @@ pub(crate) fn link_package_functions<R>(
         },
     )?;
     let function_ids = linked_test_function_ids(&lowered, &links, scope, &anchor_path)?;
-    Ok(run(&lowered.validated, &function_ids))
+    Ok(run(&lowered, &function_ids))
 }
 
 pub(super) fn with_prepared_package_mir<R>(

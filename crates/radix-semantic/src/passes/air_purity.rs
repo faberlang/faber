@@ -369,6 +369,16 @@ impl AirPurityChecker<'_> {
                     self.check_expr(identity);
                 }
             }
+            HirExpressionKind::Scan {
+                source, group, body, ..
+            } => {
+                self.reject(expr.span, "unapproved_effect");
+                self.check_expr(source);
+                if let Some(group) = group {
+                    self.check_expr(group);
+                }
+                self.check_block(body);
+            }
             HirExpressionKind::Sort { source, body, .. } => {
                 self.reject(expr.span, "sort_expression_unsupported");
                 self.check_expr(source);

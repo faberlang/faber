@@ -1966,6 +1966,123 @@ impl Parser {
         })
     }
 
+    /// Parse the ordered prefix form. Its body is mandatory, unlike the
+    /// scalar reduction's optional identity form. A following `vel` remains
+    /// for the outer expression parser to wrap around the complete scan.
+    fn parse_scan_expr(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        self.advance();
+        self.expect_keyword_ident(TokenKind::Via)?;
+        let op = match self.peek().kind {
+            TokenKind::Ident(sym) => match self.keyword_claim_key(sym) {
+                Some("summa") => ReductaOp::Sum,
+                Some("factum") => ReductaOp::Product,
+                Some("maxima") => ReductaOp::Max,
+                Some("minima") => ReductaOp::Min,
+                Some("omnia") => ReductaOp::All,
+                Some("quilibet") => ReductaOp::Any,
+                Some("numeratio") => ReductaOp::Count,
+                _ => return Err(self.scan_operator_error()),
+            },
+            _ => return Err(self.scan_operator_error()),
+        };
+        self.advance();
+
+        let total = if self.is_keyword_key("scan_total") {
+            self.advance();
+            let total = match self.peek().kind {
+                TokenKind::Ident(sym) => match self.keyword_claim_key(sym) {
+                    Some("scan_inclusive") => ScanTotal::Inclusive,
+                    Some("scan_exclusive") => ScanTotal::Exclusive,
+                    _ => return Err(self.scan_total_error()),
+                },
+                _ => return Err(self.scan_total_error()),
+            };
+            self.advance();
+            total
+        } else {
+            ScanTotal::Inclusive
+        };
+
+        self.expect_keyword_ident(TokenKind::Ex)?;
+        let source = Box::new(self.parse_expression()?);
+        if !self.eat_keyword_ident(TokenKind::Apud) {
+            return Err(self.scan_expected_keyword_error(&["apud"]));
+        }
+        let apud = self.parse_apud_clause()?;
+        let group = if self.is_keyword_key("pro") {
+            self.advance();
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
+        };
+        let order = if self.is_keyword_key("scan_order") {
+            self.advance();
+            let order = match self.peek().kind {
+                TokenKind::Ident(sym) => match self.keyword_claim_key(sym) {
+                    Some("ascendens") => SortDirection::Ascending,
+                    Some("descendens") => SortDirection::Descending,
+                    _ => return Err(self.scan_order_error()),
+                },
+                _ => return Err(self.scan_order_error()),
+            };
+            self.advance();
+            order
+        } else {
+            SortDirection::Ascending
+        };
+
+        if !self.is_keyword_key("filum") {
+            return Err(self.scan_expected_keyword_error(&["filum"]));
+        }
+        self.advance();
+        let filum = self.parse_ident()?;
+        self.expect_keyword_ident(TokenKind::Sit)?;
+        let binding = self.parse_ident()?;
+        let body = self.parse_block()?;
+
+        Ok(Expr {
+            id: self.next_id(),
+            kind: ExprKind::Scan(Box::new(ScanExpr {
+                op,
+                total,
+                source,
+                apud,
+                group,
+                order,
+                filum,
+                binding,
+                body,
+            })),
+            span: start.merge(self.previous_span()),
+        })
+    }
+
+    fn scan_operator_error(&self) -> ParseError {
+        self.scan_expected_keyword_error(&[
+            "summa", "factum", "maxima", "minima", "omnia", "quilibet", "numeratio",
+        ])
+    }
+
+    fn scan_total_error(&self) -> ParseError {
+        self.scan_expected_keyword_error(&["scan_inclusive", "scan_exclusive"])
+    }
+
+    fn scan_order_error(&self) -> ParseError {
+        self.scan_expected_keyword_error(&["ascendens", "descendens"])
+    }
+
+    fn scan_expected_keyword_error(&self, keys: &[&str]) -> ParseError {
+        let keyword = keys
+            .iter()
+            .map(|key| self.keyword_surface(key))
+            .collect::<Vec<_>>()
+            .join(&format!(" {} ", self.keyword_surface("aut")));
+        ParseError::structured(ParseErrorKind::Expected, self.current_span())
+            .with_arg("issue", "expected_keyword")
+            .with_arg("keyword", keyword)
+    }
+
     /// Parse the `ordinata via Direction (ex | de) source [body]` expression.
     ///
     /// The direction word is claimed by Latin key after `via`; the source word
@@ -2195,6 +2312,14 @@ impl Parser {
     /// object initialization. Anything that starts with a non-primary token must
     /// be introduced by an earlier precedence layer.
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
+        if self.is_keyword_key("scan")
+            && matches!(
+                self.keyword_ident_at(1),
+                Some(TokenKind::Via | TokenKind::Ex)
+            )
+        {
+            return self.parse_scan_expr();
+        }
         if self.is_keyword_key("reducta")
             && matches!(
                 self.keyword_ident_at(1),

@@ -167,6 +167,13 @@ ordinata = "क्रमबद्ध_करो"
 ascendens = "आरोही"
 descendens = "अवरोही"
 
+# Prefix-scan mode words use the shared source spelling in every reader pack.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
+
 [types]
 ascii = "ascii"
 textus = "पाठ"
@@ -3707,6 +3714,14 @@ help = "हर aut विकल्प में समान नामों क
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "थ्रेड पुनरावृत्तियों की स्वतंत्रता सिद्ध नहीं हो सकी: {reason}"
 help = "सामान्य लूप का उपयोग करें, या केवल पुनरावृत्ति के अपने निर्देशांक पर लिखें और लिखे गए भंडारण को उसी निर्देशांक पर पढ़ें; बाहरी चर न बदलें और अप्रमाणित प्रभाव न बुलाएँ"
+
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "`{rumpe}` `{filum}` लूप को समाप्त नहीं कर सकता"
+help = "`{rumpe}` `{filum}` लूप को रोक नहीं सकता: लेन स्वतंत्र रूप से चलती हैं। पहला मेल खोजने के लिए `{reducta} {via} {argminima} …` का उपयोग करें; किसी सीमा पर रुकने के लिए पहले सीमा की गणना करें और उसी तक लूप चलाएँ।"
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "`{redde}` `{filum}` लूप से बाहर नहीं निकल सकता"
+help = "`{redde}` `{filum}` लूप से बाहर नहीं निकल सकता: लेन स्वतंत्र रूप से चलती हैं। लेनों से एक मान पाने के लिए `{reducta}` का उपयोग करें; किसी सीमा पर रुकने के लिए पहले सीमा की गणना करें और उसी तक लूप चलाएँ।"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "रिडक्शन का मुख्य भाग केवल डिवाइस इंट्रिंसिक, फ्रैगमेंट और निजी कर्नेल सहायकों को बुला सकता है: {reason}"

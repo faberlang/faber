@@ -167,6 +167,13 @@ ordinata = "رتب"
 ascendens = "تصاعدي"
 descendens = "تنازلي"
 
+# Prefix-scan mode words use the shared source spelling in every reader pack.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
+
 [types]
 ascii = "أسكي"
 textus = "نص"
@@ -3838,6 +3845,14 @@ help = "اجعل كل بديل aut يربط الأسماء نفسها بالأن
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "تعذر إثبات استقلال تكرارات الخيط: {reason}"
 help = "استخدم حلقة عادية، أو اكتب واقرأ التخزين المكتوب عند إحداثي التكرار نفسه فقط؛ لا تعدّل المتغيرات الخارجية ولا تستدعِ تأثيرات غير مثبتة"
+
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "لا يمكن لـ `{rumpe}` إنهاء حلقة `{filum}`"
+help = "لا يمكن لـ `{rumpe}` إيقاف حلقة `{filum}`: المسارات تعمل باستقلال. لإيجاد أول تطابق استخدم `{reducta} {via} {argminima} …`؛ وللتوقف عند حدّ، احسب الحدّ أولاً ثم كرّر حتى بلوغه."
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "لا يمكن لـ `{redde}` مغادرة حلقة `{filum}`"
+help = "لا يمكن لـ `{redde}` مغادرة حلقة `{filum}`: المسارات تعمل باستقلال. للحصول على قيمة واحدة من المسارات استخدم `{reducta}`؛ وللتوقف عند حدّ، احسب الحدّ أولاً ثم كرّر حتى بلوغه."
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "يمكن لجسم الاختزال استدعاء الدوال الجوهرية للجهاز والمقاطع والمساعدات الخاصة بالنواة فقط: {reason}"

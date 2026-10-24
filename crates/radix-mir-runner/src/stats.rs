@@ -411,6 +411,7 @@ pub(crate) fn intrinsic_name(intrinsic: &MirIntrinsic) -> String {
         MirIntrinsic::TensorShapeSize(_) => "tensor_shape_size".to_owned(),
         MirIntrinsic::TensorLimes(_) => "tensor_limes".to_owned(),
         MirIntrinsic::FilumReduce(_) => "filum_sum".to_owned(),
+        MirIntrinsic::Scan(_) => "scan".to_owned(),
         MirIntrinsic::Duplicate => "duplicate".to_owned(),
         MirIntrinsic::Pow => "pow".to_owned(),
         MirIntrinsic::TensorLift(op) => format!("tensor_lift.{}", op.name()),

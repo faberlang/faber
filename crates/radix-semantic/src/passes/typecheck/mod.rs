@@ -237,9 +237,13 @@ pub mod range;
 #[path = "record_anon_test.rs"]
 mod record_anon_test;
 pub mod reduction;
+pub mod scan;
 #[cfg(test)]
 #[path = "reduction_test.rs"]
 mod reduction_test;
+#[cfg(test)]
+#[path = "scan_test.rs"]
+mod scan_test;
 #[cfg(test)]
 pub mod relations_test;
 pub mod scalar_text;
@@ -537,6 +541,10 @@ pub(crate) struct TypeChecker<'a> {
     /// locals and module constants), keyed by binding DefId. The `axis`
     /// argument of an axis reduction accepts one of these.
     pub(crate) const_int_values: FxHashMap<radix_hir::DefId, i128>,
+    /// The module constants among `const_int_values`: with the
+    /// `compile_time_locals`, the bindings whose value is a compile-time
+    /// fact, so an index naming one is proven like the literal it holds.
+    pub(crate) module_const_ints: FxHashSet<radix_hir::DefId>,
     /// Node ids of expressions desugared from numeric twin methods (operator,
     /// assignment, or effect-hoisted block), handed to the presentation
     /// sidecar when the check finishes.
@@ -940,6 +948,7 @@ impl<'a> TypeChecker<'a> {
             compile_time_locals: FxHashSet::default(),
             static_size_values: FxHashMap::default(),
             const_int_values: FxHashMap::default(),
+            module_const_ints: FxHashSet::default(),
             numeric_twin_ids: Vec::new(),
             axis_reduction_results: FxHashMap::default(),
             empty_dense_ids: Vec::new(),

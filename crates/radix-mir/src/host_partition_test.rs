@@ -116,6 +116,7 @@ fn fixture_metadata(program: &MirProgram) -> MirDeviceFunctionMetadataMap {
                     shader_stage: MirKernelShaderStage::Compute,
                     visibility: MirFunctionVisibility::Private,
                     origin: MirFunctionOrigin::SyntheticKernelClosure,
+                    lane_domain_local: None,
                 },
             )
         })
@@ -893,6 +894,7 @@ fn synthetic_row(function_id: u32) -> (MirFunctionId, MirDeviceFunctionMetadata)
             shader_stage: MirKernelShaderStage::Compute,
             visibility: MirFunctionVisibility::Private,
             origin: MirFunctionOrigin::SyntheticKernelClosure,
+            lane_domain_local: None,
         },
     )
 }

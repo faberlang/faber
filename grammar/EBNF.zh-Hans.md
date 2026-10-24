@@ -437,7 +437,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [213] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [214] primary
-primary ::= IDENTIFIER | literal | regex_literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [215] ad_expr
 ad_expr ::= '调用' ASCII_STRING ad_opener?
 # [216] ad_opener
@@ -496,87 +496,95 @@ reducta_group ::= '按' expression
 reducta_body ::= ('设' | '变量') IDENTIFIER block_stmt
 # [243] reducta_identity
 reducta_identity ::= '兜底' expression
-# [244] sort_expr
+# [244] scan_expr
+scan_expr ::= 'scan' '经由' scan_op ('total' ('inclusive' | 'exclusive'))? '取自' expression apud_clause scan_group? scan_order_clause? filum_clause '设' IDENTIFIER block_stmt
+# [245] scan_op
+scan_op ::= '求和' | '求积' | '最大' | '最小' | '全部' | '任一' | '计数'
+# [246] scan_group
+scan_group ::= '按' expression
+# [247] scan_order_clause
+scan_order_clause ::= 'order' ('升序' | '降序')
+# [248] sort_expr
 sort_expr ::= '排序' '经由' sort_direction ('取自' | '借自') expression sort_body?
-# [245] sort_direction
+# [249] sort_direction
 sort_direction ::= '升序' | '降序'
-# [246] sort_body
+# [250] sort_body
 sort_body ::= ('设' | '变量') IDENTIFIER block_stmt
-# [247] filum_clause
+# [251] filum_clause
 filum_clause ::= '线程' IDENTIFIER
-# [248] capta_expr
+# [252] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [249] object_pattern
+# [253] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [250] pattern_property
+# [254] pattern_property
 pattern_property ::= '其余'? IDENTIFIER ('作为' IDENTIFIER)?
-# [251] array_pattern
+# [255] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [252] array_pattern_element
+# [256] array_pattern_element
 array_pattern_element ::= '_' | '其余'? IDENTIFIER
-# [253] nota_stmt
+# [257] nota_stmt
 nota_stmt ::= ('显示' | '查看' | '警告' | '写入') expression (',' expression)*
-# [254] entry_header
+# [258] entry_header
 entry_header ::= ('参数' IDENTIFIER)? ('退出' expression)?
-# [255] incipit_stmt
+# [259] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [256] incipiet_stmt
+# [260] incipiet_stmt
 incipiet_stmt ::= '异步入口' entry_header block_stmt
-# [257] probandum_decl
+# [261] probandum_decl
 probandum_decl ::= '验题' STRING proba_modifier* '{' probandum_body '}'
-# [258] probandum_body
+# [262] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [259] proba_stmt
+# [263] proba_stmt
 proba_stmt ::= '测试' STRING proba_modifier* block_stmt
-# [260] proba_modifier
+# [264] proba_modifier
 proba_modifier ::= '预期失败' | '跳过' STRING | '预期' STRING | '仅' | '标签' STRING | '时限' NATURAL | '计量' | '重复' NATURAL | '易碎' NATURAL | '仅于' STRING
-# [261] praepara_block
+# [265] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
-# [262] fac_stmt
+# [266] fac_stmt
 fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [263] IDENTIFIER
+# [267] IDENTIFIER
 IDENTIFIER ::=
-# [264] NUMBER
+# [268] NUMBER
 NUMBER ::=
-# [265] NATURAL
+# [269] NATURAL
 NATURAL ::=
-# [266] STRING
+# [270] STRING
 STRING ::=
-# [267] ASCII_STRING
+# [271] ASCII_STRING
 ASCII_STRING ::=
-# [268] BACKTICK_STRING
+# [272] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [269] OCTETI_STRING
+# [273] OCTETI_STRING
 OCTETI_STRING ::=
-# [270] REGEX_TYPE_WORD
+# [274] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [271] REGEX_BODY
+# [275] REGEX_BODY
 REGEX_BODY ::=
-# [272] NEWLINE
+# [276] NEWLINE
 NEWLINE ::=
-# [273] WIDTH_MARKER
+# [277] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [274] LISTA_WIDTH_SUGAR
+# [278] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [275] TENSOR_WIDTH_SUGAR
+# [279] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [276] SPARSA_WIDTH_SUGAR
+# [280] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [277] VECTOR_WIDTH_SUGAR
+# [281] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [278] MATRIX_WIDTH_SUGAR
+# [282] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [279] FRONTMATTER_DELIMITER
+# [283] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [280] TOML_LINES
+# [284] TOML_LINES
 TOML_LINES ::=
-# [281] ANNOTATION_NAME
+# [285] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [282] ANNOTATION_FIELD_NAME
+# [286] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [283] NON_NEWLINE_TOKEN
+# [287] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [284] NO_NEWLINE
+# [288] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -849,6 +857,10 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#归约-group` | live |
 | [`reducta_body`](#reducta-body) | `#归约-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#归约-identity` | live |
+| [`scan_expr`](#scan-expr) | `#scan-expr` | live |
+| [`scan_op`](#scan-op) | `#scan-op` | live |
+| [`scan_group`](#scan-group) | `#scan-group` | live |
+| [`scan_order_clause`](#scan-order-clause) | `#scan-order-clause` | live |
 | [`sort_expr`](#sort-expr) | `#sort-expr` | live |
 | [`sort_direction`](#sort-direction) | `#sort-direction` | live |
 | [`sort_body`](#sort-body) | `#sort-body` | live |
@@ -1019,6 +1031,11 @@ productions. It is not a second keyword authority.
 | Testing | `重复` | repeat |
 | Error | `需求` | require |
 | Control | `中断` | break |
+| Expression | `scan` | ordered prefix-scan head (shared source spelling; contextual) |
+| Expression | `exclusive` | exclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `inclusive` | inclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `order` | scan order-clause introducer (shared source spelling; contextual) |
+| Expression | `total` | prefix-scan total-mode introducer (shared source spelling; contextual) |
 | Declarations | `架构` | relational heading (experimental; census-types) |
 | Diagnostics | `写入` | diagnostic channel |
 | Builtin | `格式化` | write |
@@ -1044,7 +1061,7 @@ productions. It is not a second keyword authority.
 | Async | `等变` | await-bind mutable |
 | Boolean | `兜底` | nullable default / explicit reduction identity |
 | Boolean | `真` | true |
-| Conversion | `经由` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
+| Conversion | `经由` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 | Diagnostics | `查看` | debug |
 | Declarations | `visibilitas` | visibility field |
 

@@ -52,15 +52,17 @@ impl MirKernelReflection {
                 signature.workgroup,
             )?,
             fault_sites: fault_sites_for_signature(signature),
+            lane_range_binding: None,
         })
     }
 
     /// Replace the signature-derived fault sites with the kernel's full list
-    /// (gpu-reset U9-6): the unproven index sites first (`Fatal`, the index
-    /// text), then one `Recoverable` site per constant throw in block order,
-    /// carrying the thrown text. The signature alone knows only how many sites
-    /// the fault record holds, so a consumer that has the function applies this
-    /// after [`Self::from_signature`]. A kernel with no fault record is
+    /// (gpu-reset U9-6): tensor and vector index sites first (`Fatal`, the
+    /// index text), grouped-key axis sites next (`Fatal`), then one
+    /// `Recoverable` site per constant throw in block order, carrying the
+    /// thrown text. The signature alone knows only how many
+    /// sites the fault record holds, so a consumer that has the function applies
+    /// this after [`Self::from_signature`]. A kernel with no fault record is
     /// untouched.
     pub fn apply_fault_sites(
         &mut self,
@@ -70,7 +72,11 @@ impl MirKernelReflection {
         if self.fault_sites.is_empty() {
             return;
         }
-        let indexes = super::unproven_indexes(function, validation).len();
+        let indexes = super::unproven_indexes(function, validation).len()
+            + super::unproven_vector_indexes(function, validation).len()
+            + super::grid_reduce_node(function)
+                .and_then(|(filum, _)| filum.group.as_ref())
+                .map_or(0, |group| group.keys.len());
         let throws = super::throw_sites(function, &validation.types).unwrap_or_default();
         if indexes + throws.len() != self.fault_sites.len() {
             return;
@@ -124,6 +130,31 @@ impl MirKernelReflection {
             collection_op_workgroup_count(function, self.dispatch_size, effective);
     }
 
+    /// The full per-kernel reflection of one device-artifact kernel unit,
+    /// independent of the emitting backend: [`Self::from_signature`] under the
+    /// validation context the emission signature was synthesized with, then
+    /// [`Self::apply_fault_sites`] (the full fault-site list from the
+    /// function), then [`Self::apply_effective_workgroup`] against
+    /// `effective_workgroup` (the device program's launch-plan workgroup, the
+    /// authoritative per-kernel fact — for a generic one-dimensional kernel it
+    /// differs from the signature's `1×1×1`). `entry_name` is the logical
+    /// entry the host launches by.
+    ///
+    /// # Errors
+    /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
+    pub fn for_device_unit(
+        entry_name: impl Into<String>,
+        function: &MirFunction,
+        signature: &MirKernelSignature,
+        validation: &MirValidationContext<'_>,
+        effective_workgroup: MirWorkgroupSize,
+    ) -> Result<Self, MirAbiError> {
+        let mut reflection = Self::from_signature(entry_name, signature, validation)?;
+        reflection.apply_fault_sites(function, validation);
+        reflection.apply_effective_workgroup(function, effective_workgroup);
+        Ok(reflection)
+    }
+
     /// # Errors
     /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
     pub fn vertex_entry(
@@ -140,6 +171,7 @@ impl MirKernelReflection {
             shader_stage: MirKernelShaderStage::Vertex,
             resources,
             fault_sites: Vec::new(),
+            lane_range_binding: None,
             bound_resources: Vec::new(),
             vertex_inputs,
             varyings: Vec::new(),
@@ -173,6 +205,7 @@ impl MirKernelReflection {
             shader_stage: MirKernelShaderStage::Fragment,
             resources,
             fault_sites: Vec::new(),
+            lane_range_binding: None,
             bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,
@@ -206,6 +239,7 @@ impl MirKernelReflection {
             shader_stage: MirKernelShaderStage::Fragment,
             resources,
             fault_sites: Vec::new(),
+            lane_range_binding: None,
             bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,

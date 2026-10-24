@@ -1076,6 +1076,7 @@ impl<'a> LoweringContextMaps<'a> {
                     .device_interfaces
                     .get(self.interner.resolve(binding))
                 {
+                    self.fault_delivery |= ImportedDeviceRoute::interface_has_failable_kernel(interface);
                     let routes =
                         ImportedDeviceRoute::from_interface(&package_identities.product, target_segments, interface);
                     if !routes.is_empty() {

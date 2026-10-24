@@ -841,7 +841,11 @@ fn device_vector_align(element: MirScalarLayout, width: u8) -> u8 {
             clippy::cast_possible_truncation,
             reason = "MirScalarLayout::size_bits is one of {1,8,16,32,64,128}, so /8 <= 16 < u8::MAX"
         )]
-        let elem_bytes = (element.size_bits() / 8) as u8;
+        let elem_bytes = if element == MirScalarLayout::Bool {
+            1
+        } else {
+            (element.size_bits() / 8) as u8
+        };
         elem_bytes.saturating_mul(width)
     }
 }

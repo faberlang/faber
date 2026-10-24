@@ -1094,6 +1094,8 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             CollectionKernelPlan::LaneGrid { .. } | CollectionKernelPlan::SingleLane => true,
             // C4-8: a grid reduction is an in-kernel recipe plan.
             CollectionKernelPlan::GridReduce { .. } => true,
+            // A staged scan is three in-kernel stages, no communication variant.
+            CollectionKernelPlan::Scan { .. } => true,
         }
     }
 

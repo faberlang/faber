@@ -437,7 +437,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [213] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [214] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [215] ad_expr
 ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
 # [216] ad_opener
@@ -496,87 +496,95 @@ reducta_group ::= 'अनुसार' expression
 reducta_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
 # [243] reducta_identity
 reducta_identity ::= 'डिफ़ॉल्ट' expression
-# [244] sort_expr
+# [244] scan_expr
+scan_expr ::= 'scan' 'द्वारा' scan_op ('total' ('inclusive' | 'exclusive'))? 'सेवन' expression apud_clause scan_group? scan_order_clause? filum_clause 'बैठा' IDENTIFIER block_stmt
+# [245] scan_op
+scan_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'सभी' | 'कोई' | 'गिनती'
+# [246] scan_group
+scan_group ::= 'अनुसार' expression
+# [247] scan_order_clause
+scan_order_clause ::= 'order' ('आरोही' | 'अवरोही')
+# [248] sort_expr
 sort_expr ::= 'क्रमबद्ध_करो' 'द्वारा' sort_direction ('सेवन' | 'से') expression sort_body?
-# [245] sort_direction
+# [249] sort_direction
 sort_direction ::= 'आरोही' | 'अवरोही'
-# [246] sort_body
+# [250] sort_body
 sort_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
-# [247] filum_clause
+# [251] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
-# [248] capta_expr
+# [252] capta_expr
 capta_expr ::= 'जाल' block_stmt
-# [249] object_pattern
+# [253] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [250] pattern_property
+# [254] pattern_property
 pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [251] array_pattern
+# [255] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [252] array_pattern_element
+# [256] array_pattern_element
 array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
-# [253] nota_stmt
+# [257] nota_stmt
 nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
-# [254] entry_header
+# [258] entry_header
 entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
-# [255] incipit_stmt
+# [259] incipit_stmt
 incipit_stmt ::= 'आरंभ' entry_header block_stmt
-# [256] incipiet_stmt
+# [260] incipiet_stmt
 incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
-# [257] probandum_decl
+# [261] probandum_decl
 probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
-# [258] probandum_body
+# [262] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [259] proba_stmt
+# [263] proba_stmt
 proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
-# [260] proba_modifier
+# [264] proba_modifier
 proba_modifier ::= 'अपेक्षित_विफलता' | 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NATURAL | 'मापो' | 'पुनरावृत्ति' NATURAL | 'नाज़ुक' NATURAL | 'केवलमें' STRING
-# [261] praepara_block
+# [265] praepara_block
 praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सभी'? block_stmt
-# [262] fac_stmt
+# [266] fac_stmt
 fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [263] IDENTIFIER
+# [267] IDENTIFIER
 IDENTIFIER ::=
-# [264] NUMBER
+# [268] NUMBER
 NUMBER ::=
-# [265] NATURAL
+# [269] NATURAL
 NATURAL ::=
-# [266] STRING
+# [270] STRING
 STRING ::=
-# [267] ASCII_STRING
+# [271] ASCII_STRING
 ASCII_STRING ::=
-# [268] BACKTICK_STRING
+# [272] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [269] OCTETI_STRING
+# [273] OCTETI_STRING
 OCTETI_STRING ::=
-# [270] REGEX_TYPE_WORD
+# [274] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [271] REGEX_BODY
+# [275] REGEX_BODY
 REGEX_BODY ::=
-# [272] NEWLINE
+# [276] NEWLINE
 NEWLINE ::=
-# [273] WIDTH_MARKER
+# [277] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [274] LISTA_WIDTH_SUGAR
+# [278] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [275] TENSOR_WIDTH_SUGAR
+# [279] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [276] SPARSA_WIDTH_SUGAR
+# [280] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [277] VECTOR_WIDTH_SUGAR
+# [281] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [278] MATRIX_WIDTH_SUGAR
+# [282] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [279] FRONTMATTER_DELIMITER
+# [283] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [280] TOML_LINES
+# [284] TOML_LINES
 TOML_LINES ::=
-# [281] ANNOTATION_NAME
+# [285] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [282] ANNOTATION_FIELD_NAME
+# [286] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [283] NON_NEWLINE_TOKEN
+# [287] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [284] NO_NEWLINE
+# [288] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -849,6 +857,10 @@ NO_NEWLINE ::=
 | [`reducta_group`](#reducta-group) | `#समेटो-group` | live |
 | [`reducta_body`](#reducta-body) | `#समेटो-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#समेटो-identity` | live |
+| [`scan_expr`](#scan-expr) | `#scan-expr` | live |
+| [`scan_op`](#scan-op) | `#scan-op` | live |
+| [`scan_group`](#scan-group) | `#scan-group` | live |
+| [`scan_order_clause`](#scan-order-clause) | `#scan-order-clause` | live |
 | [`sort_expr`](#sort-expr) | `#sort-expr` | live |
 | [`sort_direction`](#sort-direction) | `#sort-direction` | live |
 | [`sort_body`](#sort-body) | `#sort-body` | live |
@@ -1019,6 +1031,11 @@ productions. It is not a second keyword authority.
 | Testing | `पुनरावृत्ति` | repeat |
 | Error | `आवश्यक` | require |
 | Control | `तोड़ो` | break |
+| Expression | `scan` | ordered prefix-scan head (shared source spelling; contextual) |
+| Expression | `exclusive` | exclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `inclusive` | inclusive prefix-scan mode (shared source spelling; contextual) |
+| Expression | `order` | scan order-clause introducer (shared source spelling; contextual) |
+| Expression | `total` | prefix-scan total-mode introducer (shared source spelling; contextual) |
 | Declarations | `स्कीमा` | relational heading (experimental; census-types) |
 | Diagnostics | `लिखो` | diagnostic channel |
 | Builtin | `लिखित` | write |
@@ -1044,7 +1061,7 @@ productions. It is not a second keyword authority.
 | Async | `रुको_चर` | await-bind mutable |
 | Boolean | `डिफ़ॉल्ट` | nullable default / explicit reduction identity |
 | Boolean | `सत्य` | true |
-| Conversion | `द्वारा` | convert-hint clause, reduction operator clause or sort direction clause (contextual) |
+| Conversion | `द्वारा` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 | Diagnostics | `देखो` | debug |
 | Declarations | `visibilitas` | visibility field |
 

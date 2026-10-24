@@ -22,12 +22,16 @@ mod types;
 pub use broadcast::*;
 pub use contract::*;
 pub use error::*;
-pub use lane_index::{IndexGuard, LaneIndexProof, UnprovenIndex, unproven_indexes};
+pub use lane_index::{
+    IndexGuard, LaneIndexProof, LaneWriteMap, LaneWriteSelector, UnprovenIndex,
+    UnprovenVectorIndex, lane_write_maps, unproven_indexes, unproven_vector_indexes,
+};
 pub use launch::*;
 pub use resource::*;
+pub use signature::resolve_parameter_alias;
 pub(crate) use signature::{
     append_gather_axis_extent_resources, append_matmul_runtime_extent_resources, grid_reduce_node,
-    grid_reduce_partial_layout,
+    grid_reduce_partial_layout, scan_node, scan_partial_layout,
 };
 pub use throw_sites::{ThrowSite, throw_sites};
 // Vocabulary types moved to radix-types (re-exported at the crate root).

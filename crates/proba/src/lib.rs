@@ -20,11 +20,28 @@ use radix::mir::{
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;
-use radix_mir_runner::{RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED, RUNNER_ISSUE_WALL_CLOCK_TIMEOUT};
+use radix_mir_runner::kernel_dispatch::ResidencyHook;
+use radix_mir_runner::{
+    RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED, RUNNER_ISSUE_WALL_CLOCK_TIMEOUT,
+    run_function_with_limits_and_kernel_dispatcher,
+};
 use std::collections::HashMap;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
+
+/// How a proba case executes its `@ kernel` calls.
+#[derive(Clone, Copy)]
+pub enum CaseKernels<'a> {
+    /// The MIR runner's own policy: refuse kernels, or execute host-form
+    /// kernels in sequence (the `reference` oracle route).
+    Runner(RunnerKernelPolicy),
+    /// Hand every kernel call to a device dispatcher (the `cpu` device
+    /// session route). The opener is called once per execution, because a
+    /// dispatcher tears its session down when the program ends; its error is
+    /// the case's blocked reason.
+    Dispatch(&'a dyn Fn() -> Result<ResidencyHook, String>),
+}
 
 /// User-facing test filter requested by the package or CLI layer.
 ///
@@ -631,7 +648,7 @@ fn run_proba_on_validated_with_unit_path(
         include_ignored,
         default_timeout_secs,
         collect_stats,
-        kernel_policy,
+        CaseKernels::Runner(kernel_policy),
         |case| mir_function_id_from_def(validated, case.def_id),
     )
 }
@@ -654,7 +671,7 @@ pub fn run_proba_on_validated_with_function_ids(
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
     collect_stats: bool,
-    kernel_policy: RunnerKernelPolicy,
+    kernels: CaseKernels<'_>,
 ) -> ProbaReport {
     let module_path = module_path.to_path_buf();
     run_proba_cases(
@@ -667,7 +684,7 @@ pub fn run_proba_on_validated_with_function_ids(
         include_ignored,
         default_timeout_secs,
         collect_stats,
-        kernel_policy,
+        kernels,
         |case| {
             function_ids
                 .get(&(module_path.clone(), case.def_id))
@@ -686,7 +703,7 @@ fn run_proba_cases(
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
     collect_stats: bool,
-    kernel_policy: RunnerKernelPolicy,
+    kernels: CaseKernels<'_>,
     function_id_for_case: impl Fn(&ProbaCase) -> Option<MirFunctionId>,
 ) -> ProbaReport {
     let has_solum = has_solum_cases(cases);
@@ -731,7 +748,7 @@ fn run_proba_cases(
                     repeats,
                     erratur,
                     collect_stats,
-                    kernel_policy,
+                    kernels,
                 ),
                 None => CaseExecution::without_output(CaseOutcome::Blocked {
                     reason: format!(
@@ -771,7 +788,7 @@ fn execute_case_repeated(
     repeats: u64,
     erratur: bool,
     collect_stats: bool,
-    kernel_policy: RunnerKernelPolicy,
+    kernels: CaseKernels<'_>,
 ) -> CaseExecution {
     execute_repeated(repeats, || {
         // Apply erratur inside each execution so a passing expected-error run
@@ -782,7 +799,7 @@ fn execute_case_repeated(
             timeout_secs,
             erratur,
             collect_stats,
-            kernel_policy,
+            kernels,
         )
     })
 }
@@ -804,11 +821,26 @@ fn execute_case(
     timeout_secs: Option<u64>,
     erratur: bool,
     collect_stats: bool,
-    kernel_policy: RunnerKernelPolicy,
+    kernels: CaseKernels<'_>,
 ) -> CaseExecution {
     // A seed belongs to one program execution. Clear the runner's process-wide
     // kernel state before this case can observe an earlier program's seed.
     reset_execution_state();
+    // A device route opens its dispatcher before the case starts; a device
+    // that cannot open blocks the case, naming why.
+    let dispatcher = match kernels {
+        CaseKernels::Runner(_) => None,
+        CaseKernels::Dispatch(open) => match open() {
+            Ok(dispatcher) => Some(dispatcher),
+            Err(reason) => {
+                return CaseExecution::without_output(CaseOutcome::Blocked { reason });
+            }
+        },
+    };
+    let kernel_policy = match kernels {
+        CaseKernels::Runner(policy) => policy,
+        CaseKernels::Dispatch(_) => RunnerKernelPolicy::Dispatch,
+    };
     let mut host = BufferHost::default();
     // Wall-clock deadline from the resolved timeout (per-test temporis, else
     // the CLI default). The runner's default step budget still applies as a
@@ -819,7 +851,20 @@ fn execute_case(
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let trapped = catch_unwind(AssertUnwindSafe(|| {
-        if collect_stats {
+        if let Some(dispatcher) = &dispatcher {
+            match run_function_with_limits_and_kernel_dispatcher(
+                validated,
+                function_id,
+                &mut host,
+                None,
+                deadline,
+                collect_stats,
+                dispatcher,
+            ) {
+                Ok(outcome) => (outcome.result, collect_stats.then_some(outcome.stats)),
+                Err(errors) => (Err(errors), None),
+            }
+        } else if collect_stats {
             match run_function_with_stats_and_limits_and_kernel_policy(
                 validated,
                 function_id,

@@ -33,14 +33,22 @@ fn case(args: &[&str]) -> Case {
 }
 
 #[test]
-fn runner_target_pins_the_cpu_device() {
+fn runner_target_pins_the_reference_route() {
     assert_eq!(
         runner_run_args(&case(&[])),
-        ["run", "/d/main.fab", "--device", "cpu"]
+        ["run", "/d/main.fab", "--device", "reference"]
     );
     assert_eq!(
         runner_run_args(&case(&["a", "b"])),
-        ["run", "/d/main.fab", "--device", "cpu", "--", "a", "b"]
+        [
+            "run",
+            "/d/main.fab",
+            "--device",
+            "reference",
+            "--",
+            "a",
+            "b"
+        ]
     );
 }
 

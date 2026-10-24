@@ -31,7 +31,7 @@ use super::control::CollectionIteraKind;
 use super::{
     BreakableContext, DefId, FunctionBuilder, HirBinOp, HirBlock, HirExpression, HirExpressionKind,
     HirExpressionLoweringVisitor, HirIteraMode, HirStatement, HirStatementKind, HirVisitor, LocalBinding, MirBinOp,
-    MirConstant, MirError, MirFilumForm, MirLocalDecl, MirLocalId, MirOperand, MirPlace, MirProjection,
+    MirConstant, MirError, MirFilumForm, MirLocalDecl, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirProjection,
     MirTerminatorKind, MirType, MirValueKind, NumericWidth, Primitive, Span, Symbol, TypeId, TypeTable,
 };
 
@@ -66,15 +66,26 @@ pub(super) struct LaneRegion {
     pub lane: MirLocalId,
     /// Half-open local-id range of the program-visible coordinate binders.
     pub coordinate_locals: Option<(MirLocalId, MirLocalId)>,
+    /// The exact materialized tensor local that defines this region's lane
+    /// domain. Resolved to its ABI resource through parameter aliases later.
+    pub source_local: Option<MirLocalId>,
 }
 
 /// The region expression of a top-level statement: a `filum` loop, or a
 /// `filum` reduction (bare or the right side of an assignment).
 fn lane_loop(statement: &HirStatement) -> Option<&HirExpression> {
-    let HirStatementKind::Expr(expr) = &statement.kind else {
-        return None;
-    };
-    tail_lane_loop(expr)
+    match &statement.kind {
+        HirStatementKind::Expr(expr) => tail_lane_loop(expr),
+        HirStatementKind::Local(local) => local
+            .init
+            .as_ref()
+            .and_then(|expr| grouped_grid_reduction(expr).map(|_| expr)),
+        // A grouped grid reduction can be the returned tensor itself. The
+        // function result buffer is its destination, so the return is part of
+        // the lane region and is emitted by stage 2.
+        HirStatementKind::Redde(Some(expr)) if grouped_grid_reduction(expr).is_some() => Some(expr),
+        _ => None,
+    }
 }
 
 fn tail_lane_loop(expr: &HirExpression) -> Option<&HirExpression> {
@@ -105,6 +116,20 @@ fn grid_reduction(expr: &HirExpression) -> Option<&HirExpression> {
         HirExpressionKind::Reduction { filum: Some(_), group: None, .. }
     )
     .then_some(reduction)
+    .or_else(|| grouped_grid_reduction(reduction))
+}
+
+fn grouped_grid_reduction(expr: &HirExpression) -> Option<&HirExpression> {
+    matches!(
+        &expr.kind,
+        HirExpressionKind::Reduction {
+            op: radix_hir::HirReductionOp::Sum | radix_hir::HirReductionOp::Count,
+            filum: Some(_),
+            group: Some(_),
+            ..
+        }
+    )
+    .then_some(expr)
 }
 
 /// The expression under the implicit narrowing the type checker wraps around a
@@ -152,12 +177,31 @@ impl FunctionBuilder<'_> {
         }
         // Everything after the loop would read results of the whole grid. A
         // reduction region is exempt: its node is a launch split point.
+        let returned_alias = body.statements.iter().find_map(|statement| {
+            let HirStatementKind::Local(local) = &statement.kind else {
+                return None;
+            };
+            local
+                .init
+                .as_ref()
+                .filter(|init| init.span == first.span)
+                .map(|_| local.def_id)
+        });
         let after_loop = body
             .statements
             .iter()
             .skip_while(|statement| lane_loop(statement).is_none_or(|expr| expr.span != first.span))
             .skip(1)
-            .find(|statement| !matches!(statement.kind, HirStatementKind::Tacet | HirStatementKind::Redde(None)));
+            .find(|statement| {
+                let returns_alias = returned_alias.is_some_and(|alias| {
+                    matches!(
+                        &statement.kind,
+                        HirStatementKind::Redde(Some(expr))
+                            if matches!(&expr.kind, HirExpressionKind::Path(def_id) if *def_id == alias)
+                    )
+                });
+                !returns_alias && !matches!(statement.kind, HirStatementKind::Tacet | HirStatementKind::Redde(None))
+            });
         let trailing = body.expr.as_deref().filter(|expr| expr.span != first.span);
         let post_region = if is_reduce_region(first) {
             None
@@ -191,7 +235,7 @@ impl FunctionBuilder<'_> {
         };
         let lane = self.next_local_id();
         self.add_lane_param(*def_id, *name, lane_ty, first.span);
-        self.lane_region = Some(LaneRegion { span: first.span, lane, coordinate_locals: None });
+        self.lane_region = Some(LaneRegion { span: first.span, lane, coordinate_locals: None, source_local: None });
     }
 
     /// Whether `expr` is the pre-scanned lane region of this body.
@@ -235,6 +279,7 @@ impl FunctionBuilder<'_> {
                 op: *op,
                 form: MirFilumForm::Grid,
                 source: tensor,
+                group: None,
                 coordinates,
                 filum,
                 binding: binding.as_ref(),
@@ -264,6 +309,7 @@ impl FunctionBuilder<'_> {
                 op: *op,
                 form: MirFilumForm::Grid,
                 source,
+                group: None,
                 coordinates,
                 filum,
                 binding: binding.as_ref(),
@@ -356,6 +402,10 @@ impl FunctionBuilder<'_> {
 
         let source = self.lower_expr_value(iter)?;
         let tensor = self.materialize_operand_place(source, MirType::semantic(iter_ty), iter.span);
+        self.lane_region.as_mut()?.source_local = match &tensor.base {
+            MirPlaceBase::Local(local) => Some(*local),
+            MirPlaceBase::Temp(_) => None,
+        };
 
         // Extents: constants for literal axes, `TensorExtent` otherwise.
         let mut extents = Vec::with_capacity(rank);

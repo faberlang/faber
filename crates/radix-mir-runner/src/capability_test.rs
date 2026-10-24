@@ -146,7 +146,7 @@ fn every_runtime_family_has_a_runner_ledger_status() {
     // family) is a deliberate change visible in this test and in
     // docs/factory/stepper-alignment/stepper-runtime-ledger.md.
     use RunnerDispatchStatus::*;
-    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 24] = [
+    let expected: [(MirRuntimeAbiFamily, RunnerDispatchStatus); 25] = [
         (MirRuntimeAbiFamily::RuntimeDiagnostic, Implement),
         (MirRuntimeAbiFamily::RuntimeAssert, Implement),
         (MirRuntimeAbiFamily::RuntimeFormat, Implement),
@@ -172,6 +172,7 @@ fn every_runtime_family_has_a_runner_ledger_status() {
         // SFR-5: the filum sum declaration is device-lane only; the host script
         // runner rejects it by target policy.
         (MirRuntimeAbiFamily::RuntimeFilumReduce, IntentionalReject),
+        (MirRuntimeAbiFamily::RuntimeScan, Implement),
         (MirRuntimeAbiFamily::RuntimeDuplicate, Implement),
         // K4: elementwise operator lift over tensors; the runner is the
         // reference, other lanes reject it.
@@ -185,8 +186,8 @@ fn every_runtime_family_has_a_runner_ledger_status() {
     ];
     assert_eq!(
         expected.len(),
-        24,
-        "ledger must cover all twenty-four runtime families"
+        25,
+        "ledger must cover all twenty-five runtime families"
     );
     for (family, want) in expected {
         assert_eq!(
@@ -209,6 +210,7 @@ fn filum_reduce_is_a_target_policy_rejection() {
         op: MirReduceOp::Sum,
         form: MirFilumForm::Declared,
         term_ty: numerus,
+        group: None,
         filum_binder: None,
         term_binder: MirLocalId(1),
         term_binder_name: None,

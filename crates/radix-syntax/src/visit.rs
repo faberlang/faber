@@ -544,6 +544,18 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_expr(identity);
             }
         }
+        ExprKind::Scan(scan) => {
+            visitor.visit_expr(&scan.source);
+            for coordinate in &scan.apud {
+                visitor.visit_ident(coordinate);
+            }
+            if let Some(group) = &scan.group {
+                visitor.visit_expr(group);
+            }
+            visitor.visit_ident(&scan.filum);
+            visitor.visit_ident(&scan.binding);
+            visitor.visit_block(&scan.body);
+        }
         ExprKind::Sort(sort) => {
             visitor.visit_expr(&sort.source);
             if let Some(binding) = &sort.binding {

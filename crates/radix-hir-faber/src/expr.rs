@@ -268,7 +268,9 @@ impl super::FaberCodegen<'_> {
                     self.write_twin_call(receiver, canonical, argument, names, surface, writer);
                 }
             }
-            HirExpressionKind::Binary(..) | HirExpressionKind::Reduction { .. }
+            HirExpressionKind::Binary(..)
+            | HirExpressionKind::Reduction { .. }
+            | HirExpressionKind::Scan { .. }
                 if self.axis_sugar_call(expr).is_some() =>
             {
                 // Authored axis reduction (`t.summa(axis n)` /
@@ -1332,6 +1334,54 @@ impl super::FaberCodegen<'_> {
                     writer.write(" ");
                     self.write_expr(identity, names, surface, writer);
                 }
+            }
+            HirExpressionKind::Scan {
+                op,
+                total,
+                source,
+                coordinates,
+                group,
+                order,
+                filum,
+                binding,
+                body,
+                ..
+            } => {
+                writer.write(surface.contextual_keyword("scan"));
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Via));
+                writer.write(" ");
+                writer.write(surface.contextual_keyword(op.keyword_key()));
+                if !matches!(total, radix_hir::HirScanTotal::Inclusive) {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("scan_total"));
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword(total.keyword_key()));
+                }
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Ex));
+                writer.write(" ");
+                self.write_expr_prec(source, 12, names, surface, writer);
+                self.write_apud_coordinates(coordinates, surface, writer);
+                if let Some(group) = group {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("pro"));
+                    writer.write(" ");
+                    self.write_expr_prec(group, 12, names, surface, writer);
+                }
+                writer.write(" ");
+                writer.write(surface.contextual_keyword("scan_order"));
+                writer.write(" ");
+                writer.write(surface.contextual_keyword(order.keyword_key()));
+                self.write_filum_clause(Some(*filum), surface, writer);
+                self.write_binder_body_clause(
+                    Some(*binding),
+                    Some(body),
+                    false,
+                    names,
+                    surface,
+                    writer,
+                );
             }
             HirExpressionKind::Sort {
                 direction,

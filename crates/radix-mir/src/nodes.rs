@@ -1125,6 +1125,11 @@ pub enum MirIntrinsic {
     /// region (gpu-reset rule 14.5); it validates like `Grid` but resolves
     /// to no plan here — later lowering owns it.
     FilumReduce(MirFilumReduceOp),
+    /// Ordered whole-source prefix operation. The runtime call is the typed
+    /// declaration site for both the reference interpreter and device plan.
+    /// Its arguments are the source tensor, term captures and helper, then
+    /// one capture/helper pair per grouped key axis.
+    Scan(MirScanOp),
     /// Deep duplicate-then-own for the `copy` access marker (mutability
     /// engine D-6): the lone argument is the source value; the result is an
     /// independent deep copy of the same payload type — no container, field,
@@ -1494,8 +1499,8 @@ pub struct MirFilumReduceOp {
     /// function (see [`Self::term_captures`]).
     pub term_body: Vec<MirStatement>,
     /// A grid-form term that is a first-class MIR function (C4-8 U5):
-    /// `Some(n)` when the call's LAST argument is the term's
-    /// `MirConstant::Function` and the `n` operands before it are the values
+    /// `Some(n)` when the term segment ends in a `MirConstant::Function`
+    /// and the `n` operands before it are the values
     /// the term captures from before the node. The function's parameters are
     /// those `n` captures (in order), then one per coordinate, then the
     /// element binder; it returns the term value. The function carries its
@@ -1503,11 +1508,86 @@ pub struct MirFilumReduceOp {
     /// `coordinates[i].local` and `term_binder` then name the term function's
     /// own parameter locals. `None` is the flat-list form (the declared sum,
     /// and a grid term with no body, whose term is the element binder).
+    /// Group-key capture/function segments, when present, follow this segment.
     pub term_captures: Option<u32>,
     /// The local the term value lands in at term-body exit.
     pub term_result: MirLocalId,
     /// The type of the per-element term value.
     pub term_ty: MirType,
+    /// Group-key functions and the literal result extents for a grouped sum
+    /// or count. Each key has its own typed helper and explicit captures so
+    /// device lowering can validate every axis before selecting a bucket.
+    pub group: Option<MirFilumGroupOp>,
+}
+
+/// The literal output shape and per-axis key helpers of a grouped reduction.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirFilumGroupOp {
+    /// Literal bucket extents, one per key expression.
+    pub dimensions: Vec<u64>,
+    /// Accumulator/result element type. Grouped sums widen here before any
+    /// partial is formed; counts keep their fixed `u32` partial carrier.
+    pub result_element_ty: MirType,
+    /// One scalar helper for each key axis, in result-axis order.
+    pub keys: Vec<MirFilumGroupKey>,
+}
+
+/// Typed capture contract for one grouped-reduction key helper.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirFilumGroupKey {
+    /// Number of explicit capture operands before this helper's function id.
+    pub captures: u32,
+    /// Checked integer type returned by the key helper.
+    pub key_ty: MirType,
+}
+
+/// Whether a scan stores the value before or after incorporating the current
+/// source element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirScanTotal {
+    Inclusive,
+    Exclusive,
+}
+
+/// Typed scan facts carried by [`MirIntrinsic::Scan`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MirScanOp {
+    /// The same closed operation family used by reductions. Arg operations
+    /// are rejected before MIR lowering.
+    pub op: MirReduceOp,
+    /// Inclusive or identity-based exclusive output.
+    pub total: MirScanTotal,
+    /// Whether traversal visits flattened source indexes from last to first.
+    pub reverse: bool,
+    /// Source tensor rank.
+    pub rank: u8,
+    /// Term helper result type.
+    pub term_ty: MirType,
+    /// Scan accumulator and result element type.
+    pub result_element_ty: MirType,
+    /// Number of capture operands preceding the term helper function id.
+    pub term_captures: u32,
+    /// Finite grouped key axes, each with the proven key interval and helper.
+    pub group: Option<MirScanGroupOp>,
+}
+
+/// Finite key-domain facts and helpers for a grouped scan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirScanGroupOp {
+    pub axes: Vec<MirScanGroupAxis>,
+}
+
+/// One key coordinate in the finite group domain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirScanGroupAxis {
+    /// Lowest valid key value, inclusive.
+    pub min: i128,
+    /// Number of valid values beginning at `min`.
+    pub extent: u64,
+    /// The helper's integer return type.
+    pub key_ty: MirType,
+    /// Number of capture operands preceding the key helper function id.
+    pub captures: u32,
 }
 
 /// One coordinate binder of a filum declaration (SFR-5).
@@ -1523,6 +1603,10 @@ pub struct MirFilumCoordinate {
 // equality stance `impl Eq for MirConstant` already takes for float-bearing
 // payloads; the kernel plan derives `Eq`.
 impl Eq for MirFilumReduceOp {}
+
+// Plan-carried MIR facts use the same bitwise equality stance as other
+// float-bearing MIR nodes; scan contracts themselves are structurally typed.
+impl Eq for MirScanOp {}
 
 impl Eq for MirFilumCoordinate {}
 

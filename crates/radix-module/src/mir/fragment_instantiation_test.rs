@@ -874,6 +874,7 @@ fn synthetic_metadata(function_id: u32) -> MirDeviceFunctionMetadataMap {
             shader_stage: MirKernelShaderStage::Compute,
             visibility: MirFunctionVisibility::Private,
             origin: MirFunctionOrigin::SyntheticKernelClosure,
+            lane_domain_local: None,
         },
     );
     metadata

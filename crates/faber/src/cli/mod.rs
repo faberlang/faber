@@ -567,6 +567,32 @@ pub struct CheckArgs {
     #[arg(long, conflicts_with_all = ["air", "permissive"])]
     pub lower: bool,
 
+    /// Advise where the package's kernels run serialized on this device
+    /// (`cpu`, `metal` or `cuda`): a single-lane kernel, a kernel the device
+    /// runs as one sequential call, a kernel it cannot place, and with
+    /// `--partitions` a kernel that will not split across the partitions.
+    /// The rows are `info` advice (INFO001), never errors; the package is
+    /// lowered and its device image built as `faber run --device` builds it,
+    /// and nothing runs. Needs a file or package path
+    #[arg(
+        long = "device",
+        value_enum,
+        value_name = "DEVICE",
+        conflicts_with_all = ["air", "permissive"]
+    )]
+    pub device: Option<DeviceChoice>,
+
+    /// With `--device cpu` or `--device metal`: the partition count of the
+    /// one spanned logical device to advise for (default 1), as
+    /// `faber run --partitions N`
+    #[arg(
+        long = "partitions",
+        value_name = "N",
+        requires = "device",
+        value_parser = clap::value_parser!(u32).range(1..)
+    )]
+    pub partitions: Option<u32>,
+
     /// Force package checking mode
     #[arg(long)]
     pub package: bool,
@@ -671,25 +697,42 @@ pub struct RunArgs {
     /// `E_DEVICE_NONE_ADMITTED` when the runtime finds no usable device), and
     /// a package with no device program fails closed ("package has no device
     /// program"). `reference` is plain sequential code on the
-    /// MIR runner, the oracle device results are checked against; `cpu` is
-    /// processor cores as a device (until the worker device lands this is the
-    /// same route as `reference`). Both lower `@ kernel` functions as ordinary
-    /// functions and run them single-threaded on the MIR runner; without one
-    /// of them a program that calls a kernel is refused. `metal` and `cuda` run
+    /// MIR runner, the oracle device results are checked against: it lowers
+    /// `@ kernel` functions as ordinary functions and runs them
+    /// single-threaded. `cpu` is processor cores as one device: the kernels go
+    /// through the same device session as `metal` and `cuda`, run by
+    /// `--threads` workers shared across `--partitions` logical partitions, and the result is
+    /// the same at any worker or partition count; a
+    /// package without kernels runs on the reference route. `auto` never picks
+    /// `cpu`, and without an explicit `reference` or `cpu` a program that calls
+    /// a kernel on a machine with no GPU is refused. `metal` and `cuda` run
     /// kernels in process: Metal on Apple GPUs, CUDA through the NVIDIA driver
     /// with a PTX image built at run time (`clang` with the NVPTX target on
     /// `PATH`).
     #[arg(long = "device", value_enum, value_name = "DEVICE")]
     pub device: Option<DeviceChoice>,
 
-    /// Worker count for the `cpu` device. The default is half the available
-    /// cores, minimum one. CPU workers run at reduced priority, below
-    /// interactive programs, whether the count is the default or given here.
-    /// Results are identical at any worker count. Valid only with
-    /// `--device cpu`; until the worker device lands `cpu` runs on the
-    /// reference route and the count has no effect.
+    /// Worker count for the `cpu` device. Without it the manifest
+    /// `[device] threads` applies, and without that the default is half the
+    /// available cores, minimum one. CPU workers run at reduced priority,
+    /// below interactive programs, whether the count is the default or given
+    /// here. Results are identical at any worker count. Valid only with
+    /// `--device cpu`.
     #[arg(long = "threads", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
     pub threads: Option<u32>,
+
+    /// Virtual partition count for the `cpu` or `metal` device (default 1). The CPU's
+    /// logical device spans N partitions sharing one memory budget, one
+    /// buffer store, and one pool of `--threads` workers. Each launch's
+    /// workgroups are split into N contiguous ranges scheduled on that pool;
+    /// increasing partitions never increases the worker count.
+    /// Results are identical at any partition count. Valid with
+    /// `--device cpu`, and with `--device metal`. Metal partitions share one
+    /// buffer store and one command queue on the GPU. Split kernels dispatch
+    /// each nonempty share in order; single-lane kernels and other whole-call
+    /// stages execute once. No data moves between Metal partitions.
+    #[arg(long = "partitions", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+    pub partitions: Option<u32>,
 
     /// Emit diagnostic runner statistics after a package run.
     #[arg(long)]
@@ -767,14 +810,23 @@ pub struct TestArgs {
     #[arg(long = "diagnostics-locale", value_name = "LOCALE")]
     pub diagnostics_locale: Option<String>,
 
-    /// Device selection for cases that call `@ kernel` functions: `reference`
-    /// and `cpu` run them in host form on the MIR runner (the rule 16.3 oracle
-    /// mode; until the worker device lands `cpu` is the same route);
-    /// `auto` or absent keeps refusing kernels. `metal` and `cuda` are not
-    /// served by `faber test` and fail closed. Precedence: CLI > manifest
-    /// `[device] device` > `auto`.
+    /// Device selection for cases that call `@ kernel` functions:
+    /// `reference` runs them in host form, in sequence, on the MIR runner (the
+    /// oracle); `cpu` runs a package's kernels on the CPU device, through the
+    /// same device session as `faber run --device cpu`, by `--threads`
+    /// workers (a single `.fab` / `.proba` file outside a package runs them
+    /// on the reference route, as `faber run` does); `auto` or absent keeps
+    /// refusing kernels. `metal` and `cuda` are not served by `faber test` and
+    /// fail closed. Precedence: CLI > manifest `[device] device` > `auto`.
     #[arg(long = "device", value_enum, value_name = "DEVICE")]
     pub device: Option<DeviceChoice>,
+
+    /// Worker count for the `cpu` device, as for `faber run`. Precedence:
+    /// `--threads` > manifest `[device] threads` > half the available cores,
+    /// minimum one. Results are identical at any worker count. Valid only
+    /// with `--device cpu`.
+    #[arg(long = "threads", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+    pub threads: Option<u32>,
 
     /// Environment name that `solum_in` modifiers match, in addition to the
     /// OS name.

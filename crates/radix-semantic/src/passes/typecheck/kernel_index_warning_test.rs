@@ -95,3 +95,65 @@ functio k(tensor<f32, [8]> src, numerus j) → f32 ∪ nihil {
 ";
     assert_eq!(unproven_count(source), 0);
 }
+
+#[test]
+fn kernel_index_warning_is_silent_for_a_constant_index_in_range() {
+    // A module constant, and a constant expression over one, are proven
+    // exactly like the literal they fold to.
+    for index in ["K", "K + 1", "[K]"] {
+        let source = format!(
+            r"
+fixum numerus K = 2
+
+@ nucleum
+functio k(tensor<f32, [8]> src) → f32 ∪ nihil {{
+    redde src[{index}]
+}}
+"
+        );
+        assert_eq!(unproven_count(&source), 0, "src[{index}]");
+    }
+    let local = r"
+@ nucleum
+functio k(tensor<f32, [8]> src) → f32 ∪ nihil {
+    fixum numerus K = 2
+    redde src[K]
+}
+";
+    assert_eq!(unproven_count(local), 0, "a local compile-time constant");
+}
+
+#[test]
+fn kernel_index_warning_keeps_a_run_time_binding_unproven() {
+    // `sit` is a run-time binding even with a literal initializer.
+    let source = r"
+@ nucleum
+functio k(tensor<f32, [8]> src) → f32 ∪ nihil {
+    sit numerus i ← 2
+    redde src[i]
+}
+";
+    assert_eq!(unproven_count(source), 1);
+}
+
+#[test]
+fn a_constant_index_out_of_range_is_refused_at_compile_time() {
+    let source = r"
+fixum numerus K = 8
+
+@ nucleum
+functio k(tensor<f32, [8]> src) → f32 ∪ nihil {
+    redde src[K]
+}
+";
+    let analysis = analyze_source(source);
+    assert!(
+        analysis
+            .diagnostics
+            .iter()
+            .any(|diag| diag.is_error() && diag.issue() == Some("index_provably_out_of_bounds")),
+        "{:?}",
+        analysis.diagnostics
+    );
+    assert_eq!(unproven_count(source), 0);
+}

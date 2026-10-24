@@ -1,6 +1,6 @@
 //! GI4-2 tests: the optional cadence/session section (schema), its version
 //! ratchet + admission (the MD2-W1 sibling-field precedent — own ratchet,
-//! no `WIRE_DEVICE_PROGRAM_VERSION` bump), the wire-level session-facts
+//! no nested device-program bump for this session change), the wire-level session-facts
 //! validation, and the mutation tests proving admission inspects the
 //! **actually-delivered session facts** (the equivalence-gate discipline:
 //! flipped cadence, altered KV layout, mutated invocation mode, mutated
@@ -601,7 +601,7 @@ fn session_section_version_ratchet_is_declared() {
     assert_eq!(EXECUTOR_PLAN_SECTION_VERSION, 2);
     assert_eq!(EXECUTOR_PLAN_V2_VERSION, 2);
     assert_eq!(LEGACY_EXECUTOR_PLAN_SECTION_VERSION, 1);
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
-    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 14);
+    assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 8);
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
 }

@@ -164,6 +164,13 @@ imperia = "commands"
 vacua = "empty"
 primus_quem = "primus_quem"
 ubi = "ubi"
+# Prefix-scan expression surface. These clause words are shared verbatim by
+# all reader packs; `scan` is the industry term used by the source contract.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
 # Sum-reduce expression surface.
 summa = "sum"
 filum = "thread"
@@ -5412,6 +5419,14 @@ help = "make every `aut` alternative bind the same names with the same types"
 message = "cannot prove thread iteration independence: {reason}"
 help = "use an ordinary loop, or write only the iteration’s own coordinate and read written storage only at that coordinate; do not mutate outer locals or call unproved effects"
 
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "`{rumpe}` cannot end a `{filum}` loop"
+help = "`{rumpe}` cannot stop a `{filum}` loop: lanes run independently. To find the first match use `{reducta} {via} {argminima} …`; to stop at a cutoff, compute it first and loop to it."
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "`{redde}` cannot leave a `{filum}` loop"
+help = "`{redde}` cannot leave a `{filum}` loop: lanes run independently. To get one value out of the lanes use `{reducta}`; to stop at a cutoff, compute it first and loop to it."
+
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "a reduction body can call only device intrinsics, fragments and private kernel helpers: {reason}"
 help = "move the call out of the reduction, or call a private kernel helper"
@@ -5895,3 +5910,24 @@ help = "install LLVM's opt beside llvm-as or on PATH, then build again"
 [diagnostics.PKG001.issues.llvm_host_link_failed]
 message = "clang failed to link {path}: {detail}"
 help = "check that clang works and that the runtime archive matches this compiler; the detail is clang's own output"
+
+# Advice rows (info severity, never an error): "serialized by the backend".
+# `faber check --device D [--partitions N]` names each kernel D runs
+# serialized; `kernel`, `entry`, `device`, `partitions` and `reason` are args.
+[diagnostics.INFO001]
+message = "kernel `{kernel}` runs serialized on the {device} device"
+
+[diagnostics.INFO001.issues.single_lane]
+message = "kernel `{kernel}` runs on one lane"
+
+[diagnostics.INFO001.issues.not_split]
+message = "kernel `{kernel}` runs on one of the {partitions} partitions: {reason}"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "kernel `{kernel}`: whether it splits across the {partitions} partitions depends on run-time shapes"
+
+[diagnostics.INFO001.issues.whole_call]
+message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
+
+[diagnostics.INFO001.issues.not_placed]
+message = "kernel `{kernel}` is not placed on the {device} device: {reason}"

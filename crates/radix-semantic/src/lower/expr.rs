@@ -138,6 +138,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
         ExprKind::Construct(ty) => lowerer.lower_construct(ty, id, expr.span),
         ExprKind::Reducta(reduction) => lower_reducta(lowerer, reduction),
+        ExprKind::Scan(scan) => lower_scan(lowerer, scan),
         ExprKind::Sort(sort) => lower_sort(lowerer, sort),
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
@@ -230,6 +231,63 @@ fn lower_reducta(
         body,
         identity,
         mutable: reduction.mutability == radix_syntax::AstMutability::Mutable,
+    }
+}
+
+fn lower_scan(lowerer: &mut Lowerer, scan: &radix_syntax::ScanExpr) -> HirExpressionKind {
+    let source = Box::new(lower_expr(lowerer, &scan.source));
+    lowerer.push_scope();
+    let coordinates = scan
+        .apud
+        .iter()
+        .map(|ident| {
+            let id = lowerer.next_def_id();
+            lowerer.bind_local(ident.name, id);
+            (id, ident.name)
+        })
+        .collect();
+    let group = scan
+        .group
+        .as_ref()
+        .map(|expr| Box::new(lower_expr(lowerer, expr)));
+    let filum_id = lowerer.next_def_id();
+    lowerer.bind_local(scan.filum.name, filum_id);
+    let binding_id = lowerer.next_def_id();
+    lowerer.bind_local(scan.binding.name, binding_id);
+    let body = lowerer.lower_block(&scan.body);
+    lowerer.pop_scope();
+
+    let op = match scan.op {
+        radix_syntax::ReductaOp::Sum => radix_hir::HirReductionOp::Sum,
+        radix_syntax::ReductaOp::Product => radix_hir::HirReductionOp::Product,
+        radix_syntax::ReductaOp::Max => radix_hir::HirReductionOp::Max,
+        radix_syntax::ReductaOp::Min => radix_hir::HirReductionOp::Min,
+        radix_syntax::ReductaOp::All => radix_hir::HirReductionOp::All,
+        radix_syntax::ReductaOp::Any => radix_hir::HirReductionOp::Any,
+        radix_syntax::ReductaOp::Count => radix_hir::HirReductionOp::Count,
+        radix_syntax::ReductaOp::ArgMax | radix_syntax::ReductaOp::ArgMin => {
+            unreachable!("scan parser admits only value-prefix operators")
+        }
+    };
+    let total = match scan.total {
+        radix_syntax::ScanTotal::Inclusive => radix_hir::HirScanTotal::Inclusive,
+        radix_syntax::ScanTotal::Exclusive => radix_hir::HirScanTotal::Exclusive,
+    };
+    let order = match scan.order {
+        radix_syntax::SortDirection::Ascending => radix_hir::HirSortDirection::Ascending,
+        radix_syntax::SortDirection::Descending => radix_hir::HirSortDirection::Descending,
+    };
+    HirExpressionKind::Scan {
+        op,
+        total,
+        source,
+        coordinates,
+        group,
+        group_domain: None,
+        order,
+        filum: (filum_id, scan.filum.name),
+        binding: (binding_id, scan.binding.name),
+        body,
     }
 }
 

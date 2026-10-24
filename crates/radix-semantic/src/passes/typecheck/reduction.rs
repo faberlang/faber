@@ -705,7 +705,7 @@ fn check_group_keys(
     Some(keys.len())
 }
 
-fn is_numeric_scalar(types: &TypeTable, ty: TypeId) -> bool {
+pub(super) fn is_numeric_scalar(types: &TypeTable, ty: TypeId) -> bool {
     matches!(
         types.get(ty),
         Type::Primitive(Primitive::Numerus | Primitive::Fractus)
@@ -724,7 +724,7 @@ struct ReductionBodyState {
     valued_redde: usize,
 }
 
-fn check_reducta_body_laws(
+pub(super) fn check_reducta_body_laws(
     checker: &mut TypeChecker<'_>,
     coordinates: &[(DefId, Symbol)],
     filum: Option<(DefId, Symbol)>,
@@ -902,6 +902,7 @@ impl ReductionBodyState {
             // treats the nested node as an unapproved effect, so the outer
             // body walk does not descend into it.
             HirExpressionKind::Reduction { .. } => effect(checker, expr.span, "unapproved_effect"),
+            HirExpressionKind::Scan { .. } => effect(checker, expr.span, "unapproved_effect"),
             HirExpressionKind::Sort { .. } => effect(checker, expr.span, "unapproved_effect"),
             // Same fragment-subset posture for the dedicated first-match
             // head: unadmitted until AFM-3/AFM-4, so never descended into.

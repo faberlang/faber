@@ -1284,6 +1284,7 @@ fn plan_spelling(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::LaneGrid { .. } => "lane-grid",
         CollectionKernelPlan::SingleLane => "single-lane",
         CollectionKernelPlan::GridReduce { .. } => "grid-reduce",
+        CollectionKernelPlan::Scan { .. } => "scan",
     }
 }
 

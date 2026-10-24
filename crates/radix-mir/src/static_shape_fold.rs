@@ -187,7 +187,9 @@ pub fn fold_static_shapes(
     validation: &MirValidationContext<'_>,
 ) -> Result<ShapeFoldOutcome, ShapeFoldError> {
     let expansion_folded = crate::tensor_expansion::fold_expansion_witnesses(function, validation)?;
-    let function = &expansion_folded;
+    let views_resolved =
+        crate::kernel_shift_view::resolve_kernel_shift_views(&expansion_folded, validation)?;
+    let function = views_resolved.as_ref().unwrap_or(&expansion_folded);
     // The lowered body's call-result copies: a runtime call lands in a temp
     // and the next statement copies it into a local (`Local(l) ← Temp(t)`).
     // Shape construction is no exception (`shape_w ← weight.magnitudines()`,

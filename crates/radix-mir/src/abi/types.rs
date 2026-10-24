@@ -87,6 +87,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeTensorShapeSize,
     RuntimeTensorLimes,
     RuntimeFilumReduce,
+    RuntimeScan,
     RuntimeDuplicate,
     RuntimeTensorLift,
     RuntimePow,
@@ -208,6 +209,11 @@ impl MirRuntimeAbi {
             // pass resolves it); host lanes reject it by target policy.
             MirIntrinsic::FilumReduce(_) => (
                 MirRuntimeAbiFamily::RuntimeFilumReduce,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            MirIntrinsic::Scan(_) => (
+                MirRuntimeAbiFamily::RuntimeScan,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),
@@ -438,11 +444,24 @@ pub struct MirKernelReflection {
     pub dispatch_size: MirKernelDispatchSize,
     pub workgroup_count: MirKernelWorkgroupCount,
     /// The kernel's device fault sites (gpu-reset U9-2), ids dense from 0: one
-    /// slot of the per-launch fault record each. Non-empty exactly when the
-    /// resource list carries a `FaultRecord` binding. Omitted from serialized
-    /// reflection when empty so existing reflection JSON is byte-identical.
+    /// slot of the per-launch fault record each. Index bounds sites cover
+    /// tensors and register vectors before recoverable throw sites. Non-empty
+    /// exactly when the resource list carries a `FaultRecord` binding. Omitted
+    /// from serialized reflection when empty so existing reflection JSON is
+    /// byte-identical.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fault_sites: Vec<MirFaultSite>,
+    /// The binding of the kernel's lane-range input (rule 18), present only
+    /// when the kernel was emitted for a logical device spanning several
+    /// partitions: an inline argument of two `u32` words `[first, end)` after
+    /// every declared binding. The kernel adds `first` to its grid position
+    /// and does nothing for a lane at or past `end`. A whole-grid reduction
+    /// (both of its entries declare it) reads it as the workgroup range of
+    /// its stage 1: `first` offsets the workgroup position, and a workgroup
+    /// at or past `end` does nothing. Omitted from serialized
+    /// reflection when absent so existing reflection JSON is byte-identical.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lane_range_binding: Option<u32>,
 }
 
 /// What a device fault site does when it fires.

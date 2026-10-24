@@ -167,6 +167,13 @@ ordinata = "排序"
 ascendens = "升序"
 descendens = "降序"
 
+# Prefix-scan mode words use the shared source spelling in every reader pack.
+scan = "scan"
+scan_order = "order"
+scan_total = "total"
+scan_inclusive = "inclusive"
+scan_exclusive = "exclusive"
+
 [types]
 ascii = "窄字串"
 textus = "文本"
@@ -3739,6 +3746,14 @@ help = "让每个 aut 分支以相同类型绑定相同名称"
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "无法证明线程迭代的独立性：{reason}"
 help = "使用普通循环，或仅写入本次迭代的坐标，并仅在同一坐标读取已写入的存储；不要修改外部局部变量或调用未经证明的副作用"
+
+[diagnostics.SEM010.issues.break_in_thread_body]
+message = "`{rumpe}` 不能结束 `{filum}` 循环"
+help = "`{rumpe}` 不能停止 `{filum}` 循环：各通道相互独立运行。要找第一个匹配项，请用 `{reducta} {via} {argminima} …`；要在某个界限处停止，请先算出该界限，再循环到该界限。"
+
+[diagnostics.SEM010.issues.return_in_thread_body]
+message = "`{redde}` 不能离开 `{filum}` 循环"
+help = "`{redde}` 不能离开 `{filum}` 循环：各通道相互独立运行。要从各通道得到一个值，请用 `{reducta}`；要在某个界限处停止，请先算出该界限，再循环到该界限。"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "归约体只能调用设备内建函数、片段和私有内核辅助函数：{reason}"

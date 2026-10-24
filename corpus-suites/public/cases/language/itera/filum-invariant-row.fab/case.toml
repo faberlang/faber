@@ -1,0 +1,9 @@
+version = 1
+id = "corpus/itera/filum-invariant-row.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/filum-invariant-row.fab"
+
+
+[expect]
+check_only = true

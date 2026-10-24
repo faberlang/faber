@@ -68,12 +68,19 @@ mod runtime_extent_itera_test;
 mod reducta_filum_test;
 
 #[cfg(all(test, feature = "runner"))]
+#[path = "scan_reference_test.rs"]
+mod scan_reference_tests;
+
+#[cfg(all(test, feature = "runner"))]
 #[path = "kernel_host_lowering_test.rs"]
 mod kernel_host_lowering_test;
 
 #[cfg(test)]
 #[path = "fault_sites_test.rs"]
 mod fault_sites_test;
+#[cfg(all(test, feature = "mir-metal"))]
+#[path = "shift_view_test.rs"]
+mod shift_view_test;
 
 #[cfg(test)]
 #[path = "kernel_get_set_test.rs"]

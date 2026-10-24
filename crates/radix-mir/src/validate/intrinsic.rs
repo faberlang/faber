@@ -10,7 +10,7 @@ use crate::{
     MirSermoOp, MirShapeExpr, MirType,
 };
 use radix_lexer::Span;
-use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type, i64s_from_literal_index};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ElementwiseCollectionKind {
@@ -478,26 +478,156 @@ impl Validator<'_, '_> {
                     }
                     MirFilumForm::Grid | MirFilumForm::Nested => {
                         let rank = op.coordinates.len();
-                        // A function term appends its captures and the term
-                        // function constant after the identity.
+                        // Group key helpers follow the optional term helper;
+                        // each key carries its captures and function constant.
                         let term_operands =
                             op.term_captures.map_or(0, |captures| captures as usize + 1);
+                        let group_operands = op.group.as_ref().map_or(Some(0), |group| {
+                            group.keys.iter().try_fold(0_usize, |count, key| {
+                                count.checked_add(
+                                    usize::try_from(key.captures).ok()?.checked_add(1)?,
+                                )
+                            })
+                        });
+                        let Some(group_operands) = group_operands else {
+                            self.error(span, "filum group key operand count overflows usize");
+                            return;
+                        };
                         if rank == 0
-                            || ![1 + rank + term_operands, 2 + rank + term_operands]
-                                .contains(&call.args.len())
+                            || ![
+                                1 + rank + term_operands + group_operands,
+                                2 + rank + term_operands + group_operands,
+                            ]
+                            .contains(&call.args.len())
                         {
                             self.error(
                                 span,
-                                "filum grid reduce takes the source, one extent per axis, an optional identity, and a function term's captures and function",
+                                "filum grid reduce takes the source, one extent per axis, an optional identity, and its typed term and group helper captures",
                             );
                         }
                         if op.term_captures.is_some()
-                            && !matches!(
-                                call.args.last(),
-                                Some(MirOperand::Constant(MirConstant::Function(_)))
-                            )
+                            && (call.args.len() < group_operands + 1
+                                || !matches!(
+                                    call.args.get(call.args.len() - group_operands - 1),
+                                    Some(MirOperand::Constant(MirConstant::Function(_)))
+                                ))
                         {
-                            self.error(span, "filum grid reduce function term must end with its function constant");
+                            self.error(span, "filum grid reduce term helper must carry its function constant before group helpers");
+                        }
+                        if let Some(group) = &op.group {
+                            if op.form != MirFilumForm::Grid
+                                || !matches!(
+                                    op.op,
+                                    crate::MirReduceOp::Sum | crate::MirReduceOp::Count
+                                )
+                                || group.keys.is_empty()
+                                || group.keys.len() != group.dimensions.len()
+                            {
+                                self.error(span, "filum grouped grid reduction has an invalid operator or key shape");
+                            }
+                            let result_facts = match self.type_kind(call.return_ty) {
+                                Type::Tensor(element, shape) => {
+                                    let element_ty = MirType::semantic(*element);
+                                    let result_element = self.type_kind(element_ty);
+                                    let valid_element = match op.op {
+                                        crate::MirReduceOp::Sum => matches!(
+                                            result_element,
+                                            Type::Primitive(
+                                                Primitive::Fractus | Primitive::Numerus
+                                            ) | Type::SizedNumeric(
+                                                Primitive::Fractus | Primitive::Numerus,
+                                                _
+                                            )
+                                        ),
+                                        crate::MirReduceOp::Count => matches!(
+                                            result_element,
+                                            Type::Primitive(Primitive::Numerus)
+                                                | Type::SizedNumeric(Primitive::Numerus, _)
+                                        ),
+                                        _ => false,
+                                    };
+                                    let dims = i64s_from_literal_index(*shape, &self.context.types);
+                                    Some((element_ty, valid_element, dims))
+                                }
+                                _ => None,
+                            };
+                            let dims = if let Some((element_ty, valid_element, dims)) = result_facts
+                            {
+                                if element_ty != group.result_element_ty {
+                                    self.error(span, "filum grouped grid reduction element type differs from its result type");
+                                }
+                                if !valid_element {
+                                    self.error(span, "filum grouped grid reduction result element type is unsupported");
+                                }
+                                dims
+                            } else {
+                                None
+                            };
+                            let dimensions = group
+                                .dimensions
+                                .iter()
+                                .map(|extent| i64::try_from(*extent).ok())
+                                .collect::<Option<Vec<_>>>();
+                            if dims != dimensions {
+                                self.error(span, "filum grouped grid reduction result shape differs from its key shape");
+                            }
+                            for (axis, key) in group.keys.iter().enumerate() {
+                                if !matches!(
+                                    self.type_kind(key.key_ty),
+                                    Type::Primitive(Primitive::Numerus)
+                                        | Type::SizedNumeric(Primitive::Numerus, _)
+                                ) {
+                                    self.error(
+                                        span,
+                                        "filum group key helper result is not integer",
+                                    );
+                                }
+                                let function_position = call
+                                    .args
+                                    .len()
+                                    .checked_sub(group_operands)
+                                    .and_then(|start| {
+                                        group.keys.iter().take(axis).try_fold(
+                                            start,
+                                            |position, previous| {
+                                                position.checked_add(
+                                                    usize::try_from(previous.captures)
+                                                        .ok()?
+                                                        .checked_add(1)?,
+                                                )
+                                            },
+                                        )
+                                    })
+                                    .and_then(|start| {
+                                        start.checked_add(usize::try_from(key.captures).ok()?)
+                                    });
+                                let Some(function_position) = function_position else {
+                                    self.error(
+                                        span,
+                                        "filum group key helper position overflows usize",
+                                    );
+                                    continue;
+                                };
+                                let Some(MirOperand::Constant(MirConstant::Function(function_id))) =
+                                    call.args.get(function_position)
+                                else {
+                                    self.error(
+                                        span,
+                                        "filum group key helper must carry its function constant",
+                                    );
+                                    continue;
+                                };
+                                let helper = scope.functions_by_id.get(function_id).copied();
+                                if helper.is_none_or(|function| {
+                                    usize::try_from(key.captures)
+                                        .ok()
+                                        .and_then(|captures| captures.checked_add(rank))
+                                        != Some(function.params.len())
+                                        || function.return_ty != key.key_ty
+                                }) {
+                                    self.error(span, "filum group key helper signature differs from its typed captures");
+                                }
+                            }
                         }
                     }
                 }
@@ -511,6 +641,10 @@ impl Validator<'_, '_> {
                     | Type::SizedNumeric(Primitive::Numerus, _) => {
                         matches!(op.form, MirFilumForm::Grid | MirFilumForm::Nested)
                     }
+                    Type::Tensor(_, _) if op.group.is_some() => {
+                        op.form == MirFilumForm::Grid
+                            && matches!(op.op, crate::MirReduceOp::Sum | crate::MirReduceOp::Count)
+                    }
                     _ => false,
                 };
                 if !scalar_result {
@@ -523,6 +657,7 @@ impl Validator<'_, '_> {
                     self.error(span, "filum lane width must be a positive power of two");
                 }
             }
+            MirIntrinsic::Scan(op) => self.validate_scan_call(scope, op, call, span),
             // `copy` duplicate: one source operand; the result keeps the
             // source payload type (access markers are source-level wrappers).
             MirIntrinsic::Duplicate => {
@@ -893,6 +1028,167 @@ impl Validator<'_, '_> {
                     self.error(span, "sermo cursor drain element type mismatch");
                 }
             }
+        }
+    }
+
+    fn validate_scan_call(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        scan: &crate::MirScanOp,
+        call: &MirRuntimeCall,
+        span: Span,
+    ) {
+        if matches!(scan.op, crate::MirReduceOp::ArgMax | crate::MirReduceOp::ArgMin) {
+            self.error(span, "scan does not admit argmax or argmin");
+        }
+        if scan.total == crate::MirScanTotal::Exclusive
+            && matches!(scan.op, crate::MirReduceOp::Max | crate::MirReduceOp::Min)
+        {
+            self.error(span, "exclusive scan does not admit max or min");
+        }
+        if scan.rank == 0 {
+            self.error(span, "scan source rank must be positive");
+        }
+        self.validate_mir_type(scan.term_ty, span);
+        self.validate_mir_type(scan.result_element_ty, span);
+        if let Some(source_ty) = call
+            .args
+            .first()
+            .and_then(|arg| self.validate_operand(scope, arg, span))
+        {
+            match self.type_kind(source_ty) {
+                Type::Tensor(_, _) => {
+                    if self.static_tensor_rank(source_ty).is_some_and(|rank| rank != usize::from(scan.rank)) {
+                        self.error(span, "scan rank differs from source tensor rank");
+                    }
+                }
+                Type::Matrix(_, _) if scan.rank == 2 => {}
+                _ => self.error(span, "scan source is not a ranked tensor"),
+            }
+        }
+        match self.type_kind(call.return_ty) {
+            Type::Tensor(element, _) => self.require_exact(
+                MirType::semantic(*element),
+                scan.result_element_ty,
+                span,
+                "scan result element type differs from its tensor type",
+            ),
+            _ => self.error(span, "scan result is not a tensor"),
+        }
+
+        let Ok(term_captures) = usize::try_from(scan.term_captures) else {
+            self.error(span, "scan term capture count exceeds usize");
+            return;
+        };
+        let group_operands = scan.group.as_ref().map_or(Some(0), |group| {
+            group.axes.iter().try_fold(0_usize, |count, axis| {
+                count.checked_add(usize::try_from(axis.captures).ok()?.checked_add(1)?)
+            })
+        });
+        let Some(group_operands) = group_operands else {
+            self.error(span, "scan group operand count overflows usize");
+            return;
+        };
+        let Some(group_start) = call.args.len().checked_sub(group_operands) else {
+            self.error(span, "scan group operands exceed call arguments");
+            return;
+        };
+        let Some(term_function_position) = 1_usize
+            .checked_add(term_captures)
+            .filter(|position| *position < group_start)
+        else {
+            self.error(span, "scan term helper operands are missing");
+            return;
+        };
+        let term_id = match call.args.get(term_function_position) {
+            Some(MirOperand::Constant(MirConstant::Function(id))) => *id,
+            _ => {
+                self.error(span, "scan term helper function is missing");
+                return;
+            }
+        };
+        let Some(term) = scope.functions_by_id.get(&term_id) else {
+            self.error(span, "scan term helper does not resolve to a function");
+            return;
+        };
+        if term.params.len() != term_captures + usize::from(scan.rank) + 1 {
+            self.error(span, "scan term helper must take captures, coordinates, and element");
+        }
+        self.require_exact(term.return_ty, scan.term_ty, span, "scan term helper return type mismatch");
+        for (argument, parameter) in call.args[1..term_function_position]
+            .iter()
+            .zip(term.params.iter())
+        {
+            if let Some(actual) = self.validate_operand(scope, argument, span) {
+                self.require_assignable(actual, parameter.ty, span, "scan term capture type mismatch");
+            }
+        }
+        if term_function_position + 1 != group_start {
+            self.error(span, "scan call operands do not match the declared helper segments");
+            return;
+        }
+
+        let Some(group) = &scan.group else {
+            return;
+        };
+        if group.axes.is_empty() {
+            self.error(span, "scan group has no key axes");
+            return;
+        }
+        let mut group_count = Some(1_u64);
+        let mut position = group_start;
+        for axis in &group.axes {
+            if axis.extent == 0 || axis.min.checked_add(i128::from(axis.extent - 1)).is_none() {
+                self.error(span, "scan group axis has an invalid finite domain");
+            }
+            group_count = group_count.and_then(|count| count.checked_mul(axis.extent));
+            let Ok(captures) = usize::try_from(axis.captures) else {
+                self.error(span, "scan key capture count exceeds usize");
+                return;
+            };
+            self.validate_mir_type(axis.key_ty, span);
+            if !matches!(
+                self.type_kind(axis.key_ty),
+                Type::SizedNumeric(Primitive::Numerus, width)
+                    if width.is_signed_int() || width.is_unsigned_int()
+            ) && !matches!(self.type_kind(axis.key_ty), Type::Primitive(Primitive::Numerus))
+            {
+                self.error(span, "scan key type is not an integer");
+            }
+            let Some(function_position) = position.checked_add(captures) else {
+                self.error(span, "scan key helper position overflows usize");
+                return;
+            };
+            let key_id = match call.args.get(function_position) {
+                Some(MirOperand::Constant(MirConstant::Function(id))) => *id,
+                _ => {
+                    self.error(span, "scan key helper function is missing");
+                    return;
+                }
+            };
+            let Some(key_fn) = scope.functions_by_id.get(&key_id) else {
+                self.error(span, "scan key helper does not resolve to a function");
+                return;
+            };
+            if key_fn.params.len() != captures + usize::from(scan.rank) {
+                self.error(span, "scan key helper must take captures and coordinates");
+            }
+            self.require_exact(key_fn.return_ty, axis.key_ty, span, "scan key helper return type mismatch");
+            for (argument, parameter) in call.args[position..function_position]
+                .iter()
+                .zip(key_fn.params.iter())
+            {
+                if let Some(actual) = self.validate_operand(scope, argument, span) {
+                    self.require_assignable(actual, parameter.ty, span, "scan key capture type mismatch");
+                }
+            }
+            position = function_position.saturating_add(1);
+        }
+        if group_count.is_none() {
+            self.error(span, "scan group domain cardinality overflows u64");
+        }
+        if position != call.args.len() {
+            self.error(span, "scan has trailing helper operands");
         }
     }
 

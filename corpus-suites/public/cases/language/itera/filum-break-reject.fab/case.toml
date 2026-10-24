@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/itera/filum-break-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/filum-break-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "break_in_thread_body"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "break_in_thread_body"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "break_in_thread_body"

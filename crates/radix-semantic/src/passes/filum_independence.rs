@@ -11,6 +11,7 @@
 //! storage and coordinates, and its reads and writes meet the same rules.
 
 mod calls;
+mod ends;
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
 pub(crate) use calls::is_inlinable_kernel;
@@ -1070,6 +1071,20 @@ impl HirVisitor for BodyProof<'_> {
                     self.visit_block(body);
                 }
             }
+            HirExpressionKind::Scan {
+                source,
+                coordinates,
+                group,
+                body,
+                ..
+            } => {
+                self.fetch(source, coordinates_of(coordinates));
+                self.receiver(source);
+                if let Some(group) = group {
+                    self.visit_expr(group);
+                }
+                self.visit_block(body);
+            }
             // The range product walks counted ranges sequentially inside the
             // iteration, like nested `while` loops: bounds are read once, the
             // binders are iteration-local, and the body meets the same rules.
@@ -1099,6 +1114,20 @@ impl HirVisitor for Owned {
     fn visit_def(&mut self, def: DefId, _: Symbol) {
         self.defs.insert(def);
     }
+}
+
+/// A coordinate component that is the same for every lane: a constant, or a
+/// def declared outside the proved loop. Lane coordinates and the locals a lane
+/// body declares differ per lane; rule 10 refuses a body write to any outer
+/// local, so an outer def keeps one value for the whole loop.
+fn lane_invariant(loops: &[LoopCtx], coord: &Coordinate) -> bool {
+    let Some(variable) = coord.variable else {
+        return true;
+    };
+    !loops[0].owned.contains(&variable)
+        && !loops
+            .iter()
+            .any(|ctx| ctx.coords.iter().any(|c| c.variable == Some(variable)))
 }
 
 fn prove(
@@ -1132,9 +1161,20 @@ fn prove(
                 .coords
                 .clone()
                 .and_then(|coords| mapped(storage, coords));
-            // One loop keeps its element fetch as the expected address. In a
-            // nest the address must be the whole chain's composed coordinate,
-            // so no inner iteration repeats a cell an outer one also writes.
+            // Components every lane shares do not tell lanes apart: the
+            // remainder must be exactly the lanes' own coordinates.
+            let lane_part = physical.as_ref().map(|coords| {
+                coords
+                    .iter()
+                    .filter(|c| !lane_invariant(&proof.loops, c))
+                    .cloned()
+                    .collect::<Vec<_>>()
+            });
+            // One loop keeps its element fetch as the expected address (a write
+            // into the storage the loop reads takes no invariant components).
+            // In a nest the address must be the whole chain's composed
+            // coordinate, so no inner iteration repeats a cell an outer one
+            // also writes.
             let valid = if access.depth == 1 {
                 let source_facts = &owner.source;
                 let expected: Vec<_> = source_facts
@@ -1144,15 +1184,15 @@ fn prove(
                     .map(|s| mapped(s, access.composed.clone()))
                     .collect();
                 !access.composed.is_empty()
-                    && physical.is_some()
+                    && lane_part.is_some()
                     && if expected.is_empty() {
-                        physical.as_ref() == Some(&access.composed)
+                        lane_part.as_ref() == Some(&access.composed)
                     } else {
                         !source_facts.unknown
                             && expected.iter().all(|e| e.is_some() && *e == physical)
                     }
             } else {
-                access.every_loop_has_coordinates && physical.as_ref() == Some(&access.composed)
+                access.every_loop_has_coordinates && lane_part.as_ref() == Some(&access.composed)
             };
             if !valid {
                 proof
@@ -1240,6 +1280,9 @@ impl HirVisitor for Loops<'_> {
                 self.types,
                 self.interner,
             ));
+            let mut ends = ends::Ends::new();
+            ends.visit_block(body);
+            self.errors.extend(ends.errors);
         } else {
             walk_expr(self, expr);
         }
@@ -1255,6 +1298,7 @@ impl HirVisitor for NeedsProof {
             expr.kind,
             HirExpressionKind::Itera { filum: Some(_), .. }
                 | HirExpressionKind::Reduction { body: Some(_), .. }
+                | HirExpressionKind::Scan { .. }
         ) {
             self.0 = true;
         }

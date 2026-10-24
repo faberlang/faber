@@ -94,11 +94,13 @@ pub(crate) fn dims_product_checked(dims: &[Dim]) -> Result<u64, &'static str> {
 }
 
 /// Whether a scalar layout is a kernel buffer element — the only scalar
-/// layouts a kernel storage buffer can carry.
+/// layouts a kernel storage buffer can carry. Language booleans keep their
+/// one-bit value layout but use one canonical byte per device-buffer cell.
 pub(crate) fn is_kernel_element_layout(layout: MirScalarLayout) -> bool {
     matches!(
         layout,
-        MirScalarLayout::Bf16
+        MirScalarLayout::Bool
+            | MirScalarLayout::Bf16
             | MirScalarLayout::F32
             | MirScalarLayout::I32
             | MirScalarLayout::U32

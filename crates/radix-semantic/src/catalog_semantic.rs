@@ -309,6 +309,16 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         return Some("use an ordinary loop, or prove own-coordinate writes and same-coordinate reads of written storage without loop-carried locals or hidden effects".to_owned());
     }
     if kind == SemanticErrorKind::TypeMismatch
+        && arg_value(args, "issue") == Some("break_in_thread_body")
+    {
+        return Some("`break` cannot stop a `thread` loop: lanes run independently. To find the first match use `reduce via argmin …`; to stop at a cutoff, compute it first and loop to it.".to_owned());
+    }
+    if kind == SemanticErrorKind::TypeMismatch
+        && arg_value(args, "issue") == Some("return_in_thread_body")
+    {
+        return Some("`return` cannot leave a `thread` loop: lanes run independently. To get one value out of the lanes use `reduce`; to stop at a cutoff, compute it first and loop to it.".to_owned());
+    }
+    if kind == SemanticErrorKind::TypeMismatch
         && arg_value(args, "issue") == Some("nominal_ascription_not_provable")
     {
         return Some(

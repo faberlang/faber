@@ -243,6 +243,7 @@ fn fixture_metadata(functions: &[MirFunction]) -> MirDeviceFunctionMetadataMap {
                     shader_stage: MirKernelShaderStage::Compute,
                     visibility: MirFunctionVisibility::Public,
                     origin: MirFunctionOrigin::Source,
+                    lane_domain_local: None,
                 },
             )
         })
@@ -1540,16 +1541,15 @@ fn lane_assign(place: MirPlace, id: u32, kind: crate::MirValueKind, ty: MirType)
     }
 }
 
-/// gpu-reset C4-1: the lane-form shape C4-0 produces (params `src`, `mut dst`,
-/// a `Lane` builtin; guard on the lane id against two `TensorExtent`
-/// products, div/mod binders, one Index read, one Index store, void return)
-/// gets an ABI signature, and the constructor selects `LaneGrid` by
-/// structure: the Lane parameter plus the written tensor resource.
+/// A lane form's domain comes from the exact `for from src` source, not the
+/// first readable ABI resource. `other` precedes `src` and has a different
+/// shape; the constructor must preserve source identity through the carrier.
 #[test]
 fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     use crate::{MirBinOp, MirTemp, MirTempId, MirValueKind};
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
+    let other_tensor = rank1_tensor_ty(&mut types, 3);
     let tensor = rank2_tensor_ty(&mut types, [7, 5]);
     let u32t = u32_ty(&mut types);
     let boolean = MirType::semantic(types.primitive(Primitive::Bivalens));
@@ -1584,7 +1584,7 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
             MirPlace::temp(MirTempId(0)),
             0,
             MirValueKind::TensorExtent {
-                tensor: local(0),
+                tensor: local(1),
                 axis: 0,
             },
             u32t,
@@ -1593,7 +1593,7 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
             MirPlace::temp(MirTempId(1)),
             1,
             MirValueKind::TensorExtent {
-                tensor: local(0),
+                tensor: local(1),
                 axis: 1,
             },
             u32t,
@@ -1607,7 +1607,7 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         lane_assign(
             MirPlace::temp(MirTempId(3)),
             3,
-            binary(MirBinOp::Lt, local(2), temp(2)),
+            binary(MirBinOp::Lt, local(3), temp(2)),
             boolean,
         ),
     ];
@@ -1615,13 +1615,13 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         lane_assign(
             MirPlace::temp(MirTempId(4)),
             4,
-            binary(MirBinOp::Div, local(2), temp(1)),
+            binary(MirBinOp::Div, local(3), temp(1)),
             u32t,
         ),
         lane_assign(
             MirPlace::temp(MirTempId(5)),
             5,
-            binary(MirBinOp::Mod, local(2), temp(1)),
+            binary(MirBinOp::Mod, local(3), temp(1)),
             u32t,
         ),
         lane_assign(
@@ -1633,10 +1633,10 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         lane_assign(
             MirPlace::temp(MirTempId(7)),
             7,
-            MirValueKind::Operand(MirOperand::Place(index(0, local(2)))),
+            MirValueKind::Operand(MirOperand::Place(index(1, local(3)))),
             float,
         ),
-        lane_assign(index(1, local(2)), 8, MirValueKind::Operand(temp(7)), float),
+        lane_assign(index(2, local(3)), 8, MirValueKind::Operand(temp(7)), float),
     ];
     let block = |id: u32, statements, kind| MirBlock {
         id: MirBlockId(id),
@@ -1645,6 +1645,7 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         span: span(),
     };
     let names = [
+        interner.intern("other"),
         interner.intern("src"),
         interner.intern("dst"),
         interner.intern("lane"),
@@ -1669,14 +1670,16 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         source: Some(DefId(1)),
         name: Some(fn_name),
         params: vec![
-            param(0, tensor, MirParamMode::Ref),
-            param(1, tensor, MirParamMode::MutRef),
-            param(2, u32t, MirParamMode::Lane),
+            param(0, other_tensor, MirParamMode::Ref),
+            param(1, tensor, MirParamMode::Ref),
+            param(2, tensor, MirParamMode::MutRef),
+            param(3, u32t, MirParamMode::Lane),
         ],
         locals: vec![
-            local_decl(0, tensor, false),
-            local_decl(1, tensor, true),
-            local_decl(2, u32t, false),
+            local_decl(0, other_tensor, false),
+            local_decl(1, tensor, false),
+            local_decl(2, tensor, true),
+            local_decl(3, u32t, false),
         ],
         temps,
         blocks: vec![
@@ -1710,7 +1713,13 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         )
         .expect("the lane-form shape has an ABI signature");
     assert_eq!(signature.builtin_inputs.len(), 1);
-    assert_eq!(signature.builtin_inputs[0].local, MirLocalId(2));
+    assert_eq!(signature.builtin_inputs[0].local, MirLocalId(3));
+
+    let mut metadata = fixture_metadata(&validated.program().functions);
+    metadata
+        .get_mut(&MirFunctionId(1))
+        .expect("source kernel metadata")
+        .lane_domain_local = Some(MirLocalId(1));
 
     let (program, _semantics, _steps) = build_device_program(
         &validated,
@@ -1719,7 +1728,7 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         None,
         DeviceProgramLifetime::SingleRun,
         0,
-        &fixture_metadata(&validated.program().functions),
+        &metadata,
     )
     .expect("the lane-form kernel materializes");
     assert_eq!(program.kernels.len(), 1);
@@ -1727,13 +1736,16 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     assert_eq!(
         kernel.plan,
         CollectionKernelPlan::LaneGrid {
-            source_resource: 0,
+            source_resource: 1,
             rank: 2
         }
     );
-    assert_eq!(kernel.resources[0].buffer.name, "src");
+    assert_eq!(kernel.resources[0].buffer.name, "other");
     assert_eq!(kernel.resources[0].access, MirKernelResourceAccess::Read);
-    assert_eq!(kernel.resources[1].access, MirKernelResourceAccess::Write);
+    assert_eq!(kernel.resources[1].buffer.name, "src");
+    assert_eq!(kernel.resources[1].access, MirKernelResourceAccess::Read);
+    assert_eq!(kernel.resources[2].buffer.name, "dst");
+    assert_eq!(kernel.resources[2].access, MirKernelResourceAccess::Write);
 }
 
 /// gpu-reset A2 rung 3: a void function with no `Lane` parameter, no index

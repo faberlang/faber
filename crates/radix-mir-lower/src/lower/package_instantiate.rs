@@ -96,6 +96,21 @@ impl ImportedDeviceRoute {
             .collect()
     }
 
+    /// Whether `interface` exports a device function with an error channel
+    /// (a `⇥` kernel). A unit that imports one must deliver kernel faults at
+    /// handled-block boundaries, exactly as for a `⇥` kernel it declares
+    /// itself; without this, every call to the imported kernel syncs.
+    #[must_use]
+    pub fn interface_has_failable_kernel(interface: &FileInterface) -> bool {
+        interface.exports.values().any(|export| {
+            matches!(
+                &export.kind,
+                FileExportKind::Function(callable)
+                    if callable.device.is_some() && callable.err.is_some()
+            )
+        })
+    }
+
     /// Stable display key for diagnostics: `product::module::verb`.
     #[must_use]
     pub fn display_key(&self) -> String {
@@ -304,12 +319,26 @@ pub fn instantiate_merged_generic_calls_with_tensor_edge_policy(
     if templates.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
-    let next_id = MirProgram::allocate_function_id(&program.functions).map_err(|_| {
+    // Templates are not program functions, but they keep ids in the same id
+    // space and their device rows are keyed by those ids. A minted instance
+    // must not reuse one: it would inherit that template's row (a private
+    // helper's visibility on a public kernel) and drop out of the device image.
+    let exhausted = || {
         vec![MirError::validation(
             Span::new(0, 0),
             "package MIR function id space is exhausted",
         )]
-    })?;
+    };
+    let mut next_id = MirProgram::allocate_function_id(&program.functions).map_err(|_| exhausted())?;
+    for id in templates
+        .iter()
+        .map(|template| template.id)
+        .chain(device_function_metadata.keys().copied())
+    {
+        if id.0 >= next_id.0 {
+            next_id = MirFunctionId(id.0.checked_add(1).ok_or_else(exhausted)?);
+        }
+    }
     // Source-less synthetic functions that still carry generic params are
     // collected before `state` borrows `types`, so later passes can key them
     // without re-scanning the program.

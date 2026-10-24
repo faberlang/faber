@@ -6,7 +6,9 @@ use crate::diagnostics::is_known_diagnostic_code;
 use crate::lexer::{HOMOGLYPH_ISSUE, LexErrorKind};
 use crate::parser::ParseErrorKind;
 use crate::semantic::{SemanticErrorKind, WarningKind};
-use radix_diagnostics::{DiagnosticArg, DiagnosticSpec, locale_suggestion_spec, locale_unknown_spec};
+use radix_diagnostics::{
+    DiagnosticArg, DiagnosticSpec, locale_suggestion_spec, locale_unknown_spec, serialized_by_backend_spec,
+};
 use radix_semantic::catalog::{arg_value, quote_arg};
 use radix_semantic::catalog_semantic::{semantic_help, semantic_spec};
 use radix_semantic::catalog_syntax::{lex_message, lex_spec, parse_message, parse_spec};
@@ -303,6 +305,14 @@ fn is_known_diagnostic_code_accepts_catalog_codes() {
     assert!(!is_known_diagnostic_code("UNRES001"));
     assert!(!is_known_diagnostic_code("UNRES002"));
     assert!(!is_known_diagnostic_code("UNRES003"));
+}
+
+/// The advice code (`Severity::Info`) is a catalog code, so `--deny INFO001`
+/// is accepted; info is never promoted (`driver::apply_warn_policy`).
+#[test]
+fn serialized_by_backend_advice_code_is_known_and_stable() {
+    assert_eq!(serialized_by_backend_spec().code, "INFO001");
+    assert!(is_known_diagnostic_code("INFO001"));
 }
 
 #[test]

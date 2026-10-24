@@ -2831,7 +2831,7 @@ fn assert_default_route_matches_cpu_or_refuses(stdout: &str, stderr: &str, code:
 }
 
 #[test]
-fn run_kernel_file_default_route_matches_cpu_or_refuses_and_runs_on_the_cpu_device() {
+fn run_kernel_file_default_route_matches_reference_or_refuses_and_runs_on_the_reference_route() {
     let file = write_single_file("run-kernel-cpu-device", KERNEL_SOURCE);
     let path = file.to_str().expect("utf8 source path");
 
@@ -2843,36 +2843,37 @@ fn run_kernel_file_default_route_matches_cpu_or_refuses_and_runs_on_the_cpu_devi
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "auto", path]);
     assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
 
-    // CPU device: the kernel runs with its sequential meaning.
-    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
+    // Reference route: the kernel runs with its sequential meaning.
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "reference", path]);
     assert!(
         status.success(),
-        "`--device cpu` must run the kernel:\n{stderr}"
+        "`--device reference` must run the kernel:\n{stderr}"
     );
     assert_eq!(stdout, "2.0\n");
 }
 
 #[test]
-fn run_kernel_package_default_route_and_cpu_device_by_flag_manifest_and_with_stats() {
+fn run_kernel_package_default_route_and_reference_route_by_flag_manifest_and_with_stats() {
     let package = write_basic_package("run-kernel-package-cpu-device", KERNEL_SOURCE);
     let path = package.to_str().expect("utf8 package path");
 
     let (stdout, stderr, status) = run_faber_status(&["run", path]);
     assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
 
-    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "reference", path]);
     assert!(
         status.success(),
-        "`--device cpu` must run the package kernel:\n{stderr}"
+        "`--device reference` must run the package kernel:\n{stderr}"
     );
     assert_eq!(stdout, "2.0\n");
 
-    // `--device cpu --stats` works like the default route: the program output
+    // `--device reference --stats` works like the default route: the program output
     // and the framed statistics artifact both arrive.
-    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", "--stats", path]);
+    let (stdout, stderr, status) =
+        run_faber_status(&["run", "--device", "reference", "--stats", path]);
     assert!(
         status.success(),
-        "`--device cpu --stats` must run:\n{stderr}"
+        "`--device reference --stats` must run:\n{stderr}"
     );
     assert!(
         stdout.starts_with("2.0\n"),
@@ -2883,23 +2884,720 @@ fn run_kernel_package_default_route_and_cpu_device_by_flag_manifest_and_with_sta
         "stats artifact framed on stdout:\n{stdout}"
     );
 
-    // The manifest selects the CPU device; an explicit flag still wins.
+    // The manifest selects the reference route; an explicit flag still wins.
     let manifest = fs::read_to_string(package.join("faber.toml")).expect("read manifest");
     fs::write(
         package.join("faber.toml"),
-        format!("{manifest}\n[device]\ndevice = \"cpu\"\n"),
+        format!("{manifest}\n[device]\ndevice = \"reference\"\n"),
     )
-    .expect("write manifest with a cpu device");
+    .expect("write manifest with the reference route");
     let (stdout, stderr, status) = run_faber_status(&["run", path]);
     assert!(
         status.success(),
-        "a manifest `cpu` device must run the kernel:\n{stderr}"
+        "a manifest `reference` device must run the kernel:\n{stderr}"
     );
     assert_eq!(stdout, "2.0\n");
-    // `--device auto` overrides the manifest's `cpu`: the device route, so it
-    // matches the CPU result or refuses, never a different result.
+    // `--device auto` overrides the manifest's `reference`: the device route, so
+    // it matches the reference result or refuses, never a different result.
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "auto", path]);
     assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
+}
+
+/// The CPU device line every device session prints ahead of the program.
+const CPU_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `cpu` on ";
+
+/// `--device cpu` (gpu-reset rule 16.9): the A2 flood stencil's lane-grid and
+/// single-lane kernels run through the CPU device session on one worker and
+/// on eight, and each run prints exactly what the sequential reference route
+/// prints, after the device receipt line.
+#[test]
+fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_eight_workers() {
+    let path = repo_root().join("acceptance/a2-flood-stencil");
+    let path = path.display().to_string();
+    let (reference, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
+    assert!(ok, "reference run failed:\n{stderr}");
+    assert!(
+        !reference.is_empty(),
+        "the reference run prints the depth plane"
+    );
+    for threads in ["1", "8"] {
+        let (stdout, stderr, ok) =
+            run_faber(&["run", "--device", "cpu", "--threads", threads, &path]);
+        assert!(ok, "--threads {threads}: cpu device run failed:\n{stderr}");
+        let (receipt, program) = stdout
+            .split_once('\n')
+            .unwrap_or_else(|| panic!("--threads {threads}: no output:\n{stdout}"));
+        assert!(
+            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
+            "--threads {threads}: the cpu device session runs the kernels:\n{stdout}"
+        );
+        assert_eq!(
+            program, reference,
+            "--threads {threads}: cpu device output differs from the reference"
+        );
+    }
+}
+
+/// `--device cpu --partitions N` (gpu-reset rule 18, rule 16.3): the one
+/// logical CPU device spans N core sets that split the workers, and the A2
+/// flood stencil prints exactly what the reference route prints at one
+/// partition and at three; the spanned receipt names the partition count.
+#[test]
+fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_three_partitions() {
+    let path = repo_root().join("acceptance/a2-flood-stencil");
+    let path = path.display().to_string();
+    let (reference, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
+    assert!(ok, "reference run failed:\n{stderr}");
+    for (partitions, extra) in [("1", &[][..]), ("3", &["--threads", "6"][..])] {
+        let mut args = vec!["run", "--device", "cpu", "--partitions", partitions];
+        args.extend_from_slice(extra);
+        args.push(&path);
+        let (stdout, stderr, ok) = run_faber(&args);
+        assert!(
+            ok,
+            "--partitions {partitions}: cpu device run failed:\n{stderr}"
+        );
+        let (receipt, program) = stdout
+            .split_once('\n')
+            .unwrap_or_else(|| panic!("--partitions {partitions}: no output:\n{stdout}"));
+        assert!(
+            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
+            "--partitions {partitions}: the cpu device session runs the kernels:\n{stdout}"
+        );
+        assert_eq!(
+            receipt.contains(", 3 partitions)"),
+            partitions == "3",
+            "--partitions {partitions}: the receipt names a spanned device only:\n{receipt}"
+        );
+        assert_eq!(
+            program, reference,
+            "--partitions {partitions}: cpu device output differs from the reference"
+        );
+    }
+}
+
+/// The Metal device line every Metal device session prints ahead of the
+/// program.
+#[cfg(target_os = "macos")]
+const METAL_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `metal` on ";
+
+#[cfg(target_os = "macos")]
+fn run_metal_with_partition_memory(
+    package: &Path,
+    args: &[&str],
+    partitions: u32,
+    metal_span: faber_cli::package::mir::MetalSpan,
+) -> (String, Vec<String>, Vec<String>) {
+    use faber_cli::package::mir::{
+        CpuDeviceShape, run_package_on_device_session_shaped, system_device_registry_spanning,
+    };
+    use radix::module::driver::Config;
+    use radix::program::mir::DeviceSelection;
+
+    let mut registry = system_device_registry_spanning(metal_span);
+    let mut host = radix_mir_runner::BufferHost::with_argumenta(
+        args.iter().map(|arg| (*arg).to_owned()).collect(),
+    );
+    let shape = CpuDeviceShape {
+        workers: None,
+        partitions: std::num::NonZeroU32::new(partitions).expect("positive partition count"),
+    };
+    let run = run_package_on_device_session_shaped(
+        &Config::default(),
+        package,
+        DeviceSelection::Metal,
+        &mut registry,
+        &mut host,
+        false,
+        shape,
+    )
+    .unwrap_or_else(|failure| {
+        panic!(
+            "{metal_span:?}/Metal/{partitions} device run failed: {:?}",
+            failure.diagnostics
+        )
+    });
+    (run.receipt, host.stdout_lines, host.stderr_lines)
+}
+
+/// `--device metal --partitions N` (gpu-reset rule 18): one logical Metal
+/// device spans N partitions of the one GPU. The CLI selects shared storage;
+/// the Rust API also exercises the private-copy test mode.
+/// The A2 flood stencil (lane-local stencil kernels split by lane range, a
+/// single-lane kernel replicated) prints exactly what plain `--device metal`
+/// prints at one partition and at three; private copies produce the same full
+/// program output. The spanned receipt names the partition count and no kernel
+/// falls back to one partition. A macOS host without Metal fails this test.
+#[cfg(target_os = "macos")]
+#[test]
+fn run_metal_device_a2_stencil_matches_plain_metal_at_one_and_three_partitions() {
+    let package = repo_root().join("acceptance/a2-flood-stencil");
+    let path = package.display().to_string();
+    let (plain, stderr, ok) = run_faber(&["run", "--device", "metal", &path]);
+    assert!(ok, "plain metal run failed:\n{stderr}");
+    let (plain_receipt, plain_program) = plain
+        .split_once('\n')
+        .unwrap_or_else(|| panic!("plain metal run printed nothing:\n{plain}"));
+    assert!(
+        plain_receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX),
+        "{plain}"
+    );
+    assert!(
+        !plain_program.is_empty(),
+        "the stencil prints its depth plane"
+    );
+    for partitions in ["1", "3"] {
+        let (stdout, stderr, ok) = run_faber(&[
+            "run",
+            "--device",
+            "metal",
+            "--partitions",
+            partitions,
+            &path,
+        ]);
+        assert!(ok, "--partitions {partitions}: metal run failed:\n{stderr}");
+        let (receipt, program) = stdout
+            .split_once('\n')
+            .unwrap_or_else(|| panic!("--partitions {partitions}: no output:\n{stdout}"));
+        assert!(
+            receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX),
+            "--partitions {partitions}: the metal device session runs the kernels:\n{stdout}"
+        );
+        assert_eq!(
+            receipt.contains(", 3 partitions)"),
+            partitions == "3",
+            "--partitions {partitions}: the receipt names a spanned device only:\n{receipt}"
+        );
+        assert_eq!(
+            program, plain_program,
+            "--partitions {partitions}: spanned output differs from plain metal"
+        );
+        assert!(
+            !stderr.contains("runs on one partition"),
+            "--partitions {partitions}: every stencil kernel splits or replicates:\n{stderr}"
+        );
+    }
+
+    let (receipt, private_program, private_stderr) = run_metal_with_partition_memory(
+        &package,
+        &[],
+        3,
+        faber_cli::package::mir::MetalSpan::PrivateCopies,
+    );
+    assert!(
+        receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX),
+        "{receipt}"
+    );
+    assert!(
+        receipt.contains(", 3 partitions)"),
+        "the private-copy receipt names the spanned device: {receipt}"
+    );
+    assert!(
+        private_stderr.is_empty(),
+        "private-copy A2 run emitted diagnostics: {private_stderr:?}"
+    );
+    assert_eq!(
+        private_program,
+        plain_program.lines().map(str::to_owned).collect::<Vec<_>>(),
+        "private-copy A2 output differs from plain Metal"
+    );
+}
+
+/// Rule 18: the whole-grid reductions of `c4-grid-reduce` (stage 1 split by
+/// workgroup range, its partials all-gathered, stage 2 replicated) print
+/// exactly what plain `--device metal` prints, at a shape with more
+/// workgroups than partitions and at one with a single workgroup, and no
+/// reduction falls back to one partition. The Rust API also compares the
+/// private-copy mode against plain Metal. A macOS host without Metal fails
+/// this test.
+#[cfg(target_os = "macos")]
+#[test]
+fn run_metal_device_grid_reduce_matches_plain_metal_over_partitions() {
+    let package = repo_root().join("acceptance/c4-grid-reduce");
+    let path = package.display().to_string();
+    for shape in [["600", "500"], ["3", "5"]] {
+        let mut plain_args = vec!["run", "--device", "metal", &path, "--"];
+        plain_args.extend(shape);
+        let (plain, stderr, ok) = run_faber(&plain_args);
+        assert!(ok, "plain metal run failed:\n{stderr}");
+        let (_, plain_program) = plain
+            .split_once('\n')
+            .unwrap_or_else(|| panic!("plain metal run printed nothing:\n{plain}"));
+        for partitions in ["1", "3", "4"] {
+            let mut args = vec![
+                "run",
+                "--device",
+                "metal",
+                "--partitions",
+                partitions,
+                &path,
+                "--",
+            ];
+            args.extend(shape);
+            let (stdout, stderr, ok) = run_faber(&args);
+            assert!(
+                ok,
+                "{shape:?} --partitions {partitions}: metal run failed:\n{stderr}"
+            );
+            let (_, program) = stdout.split_once('\n').unwrap_or_else(|| {
+                panic!("{shape:?} --partitions {partitions}: no output:\n{stdout}")
+            });
+            assert_eq!(
+                program, plain_program,
+                "{shape:?} --partitions {partitions}: spanned output differs from plain metal"
+            );
+            assert!(
+                !stderr.contains("runs on one partition"),
+                "{shape:?} --partitions {partitions}: every reduction spans:\n{stderr}"
+            );
+        }
+
+        for partitions in ["3", "4"] {
+            let (receipt, private_program, private_stderr) = run_metal_with_partition_memory(
+                &package,
+                &shape,
+                partitions.parse().expect("literal partition count"),
+                faber_cli::package::mir::MetalSpan::PrivateCopies,
+            );
+            assert!(
+                receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX),
+                "{shape:?} private-copy route: {receipt}"
+            );
+            assert!(
+                receipt.contains(&format!(", {partitions} partitions)")),
+                "{shape:?} private-copy receipt names its span: {receipt}"
+            );
+            assert!(
+                private_stderr.is_empty(),
+                "{shape:?} private-copy run emitted diagnostics: {private_stderr:?}"
+            );
+            assert_eq!(
+                private_program,
+                plain_program.lines().map(str::to_owned).collect::<Vec<_>>(),
+                "{shape:?} private-copy grid reduction differs from plain Metal"
+            );
+        }
+    }
+}
+
+/// `--partitions` belongs to the CPU and Metal devices: any other route fails
+/// closed before launch instead of ignoring the flag.
+#[test]
+fn run_partitions_outside_the_cpu_device_fails_closed() {
+    let path = repo_root().join("acceptance/a2-flood-stencil");
+    let path = path.display().to_string();
+    let (_, stderr, ok) = run_faber(&["run", "--device", "reference", "--partitions", "2", &path]);
+    assert!(!ok, "--partitions with the reference route must fail");
+    assert!(
+        stderr.contains("E_PARTITIONS_REQUIRES_CPU"),
+        "the refusal names its code:\n{stderr}"
+    );
+}
+
+/// `--device cpu` runs whole-grid reductions (sum, max, argmax, argmin) as one
+/// sequential fold of the reduction node and prints what the reference route
+/// prints.
+#[test]
+fn run_cpu_device_grid_reductions_match_the_reference() {
+    for (package, args) in [
+        ("acceptance/c4-grid-reduce", &["130", "3"][..]),
+        ("acceptance/c4-reduce-int", &["4096"][..]),
+    ] {
+        let path = repo_root().join(package).display().to_string();
+        let mut reference_args = vec!["run", "--device", "reference", &path, "--"];
+        reference_args.extend_from_slice(args);
+        let (reference, stderr, ok) = run_faber(&reference_args);
+        assert!(ok, "{package}: reference run failed:\n{stderr}");
+        let mut cpu_args = vec!["run", "--device", "cpu", "--threads", "4", &path, "--"];
+        cpu_args.extend_from_slice(args);
+        let (stdout, stderr, ok) = run_faber(&cpu_args);
+        assert!(ok, "{package}: cpu device run failed:\n{stderr}");
+        let (receipt, program) = stdout
+            .split_once('\n')
+            .unwrap_or_else(|| panic!("{package}: no output:\n{stdout}"));
+        assert!(
+            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
+            "{package}: the cpu device session runs the kernels:\n{stdout}"
+        );
+        assert_eq!(program, reference, "{package}: cpu device output differs");
+    }
+}
+
+/// The kernel-bearing proba package of the CPU device (gpu-reset rule 16.9):
+/// its manifest sets `[device] threads = 2`.
+fn cpu_proba_kernels_package() -> String {
+    repo_root()
+        .join("acceptance/cpu-proba-kernels")
+        .display()
+        .to_string()
+}
+
+/// A copy of the CPU proba package whose `[device] threads` line is
+/// `threads_line`.
+fn cpu_proba_kernels_copy(label: &str, threads_line: &str) -> TempDir {
+    let source = repo_root().join("acceptance/cpu-proba-kernels");
+    let package = temp_dir(label);
+    fs::create_dir_all(package.join("src")).expect("create src");
+    for file in ["src/main.fab", "src/main.proba"] {
+        fs::copy(source.join(file), package.join(file)).expect("copy source");
+    }
+    let manifest = fs::read_to_string(source.join("faber.toml")).expect("read manifest");
+    assert!(manifest.contains("threads = 2\n"), "{manifest}");
+    fs::write(
+        package.join("faber.toml"),
+        manifest.replace("threads = 2\n", &format!("{threads_line}\n")),
+    )
+    .expect("write manifest");
+    package
+}
+
+/// `[device] threads` (gpu-reset rule 16.9): the manifest count drives `faber
+/// run --device cpu`, the `--threads` flag wins over it, the result is what
+/// the reference route prints, and `--device reference` ignores the key.
+#[test]
+fn run_cpu_device_manifest_threads_run_and_match_the_reference() {
+    let path = cpu_proba_kernels_package();
+    let (reference, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
+    assert!(
+        ok,
+        "the reference route ignores `[device] threads`:\n{stderr}"
+    );
+    assert_eq!(reference, "1001000.0\n");
+    for flags in [
+        &["--device", "cpu"][..],
+        &["--device", "cpu", "--threads", "3"][..],
+    ] {
+        let mut args = vec!["run"];
+        args.extend_from_slice(flags);
+        args.push(&path);
+        let (stdout, stderr, ok) = run_faber(&args);
+        assert!(ok, "{flags:?}: cpu device run failed:\n{stderr}");
+        let (receipt, program) = stdout
+            .split_once('\n')
+            .unwrap_or_else(|| panic!("{flags:?}: no output:\n{stdout}"));
+        assert!(
+            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
+            "{flags:?}: the cpu device session runs the kernel:\n{stdout}"
+        );
+        assert_eq!(program, reference, "{flags:?}: cpu output differs");
+    }
+}
+
+/// An invalid `[device] threads` fails closed with a diagnostic naming the
+/// key, before any program output.
+#[test]
+fn run_cpu_device_invalid_manifest_threads_fail_closed() {
+    for (label, line) in [
+        ("threads-zero", "threads = 0"),
+        ("threads-negative", "threads = -4"),
+        ("threads-fraction", "threads = 1.5"),
+    ] {
+        let package = cpu_proba_kernels_copy(label, line);
+        let path = package.to_str().expect("utf8 package path");
+        let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
+        assert!(!status.success(), "{line}: must fail:\n{stdout}");
+        assert!(
+            stderr.contains("device.threads must be a positive integer"),
+            "{line}: the diagnostic names the key:\n{stderr}"
+        );
+        assert!(stdout.is_empty(), "{line}: nothing runs:\n{stdout}");
+    }
+    let package = cpu_proba_kernels_copy("threads-metal", "threads = 2\ndevice = \"metal\"");
+    let path = package.to_str().expect("utf8 package path");
+    let (_, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
+    assert!(!status.success(), "threads beside metal must fail");
+    assert!(
+        stderr.contains("device.threads applies only to the cpu device"),
+        "{stderr}"
+    );
+}
+
+/// Drop each case's wall time (`(12 ms)`) from a `faber test` report so two
+/// routes' reports compare by verdicts and captured output.
+fn without_case_times(report: &str) -> String {
+    report
+        .lines()
+        .map(|line| match line.rfind(" (") {
+            Some(at) if line.ends_with(" ms)") => &line[..at],
+            _ => line,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// `faber test --device cpu` (gpu-reset rule 16.9) runs the package's kernels
+/// on the CPU device session, with the manifest worker count or `--threads`,
+/// and reports exactly what `--device reference` reports. The kernel is
+/// dispatched, never run on the MIR runner: the runner's statistics carry a
+/// `twice` row on the reference route and none on the device.
+#[test]
+fn test_cpu_device_runs_proba_kernels_and_matches_the_reference() {
+    let path = cpu_proba_kernels_package();
+    let (reference, stderr, ok) =
+        run_faber(&["test", "--device", "reference", "--nocapture", &path]);
+    assert!(ok, "reference proba run failed:\n{stderr}");
+    assert!(
+        reference.contains("3 passed; 0 failed"),
+        "every case passes on the reference route:\n{reference}"
+    );
+    for flags in [
+        &["--device", "cpu"][..],
+        &["--device", "cpu", "--threads", "3"][..],
+    ] {
+        let mut args = vec!["test"];
+        args.extend_from_slice(flags);
+        args.extend_from_slice(&["--nocapture", &path]);
+        let (stdout, stderr, ok) = run_faber(&args);
+        assert!(ok, "{flags:?}: cpu proba run failed:\n{stderr}");
+        assert_eq!(
+            without_case_times(&stdout),
+            without_case_times(&reference),
+            "{flags:?}: the cpu report differs from the reference"
+        );
+    }
+
+    let kernel_row = "\"module\":\"root\",\"name\":\"twice\"";
+    let (stdout, stderr, ok) = run_faber(&["test", "--device", "reference", "--stats", &path]);
+    assert!(ok, "reference stats run failed:\n{stderr}");
+    assert!(
+        stdout.contains(kernel_row),
+        "the reference route runs the kernel on the runner:\n{stdout}"
+    );
+    let (stdout, stderr, ok) = run_faber(&["test", "--device", "cpu", "--stats", &path]);
+    assert!(ok, "cpu stats run failed:\n{stderr}");
+    assert!(stdout.contains("\"passed\":3"), "{stdout}");
+    assert!(
+        !stdout.contains(kernel_row),
+        "the cpu device dispatches the kernel instead of running it:\n{stdout}"
+    );
+}
+
+/// `faber test --threads N` takes the `faber run` contract: valid only with
+/// the CPU device.
+#[test]
+fn test_threads_requires_the_cpu_device() {
+    let path = cpu_proba_kernels_package();
+    let (stdout, stderr, status) =
+        run_faber_status(&["test", "--device", "reference", "--threads", "2", &path]);
+    assert!(!status.success(), "must fail:\n{stdout}");
+    assert!(
+        stderr.contains("`--threads` is valid only with `--device cpu`"),
+        "{stderr}"
+    );
+}
+
+/// Run `package` with `args` on `--device reference` and on `--device cpu` at
+/// one and eight workers; the cpu run must succeed and print, after its
+/// receipt line, exactly what the reference prints.
+fn assert_cpu_device_matches_reference(package: &str, args: &[&str]) {
+    let path = repo_root().join(package).display().to_string();
+    let mut reference_args = vec!["run", "--device", "reference", &path, "--"];
+    reference_args.extend_from_slice(args);
+    let (reference, stderr, ok) = run_faber(&reference_args);
+    assert!(ok, "{package} {args:?}: reference run failed:\n{stderr}");
+    for threads in ["1", "8"] {
+        let mut cpu_args = vec!["run", "--device", "cpu", "--threads", threads, &path, "--"];
+        cpu_args.extend_from_slice(args);
+        let (stdout, stderr, ok) = run_faber(&cpu_args);
+        assert!(
+            ok,
+            "{package} {args:?} --threads {threads}: cpu device run failed:\n{stderr}"
+        );
+        let (receipt, program) = stdout
+            .split_once('\n')
+            .unwrap_or_else(|| panic!("{package} --threads {threads}: no output:\n{stdout}"));
+        assert!(
+            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
+            "{package} --threads {threads}: the cpu device session runs the kernels:\n{stdout}"
+        );
+        assert_eq!(
+            program, reference,
+            "{package} {args:?} --threads {threads}: cpu device output differs from the reference"
+        );
+    }
+}
+
+/// `--device cpu` runs matmul kernels, whose GPU ABI is the backend's tiled
+/// form, as one whole call of the kernel body. `a1-rungs` holds the assign
+/// form of a GEMV (`o ⇇ w · x` rebinds the `mut` parameter) beside a returned
+/// result and lane kernels; it prints what the reference prints.
+#[test]
+fn run_cpu_device_matmul_kernels_match_the_reference() {
+    assert_cpu_device_matches_reference("acceptance/a1-rungs", &[]);
+}
+
+/// A kernel error the program catches is delivered as a device fault: the
+/// handler prints the text of the lowest throwing lane, as the reference does,
+/// whatever the worker count. Mode 1 is `do all ... catch`, mode 2 a plain
+/// `do ... catch`; at [9, 6] the lower lanes throw a different site than the
+/// last row, so the delivered text names the first lane in launch order.
+#[test]
+fn run_cpu_device_caught_kernel_errors_match_the_reference() {
+    for mode in ["1", "2"] {
+        assert_cpu_device_matches_reference("acceptance/c4-kernel-throw", &["9", "6", mode]);
+        assert_cpu_device_matches_reference("acceptance/c4-kernel-get-set", &["7", "5", mode]);
+    }
+}
+
+/// The `error:` lines of a failed run's stderr.
+fn error_lines(stderr: &str) -> Vec<&str> {
+    stderr
+        .lines()
+        .filter(|line| line.starts_with("error:"))
+        .collect()
+}
+
+/// An unhandled kernel fault ends the run once, with the stable code first and
+/// the faulting lane in the text; the wording after the code is only the
+/// rendered diagnostic. The one-lane kernel reads past its row at `1 0 0`.
+#[test]
+fn run_cpu_device_kernel_fault_prints_one_coded_error() {
+    let path = repo_root()
+        .join("acceptance/c4-single-lane-index-fault")
+        .display()
+        .to_string();
+    let (stdout, stderr, status) = run_faber_status(&[
+        "run",
+        "--device",
+        "cpu",
+        "--threads",
+        "4",
+        &path,
+        "--",
+        "1",
+        "0",
+        "0",
+    ]);
+    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert!(stdout.starts_with(CPU_DEVICE_RECEIPT_PREFIX), "{stdout}");
+    let errors = error_lines(&stderr);
+    assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
+    assert!(
+        errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
+        "{stderr}"
+    );
+    assert!(errors[0].contains("lane [0, 0, 0]"), "{stderr}");
+}
+
+/// [`run_cpu_device_kernel_fault_prints_one_coded_error`] on the Metal device.
+/// Skips without a Metal device.
+#[test]
+fn run_metal_device_kernel_fault_prints_one_coded_error() {
+    let path = repo_root()
+        .join("acceptance/c4-single-lane-index-fault")
+        .display()
+        .to_string();
+    let (stdout, stderr, status) =
+        run_faber_status(&["run", "--device", "metal", &path, "--", "1", "0", "0"]);
+    if !cfg!(target_os = "macos") || !stdout.starts_with(METAL_DEVICE_RECEIPT_PREFIX) {
+        eprintln!("no Metal device: skipped");
+        return;
+    }
+    assert_eq!(status.code(), Some(1), "{stderr}");
+    let errors = error_lines(&stderr);
+    assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
+    assert!(
+        errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
+        "{stderr}"
+    );
+    assert!(errors[0].contains("(lane 0)"), "{stderr}");
+}
+
+const SINGLE_LANE_INDEX_FAULT: &str = "acceptance/c4-single-lane-index-fault";
+
+/// A device run that faults after it started executing still writes its
+/// `--stats-file`, as a failing run does on the reference route: exit 1 in the
+/// artifact, the device section present, and the one coded error on stderr.
+fn assert_faulting_device_run_writes_stats(device: &str, receipt_prefix: &str) {
+    let path = repo_root()
+        .join(SINGLE_LANE_INDEX_FAULT)
+        .display()
+        .to_string();
+    let dir = temp_dir(&format!("fault-stats-{device}"));
+    let stats = dir.join("stats.json");
+    let stats_arg = stats.display().to_string();
+    let (stdout, stderr, status) = run_faber_status(&[
+        "run",
+        "--device",
+        device,
+        "--stats-file",
+        &stats_arg,
+        &path,
+        "--",
+        "1",
+        "0",
+        "0",
+    ]);
+    if !stdout.starts_with(receipt_prefix) {
+        eprintln!("no {device} device: skipped");
+        return;
+    }
+    assert_eq!(status.code(), Some(1), "{stderr}");
+    let errors = error_lines(&stderr);
+    assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
+    assert!(
+        errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
+        "{stderr}"
+    );
+    let artifact: serde_json::Value =
+        serde_json::from_slice(&fs::read(&stats).expect("a failed device run writes its stats"))
+            .expect("stats file is JSON");
+    assert_eq!(artifact["run"]["exit"], 1, "{artifact}");
+    assert!(artifact["device"].is_object(), "{artifact}");
+    assert!(artifact["device"]["runtime"].is_object(), "{artifact}");
+}
+
+#[test]
+fn run_cpu_device_kernel_fault_still_writes_the_stats_file() {
+    assert_faulting_device_run_writes_stats("cpu", CPU_DEVICE_RECEIPT_PREFIX);
+}
+
+/// Skips without a Metal device.
+#[test]
+fn run_metal_device_kernel_fault_still_writes_the_stats_file() {
+    if cfg!(target_os = "macos") {
+        assert_faulting_device_run_writes_stats("metal", METAL_DEVICE_RECEIPT_PREFIX);
+    }
+}
+
+/// `auto` over a kernel package that faults on the GPU ends the run once: the
+/// program ran on the device session and is never run again on another route.
+/// Mode 2 prints before the fault is delivered, so a second run would repeat
+/// the lines. Skips without a Metal device.
+#[test]
+fn run_auto_device_kernel_fault_runs_the_program_once() {
+    let path = repo_root()
+        .join(SINGLE_LANE_INDEX_FAULT)
+        .display()
+        .to_string();
+    let (stdout, stderr, status) =
+        run_faber_status(&["run", "--device", "auto", &path, "--", "1", "0", "2"]);
+    if !cfg!(target_os = "macos") || !stdout.starts_with(METAL_DEVICE_RECEIPT_PREFIX) {
+        eprintln!("no Metal device: skipped");
+        return;
+    }
+    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert_eq!(
+        stdout.lines().filter(|l| *l == "completed").count(),
+        1,
+        "{stdout}"
+    );
+    assert_eq!(
+        stdout.lines().filter(|l| *l == "done").count(),
+        1,
+        "{stdout}"
+    );
+    assert_eq!(
+        stdout.matches("device: selected backend").count(),
+        1,
+        "{stdout}"
+    );
+    let errors = error_lines(&stderr);
+    assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
+    assert!(
+        errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
+        "{stderr}"
+    );
 }
 
 /// The corpus-product device tensor fragments must print on the reference route

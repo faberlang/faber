@@ -16,7 +16,10 @@
 //! The expected tensors are the host-form meaning of each kernel (the same
 //! element expression applied at every index).
 
-use super::kernel_lanes::run_device_form_lane;
+use super::kernel_lanes::{
+    run_device_form_call_prepared, run_device_form_lane, run_device_form_lanes,
+    run_device_form_lanes_prepared,
+};
 use super::*;
 use crate::host::BufferHost;
 use crate::value::TensorValue;
@@ -359,4 +362,402 @@ fn rank2_linearized_index_with_tensor_extent_matches_host_form() {
     }
     let expected: Vec<f64> = input.iter().map(|v| v * 2.0).collect();
     assert_eq!(contents(&out), expected);
+}
+
+/// The `add` kernel of [`elementwise_add_runs_per_lane_and_matches_host_form`].
+fn add_fixture() -> Fixture {
+    fixture(&[4], 1, &[0], &[], |_, float| {
+        vec![
+            assign(
+                MirPlace::temp(MirTempId(0)),
+                0,
+                binary(
+                    MirBinOp::Add,
+                    MirOperand::Place(indexed(0, local(3))),
+                    MirOperand::Place(indexed(1, local(3))),
+                ),
+                float,
+            ),
+            assign(
+                indexed(2, local(3)),
+                1,
+                MirValueKind::Operand(temp(0)),
+                float,
+            ),
+        ]
+    })
+}
+
+#[test]
+fn one_runner_over_every_lane_matches_one_lane_runs() {
+    let fx = add_fixture();
+    let validated = fx.validated();
+    let a = [1.0, 2.0, 3.0, 4.0];
+    let b = [0.5, 0.25, 8.0, -1.0];
+    let (ta, tb) = (tensor(&a, &[4]), tensor(&b, &[4]));
+    let builtins = [builtin(3, MirKernelBuiltin::GlobalInvocationX)];
+    let mut host = BufferHost::default();
+
+    let single = tensor(&[0.0; 4], &[4]);
+    for lane in 0..4 {
+        run_device_form_lane(
+            &validated,
+            MirFunctionId(0),
+            &mut host,
+            &[ta.clone(), tb.clone(), single.clone()],
+            &builtins,
+            [lane, 0, 0],
+        )
+        .unwrap_or_else(|errors| panic!("lane {lane}: {errors:?}"));
+    }
+    let ranged = tensor(&[0.0; 4], &[4]);
+    run_device_form_lanes(
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        &[ta, tb, ranged.clone()],
+        &builtins,
+        (0..4).map(|lane| [lane, 0, 0]),
+    )
+    .unwrap_or_else(|failure| panic!("ranged run: {failure:?}"));
+
+    assert_eq!(contents(&ranged), contents(&single));
+    let expected: Vec<f64> = a.iter().zip(&b).map(|(x, y)| x + y).collect();
+    assert_eq!(contents(&ranged), expected);
+}
+
+#[test]
+fn a_failing_lane_stops_the_run_and_is_named() {
+    let fx = add_fixture();
+    let validated = fx.validated();
+    let out = tensor(&[0.0; 4], &[4]);
+    let mut host = BufferHost::default();
+    // Lane 4 indexes past the 4-element tensors.
+    let failure = run_device_form_lanes(
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        &[
+            tensor(&[1.0, 2.0, 3.0, 4.0], &[4]),
+            tensor(&[1.0; 4], &[4]),
+            out.clone(),
+        ],
+        &[builtin(3, MirKernelBuiltin::GlobalInvocationX)],
+        (0..6).map(|lane| [lane, 0, 0]),
+    )
+    .expect_err("lane 4 is out of range");
+    assert_eq!(failure.lane, Some([4, 0, 0]));
+    assert_ne!(
+        failure.errors.len(),
+        0,
+        "the failing lane carries its errors"
+    );
+    // Lanes before the failure ran and wrote.
+    assert_eq!(contents(&out), vec![2.0, 3.0, 4.0, 5.0]);
+}
+
+#[test]
+fn a_setup_failure_names_no_lane() {
+    let fx = add_fixture();
+    let validated = fx.validated();
+    let mut host = BufferHost::default();
+    let failure = run_device_form_lanes(
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        &[tensor(&[1.0; 4], &[4])],
+        &[builtin(3, MirKernelBuiltin::GlobalInvocationX)],
+        (0..4).map(|lane| [lane, 0, 0]),
+    )
+    .expect_err("two of three tensor arguments are missing");
+    assert_eq!(failure.lane, None);
+}
+
+/// Run the `add` fixture over the given inputs through the prepared entry and
+/// return the output tensor's contents.
+fn add_prepared(
+    prepared: &RunnerPrepared,
+    validated: &ValidatedMir<'_>,
+    host: &mut BufferHost,
+    a: &[f64],
+    b: &[f64],
+) -> Vec<f64> {
+    let out = tensor(&[0.0; 4], &[4]);
+    run_device_form_lanes_prepared(
+        prepared,
+        validated,
+        MirFunctionId(0),
+        host,
+        &[tensor(a, &[4]), tensor(b, &[4]), out.clone()],
+        &[builtin(3, MirKernelBuiltin::GlobalInvocationX)],
+        (0..4).map(|lane| [lane, 0, 0]),
+    )
+    .unwrap_or_else(|failure| panic!("prepared run: {failure:?}"));
+    contents(&out)
+}
+
+#[test]
+fn one_prepared_value_serves_repeated_runs_like_the_unprepared_entry() {
+    let fx = add_fixture();
+    let validated = fx.validated();
+    let context = validated.validation();
+    let prepared = RunnerPrepared::new(validated.program(), context, context.types.as_table());
+    let mut host = BufferHost::default();
+    let cases = [
+        ([1.0, 2.0, 3.0, 4.0], [0.5, 0.25, 8.0, -1.0]),
+        ([10.0, 20.0, 30.0, 40.0], [-1.0, -2.0, -3.0, -4.0]),
+    ];
+    for (a, b) in cases {
+        let expected: Vec<f64> = a.iter().zip(&b).map(|(x, y)| x + y).collect();
+        let prepared_out = add_prepared(&prepared, &validated, &mut host, &a, &b);
+        let unprepared = tensor(&[0.0; 4], &[4]);
+        run_device_form_lanes(
+            &validated,
+            MirFunctionId(0),
+            &mut host,
+            &[tensor(&a, &[4]), tensor(&b, &[4]), unprepared.clone()],
+            &[builtin(3, MirKernelBuiltin::GlobalInvocationX)],
+            (0..4).map(|lane| [lane, 0, 0]),
+        )
+        .unwrap_or_else(|failure| panic!("unprepared run: {failure:?}"));
+        assert_eq!(prepared_out, expected);
+        assert_eq!(contents(&unprepared), prepared_out);
+    }
+}
+
+/// Per-call setup cost, prepared versus rebuilt, on a program padded with many
+/// copies of the kernel. Timing only; run with `--ignored --nocapture`.
+#[test]
+#[ignore = "timing report, not a correctness check"]
+fn prepared_setup_is_far_cheaper_than_rebuilding_a_runner() {
+    use std::time::Instant;
+
+    let mut fx = add_fixture();
+    let template = fx.program.functions[0].clone();
+    for id in 1..2000 {
+        let mut copy = template.clone();
+        copy.id = MirFunctionId(id);
+        fx.program.functions.push(copy);
+    }
+    let validated = fx.validated();
+    let context = validated.validation();
+    let a = [1.0, 2.0, 3.0, 4.0];
+    let b = [0.5, 0.25, 8.0, -1.0];
+    let mut host = BufferHost::default();
+    let rounds = 50;
+
+    let started = Instant::now();
+    let prepared = RunnerPrepared::new(validated.program(), context, context.types.as_table());
+    let build_once = started.elapsed();
+
+    let started = Instant::now();
+    for _ in 0..rounds {
+        add_prepared(&prepared, &validated, &mut host, &a, &b);
+    }
+    let prepared_per_call = started.elapsed() / rounds;
+
+    let started = Instant::now();
+    for _ in 0..rounds {
+        let out = tensor(&[0.0; 4], &[4]);
+        run_device_form_lanes(
+            &validated,
+            MirFunctionId(0),
+            &mut host,
+            &[tensor(&a, &[4]), tensor(&b, &[4]), out],
+            &[builtin(3, MirKernelBuiltin::GlobalInvocationX)],
+            (0..4).map(|lane| [lane, 0, 0]),
+        )
+        .unwrap_or_else(|failure| panic!("unprepared run: {failure:?}"));
+    }
+    let rebuilt_per_call = started.elapsed() / rounds;
+    eprintln!(
+        "2000 functions: prepare once {build_once:?}; per call prepared {prepared_per_call:?}, rebuilt {rebuilt_per_call:?}"
+    );
+    assert!(prepared_per_call * 5 < rebuilt_per_call);
+}
+
+/// The whole-call form of a kernel with no lane builtin returns the value the
+/// body returns (a returned kernel result is the call's output).
+#[test]
+fn a_whole_call_returns_the_kernel_value() {
+    let types = TypeTable::new();
+    let int = MirType::semantic(types.primitive(Primitive::Numerus));
+    let function = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: int,
+            mode: MirParamMode::Owned,
+            span: span(),
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: int,
+            mutable: false,
+            span: span(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(local(0))),
+                span: span(),
+            },
+            span: span(),
+        }],
+        return_ty: int,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    let fixture = Fixture {
+        types,
+        interner: Interner::new(),
+        program: MirProgram {
+            functions: vec![function],
+        },
+    };
+    let validated = fixture.validated();
+    let prepared = RunnerPrepared::new(
+        validated.program(),
+        validated.validation(),
+        validated.validation().types.as_table(),
+    );
+    let mut host = BufferHost::default();
+    let value = run_device_form_call_prepared(
+        &prepared,
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        &mut [Value::Int(7)],
+        &[],
+    )
+    .expect("the whole call runs");
+    assert!(matches!(value, Some(Value::Int(7))), "{value:?}");
+}
+
+/// A whole-call kernel `fn k(mut int o)` whose body stores 41 into `o`, then
+/// returns, or throws the constant text `boom` when `throws`.
+fn rebinding_fixture(throws: bool) -> Fixture {
+    let types = TypeTable::new();
+    let int = MirType::semantic(types.primitive(Primitive::Numerus));
+    let text = MirType::semantic(types.primitive(Primitive::Textus));
+    let mut interner = Interner::new();
+    let boom = interner.intern("boom");
+    let terminator = if throws {
+        MirTerminatorKind::ReturnError(MirOperand::Constant(MirConstant::String(boom)))
+    } else {
+        MirTerminatorKind::Return(None)
+    };
+    let function = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: int,
+            mode: MirParamMode::MutRef,
+            span: span(),
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(0),
+            name: None,
+            ty: int,
+            mutable: true,
+            span: span(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![assign(
+                MirPlace::local(MirLocalId(0)),
+                0,
+                MirValueKind::Operand(MirOperand::Constant(MirConstant::Int(41))),
+                int,
+            )],
+            terminator: MirTerminator {
+                kind: terminator,
+                span: span(),
+            },
+            span: span(),
+        }],
+        return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+        error_ty: throws.then_some(text),
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    Fixture {
+        types,
+        interner,
+        program: MirProgram {
+            functions: vec![function],
+        },
+    }
+}
+
+/// A `mut` parameter is a place of the caller: a body that rebinds it (as
+/// `o ⇇ a · b` lowers) leaves the new value in the argument slot.
+#[test]
+fn a_whole_call_leaves_a_rebound_mut_parameter_in_its_argument() {
+    let fixture = rebinding_fixture(false);
+    let validated = fixture.validated();
+    let prepared = RunnerPrepared::new(
+        validated.program(),
+        validated.validation(),
+        validated.validation().types.as_table(),
+    );
+    let mut host = BufferHost::default();
+    let mut args = [Value::Int(0)];
+    run_device_form_call_prepared(
+        &prepared,
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        &mut args,
+        &[],
+    )
+    .unwrap_or_else(|failure| panic!("the whole call runs: {failure:?}"));
+    assert!(matches!(args[0], Value::Int(41)), "{:?}", args[0]);
+}
+
+/// A thrown value is carried structurally for a fault channel to route, and
+/// what the body wrote before the throw stays written, as the sequential call
+/// leaves it.
+#[test]
+fn a_thrown_value_is_carried_and_earlier_writes_stay() {
+    let fixture = rebinding_fixture(true);
+    let validated = fixture.validated();
+    let prepared = RunnerPrepared::new(
+        validated.program(),
+        validated.validation(),
+        validated.validation().types.as_table(),
+    );
+    let mut host = BufferHost::default();
+    let mut args = [Value::Int(0)];
+    let failure = run_device_form_call_prepared(
+        &prepared,
+        &validated,
+        MirFunctionId(0),
+        &mut host,
+        &mut args,
+        &[],
+    )
+    .expect_err("the body throws");
+    assert_eq!(failure.lane, Some([0, 0, 0]));
+    assert!(
+        matches!(&failure.raised, Some(Value::Str(text)) if text == "boom"),
+        "{:?}",
+        failure.raised
+    );
+    assert!(matches!(args[0], Value::Int(41)), "{:?}", args[0]);
 }

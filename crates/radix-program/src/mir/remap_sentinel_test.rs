@@ -300,6 +300,7 @@ fn sentinel_program(sym: &dyn Fn(usize) -> Symbol) -> MirProgram {
                         op: radix_mir::MirReduceOp::Sum,
                         form: radix_mir::MirFilumForm::Declared,
                         term_ty: radix_mir::MirType::semantic(radix_types::TypeId(0)),
+                        group: None,
                         filum_binder: Some(sym(35)),
                         term_binder: MirLocalId(5),
                         term_binder_name: Some(sym(36)),
