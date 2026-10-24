@@ -241,7 +241,7 @@ fn scan_tensor_element_count(
                 .map_err(|error| MirAbiError::new(format!("scan tensor extent: {error:?}")))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    if extents.iter().any(|extent| *extent == Some(0)) {
+    if extents.contains(&Some(0)) {
         return Ok(0);
     }
     if extents.iter().any(Option::is_none) {
@@ -1395,8 +1395,7 @@ impl MirKernelSignature {
                     binding: u32::try_from(resources.len())
                         .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
                     kind: MirKernelResourceKind::GenusParam {
-                        size_bytes: u32::try_from(genus.size)
-                            .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                        size_bytes: genus.size,
                     },
                     role: MirKernelResourceRole::Input,
                     access: MirKernelResourceAccess::Read,

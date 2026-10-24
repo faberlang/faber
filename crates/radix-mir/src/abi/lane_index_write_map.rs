@@ -60,9 +60,7 @@ pub fn lane_write_maps(
             if !store {
                 continue;
             }
-            let Some((target, index)) = proof.addressed_tensor(place) else {
-                return None;
-            };
+            let (target, index) = proof.addressed_tensor(place)?;
             if target != local {
                 continue;
             }
@@ -122,9 +120,9 @@ fn known_stores_only(function: &MirFunction, local: MirLocalId) -> bool {
                 MirStatementKind::Assign { .. } => false,
                 MirStatementKind::Call {
                     destination, args, ..
-                } => destination.as_ref().is_some_and(&touches) || args.iter().any(&argument),
+                } => destination.as_ref().is_some_and(touches) || args.iter().any(argument),
                 MirStatementKind::RuntimeCall { destination, call } => {
-                    destination.as_ref().is_some_and(&touches) || call.args.iter().any(&argument)
+                    destination.as_ref().is_some_and(touches) || call.args.iter().any(argument)
                 }
                 MirStatementKind::Construct { destination, .. } => touches(destination),
             };
@@ -138,8 +136,8 @@ fn known_stores_only(function: &MirFunction, local: MirLocalId) -> bool {
             error_place,
             ..
         } = &block.terminator.kind
-            && (args.iter().any(&argument)
-                || destination.as_ref().is_some_and(&touches)
+            && (args.iter().any(argument)
+                || destination.as_ref().is_some_and(touches)
                 || touches(error_place))
         {
             return false;

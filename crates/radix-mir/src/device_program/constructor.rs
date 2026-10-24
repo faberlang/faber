@@ -810,6 +810,7 @@ struct KernelBuilder<'a> {
 }
 
 impl<'a> KernelBuilder<'a> {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         interner: &'a Interner,
         program: &'a crate::MirProgram,
