@@ -237,16 +237,16 @@ pub mod range;
 #[path = "record_anon_test.rs"]
 mod record_anon_test;
 pub mod reduction;
-pub mod scan;
 #[cfg(test)]
 #[path = "reduction_test.rs"]
 mod reduction_test;
 #[cfg(test)]
-#[path = "scan_test.rs"]
-mod scan_test;
-#[cfg(test)]
 pub mod relations_test;
 pub mod scalar_text;
+pub mod scan;
+#[cfg(test)]
+#[path = "scan_test.rs"]
+mod scan_test;
 pub mod sermo_route;
 #[cfg(test)]
 #[path = "sinking_test.rs"]

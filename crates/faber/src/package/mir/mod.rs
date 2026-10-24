@@ -885,7 +885,14 @@ fn session_dispatcher(
     dispatcher.borrow_mut().set_param_buffers(
         param_buffers
             .into_iter()
-            .map(|(function, row)| (function, row.into_iter().map(|buffer| buffer.map(|id| id.0)).collect()))
+            .map(|(function, row)| {
+                (
+                    function,
+                    row.into_iter()
+                        .map(|buffer| buffer.map(|id| id.0))
+                        .collect(),
+                )
+            })
             .collect(),
     );
     dispatcher

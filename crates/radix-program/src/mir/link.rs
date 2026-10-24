@@ -2168,7 +2168,10 @@ pub(super) fn rewrite_expr(
             }
         }
         HirExpressionKind::Scan {
-            source, group, body, ..
+            source,
+            group,
+            body,
+            ..
         } => {
             rewrite_expr(
                 unit_path,

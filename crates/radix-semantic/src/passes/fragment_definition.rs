@@ -329,7 +329,10 @@ impl FragmentDefinitionChecker<'_> {
                 }
             }
             HirExpressionKind::Scan {
-                source, group, body, ..
+                source,
+                group,
+                body,
+                ..
             } => {
                 self.effect(expr.span, "unapproved_effect");
                 self.check_expr(source);

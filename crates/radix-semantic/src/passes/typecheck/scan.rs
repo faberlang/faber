@@ -13,8 +13,7 @@ const ISSUE_SCAN_REQUIRES_KERNEL: &str = "scan_thread_requires_nucleum_kernel";
 const ISSUE_SCAN_TERM_TYPE_NON_SCALAR: &str = "scan_term_type_non_scalar";
 const ISSUE_SCAN_TERM_TYPE_NOT_BOOL: &str = "scan_term_type_not_bool";
 const ISSUE_SCAN_OPERATOR_UNSUPPORTED: &str = "scan_operator_unsupported";
-const ISSUE_SCAN_EXCLUSIVE_EXTREMUM_UNSUPPORTED: &str =
-    "scan_exclusive_extremum_unsupported";
+const ISSUE_SCAN_EXCLUSIVE_EXTREMUM_UNSUPPORTED: &str = "scan_exclusive_extremum_unsupported";
 const ISSUE_SCAN_GROUP_KEYS_NOT_LITERAL: &str = "scan_group_keys_not_literal";
 const ISSUE_SCAN_GROUP_KEY_NOT_INTEGER: &str = "scan_group_key_not_integer";
 const ISSUE_SCAN_GROUP_DOMAIN_UNBOUNDED: &str = "scan_group_domain_unbounded";
@@ -125,13 +124,8 @@ pub(super) fn check_scan_expr(
                     proven = false;
                     continue;
                 };
-                let domain = scan_key_domain(
-                    checker,
-                    key,
-                    width,
-                    coordinates,
-                    dimensions.as_deref(),
-                );
+                let domain =
+                    scan_key_domain(checker, key, width, coordinates, dimensions.as_deref());
                 if let Some(domain) = domain {
                     domains.push(domain);
                 } else {
@@ -144,7 +138,9 @@ pub(super) fn check_scan_expr(
                 }
             }
             if proven && domains.len() == key_count {
-                *group_domain = Some(HirScanGroupDomain { key_domains: domains });
+                *group_domain = Some(HirScanGroupDomain {
+                    key_domains: domains,
+                });
             }
         }
     }
@@ -154,24 +150,19 @@ pub(super) fn check_scan_expr(
     let previous_allow = checker.allow_inferred_return;
     checker.allow_inferred_return = true;
     checker.check_block(body, None);
-    let term_ty = checker
-        .inferred_return
-        .unwrap_or(checker.error_type);
+    let term_ty = checker.inferred_return.unwrap_or(checker.error_type);
     checker.current_return = previous_return;
     checker.inferred_return = previous_inferred;
     checker.allow_inferred_return = previous_allow;
-    super::reduction::check_reducta_body_laws(
-        checker,
-        coordinates,
-        Some(filum),
-        binding,
-        body,
-    );
+    super::reduction::check_reducta_body_laws(checker, coordinates, Some(filum), binding, body);
     checker.pop_scope();
 
     let term_ty = checker.resolve_inferred_type(term_ty);
     let boolean = checker.types.primitive(Primitive::Bivalens);
-    if matches!(op, HirReductionOp::All | HirReductionOp::Any | HirReductionOp::Count) {
+    if matches!(
+        op,
+        HirReductionOp::All | HirReductionOp::Any | HirReductionOp::Count
+    ) {
         if term_ty != boolean {
             checker.error_issue(
                 SemanticErrorKind::TypeMismatch,
@@ -234,7 +225,11 @@ fn scan_group_components<'a>(
     }
     if matches!(
         checker.types.get(group_ty),
-        Type::Array(_) | Type::BoundedArray { .. } | Type::Tuple(_) | Type::Tensor(..) | Type::Matrix(..)
+        Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::Tuple(_)
+            | Type::Tensor(..)
+            | Type::Matrix(..)
     ) {
         checker.error_issue(
             SemanticErrorKind::TypeMismatch,
@@ -254,7 +249,9 @@ fn scan_key_domain(
     coordinates: &[(radix_hir::DefId, Symbol)],
     dimensions: Option<&[i64]>,
 ) -> Option<HirScanKeyDomain> {
-    if let Some(value) = super::integer_range::const_int_value_resolved(key, &checker.const_int_values) {
+    if let Some(value) =
+        super::integer_range::const_int_value_resolved(key, &checker.const_int_values)
+    {
         return Some(HirScanKeyDomain::IntegerRange {
             min: value,
             max: value,
@@ -296,7 +293,9 @@ fn scan_key_interval(
     coordinates: &[(radix_hir::DefId, Symbol)],
     dimensions: Option<&[i64]>,
 ) -> Option<(i128, i128)> {
-    if let Some(value) = super::integer_range::const_int_value_resolved(key, &checker.const_int_values) {
+    if let Some(value) =
+        super::integer_range::const_int_value_resolved(key, &checker.const_int_values)
+    {
         return Some((value, value));
     }
     match &key.kind {

@@ -2348,7 +2348,10 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 }
             }
             HirExpressionKind::Scan {
-                source, group, body, ..
+                source,
+                group,
+                body,
+                ..
             } => {
                 collect_expr(source, registry);
                 if let Some(group) = group {

@@ -2060,7 +2060,13 @@ impl Parser {
 
     fn scan_operator_error(&self) -> ParseError {
         self.scan_expected_keyword_error(&[
-            "summa", "factum", "maxima", "minima", "omnia", "quilibet", "numeratio",
+            "summa",
+            "factum",
+            "maxima",
+            "minima",
+            "omnia",
+            "quilibet",
+            "numeratio",
         ])
     }
 

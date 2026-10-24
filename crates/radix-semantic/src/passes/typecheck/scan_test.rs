@@ -40,7 +40,11 @@ functio per_key(tensor<f32, [4]> xs, tensor<u8, [4]> keys) → tensor<f32, [4]> 
 }
 "#,
     );
-    assert!(grouped.success(), "diagnostics: {:?}", grouped.result.diagnostics);
+    assert!(
+        grouped.success(),
+        "diagnostics: {:?}",
+        grouped.result.diagnostics
+    );
     assert_eq!(
         first_group_domain(&grouped),
         HirScanKeyDomain::IntegerWidth(NumericWidth::U8)
@@ -57,7 +61,11 @@ functio modulo(tensor<f32, [8]> xs) → tensor<f32, [8]> {
 }
 "#,
     );
-    assert!(modulo.success(), "diagnostics: {:?}", modulo.result.diagnostics);
+    assert!(
+        modulo.success(),
+        "diagnostics: {:?}",
+        modulo.result.diagnostics
+    );
     assert_eq!(
         first_group_domain(&modulo),
         HirScanKeyDomain::IntegerRange { min: 0, max: 3 }
@@ -71,7 +79,11 @@ functio widened(tensor<i32, [4]> xs, tensor<i32, [4]> keys) → tensor<i32, [4]>
 }
 "#,
     );
-    assert!(widened.success(), "diagnostics: {:?}", widened.result.diagnostics);
+    assert!(
+        widened.success(),
+        "diagnostics: {:?}",
+        widened.result.diagnostics
+    );
     assert_eq!(
         first_group_domain(&widened),
         HirScanKeyDomain::IntegerRange {
@@ -117,12 +129,8 @@ fn first_group_domain(unit: &crate::test_support::AnalyzedFixture) -> HirScanKey
             _ => None,
         })
         .expect("scan function");
-    let HirStatementKind::Redde(Some(value)) = &function
-        .body
-        .as_ref()
-        .expect("body")
-        .statements[0]
-        .kind
+    let HirStatementKind::Redde(Some(value)) =
+        &function.body.as_ref().expect("body").statements[0].kind
     else {
         panic!("expected scan return expression");
     };

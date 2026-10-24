@@ -923,7 +923,9 @@ impl fmt::Display for PlanValidationError {
             }
             Self::ScanZeroBlocksCap => write!(f, "scan requires at least one source block"),
             Self::ScanZeroGroupCount => write!(f, "scan requires at least one group"),
-            Self::ScanZeroElementBytes => write!(f, "scan prefix values require a positive byte width"),
+            Self::ScanZeroElementBytes => {
+                write!(f, "scan prefix values require a positive byte width")
+            }
             Self::ScanPartialSlotsOverflow => write!(f, "scan summary allocation overflows u64"),
         }
     }

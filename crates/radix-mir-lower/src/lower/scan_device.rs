@@ -12,16 +12,7 @@ impl FunctionBuilder<'_> {
     /// retain their language-level loop implementation.
     pub(super) fn lower_device_scan_expr(&mut self, expr: &HirExpression) -> Option<MirOperand> {
         let HirExpressionKind::Scan {
-            op,
-            total,
-            source,
-            coordinates,
-            group,
-            group_domain,
-            order,
-            binding,
-            body,
-            ..
+            op, total, source, coordinates, group, group_domain, order, binding, body, ..
         } = &expr.kind
         else {
             return None;
@@ -46,10 +37,8 @@ impl FunctionBuilder<'_> {
         let element_ty = match self.normalized_type(source_ty) {
             Type::Tensor(element, _) => *element,
             Type::Matrix(_, _) => {
-                self.errors.push(MirError::unsupported(
-                    span,
-                    "scan_matrix_source_device_unsupported",
-                ));
+                self.errors
+                    .push(MirError::unsupported(span, "scan_matrix_source_device_unsupported"));
                 return None;
             }
             _ => {
@@ -77,15 +66,8 @@ impl FunctionBuilder<'_> {
         let source_value = self.lower_expr_value(source)?;
         let source_place = self.materialize_operand_place(source_value, MirType::semantic(source_ty), span);
         let mut args = vec![MirOperand::Place(source_place)];
-        let (term_function, term_captures) = self.lower_scan_term_function(
-            body,
-            coordinates,
-            binding,
-            element_ty,
-            term_ty,
-            group.as_deref(),
-            span,
-        )?;
+        let (term_function, term_captures) =
+            self.lower_scan_term_function(body, coordinates, binding, element_ty, term_ty, group.as_deref(), span)?;
         args.extend(
             term_captures
                 .iter()
@@ -94,16 +76,9 @@ impl FunctionBuilder<'_> {
         args.push(MirOperand::Constant(MirConstant::Function(term_function)));
 
         let scan_group = if let (Some(group), Some(group_domain)) = (group.as_deref(), group_domain) {
-            if !super::control::grouped_key_tensor_reads_are_proven(
-                self.types,
-                source,
-                coordinates,
-                group,
-            ) {
-                self.errors.push(MirError::unsupported(
-                    group.span,
-                    "scan_group_key_index_unproven",
-                ));
+            if !super::control::grouped_key_tensor_reads_are_proven(self.types, source, coordinates, group) {
+                self.errors
+                    .push(MirError::unsupported(group.span, "scan_group_key_index_unproven"));
                 return None;
             }
             let keys = radix_hir::reduction_group_keys(group);
@@ -115,62 +90,46 @@ impl FunctionBuilder<'_> {
             let mut axes = Vec::with_capacity(keys.len());
             for (key, domain) in keys.iter().zip(&group_domain.key_domains) {
                 let key_ty = MirType::semantic(key.ty?);
-                let (min, extent) = scan_device_key_domain(*domain).ok_or_else(|| {
-                    self.errors.push(MirError::unsupported(
-                        key.span,
-                        "scan_group_domain_too_large_for_device",
-                    ));
-                }).ok()?;
+                let (min, extent) = scan_device_key_domain(*domain)
+                    .ok_or_else(|| {
+                        self.errors
+                            .push(MirError::unsupported(key.span, "scan_group_domain_too_large_for_device"));
+                    })
+                    .ok()?;
                 if extent == 0 {
-                    self.errors.push(MirError::unsupported(
-                        key.span,
-                        "scan_group_domain_empty_for_device",
-                    ));
+                    self.errors
+                        .push(MirError::unsupported(key.span, "scan_group_domain_empty_for_device"));
                     return None;
                 }
                 let excluded = coordinates.iter().map(|(def_id, _)| *def_id).collect();
                 let captures = self.collect_expression_captures(excluded, key);
-                if captures.iter().any(|capture| capture.mode == MirCaptureMode::Shared) {
-                    self.errors.push(MirError::unsupported(
-                        key.span,
-                        "scan_group_key_captures_shared_state",
-                    ));
+                if captures
+                    .iter()
+                    .any(|capture| capture.mode == MirCaptureMode::Shared)
+                {
+                    self.errors
+                        .push(MirError::unsupported(key.span, "scan_group_key_captures_shared_state"));
                     return None;
                 }
-                let function = self.lower_scan_group_key_function(
-                    key,
-                    group,
-                    coordinates,
-                    &captures,
-                    key_ty,
-                    span,
-                )?;
+                let function = self.lower_scan_group_key_function(key, group, coordinates, &captures, key_ty, span)?;
                 args.extend(
                     captures
                         .iter()
                         .map(|capture| MirOperand::Place(capture.source_place.clone())),
                 );
                 args.push(MirOperand::Constant(MirConstant::Function(function)));
-                axes.push(MirScanGroupAxis {
-                    min,
-                    extent,
-                    key_ty,
-                    captures: u32::try_from(captures.len()).ok()?,
-                });
+                axes.push(MirScanGroupAxis { min, extent, key_ty, captures: u32::try_from(captures.len()).ok()? });
             }
-            let group_count = axes.iter().try_fold(1_u64, |count, axis| {
-                count.checked_mul(axis.extent)
-            });
-            let summary_count = group_count.and_then(|count| {
-                count.checked_mul(u64::from(radix_mir::kernel_plan::GRID_REDUCE_PARTIALS_CAP))
-            });
+            let group_count = axes
+                .iter()
+                .try_fold(1_u64, |count, axis| count.checked_mul(axis.extent));
+            let summary_count = group_count
+                .and_then(|count| count.checked_mul(u64::from(radix_mir::kernel_plan::GRID_REDUCE_PARTIALS_CAP)));
             if group_count.is_none_or(|count| count > u64::from(u32::MAX))
                 || summary_count.is_none_or(|count| count > u64::from(u32::MAX))
             {
-                self.errors.push(MirError::unsupported(
-                    span,
-                    "scan_group_domain_too_large_for_device",
-                ));
+                self.errors
+                    .push(MirError::unsupported(span, "scan_group_domain_too_large_for_device"));
                 return None;
             }
             Some(MirScanGroupOp { axes })
@@ -213,7 +172,10 @@ impl FunctionBuilder<'_> {
         let mut excluded: FxHashSet<DefId> = coordinates.iter().map(|(def_id, _)| *def_id).collect();
         excluded.insert(binding.0);
         let captures = self.collect_block_captures(excluded, body);
-        if captures.iter().any(|capture| capture.mode == MirCaptureMode::Shared) {
+        if captures
+            .iter()
+            .any(|capture| capture.mode == MirCaptureMode::Shared)
+        {
             self.errors
                 .push(MirError::unsupported(span, "scan_term_captures_shared_state"));
             return None;
@@ -398,7 +360,9 @@ fn scan_device_key_domain(domain: HirScanKeyDomain) -> Option<(i128, u64)> {
 }
 
 fn scan_synthetic_function_id(builder: &FunctionBuilder<'_>) -> Option<MirFunctionId> {
-    let offset = u32::try_from(builder.synthetic_functions.len()).ok()?.checked_add(1)?;
+    let offset = u32::try_from(builder.synthetic_functions.len())
+        .ok()?
+        .checked_add(1)?;
     Some(MirFunctionId(builder.parent_function_id.0.checked_add(offset)?))
 }
 
@@ -429,9 +393,7 @@ fn scan_device_term_is_total(body: &HirBlock) -> bool {
         fn visit_expr(&mut self, expr: &HirExpression) {
             if matches!(
                 expr.kind,
-                HirExpressionKind::Scan { .. }
-                    | HirExpressionKind::Reduction { .. }
-                    | HirExpressionKind::Clausura(..)
+                HirExpressionKind::Scan { .. } | HirExpressionKind::Reduction { .. } | HirExpressionKind::Clausura(..)
             ) {
                 return;
             }
@@ -439,17 +401,19 @@ fn scan_device_term_is_total(body: &HirBlock) -> bool {
         }
     }
     fn returns(body: &HirBlock) -> bool {
-        body.statements.iter().any(|statement| match &statement.kind {
-            HirStatementKind::Redde(Some(_)) => true,
-            HirStatementKind::Expr(expr) => match &expr.kind {
-                HirExpressionKind::Si { then_block, else_block: Some(other), .. } => {
-                    returns(then_block) && returns(other)
-                }
-                HirExpressionKind::Block(inner) => returns(inner),
+        body.statements
+            .iter()
+            .any(|statement| match &statement.kind {
+                HirStatementKind::Redde(Some(_)) => true,
+                HirStatementKind::Expr(expr) => match &expr.kind {
+                    HirExpressionKind::Si { then_block, else_block: Some(other), .. } => {
+                        returns(then_block) && returns(other)
+                    }
+                    HirExpressionKind::Block(inner) => returns(inner),
+                    _ => false,
+                },
                 _ => false,
-            },
-            _ => false,
-        })
+            })
     }
     let mut escapes = Escapes(false);
     escapes.visit_block(body);

@@ -187,7 +187,7 @@ fn reduction_term_functions(
                 };
                 if term_position < group_start
                     && let Some(MirOperand::Constant(MirConstant::Function(term))) =
-                    args.get(term_position)
+                        args.get(term_position)
                 {
                     terms.insert(*term);
                 }

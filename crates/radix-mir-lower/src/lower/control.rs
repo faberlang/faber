@@ -90,7 +90,11 @@ pub(super) fn coordinate_type(body: &HirBlock, def: DefId) -> Option<TypeId> {
     reduction_coordinate_type(Some(body), None, def)
 }
 
-pub(super) fn reduction_coordinate_type(body: Option<&HirBlock>, group: Option<&HirExpression>, def: DefId) -> Option<TypeId> {
+pub(super) fn reduction_coordinate_type(
+    body: Option<&HirBlock>,
+    group: Option<&HirExpression>,
+    def: DefId,
+) -> Option<TypeId> {
     struct Find {
         def: DefId,
         ty: Option<TypeId>,

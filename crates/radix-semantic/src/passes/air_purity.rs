@@ -370,7 +370,10 @@ impl AirPurityChecker<'_> {
                 }
             }
             HirExpressionKind::Scan {
-                source, group, body, ..
+                source,
+                group,
+                body,
+                ..
             } => {
                 self.reject(expr.span, "unapproved_effect");
                 self.check_expr(source);

@@ -52,12 +52,12 @@ use radix_mir::{
     MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLaneOp, MirLayoutTable, MirLiftOp,
     MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
     MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
-    MirProvider, MirProviderKind, MirReduceOp, MirRuntimeCall, MirShapeBinding, MirShapeCheck, MirShapeExpr,
-    MirShapeRelation, MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase,
-    MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp,
-    MirScanGroupAxis, MirScanGroupOp, MirScanOp, MirScanTotal, MirUnOp, MirValidationContext, MirValue,
-    MirValueId, MirValueKind, MirVectorOp, ValidatedMir, dump_program,
-    instantiate_existing_generic_type, terminator_successors, type_contains_param,
+    MirProvider, MirProviderKind, MirReduceOp, MirRuntimeCall, MirScanGroupAxis, MirScanGroupOp, MirScanOp,
+    MirScanTotal, MirShapeBinding, MirShapeCheck, MirShapeExpr, MirShapeRelation, MirStatement, MirStatementKind,
+    MirStructFieldDefaults, MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator,
+    MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
+    MirVectorOp, ValidatedMir, dump_program, instantiate_existing_generic_type, terminator_successors,
+    type_contains_param,
 };
 use radix_semantic::analyzed_application::AnalyzedModuleApplicationView;
 use radix_semantic::cli::{CliDefault, CliOperand, CliOption, CliType};
@@ -78,8 +78,6 @@ mod collection_higher_order;
 
 mod context;
 mod control;
-mod scan;
-mod scan_device;
 mod conversio_route;
 pub mod expr;
 mod fractus_potentia;
@@ -90,6 +88,8 @@ pub mod package_instantiate;
 pub mod place;
 mod register_lift;
 pub mod runtime;
+mod scan;
+mod scan_device;
 mod stmt;
 mod tensor_lift;
 mod union_dispatch;

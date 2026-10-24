@@ -1038,7 +1038,10 @@ impl Validator<'_, '_> {
         call: &MirRuntimeCall,
         span: Span,
     ) {
-        if matches!(scan.op, crate::MirReduceOp::ArgMax | crate::MirReduceOp::ArgMin) {
+        if matches!(
+            scan.op,
+            crate::MirReduceOp::ArgMax | crate::MirReduceOp::ArgMin
+        ) {
             self.error(span, "scan does not admit argmax or argmin");
         }
         if scan.total == crate::MirScanTotal::Exclusive
@@ -1058,7 +1061,10 @@ impl Validator<'_, '_> {
         {
             match self.type_kind(source_ty) {
                 Type::Tensor(_, _) => {
-                    if self.static_tensor_rank(source_ty).is_some_and(|rank| rank != usize::from(scan.rank)) {
+                    if self
+                        .static_tensor_rank(source_ty)
+                        .is_some_and(|rank| rank != usize::from(scan.rank))
+                    {
                         self.error(span, "scan rank differs from source tensor rank");
                     }
                 }
@@ -1112,19 +1118,35 @@ impl Validator<'_, '_> {
             return;
         };
         if term.params.len() != term_captures + usize::from(scan.rank) + 1 {
-            self.error(span, "scan term helper must take captures, coordinates, and element");
+            self.error(
+                span,
+                "scan term helper must take captures, coordinates, and element",
+            );
         }
-        self.require_exact(term.return_ty, scan.term_ty, span, "scan term helper return type mismatch");
+        self.require_exact(
+            term.return_ty,
+            scan.term_ty,
+            span,
+            "scan term helper return type mismatch",
+        );
         for (argument, parameter) in call.args[1..term_function_position]
             .iter()
             .zip(term.params.iter())
         {
             if let Some(actual) = self.validate_operand(scope, argument, span) {
-                self.require_assignable(actual, parameter.ty, span, "scan term capture type mismatch");
+                self.require_assignable(
+                    actual,
+                    parameter.ty,
+                    span,
+                    "scan term capture type mismatch",
+                );
             }
         }
         if term_function_position + 1 != group_start {
-            self.error(span, "scan call operands do not match the declared helper segments");
+            self.error(
+                span,
+                "scan call operands do not match the declared helper segments",
+            );
             return;
         }
 
@@ -1151,8 +1173,10 @@ impl Validator<'_, '_> {
                 self.type_kind(axis.key_ty),
                 Type::SizedNumeric(Primitive::Numerus, width)
                     if width.is_signed_int() || width.is_unsigned_int()
-            ) && !matches!(self.type_kind(axis.key_ty), Type::Primitive(Primitive::Numerus))
-            {
+            ) && !matches!(
+                self.type_kind(axis.key_ty),
+                Type::Primitive(Primitive::Numerus)
+            ) {
                 self.error(span, "scan key type is not an integer");
             }
             let Some(function_position) = position.checked_add(captures) else {
@@ -1173,13 +1197,23 @@ impl Validator<'_, '_> {
             if key_fn.params.len() != captures + usize::from(scan.rank) {
                 self.error(span, "scan key helper must take captures and coordinates");
             }
-            self.require_exact(key_fn.return_ty, axis.key_ty, span, "scan key helper return type mismatch");
+            self.require_exact(
+                key_fn.return_ty,
+                axis.key_ty,
+                span,
+                "scan key helper return type mismatch",
+            );
             for (argument, parameter) in call.args[position..function_position]
                 .iter()
                 .zip(key_fn.params.iter())
             {
                 if let Some(actual) = self.validate_operand(scope, argument, span) {
-                    self.require_assignable(actual, parameter.ty, span, "scan key capture type mismatch");
+                    self.require_assignable(
+                        actual,
+                        parameter.ty,
+                        span,
+                        "scan key capture type mismatch",
+                    );
                 }
             }
             position = function_position.saturating_add(1);

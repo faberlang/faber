@@ -114,7 +114,10 @@ fn reduction_words_are_tokenless_contextual_rows_with_reduction_owners() {
         };
         assert!(owners.contains(&owner), "'{text}' owner");
         if text == "pro" {
-            assert!(owners.contains(&KeywordOwner::ScanGroup), "'pro' also owns scan grouping");
+            assert!(
+                owners.contains(&KeywordOwner::ScanGroup),
+                "'pro' also owns scan grouping"
+            );
         } else {
             assert_eq!(owners, [owner], "'{text}' owner");
         }
@@ -210,7 +213,10 @@ fn existing_rows_gain_the_reduction_owner_and_keep_their_old_one() {
     let KeywordScope::Contextual(owners) = via.scope else {
         panic!("via must be contextual");
     };
-    assert!(owners.contains(&KeywordOwner::ScanHead), "via gains scan-head use");
+    assert!(
+        owners.contains(&KeywordOwner::ScanHead),
+        "via gains scan-head use"
+    );
 }
 
 #[test]

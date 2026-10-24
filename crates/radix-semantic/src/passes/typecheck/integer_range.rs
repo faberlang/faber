@@ -787,11 +787,7 @@ impl TypeChecker<'_> {
     /// element, call result or converted value, each already checked at the
     /// store that produced it) is bounded by its declared type. `None` when
     /// the expression is not range-typed integer arithmetic.
-    pub(super) fn value_range(
-        &self,
-        expr: &HirExpression,
-        ty: Option<TypeId>,
-    ) -> Option<IntRange> {
+    pub(super) fn value_range(&self, expr: &HirExpression, ty: Option<TypeId>) -> Option<IntRange> {
         if let Some(value) = const_int_value(expr) {
             return Some((value, value));
         }
@@ -861,11 +857,7 @@ impl TypeChecker<'_> {
     /// Interval of a binary operator over operand intervals. `& | ^ >>` never
     /// leave the 64-bit range when their operands sit inside it; an operand
     /// beyond it lets the result go anywhere in the single 64-bit range.
-    pub(super) fn binary_value_range(
-        op: HirBinOp,
-        a: IntRange,
-        b: IntRange,
-    ) -> Option<IntRange> {
+    pub(super) fn binary_value_range(op: HirBinOp, a: IntRange, b: IntRange) -> Option<IntRange> {
         if let Some(result) = Self::scalar_binary_range(op, a, b) {
             return Some(result);
         }

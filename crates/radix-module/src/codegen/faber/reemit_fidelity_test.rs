@@ -141,9 +141,7 @@ fn scan_surface_round_trips_with_total_order_and_thread_body() {
     let emitted = emit(source);
     assert_eq!(emit(&emitted), emitted, "scan output is not idempotent");
     assert!(
-        emitted.contains(
-            "scan via summa total exclusive ex xs apud [i] order descendens filum lane sit value"
-        ),
+        emitted.contains("scan via summa total exclusive ex xs apud [i] order descendens filum lane sit value"),
         "canonical scan form missing from output: {emitted}"
     );
 }

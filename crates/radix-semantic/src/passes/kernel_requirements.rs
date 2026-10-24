@@ -1744,15 +1744,7 @@ impl BodyFacts<'_> {
                 binding,
                 body,
                 ..
-            } => self.evaluate_scan(
-                expr,
-                *op,
-                source,
-                coordinates,
-                group,
-                *binding,
-                body,
-            ),
+            } => self.evaluate_scan(expr, *op, source, coordinates, group, *binding, body),
             HirExpressionKind::Array(elements) => self.evaluate_array_elements(expr.id, elements),
             HirExpressionKind::Si {
                 cond,

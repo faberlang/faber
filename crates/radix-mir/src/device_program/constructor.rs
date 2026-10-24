@@ -1260,9 +1260,7 @@ impl<'a> KernelBuilder<'a> {
                         .and_then(|local| {
                             crate::abi::kernel_local_shape(synthetic, local, self.validation)
                         })
-                        .or_else(|| {
-                            crate::abi::kernel_result_shape(synthetic, self.validation)
-                        })
+                        .or_else(|| crate::abi::kernel_result_shape(synthetic, self.validation))
                 };
                 result_shape.filter(|dims| {
                     dims.iter().try_fold(1u64, |acc, d| acc.checked_mul(*d))

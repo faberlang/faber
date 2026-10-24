@@ -1,7 +1,7 @@
 use crate::{
     MirAggregateFields, MirAggregateItem, MirAggregateKind, MirFunction, MirLayoutKind, MirLocalId,
-    MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirScalarLayout, MirStatementKind,
-    MirTerminatorKind, MirType, MirValidationContext, MirScanOp,
+    MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirScalarLayout, MirScanOp,
+    MirStatementKind, MirTerminatorKind, MirType, MirValidationContext,
 };
 use radix_lexer::Interner;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
@@ -15,13 +15,14 @@ use super::{
     ERR_KERNEL_TENSOR_EXTENT_U32, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
     MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
     MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
-    RUNTIME_SHAPED_ELEMENT_COUNT, StorageBufferLimitRecord, apply_collection_op_contract, buffer_element_count,
-    buffer_element_type, builtin_input_for_index_param, builtin_inputs_for_named_params,
-    called_builtins_for_function, collection_op_contract, combined_builtin_dependencies,
-    device_view_element_count, device_view_element_count_or_runtime, device_view_element_type,
-    dispatch_size_for_1d_elements, genus_param_layout, is_vacuum, kernel_element_byte_width,
-    kernel_has_collection_op, named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
-    require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
+    RUNTIME_SHAPED_ELEMENT_COUNT, StorageBufferLimitRecord, apply_collection_op_contract,
+    buffer_element_count, buffer_element_type, builtin_input_for_index_param,
+    builtin_inputs_for_named_params, called_builtins_for_function, collection_op_contract,
+    combined_builtin_dependencies, device_view_element_count, device_view_element_count_or_runtime,
+    device_view_element_type, dispatch_size_for_1d_elements, genus_param_layout, is_vacuum,
+    kernel_element_byte_width, kernel_has_collection_op, named_builtin_for_param,
+    param_source_name, reject_kernel_matrix_abi, require_same_element_type, require_u32_index,
+    result_tuple_count, storage_buffer_limit_error,
 };
 
 struct IndexedViewKernelContext<'a> {
@@ -201,7 +202,10 @@ fn scan_tensor_rank(shape: radix_types::IndexId, types: &TypeTable) -> Option<us
     })
 }
 
-fn scan_tensor_shape(ty: MirType, validation: &MirValidationContext<'_>) -> Option<radix_types::IndexId> {
+fn scan_tensor_shape(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Option<radix_types::IndexId> {
     let ty = validation.types.peel_access_marker(ty.semantic_id()).1;
     match validation.types.get(ty) {
         Type::Tensor(_, shape) => Some(*shape),
@@ -356,7 +360,11 @@ pub(crate) fn scan_partial_layout(
             }
             _ => return Err(MirAbiError::new("scan result element is not scalar")),
         },
-        Err(_) => return Err(MirAbiError::new("scan result element layout is unavailable")),
+        Err(_) => {
+            return Err(MirAbiError::new(
+                "scan result element layout is unavailable",
+            ));
+        }
     };
     Ok(crate::kernel_plan::GridReducePartialLayout::for_op(
         scan.op,
@@ -386,8 +394,8 @@ fn append_scan_scratch_resources(
     if group_count == 0 {
         return Err(MirAbiError::new("scan group count is empty"));
     }
-    let group_count = u32::try_from(group_count)
-        .map_err(|_| MirAbiError::new("scan group count exceeds u32"))?;
+    let group_count =
+        u32::try_from(group_count).map_err(|_| MirAbiError::new("scan group count exceeds u32"))?;
     let layout = scan_partial_layout(scan, validation)?;
     let partial_ty = scan_partial_type(scan, validation)?;
     let blocks_cap = crate::kernel_plan::GRID_REDUCE_PARTIALS_CAP;
@@ -402,7 +410,11 @@ fn append_scan_scratch_resources(
             }
             _ => return Err(MirAbiError::new("scan result element is not scalar")),
         },
-        Err(_) => return Err(MirAbiError::new("scan result element layout is unavailable")),
+        Err(_) => {
+            return Err(MirAbiError::new(
+                "scan result element layout is unavailable",
+            ));
+        }
     };
     let prefix_binding = next_free_binding(signature);
     signature.extra_inputs.push(MirKernelResource {
@@ -441,7 +453,10 @@ fn scan_partial_type(
     scan: &MirScanOp,
     validation: &MirValidationContext<'_>,
 ) -> Result<MirType, MirAbiError> {
-    if matches!(scan.op, crate::MirReduceOp::Count | crate::MirReduceOp::All | crate::MirReduceOp::Any) {
+    if matches!(
+        scan.op,
+        crate::MirReduceOp::Count | crate::MirReduceOp::All | crate::MirReduceOp::Any
+    ) {
         return validation
             .types
             .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
@@ -662,18 +677,25 @@ fn append_tensor_extent_resources(
         for axis in 0..u32::from(scan.rank) {
             ordered.insert((parameter, local, axis));
         }
-        let call = function.blocks.iter().flat_map(|block| &block.statements).find_map(|statement| {
-            let crate::MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
-                return None;
-            };
-            matches!(&call.intrinsic, crate::MirIntrinsic::Scan(_)).then_some(call)
-        }).ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
+        let call = function
+            .blocks
+            .iter()
+            .flat_map(|block| &block.statements)
+            .find_map(|statement| {
+                let crate::MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                    return None;
+                };
+                matches!(&call.intrinsic, crate::MirIntrinsic::Scan(_)).then_some(call)
+            })
+            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
         let term_captures = usize::try_from(scan.term_captures)
             .map_err(|_| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
         let term_end = 1_usize
             .checked_add(term_captures)
             .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
-        for operand in call.args.get(1..term_end)
+        for operand in call
+            .args
+            .get(1..term_end)
             .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?
         {
             append_scan_capture_extents(operand, function, validation, &mut ordered)?;
@@ -687,7 +709,9 @@ fn append_tensor_extent_resources(
                 let end = position
                     .checked_add(captures)
                     .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?;
-                for operand in call.args.get(position..end)
+                for operand in call
+                    .args
+                    .get(position..end)
                     .ok_or_else(|| MirAbiError::new(ERR_KERNEL_TENSOR_EXTENT_OPERAND))?
                 {
                     append_scan_capture_extents(operand, function, validation, &mut ordered)?;
@@ -733,13 +757,19 @@ fn append_scan_capture_extents(
                 {
                     (Some(position), Some(root), Some(parameter.ty))
                 } else {
-                    let ty = function.locals.iter().find(|decl| decl.id == local)
+                    let ty = function
+                        .locals
+                        .iter()
+                        .find(|decl| decl.id == local)
                         .map(|decl| decl.ty);
                     (None, Some(local), ty)
                 }
             }
             MirPlaceBase::Temp(temp) => {
-                let ty = function.temps.iter().find(|candidate| candidate.id == temp)
+                let ty = function
+                    .temps
+                    .iter()
+                    .find(|candidate| candidate.id == temp)
                     .map(|temp| temp.ty);
                 (None, None, ty)
             }
@@ -1305,18 +1335,28 @@ impl MirKernelSignature {
         let Some((scan, source_local)) = scan_node(function) else {
             return Ok(None);
         };
-        let Some(source_param) = function.params.iter().find(|param| param.local == source_local) else {
-            return Err(MirAbiError::new("scan source does not resolve to a kernel input"));
+        let Some(source_param) = function
+            .params
+            .iter()
+            .find(|param| param.local == source_local)
+        else {
+            return Err(MirAbiError::new(
+                "scan source does not resolve to a kernel input",
+            ));
         };
         if source_param.mode == MirParamMode::MutRef {
-            return Err(MirAbiError::new("scan source must be a read-only kernel input"));
+            return Err(MirAbiError::new(
+                "scan source must be a read-only kernel input",
+            ));
         }
         let source_shape = scan_tensor_shape(source_param.ty, validation)
             .ok_or_else(|| MirAbiError::new("scan source must be a tensor kernel input"))?;
         let result_shape = scan_tensor_shape(function.return_ty, validation)
             .ok_or_else(|| MirAbiError::new("scan return must be a source-shaped tensor"))?;
         if !validation.types.index_equals(source_shape, result_shape) {
-            return Err(MirAbiError::new("scan return shape differs from its source"));
+            return Err(MirAbiError::new(
+                "scan return shape differs from its source",
+            ));
         }
         if let Some(rank) = scan_tensor_rank(source_shape, &validation.types)
             && rank != usize::from(scan.rank)
@@ -1326,7 +1366,9 @@ impl MirKernelSignature {
         let source_element_count = scan_tensor_element_count(source_param.ty, validation)?;
         let return_element_count = scan_tensor_element_count(function.return_ty, validation)?;
         if source_element_count != return_element_count {
-            return Err(MirAbiError::new("scan return element count differs from its source"));
+            return Err(MirAbiError::new(
+                "scan return element count differs from its source",
+            ));
         }
         let return_element_ty = buffer_element_type(
             function.return_ty,
@@ -1334,9 +1376,15 @@ impl MirKernelSignature {
             allow_host_owned_tensor_entry,
         )?;
         let mut resources = Vec::new();
-        for param in function.params.iter().filter(|param| param.mode != MirParamMode::Lane) {
+        for param in function
+            .params
+            .iter()
+            .filter(|param| param.mode != MirParamMode::Lane)
+        {
             if param.mode == MirParamMode::MutRef {
-                return Err(MirAbiError::new("scan kernels require read-only capture parameters"));
+                return Err(MirAbiError::new(
+                    "scan kernels require read-only capture parameters",
+                ));
             }
             if is_vacuum(param.ty, validation) {
                 continue;
@@ -1360,7 +1408,8 @@ impl MirKernelSignature {
                 });
                 continue;
             }
-            let element_ty = buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?;
+            let element_ty =
+                buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?;
             let element_count = if param.local == source_local {
                 source_element_count
             } else if Self::is_kernel_scalar_input(param.ty, validation)? {
@@ -1389,7 +1438,9 @@ impl MirKernelSignature {
         let output_binding = u32::try_from(resources.len())
             .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
         let extra_inputs = resources.into_iter().skip(1).collect();
-        let builtin_inputs = function.params.iter()
+        let builtin_inputs = function
+            .params
+            .iter()
             .filter(|param| param.mode == MirParamMode::Lane)
             .map(|param| MirKernelBuiltinInput {
                 local: param.local,

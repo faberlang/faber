@@ -1686,11 +1686,13 @@ fn static_index_value(checker: &TypeChecker<'_>, expr: &HirExpression) -> Option
 fn names_only_compile_time_values(checker: &TypeChecker<'_>, expr: &HirExpression) -> bool {
     match &expr.kind {
         HirExpressionKind::Path(def_id) => {
-            checker.module_const_ints.contains(def_id) || checker.compile_time_locals.contains(def_id)
+            checker.module_const_ints.contains(def_id)
+                || checker.compile_time_locals.contains(def_id)
         }
         HirExpressionKind::Unary(_, inner) => names_only_compile_time_values(checker, inner),
         HirExpressionKind::Binary(_, lhs, rhs) => {
-            names_only_compile_time_values(checker, lhs) && names_only_compile_time_values(checker, rhs)
+            names_only_compile_time_values(checker, lhs)
+                && names_only_compile_time_values(checker, rhs)
         }
         _ => true,
     }

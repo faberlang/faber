@@ -506,7 +506,10 @@ pub fn kernel_local_shape(
     local: MirLocalId,
     validation: &MirValidationContext<'_>,
 ) -> Option<Vec<u64>> {
-    let local = function.locals.iter().find(|candidate| candidate.id == local)?;
+    let local = function
+        .locals
+        .iter()
+        .find(|candidate| candidate.id == local)?;
     tensor_param_shape_dims(local.ty, validation)
 }
 
