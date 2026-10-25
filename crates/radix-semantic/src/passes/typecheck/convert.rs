@@ -212,10 +212,10 @@ fn lista_to_tensor_issue(error: ListaToTensorError) -> Option<&'static str> {
 fn endian_read_width_bytes(ty: &Type) -> Option<usize> {
     match ty {
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::I16 | NumericWidth::U16) => Some(2),
-        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32 | NumericWidth::U32) => Some(4),
-        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64 | NumericWidth::U64) => Some(8),
-        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Some(4),
-        Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Some(8),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I32 | NumericWidth::U32)
+        | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32) => Some(4),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64 | NumericWidth::U64)
+        | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Some(8),
         _ => None,
     }
 }
@@ -242,11 +242,13 @@ fn static_integer_magnitude(source: &HirExpression) -> Option<i128> {
 
 fn static_float_magnitude(source: &HirExpression) -> Option<f64> {
     match &source.kind {
-        HirExpressionKind::Literal(HirLiteral::Float(value)) => Some(*value),
-        HirExpressionKind::Literal(HirLiteral::FloatText { value, .. }) => Some(*value),
+        HirExpressionKind::Literal(
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. },
+        ) => Some(*value),
         HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => match &inner.kind {
-            HirExpressionKind::Literal(HirLiteral::Float(value)) => Some(-*value),
-            HirExpressionKind::Literal(HirLiteral::FloatText { value, .. }) => Some(-*value),
+            HirExpressionKind::Literal(
+                HirLiteral::Float(value) | HirLiteral::FloatText { value, .. },
+            ) => Some(-*value),
             _ => None,
         },
         _ => None,
@@ -468,9 +470,9 @@ fn integer_width_range(width: NumericWidth) -> Option<(i128, i128)> {
 /// hint rounds toward zero, as the runner does.
 fn float_rounding_fits(value: f64, mode: Option<&str>, (lo, hi): (i128, i128)) -> bool {
     let rounded = match mode {
-        Some("floor") | Some("Floor") => value.floor(),
-        Some("ceil") | Some("Ceil") => value.ceil(),
-        Some("half_even") | Some("HalfEven") => value.round_ties_even(),
+        Some("floor" | "Floor") => value.floor(),
+        Some("ceil" | "Ceil") => value.ceil(),
+        Some("half_even" | "HalfEven") => value.round_ties_even(),
         _ => value.trunc(),
     };
     rounded.is_finite() && (lo..=hi).contains(&(rounded as i128))
@@ -632,12 +634,11 @@ impl TypeChecker<'_> {
         }
         // Need: float/decimal into an integer family names its
         // rounding; a rounding hint on any other pairing is an unknown hint.
-        let rounded = match self.check_rounding_conversio(source_ty, target_resolved, params, span)
-        {
-            Ok(rounded) => rounded,
+        let Ok(rounded) = self.check_rounding_conversio(source_ty, target_resolved, params, span)
+        else {
             // The refusal is reported; the declared target keeps the
             // surrounding expression typed instead of cascading mismatches.
-            Err(()) => return target_resolved,
+            return target_resolved;
         };
         // decimal-widths D2 (wildcard audit): any conversio `via` hint aimed
         // at a decimal numerus target rejects here — radix text parse, endian
@@ -2138,12 +2139,12 @@ impl TypeChecker<'_> {
         match self.types.get(target_resolved) {
             Type::BoundedAscii { capacity } => {
                 let capacity = *capacity;
-                match self.primitive_conversio_family(source_ty) {
-                    PrimitiveConversioFamily::Numerus => {}
-                    _ => {
-                        self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
-                        return Some(self.error_type);
-                    }
+                if let PrimitiveConversioFamily::Numerus =
+                    self.primitive_conversio_family(source_ty)
+                {
+                } else {
+                    self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
+                    return Some(self.error_type);
                 }
                 // decimal-widths D2 (wildcard audit): `n ↦ ascii<N> via Hex` is
                 // integer digit packing; a scaled decimal has no radix digits.
@@ -2902,24 +2903,18 @@ impl TypeChecker<'_> {
         target: &CollectionConversioShape,
     ) -> bool {
         match (source.family, target.family) {
-            (CollectionConversioFamily::Array, CollectionConversioFamily::Set) => {
-                self.collection_elems_match(source.elem, target.elem)
-            }
-            (CollectionConversioFamily::Set, CollectionConversioFamily::Array) => {
-                self.collection_elems_match(source.elem, target.elem)
-            }
-            (CollectionConversioFamily::Tensor, CollectionConversioFamily::Array) => {
-                self.collection_elems_match(source.elem, target.elem)
-            }
-            (CollectionConversioFamily::Array, CollectionConversioFamily::Tensor) => {
-                self.collection_elems_match(source.elem, target.elem)
-            }
-            (CollectionConversioFamily::Cursor, CollectionConversioFamily::Array) => {
-                self.collection_elems_match(source.elem, target.elem)
-            }
-            (CollectionConversioFamily::Array, CollectionConversioFamily::Cursor) => {
-                self.collection_elems_match(source.elem, target.elem)
-            }
+            (
+                CollectionConversioFamily::Array,
+                CollectionConversioFamily::Set
+                | CollectionConversioFamily::Tensor
+                | CollectionConversioFamily::Cursor,
+            )
+            | (
+                CollectionConversioFamily::Set
+                | CollectionConversioFamily::Tensor
+                | CollectionConversioFamily::Cursor,
+                CollectionConversioFamily::Array,
+            ) => self.collection_elems_match(source.elem, target.elem),
             (CollectionConversioFamily::Map, CollectionConversioFamily::Array) => {
                 let (Some(key), Some(value), Some(elem)) = (source.key, source.value, target.elem)
                 else {
@@ -3671,15 +3666,13 @@ impl TypeChecker<'_> {
         ) {
             (
                 PrimitiveConversioFamily::Textus | PrimitiveConversioFamily::Ascii,
-                PrimitiveConversioFamily::Numerus | PrimitiveConversioFamily::Fractus,
+                PrimitiveConversioFamily::Numerus
+                | PrimitiveConversioFamily::Fractus
+                | PrimitiveConversioFamily::Regex,
             )
             | (
                 PrimitiveConversioFamily::Textus | PrimitiveConversioFamily::Octeti,
                 PrimitiveConversioFamily::Ascii,
-            )
-            | (
-                PrimitiveConversioFamily::Textus | PrimitiveConversioFamily::Ascii,
-                PrimitiveConversioFamily::Regex,
             )
             | (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Textus) => true,
             _ => matches!(
