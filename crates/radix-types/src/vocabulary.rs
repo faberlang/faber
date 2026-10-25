@@ -4,10 +4,15 @@
 //! atomic/collection op categories, lowerability verdicts — not MIR
 //! machinery. They live here (below both layers) so semantic, HIR, and
 //! intrinsics consume them without importing the MIR crate, keeping
-//! `radix-mir` a downward-consumed leaf (feature-granularity doc §2).
+//! `radix-mir` a downward-consumed leaf (see
+//! `docs/operator/feature-granularity.md` §2).
 
 use serde::{Deserialize, Serialize};
 
+/// Kernel entry-point inputs the ABI recognises by source name.
+///
+/// A spelling is the parameter name a `@ kernel` signature uses, so these
+/// strings are an interface: renaming one changes the source surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirKernelBuiltin {
     GlobalInvocationX,
@@ -49,7 +54,8 @@ pub enum KernelLowering {
 }
 
 impl MirKernelBuiltin {
-    /// Width of vector-valued builtins (`global_invocation_id`, `workgroup_id`, `local_invocation_id`).
+    /// Width of vector-valued builtins (`global_invocation_id`,
+    /// `workgroup_id`, `local_invocation_id`).
     pub const VECTOR_WIDTH: u8 = 3;
 
     pub const ALL: [Self; 15] = [
@@ -70,28 +76,15 @@ impl MirKernelBuiltin {
         Self::WorkgroupSizeZ,
     ];
 
+    /// The builtin a source spelling names.
     #[must_use]
     pub fn from_spelling(spelling: &str) -> Option<Self> {
-        match spelling {
-            "global_invocation_x" => Some(Self::GlobalInvocationX),
-            "global_invocation_y" => Some(Self::GlobalInvocationY),
-            "global_invocation_z" => Some(Self::GlobalInvocationZ),
-            "global_invocation_id" => Some(Self::GlobalInvocationId),
-            "workgroup_id_x" => Some(Self::WorkgroupIdX),
-            "workgroup_id_y" => Some(Self::WorkgroupIdY),
-            "workgroup_id_z" => Some(Self::WorkgroupIdZ),
-            "workgroup_id" => Some(Self::WorkgroupId),
-            "local_invocation_id_x" => Some(Self::LocalInvocationIdX),
-            "local_invocation_id_y" => Some(Self::LocalInvocationIdY),
-            "local_invocation_id_z" => Some(Self::LocalInvocationIdZ),
-            "local_invocation_id" => Some(Self::LocalInvocationId),
-            "workgroup_size_x" => Some(Self::WorkgroupSizeX),
-            "workgroup_size_y" => Some(Self::WorkgroupSizeY),
-            "workgroup_size_z" => Some(Self::WorkgroupSizeZ),
-            _ => None,
-        }
+        Self::ALL
+            .into_iter()
+            .find(|builtin| builtin.spelling() == spelling)
     }
 
+    /// The source spelling matched by [`Self::from_spelling`].
     #[must_use]
     pub fn spelling(self) -> &'static str {
         match self {
@@ -113,6 +106,7 @@ impl MirKernelBuiltin {
         }
     }
 
+    /// Whether the builtin's value is a width-[`Self::VECTOR_WIDTH`] vector.
     #[must_use]
     pub fn returns_vector(self) -> bool {
         matches!(
@@ -121,6 +115,8 @@ impl MirKernelBuiltin {
         )
     }
 
+    /// The axis of a per-axis builtin. The vector forms carry no single axis
+    /// and report [`MirKernelAxis::X`].
     #[must_use]
     pub fn axis(self) -> MirKernelAxis {
         match self {
@@ -143,6 +139,7 @@ impl MirKernelBuiltin {
     }
 }
 
+/// Axis label of a per-axis kernel builtin (`global_invocation_x`, …).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirKernelAxis {
     X,
@@ -161,7 +158,17 @@ impl MirKernelAxis {
     }
 }
 
+/// Compiler-owned atomic cell operation category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirAtomicOp {
+    Load,
+    Store,
+    Exchange,
+    CompareExchange,
+}
+
 impl MirAtomicOp {
+    /// Stable lowercase name used in runner errors and intrinsic rows.
     #[must_use]
     pub fn spelling(self) -> &'static str {
         match self {
@@ -171,15 +178,6 @@ impl MirAtomicOp {
             Self::CompareExchange => "compare_exchange",
         }
     }
-}
-
-/// Compiler-owned atomic cell operation category.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum MirAtomicOp {
-    Load,
-    Store,
-    Exchange,
-    CompareExchange,
 }
 
 /// Built-in collection operation category.
@@ -312,7 +310,8 @@ pub enum MirCollectionOp {
     /// Number of extents (axes); distinct from `Length`, which is the element
     /// count on every collection (operator ruling 2026-10-15, Q-X1).
     TensorRank,
-    /// Euclidean norm sqrt(sum x^2) over the logical elements, in the receiver's element carrier (operator ruling 2026-10-15, Q-X1).
+    /// Euclidean norm sqrt(sum x^2) over the logical elements, in the
+    /// receiver's element carrier (operator ruling 2026-10-15, Q-X1).
     TensorNorm,
     TensorAdd,
     TensorSub,
@@ -415,7 +414,7 @@ pub enum MirCollectionOp {
     /// Rectified linear unit: max(0, x), elementwise unary activation on tensor
     /// values. All finite inputs valid; no domain constraints.
     TensorRelu,
-    /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
+    /// Softmax: `exp(x_i - max(x)) / sum(exp(x_j - max(x)))` with numerical
     /// stability. Operates on rank-1 (vector) or rank-2 (batched row-wise,
     /// axis 1 — the last axis). The AIR VJP exists
     /// (`radix-air/src/reverse_ad/vjp.rs`, softmax walk: Mul → `TensorSumAxis`
@@ -544,7 +543,7 @@ impl MirMathFunction {
         Self::Tan,
     ];
 
-    /// Stable lowercase name used by MIR dumps and target import names.
+    /// Stable lowercase name used in diagnostics and runtime messages.
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
@@ -607,7 +606,8 @@ impl MirMathFunction {
 }
 
 impl MirCollectionOp {
-    /// llama pair-rotate (`TensorRope`) or Qwen/NeoX `rotate_half`
+    /// Whether the op is one of the two rotary-embedding forms: llama
+    /// pair-rotate (`TensorRope`) or Qwen/NeoX `rotate_half`
     /// (`TensorRopeHalf`). Same `[x, pos, dim]` const layout; the variant
     /// selects the pairing.
     #[must_use]
@@ -619,10 +619,11 @@ impl MirCollectionOp {
 /// A classified reason a MIR-backed target cannot lower a shape.
 ///
 /// One gap per rejection site. Categories are the five named in
-/// `goals/02-target-capability-validation.md`; the owning stage column is the
-/// campaign stage that supplies the missing fact or removes the rejection.
-/// [`CapabilityGap::RuntimePanic`] is the exception: it reports a crash in the
-/// classification run itself, not a verdict about the target.
+/// `docs/archived/mir-llvm/goals/02-target-capability-validation.md`; the
+/// owning stage column is the campaign stage that supplies the missing fact or
+/// removes the rejection. [`CapabilityGap::RuntimePanic`] is the exception: it
+/// reports a crash in the classification run itself, not a verdict about the
+/// target.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CapabilityGap {
     /// A MIR shape the target does not print at all (e.g. indirect value
@@ -741,6 +742,7 @@ pub enum KernelModule {
 }
 
 impl KernelModule {
+    /// Manifest short name, the key the kernel manifest is looked up by.
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
@@ -750,18 +752,6 @@ impl KernelModule {
             Self::Json => "json",
             Self::Consolum => "consolum",
             Self::Toml => "toml",
-        }
-    }
-
-    #[must_use]
-    pub const fn import_path(self) -> &'static str {
-        match self {
-            Self::Solum => "faber:solum",
-            Self::Processus => "faber:processus",
-            Self::Aleator => "faber:aleator",
-            Self::Json => "faber:json",
-            Self::Consolum => "faber:consolum",
-            Self::Toml => "faber:toml",
         }
     }
 }
