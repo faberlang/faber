@@ -689,10 +689,7 @@ impl TypeChecker<'_> {
                     }
                 }
             }
-            Type::Alias(_, inner) => {
-                self.collect_tensor_shapes(parameter, inner, fields, seen, out, span);
-            }
-            Type::Ref(_, inner) => {
+            Type::Alias(_, inner) | Type::Ref(_, inner) => {
                 self.collect_tensor_shapes(parameter, inner, fields, seen, out, span);
             }
             _ => {}
@@ -778,8 +775,8 @@ impl TypeChecker<'_> {
             Type::Tensor(_, shape) => *shape,
             Type::BoundedAscii { capacity }
             | Type::BoundedTextus { capacity }
-            | Type::BoundedOcteti { capacity } => *capacity,
-            Type::BoundedArray { capacity, .. } => *capacity,
+            | Type::BoundedOcteti { capacity }
+            | Type::BoundedArray { capacity, .. } => *capacity,
             _ => return false,
         };
         let capacity = self.resolve_index(capacity);
@@ -821,11 +818,11 @@ fn collect_value_parameter_extents(
                       seen_types: &mut FxHashSet<TypeId>,
                       seen_indices: &mut FxHashSet<IndexId>,
                       out: &mut FxHashSet<u32>| {
-        collect_value_parameter_extents(ty, types, seen_types, seen_indices, out)
+        collect_value_parameter_extents(ty, types, seen_types, seen_indices, out);
     };
     let check_index =
         |id: IndexId, seen_indices: &mut FxHashSet<IndexId>, out: &mut FxHashSet<u32>| {
-            collect_value_parameter_extents_in_index(id, types, seen_indices, out)
+            collect_value_parameter_extents_in_index(id, types, seen_indices, out);
         };
 
     match types.get(ty) {
@@ -885,7 +882,7 @@ fn collect_value_parameter_extents(
             for arg in args {
                 match arg {
                     radix_types::AppliedArg::Type(ty) => {
-                        check_type(*ty, seen_types, seen_indices, out)
+                        check_type(*ty, seen_types, seen_indices, out);
                     }
                     radix_types::AppliedArg::Size(index) => check_index(*index, seen_indices, out),
                 }
@@ -919,7 +916,7 @@ fn collect_value_parameter_extents_in_index(
             }
         }
         IndexExpr::Affine { base, .. } => {
-            collect_value_parameter_extents_in_index(*base, types, seen_indices, out)
+            collect_value_parameter_extents_in_index(*base, types, seen_indices, out);
         }
         IndexExpr::Divide { numerator, .. } => {
             collect_value_parameter_extents_in_index(*numerator, types, seen_indices, out);

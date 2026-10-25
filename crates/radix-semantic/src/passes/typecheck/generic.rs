@@ -672,7 +672,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
-        debug_assert!(!explicit_type_args.is_empty());
+        debug_assert_ne!(explicit_type_args, []);
 
         if self.explicit_args_are_magnitudo_list(explicit_type_args) {
             // Only the zipped prefix may reject on sort: a Typus descriptor
@@ -922,7 +922,6 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let resolved = self.resolve_inferred_type(ty);
         match self.types.get(resolved).clone() {
-            Type::Param(_) => ty,
             Type::Array(inner) => {
                 let inner = self.freshen_anonymous_type_holes(inner, holes);
                 self.types.array(inner)
@@ -1091,14 +1090,15 @@ impl TypeChecker<'_> {
         holes: &mut FxHashMap<radix_types::IndexVar, IndexId>,
     ) -> IndexId {
         match self.types.get_index(id).clone() {
-            IndexExpr::Infer(var) => match holes.get(&var) {
-                Some(fresh) => *fresh,
-                None => {
+            IndexExpr::Infer(var) => {
+                if let Some(fresh) = holes.get(&var) {
+                    *fresh
+                } else {
                     let fresh = self.fresh_index_hole();
                     holes.insert(var, fresh);
                     fresh
                 }
-            },
+            }
             IndexExpr::Tuple(dims) => {
                 let dims = dims
                     .iter()
@@ -1475,7 +1475,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// DefId of the in-scope HIR value binding spelled `sym`, if any. HIR
+    /// `DefId` of the in-scope HIR value binding spelled `sym`, if any. HIR
     /// locals and parameters are keyed in the scope stack, not the resolver,
     /// so a spelled size-lift slot argument encoded as `Type::Param(sym)`
     /// resolves its runtime witness here.
@@ -1628,16 +1628,15 @@ impl TypeChecker<'_> {
     ) -> Option<IndexId> {
         let literal = self.types.intern_index(IndexExpr::Literal(value));
         let mut unifier = self.index_infer.unifier(self.types);
-        match unifier.unify(hole, literal) {
-            Ok(bound) => Some(bound),
-            Err(_) => {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_INCOMPATIBLE_TENSOR_INDEX,
-                    span,
-                );
-                None
-            }
+        if let Ok(bound) = unifier.unify(hole, literal) {
+            Some(bound)
+        } else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+                span,
+            );
+            None
         }
     }
 
@@ -1743,7 +1742,6 @@ fn collect_type_param_symbols(
         | Type::BoundedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => collect(*element, seen_types, symbols),
-        Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {}
         Type::Func(signature) => {
             for param in &signature.params {
                 collect(param.ty, seen_types, symbols);
