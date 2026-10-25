@@ -1,4 +1,4 @@
-use super::{Arg, Reply, install_argv, is_route, reset_argv, reset_children, serve};
+use super::{Arg, Reply, install_argv, is_route, reset_argv, serve};
 
 #[test]
 fn route_list_matches_serve() {
@@ -214,7 +214,6 @@ fn empty_detach_argv_is_invalid() {
 
 #[test]
 fn exspecta_returns_exit_code() {
-    reset_children();
     let Reply::Int(pid) = serve(
         "processus:genera",
         &[Arg::Strs(vec![
@@ -244,7 +243,6 @@ fn exspecta_returns_exit_code() {
 
 #[test]
 fn neca_kills_and_exspecta_returns_promptly() {
-    reset_children();
     let Reply::Int(pid) = serve(
         "processus:genera",
         &[Arg::Strs(vec!["sleep".to_owned(), "30".to_owned()])],

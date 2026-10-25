@@ -1,8 +1,9 @@
 //! Blocking process leaf. Serves Latin `processus:*` routes.
 //!
-//! `spawn` / `Subprocess` stay N4b. `processus:exi` stays a runner/product
-//! builtin (`Host::exit`) so `faber run` and cargo tests do not share a
-//! `std::process::exit` path. `write_env` is not restored.
+//! `processus:genera` answers the child pid; Norma wraps it in `Subprocess`.
+//! `processus:exi` stays a runner/product builtin (`Host::exit`) so `faber
+//! run` and cargo tests do not share a `std::process::exit` path. `write_env`
+//! is not restored.
 
 #[cfg(test)]
 #[path = "process_test.rs"]
@@ -12,8 +13,9 @@ use crate::error::LeafError;
 use crate::value::{Arg, Reply};
 use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
+/// Process-wide argv, for worker threads that did not install one themselves.
 static PROGRAM_ARGV: Mutex<Option<Vec<String>>> = Mutex::new(None);
 
 /// Live spawned children keyed by pid, so `exspecta` / `neca` can reach them.
@@ -25,12 +27,6 @@ fn with_children<T>(f: impl FnOnce(&mut HashMap<i64, Child>) -> T) -> T {
         Err(poisoned) => poisoned.into_inner(),
     };
     f(guard.get_or_insert_with(HashMap::new))
-}
-
-/// Drop every tracked child. Test isolation only.
-#[cfg(test)]
-fn reset_children() {
-    with_children(HashMap::clear);
 }
 
 thread_local! {
@@ -57,7 +53,7 @@ pub fn reset_argv() {
     *lock_argv() = None;
 }
 
-fn lock_argv() -> std::sync::MutexGuard<'static, Option<Vec<String>>> {
+fn lock_argv() -> MutexGuard<'static, Option<Vec<String>>> {
     match PROGRAM_ARGV.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
@@ -134,9 +130,9 @@ fn expect_str<'a>(
 /// Collect the child argv from an opener that flattened a `lista<textus>`
 /// into one positional `Str` per element, while still accepting a single
 /// `Arg::Strs` when the list arrived intact. An empty program or command is
-/// rejected here so every spawn/exec caller shares the guard.
+/// rejected here so `genera`, `dimitte` and `captura` share one guard.
 fn expect_argv(route: &'static str, args: &[Arg]) -> Result<Vec<String>, LeafError> {
-    let program_argv = match args {
+    let child_argv = match args {
         [Arg::Strs(value)] => value.clone(),
         [] => return Err(LeafError::invalid_argument(route, "missing args")),
         other => other
@@ -150,13 +146,13 @@ fn expect_argv(route: &'static str, args: &[Arg]) -> Result<Vec<String>, LeafErr
             })
             .collect::<Result<Vec<_>, _>>()?,
     };
-    if program_argv.is_empty() || program_argv[0].is_empty() {
+    if child_argv.is_empty() || child_argv[0].is_empty() {
         return Err(LeafError::invalid_argument(
             route,
             "empty argv / empty command",
         ));
     }
-    Ok(program_argv)
+    Ok(child_argv)
 }
 
 fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), LeafError> {
@@ -195,8 +191,9 @@ fn kill(args: &[Arg]) -> Result<Reply, LeafError> {
     let pid = expect_pid(ROUTE, args)?;
     let known = with_children(|map| match map.get_mut(&pid) {
         Some(child) => {
-            // WHY: an already-exited child reports InvalidInput from kill();
-            // the child is being discarded either way, so it is not actionable.
+            // WHY: the pid stays tracked either way, so `exspecta` still
+            // reports the real outcome; a kill that fails because the child is
+            // already gone is not actionable.
             drop(child.kill());
             true
         }
@@ -208,17 +205,19 @@ fn kill(args: &[Arg]) -> Result<Reply, LeafError> {
     Ok(Reply::Unit)
 }
 
+/// `processus:genera` — start the command on inherited stdio and keep the pid
+/// tracked, so `exspecta` / `neca` can reach it.
 fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:genera";
-    let program_argv = expect_argv(ROUTE, args)?;
-    let mut command = Command::new(&program_argv[0]);
-    command.args(&program_argv[1..]);
+    let child_argv = expect_argv(ROUTE, args)?;
+    let mut command = Command::new(&child_argv[0]);
+    command.args(&child_argv[1..]);
     command.stdin(Stdio::inherit());
     command.stdout(Stdio::inherit());
     command.stderr(Stdio::inherit());
     let child = command
         .spawn()
-        .map_err(|err| LeafError::from_io(ROUTE, &program_argv[0], &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &child_argv[0], &err))?;
     let pid = i64::from(child.id());
     with_children(|map| map.insert(pid, child));
     Ok(Reply::Int(pid))
@@ -226,15 +225,15 @@ fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:dimitte";
-    let program_argv = expect_argv(ROUTE, args)?;
-    let mut command = Command::new(&program_argv[0]);
-    command.args(&program_argv[1..]);
+    let child_argv = expect_argv(ROUTE, args)?;
+    let mut command = Command::new(&child_argv[0]);
+    command.args(&child_argv[1..]);
     command.stdin(Stdio::null());
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
     let mut child = command
         .spawn()
-        .map_err(|err| LeafError::from_io(ROUTE, &program_argv[0], &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &child_argv[0], &err))?;
     let pid = i64::from(child.id());
     // Reap in the background so a detached child never becomes a zombie.
     std::thread::spawn(move || {
@@ -245,13 +244,15 @@ fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
     Ok(Reply::Int(pid))
 }
 
+/// `processus:captura` — run the command without a shell and report
+/// `{status, stdout, stderr}`; a non-zero status is data, not an error.
 fn capture(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:captura";
-    let program_argv = expect_argv(ROUTE, args)?;
-    let output = Command::new(&program_argv[0])
-        .args(&program_argv[1..])
+    let child_argv = expect_argv(ROUTE, args)?;
+    let output = Command::new(&child_argv[0])
+        .args(&child_argv[1..])
         .output()
-        .map_err(|err| LeafError::from_io(ROUTE, &program_argv[0], &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &child_argv[0], &err))?;
     Ok(Reply::Map(vec![
         (
             "status".to_owned(),
@@ -268,6 +269,9 @@ fn capture(args: &[Arg]) -> Result<Reply, LeafError> {
     ]))
 }
 
+/// `processus:exsequi` / `processus:exsequetur` — run the command through
+/// `sh -c` and return stdout; a non-zero status is an error carrying the
+/// command.
 fn exec(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:exsequi";
     let command = expect_str(ROUTE, args, 0, "command")?;
@@ -337,6 +341,8 @@ fn pid(args: &[Arg]) -> Result<Reply, LeafError> {
     Ok(Reply::Int(i64::from(std::process::id())))
 }
 
+/// `processus:argumenta` — the installed program argv, which excludes the
+/// runtime and script path.
 fn argv(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:argumenta";
     empty_ok(ROUTE, args)?;
