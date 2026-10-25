@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 461,
-    "analyzable": 511
+    "capable": 462,
+    "analyzable": 512
   },
   "terms": [
     {
@@ -462,8 +462,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 24,
-      "analyzable": 24
+      "capable": 25,
+      "analyzable": 25
     },
     {
       "term": "iuncta",

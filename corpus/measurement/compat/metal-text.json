@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 511
+    "analyzable": 512
   },
   "terms": [
     {
@@ -463,7 +463,7 @@
       "term": "itera",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 24
+      "analyzable": 25
     },
     {
       "term": "iuncta",
