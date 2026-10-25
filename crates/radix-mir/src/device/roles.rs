@@ -21,7 +21,9 @@ pub struct MirDeviceFunctionMetadata {
     pub origin: MirFunctionOrigin,
     /// The exact tensor local used as the source of a top-level lane-form
     /// region. `None` for functions without a lane-form source or when the
-    /// source is not a local place that can resolve to an ABI resource.
+    /// source is not a local place that can resolve to an ABI resource. A
+    /// shift view (`src.shift(s).limes<P>()`) carries no storage of its own,
+    /// so a region over one records the view's base parameter.
     pub lane_domain_local: Option<MirLocalId>,
 }
 

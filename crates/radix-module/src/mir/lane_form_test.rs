@@ -130,6 +130,37 @@ main {}
 }
 
 #[test]
+fn a_lane_region_over_a_shift_view_takes_the_base_parameter_for_its_domain() {
+    let unit = analyze(
+        r#"
+@ kernel
+@ public
+fn iterate(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
+    for from src.shift([0, -1]).limes<wrap>() at [i, j] thread lane let w {
+        dst[[i, j]] ← w * 10.0 + src[[i, j]]
+    }
+}
+main {}
+"#,
+    );
+    let lowered = lower_analyzed_unit(
+        unit.application_view(),
+        MirLoweringOptions { kernel_lowering: KernelLowering::Device, ..Default::default() },
+    )
+    .expect("device lane form lowers");
+    let function = &lowered.validated.program().functions[0];
+    let metadata = lowered
+        .device_function_metadata
+        .get(&function.id)
+        .expect("device metadata");
+    assert_eq!(
+        metadata.lane_domain_local,
+        Some(MirLocalId(0)),
+        "the view has its base's shape: the domain is the parameter it reads"
+    );
+}
+
+#[test]
 fn host_form_of_the_same_kernel_is_unchanged() {
     let (dump, modes) = lower(COPY, KernelLowering::Host).expect("host lowering validates");
     assert_eq!(

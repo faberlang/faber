@@ -31,8 +31,9 @@ use super::control::CollectionIteraKind;
 use super::{
     BreakableContext, DefId, FunctionBuilder, HirBinOp, HirBlock, HirExpression, HirExpressionKind,
     HirExpressionLoweringVisitor, HirIteraMode, HirStatement, HirStatementKind, HirVisitor, LocalBinding, MirBinOp,
-    MirConstant, MirError, MirFilumForm, MirLocalDecl, MirLocalId, MirOperand, MirPlace, MirPlaceBase, MirProjection,
-    MirTerminatorKind, MirType, MirValueKind, NumericWidth, Primitive, Span, Symbol, TypeId, TypeTable,
+    MirCollectionOp, MirConstant, MirError, MirFilumForm, MirIntrinsic, MirLocalDecl, MirLocalId, MirOperand, MirPlace,
+    MirPlaceBase, MirProjection, MirStatement, MirStatementKind, MirTerminatorKind, MirType, MirValueKind,
+    NumericWidth, OpenBlock, Primitive, Span, Symbol, TypeId, TypeTable,
 };
 
 /// Issue name: a second top-level `thread lane` loop in one kernel.
@@ -402,10 +403,15 @@ impl FunctionBuilder<'_> {
 
         let source = self.lower_expr_value(iter)?;
         let tensor = self.materialize_operand_place(source, MirType::semantic(iter_ty), iter.span);
-        self.lane_region.as_mut()?.source_local = match &tensor.base {
+        // A shift view (`src.shift(s).limes<P>()`) has its base tensor's shape
+        // and no storage of its own, so iterating one has the base parameter
+        // for its domain — the same reading the device shift-view fold takes
+        // when it retargets the view's extents and reads onto the base.
+        let source_local = match &tensor.base {
             MirPlaceBase::Local(local) => Some(*local),
-            MirPlaceBase::Temp(_) => None,
+            MirPlaceBase::Temp(_) => view_base_local(&self.blocks, &tensor.base),
         };
+        self.lane_region.as_mut()?.source_local = source_local;
 
         // Extents: constants for literal axes, `TensorExtent` otherwise.
         let mut extents = Vec::with_capacity(rank);
@@ -490,4 +496,61 @@ impl FunctionBuilder<'_> {
         self.switch_to(done_id);
         Some(MirOperand::Constant(MirConstant::Unit))
     }
+}
+
+/// The parameter local a shift view chains to, when `base` names the view
+/// (`src.shift(s)` then `…limes<P>()`, optionally through whole-value copies).
+/// `None` when the chain does not end at a local place.
+fn view_base_local(blocks: &[OpenBlock], base: &MirPlaceBase) -> Option<MirLocalId> {
+    view_base_chain(blocks, base, 0)
+}
+
+fn view_base_chain(blocks: &[OpenBlock], base: &MirPlaceBase, depth: u32) -> Option<MirLocalId> {
+    if depth > 8 {
+        return None;
+    }
+    let definition = blocks
+        .iter()
+        .flat_map(|block| block.statements.iter())
+        .find(|statement| defines(statement, base))?;
+    match &definition.kind {
+        MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+            MirIntrinsic::TensorLimes(_) => view_base_operand(blocks, call.args.first()?, depth),
+            // The shift's base is the tensor parameter itself.
+            MirIntrinsic::Collection(MirCollectionOp::TensorShift) => match call.args.first()? {
+                MirOperand::Place(place) if place.projections.is_empty() => match &place.base {
+                    MirPlaceBase::Local(local) => Some(*local),
+                    MirPlaceBase::Temp(_) => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        },
+        MirStatementKind::Assign { value, .. } => match &value.kind {
+            MirValueKind::Operand(operand) => view_base_operand(blocks, operand, depth),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn view_base_operand(blocks: &[OpenBlock], operand: &MirOperand, depth: u32) -> Option<MirLocalId> {
+    match operand {
+        MirOperand::Place(place) if place.projections.is_empty() => view_base_chain(blocks, &place.base, depth + 1),
+        MirOperand::Temp(temp) => view_base_chain(blocks, &MirPlaceBase::Temp(*temp), depth + 1),
+        _ => None,
+    }
+}
+
+/// Whether `statement` writes the whole storage `base` names.
+fn defines(statement: &MirStatement, base: &MirPlaceBase) -> bool {
+    let place = match &statement.kind {
+        MirStatementKind::Assign { place, .. } | MirStatementKind::Construct { destination: place, .. } => place,
+        MirStatementKind::RuntimeCall { destination, .. } => match destination {
+            Some(place) => place,
+            None => return false,
+        },
+        MirStatementKind::Call { .. } => return false,
+    };
+    place.projections.is_empty() && place.base == *base
 }
