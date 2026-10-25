@@ -164,7 +164,7 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// The current clean break is `13 → 14` (ordered Scan plans): Scan adds its
 /// three-stage workgroup/chunk/group geometry, summary layout, prefix element
 /// width, and traversal direction. A stale wire-13 consumer cannot interpret
-/// these stage semantics. The preceding clean break is `12 → 13` (grouped GridReduce shapes): a grouped
+/// these stage semantics. The preceding clean break is `12 → 13` (grouped `GridReduce` shapes): a grouped
 /// reduction carries its literal bucket shape so its workgroup-by-bucket
 /// scratch and second-stage launch are checked from the wire facts. A stale
 /// wire-12 device section fails nested admission before field interpretation.
