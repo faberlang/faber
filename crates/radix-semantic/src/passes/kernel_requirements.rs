@@ -246,7 +246,6 @@ fn language_failure(
                 args: vec![("width", width.faber_marker().to_string())],
             })
         }
-        KernelRequirementFailure::UnsupportedFloatWidth { .. } => None,
         KernelRequirementFailure::IntermediateOutOfRange { span, range } => {
             Some(LanguageDiagnostic {
                 issue: ISSUE_WIDE_INTERMEDIATE,
@@ -276,7 +275,8 @@ fn language_failure(
         | KernelRequirementFailure::DivideByZeroPossible { .. }
         | KernelRequirementFailure::NegativeShiftCountPossible { .. }
         | KernelRequirementFailure::SaturatingLoweringDeferred { .. }
-        | KernelRequirementFailure::TensorEdgePolicyDeferred { .. } => None,
+        | KernelRequirementFailure::TensorEdgePolicyDeferred { .. }
+        | KernelRequirementFailure::UnsupportedFloatWidth { .. } => None,
     }
 }
 
@@ -609,7 +609,7 @@ fn seed_constant_kernel_arguments(
         if !private_kernels.contains(&callee) || recursive_kernels.contains(&callee) {
             continue;
         }
-        if sites.iter().any(|site| site.is_none()) {
+        if sites.iter().any(Option::is_none) {
             continue;
         }
         let mut tuples: Vec<&FxHashMap<DefId, i128>> = Vec::new();
@@ -1099,12 +1099,12 @@ fn callback_coordinate_ranges(
         }
         if !fits {
             if !contains_shape(&range)
-                || !minimum_bounds
+                || minimum_bounds
                     .minimum
-                    .is_some_and(|minimum| minimum >= DEVICE_INTEGER_MIN)
-                || !maximum_bounds
+                    .is_none_or(|minimum| minimum < DEVICE_INTEGER_MIN)
+                || maximum_bounds
                     .minimum
-                    .is_some_and(|maximum| maximum <= 2_147_483_647)
+                    .is_none_or(|maximum| maximum > 2_147_483_647)
             {
                 return None;
             }
@@ -1374,7 +1374,7 @@ impl BodyFacts<'_> {
                 for clause in &custodi.clauses {
                     let before = self.ranges.clone();
                     self.evaluate(&clause.cond);
-                    self.ranges = before.clone();
+                    self.ranges.clone_from(&before);
                     self.refine_condition(&clause.cond, true);
                     self.visit_block_stateful(&clause.body);
                     let entered = self.ranges.clone();
@@ -1754,11 +1754,11 @@ impl BodyFacts<'_> {
             } => {
                 self.evaluate(cond);
                 let before = self.ranges.clone();
-                self.ranges = before.clone();
+                self.ranges.clone_from(&before);
                 self.refine_condition(cond, true);
                 self.visit_block_stateful(then_block);
                 let then_ranges = self.ranges.clone();
-                self.ranges = before.clone();
+                self.ranges.clone_from(&before);
                 self.refine_condition(cond, false);
                 if let Some(else_block) = else_block {
                     self.visit_block_stateful(else_block);
@@ -1833,8 +1833,7 @@ impl BodyFacts<'_> {
                 for (index, (def_id, _)) in bindings.iter().enumerate() {
                     let range = ranges
                         .get(index)
-                        .map(|range| self.range_binding(range))
-                        .unwrap_or_else(AbstractRange::unknown);
+                        .map_or_else(AbstractRange::unknown, |range| self.range_binding(range));
                     self.check_intermediate(body.span, range.clone());
                     self.ranges.insert(*def_id, range);
                     self.range_only_bindings.insert(*def_id);
@@ -1998,21 +1997,18 @@ impl BodyFacts<'_> {
         if let Some(identity) = identity {
             self.evaluate(identity);
         }
-        match (binding, body) {
-            (Some((binding, _)), Some(body)) => {
-                // The term's `redde` returns the term, not the kernel result.
-                let return_type = self.return_type.take();
-                self.visit_tensor_loop(source, coordinates, *binding, body, group.as_deref());
-                self.return_type = return_type;
-            }
-            _ => {
-                self.evaluate(source);
-                if let Some(group) = group {
-                    let before = self.ranges.clone();
-                    self.bind_tensor_coordinates(source, coordinates, expr.span);
-                    self.evaluate(group);
-                    self.ranges = before;
-                }
+        if let (Some((binding, _)), Some(body)) = (binding, body) {
+            // The term's `redde` returns the term, not the kernel result.
+            let return_type = self.return_type.take();
+            self.visit_tensor_loop(source, coordinates, *binding, body, group.as_deref());
+            self.return_type = return_type;
+        } else {
+            self.evaluate(source);
+            if let Some(group) = group {
+                let before = self.ranges.clone();
+                self.bind_tensor_coordinates(source, coordinates, expr.span);
+                self.evaluate(group);
+                self.ranges = before;
             }
         }
         let declared = expr.ty.map_or_else(AbstractRange::unknown, |ty| {
@@ -3296,7 +3292,7 @@ fn maximum(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
 fn constant(expr: &KernelRangeExpr) -> Option<i128> {
     match expr {
         KernelRangeExpr::Constant(value) => Some(*value),
-        KernelRangeExpr::Shape(_) => None,
+        KernelRangeExpr::Shape(_) | KernelRangeExpr::Parameter(_) => None,
         KernelRangeExpr::Add(lhs, rhs) => constant(lhs)?.checked_add(constant(rhs)?),
         KernelRangeExpr::Subtract(lhs, rhs) => constant(lhs)?.checked_sub(constant(rhs)?),
         KernelRangeExpr::Multiply(lhs, rhs) => constant(lhs)?.checked_mul(constant(rhs)?),
@@ -3308,7 +3304,6 @@ fn constant(expr: &KernelRangeExpr) -> Option<i128> {
         }
         KernelRangeExpr::Minimum(lhs, rhs) => Some(constant(lhs)?.min(constant(rhs)?)),
         KernelRangeExpr::Maximum(lhs, rhs) => Some(constant(lhs)?.max(constant(rhs)?)),
-        KernelRangeExpr::Parameter(_) => None,
     }
 }
 
@@ -3579,8 +3574,8 @@ fn could_fit_between(
     slot_min: i128,
     slot_max: i128,
 ) -> bool {
-    !minimum.minimum.is_some_and(|minimum| minimum > slot_max)
-        && !maximum.maximum.is_some_and(|maximum| maximum < slot_min)
+    minimum.minimum.is_none_or(|minimum| minimum <= slot_max)
+        && maximum.maximum.is_none_or(|maximum| maximum >= slot_min)
 }
 
 fn excludes_zero(range: &AbstractRange) -> bool {
@@ -3626,49 +3621,27 @@ fn refine_interval(
     }
     let bound = bound_min;
     let range = match (op, truth) {
-        (HirBinOp::Lt, true) => KernelValueRange {
+        (HirBinOp::Lt, true) | (HirBinOp::GtEq, false) => KernelValueRange {
             minimum: current.minimum,
             maximum: minimum(
                 current.maximum,
                 KernelRangeExpr::Constant(bound.checked_sub(1)?),
             ),
         },
-        (HirBinOp::Lt, false) => KernelValueRange {
+        (HirBinOp::Lt, false) | (HirBinOp::GtEq, true) => KernelValueRange {
             minimum: maximum(current.minimum, KernelRangeExpr::Constant(bound)),
             maximum: current.maximum,
         },
-        (HirBinOp::LtEq, true) => KernelValueRange {
+        (HirBinOp::LtEq, true) | (HirBinOp::Gt, false) => KernelValueRange {
             minimum: current.minimum,
             maximum: minimum(current.maximum, KernelRangeExpr::Constant(bound)),
         },
-        (HirBinOp::LtEq, false) => KernelValueRange {
+        (HirBinOp::LtEq, false) | (HirBinOp::Gt, true) => KernelValueRange {
             minimum: maximum(
                 current.minimum,
                 KernelRangeExpr::Constant(bound.checked_add(1)?),
             ),
             maximum: current.maximum,
-        },
-        (HirBinOp::Gt, true) => KernelValueRange {
-            minimum: maximum(
-                current.minimum,
-                KernelRangeExpr::Constant(bound.checked_add(1)?),
-            ),
-            maximum: current.maximum,
-        },
-        (HirBinOp::Gt, false) => KernelValueRange {
-            minimum: current.minimum,
-            maximum: minimum(current.maximum, KernelRangeExpr::Constant(bound)),
-        },
-        (HirBinOp::GtEq, true) => KernelValueRange {
-            minimum: maximum(current.minimum, KernelRangeExpr::Constant(bound)),
-            maximum: current.maximum,
-        },
-        (HirBinOp::GtEq, false) => KernelValueRange {
-            minimum: current.minimum,
-            maximum: minimum(
-                current.maximum,
-                KernelRangeExpr::Constant(bound.checked_sub(1)?),
-            ),
         },
         _ => return None,
     };
