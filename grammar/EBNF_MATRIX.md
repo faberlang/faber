@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 505 | 509 | 99% |
-| go | 458 | 509 | 90% |
-| ts | 509 | 509 | 100% |
-| faber | 509 | 509 | 100% |
+| rust | 506 | 510 | 99% |
+| go | 459 | 510 | 90% |
+| ts | 510 | 510 | 100% |
+| faber | 510 | 510 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 439 | 511 | 86% |
-| wasm-text | 376 | 511 | 74% |
-| wasm | 375 | 511 | 73% |
-| metal-text | 5 | 511 | 1% |
-| wgsl-text | 5 | 511 | 1% |
-| sexp-struct | 461 | 511 | 90% |
-| sexp | 459 | 511 | 90% |
-| runner | 453 | 511 | 89% |
+| llvm-text | 440 | 512 | 86% |
+| wasm-text | 377 | 512 | 74% |
+| wasm | 376 | 512 | 73% |
+| metal-text | 5 | 512 | 1% |
+| wgsl-text | 5 | 512 | 1% |
+| sexp-struct | 462 | 512 | 90% |
+| sexp | 460 | 512 | 90% |
+| runner | 454 | 512 | 89% |
 
 ## Keywords — application lane
 
