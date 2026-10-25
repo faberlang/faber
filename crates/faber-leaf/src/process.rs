@@ -136,7 +136,7 @@ fn expect_str<'a>(
 /// `Arg::Strs` when the list arrived intact. An empty program or command is
 /// rejected here so every spawn/exec caller shares the guard.
 fn expect_argv(route: &'static str, args: &[Arg]) -> Result<Vec<String>, LeafError> {
-    let argv = match args {
+    let program_argv = match args {
         [Arg::Strs(value)] => value.clone(),
         [] => return Err(LeafError::invalid_argument(route, "missing args")),
         other => other
@@ -150,13 +150,13 @@ fn expect_argv(route: &'static str, args: &[Arg]) -> Result<Vec<String>, LeafErr
             })
             .collect::<Result<Vec<_>, _>>()?,
     };
-    if argv.is_empty() || argv[0].is_empty() {
+    if program_argv.is_empty() || program_argv[0].is_empty() {
         return Err(LeafError::invalid_argument(
             route,
             "empty argv / empty command",
         ));
     }
-    Ok(argv)
+    Ok(program_argv)
 }
 
 fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), LeafError> {
@@ -210,15 +210,15 @@ fn kill(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:genera";
-    let argv = expect_argv(ROUTE, args)?;
-    let mut command = Command::new(&argv[0]);
-    command.args(&argv[1..]);
+    let program_argv = expect_argv(ROUTE, args)?;
+    let mut command = Command::new(&program_argv[0]);
+    command.args(&program_argv[1..]);
     command.stdin(Stdio::inherit());
     command.stdout(Stdio::inherit());
     command.stderr(Stdio::inherit());
     let child = command
         .spawn()
-        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &program_argv[0], &err))?;
     let pid = i64::from(child.id());
     with_children(|map| map.insert(pid, child));
     Ok(Reply::Int(pid))
@@ -226,15 +226,15 @@ fn spawn(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:dimitte";
-    let argv = expect_argv(ROUTE, args)?;
-    let mut command = Command::new(&argv[0]);
-    command.args(&argv[1..]);
+    let program_argv = expect_argv(ROUTE, args)?;
+    let mut command = Command::new(&program_argv[0]);
+    command.args(&program_argv[1..]);
     command.stdin(Stdio::null());
     command.stdout(Stdio::null());
     command.stderr(Stdio::null());
     let mut child = command
         .spawn()
-        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &program_argv[0], &err))?;
     let pid = i64::from(child.id());
     // Reap in the background so a detached child never becomes a zombie.
     std::thread::spawn(move || {
@@ -247,11 +247,11 @@ fn detach(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn capture(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "processus:captura";
-    let argv = expect_argv(ROUTE, args)?;
-    let output = Command::new(&argv[0])
-        .args(&argv[1..])
+    let program_argv = expect_argv(ROUTE, args)?;
+    let output = Command::new(&program_argv[0])
+        .args(&program_argv[1..])
         .output()
-        .map_err(|err| LeafError::from_io(ROUTE, &argv[0], &err))?;
+        .map_err(|err| LeafError::from_io(ROUTE, &program_argv[0], &err))?;
     Ok(Reply::Map(vec![
         (
             "status".to_owned(),

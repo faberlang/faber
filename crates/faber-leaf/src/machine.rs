@@ -708,7 +708,7 @@ fn used_memory() -> Result<u64, LeafError> {
     let mut count = libc::HOST_VM_INFO64_COUNT;
     // SAFETY: `HOST_VM_INFO64` fixes the struct type; the kernel writes a
     // `vm_statistics64_data_t` into `stats` and its word count into `count`.
-    let status = unsafe {
+    let statistics_status = unsafe {
         libc::host_statistics64(
             libc::mach_host_self(),
             libc::HOST_VM_INFO64,
@@ -716,10 +716,10 @@ fn used_memory() -> Result<u64, LeafError> {
             std::ptr::from_mut(&mut count),
         )
     };
-    if status != libc::KERN_SUCCESS {
+    if statistics_status != libc::KERN_SUCCESS {
         return Err(LeafError::unavailable(
             ROUTE,
-            format!("host_statistics64 failed ({status})"),
+            format!("host_statistics64 failed ({statistics_status})"),
         ));
     }
     // SAFETY: the call above returned KERN_SUCCESS, so the whole
@@ -727,12 +727,12 @@ fn used_memory() -> Result<u64, LeafError> {
     let stats = unsafe { stats.assume_init() };
     let mut page_size: libc::vm_size_t = 0;
     // SAFETY: `host_page_size` writes one `vm_size_t` into `page_size`.
-    let status =
+    let page_size_status =
         unsafe { host_page_size(libc::mach_host_self(), std::ptr::from_mut(&mut page_size)) };
-    if status != libc::KERN_SUCCESS {
+    if page_size_status != libc::KERN_SUCCESS {
         return Err(LeafError::unavailable(
             ROUTE,
-            format!("host_page_size failed ({status})"),
+            format!("host_page_size failed ({page_size_status})"),
         ));
     }
     // Used = wired (unswappable) + active + compressed. Inactive, free, and

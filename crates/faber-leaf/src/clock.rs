@@ -44,6 +44,12 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
 }
 
 /// One-shot sleep that can abort when `is_cancelled` becomes true.
+///
+/// # Errors
+///
+/// Returns `LeafError::invalid_argument` when `args` is not a single
+/// non-negative `ms` integer, and `LeafError::cancelled` when `is_cancelled`
+/// reports cancellation before the deadline.
 pub fn sleep_interruptible(
     args: &[Arg],
     is_cancelled: &dyn Fn() -> bool,
@@ -83,8 +89,9 @@ fn now(args: &[Arg]) -> Result<Reply, LeafError> {
     empty_ok(ROUTE, args)?;
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|elapsed| i64::try_from(elapsed.as_nanos()).unwrap_or(i64::MAX))
-        .unwrap_or(0);
+        .map_or(0, |elapsed| {
+            i64::try_from(elapsed.as_nanos()).unwrap_or(i64::MAX)
+        });
     Ok(Reply::Int(nanos))
 }
 

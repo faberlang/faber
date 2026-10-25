@@ -261,13 +261,13 @@ fn find(args: &[Arg]) -> Result<Reply, FsError> {
     let pattern = expect_str(ROUTE, args, 1, "pattern")?;
     let offset = expect_int(ROUTE, args, 2, "offset")?;
     let length = expect_int(ROUTE, args, 3, "length")?;
-    let bytes = match read_range(&[
+    let Reply::Bytes(bytes) = read_range(&[
         Arg::Str(path.to_owned()),
         Arg::Int(offset),
         Arg::Int(length),
-    ])? {
-        Reply::Bytes(bytes) => bytes,
-        _ => return Err(FsError::invalid_argument(ROUTE, "range read failed")),
+    ])?
+    else {
+        return Err(FsError::invalid_argument(ROUTE, "range read failed"));
     };
     let needle = pattern.as_bytes();
     if needle.is_empty() {
@@ -397,9 +397,7 @@ fn is_directory(args: &[Arg]) -> Result<Reply, FsError> {
     const ROUTE: &str = "solum:directoriumne";
     let path = expect_str(ROUTE, args, 0, "path")?;
     Ok(Reply::Bool(
-        fs::metadata(path)
-            .map(|meta| meta.is_dir())
-            .unwrap_or(false),
+        fs::metadata(path).is_ok_and(|meta| meta.is_dir()),
     ))
 }
 
@@ -407,20 +405,14 @@ fn is_regular(args: &[Arg]) -> Result<Reply, FsError> {
     const ROUTE: &str = "solum:regularene";
     let path = expect_str(ROUTE, args, 0, "path")?;
     Ok(Reply::Bool(
-        fs::metadata(path)
-            .map(|meta| meta.is_file())
-            .unwrap_or(false),
+        fs::metadata(path).is_ok_and(|meta| meta.is_file()),
     ))
 }
 
 fn is_readable(args: &[Arg]) -> Result<Reply, FsError> {
     const ROUTE: &str = "solum:legibilene";
     let path = expect_str(ROUTE, args, 0, "path")?;
-    if !Path::new(path)
-        .metadata()
-        .map(|meta| meta.is_file())
-        .unwrap_or(false)
-    {
+    if !Path::new(path).metadata().is_ok_and(|meta| meta.is_file()) {
         return Ok(Reply::Bool(false));
     }
     Ok(Reply::Bool(File::open(path).is_ok()))
@@ -430,9 +422,7 @@ fn is_symlink(args: &[Arg]) -> Result<Reply, FsError> {
     const ROUTE: &str = "solum:vinculumne";
     let path = expect_str(ROUTE, args, 0, "path")?;
     Ok(Reply::Bool(
-        fs::symlink_metadata(path)
-            .map(|meta| meta.file_type().is_symlink())
-            .unwrap_or(false),
+        fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink()),
     ))
 }
 
@@ -538,8 +528,7 @@ fn delete_file(args: &[Arg]) -> Result<Reply, FsError> {
     let path = expect_str(ROUTE, args, 0, "path")?;
     if Path::new(path)
         .symlink_metadata()
-        .map(|meta| meta.is_dir())
-        .unwrap_or(false)
+        .is_ok_and(|meta| meta.is_dir())
     {
         return Err(FsError::is_a_directory(ROUTE, path));
     }
@@ -616,11 +605,7 @@ fn list_dir(args: &[Arg]) -> Result<Reply, FsError> {
     let entries = fs::read_dir(path).map_err(|err| {
         if err.kind() == ErrorKind::NotFound {
             FsError::from_io(ROUTE, path, &err)
-        } else if Path::new(path)
-            .metadata()
-            .map(|meta| !meta.is_dir())
-            .unwrap_or(false)
-        {
+        } else if Path::new(path).metadata().is_ok_and(|meta| !meta.is_dir()) {
             FsError::not_a_directory(ROUTE, path)
         } else {
             FsError::from_io(ROUTE, path, &err)
@@ -731,11 +716,7 @@ fn temp_dir(args: &[Arg]) -> Result<Reply, FsError> {
 }
 
 fn refuse_directory(route: &'static str, path: &str) -> Result<(), FsError> {
-    if Path::new(path)
-        .metadata()
-        .map(|meta| meta.is_dir())
-        .unwrap_or(false)
-    {
+    if Path::new(path).metadata().is_ok_and(|meta| meta.is_dir()) {
         Err(FsError::is_a_directory(route, path))
     } else {
         Ok(())
