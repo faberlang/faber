@@ -20,6 +20,8 @@ use std::time::Duration;
 
 const DEFAULT_MAX_BODY: usize = 1_048_576;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+/// Longest chunk-size line either direction accepts; a longer one is hostile.
+const MAX_CHUNK_LINE: usize = 64;
 
 static NEXT_ID: AtomicI64 = AtomicI64::new(1);
 static NEXT_CONN: AtomicI64 = AtomicI64::new(1);
@@ -390,6 +392,8 @@ struct UrlParts {
     target: String,
 }
 
+/// Split an `http` or `https` URL into its parts; the host keeps IPv6 brackets
+/// and the port defaults from the scheme.
 fn split_url(url: &str) -> Result<UrlParts, LeafError> {
     let (scheme, rest) = url.split_once("://").ok_or_else(|| {
         LeafError::invalid_argument("http:request", format!("invalid URL `{url}`"))
@@ -408,8 +412,15 @@ fn split_url(url: &str) -> Result<UrlParts, LeafError> {
         Some(index) => (&rest[..index], &rest[index..]),
         None => (rest, "/"),
     };
-    let (host, port) = match authority.rsplit_once(':') {
-        Some((host, port)) if !host.is_empty() && !host.ends_with(']') => {
+    // WHY: an IPv6 literal carries colons of its own, so the port separator is
+    // only a colon after the closing bracket.
+    let port_colon = match authority.rfind(']') {
+        Some(close) => authority[close..].find(':').map(|offset| close + offset),
+        None => authority.rfind(':'),
+    };
+    let (host, port) = match port_colon.map(|index| (&authority[..index], &authority[index + 1..]))
+    {
+        Some((host, port)) if !host.is_empty() => {
             let parsed = port.parse::<u16>().map_err(|_| {
                 LeafError::invalid_argument("http:request", format!("invalid port `{port}`"))
             })?;
@@ -417,12 +428,11 @@ fn split_url(url: &str) -> Result<UrlParts, LeafError> {
         }
         _ => (authority.to_owned(), if https { 443 } else { 80 }),
     };
-    let target = if path.is_empty() { "/" } else { path }.to_owned();
     Ok(UrlParts {
         https,
         host,
         port,
-        target,
+        target: path.to_owned(),
     })
 }
 
@@ -556,29 +566,11 @@ fn read_chunk(args: &[Arg]) -> Result<Reply, LeafError> {
             }
             None => Err(LeafError::closed(ROUTE, "reader closed")),
         })?;
-    if done {
-        with_handles(|map| {
-            map.insert(
-                id,
-                Handle::Reader {
-                    stream,
-                    leftover,
-                    remaining,
-                    chunked,
-                    done,
-                },
-            );
-        });
-        return Ok(Reply::Map(vec![
-            ("bytes".to_owned(), Reply::Bytes(Vec::new())),
-            ("done".to_owned(), Reply::Bool(true)),
-        ]));
-    }
     let mut out = Vec::new();
-    if !chunked {
+    if !done && !chunked {
         take_leftover(&mut leftover, remaining.as_mut(), max, &mut out);
     }
-    if out.is_empty() {
+    if !done && out.is_empty() {
         fill_reader(
             &mut stream,
             &mut leftover,
@@ -592,6 +584,8 @@ fn read_chunk(args: &[Arg]) -> Result<Reply, LeafError> {
     if remaining == Some(0) && leftover.is_empty() {
         done = true;
     }
+    // A finished reader stays registered, so a later read reports `done` rather
+    // than a closed handle.
     with_handles(|map| {
         map.insert(
             id,
@@ -639,9 +633,8 @@ fn fill_reader(
     while out.len() < max && !*done {
         if chunked {
             match read_next_chunk(stream, leftover, max) {
-                Ok(Some(chunk)) if chunk.is_empty() => *done = true,
-                Ok(Some(chunk)) => out.extend(chunk),
-                Ok(None) => *done = true,
+                Ok(Some(chunk)) if !chunk.is_empty() => out.extend(chunk),
+                Ok(_) => *done = true,
                 Err(err) if is_peer_closed(&err) => *done = true,
                 Err(err) => return Err(err),
             }
@@ -749,7 +742,7 @@ fn read_next_chunk(
                 if line.ends_with(b"\r\n") {
                     break;
                 }
-                if line.len() > 64 {
+                if line.len() > MAX_CHUNK_LINE {
                     return Err(LeafError::invalid_argument(
                         "http:read",
                         "chunk size line too long",
@@ -1036,24 +1029,28 @@ fn read_http_message(
     response: bool,
     drain_body: bool,
 ) -> Result<ParsedMessage, LeafError> {
+    // A client reads a response on behalf of an `http:request*` call; a server
+    // reads a request for `http:accept`. Every failure names its own side.
+    let route = if response {
+        "http:request"
+    } else {
+        "http:accept"
+    };
     let mut buf = Vec::new();
     let mut scratch = [0_u8; 4096];
     let header_end = loop {
         let n = stream
             .read(&mut scratch)
-            .map_err(|err| LeafError::from_io("http:accept", "", &err))?;
+            .map_err(|err| LeafError::from_io(route, "", &err))?;
         if n == 0 {
-            return Err(LeafError::closed("http:accept", "peer closed"));
+            return Err(LeafError::closed(route, "peer closed"));
         }
         buf.extend_from_slice(&scratch[..n]);
         if let Some(index) = find_header_end(&buf) {
             break index;
         }
         if buf.len() > 64 * 1024 {
-            return Err(LeafError::invalid_argument(
-                "http:accept",
-                "headers too large",
-            ));
+            return Err(LeafError::invalid_argument(route, "headers too large"));
         }
     };
     let header_bytes = &buf[..header_end];
@@ -1063,12 +1060,7 @@ fn read_http_message(
         let mut resp = httparse::Response::new(&mut parsed_headers);
         match resp.parse(header_bytes) {
             Ok(httparse::Status::Complete(_)) => {}
-            _ => {
-                return Err(LeafError::invalid_argument(
-                    "http:request",
-                    "malformed response",
-                ));
-            }
+            _ => return Err(LeafError::invalid_argument(route, "malformed response")),
         }
         let status = resp.code.unwrap_or(0);
         (
@@ -1081,12 +1073,7 @@ fn read_http_message(
         let mut req = httparse::Request::new(&mut parsed_headers);
         match req.parse(header_bytes) {
             Ok(httparse::Status::Complete(_)) => {}
-            _ => {
-                return Err(LeafError::invalid_argument(
-                    "http:accept",
-                    "malformed request",
-                ));
-            }
+            _ => return Err(LeafError::invalid_argument(route, "malformed request")),
         }
         (
             0,
@@ -1108,16 +1095,16 @@ fn read_http_message(
         && usize::try_from(length).unwrap_or(usize::MAX) > max_body
     {
         return Err(LeafError::invalid_argument(
-            "http:accept",
-            "request body exceeds max_body_bytes",
+            route,
+            "body exceeds max_body_bytes",
         ));
     }
     let body = if !drain_body {
         leftover
     } else if chunked {
-        read_chunked_body(stream, leftover, max_body)?
+        read_chunked_body(stream, leftover, max_body, route)?
     } else if content_length.is_some() || response {
-        read_length_body(stream, leftover, content_length, max_body)?
+        read_length_body(stream, leftover, content_length, max_body, route)?
     } else {
         leftover
     };
@@ -1155,6 +1142,7 @@ fn read_length_body(
     leftover: Vec<u8>,
     length: Option<u64>,
     max_body: usize,
+    route: &'static str,
 ) -> Result<Vec<u8>, LeafError> {
     let mut body = leftover;
     let already = body.len();
@@ -1167,22 +1155,22 @@ fn read_length_body(
         body.resize(target, 0);
         stream
             .read_exact(&mut body[already..])
-            .map_err(|err| LeafError::from_io("http:accept", "", &err))?;
+            .map_err(|err| LeafError::from_io(route, "", &err))?;
         return Ok(body);
     }
     let mut scratch = [0_u8; 4096];
     loop {
         let n = stream
             .read(&mut scratch)
-            .map_err(|err| LeafError::from_io("http:accept", "", &err))?;
+            .map_err(|err| LeafError::from_io(route, "", &err))?;
         if n == 0 {
             break;
         }
         body.extend_from_slice(&scratch[..n]);
         if body.len() > max_body {
             return Err(LeafError::invalid_argument(
-                "http:accept",
-                "request body exceeds max_body_bytes",
+                route,
+                "body exceeds max_body_bytes",
             ));
         }
     }
@@ -1193,17 +1181,29 @@ fn read_chunked_body(
     stream: &mut IoStream,
     leftover: Vec<u8>,
     max_body: usize,
+    route: &'static str,
 ) -> Result<Vec<u8>, LeafError> {
     let mut pending = leftover;
     let mut body = Vec::new();
     loop {
         // A chunk-size line is only parseable once its closing `\r\n` has
-        // arrived; anything shorter reads more bytes.
-        let Some(end) = pending.windows(2).position(|window| window == b"\r\n") else {
+        // arrived; anything shorter reads more bytes, and a line longer than
+        // the cap is hostile and must not be buffered.
+        let end = pending
+            .windows(2)
+            .position(|window| window == b"\r\n")
+            .filter(|end| *end <= MAX_CHUNK_LINE);
+        let Some(end) = end else {
+            if pending.len() > MAX_CHUNK_LINE {
+                return Err(LeafError::invalid_argument(
+                    route,
+                    "chunk size line too long",
+                ));
+            }
             let mut scratch = [0_u8; 1024];
             let n = stream
                 .read(&mut scratch)
-                .map_err(|err| LeafError::from_io("http:accept", "", &err))?;
+                .map_err(|err| LeafError::from_io(route, "", &err))?;
             if n == 0 {
                 break;
             }
@@ -1212,11 +1212,11 @@ fn read_chunked_body(
         };
         let hex = std::str::from_utf8(&pending[..end]).unwrap_or("");
         let size = usize::from_str_radix(hex.split(';').next().unwrap_or("").trim(), 16)
-            .map_err(|_| LeafError::invalid_argument("http:accept", "invalid chunk size"))?;
+            .map_err(|_| LeafError::invalid_argument(route, "invalid chunk size"))?;
         if size > max_body || body.len().saturating_add(size) > max_body {
             return Err(LeafError::invalid_argument(
-                "http:accept",
-                "request body exceeds max_body_bytes",
+                route,
+                "body exceeds max_body_bytes",
             ));
         }
         pending.drain(..end + 2);
@@ -1225,14 +1225,14 @@ fn read_chunked_body(
         }
         let want = size
             .checked_add(2)
-            .ok_or_else(|| LeafError::invalid_argument("http:accept", "invalid chunk size"))?;
+            .ok_or_else(|| LeafError::invalid_argument(route, "invalid chunk size"))?;
         while pending.len() < want {
             let mut scratch = [0_u8; 4096];
             let n = stream
                 .read(&mut scratch)
-                .map_err(|err| LeafError::from_io("http:accept", "", &err))?;
+                .map_err(|err| LeafError::from_io(route, "", &err))?;
             if n == 0 {
-                return Err(LeafError::closed("http:accept", "truncated chunk"));
+                return Err(LeafError::closed(route, "truncated chunk"));
             }
             pending.extend_from_slice(&scratch[..n]);
         }
@@ -1240,8 +1240,8 @@ fn read_chunked_body(
         pending.drain(..size + 2);
         if body.len() > max_body {
             return Err(LeafError::invalid_argument(
-                "http:accept",
-                "request body exceeds max_body_bytes",
+                route,
+                "body exceeds max_body_bytes",
             ));
         }
     }
@@ -1293,7 +1293,10 @@ fn wrap_tls_client(
             .with_root_certificates(roots)
             .with_no_client_auth(),
     );
-    let name = ServerName::try_from(host.to_owned()).map_err(|_| {
+    // WHY: the URL host keeps its brackets for `addr` and the Host header, but
+    // a TLS server name is the bare IP literal.
+    let bare_host = host.trim_start_matches('[').trim_end_matches(']');
+    let name = ServerName::try_from(bare_host.to_owned()).map_err(|_| {
         LeafError::invalid_argument("http:request", format!("invalid TLS server name `{host}`"))
     })?;
     let conn = ClientConnection::new(config, name)

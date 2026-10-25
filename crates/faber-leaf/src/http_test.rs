@@ -1,6 +1,6 @@
 //! HTTP/1.1 leaf: listen, accept, respond, client get/post.
 
-use super::{is_route, reset_handles, serve};
+use super::{is_route, reset_handles, serve, split_url};
 use crate::value::{Arg, Reply};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -129,6 +129,25 @@ fn client_posts_to_local_listener() {
     };
     assert!(fields.contains(&("status".to_owned(), Reply::Int(200))));
     assert!(fields.contains(&("body".to_owned(), Reply::Str("posted".to_owned()))));
+}
+
+#[test]
+fn client_reports_a_closed_peer_on_its_own_route() {
+    let _guard = crate::test_support::handle_table_guard();
+    reset_handles();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let server = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().expect("accept");
+        let mut request = [0_u8; 1024];
+        let _ = socket.read(&mut request);
+    });
+    let url = format!("http://127.0.0.1:{port}/gone");
+    let error = serve("http:get", &[Arg::Str(url)])
+        .expect("route")
+        .expect_err("peer closed");
+    server.join().expect("server");
+    assert!(error.to_string().starts_with("http:request:"), "{error}");
 }
 
 #[test]
@@ -503,6 +522,29 @@ fn read_request_body(socket: &mut TcpStream, head: &str, want: usize) -> Vec<u8>
 }
 
 #[test]
+fn bracketed_ipv6_authority_keeps_host_and_port_apart() {
+    let parts = split_url("http://[::1]:8080/path?q=1").expect("url");
+    assert_eq!(parts.host, "[::1]");
+    assert_eq!(parts.port, 8080);
+    assert_eq!(parts.target, "/path?q=1");
+    assert!(!parts.https);
+
+    let literal = split_url("https://[::1]").expect("url");
+    assert_eq!(literal.host, "[::1]");
+    assert_eq!(literal.port, 443);
+    assert_eq!(literal.target, "/");
+    assert!(literal.https);
+
+    let named = split_url("http://example.com:8000/p").expect("url");
+    assert_eq!(named.host, "example.com");
+    assert_eq!(named.port, 8000);
+
+    let bare = split_url("http://example.com/p").expect("url");
+    assert_eq!(bare.host, "example.com");
+    assert_eq!(bare.port, 80);
+}
+
+#[test]
 fn route_list_matches_serve() {
     let _guard = crate::test_support::handle_table_guard();
     for route in super::ROUTES {
@@ -577,6 +619,16 @@ fn server_rejects_non_hex_chunk_size() {
     let _guard = crate::test_support::handle_table_guard();
     let message = hostile_chunk_request("zzzz");
     assert!(message.contains("invalid chunk size"), "{message}");
+}
+
+#[test]
+fn server_rejects_a_chunk_size_line_that_never_ends() {
+    let _guard = crate::test_support::handle_table_guard();
+    let mut request =
+        b"POST /chunked HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n".to_vec();
+    request.extend_from_slice(&[b'a'; 4096]);
+    let message = hostile_chunk_case_server(&request);
+    assert!(message.contains("chunk size line too long"), "{message}");
 }
 
 fn hostile_chunked_response(chunk_header: &str) -> String {
