@@ -174,10 +174,10 @@ pub(crate) enum Rep {
 impl Rep {
     fn cl_type(self) -> Option<ClType> {
         match self {
-            Self::Int => Some(types::I64),
             Self::Float => Some(types::F64),
             Self::Bool => Some(types::I8),
-            Self::Text
+            Self::Int
+            | Self::Text
             | Self::Char
             | Self::Regex
             | Self::Match
@@ -289,9 +289,6 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             rep_of(table, MirType::semantic(*inner))?;
             Ok(Rep::Opt)
         }
-        // A promise carrier is its payload: async functions run to
-        // completion and `cede` reads the value.
-        Type::Promissum(inner) => rep_of(table, MirType::semantic(*inner)),
         Type::Array(element) | Type::BoundedArray { element, .. } | Type::Cursor(element) => {
             rep_of(table, MirType::semantic(*element))?;
             Ok(Rep::List)
@@ -315,7 +312,10 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
                 _ => Err(Decline::new("reference value")),
             }
         }
-        Type::Ref(_, inner) => rep_of(table, MirType::semantic(*inner)),
+        // A promise carrier is its payload: async functions run to
+        // completion and `cede` reads the value. A read-only reference is
+        // the value it borrows.
+        Type::Promissum(inner) | Type::Ref(_, inner) => rep_of(table, MirType::semantic(*inner)),
         // The type of `null`: an optional that is always none. An unknown
         // value is a box of any tagged payload, or none.
         // Open data (`json`, `valor`) is a box of any tagged payload, as `ignotum`.
@@ -1054,10 +1054,10 @@ impl FunctionLower<'_, '_> {
 
     fn zero(&mut self, rep: Rep) -> Option<Value> {
         match rep {
-            Rep::Int => Some(self.builder.ins().iconst(types::I64, 0)),
             Rep::Float => Some(self.builder.ins().f64const(0.0)),
             Rep::Bool => Some(self.builder.ins().iconst(types::I8, 0)),
-            Rep::Text
+            Rep::Int
+            | Rep::Text
             | Rep::Char
             | Rep::Regex
             | Rep::Match
@@ -1130,15 +1130,16 @@ impl FunctionLower<'_, '_> {
                 Some(self.builder.ins().iconst(types::I64, *value)),
                 Rep::Int,
             ),
-            MirConstant::UInt(value) => match i64::try_from(*value) {
-                Ok(value) => (Some(self.builder.ins().iconst(types::I64, value)), Rep::Int),
-                // Beyond the i64 carrier: an exact intermediate.
-                Err(_) => {
+            MirConstant::UInt(value) => {
+                if let Ok(value) = i64::try_from(*value) {
+                    (Some(self.builder.ins().iconst(types::I64, value)), Rep::Int)
+                } else {
+                    // Beyond the i64 carrier: an exact intermediate.
                     let constant = self.wide_const(i128::from(*value));
                     self.huge.insert(constant);
                     (Some(constant), Rep::Int)
                 }
-            },
+            }
             MirConstant::Magnus(digits) => {
                 let text = self.text_literal(digits.as_bytes())?;
                 let big = self.call_runtime(&abi::INF_DIGITS, &[text])?;
@@ -1419,12 +1420,10 @@ impl FunctionLower<'_, '_> {
             Rep::Inf => abi::TAG_INF,
             Rep::Ins => abi::TAG_INS,
             Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
-            Rep::List => abi::TAG_LIST,
+            Rep::List | Rep::Func | Rep::Tuple => abi::TAG_LIST,
             Rep::Record => abi::TAG_STRUCT,
             Rep::Opt => abi::TAG_OPT,
             Rep::Map | Rep::Set => abi::TAG_MAP,
-            Rep::Func => abi::TAG_LIST,
-            Rep::Tuple => abi::TAG_LIST,
             Rep::Unit => return Err(Decline::new("unit list element")),
         })
     }
@@ -3131,15 +3130,13 @@ impl FunctionLower<'_, '_> {
                         .ok_or_else(|| Decline::new("approximate result"))?
                 } else {
                     let narrow = [left, right].iter().all(|operand| {
-                        self.operand_type(operand)
-                            .map(|ty| {
-                                matches!(
-                                    resolve(self.state.input.types, ty.semantic_id()),
-                                    Type::SizedNumeric(Primitive::Fractus, width)
-                                        if *width != NumericWidth::F64
-                                )
-                            })
-                            .unwrap_or(false)
+                        self.operand_type(operand).is_ok_and(|ty| {
+                            matches!(
+                                resolve(self.state.input.types, ty.semantic_id()),
+                                Type::SizedNumeric(Primitive::Fractus, width)
+                                    if *width != NumericWidth::F64
+                            )
+                        })
                     });
                     let mut a = self.float_operand(left)?;
                     let mut b = self.float_operand(right)?;
@@ -3390,7 +3387,7 @@ impl FunctionLower<'_, '_> {
                 environment = Some(record);
                 closure.function
             }
-            _ => return Err(Decline::new("indirect call")),
+            MirCallee::Definition { .. } => return Err(Decline::new("indirect call")),
         };
         let reference = self.function_ref(id)?;
         let params: Vec<Rep> = {
@@ -3465,9 +3462,8 @@ impl FunctionLower<'_, '_> {
             .functions
             .iter()
             .filter(|function| function.source == Some(callee));
-        let target = match (matches.next(), matches.next()) {
-            (Some(function), None) => function,
-            _ => return Err(Decline::new("ambiguous generator")),
+        let (Some(target), None) = (matches.next(), matches.next()) else {
+            return Err(Decline::new("ambiguous generator"));
         };
         if !target.is_generator {
             return Err(Decline::new("cursor stream of a non-generator"));
@@ -4059,6 +4055,10 @@ impl FunctionLower<'_, '_> {
         template: radix_lexer::Symbol,
         args: &[MirOperand],
     ) -> Lowered<()> {
+        enum Part {
+            Literal(String),
+            Argument(usize),
+        }
         let template = self.state.input.interner.resolve(template).to_owned();
         let mut rendered: Vec<Value> = Vec::with_capacity(args.len());
         for arg in args {
@@ -4066,10 +4066,6 @@ impl FunctionLower<'_, '_> {
             self.refuse_nested_tuple_display(arg)?;
             let narrow = self.float_narrow(arg);
             rendered.push(self.render_text_at(value, rep, narrow)?);
-        }
-        enum Part {
-            Literal(String),
-            Argument(usize),
         }
         let mut parts: Vec<Part> = Vec::new();
         let mut literal = String::new();
@@ -4868,7 +4864,7 @@ impl FunctionLower<'_, '_> {
                 Ok((Some(computed), rep))
             }
             MirValueKind::Closure(closure) => Ok((Some(self.closure_value(closure)?), Rep::Func)),
-            _ => Err(Decline::new("value kind")),
+            MirValueKind::TensorExtent { .. } => Err(Decline::new("value kind")),
         }
     }
 
@@ -4964,9 +4960,9 @@ impl FunctionLower<'_, '_> {
                     .ins()
                     .fcmp(FloatCC::LessThan, magnitude, infinity);
                 let one = self.builder.ins().iconst(types::I8, 1);
-                let infinite = self.builder.ins().bxor(finite, one);
+                let trap = self.builder.ins().bxor(finite, one);
                 self.trap_if(
-                    infinite,
+                    trap,
                     if logarithm {
                         "log produced non-finite result"
                     } else {
