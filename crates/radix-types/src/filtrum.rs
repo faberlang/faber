@@ -252,19 +252,13 @@ impl Window {
     /// Returns [`WindowError::NegativeLimit`] or
     /// [`WindowError::NegativeOffset`] when the corresponding value is
     /// negative.
-    ///
-    /// The guarded `as u64` casts below are safe: every negative input has
-    /// already returned an error in the preceding match arm.
-    #[allow(clippy::cast_sign_loss)]
     pub fn new(limit: Option<i64>, offset: Option<i64>) -> Result<Option<Self>, WindowError> {
         let limit = match limit {
-            Some(v) if v < 0 => return Err(WindowError::NegativeLimit(v)),
-            Some(v) => Some(v as u64),
+            Some(v) => Some(u64::try_from(v).map_err(|_| WindowError::NegativeLimit(v))?),
             None => None,
         };
         let offset = match offset {
-            Some(v) if v < 0 => return Err(WindowError::NegativeOffset(v)),
-            Some(v) => Some(v as u64),
+            Some(v) => Some(u64::try_from(v).map_err(|_| WindowError::NegativeOffset(v))?),
             None => None,
         };
         if limit.is_none() && offset.is_none() {
@@ -278,7 +272,9 @@ impl Window {
 /// §3.1; §3.5). Field order is the canonical serialization order (design
 /// §8.2): encoding version, source identity, schema identities `I` and `O`,
 /// then the plan-content fields predicate, order, and window, and finally the
-/// capability requirements (identity component 5).
+/// capability requirements (identity component 5). §8.2's field 4 is not a
+/// plan field: the D4 source mapping is carried per column by
+/// [`crate::SchemaColumnDef::source`] on both schema definitions.
 ///
 /// The model carries both schema identities so the semantic unit can make the
 /// landed `O ⊆ I` proof ([`crate::schema_subset`]) a required construction

@@ -182,7 +182,7 @@ fn predicate_ast_is_closed_to_the_eight_locked_variants() {
     // the model breaks this test at compile time. No variant carries SQL text
     // or a closure (design §1.3, §3.2).
     for predicate in predicates {
-        let _ = match &predicate {
+        match &predicate {
             Predicate::Compare { .. } => 0,
             Predicate::Between { .. } => 1,
             Predicate::In { .. } => 2,
