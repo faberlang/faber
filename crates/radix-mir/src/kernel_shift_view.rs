@@ -113,8 +113,8 @@ impl Key {
 
 fn destination_key(statement: &MirStatement) -> Option<Key> {
     let place = match &statement.kind {
-        MirStatementKind::Assign { place, .. } => place,
-        MirStatementKind::RuntimeCall {
+        MirStatementKind::Assign { place, .. }
+        | MirStatementKind::RuntimeCall {
             destination: Some(place),
             ..
         }

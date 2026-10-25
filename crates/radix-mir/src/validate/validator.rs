@@ -267,6 +267,9 @@ impl<'a> ValidatedMir<'a> {
     /// # Errors
     /// Returns a message when the context carries a borrowed interner, which
     /// cannot outlive its owner.
+    ///
+    /// # Panics
+    /// Panics when the freshly cloned type table is not uniquely owned.
     pub fn detach(&self) -> Result<DetachedMir, String> {
         let interner = match &self.validation.interner {
             MirInterner::Absent => MirInterner::Absent,

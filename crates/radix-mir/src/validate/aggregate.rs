@@ -730,15 +730,14 @@ impl Validator<'_, '_> {
         if let Some(order) = self.context.variant_field_order.get(&def_id).cloned() {
             let mut field_tys = Vec::with_capacity(order.len());
             for name in &order {
-                match fields.get(name).copied() {
-                    Some(field_ty) => field_tys.push(field_ty),
-                    None => {
-                        self.error(
-                            span,
-                            "enum variant aggregate payload metadata is missing a declared field",
-                        );
-                        return None;
-                    }
+                if let Some(field_ty) = fields.get(name).copied() {
+                    field_tys.push(field_ty);
+                } else {
+                    self.error(
+                        span,
+                        "enum variant aggregate payload metadata is missing a declared field",
+                    );
+                    return None;
                 }
             }
             return Some(field_tys);

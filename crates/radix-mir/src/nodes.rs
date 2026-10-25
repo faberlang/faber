@@ -1642,7 +1642,8 @@ pub enum MirSermoOp {
     ViewMeus,
     ViewTuus,
     Send,
-    /// meus.flush(): push any pending outbound frames and keep the conversation open (Finish stays the close).
+    /// `meus.flush()`: push any pending outbound frames and keep the
+    /// conversation open (Finish stays the close).
     Flush,
     Finish,
     /// `s.close()` (D8.3): close the handle; `bivalens` says whether this
