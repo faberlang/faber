@@ -1,8 +1,8 @@
 //! Blocking fs leaf. Serves Latin `solum:*` routes. No open-file handle.
 //!
-//! `stat` / `FileStatus` and `map_read` / `MappedRegion` are named in the
-//! contract and not implemented here. Runner-only `digest_file` is not
-//! restored (R1).
+//! `solum:status` returns the tabula Norma turns into `FileStatus`.
+//! `map_read` / `MappedRegion` are named in the contract and not implemented
+//! here. Runner-only `digest_file` is not restored (R1).
 
 #[cfg(test)]
 #[path = "fs_test.rs"]
@@ -216,6 +216,10 @@ fn read_bytes(args: &[Arg]) -> Result<Reply, FsError> {
 }
 
 fn read_range(args: &[Arg]) -> Result<Reply, FsError> {
+    read_range_bytes(args).map(Reply::Bytes)
+}
+
+fn read_range_bytes(args: &[Arg]) -> Result<Vec<u8>, FsError> {
     const ROUTE: &str = "solum:partem";
     let path = expect_str(ROUTE, args, 0, "path")?;
     let start = expect_int(ROUTE, args, 1, "offset")?;
@@ -243,16 +247,18 @@ fn read_range(args: &[Arg]) -> Result<Reply, FsError> {
     let mut bytes = vec![0_u8; wanted];
     let mut filled = 0;
     while filled < wanted {
-        let read = file
-            .read(&mut bytes[filled..])
-            .map_err(|err| FsError::from_io(ROUTE, path, &err))?;
-        if read == 0 {
-            break;
+        match file.read(&mut bytes[filled..]) {
+            Ok(0) => break,
+            Ok(read) => filled += read,
+            // WHY: a signal without `SA_RESTART` interrupts the read with no
+            // bytes transferred, so the range is still whole and the call
+            // retries rather than reporting a spurious `io` failure.
+            Err(err) if err.kind() == ErrorKind::Interrupted => {}
+            Err(err) => return Err(FsError::from_io(ROUTE, path, &err)),
         }
-        filled += read;
     }
     bytes.truncate(filled);
-    Ok(Reply::Bytes(bytes))
+    Ok(bytes)
 }
 
 fn find(args: &[Arg]) -> Result<Reply, FsError> {
@@ -261,15 +267,13 @@ fn find(args: &[Arg]) -> Result<Reply, FsError> {
     let pattern = expect_str(ROUTE, args, 1, "pattern")?;
     let offset = expect_int(ROUTE, args, 2, "offset")?;
     let length = expect_int(ROUTE, args, 3, "length")?;
-    let Reply::Bytes(bytes) = read_range(&[
+    let bytes = read_range_bytes(&[
         Arg::Str(path.to_owned()),
         Arg::Int(offset),
         Arg::Int(length),
-    ])?
-    else {
-        return Err(FsError::invalid_argument(ROUTE, "range read failed"));
-    };
+    ])?;
     let needle = pattern.as_bytes();
+    // WHY: `windows(0)` panics; an empty pattern matches at the range start.
     if needle.is_empty() {
         return Ok(Reply::Int(offset));
     }
@@ -328,7 +332,8 @@ fn write_durably(args: &[Arg]) -> Result<Reply, FsError> {
 /// atomically. A failure or process death before the rename leaves the
 /// previous complete file; it can orphan the hidden temporary but can never
 /// leave a partial target. This route removes its own temporary on the errors
-/// it observes.
+/// it observes. The directory handle is opened before staging, so a directory
+/// the process may write but not read fails while the target is still intact.
 fn replace_durably(route: &'static str, target: &Path, data: &[u8]) -> Result<(), FsError> {
     let parent = match target.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent,
@@ -347,6 +352,9 @@ fn replace_durably(route: &'static str, target: &Path, data: &[u8]) -> Result<()
         nanos
     ));
     let path_text = target.to_string_lossy().into_owned();
+    #[cfg(unix)]
+    let directory =
+        File::open(parent).map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
 
     let staged = (|| -> Result<(), FsError> {
         let mut file =
@@ -359,8 +367,8 @@ fn replace_durably(route: &'static str, target: &Path, data: &[u8]) -> Result<()
         fs::rename(&temp, target)
             .map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
         #[cfg(unix)]
-        File::open(parent)
-            .and_then(|directory| directory.sync_all())
+        directory
+            .sync_all()
             .map_err(|err| FsError::from_io(route, path_text.clone(), &err))?;
         Ok(())
     })();
@@ -708,6 +716,8 @@ fn temp_dir(args: &[Arg]) -> Result<Reply, FsError> {
     // canonical working directory, so the two must agree after a chdir.
     let path = std::fs::canonicalize(&raw).unwrap_or(raw);
     let text = path.to_string_lossy().into_owned();
+    // A filesystem root has no parent and must keep its separator; trimming
+    // would leave an empty string.
     if path.parent().is_none() {
         return Ok(Reply::Str(text));
     }

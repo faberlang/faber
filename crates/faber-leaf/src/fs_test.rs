@@ -56,6 +56,37 @@ fn read_lines_splits_on_newlines() {
 }
 
 #[test]
+fn find_reports_an_absolute_offset_or_minus_one() {
+    let path = temp_path("find");
+    let path_text = path.to_string_lossy().into_owned();
+    fs::write(&path, "alpha beta gamma").expect("write");
+    let find = |pattern: &str, offset: i64| {
+        serve_ok(
+            "solum:inveni",
+            &[
+                Arg::Str(path_text.clone()),
+                Arg::Str(pattern.to_owned()),
+                Arg::Int(offset),
+                Arg::Int(64),
+            ],
+        )
+    };
+    assert_eq!(find("beta", 0), Reply::Int(6));
+    assert_eq!(find("gamma", 6), Reply::Int(11), "offset is absolute");
+    assert_eq!(
+        find("alpha", 1),
+        Reply::Int(-1),
+        "a match before the range start is not found"
+    );
+    assert_eq!(
+        find("", 4),
+        Reply::Int(4),
+        "an empty pattern matches at the range start"
+    );
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn missing_file_is_not_found() {
     let error = serve(
         "solum:lege",
@@ -207,6 +238,42 @@ fn conde_failure_leaves_old_file_intact() {
         names,
         vec![std::ffi::OsString::from("target.bin")],
         "the failed replace must not leave a temporary behind"
+    );
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[cfg(unix)]
+#[test]
+fn conde_fails_before_replacing_when_the_directory_cannot_be_read() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = temp_path("conde-unreadable-dir");
+    fs::create_dir_all(&dir).expect("create dir");
+    let target = dir.join("target.bin");
+    fs::write(&target, b"old-complete").expect("write old");
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o300)).expect("write-only dir");
+    if fs::read_dir(&dir).is_ok() {
+        // Root ignores the permission bits, so the condition cannot be staged.
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).expect("restore dir");
+        let _ = fs::remove_dir_all(dir);
+        return;
+    }
+
+    let error = serve(
+        "solum:conde",
+        &[
+            Arg::Str(target.to_string_lossy().into_owned()),
+            Arg::Str("new".to_owned()),
+        ],
+    )
+    .expect("fs route")
+    .expect_err("a directory that cannot be read cannot be flushed");
+    assert_eq!(error.kind(), FsErrorKind::Permission);
+
+    fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).expect("restore dir");
+    assert_eq!(
+        fs::read(&target).expect("read target"),
+        b"old-complete".as_slice(),
+        "the refusal must arrive before the target is replaced"
     );
     let _ = fs::remove_dir_all(dir);
 }
