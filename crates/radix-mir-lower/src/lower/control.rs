@@ -150,13 +150,6 @@ pub(super) fn grouped_key_tensor_reads_are_proven(
     coordinates: &[(DefId, Symbol)],
     group: &HirExpression,
 ) -> bool {
-    let Some(source_ty) = source.ty.map(|ty| types.peel_access_marker(ty).1) else {
-        return false;
-    };
-    let Type::Tensor(_, source_shape) = types.get(source_ty) else {
-        return false;
-    };
-    let source_axes = shape_axes(types, *source_shape);
     struct Reads<'a> {
         types: &'a TypeTable,
         coordinates: &'a [(DefId, Symbol)],
@@ -175,9 +168,7 @@ pub(super) fn grouped_key_tensor_reads_are_proven(
                     radix_hir::visit::walk_expr(self, expr);
                     return;
                 };
-                if target_axes.len() != index_ids.len() {
-                    self.safe = false;
-                } else {
+                if target_axes.len() == index_ids.len() {
                     for (axis, coordinate) in target_axes.iter().zip(index_ids) {
                         let Some(source_axis) = self
                             .coordinates
@@ -191,11 +182,20 @@ pub(super) fn grouped_key_tensor_reads_are_proven(
                             self.safe = false;
                         }
                     }
+                } else {
+                    self.safe = false;
                 }
             }
             radix_hir::visit::walk_expr(self, expr);
         }
     }
+    let Some(source_ty) = source.ty.map(|ty| types.peel_access_marker(ty).1) else {
+        return false;
+    };
+    let Type::Tensor(_, source_shape) = types.get(source_ty) else {
+        return false;
+    };
+    let source_axes = shape_axes(types, *source_shape);
     let mut reads = Reads { types, coordinates, source_axes: &source_axes, safe: true };
     reads.visit_expr(group);
     reads.safe
@@ -2079,8 +2079,8 @@ impl FunctionBuilder<'_> {
             None => (None, Vec::new()),
         };
         match self.types.get(result_ty) {
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {}
-            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {}
+            Type::Primitive(Primitive::Fractus | Primitive::Numerus)
+            | Type::SizedNumeric(Primitive::Fractus | Primitive::Numerus, _) => {}
             Type::Primitive(Primitive::Bivalens) if grid => {}
             Type::Tensor(_, _) if grid && group.is_some() && matches!(op, Op::Sum | Op::Count) => {}
             _ => {
@@ -2248,15 +2248,14 @@ impl FunctionBuilder<'_> {
         result_ty: TypeId,
         span: Span,
     ) -> Option<(MirFilumGroupOp, Vec<MirOperand>)> {
-        let (result_element_ty, shape) = match self.normalized_type(result_ty) {
-            Type::Tensor(element, shape) => (*element, *shape),
-            _ => {
-                self.errors.push(MirError::unsupported(
-                    span,
-                    "grouped grid reduction result before tensor lowering",
-                ));
-                return None;
-            }
+        let (result_element_ty, shape) = if let Type::Tensor(element, shape) = self.normalized_type(result_ty) {
+            (*element, *shape)
+        } else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "grouped grid reduction result before tensor lowering",
+            ));
+            return None;
         };
         let Some(literal_dimensions) = i64s_from_literal_index(shape, self.types) else {
             self.errors.push(MirError::unsupported(
@@ -3210,7 +3209,7 @@ impl FunctionBuilder<'_> {
                 .context
                 .variant_fields
                 .get(&variant)
-                .is_none_or(|declared| declared.is_empty())
+                .is_none_or(Vec::is_empty)
         {
             // A unit variant probes as the empty ordered aggregate: its
             // payload map is empty, so equality is variant identity.
@@ -3318,10 +3317,7 @@ impl FunctionBuilder<'_> {
                 .copied()
                 .and_then(|ty| self.instantiate_variant_field_ty(variant, ty, scrutinee_ty, span));
             match subpattern {
-                HirPattern::Binding(def_id, name) => {
-                    self.bind_variant_field_payload(*def_id, *name, variant, field, scrutinee, field_ty, span)?;
-                }
-                HirPattern::Alias(def_id, name, _) => {
+                HirPattern::Binding(def_id, name) | HirPattern::Alias(def_id, name, _) => {
                     self.bind_variant_field_payload(*def_id, *name, variant, field, scrutinee, field_ty, span)?;
                 }
                 HirPattern::Wildcard => {}
@@ -3881,9 +3877,10 @@ impl FunctionBuilder<'_> {
     }
 
     fn lower_range_itera(&mut self, range: RangeIteraLowering<'_>) -> Option<()> {
-        let index_ty = coordinate_type(range.body, range.binding)
-            .map(MirType::semantic)
-            .unwrap_or_else(|| self.range_index_ty(&[Some(range.start), Some(range.end), range.step]));
+        let index_ty = coordinate_type(range.body, range.binding).map_or_else(
+            || self.range_index_ty(&[Some(range.start), Some(range.end), range.step]),
+            MirType::semantic,
+        );
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
 
         let index = self.next_local_id();
@@ -4089,8 +4086,7 @@ impl FunctionBuilder<'_> {
         let mut axes = Vec::with_capacity(axis_count);
         for (position, ((start, end, step, kind), (binding, name))) in members.iter().zip(bindings).enumerate() {
             let index_ty = coordinate_type(body, *binding)
-                .map(MirType::semantic)
-                .unwrap_or_else(|| self.range_index_ty(&[Some(*start), Some(*end), *step]));
+                .map_or_else(|| self.range_index_ty(&[Some(*start), Some(*end), *step]), MirType::semantic);
             let index = self.next_local_id();
             self.locals.push(MirLocalDecl {
                 id: index,
@@ -4171,9 +4167,9 @@ impl FunctionBuilder<'_> {
         continuation: MirBlockId,
         span: Span,
     ) -> Option<()> {
-        let axis = &axes[level];
+        let range_axis = &axes[level];
         let innermost = level + 1 == axes.len();
-        let numerus = axis.index_ty;
+        let numerus = range_axis.index_ty;
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
 
         let cond_id = self.fresh_block(span);
@@ -4190,8 +4186,8 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(entry);
         self.assign(
-            MirPlace::local(axis.index),
-            MirOperand::Place(MirPlace::local(axis.start)),
+            MirPlace::local(range_axis.index),
+            MirOperand::Place(MirPlace::local(range_axis.start)),
             numerus,
             span,
         );
@@ -4200,7 +4196,7 @@ impl FunctionBuilder<'_> {
         self.switch_to(cond_id);
         let step_is_positive = self.binary_temp(
             MirBinOp::Gt,
-            MirOperand::Place(MirPlace::local(axis.step)),
+            MirOperand::Place(MirPlace::local(range_axis.step)),
             MirOperand::Constant(MirConstant::Int(0)),
             bivalens,
             span,
@@ -4215,14 +4211,14 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(positive_check_id);
-        let positive_op = match axis.kind {
+        let positive_op = match range_axis.kind {
             HirRangeKind::Exclusive => MirBinOp::Lt,
             HirRangeKind::Inclusive => MirBinOp::LtEq,
         };
         let positive_continues = self.binary_temp(
             positive_op,
-            MirOperand::Place(MirPlace::local(axis.index)),
-            MirOperand::Place(MirPlace::local(axis.bound)),
+            MirOperand::Place(MirPlace::local(range_axis.index)),
+            MirOperand::Place(MirPlace::local(range_axis.bound)),
             bivalens,
             span,
         );
@@ -4238,7 +4234,7 @@ impl FunctionBuilder<'_> {
         self.switch_to(negative_or_zero_id);
         let step_is_negative = self.binary_temp(
             MirBinOp::Lt,
-            MirOperand::Place(MirPlace::local(axis.step)),
+            MirOperand::Place(MirPlace::local(range_axis.step)),
             MirOperand::Constant(MirConstant::Int(0)),
             bivalens,
             span,
@@ -4253,14 +4249,14 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(negative_check_id);
-        let negative_op = match axis.kind {
+        let negative_op = match range_axis.kind {
             HirRangeKind::Exclusive => MirBinOp::Gt,
             HirRangeKind::Inclusive => MirBinOp::GtEq,
         };
         let negative_continues = self.binary_temp(
             negative_op,
-            MirOperand::Place(MirPlace::local(axis.index)),
-            MirOperand::Place(MirPlace::local(axis.bound)),
+            MirOperand::Place(MirPlace::local(range_axis.index)),
+            MirOperand::Place(MirPlace::local(range_axis.bound)),
             bivalens,
             span,
         );
@@ -4274,7 +4270,7 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(then_target);
-        self.copy_range_binder(axis.binder, axis.index, numerus, span);
+        self.copy_range_binder(range_axis.binder, range_axis.index, numerus, span);
         if innermost {
             self.breakables.push(BreakableContext {
                 perge_target: Some(increment_id),
@@ -4293,12 +4289,12 @@ impl FunctionBuilder<'_> {
         self.switch_to(increment_id);
         let next = self.binary_temp(
             MirBinOp::Add,
-            MirOperand::Place(MirPlace::local(axis.index)),
-            MirOperand::Place(MirPlace::local(axis.step)),
+            MirOperand::Place(MirPlace::local(range_axis.index)),
+            MirOperand::Place(MirPlace::local(range_axis.step)),
             numerus,
             span,
         );
-        self.assign(MirPlace::local(axis.index), next, numerus, span);
+        self.assign(MirPlace::local(range_axis.index), next, numerus, span);
         self.terminate_current(MirTerminatorKind::Goto(cond_id), span);
 
         self.switch_to(loop_after_id);
@@ -4783,8 +4779,9 @@ impl FunctionBuilder<'_> {
                 (collection, MirType::semantic(*elem), false)
             }
             CollectionIteraKind::BoundedArray(elem, _) => (collection, MirType::semantic(*elem), false),
-            CollectionIteraKind::Bytes(element) => (collection, MirType::semantic(*element), false),
-            CollectionIteraKind::Text(element) => (collection, MirType::semantic(*element), false),
+            CollectionIteraKind::Bytes(element) | CollectionIteraKind::Text(element) => {
+                (collection, MirType::semantic(*element), false)
+            }
             // Shaped itera returned through nested lowering above and
             // unsupported kinds failed closed before the collection lowered.
             CollectionIteraKind::Shaped { .. } | CollectionIteraKind::Unsupported => {
