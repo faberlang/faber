@@ -1,15 +1,15 @@
 //! Radix-owned `instans` runtime — absolute point-in-time with precision
 //! contract.
 //!
-//! Mirrors `faber::instans`. Radix is the authority; the runtime copy
-//! is expected to become a generated/committed artifact in a later phase. All
+//! Mirrors `faber::instans`. Radix is the authority; the runtime copy is
+//! expected to become a generated/committed artifact in a later phase. All
 //! precision variants store i64 nanoseconds since Unix epoch; the precision
 //! parameter declares how many trailing digits are meaningful
 //! (significant-figures semantics), not a different storage width.
 //!
 //! Unlike the runtime original, this copy carries no `Valor` coupling: the
-//! runner extracts instans values from concrete `Value` via [`Instans::from_rfc3339`]
-//! and [`Instans::from_epoch_integer`].
+//! runner extracts instans values from concrete `Value` via
+//! [`Instans::from_rfc3339`] and [`Instans::from_epoch_integer`].
 
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
 const NANOS_PER_MILLI: i64 = 1_000_000;
@@ -19,29 +19,23 @@ const SECONDS_PER_HOUR: i64 = 3_600;
 const NANOS_PER_DAY: i64 = SECONDS_PER_HOUR * 24 * NANOS_PER_SECOND;
 
 /// Declared precision (`praecisio`) for an [`Instans`] value.
+///
+/// Variant order is coarse→fine and matches the C ABI `INSTANS_PRECISION_*`
+/// values (0..=3). The derived [`Ord`] and every coarser-operand compare depend
+/// on that order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InstansPraecisio {
     /// Bare `instans` — second granularity (Unix time default).
     Secunda,
     /// Millisecond granularity (`instans<ms>`).
     Millisecunda,
-    /// Microsecond granularity (`instans<µs>`).
+    /// Microsecond granularity (`instans<us>`).
     Microsecunda,
     /// Nanosecond granularity (`instans<ns>`).
     Nanosecunda,
 }
 
 impl InstansPraecisio {
-    /// Coarsest (`Secunda`) to finest (`Nanosecunda`) rank for cross-precision comparison.
-    fn rank(self) -> u8 {
-        match self {
-            Self::Secunda => 0,
-            Self::Millisecunda => 1,
-            Self::Microsecunda => 2,
-            Self::Nanosecunda => 3,
-        }
-    }
-
     /// Nanosecond modulus for this precision (finer bits are zeroed).
     #[must_use]
     pub fn modulus_nanos(self) -> i64 {
@@ -112,11 +106,8 @@ impl Instans {
 
     /// Parse an RFC3339 wire string into an instant at the requested precision.
     ///
-    /// Replaces the runtime's `Instans::try_from_valor` for the
-    /// `Valor::Instans(text) | Valor::Textus(text)` arms, without the `Valor`
-    /// middleman. Returns `None` when the text is not one of the forms
-    /// `parse_rfc3339` accepts; the offset spellings it takes are wider than
-    /// strict RFC3339.
+    /// Returns `None` when the text is not one of the forms `parse_rfc3339`
+    /// accepts; the offset spellings it takes are wider than strict RFC3339.
     #[must_use]
     pub fn from_rfc3339(text: &str, praecisio: InstansPraecisio) -> Option<Self> {
         let nanos = parse_rfc3339(text)?;
@@ -124,10 +115,7 @@ impl Instans {
     }
 
     /// Build an instant from an epoch integer interpreted in the requested
-    /// precision's native units (seconds/ms/µs/ns).
-    ///
-    /// Replaces the runtime's `Instans::try_from_valor` for the `Valor::Numerus`
-    /// arm.
+    /// precision's native units (seconds/ms/us/ns).
     #[must_use]
     pub fn from_epoch_integer(epoch: i64, praecisio: InstansPraecisio) -> Self {
         match praecisio {
@@ -163,7 +151,7 @@ impl Instans {
     /// Three-way compare at the coarser operand precision; the only coarser compare.
     #[must_use]
     pub fn cmp_at_coarser(self, other: Self) -> std::cmp::Ordering {
-        let praecisio = coarser_praecisio(self.praecisio, other.praecisio);
+        let praecisio = self.praecisio.min(other.praecisio);
         let lhs = praecisio.truncate_nanos(self.nanos);
         let rhs = praecisio.truncate_nanos(other.nanos);
         lhs.cmp(&rhs)
@@ -176,14 +164,11 @@ impl Instans {
     }
 }
 
-fn coarser_praecisio(a: InstansPraecisio, b: InstansPraecisio) -> InstansPraecisio {
-    if a.rank() <= b.rank() { a } else { b }
-}
-
 /// Parse RFC3339 datetimes to nanoseconds since Unix epoch (UTC storage).
 ///
-/// EDGE: accepts `Z` / `±00:00` and numeric offsets `±HH:MM` / `±HHMM` / `±HH`;
-/// rejects missing offset and named zones.
+/// EDGE: accepts `T` / `t` between date and time, and a `Z` / `z` zone or a
+/// numeric offset `±HH:MM` / `±HHMM` / `±HH`; rejects a missing offset and named
+/// zones. Fraction digits past nine are dropped (nanosecond storage).
 fn parse_rfc3339(input: &str) -> Option<i64> {
     let (date, rest) = input.split_once('T').or_else(|| input.split_once('t'))?;
     let (year, month, day) = parse_date(date)?;
@@ -192,7 +177,9 @@ fn parse_rfc3339(input: &str) -> Option<i64> {
     validate_time_of_day(hour, minute, second)?;
 
     let local_nanos = civil_datetime_nanos(year, month, day, hour, minute, second, fraction_nanos)?;
-    let offset_nanos = nanos_from_offset_minutes(offset_minutes)?;
+    let offset_nanos = i64::from(offset_minutes)
+        .checked_mul(SECONDS_PER_MINUTE)?
+        .checked_mul(NANOS_PER_SECOND)?;
     local_nanos.checked_sub(offset_nanos)
 }
 
@@ -216,17 +203,7 @@ fn civil_datetime_nanos(
     day_nanos.checked_add(time_nanos)
 }
 
-fn nanos_from_offset_minutes(offset_minutes: i32) -> Option<i64> {
-    i64::from(offset_minutes)
-        .checked_mul(60)?
-        .checked_mul(NANOS_PER_SECOND)
-}
-
-#[allow(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    clippy::cast_possible_wrap
-)]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn format_rfc3339_utc(nanos: i64, praecisio: InstansPraecisio) -> String {
     use std::fmt::Write as _;
 
@@ -272,7 +249,7 @@ fn parse_time_and_offset(rest: &str) -> Option<(u32, u32, u32, i64, i32)> {
     let minute: u32 = rest.get(3..5)?.parse().ok()?;
     expect_char(rest, 5, b':')?;
     let second: u32 = rest.get(6..8)?.parse().ok()?;
-    let mut cursor = 8usize;
+    let mut cursor = 8;
     let fraction_nanos = if rest.as_bytes().get(cursor) == Some(&b'.') {
         cursor += 1;
         let start = cursor;
