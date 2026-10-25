@@ -58,16 +58,19 @@ pub fn hull(a: IntRange, b: IntRange) -> IntRange {
     (a.0.min(b.0), a.1.max(b.1))
 }
 
+/// `a + b`: `[a0 + b0, a1 + b1]`.
 #[must_use]
 pub fn add(a: IntRange, b: IntRange) -> IntRange {
     (a.0.saturating_add(b.0), a.1.saturating_add(b.1))
 }
 
+/// `a - b`: `[a0 - b1, a1 - b0]`.
 #[must_use]
 pub fn sub(a: IntRange, b: IntRange) -> IntRange {
     (a.0.saturating_sub(b.1), a.1.saturating_sub(b.0))
 }
 
+/// `a * b`: the minimum and maximum of the four corner products.
 #[must_use]
 pub fn mul(a: IntRange, b: IntRange) -> IntRange {
     let corners = [
@@ -99,6 +102,7 @@ pub fn floor_rem(_a: IntRange, b: IntRange) -> IntRange {
     (0.min(b.0.saturating_add(1)), 0.max(b.1.saturating_sub(1)))
 }
 
+/// `-a`: `[-a1, -a0]`.
 #[must_use]
 pub fn neg(a: IntRange) -> IntRange {
     (a.1.saturating_neg(), a.0.saturating_neg())
@@ -117,19 +121,20 @@ pub fn bit_not(a: IntRange) -> IntRange {
 #[must_use]
 pub fn abs(a: IntRange) -> IntRange {
     let (lo, hi) = (a.0.saturating_abs(), a.1.saturating_abs());
-    let low = if a.0 <= 0 && a.1 >= 0 { 0 } else { lo.min(hi) };
-    (low, lo.max(hi))
+    let lower = if a.0 <= 0 && a.1 >= 0 { 0 } else { lo.min(hi) };
+    (lower, lo.max(hi))
 }
 
-/// Largest constant exponent `pow_const` computes exactly; beyond it the
-/// result is taken at the cap.
+/// Largest constant exponent `pow_const` folds; a larger exponent clamps to
+/// it.
 pub const MAX_CONST_EXPONENT: i128 = 128;
 
 fn saturating_pow(base: i128, exponent: u32) -> i128 {
     (0..exponent).fold(1_i128, |acc, _| acc.saturating_mul(base))
 }
 
-/// `a ^ n` for a constant exponent `0 <= n <= MAX_CONST_EXPONENT`.
+/// `a ^ n` for a constant exponent `0 <= n <= MAX_CONST_EXPONENT`; an exponent
+/// outside that range clamps into it.
 #[must_use]
 pub fn pow_const(a: IntRange, n: i128) -> IntRange {
     let n = u32::try_from(n.clamp(0, MAX_CONST_EXPONENT)).unwrap_or(0);
@@ -157,6 +162,8 @@ pub fn pow_unbounded(a: IntRange) -> IntRange {
 }
 
 fn pow2(n: i128) -> i128 {
+    // `2^126` is the largest power of two an `i128` holds; at or past it the
+    // scale saturates.
     if n >= 126 {
         i128::MAX
     } else {
