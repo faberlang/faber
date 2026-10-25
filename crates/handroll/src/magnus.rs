@@ -383,21 +383,21 @@ fn divmod_dc(u: &[u32], v: &[u32]) -> (Vec<u32>, Vec<u32>) {
     let n = vn.len();
     let blocks = un.len().div_ceil(n);
     un.resize(blocks * n, 0);
-    let mut q = vec![0_u32; blocks * n];
-    let mut rem: Vec<u32> = Vec::new();
+    let mut quot = vec![0_u32; blocks * n];
+    let mut rest: Vec<u32> = Vec::new();
     for block in (0..blocks).rev() {
-        // A = rem * BASE^n + the next base-BASE^n block of the normalized dividend.
-        let mut a: Vec<u32> = un[block * n..(block + 1) * n].to_vec();
-        a.extend_from_slice(&rem);
-        trim(&mut a);
-        let (q_block, r_block) = divmod_dc_2n1n(&a, &vn);
-        q[block * n..block * n + q_block.len()].copy_from_slice(&q_block);
-        rem = r_block;
+        // A = rest * BASE^n + the next base-BASE^n block of the normalized dividend.
+        let mut dividend: Vec<u32> = un[block * n..(block + 1) * n].to_vec();
+        dividend.extend_from_slice(&rest);
+        trim(&mut dividend);
+        let (q_block, r_block) = divmod_dc_2n1n(&dividend, &vn);
+        quot[block * n..block * n + q_block.len()].copy_from_slice(&q_block);
+        rest = r_block;
     }
-    let mut r = shr_small(&rem, shift);
-    trim(&mut q);
-    trim(&mut r);
-    (q, r)
+    let mut remainder = shr_small(&rest, shift);
+    trim(&mut quot);
+    trim(&mut remainder);
+    (quot, remainder)
 }
 
 /// `a / v` with `v.len() = n`, `a.len() <= 2n`, `a < v * BASE^n` and `v` normalized (top bit
@@ -418,29 +418,29 @@ fn divmod_dc_2n1n(a: &[u32], v: &[u32]) -> (Vec<u32>, Vec<u32>) {
         scaled_a.extend_from_slice(a);
         let mut scaled_v = vec![0_u32];
         scaled_v.extend_from_slice(v);
-        let (q, scaled_r) = divmod_dc_2n1n(&scaled_a, &scaled_v);
-        let r = if scaled_r.is_empty() {
+        let (quot, scaled_r) = divmod_dc_2n1n(&scaled_a, &scaled_v);
+        let remainder = if scaled_r.is_empty() {
             scaled_r
         } else {
             scaled_r[1..].to_vec()
         };
-        return (q, r);
+        return (quot, remainder);
     }
-    let m = n / 2;
-    let a_top = if a.len() > m { &a[m..] } else { &[] };
-    let a_low = if a.len() >= m { &a[..m] } else { a };
-    let (q_high, r_high) = divmod_dc_3n2n(a_top, v, m);
-    // rest = r_high * BASE^m + a_low, which is below v * BASE^m.
-    let mut rest = vec![0_u32; m];
+    let half = n / 2;
+    let a_top = if a.len() > half { &a[half..] } else { &[] };
+    let a_low = if a.len() >= half { &a[..half] } else { a };
+    let (q_high, r_high) = divmod_dc_3n2n(a_top, v, half);
+    // rest = r_high * BASE^half + a_low, which is below v * BASE^half.
+    let mut rest = vec![0_u32; half];
     rest.extend_from_slice(&r_high);
     let mut rest = add_mag(&rest, a_low);
     trim(&mut rest);
-    let (q_low, r) = divmod_dc_3n2n(&rest, v, m);
-    let mut q = vec![0_u32; m];
-    q.extend_from_slice(&q_high);
-    let mut q = add_mag(&q, &q_low);
-    trim(&mut q);
-    (q, r)
+    let (q_low, remainder) = divmod_dc_3n2n(&rest, v, half);
+    let mut quot = vec![0_u32; half];
+    quot.extend_from_slice(&q_high);
+    let mut quot = add_mag(&quot, &q_low);
+    trim(&mut quot);
+    (quot, remainder)
 }
 
 /// `a / v` with `v.len() = 2n`, `a.len() <= 3n`, `a < v * BASE^n` and `v` normalized, so the
@@ -455,23 +455,24 @@ fn divmod_dc_3n2n(a: &[u32], v: &[u32], n: usize) -> (Vec<u32>, Vec<u32>) {
     }
     let a_top = if a.len() > n { &a[n..] } else { &[] };
     let a_low = if a.len() >= n { &a[..n] } else { a };
-    let (mut q, r_high) = divmod_dc_2n1n(a_top, &v[n..]);
-    let mut r = vec![0_u32; n];
-    r.extend_from_slice(&r_high);
-    let mut r = add_mag(&r, a_low);
-    trim(&mut r);
-    // A = q * v + r - q * v_low; subtract the low-half product, borrowing whole divisors.
-    let correction = mul_mag(&q, &v[..n]);
-    while cmp_mag(&r, &correction) == Ordering::Less {
-        r = add_mag(&r, v);
-        q = sub_mag(&q, &[1]);
+    let (mut quot, r_high) = divmod_dc_2n1n(a_top, &v[n..]);
+    let mut remainder = vec![0_u32; n];
+    remainder.extend_from_slice(&r_high);
+    let mut remainder = add_mag(&remainder, a_low);
+    trim(&mut remainder);
+    // A = quot * v + remainder - quot * v_low; subtract the low-half product, borrowing whole
+    // divisors.
+    let correction = mul_mag(&quot, &v[..n]);
+    while cmp_mag(&remainder, &correction) == Ordering::Less {
+        remainder = add_mag(&remainder, v);
+        quot = sub_mag(&quot, &[1]);
     }
-    r = sub_mag(&r, &correction);
-    while cmp_mag(&r, v) != Ordering::Less {
-        r = sub_mag(&r, v);
-        q = add_mag(&q, &[1]);
+    remainder = sub_mag(&remainder, &correction);
+    while cmp_mag(&remainder, v) != Ordering::Less {
+        remainder = sub_mag(&remainder, v);
+        quot = add_mag(&quot, &[1]);
     }
-    (q, r)
+    (quot, remainder)
 }
 
 /// Left shift by `bits < 32`; `grow` appends the carry-out limb.
