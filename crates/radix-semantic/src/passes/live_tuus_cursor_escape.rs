@@ -136,7 +136,6 @@ impl LiveTuusCursorEscapeChecker<'_> {
             EscapeContext::CallArg => ISSUE_CALL_ARG,
             EscapeContext::Return => ISSUE_RETURN,
             EscapeContext::StructField => ISSUE_STRUCT,
-            EscapeContext::AggregateElement => ISSUE_DIRECT_INITIALIZER,
             EscapeContext::Conversio => ISSUE_CONVERSIO,
             _ => ISSUE_DIRECT_INITIALIZER,
         }
@@ -198,7 +197,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
     fn visit_object_field(&mut self, field: &HirObjectField) {
         if let Some(value) = &field.value {
             self.with_context(EscapeContext::StructField, |checker| {
-                checker.visit_expr(value)
+                checker.visit_expr(value);
             });
         }
     }
@@ -221,7 +220,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                     }
                 }
                 self.with_context(EscapeContext::AssignTarget, |checker| {
-                    checker.visit_expr(target)
+                    checker.visit_expr(target);
                 });
                 self.with_context(EscapeContext::Value, |checker| checker.visit_expr(value));
             }
@@ -247,7 +246,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                     }
                 }
                 self.with_context(EscapeContext::AssignTarget, |checker| {
-                    checker.visit_expr(target)
+                    checker.visit_expr(target);
                 });
                 self.with_context(EscapeContext::Value, |checker| checker.visit_expr(source));
                 if let Some(recovery) = recovery {
@@ -258,7 +257,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                 self.visit_expr(callee);
                 for arg in args {
                     self.with_context(EscapeContext::CallArg, |checker| {
-                        checker.visit_expr(&arg.expr)
+                        checker.visit_expr(&arg.expr);
                     });
                 }
             }
@@ -266,7 +265,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                 self.visit_expr(receiver);
                 for arg in args {
                     self.with_context(EscapeContext::CallArg, |checker| {
-                        checker.visit_expr(&arg.expr)
+                        checker.visit_expr(&arg.expr);
                     });
                 }
             }
@@ -279,7 +278,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
             } => {
                 self.visit_def(*def_id, *name);
                 self.with_context(EscapeContext::IteraSource, |checker| {
-                    checker.visit_expr(iter)
+                    checker.visit_expr(iter);
                 });
                 self.visit_block(block);
             }
@@ -290,7 +289,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                 ..
             } => {
                 self.with_context(EscapeContext::Conversio, |checker| {
-                    checker.visit_expr(source)
+                    checker.visit_expr(source);
                 });
                 if let HirConversioTarget::Intervallum(operand) = target {
                     self.visit_expr(operand);
@@ -302,7 +301,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
             HirExpressionKind::Struct(_, fields) => {
                 for (_, value) in fields {
                     self.with_context(EscapeContext::StructField, |checker| {
-                        checker.visit_expr(value)
+                        checker.visit_expr(value);
                     });
                 }
             }
@@ -321,7 +320,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                     match element {
                         HirArrayElement::Expr(element) | HirArrayElement::Spread(element) => {
                             self.with_context(EscapeContext::AggregateElement, |checker| {
-                                checker.visit_expr(element)
+                                checker.visit_expr(element);
                             });
                         }
                         HirArrayElement::Infer(_) => {}
@@ -331,7 +330,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
             HirExpressionKind::Tuple(elements, _) => {
                 for element in elements {
                     self.with_context(EscapeContext::AggregateElement, |checker| {
-                        checker.visit_expr(element)
+                        checker.visit_expr(element);
                     });
                 }
             }
