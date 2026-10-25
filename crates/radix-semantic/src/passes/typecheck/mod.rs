@@ -378,8 +378,8 @@ pub(crate) struct TypeChecker<'a> {
     /// Updated on insert; restored or removed on pop.
     pub binding_shadow: FxHashMap<DefId, BindingInfo>,
 
-    /// Source spelling for HIR-local bindings (params/locals). Their DefIds
-    /// start at 1_000_000 and are not in the resolver symbol table, so a
+    /// Source spelling for HIR-local bindings (params/locals). Their `DefIds`
+    /// start at `1_000_000` and are not in the resolver symbol table, so a
     /// Path that shadows an imported namespace must recover the name here.
     pub binding_names: FxHashMap<DefId, Symbol>,
 
@@ -390,7 +390,7 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Read-only parameters (unmarked or `de`) seen while checking bodies.
     /// Like a `const` local, such a parameter is a read-only value: a plain
-    /// `mut T y ← p` of a shareable value is SEM065. DefIds
+    /// `mut T y ← p` of a shareable value is SEM065. `DefIds`
     /// are unique, so the set needs no per-body scope.
     pub read_only_param_roots: FxHashSet<DefId>,
 
@@ -532,13 +532,13 @@ pub(crate) struct TypeChecker<'a> {
     /// Locals declared `fixum T x = e` (D5.10): their initializer is an `=`
     /// position, a compile-time store.
     compile_time_locals: FxHashSet<DefId>,
-    /// Static `const size N = 3` values keyed by binding DefId (Z1): figura
+    /// Static `const size N = 3` values keyed by binding `DefId` (Z1): figura
     /// references to a declared size lower as `Runtime(ScalarBinding(def))`,
     /// so the fold keys on the binding; an affine extent over a static size
     /// that folds provably negative fails its lift obligation at the store.
     pub(crate) static_size_values: FxHashMap<radix_hir::DefId, u64>,
     /// Exact values of compile-time integer bindings (immutable `const int`
-    /// locals and module constants), keyed by binding DefId. The `axis`
+    /// locals and module constants), keyed by binding `DefId`. The `axis`
     /// argument of an axis reduction accepts one of these.
     pub(crate) const_int_values: FxHashMap<radix_hir::DefId, i128>,
     /// The module constants among `const_int_values`: with the
@@ -613,8 +613,8 @@ pub(crate) struct TypeChecker<'a> {
     /// a caller-owned `magnitudo` witness from a caller-owned type parameter.
     pub current_generic_param_kinds: FxHashMap<Symbol, radix_syntax::GenericParamKind>,
 
-    /// DefIds of the active function's `magnitudo` (size) generic params.
-    /// A size name in value position lowers as a Path on its HirTypeParam
+    /// `DefIds` of the active function's `magnitudo` (size) generic params.
+    /// A size name in value position lowers as a `Path` on its `HirTypeParam`
     /// def, which has no resolver symbol; this set types it (size-type Z1).
     pub current_size_param_defs: FxHashSet<DefId>,
     /// The same `size` parameters by source name, for synthesized extent values.
@@ -691,7 +691,7 @@ pub(crate) struct TypeChecker<'a> {
     /// Interior-mutable so `resolve_inferred_type` can path-compress under `&self`.
     pub substitutions: RefCell<FxHashMap<InferVar, TypeId>>,
 
-    /// Memo for `canonicalize_type` (input TypeId → canonical TypeId). BO-S-5.
+    /// Memo for `canonicalize_type` (input `TypeId` → canonical `TypeId`). BO-S-5.
     pub canonical_cache: FxHashMap<TypeId, TypeId>,
 
     /// Memo for `occurs_in` results keyed by `(InferVar, resolved TypeId)`. BO-S-6.
@@ -753,7 +753,7 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Field-path narrowing facts in force for the current branch body (need
     /// c58fff9c): (base binding, root-to-leaf path) -> narrowed type. Inserted
-    /// by check_block_with_refinement, removed at block exit; joins and the
+    /// by `check_block_with_refinement`, removed at block exit; joins and the
     /// implicit fallthrough never carry them.
     pub(crate) field_facts: FxHashMap<(DefId, Vec<Symbol>), TypeId>,
 
