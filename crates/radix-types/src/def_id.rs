@@ -57,12 +57,13 @@ pub const PROVIDER_DEF_ID_BASE: u32 = 0x7FFF_F000;
 pub const COMPANION_DEF_ID_FLAG: u32 = 0x8000_0000;
 
 impl DefId {
-    /// Sentinel for "not yet allocated."
+    /// Sentinel for "not yet allocated"; compare against this value rather
+    /// than raw `u32::MAX`.
     ///
-    /// Replaces raw `u32::MAX` comparisons so sentinel checks are type-safe.
-    /// Real ids never reach this value because `USER_DEF_ID_BASE` starts at
-    /// `0x0000_1000` and the allocator would need ~4 billion definitions to
-    /// approach `u32::MAX`.
+    /// Only a companion index of `0x7FFF_FFFF`, or ~4 billion user ids,
+    /// would reach it. The range predicates do not exclude it — `u32::MAX`
+    /// sits above every base and carries [`COMPANION_DEF_ID_FLAG`] — so check
+    /// the sentinel before classifying.
     pub const INVALID: Self = Self(u32::MAX);
 
     /// True for builtin ids in `[1, USER_DEF_ID_BASE)`. Zero is not a
@@ -106,7 +107,8 @@ impl DefId {
     }
 
     /// The low 31 bits of a companion id — the index the
-    /// [`COMPANION_DEF_ID_FLAG`] was OR-ed onto at mint time.
+    /// [`COMPANION_DEF_ID_FLAG`] was OR-ed onto at mint time. Non-companion
+    /// ids are returned unchanged; test [`DefId::is_companion`] first.
     #[must_use]
     pub fn companion_index(self) -> u32 {
         self.0 & !COMPANION_DEF_ID_FLAG
