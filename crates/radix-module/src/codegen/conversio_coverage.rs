@@ -7,11 +7,11 @@
 //! exempla corpus.
 //!
 //! Since Phase 2 the classifier is the **cross-check oracle**, not the
-//! measurement: the harness (`exempla::exempla_e2e::conversio_target_matrix`)
-//! measures fixture-backed cells through the real frontend, MIR probes, and
-//! HIR emit-arm detection, and reports where the prediction disagrees (see
-//! `CONVERSIO_MATRIX.md` → Measured divergences). This module predicts the
-//! same tiers read-only for cells without fixtures and for the oracle role.
+//! measurement: the retired harness (`exempla::exempla_e2e::conversio_target_matrix`,
+//! deleted 2026-10-24 with the e2e driver) measured fixture-backed cells through
+//! the real frontend, MIR probes, and HIR emit-arm detection; `faber corpus` is
+//! the target verifier now. This module predicts the same tiers read-only for
+//! cells without fixtures and for the oracle role.
 //!
 //! ## Tiers
 //!
