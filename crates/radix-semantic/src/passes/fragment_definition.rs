@@ -118,7 +118,7 @@ impl FragmentDefinitionChecker<'_> {
         for item in &hir.items {
             match &item.kind {
                 HirItemKind::Function(function) => {
-                    self.check_item(item.def_id, function, item.span)
+                    self.check_item(item.def_id, function, item.span);
                 }
                 HirItemKind::Struct(strukt) => {
                     for method in &strukt.methods {
@@ -180,7 +180,7 @@ impl FragmentDefinitionChecker<'_> {
         match &stmt.kind {
             HirStatementKind::Local(local) => self.check_local(local),
             HirStatementKind::Redde(Some(expr)) | HirStatementKind::Expr(expr) => {
-                self.check_expr(expr)
+                self.check_expr(expr);
             }
             HirStatementKind::Redde(None)
             | HirStatementKind::Rumpe
@@ -213,12 +213,13 @@ impl FragmentDefinitionChecker<'_> {
             | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua
             | HirExpressionKind::Error => {}
-            HirExpressionKind::Widen { operand, .. } => self.check_expr(operand),
+            HirExpressionKind::Widen { operand, .. } | HirExpressionKind::Unary(_, operand) => {
+                self.check_expr(operand);
+            }
             HirExpressionKind::Binary(_, lhs, rhs) => {
                 self.check_expr(lhs);
                 self.check_expr(rhs);
             }
-            HirExpressionKind::Unary(_, operand) => self.check_expr(operand),
             HirExpressionKind::Call(callee, _, args, _) => self.check_call(callee, args, expr.span),
             // `target ⇇ value` writes existing tensor storage; fragments admit
             // no such effect yet, so classify it as one instead of admitting it
@@ -257,8 +258,12 @@ impl FragmentDefinitionChecker<'_> {
                 self.effect(expr.span, "unapproved_effect");
                 self.check_expr(object);
             }
-            HirExpressionKind::Marked { expr: inner, .. } => self.check_expr(inner),
-            HirExpressionKind::Block(block) => self.check_block(block),
+            HirExpressionKind::Marked { expr: inner, .. } | HirExpressionKind::Praefixum(inner) => {
+                self.check_expr(inner);
+            }
+            HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
+                self.check_block(block);
+            }
             HirExpressionKind::Si {
                 cond,
                 then_block,
@@ -284,7 +289,6 @@ impl FragmentDefinitionChecker<'_> {
                     self.check_expr(&arm.body);
                 }
             }
-            HirExpressionKind::Loop(block) => self.check_block(block),
             HirExpressionKind::Dum(cond, block) => {
                 self.check_expr(cond);
                 self.check_block(block);
@@ -404,13 +408,7 @@ impl FragmentDefinitionChecker<'_> {
                     self.check_expr(element);
                 }
             }
-            HirExpressionKind::Scriptum(_, elements) => {
-                self.effect(expr.span, "host_io");
-                for element in elements {
-                    self.check_expr(element);
-                }
-            }
-            HirExpressionKind::Scribe(_, elements) => {
+            HirExpressionKind::Scriptum(_, elements) | HirExpressionKind::Scribe(_, elements) => {
                 self.effect(expr.span, "host_io");
                 for element in elements {
                     self.check_expr(element);
@@ -506,7 +504,6 @@ impl FragmentDefinitionChecker<'_> {
                 self.effect(expr.span, "unapproved_effect");
                 self.check_expr(inner);
             }
-            HirExpressionKind::Praefixum(inner) => self.check_expr(inner),
             // `¶` builds text, like `scriptum`: not a device-lane value.
             HirExpressionKind::Format { value, .. } => {
                 self.effect(expr.span, "host_io");

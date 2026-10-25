@@ -699,7 +699,7 @@ fn check_registered_intrinsic(
             | radix_intrinsics::IntrinsicReceiver::Sparsa
             | radix_intrinsics::IntrinsicReceiver::Matrix
     ) {
-        let checked = check_tensor_method_args(checker, entry, &params, args, ret, span);
+        let value_ty = check_tensor_method_args(checker, entry, &params, args, ret, span);
         if entry.failable {
             // A registry row that declares `⇥` is a failable call: the
             // same handler / `⊥` default / enclosing `⇥` rule (D17.8)
@@ -731,7 +731,7 @@ fn check_registered_intrinsic(
                     let sig = FuncSig {
                         type_params: Vec::new(),
                         params: Vec::new(),
-                        ret: checked,
+                        ret: value_ty,
                         err: Some(err),
                         is_async: false,
                         is_generator: false,
@@ -740,24 +740,24 @@ fn check_registered_intrinsic(
                 }
             }
         }
-        checked
+        value_ty
     } else if entry.failable {
         // need: the `at` read (la `apud`) on `lista`, `tabula`
         // and `textus` is a failable call: an out-of-range index or a
         // missing key is reported on `⇥ textus`, so the call needs a
         // handler, a `⊥` default or an enclosing `⇥` (D17.8).
-        let checked = checker.check_known_method_args(args, params, ret, span);
+        let value_ty = checker.check_known_method_args(args, params, ret, span);
         let err = checker.textus_type();
         let sig = FuncSig {
             type_params: Vec::new(),
             params: Vec::new(),
-            ret: checked,
+            ret: value_ty,
             err: Some(err),
             is_async: false,
             is_generator: false,
         };
         checker.reject_failable_call(&sig, span);
-        checked
+        value_ty
     } else if bounded_appende {
         // D6: bounded `appende` is a typed recoverable alternate exit.
         // Unbounded `lista<T>.appende` stays vacuum with no error channel.
@@ -1090,7 +1090,9 @@ fn resolve_return_type(
     match entry.return_kind {
         IntrinsicReturnKind::Vacuum => checker.vacuum_type(),
         IntrinsicReturnKind::Bool => checker.bool_type(),
-        IntrinsicReturnKind::Numerus => checker.numerus_type(),
+        IntrinsicReturnKind::Numerus | IntrinsicReturnKind::NumerusFromFractus => {
+            checker.numerus_type()
+        }
         IntrinsicReturnKind::Textus => checker.textus_type(),
         IntrinsicReturnKind::NumericInner | IntrinsicReturnKind::NumericSum => {
             let Some(inner) = ctx.inner else {
@@ -1203,7 +1205,6 @@ fn resolve_return_type(
             };
             checker.types.option(receiver_ty)
         }
-        IntrinsicReturnKind::NumerusFromFractus => checker.numerus_type(),
         IntrinsicReturnKind::FractusFromElement => {
             // WHY: tensor `media` reduces to a float to dodge integer division;
             // the width follows the goal's dtype table (f64 for numerus, matching
@@ -1375,31 +1376,29 @@ fn check_matrix_applica(
     let Type::Matrix(element_ty, shape) = checker.types.get(resolved).clone() else {
         return checker.error_type;
     };
-    let (peer_width, result_width) = match crate::literal_matrix_shape(shape, checker.types) {
-        Some((rows, columns)) => {
-            if rows > 4 || columns > 4 {
-                checker.invalid_operand_types("matrix_register_exceeds_cpu_subset", span);
-                return checker.error_type;
-            }
-            (
-                checker
-                    .types
-                    .intern_index(crate::IndexExpr::Literal(u64::from(columns))),
-                checker
-                    .types
-                    .intern_index(crate::IndexExpr::Literal(u64::from(rows))),
-            )
+    let (peer_width, result_width) = if let Some((rows, columns)) =
+        crate::literal_matrix_shape(shape, checker.types)
+    {
+        if rows > 4 || columns > 4 {
+            checker.invalid_operand_types("matrix_register_exceeds_cpu_subset", span);
+            return checker.error_type;
         }
-        None => {
-            // Matrix shapes are always two-dim tuples; a parametric shape
-            // carries the column and row terms directly.
-            let Some((rows, columns)) = super::tensor_index::matrix_shape_dims(checker, shape)
-            else {
-                checker.invalid_operand_types("matrix_applica_requires_literal_shape", span);
-                return checker.error_type;
-            };
-            (columns, rows)
-        }
+        (
+            checker
+                .types
+                .intern_index(crate::IndexExpr::Literal(u64::from(columns))),
+            checker
+                .types
+                .intern_index(crate::IndexExpr::Literal(u64::from(rows))),
+        )
+    } else {
+        // Matrix shapes are always two-dim tuples; a parametric shape
+        // carries the column and row terms directly.
+        let Some((rows, columns)) = super::tensor_index::matrix_shape_dims(checker, shape) else {
+            checker.invalid_operand_types("matrix_applica_requires_literal_shape", span);
+            return checker.error_type;
+        };
+        (columns, rows)
     };
     if args.len() != 1 {
         checker.wrong_arity("wrong_number_of_arguments", span);
@@ -1533,12 +1532,9 @@ fn check_tensor_shift(
     span: radix_lexer::Span,
 ) -> TypeId {
     let resolved = checker.resolve_inferred_type(receiver_ty);
-    let (element, shape) = match checker.types.get(resolved).clone() {
-        Type::Tensor(element, shape) => (element, shape),
-        _ => {
-            checker.invalid_operand_types(ISSUE_TENSOR_SHIFT_NULLABLE_SOURCE_UNSUPPORTED, span);
-            return checker.error_type;
-        }
+    let Type::Tensor(element, shape) = checker.types.get(resolved).clone() else {
+        checker.invalid_operand_types(ISSUE_TENSOR_SHIFT_NULLABLE_SOURCE_UNSUPPORTED, span);
+        return checker.error_type;
     };
     let element = checker.resolve_inferred_type(element);
     if checker
@@ -1667,13 +1663,16 @@ fn check_tensor_limes(
                 checker.invalid_operand_types(ISSUE_TENSOR_LIMES_POLICY_INVALID, span);
                 return checker.error_type;
             }
-            _ => match check_custom_tensor_edge_policy(checker, policy_type, element, rank) {
-                Some(policy) => policy,
-                None => {
+            _ => {
+                if let Some(policy) =
+                    check_custom_tensor_edge_policy(checker, policy_type, element, rank)
+                {
+                    policy
+                } else {
                     checker.invalid_operand_types(ISSUE_TENSOR_LIMES_POLICY_INVALID, span);
                     return checker.error_type;
                 }
-            },
+            }
         }
     };
     if let Some(call) = checker.current_shape_call {
@@ -1839,7 +1838,7 @@ fn validate_edge_policy_callback_signature(
 fn tensor_shape_hole_argument(method: &str, arg_index: usize) -> bool {
     matches!(
         (method, arg_index),
-        ("forma", 0) | ("crea", 1) | ("strue", 1) | ("expande", 0)
+        ("forma" | "expande", 0) | ("crea" | "strue", 1)
     )
 }
 
