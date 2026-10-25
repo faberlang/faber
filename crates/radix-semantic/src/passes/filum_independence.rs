@@ -378,10 +378,11 @@ impl Aliases {
                     return Facts::unknown();
                 }
                 let transform = match interner.resolve(*name) {
-                    // A shifted or edge-policy view reads another coordinate of
-                    // its parent, so its map is unknown: it certifies a read of
-                    // storage the body never writes, and nothing else.
-                    "disloco" => Transform::Unknown,
+                    // A shifted, reshaped or edge-policy view reads another
+                    // coordinate of its parent, so its map is unknown: it
+                    // certifies a read of storage the body never writes, and
+                    // nothing else.
+                    "disloco" | "forma" | "expande" => Transform::Unknown,
                     "limes" if builtin_edge_policy(type_args, types) => Transform::Unknown,
                     "transpone" | "__faber_glyph_transpose" => Transform::Transpose,
                     "sectio" if args.len() >= 2 => {
@@ -394,7 +395,6 @@ impl Aliases {
                             _ => Transform::Unknown,
                         }
                     }
-                    "forma" | "expande" => Transform::Unknown,
                     _ => return Facts::unknown(),
                 };
                 let mut result = self.facts(receiver, types, interner);
@@ -926,10 +926,10 @@ impl BodyProof<'_> {
     ) {
         match self.interner.resolve(name) {
             "accipe" if args.len() == 1 => {
-                self.access(receiver, Some(&args[0].expr), false, expr.span)
+                self.access(receiver, Some(&args[0].expr), false, expr.span);
             }
             "ponde" if args.len() == 2 => {
-                self.access(receiver, Some(&args[0].expr), true, expr.span)
+                self.access(receiver, Some(&args[0].expr), true, expr.span);
             }
             "transpone"
             | "__faber_glyph_transpose"

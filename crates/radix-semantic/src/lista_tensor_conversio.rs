@@ -94,7 +94,6 @@ fn symbolic_shape_rank(shape: IndexId, types: &TypeTable) -> Option<usize> {
             .iter()
             .all(|dim| valid_declared_dimension(*dim, types))
             .then_some(dims.len()),
-        IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
         _ => None,
     }
 }

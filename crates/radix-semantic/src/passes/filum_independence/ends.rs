@@ -46,7 +46,9 @@ impl Ends {
 
 impl HirVisitor for Ends {
     fn visit_block(&mut self, block: &HirBlock) {
-        let scope = block.breakable.is_some_and(|kind| kind.is_scope());
+        let scope = block
+            .breakable
+            .is_some_and(radix_hir::HirBreakableKind::is_scope);
         if scope {
             self.targets.push(Target::Sequential);
         }

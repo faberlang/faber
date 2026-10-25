@@ -42,6 +42,9 @@ impl IndexInferState {
     }
 
     /// Register resolve/lowering inference holes already present in `types`.
+    ///
+    /// # Panics
+    /// Panics when the index table holds more entries than `u32::MAX`.
     pub fn bootstrap_from_types(&mut self, types: &TypeTable) {
         for index in 0..types.index_count() {
             let id = IndexId(u32::try_from(index).expect("index table fits u32"));

@@ -467,13 +467,10 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64".to_owned())
         }
         "octeti_to_tensor_unspecified" => Some("write bytes ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
-        "octeti_to_tensor_element_unsupported" => {
+        "octeti_to_tensor_element_unsupported" | "tensor_to_octeti_element_unsupported" => {
             Some("use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type".to_owned())
         }
         "tensor_to_octeti_unspecified" => Some("write tensor ↦ octeti via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
-        "tensor_to_octeti_element_unsupported" => {
-            Some("use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type".to_owned())
-        }
         "octeti_to_tensor_length_mismatch" => {
             Some("size the byte window to product(shape) times the element width, or change the tensor shape".to_owned())
         }
@@ -871,8 +868,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("bind the constructor first: let tf32[2, 2] a ← tf32[2, 2] {}".to_owned())
         }
         "tensor_structa_forma_removed" => Some("use tensor.structa<CompleteTensorType>(data)".to_owned()),
-        "tensor_creata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),
-        "tensor_formata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),
+        "tensor_creata_complete_type_arg_required" | "tensor_formata_complete_type_arg_required" => {
+            Some("provide a complete tensor type argument".to_owned())
+        }
         "tensor_formata_forbids_value_args" => Some("use grid.forma(shape) for runtime reshape".to_owned()),
         "tensor_type_arg_incomplete" => {
             Some("include both element type and shape in the tensor type argument".to_owned())
@@ -1016,8 +1014,7 @@ fn nucleum_fragment_effect_help(args: &[DiagnosticArg]) -> Option<String> {
     Some(
         match arg_value(args, "reason")? {
             "alternate_exit" => "remove the ⇥ channel, iace, and fac/cape recovery from the fragment",
-            "async_posture" => "write the fragment as a synchronous finite function",
-            "generator_posture" => "write the fragment as a synchronous finite function",
+            "async_posture" | "generator_posture" => "write the fragment as a synchronous finite function",
             "host_io" => "keep scribe, lege, and other host I/O out of the fragment body",
             "host_allocation" => "use only local scalars, tensors, and caller-provided device storage",
             "host_runtime" => "replace the host helper with a fragment or an approved device intrinsic",

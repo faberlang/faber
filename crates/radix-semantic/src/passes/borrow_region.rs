@@ -386,6 +386,10 @@ pub fn analyze(
 /// Interner-aware region inference. Tensor view methods are identified by
 /// their canonical intrinsic rows and receive the same last-use treatment as
 /// explicitly marked borrows.
+///
+/// # Errors
+/// Returns `RegionError` when a control-flow shape has no conservative CFG
+/// lowering, or when a borrow's start node has no source location.
 pub fn analyze_with_interner(
     hir: &HirModule,
     types: &TypeTable,

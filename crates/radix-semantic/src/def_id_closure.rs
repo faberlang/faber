@@ -68,7 +68,7 @@ pub fn missing_emit_def_diagnostic(def_id: DefId, name: Option<&str>, file: &str
 
 /// Display name for a def on the DEFID001 surface.
 ///
-/// Locale-pack TypeAlias surfaces are not imported type-paths. `name_of` used
+/// Locale-pack `TypeAlias` surfaces are not imported type-paths. `name_of` used
 /// to look only at path tails, so a missing pack alias reported `def_id=35`
 /// with no `def_name`. Pack spellings win; imported path tails remain the
 /// fallback for genuine import defs.

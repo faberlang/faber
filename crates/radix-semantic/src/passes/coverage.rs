@@ -222,11 +222,11 @@ enum Admit {
 /// Whether a head is a pattern kind its column's space can be computed for.
 fn admit(head: Head, space: &Space) -> Admit {
     let fits = match (space, head) {
-        (_, Head::Wild) => true,
+        (_, Head::Wild)
+        | (Space::Bool, Head::Bool(_))
+        | (Space::Union(_), Head::TypeTest(_) | Head::Nil)
+        | (Space::Open, Head::Value | Head::TypeTest(_) | Head::Nil) => true,
         (Space::Enum(variants), Head::Variant(def_id)) => variants.contains(&def_id),
-        (Space::Bool, Head::Bool(_)) => true,
-        (Space::Union(_), Head::TypeTest(_) | Head::Nil) => true,
-        (Space::Open, Head::Value | Head::TypeTest(_) | Head::Nil) => true,
         (Space::Unknown, _) => return Admit::Skipped,
         _ => false,
     };

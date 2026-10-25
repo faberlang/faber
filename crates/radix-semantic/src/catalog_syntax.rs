@@ -620,8 +620,8 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
             }
             "expected_incipit_keyword" => {
                 let incipit = quote_arg(args, "incipit")?;
-                let incipiet = quote_arg(args, "incipiet")?;
-                return Some(format!("expected {incipit} or {incipiet}"));
+                let incipiet_keyword = quote_arg(args, "incipiet")?;
+                return Some(format!("expected {incipit} or {incipiet_keyword}"));
             }
             "reducta_source" => {
                 return Some("expected a reduction source after the reduction operator".to_owned());

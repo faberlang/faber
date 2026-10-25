@@ -257,14 +257,12 @@ impl TypeChecker<'_> {
         slot_ty: TypeId,
         site: StoreSite,
     ) -> TypeId {
-        match self.implicit_store_target(expr, ty, slot_ty) {
-            Some(target) => self.wrap_implicit_store(expr, ty, target, site),
-            None => {
-                if let Some(landed) = self.import_store_door(expr, ty, slot_ty, site) {
-                    return landed;
-                }
-                self.unify_expected(ty, slot_ty, expr.span)
-            }
+        if let Some(target) = self.implicit_store_target(expr, ty, slot_ty) {
+            self.wrap_implicit_store(expr, ty, target, site)
+        } else if let Some(landed) = self.import_store_door(expr, ty, slot_ty, site) {
+            landed
+        } else {
+            self.unify_expected(ty, slot_ty, expr.span)
         }
     }
 

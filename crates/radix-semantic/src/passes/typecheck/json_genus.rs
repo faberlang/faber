@@ -100,9 +100,11 @@ impl TypeChecker<'_> {
                 | Primitive::Textus
                 | Primitive::Ascii
                 | Primitive::Instans,
-            ) => {}
-            Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
-            | Type::SizedInstans(_) => {}
+            )
+            | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+            | Type::SizedInstans(_)
+            | Type::Error
+            | Type::Infer(_) => {}
             Type::Array(inner) | Type::Option(inner) | Type::Alias(_, inner) => {
                 self.check_json_safe_type(inner, span);
             }
@@ -128,7 +130,6 @@ impl TypeChecker<'_> {
                     span,
                 );
             }
-            Type::Error | Type::Infer(_) => {}
             _ => {
                 self.error_issue(
                     SemanticErrorKind::AnnotationInvalid,

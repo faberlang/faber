@@ -145,7 +145,7 @@ pub(crate) fn substitute_alias_params(
                     radix_types::AppliedArg::Type(ty) => {
                         radix_types::AppliedArg::Type(substitute_alias_params(types, ty, vars))
                     }
-                    size => size,
+                    radix_types::AppliedArg::Size(size) => radix_types::AppliedArg::Size(size),
                 })
                 .collect();
             types.intern(Type::Applied(base, args))

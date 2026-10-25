@@ -490,13 +490,13 @@ impl CaptureMutations {
     pub(crate) fn note_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
             HirExpressionKind::Assign(target, _)
-            | HirExpressionKind::ConversioAssign { target, .. } => self.note_place(target),
+            | HirExpressionKind::ConversioAssign { target, .. }
+            | HirExpressionKind::CopyInto { target, .. } => self.note_place(target),
             HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
                 self.note_place(receiver);
                 self.note_moves(args);
             }
             HirExpressionKind::Call(_, _, args, _) => self.note_moves(args),
-            HirExpressionKind::CopyInto { target, .. } => self.note_place(target),
             _ => {}
         }
     }
@@ -642,8 +642,8 @@ impl HirVisitor for ClosureCaptureCollector {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.note_use(*def_id),
             HirExpressionKind::Assign(target, _)
-            | HirExpressionKind::ConversioAssign { target, .. } => self.note_write(target),
-            HirExpressionKind::CopyInto { target, .. } => self.note_write(target),
+            | HirExpressionKind::ConversioAssign { target, .. }
+            | HirExpressionKind::CopyInto { target, .. } => self.note_write(target),
             HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
                 self.note_write(receiver);
                 self.note_moves(args);

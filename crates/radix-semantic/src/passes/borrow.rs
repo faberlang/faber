@@ -1173,35 +1173,30 @@ impl<'a> BorrowChecker<'a> {
     /// its `←` aliases) keeps the alias rules' own diagnostics (SEM056/SEM020)
     /// and is not reported twice.
     fn check_mut_argument_writable(&mut self, arg: &HirExpression, position: usize) {
-        let origin = match Self::root_def_id(arg) {
-            Some(root) => {
-                let covered = self.nonmut_tensor_origin(root).is_some()
-                    || self.nonmut_agg_origin(root).is_some();
-                if covered
-                    || !(self.immutable_locals.contains(&root)
-                        || self.unmarked_params.contains(&root))
-                {
-                    return;
-                }
-                Some(root)
+        let origin = if let Some(root) = Self::root_def_id(arg) {
+            let covered =
+                self.nonmut_tensor_origin(root).is_some() || self.nonmut_agg_origin(root).is_some();
+            if covered
+                || !(self.immutable_locals.contains(&root) || self.unmarked_params.contains(&root))
+            {
+                return;
             }
-            None => {
-                if !matches!(
-                    arg.kind,
-                    HirExpressionKind::Literal(_)
-                        | HirExpressionKind::Array(_)
-                        | HirExpressionKind::Struct(..)
-                        | HirExpressionKind::Verte { .. }
-                        | HirExpressionKind::Tuple(..)
-                        | HirExpressionKind::Binary(..)
-                        | HirExpressionKind::Unary(..)
-                        | HirExpressionKind::Call(..)
-                        | HirExpressionKind::MethodCall(..)
-                ) {
-                    return;
-                }
-                None
-            }
+            Some(root)
+        } else if !matches!(
+            arg.kind,
+            HirExpressionKind::Literal(_)
+                | HirExpressionKind::Array(_)
+                | HirExpressionKind::Struct(..)
+                | HirExpressionKind::Verte { .. }
+                | HirExpressionKind::Tuple(..)
+                | HirExpressionKind::Binary(..)
+                | HirExpressionKind::Unary(..)
+                | HirExpressionKind::Call(..)
+                | HirExpressionKind::MethodCall(..)
+        ) {
+            return;
+        } else {
+            None
         };
         let mut error = SemanticError::structured(SemanticErrorKind::ImmutableAssignment, arg.span)
             .with_arg("issue", ISSUE_MUT_ARGUMENT_NOT_WRITABLE)
@@ -1453,7 +1448,7 @@ impl<'a> BorrowChecker<'a> {
                 for element in elements {
                     match element {
                         radix_hir::HirArrayElement::Expr(expr) => {
-                            self.collect_element_sources(expr, &mut out)
+                            self.collect_element_sources(expr, &mut out);
                         }
                         radix_hir::HirArrayElement::Spread(expr) => {
                             if let Some((root, _)) = Self::place_key(expr) {

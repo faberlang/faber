@@ -53,6 +53,10 @@ impl<'a> IndexUnifier<'a> {
     ///
     /// BO-S-2: path-compress intermediate `IndexVar` substitutions after finding
     /// the representative (amortized O(α(n)) subsequent reads).
+    ///
+    /// # Panics
+    ///
+    /// Panics when the type table's index count does not fit `u32`.
     pub fn resolve(&mut self, id: IndexId) -> IndexId {
         let mut current = id;
         let mut path: Vec<IndexVar> = Vec::new();
@@ -213,10 +217,11 @@ impl<'a> IndexUnifier<'a> {
                 }
                 Ok(self.types.intern_index(IndexExpr::Tuple(unified)))
             }
-            (IndexExpr::Tuple(_), IndexExpr::Literal(_))
-            | (IndexExpr::Literal(_), IndexExpr::Tuple(_)) => Err(IndexUnifyError::Mismatch),
             (IndexExpr::Literal(la), IndexExpr::Literal(lb)) if la == lb => Ok(a),
-            (IndexExpr::Literal(_), IndexExpr::Literal(_)) => Err(IndexUnifyError::Mismatch),
+            // The literal-mismatch arms sit after the guard above: a preceding
+            // unguarded literal pair would shadow it.
+            (IndexExpr::Tuple(_) | IndexExpr::Literal(_), IndexExpr::Literal(_))
+            | (IndexExpr::Literal(_), IndexExpr::Tuple(_)) => Err(IndexUnifyError::Mismatch),
             (IndexExpr::Param(pa), IndexExpr::Param(pb)) if pa == pb => Ok(a),
             (IndexExpr::Runtime(ra), IndexExpr::Runtime(rb)) if ra == rb => Ok(a),
             _ => self.unify(a, b),

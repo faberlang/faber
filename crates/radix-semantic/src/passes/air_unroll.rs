@@ -1638,9 +1638,6 @@ impl BodyDecline<'_> {
                 self.scan_block(block);
                 self.at_loop_body_root = saved;
             }
-            HirExpressionKind::Loop(_)
-            | HirExpressionKind::Dum(_, _)
-            | HirExpressionKind::Discerne { .. } => self.reject(CAUSA_UNSUPPORTED_CONTROL),
             // A nested itera directly at the loop body root is its own
             // unroll unit: the body rewrite validates it recursively
             // (multiplicative budget, fail-closed decline) instead of this
@@ -1651,7 +1648,10 @@ impl BodyDecline<'_> {
             // through the generic arm below like any other nested
             // expression.
             HirExpressionKind::Itera { .. } if self.at_loop_body_root && as_statement => {}
-            HirExpressionKind::Itera { .. } => self.reject(CAUSA_UNSUPPORTED_CONTROL),
+            HirExpressionKind::Loop(_)
+            | HirExpressionKind::Dum(_, _)
+            | HirExpressionKind::Discerne { .. }
+            | HirExpressionKind::Itera { .. } => self.reject(CAUSA_UNSUPPORTED_CONTROL),
             HirExpressionKind::Call(callee, _, args, _) => {
                 if !matches!(&callee.kind, HirExpressionKind::Path(def) if self.lanes.lane_for(*def) == Some(RadixLane::Air))
                 {

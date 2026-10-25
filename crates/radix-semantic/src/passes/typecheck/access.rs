@@ -574,9 +574,9 @@ impl TypeChecker<'_> {
         ) {
             return None;
         }
-        if !self
+        if self
             .interner
-            .is_some_and(|interner| interner.resolve(name) == "nuntius")
+            .is_none_or(|interner| interner.resolve(name) != "nuntius")
         {
             return None;
         }

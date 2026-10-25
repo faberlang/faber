@@ -33,7 +33,7 @@ use rustc_hash::FxHashMap;
 /// [`radix_lane::collect`].
 #[derive(Debug, Clone, Default)]
 pub struct CompanionPredeclarations {
-    /// Companion name → pre-allocated DefId.
+    /// Companion name → pre-allocated `DefId`.
     pub by_name: FxHashMap<LexSymbol, DefId>,
     /// Highest companion index allocated so `radix_lane::collect` can seed its
     /// counter past ours.

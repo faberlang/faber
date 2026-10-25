@@ -364,9 +364,9 @@ fn contains_rumpe_expr(expr: &HirExpression) -> bool {
         HirExpressionKind::Discerne { arms, .. } => {
             arms.iter().any(|arm| contains_rumpe_expr(&arm.body))
         }
-        HirExpressionKind::Loop(body) => contains_rumpe_block(body),
-        HirExpressionKind::Dum(_, body) => contains_rumpe_block(body),
-        HirExpressionKind::Itera { body, .. } => contains_rumpe_block(body),
+        HirExpressionKind::Loop(body)
+        | HirExpressionKind::Dum(_, body)
+        | HirExpressionKind::Itera { body, .. } => contains_rumpe_block(body),
         HirExpressionKind::Handled { body, catch } => {
             contains_rumpe_block(body) || contains_rumpe_block(&catch.body)
         }

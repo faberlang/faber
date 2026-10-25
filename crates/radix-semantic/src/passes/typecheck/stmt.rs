@@ -569,7 +569,6 @@ impl TypeChecker<'_> {
             // A bare generic parameter may instantiate to a scalar, so it is
             // not shareable on its own; its container members are caught once
             // the instantiation is resolved.
-            Type::Param(_) => false,
             _ => false,
         }
     }
@@ -598,8 +597,7 @@ impl TypeChecker<'_> {
         };
         let object_ty = self.types.peel_access_marker(object_ty).1;
         let element = match self.types.get(object_ty) {
-            Type::Array(element) => *element,
-            Type::BoundedArray { element, .. } => *element,
+            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
             _ => return false,
         };
         !self.is_shareable_payload(element)

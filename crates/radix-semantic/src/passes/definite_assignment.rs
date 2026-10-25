@@ -427,8 +427,9 @@ impl<'a> DefiniteAssignmentChecker<'a> {
     fn root_def_id(expr: &HirExpression) -> Option<DefId> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => Some(*def_id),
-            HirExpressionKind::Field(object, _) => Self::root_def_id(object),
-            HirExpressionKind::Index(object, _) => Self::root_def_id(object),
+            HirExpressionKind::Field(object, _) | HirExpressionKind::Index(object, _) => {
+                Self::root_def_id(object)
+            }
             HirExpressionKind::Deref(inner) => Self::root_def_id(inner),
             _ => None,
         }

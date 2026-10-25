@@ -528,6 +528,7 @@ fn contains_unresolved_type(
         | Type::Struct(_)
         | Type::Enum(_)
         | Type::Interface(_)
+        | Type::SizedNumeric(_, _)
         | Type::Error => false,
         Type::Array(inner)
         | Type::Queue(inner)
@@ -566,7 +567,6 @@ fn contains_unresolved_type(
             contains_unresolved_type(*element, types, seen)
                 || !concrete_index(*shape, types, &mut FxHashSet::default())
         }
-        Type::SizedNumeric(_, _) => false,
         Type::Ref(_, inner) | Type::Alias(_, inner) => {
             contains_unresolved_type(*inner, types, seen)
         }
@@ -657,7 +657,6 @@ impl HirVisitorMut for InstanceRewriter<'_> {
             substitute_type(ty, self.type_map, self.index_map, self.types, self.interner)
         });
         match &mut expr.kind {
-            HirExpressionKind::Path(_) => {}
             HirExpressionKind::Call(_, type_args, _, _)
             | HirExpressionKind::MethodCall(_, _, type_args, _, _) => {
                 for type_arg in type_args {
@@ -892,8 +891,7 @@ fn substitute_index(
             match radix_types::compose_index_affine_constant(types, base, offset) {
                 Ok(term) => match radix_types::evaluate_index_dimension(term, types) {
                     Ok(Some(value)) => types.intern_index(IndexExpr::Literal(value)),
-                    Ok(None) => term,
-                    Err(_) => term,
+                    Ok(None) | Err(_) => term,
                 },
                 Err(_) => types.intern_index(IndexExpr::Affine { base, offset }),
             }

@@ -339,7 +339,7 @@ fn child_types(ty: &Type, out: &mut Vec<TypeId>) {
             out.push(*base);
             out.extend(args.iter().filter_map(|arg| match arg {
                 AppliedArg::Type(arg) => Some(*arg),
-                _ => None,
+                AppliedArg::Size(_) => None,
             }));
         }
         _ => {}

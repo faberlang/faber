@@ -747,9 +747,10 @@ impl TypeChecker<'_> {
     fn expected_numerus_literal_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
         let expected = self.resolve_inferred_type(expected?);
         match self.types.get(expected) {
-            Type::Primitive(Primitive::Numerus) => Some(expected),
+            Type::Primitive(Primitive::Numerus)
+            | Type::ModularWord(_)
+            | Type::SaturatingWord(_) => Some(expected),
             Type::SizedNumeric(Primitive::Numerus, width) if !width.is_decimal() => Some(expected),
-            Type::ModularWord(_) | Type::SaturatingWord(_) => Some(expected),
             _ => None,
         }
     }

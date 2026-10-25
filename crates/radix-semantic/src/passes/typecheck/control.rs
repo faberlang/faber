@@ -540,16 +540,12 @@ impl TypeChecker<'_> {
         // else is still a real normal edge: it carries the incoming facts plus
         // any refinement proven by the negated condition.
         self.restore_flow_state(&incoming);
-        let (else_ty, else_state, else_diverges) = match else_block {
-            Some(block) => {
-                let (ty, state) =
-                    self.check_block_with_refinement(block, block_expected, else_refine);
-                (ty, state, self.block_diverges(block))
-            }
-            None => {
-                let state = self.state_with_refinement(else_refine);
-                (self.vacuum_type(), state, false)
-            }
+        let (else_ty, else_state, else_diverges) = if let Some(block) = else_block {
+            let (ty, state) = self.check_block_with_refinement(block, block_expected, else_refine);
+            (ty, state, self.block_diverges(block))
+        } else {
+            let state = self.state_with_refinement(else_refine);
+            (self.vacuum_type(), state, false)
         };
 
         // Apply the ruled join to the statement's continuation. Diverging

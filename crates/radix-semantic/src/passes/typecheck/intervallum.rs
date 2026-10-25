@@ -250,8 +250,9 @@ fn constant_step_is_not_positive(step: &HirExpression) -> bool {
     use radix_hir::{HirLiteral, HirUnOp};
     match &step.kind {
         HirExpressionKind::Literal(HirLiteral::Int(value)) => *value == 0,
-        HirExpressionKind::Literal(HirLiteral::Float(value)) => *value <= 0.0,
-        HirExpressionKind::Literal(HirLiteral::FloatText { value, .. }) => *value <= 0.0,
+        HirExpressionKind::Literal(
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. },
+        ) => *value <= 0.0,
         HirExpressionKind::Unary(HirUnOp::Neg, inner) => matches!(
             &inner.kind,
             HirExpressionKind::Literal(

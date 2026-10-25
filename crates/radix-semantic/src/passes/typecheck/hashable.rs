@@ -91,8 +91,8 @@ impl TypeChecker<'_> {
                 | Primitive::Regex
                 | Primitive::Match,
             )
-            | Type::SizedNumeric(Primitive::Fractus, _) => false,
-            Type::Array(_)
+            | Type::SizedNumeric(Primitive::Fractus, _)
+            | Type::Array(_)
             | Type::BoundedArray { .. }
             | Type::Map(_, _)
             | Type::Ledger(_, _)
