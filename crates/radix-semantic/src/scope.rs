@@ -273,7 +273,7 @@ pub struct ImportedSpellings {
 pub struct ImportedFileInterface {
     exports: FxHashMap<LexSymbol, ImportedFileExport>,
     /// Generic edge-policy contracts exported with callables, keyed by their
-    /// consumer-visible member spelling. The synthetic DefId is local to this
+    /// consumer-visible member spelling. The synthetic `DefId` is local to this
     /// resolver and exists only to key semantic call obligations.
     tensor_edge_policy_requirements:
         FxHashMap<LexSymbol, (DefId, Vec<TensorEdgePolicyRequirement>)>,
@@ -779,8 +779,8 @@ pub struct Resolver {
     gpu_builtins: FxHashMap<DefId, radix_types::MirKernelBuiltin>,
     /// Insertion-order mirror of `gpu_builtins` for callers that need a slice.
     gpu_builtins_order: Vec<(DefId, radix_types::MirKernelBuiltin)>,
-    /// Nearest visible name → DefId for the current scope chain (O(1) lookup).
-    /// Maintained eagerly on define / exit_scope.
+    /// Nearest visible name → `DefId` for the current scope chain (O(1) lookup).
+    /// Maintained eagerly on define / `exit_scope`.
     lookup_shadow: FxHashMap<LexSymbol, DefId>,
     /// Cache of `name_suggestion_key` folds per interned symbol.
     ///
@@ -834,7 +834,7 @@ pub struct Resolver {
     /// `(source → destination)`. Builtin and user rows share this one
     /// table; there is no second compatibility table.
     conversion_rows: FxHashMap<ConversionPair, Vec<ConversionRow>>,
-    /// DefIds of nominal types installed from imported file interfaces.
+    /// `DefIds` of nominal types installed from imported file interfaces.
     /// Runtime-only ownership surface for orphan-style conversion rules.
     imported_type_def_ids: FxHashSet<DefId>,
     /// Namespace bindings referenced from qualified type paths.
@@ -845,8 +845,8 @@ pub struct Resolver {
     /// excluded from import snapshots: schemas are source-level declarations
     /// of the analyzed unit.
     schemas: FxHashMap<DefId, crate::SchemaDef>,
-    /// Reader-locale pack `[types]` surfaces registered as builtin TypeAlias
-    /// defs. These identities are not HIR items, so NameCatalog and imported
+    /// Reader-locale pack `[types]` surfaces registered as builtin `TypeAlias`
+    /// defs. These identities are not HIR items, so `NameCatalog` and imported
     /// type-paths miss them unless emit admits this map.
     locale_pack_type_aliases: FxHashMap<DefId, LexSymbol>,
     /// Builtin-claimed expression nodes (`lege`/`lineam`/`vacua`/`scriptum`)
@@ -856,7 +856,7 @@ pub struct Resolver {
     shadowed_builtins: FxHashMap<radix_syntax::NodeId, DefId>,
     /// Surface spellings of the scribe family (`nota`/`vide`/`mone`/`scribe`
     /// and the active pack's aliases). Empty means registry-direct Latin.
-    /// Runtime-only hint state for SEM001.scribe_callee; excluded from snapshots.
+    /// Runtime-only hint state for `SEM001.scribe_callee`; excluded from snapshots.
     scribe_family_surfaces: FxHashSet<String>,
     /// Checker-side `iuncta` element labels keyed by binding `DefId`.
     ///
@@ -1700,7 +1700,7 @@ impl Resolver {
     /// only the shared field, so a dropped row would leave that variant to
     /// the runtime trap fallback, while `variant_child`
     /// excludes flagged rows so the package-MIR merge still fails closed on
-    /// the unknown payload identity (council-11 correct_before_next_phase).
+    /// the unknown payload identity (council-11 `correct_before_next_phase`).
     fn import_enum_variants_partial(
         &mut self,
         enum_def: DefId,
@@ -1720,16 +1720,18 @@ impl Resolver {
                     .fields
                     .iter()
                     .filter_map(|field| {
-                        match import_interface_type_with_resolver(&field.ty, types, interner, self)
-                            .and_then(|ty| {
-                                let init = field
-                                    .default
-                                    .as_ref()
-                                    .map(|default| default.import(types, interner, self))
-                                    .transpose()?;
-                                Ok((ty, init))
-                            }) {
-                            Ok((ty, init)) => Some(ImportedFileStructField {
+                        if let Ok((ty, init)) =
+                            import_interface_type_with_resolver(&field.ty, types, interner, self)
+                                .and_then(|ty| {
+                                    let init = field
+                                        .default
+                                        .as_ref()
+                                        .map(|default| default.import(types, interner, self))
+                                        .transpose()?;
+                                    Ok((ty, init))
+                                })
+                        {
+                            Some(ImportedFileStructField {
                                 name: interner.intern(&field.name),
                                 ty,
                                 optional: field.optional,
@@ -1737,11 +1739,10 @@ impl Resolver {
                                 modifier: field.modifier,
                                 visibility: field.visibility,
                                 init,
-                            }),
-                            Err(_) => {
-                                payload_unresolved = true;
-                                None
-                            }
+                            })
+                        } else {
+                            payload_unresolved = true;
+                            None
                         }
                     })
                     .collect::<Vec<_>>();
@@ -2558,7 +2559,7 @@ impl Resolver {
     }
 
     /// Return source spellings for compiler-generated backward companion
-    /// functions registered during analysis (the `0x8000_0000` DefId family),
+    /// functions registered during analysis (the `0x8000_0000` `DefId` family),
     /// keyed by definition id. The companion names are registered in the
     /// resolver before resolve but never appear as HIR definitions, so the
     /// emitter's DefId→name table cannot recover them; carrying the spelling
@@ -2944,6 +2945,11 @@ impl Resolver {
     /// Builtin rows occupy the global scope, are visible from every scope, and
     /// reject any later user row for the same ordered pair. Registering the
     /// same builtin pair twice is a duplicate conflict carrying both spans.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConversionRowConflict::Duplicate`] when a builtin row for the
+    /// pair is already enrolled.
     pub fn register_builtin_conversion(
         &mut self,
         pair: ConversionPair,
@@ -2972,6 +2978,12 @@ impl Resolver {
     /// (duplicate, both spans) or owned by a builtin row in any scope
     /// (non-shadowing, builtin + user spans). At most one row per pair per
     /// scope.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConversionRowConflict::BuiltinShadow`] when a builtin row owns
+    /// the pair, or [`ConversionRowConflict::Duplicate`] when the current scope
+    /// already holds a row for it.
     pub fn register_user_conversion(
         &mut self,
         pair: ConversionPair,
@@ -3295,7 +3307,7 @@ impl Resolver {
     ///
     /// Transitive library leaves are installed on the consumer during
     /// `set_file_interfaces_from_snapshots` (so signatures can name them) but
-    /// have no HIR import binding. Emit walks this to register those DefIds.
+    /// have no HIR import binding. Emit walks this to register those `DefIds`.
     #[must_use]
     pub fn file_interface_namespace(
         &self,
@@ -3314,7 +3326,7 @@ impl Resolver {
         self.file_interfaces.keys().copied()
     }
 
-    /// Canonical FileInterface export name for a consumer-locale surface.
+    /// Canonical `FileInterface` export name for a consumer-locale surface.
     ///
     /// Target backends write this name. The library module is emitted from
     /// native source, so `Visus` must become `View`.
@@ -3334,7 +3346,7 @@ impl Resolver {
             .unwrap_or(surface)
     }
 
-    /// Consumer-locale surface for a canonical FileInterface export name.
+    /// Consumer-locale surface for a canonical `FileInterface` export name.
     ///
     /// Package-MIR linking keys library call targets by the library's native
     /// (canonical) export name. The consumer HIR uses the projected surface.
@@ -3783,6 +3795,11 @@ impl Resolver {
     }
 
     /// Enter a child scope and make it current until [`Self::exit_scope`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of live scopes exceeds `u32::MAX`, since the new
+    /// scope cannot be addressed by [`ScopeId`].
     pub fn enter_scope(&mut self, kind: ScopeKind) -> ScopeId {
         let id = ScopeId(u32::try_from(self.scopes.len()).expect("scope stack fits u32"));
         let scope = Scope::new(id, Some(self.current_scope), kind);
