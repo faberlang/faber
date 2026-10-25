@@ -2,11 +2,11 @@
 //!
 //! Owns the [`Target`] enum, the variant universe ([`Target::ALL`]), its
 //! CLI spelling ([`fmt::Display`]), the availability-gate spelling table
-//! ([`Target::availability_spellings`]), and the feature-gate mapping
-//! ([`Target::required_feature`] / [`Target::is_available`]). Target
-//! identity is a std-only contract shared
-//! by semantic policy, the driver, services, and tests; it must not depend
-//! on HIR, MIR, codegen, diagnostics, or any backend leaf.
+//! ([`Target::availability_spellings`]), the feature-gate mapping
+//! ([`Target::required_feature`] / [`Target::is_available`]), and the
+//! [`OutputMode`] switch. Target identity is a std-only contract shared by
+//! semantic policy, the driver, services, and tests; it must not depend on
+//! HIR, MIR, codegen, diagnostics, or any backend leaf.
 //!
 //! Consumers forward their own `hir-*` / `mir-*` Cargo features here 1:1 so
 //! [`Target::is_available`] reflects the consumer's build, not this crate's.
@@ -19,7 +19,7 @@ pub use leaf::Leaf;
 /// Compilation target selected after analysis and before backend dispatch.
 ///
 /// This enum is the public routing surface for drivers. Each variant commits to
-/// a concrete backend module and a matching [`crate::Output`] payload shape.
+/// a concrete backend module and a matching `Output` payload in `radix-module`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Target {
     /// Core MIR interpreter target. This is the minimum executable compiler
@@ -60,13 +60,12 @@ pub enum Target {
     /// with exact arithmetic). Default-off; fails closed outside the subset.
     HirC,
 
-    /// Faber source re-emitted from analyzed HIR.
-    ///
-    /// Historically the "canonical Faber" surface; with reader locales this
-    /// is the HIR→Faber re-emit behind `faber format --locale <X>`.
+    /// Faber source re-emitted from analyzed HIR: the surface behind
+    /// `faber format` and `faber convert`.
     HirFaber,
 
-    /// Portable analyzed HIR artifact (postcard binary); serialized in emit workflow, not codegen.
+    /// Portable analyzed HIR artifact (postcard binary); serialized in emit
+    /// workflow, not codegen.
     HirFhir,
 
     /// Supported-with-limitations `MIR`-backed WebAssembly text target.
@@ -180,9 +179,9 @@ impl Target {
     /// conveniences owned by the caller, not canonical spellings.
     #[must_use]
     pub fn from_spelling(spelling: &str) -> Option<Self> {
-        // WHY: derive from [`Self::ALL`] + [`Self::as_str`] so the spelling
-        // table lives once; `all_is_exactly_the_variant_set` keeps `ALL`
-        // exhaustive over the variant domain.
+        // WHY: derive from `Self::ALL` + `Self::as_str` so the spelling table
+        // lives once; `all_is_exactly_the_variant_set` keeps `ALL` exhaustive
+        // over the variant domain.
         Self::ALL
             .iter()
             .copied()
@@ -293,7 +292,7 @@ impl Target {
     /// Any surface that must enumerate targets (report rows, completeness
     /// tests, discovery lists) starts from this list instead of keeping a
     /// second hand-typed copy. The list cannot silently drift from the
-    /// enum: [`all_is_exactly_the_variant_set`] walks the variant domain
+    /// enum: `all_is_exactly_the_variant_set` walks the variant domain
     /// through an exhaustive match with no wildcard arm, so adding or
     /// removing a variant fails that test's compilation and the assertion
     /// then fails until `ALL` matches the domain exactly.
@@ -384,9 +383,6 @@ impl Target {
 
     /// Whether this target is available in the current Radix build.
     #[must_use]
-    // WHY: each arm computes a distinct feature gate; `matches!` would compare
-    // patterns and change semantics.
-    #[allow(clippy::match_like_matches_macro)]
     pub fn is_available(self) -> bool {
         match self {
             Target::HirRust => cfg!(feature = "hir-rust"),
@@ -460,18 +456,13 @@ impl Target {
 
     /// Leaves this target declares.
     ///
-    /// Rust, the runner family (`MirStepper`, `MirFmir*`), and Faber/FHIR
-    /// share `faber-leaf` or preserve its calls, and declare all nine leaves
-    /// (129 routes: fs 47, stdio 18, process 12, clock 4, entropy 5, tcp 14,
-    /// http 20, websocket 8, machine 1). Go declares its four complete ports:
-    /// stdio 18/18 (including `consolum:metire`), process 12/12 (including
-    /// `processus:captura`, `processus:exsequi` and `processus:exsequetur`),
-    /// clock 4/4, and entropy 5/5. Its fs, tcp, http, websocket and machine
-    /// ports stay undeclared, because partial coverage is never declared as a
-    /// whole leaf. Wasm
-    /// declares stdio for its closed-set WAT probe. Clif declares clock 4/4,
-    /// served by the native runtime's `faber-leaf` conversations; every other
-    /// leaf still fails closed.
+    /// A leaf is declared whole or not at all: partial coverage is never
+    /// declared as a whole leaf, so any leaf missing here fails closed
+    /// (`leaf_unsupported_on_target`). Rust, the runner family
+    /// (`MirStepper`, `MirFmir*`), and Faber/FHIR share `faber-leaf` or
+    /// preserve its calls and declare every leaf. Clif's clock is served by
+    /// the native runtime's `faber-leaf` conversations; every other leaf
+    /// fails closed there.
     #[must_use]
     pub fn supported_leaves(self) -> &'static [Leaf] {
         match self {
