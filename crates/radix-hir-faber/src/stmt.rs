@@ -748,8 +748,9 @@ impl super::FaberCodegen<'_> {
                     .starts_with(&ref_prefix)
             });
         let keyword = match (local.is_await, await_assignment, local.mutable) {
-            (false, _, false) if !compile_time => surface.contextual_keyword("sit"),
-            (true, true, false) if !compile_time => surface.contextual_keyword("sit"),
+            (false, _, false) | (true, true, false) if !compile_time => {
+                surface.contextual_keyword("sit")
+            }
             (true, true, false) | (false, _, false) => surface.contextual_keyword("fixum"),
             (false, _, true) if ref_local => "",
             (true, true, true) | (false, _, true) => surface.contextual_keyword("varia"),
