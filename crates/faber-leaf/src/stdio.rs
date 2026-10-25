@@ -45,6 +45,9 @@ pub fn is_route(route: &str) -> bool {
 }
 
 /// Answer a `consolum:*` route. `None` means the route is not this leaf.
+///
+/// Async aliases (`hauriet`, `leget`, `scribet`, `dicet`, `monet`, `videbit`)
+/// run the sync handler and report the canonical route in errors.
 pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
     let result = match route {
         "consolum:hauri" | "consolum:hauriet" => read_bytes(args),
@@ -135,7 +138,8 @@ fn write_stdout(route: &'static str, bytes: &[u8]) -> Result<Reply, LeafError> {
         .map_err(|err| LeafError::from_io(route, "", &err))
 }
 
-fn write_stderr(route: &'static str, text: &str) -> Result<Reply, LeafError> {
+/// Write `text` plus one newline to stderr.
+fn write_stderr_line(route: &'static str, text: &str) -> Result<Reply, LeafError> {
     let mut err = io::stderr();
     err.write_all(text.as_bytes())
         .and_then(|()| err.write_all(b"\n"))
@@ -144,6 +148,8 @@ fn write_stderr(route: &'static str, text: &str) -> Result<Reply, LeafError> {
         .map_err(|io_err| LeafError::from_io(route, "", &io_err))
 }
 
+/// One `read` from stdin, so a short answer is possible; EOF and a zero-length
+/// request both return empty `bytes`.
 fn read_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "consolum:hauri";
     let length = expect_int(ROUTE, args, 0, "byte_length")?;
@@ -230,13 +236,13 @@ fn write_partial(args: &[Arg]) -> Result<Reply, LeafError> {
 fn warn_line(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "consolum:mone";
     let msg = expect_str(ROUTE, args, 0, "msg")?;
-    write_stderr(ROUTE, msg)
+    write_stderr_line(ROUTE, msg)
 }
 
 fn debug_line(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "consolum:vide";
     let msg = expect_str(ROUTE, args, 0, "msg")?;
-    write_stderr(ROUTE, msg)
+    write_stderr_line(ROUTE, msg)
 }
 
 fn stdin_is_tty(args: &[Arg]) -> Result<Reply, LeafError> {
