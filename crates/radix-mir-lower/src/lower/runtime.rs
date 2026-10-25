@@ -4007,7 +4007,6 @@ impl FunctionBuilder<'_> {
     pub(super) fn lower_read_line(&mut self, expr: &HirExpression) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
         let intrinsic = match expr.kind {
-            HirExpressionKind::ReadLine(true) => MirIntrinsic::ReadLine,
             HirExpressionKind::ReadLine(false) => MirIntrinsic::ReadAll,
             _ => MirIntrinsic::ReadLine,
         };
@@ -4120,7 +4119,12 @@ impl FunctionBuilder<'_> {
             // This is the FLAGGED continuation of the L23 grouping predicate
             // (the rows L23 explicitly left open).
             Type::Primitive(
-                Primitive::Bivalens | Primitive::Numerus | Primitive::Fractus | Primitive::Octeti | Primitive::Valor,
+                Primitive::Bivalens
+                | Primitive::Numerus
+                | Primitive::Fractus
+                | Primitive::Octeti
+                | Primitive::Valor
+                | Primitive::Instans,
             )
             | Type::Array(_)
             // An inline collection literal types as the exact-length witness
@@ -4136,7 +4140,6 @@ impl FunctionBuilder<'_> {
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
             | Type::PolicyFloat(_, _)
-            | Type::Primitive(Primitive::Instans)
             | Type::SizedInstans(_) => true,
             // Option payloads render as a bare value (`display_option`
             // semantics); nested options are not grouped.
@@ -4161,14 +4164,22 @@ impl FunctionBuilder<'_> {
             // display ABI); `instans` renders its Rust-oracle Debug shape
             // through the opaque format carrier (the runtime's arena lookup
             // renders the handle like `__faber_rt_v1_instans_display`).
-            Type::Primitive(Primitive::Bivalens | Primitive::Fractus)
+            // Opaque collections (lista, octeti, valor, tabula, copia) format
+            // through the single-opaque-arg format carrier too, which every
+            // MIR consumer renders in the Rust-oracle Debug shape.
+            Type::Primitive(
+                Primitive::Bivalens | Primitive::Fractus | Primitive::Instans | Primitive::Octeti | Primitive::Valor,
+            )
             | Type::SizedNumeric(_, _)
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
             | Type::PolicyFloat(_, _)
-            | Type::Primitive(Primitive::Instans)
-            | Type::SizedInstans(_) => self.runtime_call_value(
+            | Type::SizedInstans(_)
+            | Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::Map(_, _)
+            | Type::Set(_) => self.runtime_call_value(
                 MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },
                 vec![value],
                 text_ty,
@@ -4184,19 +4195,6 @@ impl FunctionBuilder<'_> {
                     recovery: None,
                     struct_defaults: Vec::new(),
                 }),
-                vec![value],
-                text_ty,
-                span,
-            ),
-            // Opaque collections (lista, octeti, valor, tabula, copia) format
-            // through the single-opaque-arg format carrier, which every MIR
-            // consumer renders in the Rust-oracle Debug shape.
-            Type::Primitive(Primitive::Octeti | Primitive::Valor)
-            | Type::Array(_)
-            | Type::BoundedArray { .. }
-            | Type::Map(_, _)
-            | Type::Set(_) => self.runtime_call_value(
-                MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },
                 vec![value],
                 text_ty,
                 span,

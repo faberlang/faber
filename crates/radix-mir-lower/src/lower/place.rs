@@ -595,12 +595,12 @@ impl FunctionBuilder<'_> {
         Some(indices)
     }
 
-    /// A one-element `lista` aggregate operand (one TensorSliceNd axis entry).
+    /// A one-element `lista` aggregate operand (one `TensorSliceNd` axis entry).
     fn one_element_list(&mut self, operand: MirOperand, list_ty: MirType, span: Span) -> MirOperand {
         self.element_list(vec![operand], list_ty, span)
     }
 
-    /// An N-element `lista` aggregate operand (one entry per TensorSliceNd axis).
+    /// An N-element `lista` aggregate operand (one entry per `TensorSliceNd` axis).
     fn element_list(&mut self, operands: Vec<MirOperand>, list_ty: MirType, span: Span) -> MirOperand {
         self.construct_temp(
             MirAggregateKind::Array,

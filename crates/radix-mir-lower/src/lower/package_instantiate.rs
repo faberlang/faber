@@ -301,6 +301,13 @@ pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
 /// provider module is linked. The final package pass sets
 /// `require_tensor_edge_resolution` and fails closed if any concrete limes
 /// site still has no provider or callback target.
+///
+/// # Errors
+/// Returns [`MirError`] when a call site cannot bind, a template is missing,
+/// substitution fails, a shape-size scalar survives finalization, an imported
+/// device function has no usable body channel, the role union is
+/// contradictory, the MIR function id space is exhausted, or composition
+/// rejects a cycle or expansion budget.
 #[allow(clippy::type_complexity)]
 pub fn instantiate_merged_generic_calls_with_tensor_edge_policy(
     program: &mut MirProgram,
@@ -935,26 +942,24 @@ impl PackageInstantiate<'_> {
         };
         let sym = *sym;
         if let Some(value) = radix_types::parse_natural_capacity(self.interner.resolve(sym)) {
-            return match find_literal_index(self.types, value) {
-                Some(index) => ExplicitShapeWitness::Found(index),
-                None => {
-                    self.errors.push(MirError::validation(
-                        span,
-                        "generic call signature has unresolved type parameter",
-                    ));
-                    ExplicitShapeWitness::MissingReported
-                }
-            };
-        }
-        match parent_shapes.get(&sym).copied() {
-            Some(index) => ExplicitShapeWitness::Found(index),
-            None => {
+            return if let Some(index) = find_literal_index(self.types, value) {
+                ExplicitShapeWitness::Found(index)
+            } else {
                 self.errors.push(MirError::validation(
                     span,
-                    "generic call type argument does not match parameter kind",
+                    "generic call signature has unresolved type parameter",
                 ));
                 ExplicitShapeWitness::MissingReported
-            }
+            };
+        }
+        if let Some(index) = parent_shapes.get(&sym).copied() {
+            ExplicitShapeWitness::Found(index)
+        } else {
+            self.errors.push(MirError::validation(
+                span,
+                "generic call type argument does not match parameter kind",
+            ));
+            ExplicitShapeWitness::MissingReported
         }
     }
 
@@ -1715,14 +1720,17 @@ fn runtime_extents_are_caller_formal_axes(types: &TypeTable, index: IndexId, see
     match types.get_index(index) {
         IndexExpr::Runtime(
             RuntimeExtentId::FunctionParameterAxis { .. } | RuntimeExtentId::FunctionParameterFieldAxis { .. },
-        ) => true,
+        )
+        | IndexExpr::Literal(_)
+        | IndexExpr::Param(_)
+        | IndexExpr::Infer(_)
+        | IndexExpr::Unspecified => true,
         IndexExpr::Runtime(_) => false,
         IndexExpr::Affine { base, .. } => runtime_extents_are_caller_formal_axes(types, *base, seen),
         IndexExpr::Divide { numerator, .. } => runtime_extents_are_caller_formal_axes(types, *numerator, seen),
         IndexExpr::Tuple(dimensions) => dimensions
             .iter()
             .all(|dimension| runtime_extents_are_caller_formal_axes(types, *dimension, seen)),
-        IndexExpr::Literal(_) | IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => true,
     }
 }
 

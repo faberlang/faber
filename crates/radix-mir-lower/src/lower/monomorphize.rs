@@ -1039,15 +1039,14 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         };
         let sym = *sym;
         if let Some(value) = self.magnitudo_literal_of(concrete) {
-            return match find_literal_index(self.types(), value) {
-                Some(index) => ExplicitShapeWitness::Found(index),
-                None => {
-                    self.lowerer.errors.push(MirError::validation(
-                        span,
-                        "generic call signature has unresolved type parameter",
-                    ));
-                    ExplicitShapeWitness::MissingReported
-                }
+            return if let Some(index) = find_literal_index(self.types(), value) {
+                ExplicitShapeWitness::Found(index)
+            } else {
+                self.lowerer.errors.push(MirError::validation(
+                    span,
+                    "generic call signature has unresolved type parameter",
+                ));
+                ExplicitShapeWitness::MissingReported
             };
         }
         let mut finder = LocalFinder { name: sym, found: None };
@@ -1075,15 +1074,14 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 .find(|row| matches!(self.types().get_index(row.witness), IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(found)) if *found == binding))
                 .map_or(ExplicitShapeWitness::MissingUnreported, |row| ExplicitShapeWitness::Found(row.witness));
         }
-        match find_param_index(self.types(), sym) {
-            Some(index) => ExplicitShapeWitness::Found(index),
-            None => {
-                self.lowerer.errors.push(MirError::validation(
-                    span,
-                    "generic call type argument does not match parameter kind",
-                ));
-                ExplicitShapeWitness::MissingReported
-            }
+        if let Some(index) = find_param_index(self.types(), sym) {
+            ExplicitShapeWitness::Found(index)
+        } else {
+            self.lowerer.errors.push(MirError::validation(
+                span,
+                "generic call type argument does not match parameter kind",
+            ));
+            ExplicitShapeWitness::MissingReported
         }
     }
 

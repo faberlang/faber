@@ -127,8 +127,7 @@ impl FunctionBuilder<'_> {
         let coordinate_ty = coordinates
             .first()
             .and_then(|(id, _)| super::control::reduction_coordinate_type(Some(body), group.as_deref(), *id))
-            .map(MirType::semantic)
-            .unwrap_or(integer);
+            .map_or(integer, MirType::semantic);
         let mut locals = Vec::new();
         for (id, name) in coordinates {
             let local = self.next_local_id();
@@ -286,13 +285,13 @@ impl FunctionBuilder<'_> {
                     span,
                 )
             };
-            let seen = self.runtime_call_value(
+            let already_present = self.runtime_call_value(
                 MirIntrinsic::Collection(MirCollectionOp::Contains),
                 vec![state.clone(), key.clone()],
                 boolean,
                 span,
             );
-            self.assign(MirPlace::temp(bucket.seen), seen, boolean, span);
+            self.assign(MirPlace::temp(bucket.seen), already_present, boolean, span);
             self.assign(
                 MirPlace::temp(bucket.accumulator),
                 MirOperand::Constant(initial.clone()),
