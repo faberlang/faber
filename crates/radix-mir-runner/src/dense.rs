@@ -165,11 +165,13 @@ fn reads_back_exactly(kind: DenseKind, value: &Value) -> bool {
             let rounded = f64::from(*v as f32);
             v.to_bits() == rounded.to_bits() || (v.is_nan() && rounded.is_nan())
         }
-        (DenseKind::F64, Value::Float(_)) | (DenseKind::I64, Value::Int(_)) => true,
+        (DenseKind::F64, Value::Float(_))
+        | (DenseKind::I64, Value::Int(_))
+        | (DenseKind::U64, Value::UInt(_))
+        | (DenseKind::Bool, Value::Bool(_)) => true,
         (DenseKind::I32, Value::Int(v)) => i32::try_from(*v).is_ok(),
         (DenseKind::U8, Value::Int(v)) => u8::try_from(*v).is_ok(),
         (DenseKind::U32, Value::Int(v)) => u32::try_from(*v).is_ok(),
-        (DenseKind::U64, Value::UInt(_)) | (DenseKind::Bool, Value::Bool(_)) => true,
         _ => false,
     }
 }
@@ -181,7 +183,9 @@ pub fn dense_kind_of_type(types: &TypeTable, ty: TypeId) -> Option<DenseKind> {
     match types.get(ty) {
         Type::Alias(_, inner) => dense_kind_of_type(types, *inner),
         Type::Primitive(Primitive::Bivalens) => Some(DenseKind::Bool),
-        Type::PolicyFloat(_, width) => float_kind(*width),
+        Type::PolicyFloat(_, width) | Type::SizedNumeric(Primitive::Fractus, width) => {
+            float_kind(*width)
+        }
         Type::Primitive(Primitive::Numerus) => Some(DenseKind::I64),
         Type::Primitive(Primitive::Fractus) => Some(DenseKind::F64),
         Type::SizedNumeric(Primitive::Numerus, width) => match width {
@@ -192,7 +196,6 @@ pub fn dense_kind_of_type(types: &TypeTable, ty: TypeId) -> Option<DenseKind> {
             NumericWidth::U64 => Some(DenseKind::U64),
             _ => None,
         },
-        Type::SizedNumeric(Primitive::Fractus, width) => float_kind(*width),
         _ => None,
     }
 }

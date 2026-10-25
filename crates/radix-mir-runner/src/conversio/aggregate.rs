@@ -79,17 +79,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             ));
         };
         let capacity = usize::try_from(*capacity).unwrap_or(usize::MAX);
-        let converted =
-            match self.convert_to_array_inner(value, source_ty, element, struct_defaults, span) {
-                Ok(converted) => converted,
-                Err(_) => {
-                    return self.recover_or_fail(
-                        recovery,
-                        span,
-                        "lista to bounded lista conversion failed",
-                    );
-                }
-            };
+        let Ok(converted) =
+            self.convert_to_array_inner(value, source_ty, element, struct_defaults, span)
+        else {
+            return self.recover_or_fail(
+                recovery,
+                span,
+                "lista to bounded lista conversion failed",
+            );
+        };
         let fits = matches!(&converted, Value::Array(cell) if cell.borrow().len() <= capacity);
         if fits {
             Ok(converted)

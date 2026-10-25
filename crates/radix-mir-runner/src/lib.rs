@@ -926,11 +926,12 @@ fn dynamic_display_type(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
     }
     match types.get(ty) {
         Type::Primitive(Primitive::Valor | Primitive::Json) => true,
-        Type::Map(_, elem) | Type::Option(elem) => dynamic_display_type(*elem, types, depth + 1),
-        Type::Queue(elem) | Type::Stack(elem) => dynamic_display_type(*elem, types, depth + 1),
-        Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
-            dynamic_display_type(*elem, types, depth + 1)
-        }
+        Type::Map(_, elem)
+        | Type::Option(elem)
+        | Type::Queue(elem)
+        | Type::Stack(elem)
+        | Type::Array(elem)
+        | Type::BoundedArray { element: elem, .. } => dynamic_display_type(*elem, types, depth + 1),
         _ => false,
     }
 }
@@ -944,9 +945,11 @@ fn holds_littera(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
     }
     match types.get(ty) {
         Type::Primitive(Primitive::Littera) => true,
-        Type::Map(_, elem) | Type::Option(elem) => holds_littera(*elem, types, depth + 1),
-        Type::Queue(elem) | Type::Stack(elem) => holds_littera(*elem, types, depth + 1),
-        Type::Vector(elem, _)
+        Type::Map(_, elem)
+        | Type::Option(elem)
+        | Type::Queue(elem)
+        | Type::Stack(elem)
+        | Type::Vector(elem, _)
         | Type::Matrix(elem, _)
         | Type::Tensor(elem, _)
         | Type::Sparsa(elem, _)
@@ -965,9 +968,11 @@ fn holds_interval(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
     }
     match types.get(ty) {
         Type::Intervallum(..) => true,
-        Type::Map(_, elem) | Type::Option(elem) => holds_interval(*elem, types, depth + 1),
-        Type::Queue(elem) | Type::Stack(elem) => holds_interval(*elem, types, depth + 1),
-        Type::Vector(elem, _)
+        Type::Map(_, elem)
+        | Type::Option(elem)
+        | Type::Queue(elem)
+        | Type::Stack(elem)
+        | Type::Vector(elem, _)
         | Type::Matrix(elem, _)
         | Type::Tensor(elem, _)
         | Type::Sparsa(elem, _)
@@ -2135,10 +2140,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     let returned = self.pop_frame();
                     if let Some(frame) = returned {
                         for (caller, place, local) in frame.mut_writebacks {
-                            let Some(value) = frame
-                                .locals
-                                .get(local.0 as usize)
-                                .and_then(|slot| slot.as_ref().cloned())
+                            let Some(value) = frame.locals.get(local.0 as usize).cloned().flatten()
                             else {
                                 self.fail(RunnerError::internal(
                                     terminator.span,
@@ -4118,8 +4120,7 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
                 flags.map(|flags| interner.resolve(flags)),
             ) == right.pattern()
         }
-        (MirConstant::Nil, Value::Nil) => true,
-        (MirConstant::Unit, Value::Unit) => true,
+        (MirConstant::Nil, Value::Nil) | (MirConstant::Unit, Value::Unit) => true,
         _ => false,
     }
 }

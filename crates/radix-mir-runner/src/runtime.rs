@@ -1097,7 +1097,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// variant-check surface).
     fn nominal_type_check_matches(&self, value: &Value, target: &Type) -> bool {
         match (value, target) {
-            (Value::Struct(def, _), Type::Struct(target)) => def == target,
             (Value::EnumVariant(def, _), Type::Enum(target)) => self
                 .context
                 .variant_parents
@@ -1107,7 +1106,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             // type (a `Type::Struct` carrying the variant DefId); a variant
             // DefId never collides with a real struct DefId, so the tag
             // comparison cannot false-positive against plain structs.
-            (Value::EnumVariant(def, _), Type::Struct(target)) => def == target,
+            (Value::Struct(def, _) | Value::EnumVariant(def, _), Type::Struct(target)) => {
+                def == target
+            }
             _ => false,
         }
     }
@@ -5106,8 +5107,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 .unwrap_or(Value::Nil)),
             Value::Octeti(bytes) => Ok(optional_index
                 .and_then(|idx| bytes.get(idx).copied())
-                .map(|byte| Value::Int(i64::from(byte)))
-                .unwrap_or(Value::Nil)),
+                .map_or(Value::Nil, |byte| Value::Int(i64::from(byte)))),
             other => Self::collection_index(other, index, span),
         }
     }
