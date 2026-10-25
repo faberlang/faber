@@ -87,9 +87,6 @@ fn feature_compiled(feature: &str) -> bool {
         "mir-wgsl" => cfg!(feature = "mir-wgsl"),
         "mir-llvm" => cfg!(feature = "mir-llvm"),
         "mir-wasm" => cfg!(feature = "mir-wasm"),
-        // WHY: faber has no `mir-amd` feature of its own; the AMD leaf rides
-        // the LLVM crate, so this binary never contains the target.
-        "mir-amd" => false,
         _ => false,
     }
 }
@@ -118,6 +115,10 @@ pub fn target_not_in_this_build(target: Target) -> Diagnostic {
 }
 
 /// `Ok(())` when `target` is compiled in, otherwise the gate diagnostic.
+///
+/// # Errors
+/// Returns the `PKG001:target_not_in_this_build` diagnostic when this binary
+/// does not contain `target`.
 pub fn require_target_compiled_in(target: Target) -> Result<(), Diagnostic> {
     if target_compiled_in(target) {
         Ok(())
