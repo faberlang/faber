@@ -290,7 +290,7 @@ pub(crate) fn terminator_return_local(terminator: &MirTerminatorKind) -> Option<
 // Collection helpers (private to the module)
 // ---------------------------------------------------------------------------
 
-/// The call arguments that carry live value reads. TensorFill's first
+/// The call arguments that carry live value reads. `TensorFill`'s first
 /// operand is a shape receiver only: the device emitters derive the output
 /// extent from the destination type and consume only the scalar fill
 /// operand, so a folded vacua seed used solely in this position is not a
@@ -631,9 +631,10 @@ fn aggregate_item_reads_temp(item: &MirAggregateItem, temp: MirTempId) -> bool {
 /// environments).
 fn value_reads_temp(value: &MirValue, temp: MirTempId) -> bool {
     match &value.kind {
-        MirValueKind::Operand(operand) => operand_reads_temp(operand, temp),
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            operand_reads_temp(operand, temp)
+        }
         MirValueKind::Closure(closure) => operand_reads_temp(&closure.environment, temp),
-        MirValueKind::Unary { operand, .. } => operand_reads_temp(operand, temp),
         MirValueKind::Binary { lhs, rhs, .. } => {
             operand_reads_temp(lhs, temp) || operand_reads_temp(rhs, temp)
         }

@@ -1208,8 +1208,7 @@ impl VerificationBlockAdmission {
         }
         for (index, candidate_id) in self.candidate_ids.iter().copied().enumerate() {
             let in_vocab = u64::try_from(candidate_id)
-                .ok()
-                .is_some_and(|candidate_id| candidate_id < self.plan.vocab);
+                .is_ok_and(|candidate_id| candidate_id < self.plan.vocab);
             if !in_vocab {
                 return Err(VerificationAdmissionError::InvalidCandidateId {
                     index,

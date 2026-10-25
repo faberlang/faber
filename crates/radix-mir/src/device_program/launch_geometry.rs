@@ -98,11 +98,13 @@ pub fn geometry_for_call(
 ) -> Result<CallGeometry, GeometryError> {
     let counts = element_counts(unit, shapes)?;
     match &unit.plan {
-        CollectionKernelPlan::Elementwise => generic_1d(unit, output_count(unit, &counts)?),
-        // The gather body is one thread per output row element, so its launch
-        // is the output element count from the call-site shape. The plan's own
-        // `T`/`D` facts may be runtime and are not read here.
-        CollectionKernelPlan::Gather(_) => generic_1d(unit, output_count(unit, &counts)?),
+        // Elementwise launches one thread per output element. The gather body
+        // is one thread per output row element, so its launch is the output
+        // element count from the call-site shape too. The plan's own `T`/`D`
+        // facts may be runtime and are not read here.
+        CollectionKernelPlan::Elementwise | CollectionKernelPlan::Gather(_) => {
+            generic_1d(unit, output_count(unit, &counts)?)
+        }
         CollectionKernelPlan::RowSoftmax(softmax) if softmax.batched.is_none() => {
             generic_1d(unit, output_count(unit, &counts)?)
         }
@@ -351,7 +353,7 @@ pub fn launch_stages_for_call(
     let first_lanes = partials
         .checked_mul(groups)
         .and_then(|n| n.checked_mul(lanes))
-        .filter(|lanes| *lanes <= u64::from(u32::MAX))
+        .filter(|lanes| u32::try_from(*lanes).is_ok())
         .ok_or_else(|| uncovered("grouped reduction launch overflows"))?;
     let combine_lanes = groups
         .checked_mul(lanes)
@@ -777,6 +779,13 @@ pub struct ScanLayout {
 }
 
 /// Resolve a scan's source-shaped result and fixed group/scratch capacities.
+///
+/// # Errors
+///
+/// Returns a [`GeometryError`] when the unit is not a scan plan, the call's
+/// shapes do not match the declared resources or ranks, the source element
+/// count exceeds the portable index width, a layout capacity is zero, or a
+/// scratch size overflows.
 pub fn scan_layout_for_call(
     unit: &KernelUnit,
     shapes: &[Vec<u64>],

@@ -630,15 +630,14 @@ impl Validator<'_, '_> {
                     self.error(span, "genus value projection must be a field read");
                     return;
                 };
-                let struct_layout = match crate::resolve_struct_layout(base_ty, self.context) {
-                    Ok(layout) => layout,
-                    // A refusal (`text field`, `f64 field`, `nested genus
-                    // field`, …) is the device layout law declining the
-                    // struct, not an ordinary-execution defect. The device
-                    // gate surfaces it by name when a kernel actually
-                    // receives the genus (C4-6b); a plain field read is
-                    // admitted without the byte facts.
-                    Err(_) => return,
+                // A refusal (`text field`, `f64 field`, `nested genus
+                // field`, …) is the device layout law declining the
+                // struct, not an ordinary-execution defect. The device
+                // gate surfaces it by name when a kernel actually
+                // receives the genus (C4-6b); a plain field read is
+                // admitted without the byte facts.
+                let Ok(struct_layout) = crate::resolve_struct_layout(base_ty, self.context) else {
+                    return;
                 };
                 let Some(field) = struct_layout
                     .fields
@@ -797,7 +796,7 @@ impl Validator<'_, '_> {
 
         match self.context.types.get(ty).clone() {
             Type::Infer(_) | Type::InferUnion(_) => {
-                self.error(span, "MIR type is unresolved inference variable")
+                self.error(span, "MIR type is unresolved inference variable");
             }
             Type::MarkerHole { .. } => self.error(span, "MIR type is unresolved marker-width hole"),
             Type::Error => self.error(span, "MIR type is semantic error recovery type"),

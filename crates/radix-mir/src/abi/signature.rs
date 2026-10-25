@@ -250,7 +250,7 @@ fn scan_tensor_element_count(
     extents
         .into_iter()
         .flatten()
-        .try_fold(1_u64, |count, extent| count.checked_mul(extent))
+        .try_fold(1_u64, u64::checked_mul)
         .ok_or_else(|| MirAbiError::new("scan tensor element count overflows u64"))
 }
 
