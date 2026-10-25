@@ -1,6 +1,7 @@
 //! Blocking clock leaf. Serves Latin `tempus:*` routes.
 //!
-//! Civil datetime is pure Faber. `interval` stays N4b (cursor return).
+//! Civil datetime is pure Faber; `interval` is a Norma `Ticker` built from
+//! `tempus:dormiet` and `tempus:nunc`, so this leaf serves no route for it.
 //! `tempus:activum` is process CPU time in nanoseconds: on Unix hosts
 //! `clock_gettime(CLOCK_PROCESS_CPUTIME_ID)`. A host without that clock
 //! returns 0; that is not a wall-clock substitute.
@@ -15,6 +16,8 @@ use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+// Set by the first `tempus:monotonicum` call, so the reading is
+// process-relative, not host uptime.
 static MONOTONIC_ORIGIN: OnceLock<Instant> = OnceLock::new();
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
@@ -45,10 +48,13 @@ pub fn serve(route: &str, args: &[Arg]) -> Option<Result<Reply, LeafError>> {
 
 /// One-shot sleep that can abort when `is_cancelled` becomes true.
 ///
+/// Cancellation is polled every 5 ms, so an abort can be reported up to that
+/// late.
+///
 /// # Errors
 ///
-/// Returns `LeafError::invalid_argument` when `args` is not a single
-/// non-negative `ms` integer, and `LeafError::cancelled` when `is_cancelled`
+/// Returns `LeafError::invalid_argument` when `ms` is missing, not an
+/// integer, or negative, and `LeafError::cancelled` when `is_cancelled`
 /// reports cancellation before the deadline.
 pub fn sleep_interruptible(
     args: &[Arg],
@@ -87,6 +93,7 @@ fn empty_ok(route: &'static str, args: &[Arg]) -> Result<(), LeafError> {
 fn now(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "tempus:nunc";
     empty_ok(ROUTE, args)?;
+    // A system clock set before the epoch reports 0 rather than faulting.
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| {
@@ -152,7 +159,7 @@ fn sleep(args: &[Arg], is_cancelled: &dyn Fn() -> bool) -> Result<Reply, LeafErr
     if ms == 0 {
         return Ok(Reply::Unit);
     }
-    let deadline = Instant::now() + Duration::from_millis(u64::try_from(ms).unwrap_or(u64::MAX));
+    let deadline = Instant::now() + Duration::from_millis(ms.unsigned_abs());
     while Instant::now() < deadline {
         if is_cancelled() {
             return Err(LeafError::cancelled(ROUTE));
@@ -160,6 +167,8 @@ fn sleep(args: &[Arg], is_cancelled: &dyn Fn() -> bool) -> Result<Reply, LeafErr
         let remaining = deadline.saturating_duration_since(Instant::now());
         thread::sleep(remaining.min(Duration::from_millis(5)));
     }
+    // Re-checked here: a cancel that lands during the last poll must not be
+    // reported as a completed sleep.
     if is_cancelled() {
         return Err(LeafError::cancelled(ROUTE));
     }
