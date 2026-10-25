@@ -334,6 +334,23 @@ fn inf_is_a_signed_format_subject() {
 }
 
 #[test]
+fn subject_follows_the_numeric_width() {
+    let mut types = TypeTable::new();
+    let signed_modulus = types.intern(Type::ModularWord(NumericWidth::I32));
+    assert_eq!(
+        format_subject(&types, signed_modulus),
+        FormatSubject::Signed
+    );
+    let unsigned_modulus = types.intern(Type::ModularWord(NumericWidth::U64));
+    assert_eq!(
+        format_subject(&types, unsigned_modulus),
+        FormatSubject::Unsigned
+    );
+    let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
+    assert_eq!(format_subject(&types, d64), FormatSubject::Decimal);
+}
+
+#[test]
 fn render_magnus_matches_render_integer_inside_the_i128_range() {
     let values: [i128; 9] = [
         0,

@@ -8,7 +8,8 @@
 //! ```
 //!
 //! Each subject accepts only the parts that make sense for it: integers take
-//! every part (precision pads, `42 ¶ ".2"` = `42.00`; `x b o e` kinds);
+//! every part (precision pads, `42 ¶ ".2"` = `42.00`; `x b o e` kinds, but a
+//! precision never combines with a radix kind);
 //! floats take everything except the radix kinds; `d64` decimals take the
 //! float parts except the radix kinds (`e` is admitted, operator ruling
 //! 2026-10-17; exact digits, `.N` rounds half-even);
@@ -117,9 +118,9 @@ pub enum FormatSpec {
 /// What the left side of `¶` is, as far as formatting cares.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FormatSubject {
-    /// Signed integers (`numerus`, `numerus<i8…i64>`).
+    /// Signed integers (`numerus`, `i8`…`i64`, `inf`, signed `modulus<W>`).
     Signed,
-    /// Unsigned integers (`numerus<u8…u64>`, `modulus<W>`).
+    /// Unsigned integers (`u8`…`u64`, unsigned `modulus<W>`).
     Unsigned,
     /// `fractus` of any width.
     Float,
@@ -127,18 +128,10 @@ pub enum FormatSubject {
     Text,
     /// `instans` of any precision.
     Instans,
-    /// Decimal `numerus<d64>`: exact digits, precision rounds half-even (F4).
+    /// `d64`: exact digits, precision rounds half-even (F4).
     Decimal,
     /// Anything else; user types format through an ordinary function.
     Unsupported,
-}
-
-impl FormatSubject {
-    /// Whether the subject is an integer.
-    #[must_use]
-    pub fn is_integer(self) -> bool {
-        matches!(self, Self::Signed | Self::Unsigned)
-    }
 }
 
 /// One named part of the spec pattern, for diagnostics.
@@ -602,7 +595,7 @@ fn scientific_decimal(magnitude: u128, mut scale: u32, precision: Option<usize>)
         normalized_magnitude /= 10;
         scale -= 1;
     }
-    let mut exponent = digits.len() as i64 - 1 - i64::from(scale);
+    let mut exponent = i64::from(normalized_magnitude.ilog10()) - i64::from(scale);
 
     if let Some(p) = precision {
         let significant_digits = p + 1;
