@@ -461,7 +461,7 @@ pub fn resolve_import(
     }
 
     // Explicit `.proba` in the specifier is never a legal import target.
-    if import_path.ends_with(".proba") {
+    if crate::source_files::is_proba_source_path(Path::new(import_path)) {
         return ImportResolution::Error(proba_import_forbidden_diagnostic(from_file, import_path));
     }
 

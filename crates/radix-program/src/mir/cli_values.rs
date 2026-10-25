@@ -43,15 +43,12 @@ pub(super) fn plan_cli_command_records(
         }
         return Some(None);
     };
-    let record_ty = match command_cli_args_type(unit, command) {
-        Some(record_ty) => record_ty,
-        None => {
-            diagnostics.push(unsupported_cli_diagnostic(
-                &unit.path,
-                "CLI argument records",
-            ));
-            return None;
-        }
+    let Some(record_ty) = command_cli_args_type(unit, command) else {
+        diagnostics.push(unsupported_cli_diagnostic(
+            &unit.path,
+            "CLI argument records",
+        ));
+        return None;
     };
     Some(Some(HashMap::from([(record_ty, fields)])))
 }
@@ -95,15 +92,12 @@ pub(super) fn plan_cli_command_records_check(
         }
         return Some(None);
     };
-    let record_ty = match command_cli_args_type(unit, command) {
-        Some(record_ty) => record_ty,
-        None => {
-            diagnostics.push(unsupported_cli_diagnostic(
-                &unit.path,
-                "CLI argument records",
-            ));
-            return None;
-        }
+    let Some(record_ty) = command_cli_args_type(unit, command) else {
+        diagnostics.push(unsupported_cli_diagnostic(
+            &unit.path,
+            "CLI argument records",
+        ));
+        return None;
     };
     Some(Some(HashMap::from([(record_ty, fields)])))
 }

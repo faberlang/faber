@@ -213,18 +213,17 @@ pub(super) fn plan_fmir_text_runtime_cli_root_entry(
         });
     }
     let record = unit.analysis.interner.resolve(args_name).to_owned();
-    let fields_by_type = match entry_cli_args_type(unit) {
-        Some(record_ty) => HashMap::from([(record_ty, fields)]),
-        None => {
-            if !fields.is_empty() {
-                diagnostics.push(unsupported_cli_diagnostic(
-                    &unit.path,
-                    "CLI argument records",
-                ));
-                return None;
-            }
-            HashMap::new()
+    let fields_by_type = if let Some(record_ty) = entry_cli_args_type(unit) {
+        HashMap::from([(record_ty, fields)])
+    } else {
+        if !fields.is_empty() {
+            diagnostics.push(unsupported_cli_diagnostic(
+                &unit.path,
+                "CLI argument records",
+            ));
+            return None;
         }
+        HashMap::new()
     };
     Some((
         fields_by_type,
