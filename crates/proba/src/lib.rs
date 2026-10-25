@@ -177,7 +177,7 @@ fn join_suite_path(suite_path: &str, name: &str) -> String {
     if suite_path.is_empty() {
         name.to_owned()
     } else {
-        format!("{}/{}", suite_path, name)
+        format!("{suite_path}/{name}")
     }
 }
 
