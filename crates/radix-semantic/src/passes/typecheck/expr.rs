@@ -70,12 +70,12 @@ const ISSUE_GRADIENT_EXPRESSION_UNSUPPORTED: &str = "gradient_expression_unsuppo
 /// holes and the pre-grammar unspecified bridge carry no static rank.
 pub(super) fn tensor_shape_rank(types: &TypeTable, shape: crate::IndexId) -> Option<u64> {
     match types.get_index(shape) {
-        IndexExpr::Literal(_) => Some(1),
-        IndexExpr::Tuple(dims) => Some(dims.len() as u64),
-        IndexExpr::Param(_)
+        IndexExpr::Literal(_)
+        | IndexExpr::Param(_)
         | IndexExpr::Runtime(_)
         | IndexExpr::Affine { .. }
         | IndexExpr::Divide { .. } => Some(1),
+        IndexExpr::Tuple(dims) => Some(dims.len() as u64),
         IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
     }
 }
@@ -280,10 +280,10 @@ impl TypeChecker<'_> {
             && (entries.is_some()
                 || matches!(
                     &source.kind,
-                    HirExpressionKind::Literal(HirLiteral::JsonValor(
-                        radix_syntax::JsonValue::Object(_)
-                    )) | HirExpressionKind::Array(_)
-                        | HirExpressionKind::Literal(HirLiteral::Regex(..))
+                    HirExpressionKind::Literal(
+                        HirLiteral::JsonValor(radix_syntax::JsonValue::Object(_))
+                            | HirLiteral::Regex(..)
+                    ) | HirExpressionKind::Array(_)
                 ))
     }
 
@@ -489,7 +489,7 @@ impl TypeChecker<'_> {
         }
         // The authored hole: re-emission prints `_ { … }` for this node id.
         self.inferred_constructor_ids.push(expr.id);
-        let no_fields = entries.as_ref().is_some_and(|fields| fields.is_empty());
+        let no_fields = entries.as_ref().is_some_and(Vec::is_empty);
         let span = expr.span;
         let concrete = expected
             .map(|ty| self.resolve_inferred_type(ty))
@@ -1036,7 +1036,7 @@ impl TypeChecker<'_> {
                         &source.kind,
                         HirExpressionKind::Literal(HirLiteral::Regex(..))
                     )
-                    && !expected.is_some_and(|ty| !self.is_infer(self.resolve_inferred_type(ty)))
+                    && expected.is_none_or(|ty| self.is_infer(self.resolve_inferred_type(ty)))
                 {
                     self.invalid_conversion(
                         super::convert::ISSUE_INFERRED_CONSTRUCTOR_NO_EXPECTED_TYPE,

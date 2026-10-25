@@ -1649,10 +1649,11 @@ impl TypeChecker<'_> {
             self.types.get(self.resolve_inferred_type(rhs_ty)),
             Type::Primitive(Primitive::Nihil)
         );
-        if !(lhs_is_nil || rhs_is_nil)
-            && !self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
-            && !self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
-            && !self.word_pair(lhs, rhs)
+        if !(lhs_is_nil
+            || rhs_is_nil
+            || self.equality_constant_exempt(lhs, lhs_ty, rhs, rhs_ty)
+            || self.policy_float_constant_comparison(lhs, lhs_ty, rhs, rhs_ty)
+            || self.word_pair(lhs, rhs))
         {
             self.exact_equality_types_for_operands(lhs, lhs_ty, rhs, rhs_ty, lhs.span);
         }
@@ -1914,33 +1915,29 @@ impl TypeChecker<'_> {
         let Some((lhs_resolved, rhs_resolved)) = self.glyph_operand_types(op, lhs, rhs) else {
             return self.error_type;
         };
-        match (
+        if let (Type::Vector(lhs_elem, lhs_width), Type::Vector(rhs_elem, rhs_width)) = (
             self.types.get(lhs_resolved).clone(),
             self.types.get(rhs_resolved).clone(),
         ) {
-            (Type::Vector(lhs_elem, lhs_width), Type::Vector(rhs_elem, rhs_width)) => {
-                let Some(_) = self.glyph_numeric_element(op, lhs_elem, rhs_elem, lhs.span) else {
-                    return self.error_type;
-                };
-                let Some((lhs_n, rhs_n)) =
-                    self.glyph_vector_widths(op, lhs_width, rhs_width, lhs.span)
-                else {
-                    return self.error_type;
-                };
-                if lhs_n != rhs_n {
-                    self.glyph_invalid_operand(op, GLYPH_CROSS_WIDTH_MISMATCH, lhs.span);
-                    return self.error_type;
-                }
-                if lhs_n != 3 {
-                    self.glyph_invalid_operand(op, GLYPH_CROSS_WIDTH_THREE_REQUIRED, lhs.span);
-                    return self.error_type;
-                }
-                lhs_resolved
+            let Some(_) = self.glyph_numeric_element(op, lhs_elem, rhs_elem, lhs.span) else {
+                return self.error_type;
+            };
+            let Some((lhs_n, rhs_n)) = self.glyph_vector_widths(op, lhs_width, rhs_width, lhs.span)
+            else {
+                return self.error_type;
+            };
+            if lhs_n != rhs_n {
+                self.glyph_invalid_operand(op, GLYPH_CROSS_WIDTH_MISMATCH, lhs.span);
+                return self.error_type;
             }
-            _ => {
-                self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
-                self.error_type
+            if lhs_n != 3 {
+                self.glyph_invalid_operand(op, GLYPH_CROSS_WIDTH_THREE_REQUIRED, lhs.span);
+                return self.error_type;
             }
+            lhs_resolved
+        } else {
+            self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
+            self.error_type
         }
     }
 
@@ -1955,35 +1952,31 @@ impl TypeChecker<'_> {
         let Some((lhs_resolved, rhs_resolved)) = self.glyph_operand_types(op, lhs, rhs) else {
             return self.error_type;
         };
-        match (
+        if let (Type::Vector(lhs_elem, lhs_width), Type::Vector(rhs_elem, rhs_width)) = (
             self.types.get(lhs_resolved).clone(),
             self.types.get(rhs_resolved).clone(),
         ) {
-            (Type::Vector(lhs_elem, lhs_width), Type::Vector(rhs_elem, rhs_width)) => {
-                let Some(elem) = self.glyph_numeric_element(op, lhs_elem, rhs_elem, lhs.span)
-                else {
-                    return self.error_type;
-                };
-                let (lhs_lit, rhs_lit) = (
-                    crate::literal_vector_width(lhs_width, self.types),
-                    crate::literal_vector_width(rhs_width, self.types),
-                );
-                if let (Some(lhs_n), Some(rhs_m)) = (lhs_lit, rhs_lit) {
-                    return self.glyph_matrix_type(elem, lhs_n, rhs_m);
-                }
-                // S0-G8: glyph-static but parametric widths keep the outer
-                // product symbolic — `vector<f32, N> ⊗ vector<f32, 1>` is
-                // `matrix<f32, [N, 1]>` instead of demanding literals.
-                if let Some(shape) = self.glyph_symbolic_outer_shape(lhs_width, rhs_width) {
-                    return self.types.matrix_with_shape(elem, shape);
-                }
-                self.glyph_invalid_operand(op, GLYPH_STATIC_SHAPE_REQUIRED, lhs.span);
-                self.error_type
+            let Some(elem) = self.glyph_numeric_element(op, lhs_elem, rhs_elem, lhs.span) else {
+                return self.error_type;
+            };
+            let (lhs_lit, rhs_lit) = (
+                crate::literal_vector_width(lhs_width, self.types),
+                crate::literal_vector_width(rhs_width, self.types),
+            );
+            if let (Some(lhs_n), Some(rhs_m)) = (lhs_lit, rhs_lit) {
+                return self.glyph_matrix_type(elem, lhs_n, rhs_m);
             }
-            _ => {
-                self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
-                self.error_type
+            // S0-G8: glyph-static but parametric widths keep the outer
+            // product symbolic — `vector<f32, N> ⊗ vector<f32, 1>` is
+            // `matrix<f32, [N, 1]>` instead of demanding literals.
+            if let Some(shape) = self.glyph_symbolic_outer_shape(lhs_width, rhs_width) {
+                return self.types.matrix_with_shape(elem, shape);
             }
+            self.glyph_invalid_operand(op, GLYPH_STATIC_SHAPE_REQUIRED, lhs.span);
+            self.error_type
+        } else {
+            self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
+            self.error_type
         }
     }
 
@@ -2162,15 +2155,12 @@ impl TypeChecker<'_> {
                 let lhs_shape = self.resolve_index(lhs_shape);
                 let rhs_shape = self.resolve_index(rhs_shape);
                 let mut unifier = self.index_infer.unifier(self.types);
-                match unifier.unify(lhs_shape, rhs_shape) {
-                    Ok(merged) => {
-                        self.constrain_index_equal(result_shape, merged, lhs.span);
-                        result
-                    }
-                    Err(_) => {
-                        self.glyph_invalid_operand(op, GLYPH_HADAMARD_SHAPES_MISMATCH, lhs.span);
-                        self.error_type
-                    }
+                if let Ok(merged) = unifier.unify(lhs_shape, rhs_shape) {
+                    self.constrain_index_equal(result_shape, merged, lhs.span);
+                    result
+                } else {
+                    self.glyph_invalid_operand(op, GLYPH_HADAMARD_SHAPES_MISMATCH, lhs.span);
+                    self.error_type
                 }
             }
             (

@@ -630,7 +630,7 @@ pub struct InterfaceNominalType {
     /// identity or name under any sibling kind instead of failing on the
     /// guessed kind alone (cds-u6 G4). Authoritative semantic snapshots
     /// (faber package path) leave this false and stay kind-exact
-    /// (council-11 correct_before_next_phase).
+    /// (council-11 `correct_before_next_phase`).
     pub kind_guessed: bool,
 }
 
@@ -653,7 +653,7 @@ pub enum FileInterfaceError {
     },
     /// Identity-bearing nominal snapshot whose canonical module-qualified key
     /// the consumer's canonical table does not know. Fail-closed (council-11
-    /// correct_before_next_phase): a snapshot carrying a canonical identity
+    /// `correct_before_next_phase`): a snapshot carrying a canonical identity
     /// must never fall through to legacy short-name / local-symbol resolution,
     /// which could silently bind an unknown nominal to a different consumer
     /// nominal. Legacy name-based resolution remains available only for
@@ -947,8 +947,8 @@ fn snapshot_interface_type_inner(
             resolver,
             module_identity,
         ),
-        Type::Alias(_, resolved) => {
-            snapshot_interface_type_inner(*resolved, types, interner, resolver, module_identity)
+        Type::Alias(_, aliased) => {
+            snapshot_interface_type_inner(*aliased, types, interner, resolver, module_identity)
         }
         Type::Func(sig) => Ok(InterfaceTypeSnapshot::Func(
             snapshot_interface_callable_inner(sig, types, interner, resolver, module_identity)?,
@@ -981,9 +981,13 @@ fn snapshot_interface_type_inner(
                 })
                 .collect::<FileInterfaceResult<Vec<_>>>()?,
         )),
-        Type::Infer(_) => Err(FileInterfaceError::InferenceTypeUnsupported),
-        Type::InferUnion(_) => Err(FileInterfaceError::InferenceTypeUnsupported),
-        Type::MarkerHole { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
+        Type::Infer(_)
+        | Type::InferUnion(_)
+        | Type::MarkerHole { .. }
+        | Type::BoundedArray { .. }
+        | Type::BoundedTextus { .. }
+        | Type::BoundedAscii { .. }
+        | Type::BoundedOcteti { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
         Type::Union(members) => members
             .iter()
             .map(|member| {
@@ -1006,10 +1010,6 @@ fn snapshot_interface_type_inner(
             .collect::<FileInterfaceResult<Vec<_>>>()
             .map(InterfaceTypeSnapshot::Tuple),
         Type::Error => Err(FileInterfaceError::ErrorTypeUnsupported),
-        Type::BoundedArray { .. }
-        | Type::BoundedTextus { .. }
-        | Type::BoundedAscii { .. }
-        | Type::BoundedOcteti { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
     }
 }
 
