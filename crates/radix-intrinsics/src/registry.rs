@@ -254,7 +254,7 @@ impl MethodIntrinsic {
 
 /// One catalog row with every policy field at its macro default. Arms of
 /// [`intrinsic!`] supply only the MIR classification; a row that needs a
-/// non-default policy field is written out in full instead.
+/// non-default policy field spells that field explicitly instead.
 macro_rules! intrinsic_row {
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, $mir_kind:expr) => {
         MethodIntrinsic {
@@ -327,12 +327,6 @@ macro_rules! intrinsic {
         )
     };
 }
-
-const FORMATA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
-const CREATA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
-const STRUCTA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
-const TENSOR_EDGE_POLICY_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("Policy")];
-const SERMO_VIEW_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus_default_valor("T")];
 
 /// The type-expression constructor's dispatch row. The Tensor receiver row
 /// retired (tensor-conversions C3), but the constructor path — check lane,
@@ -490,10 +484,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "vacua", 0, &[], Bool, collection IsEmpty),
     // tabula
     intrinsic!(Tabula, "accipe", 1, &[IntrinsicParamKind::Key], OptionValue, collection Index),
-    // need: the `at` read (la `apud`). `c[i]` dies, `c.get(i)` is
-    // `T ∪ none`, `c.at(i)` reports an out-of-range index / missing key on `⇥`
-    // (default form `⊥`). The error payload is the runtime failure text, the
-    // same `textus` the tensor `accipe` row declares (enum code: need).
+    // need: `apud` is the checked read; a missing key reports on `⇥`
+    // (default form `⊥`). The lista row above states the read split and payload.
     MethodIntrinsic {
         failable: true,
         ..intrinsic!(Tabula, "apud", 1, &[IntrinsicParamKind::Key], Value, collection Index)
@@ -545,10 +537,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Ascii, "cursor", 0, &[], CursorLittera, collection CordCursor),
     // textus
     intrinsic!(Textus, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], OptionTextus, collection Index),
-    // need: the `at` read (la `apud`). `c[i]` dies, `c.get(i)` is
-    // `T ∪ none`, `c.at(i)` reports an out-of-range index / missing key on `⇥`
-    // (default form `⊥`). The error payload is the runtime failure text, the
-    // same `textus` the tensor `accipe` row declares (enum code: need).
+    // need: `apud` is the checked read; an out-of-range index reports
+    // on `⇥` (default form `⊥`). The lista row above states the read split and payload.
     MethodIntrinsic {
         failable: true,
         ..intrinsic!(Textus, "apud", 1, &[IntrinsicParamKind::NumerusIndex], Textus, collection Index)
@@ -815,6 +805,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Fractus, "sinus", 0, &[], SameAsReceiver, scalar_math Sin),
     intrinsic!(Fractus, "cosinus", 0, &[], SameAsReceiver, scalar_math Cos),
     intrinsic!(Fractus, "tangens", 0, &[], SameAsReceiver, scalar_math Tan),
+    // sparsa
     intrinsic!(Sparsa, "accipe", 1, &[IntrinsicParamKind::NumerusArray], Inner, collection SparseGet),
     intrinsic!(Sparsa, "densata", 0, &[], DenseFromSparsa, collection SparseDensify),
     intrinsic!(Sparsa, "longitudo", 0, &[], Numerus, collection Length),
@@ -828,6 +819,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         Vacuum,
         collection SparseSet
     ),
+    // tensor
     intrinsic!(Tensor, "longitudo", 0, &[], Numerus, collection Length),
     intrinsic!(Tensor, "magnitudines", 0, &[], ArrayInner, collection TensorShape),
     intrinsic!(
@@ -936,7 +928,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     MethodIntrinsic {
         receiver: IntrinsicReceiver::Tensor,
         faber_name: "formata",
-        generic: FORMATA_GENERIC,
+        generic: &[CatalogGenericParam::typus("T")],
         arg_count: 0,
         params: &[],
         return_kind: IntrinsicReturnKind::GenericTypus,
@@ -958,7 +950,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // gather). Source spellings/signatures frozen in
     // docs/archived/common-case-intrinsics/common-case-intrinsics-contract.md;
     // typed fail-closed contracts enforced at the HIR→AIR construction site
-    // (air/lower.rs + radix-air nodes.rs validate_*_contract).
+    // (air/lower.rs + radix-air-nodes/src/nodes.rs validate_*_contract).
     intrinsic!(
         Tensor,
         "gather",
@@ -1173,7 +1165,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     MethodIntrinsic {
         receiver: IntrinsicReceiver::Tensor,
         faber_name: "limes",
-        generic: TENSOR_EDGE_POLICY_GENERIC,
+        generic: &[CatalogGenericParam::typus("Policy")],
         arg_count: 0,
         params: &[],
         return_kind: IntrinsicReturnKind::SameAsReceiver,
@@ -1295,6 +1287,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
             collection TensorSet
         )
     },
+    // vector
     intrinsic!(
         Vector,
         "addita",
@@ -1411,6 +1404,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // `(match) → textus` closure; one row, the form is picked by the argument.
     // `escape` is a method on `textus` (RD-6), the accepted default `munita`.
     intrinsic!(Regex, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::TextusOrReplacer], Textus, collection RegexReplace),
+    // match
     intrinsic!(Match, "inventum", 0, &[], Textus, collection MatchText),
     intrinsic!(Match, "principium", 0, &[], Numerus, collection MatchStart),
     intrinsic!(Match, "terminus", 0, &[], Numerus, collection MatchEnd),
@@ -1497,7 +1491,7 @@ pub static NAMESPACE_INTRINSICS: &[NamespaceIntrinsic] = &[
     NamespaceIntrinsic {
         namespace: "sermo",
         faber_name: "meus",
-        generic: SERMO_VIEW_GENERIC,
+        generic: &[CatalogGenericParam::typus_default_valor("T")],
         arg_count: 0,
         missing_generic_issue: None,
         excess_generic_issue: Some("sermo_view_payload_type_arg_count"),
@@ -1508,7 +1502,7 @@ pub static NAMESPACE_INTRINSICS: &[NamespaceIntrinsic] = &[
     NamespaceIntrinsic {
         namespace: "sermo",
         faber_name: "tuus",
-        generic: SERMO_VIEW_GENERIC,
+        generic: &[CatalogGenericParam::typus_default_valor("T")],
         arg_count: 0,
         missing_generic_issue: None,
         excess_generic_issue: Some("sermo_view_payload_type_arg_count"),
@@ -1519,7 +1513,7 @@ pub static NAMESPACE_INTRINSICS: &[NamespaceIntrinsic] = &[
     NamespaceIntrinsic {
         namespace: "tensor",
         faber_name: "creata",
-        generic: CREATA_GENERIC,
+        generic: &[CatalogGenericParam::typus("T")],
         arg_count: 1,
         missing_generic_issue: Some("tensor_creata_complete_type_arg_required"),
         excess_generic_issue: None,
@@ -1530,7 +1524,7 @@ pub static NAMESPACE_INTRINSICS: &[NamespaceIntrinsic] = &[
     NamespaceIntrinsic {
         namespace: "tensor",
         faber_name: "structa",
-        generic: STRUCTA_GENERIC,
+        generic: &[CatalogGenericParam::typus("T")],
         arg_count: 1,
         missing_generic_issue: None,
         excess_generic_issue: None,
