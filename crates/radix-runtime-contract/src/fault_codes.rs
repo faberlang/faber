@@ -4,6 +4,9 @@
 //! fault variant. Programs match on the variant (or on the union), never on the
 //! number, and the code is the same in every locale while the variant word is
 //! translated.
+//!
+//! KEEP IN SYNC: `runtime/c/faber.h` repeats [`FAULT_CODES`] as a static table
+//! (verified by `c_runtime_carries_every_registered_fault_code`).
 
 /// One registered fault variant and the code that identifies it forever.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +28,7 @@ pub struct FaultCode {
 /// even if the variant is removed. Removed variants move their code to
 /// [`RETIRED_CODES`]. If two lanes collide on one number, the second merger
 /// renumbers its own entry.
+// One row per code; without this rustfmt expands each entry to five lines.
 #[rustfmt::skip]
 pub const FAULT_CODES: &[FaultCode] = &[
     FaultCode { code: "ERR001", family: "IoFault", variant: "NotFound" },

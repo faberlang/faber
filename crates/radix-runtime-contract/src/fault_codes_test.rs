@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::{FAULT_CODES, RETIRED_CODES, fault_code};
 
-/// The fifteen `IoFault` variants in declaration order in `lib/norma/src/fault.fab`.
+/// The `IoFault` variants in declaration order in `lib/norma/src/fault.fab`.
 const IO_FAULT_VARIANTS: &[&str] = &[
     "NotFound",
     "Permission",
