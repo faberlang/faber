@@ -437,7 +437,7 @@ fn resolve_stmt(
         // schema introduces no value bindings or local scopes for this pass,
         // and its ordered column metadata is type-level only.
         StmtKind::Schema(_decl) => {}
-        StmtKind::Enum(_) => {}
+        StmtKind::Enum(_) | StmtKind::Tacet(_) => {}
         StmtKind::Union(decl) => {
             resolver.enter_scope(ScopeKind::Module);
             for param in &decl.type_params {
@@ -578,7 +578,6 @@ fn resolve_stmt(
         }
         StmtKind::Iace(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
         StmtKind::Mori(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
-        StmtKind::Tacet(_) => {}
         StmtKind::Reddet(stmt) => resolve_expr(resolver, interner, &stmt.future, errors),
         StmtKind::Tacebit(stmt) => resolve_expr(resolver, interner, &stmt.future, errors),
         StmtKind::Adfirma(stmt) => {
@@ -844,7 +843,7 @@ fn resolve_secus_clause(
 ) {
     match clause {
         radix_syntax::SecusClause::Sin { stmt, .. } => {
-            resolve_si_stmt(resolver, interner, stmt, errors)
+            resolve_si_stmt(resolver, interner, stmt, errors);
         }
         radix_syntax::SecusClause::Block { body, catch, .. } => {
             resolve_block(resolver, interner, body, errors);
@@ -1417,7 +1416,7 @@ fn resolve_expr(
                 );
             }
         }
-        ExprKind::Literal(_) => {}
+        ExprKind::Literal(_) | ExprKind::Ego(_) | ExprKind::Insere(_) => {}
         // A value-literal keyword is the fallback when no same-named value
         // binding is live; a binding in scope wins and lowering emits its
         // name load. Functions never shadow (they stay callable as `f()`).
@@ -1471,7 +1470,7 @@ fn resolve_expr(
             match &expr.chain {
                 radix_syntax::OptionalChainKind::Member(_) => {}
                 radix_syntax::OptionalChainKind::Index(expr) => {
-                    resolve_expr(resolver, interner, expr, errors)
+                    resolve_expr(resolver, interner, expr, errors);
                 }
                 radix_syntax::OptionalChainKind::Call(args) => {
                     for arg in args {
@@ -1485,7 +1484,7 @@ fn resolve_expr(
             match &expr.chain {
                 radix_syntax::NonNullKind::Member(_) => {}
                 radix_syntax::NonNullKind::Index(expr) => {
-                    resolve_expr(resolver, interner, expr, errors)
+                    resolve_expr(resolver, interner, expr, errors);
                 }
                 radix_syntax::NonNullKind::Call(args) => {
                     for arg in args {
@@ -1675,11 +1674,9 @@ fn resolve_expr(
         ExprKind::Array(expr) => {
             for element in &expr.elements {
                 match element {
-                    radix_syntax::ArrayElement::Expr(expr) => {
-                        resolve_expr(resolver, interner, expr, errors)
-                    }
-                    radix_syntax::ArrayElement::Spread(expr) => {
-                        resolve_expr(resolver, interner, expr, errors)
+                    radix_syntax::ArrayElement::Expr(expr)
+                    | radix_syntax::ArrayElement::Spread(expr) => {
+                        resolve_expr(resolver, interner, expr, errors);
                     }
                     radix_syntax::ArrayElement::Infer(_) => {}
                 }
@@ -1688,11 +1685,9 @@ fn resolve_expr(
         ExprKind::Object(expr) => {
             for field in &expr.fields {
                 match &field.key {
-                    radix_syntax::ObjectKey::Computed(expr) => {
-                        resolve_expr(resolver, interner, expr, errors)
-                    }
-                    radix_syntax::ObjectKey::Spread(expr) => {
-                        resolve_expr(resolver, interner, expr, errors)
+                    radix_syntax::ObjectKey::Computed(expr)
+                    | radix_syntax::ObjectKey::Spread(expr) => {
+                        resolve_expr(resolver, interner, expr, errors);
                     }
                     _ => {}
                 }
@@ -1754,7 +1749,6 @@ fn resolve_expr(
             resolve_block(resolver, interner, &expr.body, errors);
             resolver.exit_scope();
         }
-        ExprKind::Ego(_) | ExprKind::Insere(_) => {}
         ExprKind::Paren(expr) => resolve_expr(resolver, interner, expr, errors),
         ExprKind::TypeCheck(expr) => {
             resolve_expr(resolver, interner, &expr.expr, errors);
@@ -1946,21 +1940,11 @@ fn resolve_type_expr(
     errors: &mut Vec<SemanticError>,
 ) {
     match &ty.kind {
-        TypeExprKind::Infer | TypeExprKind::FieldListHole => {}
-        TypeExprKind::UnionHole => {}
-        TypeExprKind::Tensor(elem, figura) => {
-            resolve_type_expr(resolver, interner, elem, errors);
-            resolve_figura_expr(resolver, interner, figura, errors);
-        }
-        TypeExprKind::Vector(elem, figura) => {
-            resolve_type_expr(resolver, interner, elem, errors);
-            resolve_figura_expr(resolver, interner, figura, errors);
-        }
-        TypeExprKind::Matrix(elem, figura) => {
-            resolve_type_expr(resolver, interner, elem, errors);
-            resolve_figura_expr(resolver, interner, figura, errors);
-        }
-        TypeExprKind::Sparsa(elem, figura) => {
+        TypeExprKind::Infer | TypeExprKind::FieldListHole | TypeExprKind::UnionHole => {}
+        TypeExprKind::Tensor(elem, figura)
+        | TypeExprKind::Vector(elem, figura)
+        | TypeExprKind::Matrix(elem, figura)
+        | TypeExprKind::Sparsa(elem, figura) => {
             resolve_type_expr(resolver, interner, elem, errors);
             resolve_figura_expr(resolver, interner, figura, errors);
         }
@@ -1995,7 +1979,7 @@ fn resolve_type_expr(
                             ));
                         }
                         [capacity] => {
-                            validate_capacity_index_param(resolver, interner, capacity, errors)
+                            validate_capacity_index_param(resolver, interner, capacity, errors);
                         }
                         _ => errors.push(lowering_error(ISSUE_PRIMITIVE_PARAMS, name.span)),
                     }
@@ -2226,7 +2210,7 @@ fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
         GenericArgExpr::Size(FiguraExpr::Infer | FiguraExpr::Literal(_)) => {
             radix_lexer::Span::default()
         }
-        GenericArgExpr::Size(FiguraExpr::Var(ident)) => ident.span,
+        GenericArgExpr::Size(FiguraExpr::Var(ident)) | GenericArgExpr::Name(ident) => ident.span,
         GenericArgExpr::Size(FiguraExpr::Lift(extent)) => lift_extent_span(extent),
         GenericArgExpr::Size(
             FiguraExpr::Add(value, _)
@@ -2236,7 +2220,6 @@ fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
         GenericArgExpr::Size(FiguraExpr::Tuple(dims)) => {
             dims.first().map(generic_figura_span).unwrap_or_default()
         }
-        GenericArgExpr::Name(ident) => ident.span,
     }
 }
 
@@ -2340,14 +2323,14 @@ fn capacity_index_issue(
         GenericArgExpr::Size(FiguraExpr::Tuple(_)) => {
             return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
         }
-        GenericArgExpr::Size(
-            FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) | FiguraExpr::Divide(_, _),
-        ) => return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
         GenericArgExpr::Type(TypeExpr {
             kind: TypeExprKind::Named(ident, nested),
             ..
         }) => (ident, !nested.is_empty()),
-        GenericArgExpr::Type(_) => return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
+        GenericArgExpr::Size(
+            FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) | FiguraExpr::Divide(_, _),
+        )
+        | GenericArgExpr::Type(_) => return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
     };
     if nested {
         return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
@@ -3321,7 +3304,7 @@ fn record_type_lowering_error(
                 .with_arg(name, value),
         ),
         TypeLowerError::CollectionArity(collection) => {
-            errors.push(lowering_collection_arity_error(collection, span))
+            errors.push(lowering_collection_arity_error(collection, span));
         }
     }
 }
@@ -4330,8 +4313,8 @@ fn lower_named_type(
         SymbolKind::Enum => types.intern(Type::Enum(def_id)),
         SymbolKind::Interface => types.intern(Type::Interface(def_id)),
         SymbolKind::TypeAlias => match symbol.ty {
-            Some(resolved) => {
-                let body = crate::index::freshen_bounded_capacity_holes(types, resolved);
+            Some(alias_ty) => {
+                let body = crate::index::freshen_bounded_capacity_holes(types, alias_ty);
                 types.intern(Type::Alias(def_id, body))
             }
             None => return Err(TypeLowerError::UnboundAlias),
@@ -4495,7 +4478,7 @@ fn modifier_bindings(modifiers: &[radix_syntax::FuncModifier]) -> Vec<&radix_syn
             | radix_syntax::FuncModifier::Errata(ident)
             | radix_syntax::FuncModifier::Optiones(ident) => out.push(ident),
             radix_syntax::FuncModifier::Exitus(radix_syntax::ExitusValue::Name(ident)) => {
-                out.push(ident)
+                out.push(ident);
             }
             _ => {}
         }
