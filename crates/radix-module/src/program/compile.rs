@@ -443,7 +443,7 @@ pub(crate) struct ImportResolveFailure {
 }
 
 /// Named import-site diagnostic for a parse-failed imported library (KPC-WIRE
-/// done_when (i), advisory D2/D3): rides the driver-side [`Diagnostic`]
+/// `done_when` (i), advisory D2/D3): rides the driver-side [`Diagnostic`]
 /// channel only — never a `FileInterfaceError` or an interface-type change.
 fn import_site_parse_failure_diagnostic(consumer: &Path, failure: &ImportSiteFailure) -> crate::Diagnostic {
     crate::Diagnostic::error(format!(
@@ -1320,14 +1320,7 @@ fn collect_transitive_same_package_interfaces(
         // An unparsable transitive target contributes no interface here; the
         // module that directly imports it reports the named import-site
         // failure through its own contract walk.
-        let target = if !is_package_form {
-            match cached_import_target(session, from_file, import_path, pack_key, pack_ref, templates) {
-                ImportTargetLookup::Parsed(target) => Some(target),
-                ImportTargetLookup::Unparsable(_)
-                | ImportTargetLookup::Unresolved
-                | ImportTargetLookup::UnresolvedProvider(_) => None,
-            }
-        } else {
+        let target = if is_package_form {
             // Package-form edges do not resolve through
             // `resolve_namespace_import`; resolve against the source root and
             // re-derive the parse/snapshot through the equivalent relative
@@ -1353,6 +1346,13 @@ fn collect_transitive_same_package_interfaces(
                     }
                 },
             )
+        } else {
+            match cached_import_target(session, from_file, import_path, pack_key, pack_ref, templates) {
+                ImportTargetLookup::Parsed(target) => Some(target),
+                ImportTargetLookup::Unparsable(_)
+                | ImportTargetLookup::Unresolved
+                | ImportTargetLookup::UnresolvedProvider(_) => None,
+            }
         };
         let Some(target) = target else {
             continue;
@@ -2948,7 +2948,7 @@ fn contract_field_type_spelling(ty: &TypeExpr, interner: &crate::lexer::Interner
     }
 }
 
-/// Pre-check: reject import specifiers that validate_import_paths would later
+/// Pre-check: reject import specifiers that `validate_import_paths` would later
 /// reject, so resolution + filesystem I/O never touch policy-illegal targets.
 ///
 /// Mirrors the checks in `crate::semantic::passes::import_path::validate_import_paths`.

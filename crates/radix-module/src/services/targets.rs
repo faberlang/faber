@@ -96,10 +96,9 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::HirOdin => "odin",
         crate::codegen::Target::HirC => "c",
         crate::codegen::Target::MirWasm => "wat",
-        crate::codegen::Target::MirLlvm => "ll",
-        crate::codegen::Target::MirLlvmHost => "run",
+        crate::codegen::Target::MirLlvm | crate::codegen::Target::MirAmd => "ll",
+        crate::codegen::Target::MirLlvmHost | crate::codegen::Target::MirFmirBundle => "run",
         crate::codegen::Target::MirClif => "o",
-        crate::codegen::Target::MirAmd => "ll",
         crate::codegen::Target::MirMetal => "metal",
         crate::codegen::Target::MirWgsl => "wgsl",
         crate::codegen::Target::MirSexp => "rkt",
@@ -107,7 +106,6 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::MirScena => "scena",
         crate::codegen::Target::MirFmir => "fmir.txt",
         crate::codegen::Target::MirFmirBinary => "fmir",
-        crate::codegen::Target::MirFmirBundle => "run",
         crate::codegen::Target::HirFhir => "fhir",
     }
 }
@@ -196,28 +194,11 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             package: false,
             note: "canonical Faber re-emission for compiler inspection; package compilation not supported",
         },
-        crate::codegen::Target::HirGo => TargetCapabilities {
-            check: true,
-            build: true,
-            run: false,
-            package: false,
-            note: "file emission supported; package compilation not yet supported",
-        },
-        crate::codegen::Target::HirSwift => TargetCapabilities {
-            check: true,
-            build: true,
-            run: false,
-            package: false,
-            note: "file emission supported; package compilation not yet supported",
-        },
-        crate::codegen::Target::HirPython => TargetCapabilities {
-            check: true,
-            build: true,
-            run: false,
-            package: false,
-            note: "file emission supported; package compilation not yet supported",
-        },
-        crate::codegen::Target::HirHaskell => TargetCapabilities {
+        crate::codegen::Target::HirGo
+        | crate::codegen::Target::HirSwift
+        | crate::codegen::Target::HirPython
+        | crate::codegen::Target::HirHaskell
+        | crate::codegen::Target::HirTypeScript => TargetCapabilities {
             check: true,
             build: true,
             run: false,
@@ -258,13 +239,6 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             run: false,
             package: false,
             note: "preview: readable C from checked HIR, output matches the runner, no undefined behavior emitted, unsupported constructs rejected by name; build with GCC or Clang; default in faber, outside full-targets",
-        },
-        crate::codegen::Target::HirTypeScript => TargetCapabilities {
-            check: true,
-            build: true,
-            run: false,
-            package: false,
-            note: "file emission supported; package compilation not yet supported",
         },
         crate::codegen::Target::MirWasm => TargetCapabilities {
             check: true,
