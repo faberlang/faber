@@ -1,10 +1,11 @@
 //! FIPS 180-4 SHA-256, streaming.
 //!
-//! The fs leaf (`solum:digere`, next unit) reads a file through this engine in
-//! fixed blocks. The engine keeps at most one 64-byte block buffered and
-//! allocates nothing per update, so a file of any size is hashed without
-//! loading it whole. Content hash, not a secret: no side-channel hardening is
-//! attempted.
+//! No caller yet: `lib.rs` declares the module and nothing uses it, so the
+//! `#[allow(dead_code)]` markers below stay until the fs leaf's
+//! `solum:digere` reads a file through this engine in fixed blocks. The
+//! engine keeps at most one 64-byte block buffered and allocates nothing per
+//! update, so a file of any size is hashed without loading it whole. Content
+//! hash, not a secret: no side-channel hardening is attempted.
 
 #[cfg(test)]
 #[path = "sha256_test.rs"]
@@ -133,9 +134,8 @@ impl Sha256 {
                 self.buffered = 0;
             }
         }
-        let full = rest.len() - rest.len() % BLOCK_BYTES;
-        let (blocks, tail) = rest.split_at(full);
-        for block in blocks.as_chunks::<BLOCK_BYTES>().0 {
+        let (blocks, tail) = rest.as_chunks::<BLOCK_BYTES>();
+        for block in blocks {
             compress(&mut self.state, block);
         }
         if !tail.is_empty() {
@@ -147,7 +147,9 @@ impl Sha256 {
     /// Finalize the digest, consuming the hasher. Standard padding: `0x80`,
     /// zeroes, then the big-endian bit length in the final 8 bytes.
     pub(crate) fn finalize(mut self) -> [u8; 32] {
+        // The length field is the message length in bits, mod 2^64 (§5.1.2).
         let bit_len = self.total_bytes.wrapping_mul(8);
+        // `buffered` is always below BLOCK_BYTES: `update` flushes a full block.
         self.buffer[self.buffered] = 0x80;
         self.buffered += 1;
         if self.buffered > 56 {
@@ -184,9 +186,9 @@ pub(crate) fn hex(digest: &[u8; 32]) -> String {
 fn compress(state: &mut [u32; 8], block: &[u8; BLOCK_BYTES]) {
     // Message schedule W[0..64] (§6.2.2 step 1).
     let mut w = [0_u32; 64];
-    let (first, _tail) = block.as_chunks::<4>();
-    for (word, chunk) in w.iter_mut().take(16).zip(first) {
-        *word = u32::from_be_bytes(*chunk);
+    let (words, _tail) = block.as_chunks::<4>();
+    for (word, bytes) in w.iter_mut().zip(words) {
+        *word = u32::from_be_bytes(*bytes);
     }
     for i in 16..64 {
         let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
@@ -198,14 +200,14 @@ fn compress(state: &mut [u32; 8], block: &[u8; BLOCK_BYTES]) {
     }
     // Working variables + the 64 rounds (§6.2.2 steps 2–3).
     let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = *state;
-    for i in 0..64 {
+    for (&k, &wi) in ROUND_CONSTANTS.iter().zip(&w) {
         let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
         let ch = (e & f) ^ (!e & g);
         let temp1 = h
             .wrapping_add(s1)
             .wrapping_add(ch)
-            .wrapping_add(ROUND_CONSTANTS[i])
-            .wrapping_add(w[i]);
+            .wrapping_add(k)
+            .wrapping_add(wi);
         let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
         let maj = (a & b) ^ (a & c) ^ (b & c);
         let temp2 = s0.wrapping_add(maj);
