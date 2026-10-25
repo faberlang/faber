@@ -38,6 +38,25 @@ fn io_error_keeps_file_context_without_rendering_path_in_message() {
 }
 
 #[test]
+fn io_error_names_the_artifact_kind_for_each_file_class() {
+    let error = std::io::Error::from_raw_os_error(2);
+    for (path, expected) in [
+        ("/tmp/faber/faber.toml", "manifest"),
+        ("/tmp/faber/pack.toml", "locale pack"),
+        ("/tmp/faber/suite.proba", "source file"),
+        ("/tmp/faber/notes.txt", "file"),
+    ] {
+        let diagnostic = Diagnostic::io_error(Path::new(path), &error);
+        let artifact = diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "artifact")
+            .map(|arg| arg.value.as_str());
+        assert_eq!(artifact, Some(expected), "artifact for {path}");
+    }
+}
+
+#[test]
 fn offset_to_line_is_one_based_and_advances_after_newline() {
     let source = "ab\ncd\nef";
     assert_eq!(offset_to_line(source, 0), 1);

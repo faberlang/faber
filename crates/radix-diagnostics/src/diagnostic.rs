@@ -661,16 +661,13 @@ impl Diagnostic {
 }
 
 fn io_artifact(path: &Path) -> &'static str {
-    match path.file_name().and_then(|name| name.to_str()) {
-        Some("faber.toml") => "manifest",
-        Some("pack.toml") => "locale pack",
-        _ if path
-            .extension()
-            .and_then(|extension| extension.to_str())
-            .is_some_and(|extension| matches!(extension, "fab" | "proba")) =>
-        {
-            "source file"
-        }
+    match (
+        path.file_name().and_then(|name| name.to_str()),
+        path.extension().and_then(|extension| extension.to_str()),
+    ) {
+        (Some("faber.toml"), _) => "manifest",
+        (Some("pack.toml"), _) => "locale pack",
+        (_, Some("fab" | "proba")) => "source file",
         _ => "file",
     }
 }
@@ -701,7 +698,7 @@ pub fn parse_arg_value(args: &[DiagnosticArg], name: &str) -> Option<String> {
         .map(|arg| arg.value.clone())
 }
 
-/// Longest line [`get_line_at_offset`] returns, in characters.
+/// Longest unclipped line [`get_line_at_offset`] returns, in characters.
 ///
 /// A hostile single-line input (multi-megabyte, newline-free) must not drive
 /// renderer output volume; longer lines clip to this head plus an ellipsis
@@ -710,6 +707,11 @@ pub const MAX_SOURCE_LINE_CHARS: usize = 400;
 
 const SOURCE_LINE_ELLIPSIS: &str = "…";
 
+/// Source line containing a byte offset, clamped to the source length.
+///
+/// The offset snaps down to a UTF-8 char boundary, and the returned line
+/// excludes its terminating `\n`. A line longer than `MAX_SOURCE_LINE_CHARS`
+/// returns that many characters plus an ellipsis marker.
 #[must_use]
 pub fn get_line_at_offset(source: &str, offset: usize) -> String {
     let offset = nearest_char_boundary(source, offset);
@@ -724,14 +726,14 @@ pub fn get_line_at_offset(source: &str, offset: usize) -> String {
     }
 }
 
-/// One-based physical line for a byte offset, clamped to the real source length.
+/// One-based physical line for a byte offset, clamped to the source line count.
 ///
 /// Newline count before the clamped offset is the line index. Offsets past EOF
 /// or onto a trailing empty line after a final `\n` stay on the last content
-/// line so user-facing `file:N` cannot exceed `wc -l`.
+/// line so user-facing `file:N` cannot exceed the physical line count.
 #[must_use]
 pub fn offset_to_line(source: &str, offset: usize) -> u32 {
-    let offset = nearest_char_boundary(source, offset.min(source.len()));
+    let offset = nearest_char_boundary(source, offset);
     let newlines = source[..offset].bytes().filter(|&b| b == b'\n').count();
     let line = newlines.saturating_add(1);
     let physical = source.lines().count().max(1);
