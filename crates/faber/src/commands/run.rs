@@ -87,6 +87,7 @@ pub(super) fn cmd_run(args: RunArgs) {
 /// Dispatch an interpreted input path to the package-MIR runner, archive
 /// extraction, or single-source runner. `faber run` always routes through
 /// this dispatch; nothing here compiles or invokes Cargo.
+#[cfg_attr(not(feature = "device-runtime"), allow(unused_variables))]
 fn interpret_path(
     path: &Path,
     program_args: &[String],
@@ -97,8 +98,6 @@ fn interpret_path(
     stats: bool,
     stats_file: Option<&std::path::PathBuf>,
 ) {
-    #[cfg(not(feature = "device-runtime"))]
-    let _ = cpu;
     let stats_requested = stats || stats_file.is_some();
     if super::archive::is_zip_archive(path) {
         let archive = match super::archive::extract_package_archive(path) {
@@ -720,8 +719,12 @@ fn finish_failed_device_run(
     let package::mir::DeviceSessionFailure { diagnostics, run } = failure;
     if let Some(run) = run {
         // The run's own failure is the one reported: `finish_device_run`
-        // exits the process itself when the artifact cannot be written.
-        let _ = finish_device_run(run, metadata, started, stats, stats_file, out, 1);
+        // exits the process itself when the artifact cannot be written, so
+        // anything it does return is added to that failure.
+        if let Err(artifact) = finish_device_run(run, metadata, started, stats, stats_file, out, 1)
+        {
+            return diagnostics.into_iter().chain(artifact).collect();
+        }
     }
     diagnostics
 }

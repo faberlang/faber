@@ -927,8 +927,10 @@ pub(super) fn check_matrix_bracket_slot_list_index(
     let mut index_elem_ty: Option<TypeId> = None;
 
     for (axis, element) in elements.iter_mut().enumerate() {
+        // Non-expression slots were rejected above with the tensor-index
+        // diagnostic, so they carry no axis to check here.
         let HirArrayElement::Expr(slot) = element else {
-            unreachable!("spread and inferred matrix slots were rejected above");
+            continue;
         };
         if let HirExpressionKind::Intervallum {
             start,

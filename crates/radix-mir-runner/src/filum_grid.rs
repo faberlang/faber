@@ -401,7 +401,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         ));
                     }
                 },
-                _ => unreachable!("grouped operator was checked above"),
+                _ => {
+                    return Err(RunnerError::unsupported(
+                        span,
+                        "intrinsic FilumReduce(grid) supports sum and count",
+                    ));
+                }
             };
             buckets[bucket] = combined;
         }

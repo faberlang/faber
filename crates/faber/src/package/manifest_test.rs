@@ -114,7 +114,6 @@ fn invalid_threads_fail_closed_with_issue() {
             err.args.contains(&DiagnosticArg::new("threads", shown)),
             "{body}"
         );
-        assert!(err.message.contains("positive integer"), "{}", err.message);
     }
 }
 

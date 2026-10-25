@@ -253,7 +253,6 @@ fn grouped_key_out_of_range_uses_the_fatal_tensor_index_error() {
         [1, 4, 1, 2, 1].into_iter().map(Value::Int).collect(),
     )
     .expect_err("group key 4 is outside [0,4)");
-    assert_eq!(error.message, ERR_ACCIPE_INVALID_INDEX);
     assert_eq!(error.code, crate::RUNNER_CODE_INTERNAL);
     assert_eq!(error.issue, crate::runner_issue(ERR_ACCIPE_INVALID_INDEX));
 }

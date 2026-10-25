@@ -175,6 +175,17 @@ fn non_renderer_tests_do_not_assert_diagnostic_text() {
     );
 }
 
+#[test]
+fn helper_locals_are_not_diagnostic_text_fields() {
+    assert!(reads_diagnostic_text_field(
+        "assert!(d.message.contains(\"x\"))"
+    ));
+    assert!(reads_diagnostic_text_field("assert_eq!(err.help,None)"));
+    assert!(!reads_diagnostic_text_field(
+        "assert!(needs.helpers.contains(&helper))"
+    ));
+}
+
 #[cfg(unix)]
 #[test]
 fn diagnostic_text_scan_skips_symlinks_and_agent_dirs() {
@@ -316,7 +327,7 @@ fn collect_message_field_assertions(
                 .find(");")
                 .map_or(compact.len(), |relative_end| start + relative_end + 2);
             let body = &compact[start..end];
-            if body.contains(".message") || body.contains(".help") {
+            if reads_diagnostic_text_field(body) {
                 violations.push(format!(
                     "{} contains {assertion} over diagnostic message/help field",
                     display_relative(root, path)
@@ -325,6 +336,27 @@ fn collect_message_field_assertions(
             offset = end;
         }
     }
+}
+
+/// Whether `body` reads a diagnostic `message` or `help` field. The field name
+/// must end at a boundary: a `helpers` local or method is not the `help`
+/// field, and counting it hides real assertions behind a false report.
+fn reads_diagnostic_text_field(body: &str) -> bool {
+    for field in [".message", ".help"] {
+        let mut offset = 0;
+        while let Some(found) = body[offset..].find(field) {
+            let end = offset + found + field.len();
+            if body[end..]
+                .chars()
+                .next()
+                .is_none_or(|ch| !(ch.is_alphanumeric() || ch == '_'))
+            {
+                return true;
+            }
+            offset = end;
+        }
+    }
+    false
 }
 
 fn collect_diagnostic_shape_field_assertions(
