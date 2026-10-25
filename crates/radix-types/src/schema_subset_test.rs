@@ -333,7 +333,7 @@ fn widening_o_column_type_is_compatible() {
     let mut types = TypeTable::new();
     let numerus = types.sized_numeric(Primitive::Numerus, crate::NumericWidth::I32);
     let textus = types.primitive(Primitive::Textus);
-    let fractus = types.sized_numeric(Primitive::Numerus, crate::NumericWidth::I64);
+    let numerus_lata = types.sized_numeric(Primitive::Numerus, crate::NumericWidth::I64);
     let i = SchemaDef {
         name: interner.intern("PersonaI"),
         columns: vec![
@@ -344,7 +344,7 @@ fn widening_o_column_type_is_compatible() {
     let o = SchemaDef {
         name: interner.intern("PersonaLata"),
         columns: vec![
-            col(&mut interner, "id", "id", fractus, true, 0),
+            col(&mut interner, "id", "id", numerus_lata, true, 0),
             col(&mut interner, "nomen", "plenum", textus, true, 1),
         ],
     };

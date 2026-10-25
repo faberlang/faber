@@ -9,8 +9,8 @@
 //!
 //! The operation is pure metadata: no DB, no plan, no provider. It is the
 //! schema-side proof that a narrower compatible output schema proves `O ⊆ I`
-//! (plan.md S2 acceptance item 3), consumed by S3's `filtrum<I,O>` typecheck
-//! before plan construction.
+//! (plan.md S2 acceptance item 3), for S3's `filtrum<I,O>` typecheck to
+//! consume before plan construction.
 //!
 //! # Decided rule cells (named for S2-U6 review)
 //!
@@ -26,10 +26,11 @@
 //!   `I`'s column type must be usable where `O` expects one, because
 //!   projection data flows `I → O` (design §4.5 "checked by name and
 //!   compatible type"). The language's own semantic-compatibility relation
-//!   ([`TypeTable::is_assignable`]) encodes the implicit widening rules
-//!   (`numerus → fractus`, `ascii → textus`, coarse → fine instans), so an
-//!   `O` that *widens* a column type is compatible and an `O` that *narrows*
-//!   one is not.
+//!   ([`TypeTable::is_assignable`]) supplies the implicit edges — lossless
+//!   integer widening (`i32 → i64`), `ascii → textus`, coarse → fine
+//!   `instans` — and never crosses number families (integer → float needs an
+//!   explicit `↦`), so an `O` that *widens* a column type is compatible and
+//!   an `O` that *narrows* one is not.
 //! - **Nullability**: may only be relaxed, never tightened. `O` may not
 //!   require a column `I` offers only optionally (`T ∪ nihil`): a `NULL` must
 //!   never reach a required cell — required and nullable are distinct states
@@ -41,10 +42,7 @@
 //! A schema carries exactly its declared columns and never implies a complete
 //! description of the source relation: there is no arity or completeness
 //! field, [`schema_column_count`] is exactly the declared column count, and
-//! [`extra_input_columns`] names the legal `I \ O` set whose presence never
-//! invalidates a subset proof (extra source columns stay invisible and
-//! harmless — goal success criterion 8). Provider-metadata admission of a
-//! real relation against the schema (MISSING-1 etc.) is S5/S6.
+//! [`extra_input_columns`] names the legal `I \ O` set.
 
 use crate::schema::{SchemaColumnDef, SchemaDef};
 use crate::types::{TypeId, TypeTable};
@@ -153,12 +151,11 @@ pub fn schema_column_count(def: &SchemaDef) -> usize {
 }
 
 /// Legal `I \ O` set (design §2.3): the public names of `I`'s columns that
-/// `O` does not declare — source-only predicate columns and extra source
-/// columns. Their presence never invalidates the subset proof: a wider
-/// source contract satisfies the schema and the extra columns stay invisible
-/// and harmless (goal success criterion 8; "extra source columns remain
-/// invisible and harmless"). Provider-metadata admission of a real relation
-/// is S5/S6.
+/// `O` does not declare, in `I`'s canonical order — source-only predicate
+/// columns and extra source columns. Their presence never invalidates the
+/// subset proof: a wider source contract satisfies the schema and the extra
+/// columns stay invisible and harmless (goal success criterion 8).
+/// Provider-metadata admission of a real relation is S5/S6.
 #[must_use]
 pub fn extra_input_columns(o: &SchemaDef, i: &SchemaDef) -> Vec<LexSymbol> {
     i.columns
