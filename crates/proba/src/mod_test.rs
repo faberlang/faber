@@ -549,6 +549,21 @@ proba "zero" temporis 0 {
 }
 
 #[test]
+fn temporis_beyond_instant_range_still_runs_the_case() {
+    // A deadline that `Instant` cannot represent must not unwind the run; the
+    // case executes and only the runner's step budget remains as a backstop.
+    let report = run(
+        r#"
+proba "far deadline" temporis 9223372036854775807 {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.passed(), 1, "report: {report:?}");
+}
+
+#[test]
 fn cli_default_timeout_applies_without_per_test_modifier() {
     // Precedence leg 2: --test-timeout default binds cases with no modifier.
     let report = run_with_timeout(

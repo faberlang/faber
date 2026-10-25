@@ -325,26 +325,25 @@ pub fn selection_skip_reason(
         return Some("faber: not selected by solum".to_owned());
     }
 
-    if let Some(name) = selection.name.as_deref() {
-        if case.name != name {
-            return Some(format!("faber: not selected by name {name}"));
-        }
+    if let Some(name) = selection.name.as_deref()
+        && case.name != name
+    {
+        return Some(format!("faber: not selected by name {name}"));
     }
 
-    if let Some(suite) = selection.suite.as_deref() {
-        if case.suite_path != suite {
-            return Some(format!("faber: not selected by suite {suite}"));
-        }
+    if let Some(suite) = selection.suite.as_deref()
+        && case.suite_path != suite
+    {
+        return Some(format!("faber: not selected by suite {suite}"));
     }
 
-    if let Some(tag) = selection.tag.as_deref() {
-        if !case
+    if let Some(tag) = selection.tag.as_deref()
+        && !case
             .modifiers
             .iter()
             .any(|m| matches!(m, ProbaModifierView::Tag(value) if value == tag))
-        {
-            return Some(format!("faber: not selected by tag {tag}"));
-        }
+    {
+        return Some(format!("faber: not selected by tag {tag}"));
     }
 
     None
@@ -435,12 +434,12 @@ fn execution_plan(
             ProbaModifierView::SolumIn(env) => solum_in = Some(env.clone()),
         }
     }
-    if let Some(env) = solum_in {
-        if !solum_in_matches(&env) {
-            return ExecutionPlan::Skip {
-                reason: format!("faber: solum_in - only in {env}"),
-            };
-        }
+    if let Some(env) = solum_in
+        && !solum_in_matches(&env)
+    {
+        return ExecutionPlan::Skip {
+            reason: format!("faber: solum_in - only in {env}"),
+        };
     }
     ExecutionPlan::Run {
         timeout_secs,
@@ -597,9 +596,11 @@ fn run_proba_on_analyzed_with_unit_path(
     ))
 }
 
-/// Execute inventoriable cases against already-validated MIR.
+/// Execute inventoriable cases against already-validated MIR whose function
+/// IDs are unrewritten.
 ///
-/// Used by single-file runs and by package runners that share one linked program.
+/// Used by single-file runs. Package runners pass linker-owned identities to
+/// [`run_proba_on_validated_with_function_ids`] instead.
 #[must_use]
 pub fn run_proba_on_validated(
     validated: &ValidatedMir<'_>,
@@ -843,9 +844,11 @@ fn execute_case(
     };
     let mut host = BufferHost::default();
     // Wall-clock deadline from the resolved timeout (per-test temporis, else
-    // the CLI default). The runner's default step budget still applies as a
+    // the CLI default). A horizon past `Instant`'s representable range cannot
+    // form a deadline; the runner's default step budget still applies as a
     // backstop via the `None` step-budget argument.
-    let deadline = timeout_secs.map(|secs| Instant::now() + Duration::from_secs(secs));
+    let deadline =
+        timeout_secs.and_then(|secs| Instant::now().checked_add(Duration::from_secs(secs)));
     // Assertion failures call Host::abort which panics on BufferHost; catch as fail.
     // Silence the default panic hook so failed cases do not dump a backtrace to stderr.
     let previous_hook = std::panic::take_hook();
@@ -926,8 +929,8 @@ fn captured_stdout(host: &BufferHost) -> Vec<String> {
 }
 
 /// Runner issue emitted when a failable call reaches a statement without an
-/// enclosing error sink. This is the only runner failure that represents the
-/// expected error-channel escape for `erratur`.
+/// enclosing error sink. `erratur` accepts this identity as the expected
+/// error-channel escape.
 const ISSUE_UNCAUGHT_ALTERNATE_RETURN: &str = "runner_uncaught_alternate_return_from_call";
 
 fn outcome_from_run_result(result: Result<(), Vec<RunnerError>>, erratur: bool) -> CaseOutcome {
