@@ -106,6 +106,7 @@ pub enum IndexArithmeticError {
     Negative,
     NonIntegral,
     Overflow,
+    /// The term is a tuple shape or the unspecified bridge, not one dimension.
     NotScalar,
 }
 
@@ -187,12 +188,12 @@ pub fn compose_index_affine_constant(
     base: IndexId,
     amount: i128,
 ) -> Result<IndexId, IndexArithmeticError> {
-    let (base, amount) = match types.get_index(base).clone() {
+    let (base, amount) = match types.get_index(base) {
         IndexExpr::Affine {
-            base,
+            base: affine_base,
             offset: previous,
         } => (
-            base,
+            *affine_base,
             previous
                 .checked_add(amount)
                 .ok_or(IndexArithmeticError::Overflow)?,
@@ -262,22 +263,20 @@ impl IndexExpr {
 
 /// Extract compile-time literal dimensions when every term is a natural literal.
 ///
-/// Returns `None` when any dimension is symbolic (`Param`, `Runtime`, `Infer`,
-/// or `Unspecified`) or does not fit the target `i64` representation.
+/// Returns `None` when a dimension is symbolic (`Param`, `Runtime`, `Infer`, or
+/// `Unspecified`), when its arithmetic has no concrete value (non-integral
+/// division, a negative offset, or overflow), or when the value does not fit
+/// the target `i64` representation.
 #[must_use]
 pub fn i64s_from_literal_index(index_id: IndexId, types: &crate::TypeTable) -> Option<Vec<i64>> {
     match types.get_index(index_id) {
-        IndexExpr::Literal(value) => Some(vec![i64::try_from(*value).ok()?]),
-        IndexExpr::Affine { .. } | IndexExpr::Divide { .. } => Some(vec![
+        IndexExpr::Literal(_) | IndexExpr::Affine { .. } | IndexExpr::Divide { .. } => Some(vec![
             i64::try_from(evaluate_index_dimension(index_id, types).ok()??).ok()?,
         ]),
-        IndexExpr::Tuple(dims) => {
-            let mut out = Vec::with_capacity(dims.len());
-            for dim in dims {
-                out.push(i64::try_from(evaluate_index_dimension(*dim, types).ok()??).ok()?);
-            }
-            Some(out)
-        }
+        IndexExpr::Tuple(dims) => dims
+            .iter()
+            .map(|dim| i64::try_from(evaluate_index_dimension(*dim, types).ok()??).ok())
+            .collect(),
         IndexExpr::Param(_)
         | IndexExpr::Runtime(_)
         | IndexExpr::Infer(_)
@@ -291,6 +290,8 @@ pub fn i64s_from_literal_index(index_id: IndexId, types: &crate::TypeTable) -> O
 /// Returns `None` if the shapes are not broadcast-compatible. Returns
 /// `Some(axes)` where `axes` is a list of axis indices in operand-local
 /// space (0-indexed from the operand's own rank, not the padded rank).
+///
+/// A non-tuple term counts as rank 1 and [`IndexExpr::Unspecified`] as rank 0.
 #[must_use]
 pub fn compute_cotangent_reduction_axes(
     operand_shape: IndexId,
@@ -308,17 +309,10 @@ pub fn compute_cotangent_reduction_axes(
 
     let mut axes = Vec::new();
     for pos in 0..rank {
-        let op_dim_is_one = if pos < op_pad {
-            true
-        } else {
-            is_literal_one(op_dims[pos - op_pad], types)
-        };
+        // Short-circuit: a padded position has no operand dimension to index.
+        let op_dim_is_one = pos < op_pad || is_literal_one(op_dims[pos - op_pad], types);
 
-        let res_dim_is_one = if pos < res_pad {
-            true
-        } else {
-            is_literal_one(res_dims[pos - res_pad], types)
-        };
+        let res_dim_is_one = pos < res_pad || is_literal_one(res_dims[pos - res_pad], types);
 
         // A broadcast result is never smaller than its operand: a result dim
         // of one against a non-one operand dim (including a left-padded
