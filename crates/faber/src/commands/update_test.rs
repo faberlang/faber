@@ -3,6 +3,7 @@
 //! the pure release parser and a local fixture mirror.
 
 use super::update::*;
+use handroll::sha256_hex;
 use semver::Version;
 use std::fs;
 use std::path::{Path, PathBuf};

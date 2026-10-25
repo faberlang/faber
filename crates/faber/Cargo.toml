@@ -51,10 +51,9 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # through zip's deflate backend). Build-time compressor + runtime decoder.
 flate2 = "1"
 # `faber update`: public release lookup, verified archive download, and the
-# versioned install layout. TLS is rustls (already linked via faber-leaf); the
-# updater does not shell out to curl or python3.
-ureq = { version = "2", default-features = false, features = ["tls"] }
-sha2 = "0.10"
+# versioned install layout. HTTP(S) rides the shared `faber-leaf` client
+# (rustls TLS, already linked); the SHA-256 checksum is `handroll::sha256`.
+# The updater does not shell out to curl or python3.
 tar = "0.4"
 semver = "1"
 handroll = { path = "../handroll" }

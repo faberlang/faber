@@ -20,13 +20,12 @@
 
 use std::cmp::Ordering;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use clap::Args;
+use handroll::sha256_hex;
 use semver::Version;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
 
 /// Release repository that hosts the public `faber-v*` releases.
 const RELEASES_REPO: &str = "faberlang/releases";
@@ -39,6 +38,10 @@ const TAG_PREFIX: &str = "faber-v";
 /// The release list is paginated; walk a bounded number of pages so a repo
 /// that also carries other components cannot hide the newest faber release.
 const MAX_RELEASE_PAGES: usize = 5;
+/// Largest release artifact (archive or checksum) the updater will buffer.
+/// A prebuilt archive is a few tens of MiB; the bound exists so a hostile
+/// mirror cannot exhaust memory, not because real releases approach it.
+const MAX_DOWNLOAD_BYTES: usize = 256 << 20;
 
 /// Arguments for `faber update`.
 #[derive(Args, Debug)]
@@ -334,32 +337,38 @@ pub(crate) fn consider_release(best: &mut Option<PublicRelease>, release: &Relea
 }
 
 fn http_get(url: &str) -> Result<Vec<u8>, String> {
-    let mut request = ureq::get(url)
-        .set("User-Agent", concat!("faber/", env!("CARGO_PKG_VERSION")))
-        .set("Accept", "application/vnd.github+json");
+    let mut headers = vec![
+        (
+            "User-Agent".to_owned(),
+            concat!("faber/", env!("CARGO_PKG_VERSION")).to_owned(),
+        ),
+        (
+            "Accept".to_owned(),
+            "application/vnd.github+json".to_owned(),
+        ),
+    ];
     if let Some(token) = github_token() {
-        request = request.set("Authorization", &format!("Bearer {token}"));
+        headers.push(("Authorization".to_owned(), format!("Bearer {token}")));
     }
-    let response = request.call().map_err(|err| match err {
-        ureq::Error::Status(code, response) => {
-            let detail = response.into_string().unwrap_or_default();
-            if code == 403 || code == 429 {
-                format!(
-                    "GitHub rate limit or authorization failure ({code}) for {url}; \
-                     set GITHUB_TOKEN or GH_TOKEN and retry. {detail}"
-                )
-            } else {
-                format!("GET {url} failed with HTTP {code}: {detail}")
-            }
-        }
-        ureq::Error::Transport(err) => format!("cannot reach {url}: {err}"),
-    })?;
-    let mut bytes = Vec::new();
-    response
-        .into_reader()
-        .read_to_end(&mut bytes)
-        .map_err(|err| format!("cannot read {url}: {err}"))?;
-    Ok(bytes)
+    let response = faber_leaf::http::fetch(url, &headers, MAX_DOWNLOAD_BYTES)
+        .map_err(|err| format!("cannot reach {url}: {err}"))?;
+    let status = usize::from(response.status);
+    if (200..300).contains(&status) {
+        return Ok(response.body);
+    }
+    let detail = String::from_utf8_lossy(&response.body);
+    if response.status == 403 || response.status == 429 {
+        Err(format!(
+            "GitHub rate limit or authorization failure ({}) for {url}; \
+             set GITHUB_TOKEN or GH_TOKEN and retry. {detail}",
+            response.status
+        ))
+    } else {
+        Err(format!(
+            "GET {url} failed with HTTP {}: {detail}",
+            response.status
+        ))
+    }
 }
 
 fn github_token() -> Option<String> {
@@ -566,15 +575,6 @@ fn current_triple() -> Result<&'static str, String> {
              aarch64-apple-darwin and x86_64-unknown-linux-gnu"
         )),
     }
-}
-
-pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
-    let mut text = String::with_capacity(64);
-    for byte in digest {
-        text.push_str(&format!("{byte:02x}"));
-    }
-    text
 }
 
 pub(crate) fn parse_checksum(bytes: &[u8]) -> Result<String, String> {

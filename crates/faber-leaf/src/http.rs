@@ -515,6 +515,106 @@ fn exchange(opener: &ClientOpener, open: bool) -> Result<Reply, LeafError> {
     ]))
 }
 
+/// One completed one-shot response from [`fetch`].
+#[derive(Debug)]
+pub struct Fetched {
+    /// HTTP status code.
+    pub status: u16,
+    /// Response header rows in arrival order.
+    pub headers: Vec<(String, String)>,
+    /// Raw body bytes, binary-safe: this is exactly what the server sent.
+    pub body: Vec<u8>,
+}
+
+/// Longest redirect chain [`fetch`] follows before refusing.
+pub const MAX_REDIRECTS: usize = 5;
+
+/// One-shot `GET` returning the raw body bytes, following up to
+/// [`MAX_REDIRECTS`] redirects. Unlike the `http:*` route surface this is
+/// binary-safe: `body` holds the exact bytes the server sent, so archives
+/// and other opaque payloads survive. An `Authorization` header is dropped
+/// when a redirect hop leaves the original host.
+///
+/// # Errors
+/// [`LeafError`] on connect, TLS, parse, or body-limit failure; when a
+/// redirect carries no usable `Location`; or when the chain exceeds
+/// [`MAX_REDIRECTS`].
+pub fn fetch(
+    url: &str,
+    headers: &[(String, String)],
+    max_body: usize,
+) -> Result<Fetched, LeafError> {
+    const ROUTE: &str = "http:fetch";
+    let mut url = url.to_owned();
+    let original_authority = authority_of(&url)
+        .ok_or_else(|| LeafError::invalid_argument(ROUTE, format!("invalid URL `{url}`")))?;
+    let mut hop_headers = headers.to_vec();
+    for _hop in 0..=MAX_REDIRECTS {
+        let opener = ClientOpener {
+            agent: None,
+            method: "GET".to_owned(),
+            url: url.clone(),
+            headers: hop_headers.clone(),
+            body: Vec::new(),
+        };
+        let mut stream = send_request(&opener)?;
+        let parsed = read_http_message(&mut stream, max_body, true, true)?;
+        if matches!(parsed.status, 301 | 302 | 303 | 307 | 308) {
+            let location = parsed
+                .headers
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case("location"))
+                .map(|(_, value)| value.clone());
+            let Some(next) = location.and_then(|location| resolve_location(&url, &location)) else {
+                return Err(LeafError::invalid_argument(
+                    ROUTE,
+                    format!("redirect from `{url}` carries no usable `Location`"),
+                ));
+            };
+            if authority_of(&next).is_some_and(|authority| authority != original_authority) {
+                hop_headers.retain(|(name, _)| !name.eq_ignore_ascii_case("authorization"));
+            }
+            url = next;
+            continue;
+        }
+        return Ok(Fetched {
+            status: parsed.status,
+            headers: parsed.headers,
+            body: parsed.body,
+        });
+    }
+    Err(LeafError::invalid_argument(
+        ROUTE,
+        format!("more than {MAX_REDIRECTS} redirects starting at `{url}`"),
+    ))
+}
+
+/// The `host[:port]` authority of an `http`/`https` URL.
+#[must_use]
+fn authority_of(url: &str) -> Option<String> {
+    let (_scheme, rest) = url.split_once("://")?;
+    let authority = rest.split(['/', '?']).next()?;
+    if authority.is_empty() {
+        None
+    } else {
+        Some(authority.to_owned())
+    }
+}
+
+/// Join a `Location` value against the URL that produced it. Absolute URLs
+/// and absolute paths are supported; a relative reference is refused (the
+/// redirect sources this client targets do not emit them).
+#[must_use]
+fn resolve_location(current: &str, location: &str) -> Option<String> {
+    if location.contains("://") {
+        return Some(location.to_owned());
+    }
+    let path = location.strip_prefix('/')?;
+    let (scheme, authority_rest) = current.split_once("://")?;
+    let authority = authority_rest.split(['/', '?']).next()?;
+    Some(format!("{scheme}://{authority}/{path}"))
+}
+
 /// Write the request and pend the stream without reading the response head.
 fn request_send(args: &[Arg]) -> Result<Reply, LeafError> {
     let opener = opener_from_args(args)?;

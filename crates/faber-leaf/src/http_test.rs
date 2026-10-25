@@ -698,3 +698,87 @@ fn client_rejects_non_hex_chunk_size() {
     let message = hostile_chunked_response("zzzz");
     assert!(message.contains("invalid chunk size"), "{message}");
 }
+
+/// Serve one raw HTTP exchange: read the request head, then write `response`
+/// followed by `body`. Returns the request head text so tests can assert on
+/// what the client sent.
+fn serve_raw_response(
+    listener: TcpListener,
+    response: String,
+    body: Vec<u8>,
+) -> thread::JoinHandle<String> {
+    thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut head = Vec::new();
+        let mut byte = [0_u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            stream.read_exact(&mut byte).expect("request head");
+            head.push(byte[0]);
+        }
+        stream
+            .write_all(response.as_bytes())
+            .expect("write response");
+        stream.write_all(&body).expect("write body");
+        String::from_utf8_lossy(&head).into_owned()
+    })
+}
+
+#[test]
+fn fetch_follows_redirect_and_returns_binary_body() {
+    let payload: Vec<u8> = (0_u8..=255).cycle().take(700).collect();
+    let final_listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let final_port = final_listener.local_addr().expect("addr").port();
+    let redirect_listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let redirect_port = redirect_listener.local_addr().expect("addr").port();
+
+    let final_response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        payload.len()
+    );
+    let final_server = serve_raw_response(final_listener, final_response, payload.clone());
+    let redirect_server = serve_raw_response(
+        redirect_listener,
+        format!(
+            "HTTP/1.1 302 Found\r\nLocation: http://localhost:{final_port}/asset\r\n\
+             Content-Length: 0\r\nConnection: close\r\n\r\n"
+        ),
+        Vec::new(),
+    );
+
+    let fetched = super::fetch(
+        &format!("http://127.0.0.1:{redirect_port}/asset"),
+        &[("Authorization".to_owned(), "Bearer token".to_owned())],
+        1 << 20,
+    )
+    .expect("fetch");
+
+    let redirect_head = redirect_server.join().expect("redirect server");
+    let final_head = final_server.join().expect("final server");
+    assert_eq!(fetched.status, 200);
+    assert_eq!(fetched.body, payload, "binary body must survive verbatim");
+    assert!(
+        redirect_head
+            .to_ascii_lowercase()
+            .contains("authorization:"),
+        "first hop carries credentials: {redirect_head}"
+    );
+    assert!(
+        !final_head.to_ascii_lowercase().contains("authorization:"),
+        "cross-host redirect must drop credentials: {final_head}"
+    );
+}
+
+#[test]
+fn fetch_refuses_a_redirect_without_location() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().expect("addr").port();
+    let server = serve_raw_response(
+        listener,
+        "HTTP/1.1 302 Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_owned(),
+        Vec::new(),
+    );
+    let error = super::fetch(&format!("http://127.0.0.1:{port}/asset"), &[], 1 << 20)
+        .expect_err("location-less redirect");
+    server.join().expect("server");
+    assert!(error.to_string().contains("Location"), "{error}");
+}
