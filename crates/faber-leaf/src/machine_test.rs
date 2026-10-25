@@ -373,6 +373,11 @@ fn ticks_to_ns() {
     assert_eq!(super::ticks_to_ns(100, 100), 1_000_000_000);
     assert_eq!(super::ticks_to_ns(0, 100), 0);
     assert_eq!(super::ticks_to_ns(5, 0), 0);
+    // Four wrapped CPU-state counters can sum past `u32`; the scale still holds.
+    assert_eq!(
+        super::ticks_to_ns(u64::from(u32::MAX) + 1, 1_000_000_000),
+        4_294_967_296
+    );
 }
 
 #[cfg(target_os = "macos")]

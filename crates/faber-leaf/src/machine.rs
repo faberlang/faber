@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 const ROUTE: &str = "machina:specimen";
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &["machina:specimen"];
+const ROUTES: &[&str] = &[ROUTE];
 
 /// Process-table cap for one snapshot; the sampler keeps the busiest rows.
 pub const MAX_PROCS: usize = 64;
@@ -194,8 +194,8 @@ fn store_and_render(generation: u64, fresh: Collected) -> Reply {
 }
 
 /// Store `previous` only if it is newer than the slot's current snapshot.
-/// Callers have already released their guard (`store_and_render` and
-/// `store_late` drop it at the end of their body), so this never nests.
+/// `store_and_render` releases the slot guard before calling this, so the
+/// lock is never taken twice.
 fn store_if_newer(previous: Previous) {
     let mut guard = slot();
     if guard
@@ -282,8 +282,8 @@ fn interval_cores(old: Option<&Previous>, fresh: &Collected) -> Vec<IntervalCore
                     u64::from(user_ticks) + u64::from(system_ticks) + u64::from(nice_ticks);
                 let total_ticks = busy_ticks + u64::from(idle_ticks);
                 (
-                    wide_ticks_to_ns(busy_ticks, core.tick_hz),
-                    wide_ticks_to_ns(total_ticks, core.tick_hz),
+                    ticks_to_ns(busy_ticks, core.tick_hz),
+                    ticks_to_ns(total_ticks, core.tick_hz),
                 )
             });
             IntervalCore {
@@ -421,6 +421,9 @@ fn collect() -> Result<Collected, LeafError> {
     })
 }
 
+/// Mach absolute-time tick-to-nanosecond ratio. A failed or degenerate query
+/// degrades to 1:1, which keeps the process table in the snapshot at a wrong
+/// scale instead of failing the read.
 #[cfg(target_os = "macos")]
 #[allow(deprecated)]
 fn mach_timebase() -> (u32, u32) {
@@ -456,12 +459,17 @@ fn collect_procs() -> Result<Vec<ProcTicks>, LeafError> {
     // SAFETY: a null buffer with size zero asks libproc for the required size.
     let initial_size = unsafe { libc::proc_listpids(PROC_ALL_PIDS, 0, std::ptr::null_mut(), 0) };
     if initial_size < 0 {
+        // Process rows are best-effort: a failed listing costs the snapshot
+        // its process table, not its memory and CPU.
         return Ok(Vec::new());
     }
     let pid_size = std::mem::size_of::<u32>();
     let initial_pids = usize::try_from(initial_size).unwrap_or(0) / pid_size;
     let mut pids = vec![0_u32; initial_pids.saturating_add(64)];
     let mut retries = 0;
+    // WHY: a listing that exactly fills the buffer cannot be told apart from a
+    // truncated one, so the buffer keeps slack and a full listing is retried
+    // larger.
     let pid_count = loop {
         let buffer_bytes = pids.len().saturating_mul(pid_size);
         let buffer_size = i32::try_from(buffer_bytes).unwrap_or(i32::MAX);
@@ -492,7 +500,7 @@ fn collect_procs() -> Result<Vec<ProcTicks>, LeafError> {
         // SAFETY: `info` is writable for the exact task-all-info structure size.
         let read = unsafe {
             libc::proc_pidinfo(
-                pid as libc::c_int,
+                pid.cast_signed(),
                 libc::PROC_PIDTASKALLINFO,
                 0,
                 info.as_mut_ptr().cast(),
@@ -512,7 +520,7 @@ fn collect_procs() -> Result<Vec<ProcTicks>, LeafError> {
         let command_bytes = name
             .iter()
             .take_while(|&&byte| byte != 0)
-            .map(|&byte| byte.to_ne_bytes()[0])
+            .map(|&byte| byte.cast_unsigned())
             .collect::<Vec<_>>();
         procs.push(ProcTicks {
             pid: i64::from(pid),
@@ -528,11 +536,11 @@ fn collect_procs() -> Result<Vec<ProcTicks>, LeafError> {
     Ok(procs)
 }
 
-/// Convert host processor counters, whose unit is one scheduling tick, to ns.
+/// Scheduling-tick rate of the host CPU counters, in Hz. `_SC_CLK_TCK` is the
+/// scale `host_processor_info` publishes its counters against.
 #[cfg(target_os = "macos")]
 fn tick_hz() -> u64 {
     // SAFETY: `sysconf` takes a scalar selector and writes no output buffer.
-    // This is the sole source for the scheduling-tick scale of host counters.
     let hz = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
     if hz <= 0 {
         100
@@ -541,23 +549,14 @@ fn tick_hz() -> u64 {
     }
 }
 
-fn ticks_to_ns(ticks: u32, hz: u64) -> u64 {
-    // `checked_div` yields `None` exactly when `hz` is zero, so the zero-tick
-    // scale falls through to the same `0` the explicit guard produced.
-    u64::from(ticks)
-        .checked_mul(1_000_000_000)
-        .and_then(|scaled| scaled.checked_div(hz))
+/// Convert host processor counters, whose unit is one scheduling tick, to ns.
+fn ticks_to_ns(ticks: u64, hz: u64) -> u64 {
+    // `checked_div` yields `None` exactly when `hz` is zero, so a host that
+    // publishes no tick scale reports 0 instead of dividing.
+    ticks
+        .saturating_mul(1_000_000_000)
+        .checked_div(hz)
         .unwrap_or(0)
-}
-
-fn wide_ticks_to_ns(ticks: u64, hz: u64) -> u64 {
-    if hz == 0 {
-        0
-    } else if let Ok(ticks) = u32::try_from(ticks) {
-        ticks_to_ns(ticks, hz)
-    } else {
-        ticks.saturating_mul(1_000_000_000) / hz
-    }
 }
 
 // WHY: libc deprecates `mach_host_self` in favour of the `mach2` crate; adding
