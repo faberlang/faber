@@ -303,7 +303,7 @@ pub enum MirCollectionOp {
     /// steps, keeps, inclusives]`, one entry per receiver axis: `starts`/`ends`/
     /// `steps` are integer lists, `keeps`/`inclusives` are `bivalens` lists. A
     /// kept axis survives with extent `ceil((end_eff - start) / step)` and its
-    /// stride multiplied by `step`. A dropped axis (bare integer slot, NumPy
+    /// stride multiplied by `step`. A dropped axis (bare integer slot, `NumPy`
     /// rule) is `keep = false` with `end_eff = start + 1`. An inclusive axis end
     /// raises the effective bound: `end_eff = end + 1`. Out-of-range or negative
     /// bounds and `step < 1` are runtime deaths, never clamps; the result aliases
@@ -513,7 +513,7 @@ pub enum MirMathFunction {
     Abs,
     /// `radix` (en `sqrt`): square root. `sqrt(x < 0)` is NaN.
     Sqrt,
-    /// radix_cubica (en cbrt): real cube root; cbrt(-8.0) is -2.0 (never pow(x, 1/3) NaN)
+    /// `radix_cubica` (en cbrt): real cube root; cbrt(-8.0) is -2.0 (never pow(x, 1/3) NaN)
     Cbrt,
     /// `exponentia` (en `exp`): `e^x`. Overflow is infinity.
     Exp,

@@ -602,37 +602,34 @@ fn scientific_decimal(magnitude: u128, mut scale: u32, precision: Option<usize>)
         normalized_magnitude /= 10;
         scale -= 1;
     }
-    let mut exponent = digits.len() as i64 - 1 - scale as i64;
+    let mut exponent = digits.len() as i64 - 1 - i64::from(scale);
 
-    match precision {
-        Some(p) => {
-            let significant_digits = p + 1;
-            if digits.len() > significant_digits {
-                let dropped = digits.len() - significant_digits;
-                normalized_magnitude = round_half_even_pow10(normalized_magnitude, dropped);
-                digits = normalized_magnitude.to_string();
-                while digits.len() > significant_digits && digits.ends_with('0') {
-                    digits.pop();
-                    exponent += 1;
-                }
-            } else if digits.len() < significant_digits {
-                digits.push_str(&"0".repeat(significant_digits - digits.len()));
+    if let Some(p) = precision {
+        let significant_digits = p + 1;
+        if digits.len() > significant_digits {
+            let dropped = digits.len() - significant_digits;
+            normalized_magnitude = round_half_even_pow10(normalized_magnitude, dropped);
+            digits = normalized_magnitude.to_string();
+            while digits.len() > significant_digits && digits.ends_with('0') {
+                digits.pop();
+                exponent += 1;
             }
-
-            let mut body = digits[..1].to_owned();
-            if p > 0 {
-                body.push('.');
-                body.push_str(&digits[1..]);
-            }
-            format!("{body}e{exponent}")
+        } else if digits.len() < significant_digits {
+            digits.push_str(&"0".repeat(significant_digits - digits.len()));
         }
-        None => {
-            let coefficient = digits.trim_end_matches('0');
-            if coefficient.len() > 1 {
-                format!("{}.{}e{exponent}", &coefficient[..1], &coefficient[1..])
-            } else {
-                format!("{coefficient}e{exponent}")
-            }
+
+        let mut body = digits[..1].to_owned();
+        if p > 0 {
+            body.push('.');
+            body.push_str(&digits[1..]);
+        }
+        format!("{body}e{exponent}")
+    } else {
+        let coefficient = digits.trim_end_matches('0');
+        if coefficient.len() > 1 {
+            format!("{}.{}e{exponent}", &coefficient[..1], &coefficient[1..])
+        } else {
+            format!("{coefficient}e{exponent}")
         }
     }
 }
