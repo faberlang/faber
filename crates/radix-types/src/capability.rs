@@ -280,19 +280,6 @@ impl<P> CapabilityAnswer<P> {
             Self::Rejected(reason) => Some(*reason),
         }
     }
-
-    /// Convert the answer to a standard result without changing its reason.
-    ///
-    /// # Errors
-    ///
-    /// Returns the rejection [`CapabilityReason`] when the answer is
-    /// [`Self::Rejected`](Self::Rejected).
-    pub fn into_result(self) -> Result<P, CapabilityReason> {
-        match self {
-            Self::Proven(proof) => Ok(proof),
-            Self::Rejected(reason) => Err(reason),
-        }
-    }
 }
 
 /// The outcome of one recursive capability walk.
@@ -445,8 +432,8 @@ pub struct CaptureRequirement {
 }
 
 /// Settled effects and alternate-exit posture.
-// The four posture flags are the settled vocabulary contract (capability
-// vocabulary commit); they travel together by design.
+// The four posture flags are one settled vocabulary record, not independent
+// switches; they travel together by design.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EffectPosture {
@@ -593,7 +580,7 @@ impl IndexCapabilitySummary {
     pub const fn missing(index_id: IndexId) -> Self {
         Self {
             index_id,
-            solved_identity: CapabilityAnswer::Rejected(CapabilityReason::MissingFact),
+            solved_identity: CapabilityAnswer::missing_fact(),
         }
     }
 }
