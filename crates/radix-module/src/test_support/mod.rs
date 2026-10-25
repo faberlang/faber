@@ -149,7 +149,8 @@ pub fn cargo_managed_temp_root() -> PathBuf {
     } else {
         panic!("cargo_managed_temp_root: cannot resolve the test binary path");
     };
-    std::fs::create_dir_all(&root).unwrap_or_else(|err| panic!("cargo_managed_temp_root: create {root:?}: {err}"));
+    std::fs::create_dir_all(&root)
+        .unwrap_or_else(|err| panic!("cargo_managed_temp_root: create {}: {err}", root.display()));
     root
 }
 
