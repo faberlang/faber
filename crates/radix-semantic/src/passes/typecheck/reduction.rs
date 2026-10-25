@@ -138,7 +138,7 @@ impl TypeChecker<'_> {
             // immutable `const int` local or a module constant) is a constant
             // axis; a run-time variable has no recorded value and stays
             // refused.
-            let Some(axis) =
+            let Some(position) =
                 super::integer_range::const_int_value_resolved(&arg.expr, &self.const_int_values)
             else {
                 self.error_issue(
@@ -148,7 +148,7 @@ impl TypeChecker<'_> {
                 );
                 return AxisReduction::Refused;
             };
-            if !(0..rank as i128).contains(&axis) {
+            if !(0..rank as i128).contains(&position) {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
                     ISSUE_AXIS_REDUCTION_OUT_OF_RANGE,
@@ -156,8 +156,8 @@ impl TypeChecker<'_> {
                 );
                 return AxisReduction::Refused;
             }
-            let axis = axis as usize;
-            if axes.contains(&axis) {
+            let index = position as usize;
+            if axes.contains(&index) {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
                     ISSUE_AXIS_REDUCTION_REPEATED,
@@ -165,7 +165,7 @@ impl TypeChecker<'_> {
                 );
                 return AxisReduction::Refused;
             }
-            axes.push(axis);
+            axes.push(index);
         }
         // Removing every axis would leave a rank-zero result; the closed
         // family covers rank 2 to 8, not the scalar collapse.
@@ -194,27 +194,23 @@ impl TypeChecker<'_> {
             }
             let mut product: u64 = 1;
             for &axis in &axes {
-                match self.types.get_index(dims[axis]) {
-                    IndexExpr::Literal(count) => {
-                        let Some(next) = product.checked_mul(*count) else {
-                            self.error_issue(
-                                SemanticErrorKind::TypeMismatch,
-                                ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
-                                span,
-                            );
-                            return AxisReduction::Refused;
-                        };
-                        product = next;
-                    }
-                    _ => {
-                        self.error_issue(
-                            SemanticErrorKind::TypeMismatch,
-                            ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
-                            span,
-                        );
-                        return AxisReduction::Refused;
-                    }
-                }
+                let IndexExpr::Literal(count) = self.types.get_index(dims[axis]) else {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
+                        span,
+                    );
+                    return AxisReduction::Refused;
+                };
+                let Some(next) = product.checked_mul(*count) else {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_AXIS_REDUCTION_EXTENT_UNKNOWN,
+                        span,
+                    );
+                    return AxisReduction::Refused;
+                };
+                product = next;
             }
             divisor = Some(product);
         }
@@ -597,12 +593,11 @@ pub(super) fn check_reduction_expr(
         );
     }
     let result = match op {
-        HirReductionOp::Count => integer,
         HirReductionOp::All | HirReductionOp::Any => boolean,
         HirReductionOp::ArgMax | HirReductionOp::ArgMin if rank > 1 => {
             checker.types.tuple(vec![integer; rank])
         }
-        HirReductionOp::ArgMax | HirReductionOp::ArgMin => integer,
+        HirReductionOp::Count | HirReductionOp::ArgMax | HirReductionOp::ArgMin => integer,
         HirReductionOp::Sum | HirReductionOp::Product => checker.summa_result_type(term_ty),
         _ => term_ty,
     };
@@ -800,14 +795,15 @@ impl ReductionBodyState {
             | HirExpressionKind::Insere(_)
             | HirExpressionKind::Vacua
             | HirExpressionKind::Error => {}
-            HirExpressionKind::Widen { operand, .. } => self.walk_expr(checker, operand),
+            HirExpressionKind::Widen { operand, .. } | HirExpressionKind::Unary(_, operand) => {
+                self.walk_expr(checker, operand);
+            }
             HirExpressionKind::Binary(_, lhs, rhs) => {
                 self.walk_expr(checker, lhs);
                 self.walk_expr(checker, rhs);
             }
-            HirExpressionKind::Unary(_, operand) => self.walk_expr(checker, operand),
             HirExpressionKind::Call(callee, _, args, _) => {
-                self.walk_call(checker, callee, args, expr.span)
+                self.walk_call(checker, callee, args, expr.span);
             }
             // `target ⇇ value` writes existing tensor storage, an effect a term
             // body does not admit; keep the same rejection as `∇`.
@@ -845,8 +841,12 @@ impl ReductionBodyState {
                 effect(checker, expr.span, "unapproved_effect");
                 self.walk_expr(checker, object);
             }
-            HirExpressionKind::Marked { expr: inner, .. } => self.walk_expr(checker, inner),
-            HirExpressionKind::Block(block) => self.walk_block(checker, block),
+            HirExpressionKind::Marked { expr: inner, .. } | HirExpressionKind::Praefixum(inner) => {
+                self.walk_expr(checker, inner);
+            }
+            HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
+                self.walk_block(checker, block);
+            }
             HirExpressionKind::Si {
                 cond,
                 then_block,
@@ -872,7 +872,6 @@ impl ReductionBodyState {
                     self.walk_expr(checker, &arm.body);
                 }
             }
-            HirExpressionKind::Loop(block) => self.walk_block(checker, block),
             HirExpressionKind::Dum(cond, block) => {
                 self.walk_expr(checker, cond);
                 self.walk_block(checker, block);
@@ -901,12 +900,14 @@ impl ReductionBodyState {
             // check under the ordinary expression path; the fragment subset
             // treats the nested node as an unapproved effect, so the outer
             // body walk does not descend into it.
-            HirExpressionKind::Reduction { .. } => effect(checker, expr.span, "unapproved_effect"),
-            HirExpressionKind::Scan { .. } => effect(checker, expr.span, "unapproved_effect"),
-            HirExpressionKind::Sort { .. } => effect(checker, expr.span, "unapproved_effect"),
             // Same fragment-subset posture for the dedicated first-match
             // head: unadmitted until AFM-3/AFM-4, so never descended into.
-            HirExpressionKind::FirstMatch { .. } => effect(checker, expr.span, "unapproved_effect"),
+            HirExpressionKind::Reduction { .. }
+            | HirExpressionKind::Scan { .. }
+            | HirExpressionKind::Sort { .. }
+            | HirExpressionKind::FirstMatch { .. } => {
+                effect(checker, expr.span, "unapproved_effect");
+            }
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => {
@@ -963,7 +964,6 @@ impl ReductionBodyState {
                 }
             }
             HirExpressionKind::ReadLine(_) => effect(checker, expr.span, "host_io"),
-            HirExpressionKind::Praefixum(inner) => self.walk_expr(checker, inner),
             // `¶` builds text, like `scriptum`.
             HirExpressionKind::Format { value, .. } => {
                 effect(checker, expr.span, "host_io");
