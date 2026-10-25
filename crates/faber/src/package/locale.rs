@@ -31,8 +31,7 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
     let embedded_locales = embedded_locales_list();
     crate::package_diagnostic_error(format!(
         "failed to load reader locale '{locale}': {err}\n\
-         next action: choose one of the embedded reader locales ({})",
-        embedded_locales
+         next action: choose one of the embedded reader locales ({embedded_locales})"
     ))
     .with_arg("locale", locale.to_owned())
     .with_arg("embedded_locales", embedded_locales)

@@ -86,8 +86,7 @@ fn file_declares_locale(file: &str) -> bool {
         return false;
     }
     std::fs::read_to_string(path)
-        .map(|source| radix::services::source_declares_locale(file, &source))
-        .unwrap_or(false)
+        .is_ok_and(|source| radix::services::source_declares_locale(file, &source))
 }
 
 /// One diagnostic in normal mode: a compact identity, except that a package
