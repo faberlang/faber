@@ -6,8 +6,8 @@
 //! are remapped when units merge. Nothing reads the table yet.
 
 use crate::MirFunctionId;
+use handroll::FxHashMap;
 use radix_runtime_contract::display_tokens::DisplayTokens;
-use rustc_hash::FxHashMap;
 
 /// Index into [`MirDisplayTokens::tokens`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

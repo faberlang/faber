@@ -21,6 +21,7 @@
 //!   best normalized shape it can construct for tooling and inspection.
 
 use crate::{SemanticError, SemanticErrorKind};
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::{Interner, Span};
 use radix_syntax::{
     Annotation, AnnotationKind, BracedAnnotationError, BracedView, Expr, ExprKind, FuncDecl,
@@ -28,7 +29,6 @@ use radix_syntax::{
     Program, Stmt, StmtKind, TypeExpr, TypeExprKind, braced_cli_nomen, braced_cli_nomen_strict,
     braced_imperium_nomen_strict, braced_operandus_view_strict, braced_optio_view_strict,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_ALIAS_COLLIDES_WITH_PATH: &str = "alias_collides_with_path";
 const ISSUE_CLI_ON_NON_INCIPIT: &str = "cli_on_non_incipit";

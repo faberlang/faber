@@ -17,10 +17,10 @@
 //! - Literal patterns share literal spelling with expression literals.
 
 use crate::surface::KeywordSurface;
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirPattern};
 use radix_lexer::{Symbol, TokenKind};
-use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
     /// Write `discerne` arms from lowered pattern data.

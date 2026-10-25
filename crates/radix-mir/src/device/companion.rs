@@ -1,8 +1,8 @@
 //! Companion-relation carrier: primal → companion device materialization facts.
 
 use crate::device_semantics::LosslessMirCompanionEntry;
+use handroll::FxHashMap;
 use radix_hir::DefId;
-use rustc_hash::FxHashMap;
 
 /// The owned companion-relation carrier (S3-A2 / Stage 3R F4): primal →
 /// companion device materialization facts carried from the driver onto the

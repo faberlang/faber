@@ -14,10 +14,10 @@
 //!   so a closable value held inside one never auto-closes.
 //!   `closable_in_cycle` names the field that can hold it.
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::{DefId, HirCallArg, HirInterface, HirItemKind, HirModule};
 use radix_lexer::Span;
 use radix_types::{AppliedArg, ContractRef, FuncSig, Primitive, Type, TypeId};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::TypeChecker;
 use crate::radix_contract::{CLOSING_METHOD, RadixContractRole, contract_error};

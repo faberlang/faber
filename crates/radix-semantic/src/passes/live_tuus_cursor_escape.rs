@@ -8,13 +8,13 @@
 
 use crate::live_tuus_cursor::{collect_live_tuus_cursor_locals, tuus_cursor_method_payload};
 use crate::{Resolver, SemanticError, SemanticErrorKind, TypeId, TypeTable};
+use handroll::FxHashMap;
 use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirConversioTarget, HirExpression, HirExpressionKind,
     HirLocal, HirModule, HirObjectField, HirStatement, HirStatementKind,
 };
 use radix_lexer::Interner;
-use rustc_hash::FxHashMap;
 
 const ISSUE_CALL_ARG: &str = "live_tuus_cursor_call_arg";
 const ISSUE_RETURN: &str = "live_tuus_cursor_return";

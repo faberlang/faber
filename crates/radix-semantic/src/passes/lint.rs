@@ -30,6 +30,7 @@ use crate::{
     Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeTable,
     error::WarningKind, locale::LocalePack,
 };
+use handroll::FxHashSet;
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirImport, HirItem,
@@ -38,7 +39,6 @@ use radix_hir::{
 use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
 use radix_lexer::{Interner, Span};
 use radix_types::{IndexExpr, RuntimeExtentId};
-use rustc_hash::FxHashSet;
 
 const ISSUE_EMPTY_MARKER_SHADOWING: &str = "empty_marker_shadowing";
 const ISSUE_EXPLICIT_IGNOTUM_ANNOTATION: &str = "explicit_ignotum_annotation";
@@ -149,13 +149,13 @@ struct LintContext<'a> {
     /// Class methods whose body changes the receiver in place.
     mutating_methods: MutatingMethods,
     /// Per declared function: which parameter positions are `mut` (`in`).
-    mut_param_positions: rustc_hash::FxHashMap<radix_hir::DefId, Vec<bool>>,
+    mut_param_positions: handroll::FxHashMap<radix_hir::DefId, Vec<bool>>,
     imports: Vec<(radix_hir::DefId, Span)>,
     functions: Vec<(radix_hir::DefId, Span)>,
-    scope: Vec<rustc_hash::FxHashMap<radix_lexer::Symbol, radix_hir::DefId>>,
+    scope: Vec<handroll::FxHashMap<radix_lexer::Symbol, radix_hir::DefId>>,
     /// Declaration names by `DefId`, so suggestions can render path operands
     /// back to their source spellings.
-    def_names: rustc_hash::FxHashMap<radix_hir::DefId, radix_lexer::Symbol>,
+    def_names: handroll::FxHashMap<radix_hir::DefId, radix_lexer::Symbol>,
     /// Active reader-locale spellings that claim the empty-collection marker.
     marker_spellings: FxHashSet<String>,
     /// Active reader-locale spellings that claim a value-literal keyword.
@@ -195,11 +195,11 @@ impl<'a> LintContext<'a> {
             mutable_locals: Vec::new(),
             mutable_local_defs: FxHashSet::default(),
             mutating_methods: MutatingMethods::default(),
-            mut_param_positions: rustc_hash::FxHashMap::default(),
+            mut_param_positions: handroll::FxHashMap::default(),
             imports: Vec::new(),
             functions: Vec::new(),
             scope: Vec::new(),
-            def_names: rustc_hash::FxHashMap::default(),
+            def_names: handroll::FxHashMap::default(),
             marker_spellings,
             value_literal_spellings,
             inside_add_left_child: false,
@@ -532,7 +532,7 @@ impl<'a> LintContext<'a> {
     }
 
     fn push_scope(&mut self) {
-        self.scope.push(rustc_hash::FxHashMap::default());
+        self.scope.push(handroll::FxHashMap::default());
     }
 
     fn pop_scope(&mut self) {

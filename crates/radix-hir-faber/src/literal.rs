@@ -19,11 +19,11 @@
 //! payloads without full escape reconstruction.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{DefId, HirLiteral, HirObjectField, HirObjectKey};
 use radix_lexer::{Symbol, TokenKind};
 use radix_types::Primitive;
-use rustc_hash::FxHashMap;
 
 /// Key/value separator for genus vs JSON object-field spellings.
 enum ObjectFieldStyle {

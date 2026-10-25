@@ -4,11 +4,11 @@
 //! package or CLI layers.  It records execution facts only; serialization and
 //! policy for consuming those facts belong to callers.
 
+use handroll::FxHashMap;
 use radix_lexer::Interner;
 use radix_mir::{
     MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirSermoOp, MirValidationContext,
 };
-use rustc_hash::FxHashMap;
 use std::time::{Duration, Instant};
 
 /// Number of duration samples retained for each function or intrinsic.

@@ -2,11 +2,11 @@
 //! like its word sibling `non` — one space before the operand.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{HirBinOp, HirExpression, HirExpressionKind, HirUnOp};
 use radix_lexer::{Interner, Span, Symbol, TokenKind};
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
-use rustc_hash::FxHashMap;
 
 struct LatinSurface;
 

@@ -56,6 +56,7 @@ pub use shuffle::configure_shuffle_seed;
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
 pub use value::{FieldOrder, MapKey, Value};
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
@@ -68,7 +69,6 @@ use radix_mir::{
 use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 use regex_program::RegexProgram;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;

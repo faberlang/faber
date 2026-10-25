@@ -4,6 +4,7 @@
 use crate::host::BufferHost;
 use crate::value::MatrixValue;
 use crate::{MapKey, Runner, RunnerError, Value};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
@@ -11,7 +12,6 @@ use radix_mir::{
     MirStructFieldDefaults, MirType, MirValidationContext,
 };
 use radix_types::{IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 

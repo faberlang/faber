@@ -7,8 +7,8 @@
 use super::*;
 use crate::Primitive;
 use crate::types::TypeTable;
+use handroll::FxHashMap;
 use radix_hir::DefId;
-use rustc_hash::FxHashMap;
 
 // ── CaptureMode transitions ─────────────────────────────────────────────────
 
@@ -147,7 +147,7 @@ fn function_fact_requires_await() {
 
 #[test]
 fn function_fact_has_call_edges() {
-    let mut edges = rustc_hash::FxHashSet::default();
+    let mut edges = handroll::FxHashSet::default();
     edges.insert(DefId(1));
     edges.insert(DefId(2));
     let fact = FunctionFact {

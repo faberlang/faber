@@ -8,8 +8,8 @@
 //! `RADIX_RUNNER_SHUFFLE_SEED=<n>` (`0` turns the shuffle off).
 
 use crate::value::{FieldOrder, MapKey, StructFieldOrder, Value};
+use handroll::FxHashMap;
 use radix_lexer::{Interner, Span};
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 

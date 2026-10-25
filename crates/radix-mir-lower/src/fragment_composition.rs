@@ -18,6 +18,7 @@
 //! - `1_024` concrete instances per `Entry`
 //! - 1 inline per call site
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span};
@@ -30,7 +31,6 @@ use radix_mir::{
     MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 use radix_semantic::arg_value;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 use std::rc::Rc;
 

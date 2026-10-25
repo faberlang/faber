@@ -7,8 +7,8 @@
 use super::TypeTable;
 use super::index::{IndexExpr, IndexId, IndexVar};
 use super::index_unify::{IndexUnifier, IndexUnifyError};
+use handroll::FxHashMap;
 use radix_types::{IndexArithmeticError, add_index_constant, divide_index_exact};
-use rustc_hash::FxHashMap;
 
 pub const MISSING_TENSOR_SHAPE_MSG: &str = "cannot infer tensor shape";
 pub const INCOMPATIBLE_INDEX_MSG: &str = "index shapes are incompatible";

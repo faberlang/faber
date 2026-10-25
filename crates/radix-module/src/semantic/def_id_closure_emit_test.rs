@@ -9,7 +9,7 @@ fn rust_locale_pack_type_alias_def_reaches_emit_table() {
         DEF_ID_CLOSURE_CODE, PassConfig, analyze, analyze_resolved_uses, check_def_id_closure, emit_def_table_name,
         resolved_reference_defs,
     };
-    use rustc_hash::{FxHashMap, FxHashSet};
+    use handroll::{FxHashMap, FxHashSet};
 
     let pack_path = crate::locale::workspace_locale_pack_path("th-TH");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");

@@ -2,6 +2,7 @@
 
 use crate::surface::KeywordSurface;
 use crate::trivia::{TriviaIndex, write_leading_trivia};
+use handroll::{FxHashMap, FxHashSet};
 use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{DefId, HirExpressionKind};
@@ -11,7 +12,6 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol, TokenKind};
 use radix_types::{TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 
 /// Canonical Faber output from HIR re-emission.

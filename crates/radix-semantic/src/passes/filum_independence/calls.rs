@@ -41,13 +41,13 @@ use super::{
 };
 use crate::passes::fragment_definition::struct_def_from_type;
 use crate::{Primitive, SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItemKind,
     HirModule, HirParamMode, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Symbol};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Deepest chain of helper calls analysed as inlined. Rule 12.7 inlines
 /// unconditionally for now; a chain past this bound is declined by name

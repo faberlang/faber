@@ -7,6 +7,7 @@
 //! graphics stages) and host callers of fragments. Errors are call-site
 //! primary; the callee definition is a secondary span.
 
+use handroll::FxHashMap;
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::DefId;
 use radix_lexer::Span;
@@ -20,7 +21,6 @@ use radix_semantic::{
     Primitive, Type, TypeId, TypeTable, arg_value,
     passes::fragment_definition::{DeviceEffectKind, FragmentEffectTable},
 };
-use rustc_hash::FxHashMap;
 
 pub const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
 pub const ISSUE_TYPE: &str = "nucleum_fragment_type";

@@ -37,8 +37,8 @@ use crate::DefId;
 use crate::index::{IndexExpr, IndexId};
 use crate::instans_precision::{InstansPrecision, is_instans_assignable};
 use crate::numeric_width::{BitsWidth, NumericWidth, is_numeric_assignable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Symbol as LexSymbol;
-use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
@@ -132,7 +132,7 @@ pub struct TypeTable {
 
     /// Selective import bindings that name the ordering contract. The
     /// compiler supplies that contract, so backends emit no import for them.
-    pub ordering_contract_bindings: rustc_hash::FxHashSet<DefId>,
+    pub ordering_contract_bindings: handroll::FxHashSet<DefId>,
 
     /// The implendum marked `@ radix contract "closing"` (norma's
     /// `Closable`, DECISIONS D8.3) when this unit declares or imports it.
@@ -145,7 +145,7 @@ pub struct TypeTable {
 
     /// Selective import bindings that name the sinking contract. The compiler
     /// supplies that contract, so backends emit no import for them.
-    pub sinking_contract_bindings: rustc_hash::FxHashSet<DefId>,
+    pub sinking_contract_bindings: handroll::FxHashSet<DefId>,
 }
 
 /// Opaque serialized view of a [`TypeTable`] for MIR images.
@@ -240,10 +240,10 @@ impl TypeTable {
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,
-            ordering_contract_bindings: rustc_hash::FxHashSet::default(),
+            ordering_contract_bindings: handroll::FxHashSet::default(),
             closing_contract: None,
             sinking_contract: None,
-            sinking_contract_bindings: rustc_hash::FxHashSet::default(),
+            sinking_contract_bindings: handroll::FxHashSet::default(),
         };
 
         for prim in REQUIRED_PRIMITIVES {
@@ -523,10 +523,10 @@ impl TypeTable {
             variant_parent: FxHashMap::default(),
             resolved_generic_calls: Vec::new(),
             ordering_contract: None,
-            ordering_contract_bindings: rustc_hash::FxHashSet::default(),
+            ordering_contract_bindings: handroll::FxHashSet::default(),
             closing_contract: None,
             sinking_contract: None,
-            sinking_contract_bindings: rustc_hash::FxHashSet::default(),
+            sinking_contract_bindings: handroll::FxHashSet::default(),
         })
     }
 

@@ -30,8 +30,8 @@ use crate::{
     MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall,
     MirStatementKind, MirType, MirUnOp, MirValidationContext, MirValueKind, MirWorkgroupSize,
 };
+use handroll::FxHashMap;
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
-use rustc_hash::FxHashMap;
 use std::fmt;
 
 /// A typed plan-mapping failure (contract resolution, operand shapes, or a

@@ -6,8 +6,8 @@
 
 use super::{Host, MapKey, Value};
 use faber_leaf::{self as leaf, Arg, Reply};
+use handroll::FxHashMap;
 use radix_lexer::Span;
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 

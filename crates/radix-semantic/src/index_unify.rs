@@ -11,8 +11,8 @@
 
 use super::TypeTable;
 use super::index::{IndexExpr, IndexId, IndexVar};
+use handroll::FxHashMap;
 use radix_types::{add_index_constant, divide_index_exact};
-use rustc_hash::FxHashMap;
 
 /// Result of an index unification attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

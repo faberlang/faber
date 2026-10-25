@@ -29,6 +29,7 @@ use crate::tensor_edge::{
     RunnerTensorEdgeDescriptor, TensorEdgeResolution, resolve_builtin, resolve_optional,
 };
 use handroll::Magnus;
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::MirClosureEnvironmentId;
@@ -37,7 +38,6 @@ use radix_runtime_contract::display::{display_bivalens, display_fractus, display
 use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_runtime_contract::instans::Instans;
 use radix_types::{FloatPolicy, NumericWidth, Type, TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;

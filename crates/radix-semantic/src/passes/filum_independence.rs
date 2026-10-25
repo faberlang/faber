@@ -16,6 +16,7 @@ mod ends;
 use crate::{SemanticError, SemanticErrorKind, Type, TypeId, TypeTable};
 pub(crate) use calls::is_inlinable_kernel;
 use calls::{EffectScan, Frame, Module, Receiver};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCallArg, HirConversioTarget, HirExpression,
@@ -24,7 +25,6 @@ use radix_hir::{
 };
 use radix_intrinsics::{IntrinsicReceiver, IntrinsicReturnKind};
 use radix_lexer::{Interner, Span, Symbol};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE: &str = "filum_independence_unproven";
 

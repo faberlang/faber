@@ -17,7 +17,7 @@ mod render;
 
 pub use render::{render_json, render_rust};
 
-use rustc_hash::FxHasher;
+use handroll::FxHasher;
 use serde::Serialize;
 use std::hash::{Hash, Hasher};
 

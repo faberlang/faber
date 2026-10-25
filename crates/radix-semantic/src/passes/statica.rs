@@ -44,6 +44,7 @@
 
 use crate::file_interface::InterfaceConstValue;
 use crate::{Resolver, SemanticError, SemanticErrorKind, SymbolKind, Type, TypeTable};
+use handroll::FxHashMap;
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
 use radix_hir::{
     DefId, HirArrayElement, HirBinOp, HirExpression, HirExpressionKind, HirId, HirItemKind,
@@ -51,7 +52,6 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_types::{Primitive, TypeId};
-use rustc_hash::FxHashMap;
 
 const ISSUE_TOP_LEVEL_BINDING: &str = "top_level_binding";
 const ISSUE_NOT_CONSTANT: &str = "constant_initializer_not_constant";

@@ -4,9 +4,9 @@
 //! provider/package/module/export components so package graphs and annotation
 //! handoff remain coherent across files.
 
+use handroll::FxHashMap;
 use radix_hir::{DefId, LibraryIdentity, LibraryItemKind, LibraryProvider, LibraryRegistry};
 use radix_lexer::Interner;
-use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
 
 /// Declaration kind carried on a portable export identity.

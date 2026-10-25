@@ -9,8 +9,8 @@ use crate::{
     MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirIntrinsic, MirOperand,
     MirPlaceBase, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_types::{IndexExpr, Primitive, Type};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 impl Validator<'_, '_> {
     pub(crate) fn validate_program(&mut self) {

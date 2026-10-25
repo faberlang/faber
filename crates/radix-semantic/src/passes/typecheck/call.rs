@@ -2095,7 +2095,7 @@ impl TypeChecker<'_> {
 
     /// Member names every constituent of the union declares (U1R guardrail 3).
     fn union_common_member_names(&self, members: &[TypeId]) -> Vec<Symbol> {
-        let mut sets: Vec<rustc_hash::FxHashSet<Symbol>> = members
+        let mut sets: Vec<handroll::FxHashSet<Symbol>> = members
             .iter()
             .map(|member| self.constituent_member_names(*member).into_iter().collect())
             .collect();
@@ -2111,7 +2111,7 @@ impl TypeChecker<'_> {
     /// Method names two or more constituents of the union declare (U1R
     /// guardrail 4 candidates).
     fn union_shared_method_names(&self, members: &[TypeId]) -> Vec<Symbol> {
-        let mut count: rustc_hash::FxHashMap<Symbol, usize> = rustc_hash::FxHashMap::default();
+        let mut count: handroll::FxHashMap<Symbol, usize> = handroll::FxHashMap::default();
         for member in members {
             for name in self.constituent_member_names(*member) {
                 if self.lookup_method_signature(*member, name).is_some() {

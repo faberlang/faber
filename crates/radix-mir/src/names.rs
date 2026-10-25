@@ -17,9 +17,9 @@ use crate::{
     MirBlockId, MirCallee, MirConstant, MirExternalFunctionIdentity, MirFunction, MirFunctionId,
     MirLocalId, MirOperand, MirProgram, MirTempId, MirType, MirValue, MirValueId, MirValueKind,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::{Interner, Symbol};
 use radix_types::{Primitive, Type, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Wasm/sexp dispatch local holding the active `b{N}` block id.
 pub const DISPATCH: &str = "p0";

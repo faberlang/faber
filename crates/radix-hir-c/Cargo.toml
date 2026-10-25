@@ -10,6 +10,7 @@ publish = false
 workspace = true
 
 [dependencies]
+handroll = { path = "../handroll" }
 radix-codegen-shared = { path = "../radix-codegen-shared" }
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
@@ -17,7 +18,6 @@ radix-intrinsics = { path = "../radix-intrinsics" }
 radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
 radix-types = { path = "../radix-types" }
-rustc-hash = "2"
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }

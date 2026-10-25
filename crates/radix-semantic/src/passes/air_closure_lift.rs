@@ -12,6 +12,7 @@
 
 use crate::function_facts::{CaptureFact, CaptureMode, CaptureMutations};
 use crate::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, Type, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_program};
 use radix_hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
@@ -19,7 +20,6 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::CallablePosture;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Higher-order tensor methods whose first argument is a combine/callback.
 ///

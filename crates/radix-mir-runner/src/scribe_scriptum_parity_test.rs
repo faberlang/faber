@@ -32,6 +32,7 @@
 
 use super::{MapKey, Runner, Value};
 use crate::host::BufferHost;
+use handroll::FxHashMap;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirBlockId, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirLocalId,
@@ -39,7 +40,6 @@ use radix_mir::{
 };
 use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_types::{Primitive, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 

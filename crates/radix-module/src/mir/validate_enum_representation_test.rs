@@ -30,10 +30,10 @@ fn enum_representation_reports_unit_tags_in_variant_order() {
     context.variant_parents.insert(variant_b, enum_def);
     context
         .variant_fields
-        .insert(variant_a, rustc_hash::FxHashMap::default());
+        .insert(variant_a, handroll::FxHashMap::default());
     context
         .variant_fields
-        .insert(variant_b, rustc_hash::FxHashMap::default());
+        .insert(variant_b, handroll::FxHashMap::default());
 
     assert_eq!(
         context.enum_representation(enum_def),
@@ -59,12 +59,12 @@ fn enum_representation_flattens_payload_fields_by_variant_then_symbol() {
     context.variant_parents.insert(variant_a, enum_def);
     context.variant_parents.insert(variant_b, enum_def);
 
-    let mut variant_a_fields = rustc_hash::FxHashMap::default();
+    let mut variant_a_fields = handroll::FxHashMap::default();
     variant_a_fields.insert(Symbol(9), number);
     variant_a_fields.insert(Symbol(2), boolean);
     context.variant_fields.insert(variant_a, variant_a_fields);
 
-    let mut variant_b_fields = rustc_hash::FxHashMap::default();
+    let mut variant_b_fields = handroll::FxHashMap::default();
     variant_b_fields.insert(Symbol(1), number);
     context.variant_fields.insert(variant_b, variant_b_fields);
 
@@ -107,13 +107,13 @@ fn enum_representation_selects_tagged_union_for_one_payload_slot() {
     context.variant_parents.insert(variant_b, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut variant_a_fields = rustc_hash::FxHashMap::default();
+    let mut variant_a_fields = handroll::FxHashMap::default();
     variant_a_fields.insert(Symbol(9), number);
     context.variant_fields.insert(variant_a, variant_a_fields);
 
-    let mut variant_b_fields = rustc_hash::FxHashMap::default();
+    let mut variant_b_fields = handroll::FxHashMap::default();
     variant_b_fields.insert(Symbol(1), number);
     context.variant_fields.insert(variant_b, variant_b_fields);
 
@@ -149,9 +149,9 @@ fn enum_representation_selects_pointer_niche_for_unit_and_pointer_payload() {
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, text);
     context
         .variant_fields
@@ -182,9 +182,9 @@ fn enum_representation_selects_boolean_payload_packing_for_unit_and_bool_payload
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, boolean);
     context
         .variant_fields
@@ -215,9 +215,9 @@ fn enum_representation_selects_integer_payload_packing_for_unit_and_narrow_integ
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, integer);
     context
         .variant_fields
@@ -260,9 +260,9 @@ fn enum_representation_selects_integer_payload_packing_for_unit_and_wide_integer
         context.variant_parents.insert(payload_variant, enum_def);
         context
             .variant_fields
-            .insert(unit_variant, rustc_hash::FxHashMap::default());
+            .insert(unit_variant, handroll::FxHashMap::default());
 
-        let mut payload_fields = rustc_hash::FxHashMap::default();
+        let mut payload_fields = handroll::FxHashMap::default();
         payload_fields.insert(field, payload_ty);
         context
             .variant_fields
@@ -298,9 +298,9 @@ fn enum_representation_selects_same_width_integer_payload_packing_for_explicit_r
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, integer);
     context
         .variant_fields
@@ -338,9 +338,9 @@ fn enum_representation_prefers_lower_sentinel_for_signed_range_domain() {
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, integer);
     context
         .variant_fields
@@ -384,9 +384,9 @@ fn enum_representation_ignores_invalid_or_full_range_domains_for_same_width_pack
         context.variant_parents.insert(payload_variant, enum_def);
         context
             .variant_fields
-            .insert(unit_variant, rustc_hash::FxHashMap::default());
+            .insert(unit_variant, handroll::FxHashMap::default());
 
-        let mut payload_fields = rustc_hash::FxHashMap::default();
+        let mut payload_fields = handroll::FxHashMap::default();
         payload_fields.insert(field, integer);
         context
             .variant_fields
@@ -422,9 +422,9 @@ fn enum_representation_keeps_float_scalar_payloads_as_tagged_union() {
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, f32_ty);
     context
         .variant_fields
@@ -453,9 +453,9 @@ fn enum_representation_selects_float_payload_packing_for_explicit_non_nan_domain
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, f32_ty);
     context
         .variant_fields
@@ -490,9 +490,9 @@ fn enum_representation_selects_float_payload_packing_for_explicit_finite_domain(
     context.variant_parents.insert(payload_variant, enum_def);
     context
         .variant_fields
-        .insert(unit_variant, rustc_hash::FxHashMap::default());
+        .insert(unit_variant, handroll::FxHashMap::default());
 
-    let mut payload_fields = rustc_hash::FxHashMap::default();
+    let mut payload_fields = handroll::FxHashMap::default();
     payload_fields.insert(field, f64_ty);
     context
         .variant_fields
@@ -525,11 +525,11 @@ fn enum_representation_keeps_heterogeneous_one_field_payloads_as_product() {
     context.variant_parents.insert(variant_a, enum_def);
     context.variant_parents.insert(variant_b, enum_def);
 
-    let mut variant_a_fields = rustc_hash::FxHashMap::default();
+    let mut variant_a_fields = handroll::FxHashMap::default();
     variant_a_fields.insert(Symbol(1), number);
     context.variant_fields.insert(variant_a, variant_a_fields);
 
-    let mut variant_b_fields = rustc_hash::FxHashMap::default();
+    let mut variant_b_fields = handroll::FxHashMap::default();
     variant_b_fields.insert(Symbol(2), boolean);
     context.variant_fields.insert(variant_b, variant_b_fields);
 
@@ -567,7 +567,7 @@ fn enum_representation_selects_compact_tag_width_from_variant_count() {
         context.variant_parents.insert(variant, enum_def);
         context
             .variant_fields
-            .insert(variant, rustc_hash::FxHashMap::default());
+            .insert(variant, handroll::FxHashMap::default());
     }
 
     assert_eq!(context.enum_tag_layout(enum_def), Some(MirScalarLayout::U16));

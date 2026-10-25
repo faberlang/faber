@@ -11,6 +11,7 @@ publish = false
 # host-arch on all five) does not resolve — cranelift-object has no `std`
 # feature. `timing` stays off (it lives in cranelift-codegen).
 [dependencies]
+handroll = { path = "../handroll" }
 cranelift-codegen = { version = "=0.136.2", default-features = false, features = ["std", "unwind", "host-arch"] }
 cranelift-frontend = "=0.136.2"
 cranelift-module = "=0.136.2"
@@ -20,7 +21,6 @@ radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
 radix-mir = { path = "../radix-mir" }
 radix-types = { path = "../radix-types" }
-rustc-hash = "2"
 
 [lints]
 workspace = true

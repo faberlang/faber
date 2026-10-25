@@ -288,15 +288,15 @@ fn variant_payload_fields_display_at_their_declared_width() {
 
     let mut names = value::DisplayNames::default();
     names.insert(def, "Item.Cost".to_owned());
-    let structs = rustc_hash::FxHashMap::default();
-    let mut variants = rustc_hash::FxHashMap::default();
+    let structs = handroll::FxHashMap::default();
+    let mut variants = handroll::FxHashMap::default();
     variants.insert(def, vec![cost, ratio, count]);
     let order = value::FieldOrder {
         float_widths: &widths,
         names: &names,
         ..value::FieldOrder::new(&structs, &variants)
     };
-    let fields: rustc_hash::FxHashMap<_, _> = [
+    let fields: handroll::FxHashMap<_, _> = [
         (cost, Value::Int(125_000_000)),
         (ratio, Value::Float(f64::from(0.1_f32))),
         (count, Value::Int(3)),
@@ -334,8 +334,8 @@ fn tuple_prints_as_iuncta_at_every_depth_with_per_element_widths() {
     let outer = tuple_parts(nested, &types, 0).expect("nested shape");
     assert_eq!(outer.0[0].tuple, Some(shape.clone()));
 
-    let structs = rustc_hash::FxHashMap::default();
-    let variants = rustc_hash::FxHashMap::default();
+    let structs = handroll::FxHashMap::default();
+    let variants = handroll::FxHashMap::default();
     let order = value::FieldOrder::new(&structs, &variants);
     let tuple = Value::Tuple(vec![Value::Int(125_000_000), Value::Int(4)]);
     let show = |value: &Value, shape: Option<&value::TupleParts>| {
@@ -398,15 +398,15 @@ fn tuple_fields_index_by_declared_type() {
 
     let mut names = value::DisplayNames::default();
     names.insert(def, "Box".to_owned());
-    let mut structs = rustc_hash::FxHashMap::default();
+    let mut structs = handroll::FxHashMap::default();
     structs.insert(def, vec![pair_field, count_field]);
-    let variants = rustc_hash::FxHashMap::default();
+    let variants = handroll::FxHashMap::default();
     let order = value::FieldOrder {
         names: &names,
         tuple_fields: &fields,
         ..value::FieldOrder::new(&structs, &variants)
     };
-    let values: rustc_hash::FxHashMap<_, _> = [
+    let values: handroll::FxHashMap<_, _> = [
         (
             pair_field,
             Value::Tuple(vec![Value::Int(125_000_000), Value::Int(3)]),

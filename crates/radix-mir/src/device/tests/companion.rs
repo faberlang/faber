@@ -10,9 +10,9 @@ use crate::{
     MirParam, MirParamMode, MirPlace, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp,
     MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
 };
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_types::{Primitive, TypeTable};
-use rustc_hash::FxHashMap;
 
 /// A compact primal → companion lossless row for the carrier/identity tests.
 fn lossless_companion(primal: u32, companion: u32) -> LosslessMirCompanionEntry {

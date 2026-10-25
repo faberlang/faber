@@ -12,7 +12,7 @@ use super::{
 use crate::hir::DefId;
 use crate::mir::{MirLayoutId, MirType};
 use crate::semantic::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 
 #[test]
 fn layout_table_maps_default_and_sized_scalars() {

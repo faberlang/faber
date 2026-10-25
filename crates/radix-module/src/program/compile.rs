@@ -23,7 +23,7 @@ use crate::syntax::{
     Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, FiguraExpr,
     Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 

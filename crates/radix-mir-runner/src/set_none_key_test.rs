@@ -3,9 +3,9 @@
 use super::lib_test::evaluate_collection_call;
 use crate::Value;
 use crate::value::MapKey;
+use handroll::{FxHashMap, FxHashSet};
 use radix_mir::{MirCollectionOp, MirIntrinsic, MirOperand, MirRuntimeCall, MirType, MirValueId};
 use radix_types::TypeId;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 

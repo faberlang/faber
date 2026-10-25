@@ -1772,8 +1772,8 @@ fn instantiate_edge_policy_method(
     if names.len() != applied.len() {
         return None;
     }
-    let mut type_vars = rustc_hash::FxHashMap::default();
-    let mut shape_vars = rustc_hash::FxHashMap::default();
+    let mut type_vars = handroll::FxHashMap::default();
+    let mut shape_vars = handroll::FxHashMap::default();
     for (name, argument) in names.into_iter().zip(applied) {
         match argument {
             radix_types::AppliedArg::Type(ty) => {

@@ -84,7 +84,7 @@ pub fn is_const_int(expr: &HirExpression) -> bool {
 #[must_use]
 pub(crate) fn const_int_value_resolved(
     expr: &HirExpression,
-    values: &rustc_hash::FxHashMap<radix_types::DefId, i128>,
+    values: &handroll::FxHashMap<radix_types::DefId, i128>,
 ) -> Option<i128> {
     match &expr.kind {
         HirExpressionKind::Path(def_id) => values.get(def_id).copied(),

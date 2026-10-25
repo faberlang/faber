@@ -6,10 +6,10 @@
 //! backend spells that carrier.
 
 use crate::{MirLayoutId, MirType};
+use handroll::{FxHashMap, FxHashSet};
 use radix_types::{
     BitsWidth, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -32,13 +32,13 @@ use crate::{
     CollectionKind, FuncSig, IndexExpr, IndexId, InferVar, ParamType, Primitive,
     SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
 };
+use handroll::FxHashMap;
 use radix_diagnostics::DiagnosticArg;
 use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
 use radix_types::{
     AppliedArg, BuiltinTensorEdgePolicy, compose_index_affine_constant, divide_index_exact,
     evaluate_index_dimension,
 };
-use rustc_hash::FxHashMap;
 
 const FIGURA_LIFT_PRIMARY_MSG: &str =
     "size lift extent expects a natural literal, a name, or a parenthesized expression";

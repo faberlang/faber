@@ -12,8 +12,8 @@ use crate::{
     MirRuntimeCall, MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirValueKind,
     figura::i64s_from_literal_index,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_types::{Type, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MirSlot {

@@ -40,10 +40,10 @@ use super::{
 };
 use crate::conversio::MissingFieldPolicy;
 use crate::cursor::{GeneratorCursor, GeneratorStep};
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::Span;
 use radix_types::Type;
-use rustc_hash::FxHashMap;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::Rc;

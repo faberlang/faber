@@ -20,8 +20,8 @@
 //! caller reports that instead of guessing — never silence.
 
 use crate::{Primitive, Type, TypeId, TypeTable};
+use handroll::FxHashMap;
 use radix_hir::{DefId, HirCasuArm, HirExpression, HirLiteral, HirPattern};
-use rustc_hash::FxHashMap;
 
 /// One constructor of a closed column space.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

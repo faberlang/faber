@@ -693,10 +693,10 @@ fn chained_companion_call_reads_the_rewritten_destination_type() {
 
     let companion_sources = [first, second]
         .into_iter()
-        .collect::<rustc_hash::FxHashSet<_>>();
+        .collect::<handroll::FxHashSet<_>>();
     let concrete_shape = canonical_index(&types, four);
-    let mut instances = rustc_hash::FxHashMap::default();
-    let mut instance_return_types = rustc_hash::FxHashMap::default();
+    let mut instances = handroll::FxHashMap::default();
+    let mut instance_return_types = handroll::FxHashMap::default();
     for (source, id) in [(first, 21), (second, 22)] {
         let key = MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: vec![concrete_shape] };
         instances.insert(key.clone(), MirFunctionId(id));

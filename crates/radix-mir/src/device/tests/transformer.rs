@@ -10,8 +10,8 @@ use crate::{
     MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirUnOp,
     MirValidationContext, MirValue, MirValueId, MirValueKind,
 };
+use handroll::FxHashMap;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
-use rustc_hash::FxHashMap;
 
 /// A transformer-bearing device body (S6-P2): the three S6-P1
 /// transformer recipe ops (`TensorSoftmax` / `TensorSumAxis` /

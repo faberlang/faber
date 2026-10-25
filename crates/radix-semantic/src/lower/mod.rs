@@ -78,6 +78,7 @@ use crate::{
     AnnotationContractMetadata, Primitive, Resolver, SemanticErrorKind, SemanticParamMode, Type,
     TypeId, TypeTable,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirAnnotation, HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd,
@@ -90,7 +91,6 @@ use radix_syntax::{
     BlockStmt, GenericParamKind, IncipitStmt, PraeparaBlock, PraeparaKind, ProbaCase,
     ProbaModifier, ProbandumDecl, Program, Stmt, StmtKind, Trivia, TypeMode,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Map a type-position access marker onto the HIR parameter-mode fact.
 ///

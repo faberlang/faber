@@ -34,7 +34,7 @@ fn check(
         &MirDeviceFunctionMetadataMap::default(),
     )
 }
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 
 const ENTRY: DefId = DefId(1);
 const FRAGMENT: DefId = DefId(2);

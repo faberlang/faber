@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
+handroll = { path = "../handroll" }
 radix-codegen-shared = { path = "../radix-codegen-shared" }
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
@@ -15,7 +16,6 @@ radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
 radix-semantic = { path = "../radix-semantic" }
 radix-types = { path = "../radix-types" }
-rustc-hash = "2"
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }

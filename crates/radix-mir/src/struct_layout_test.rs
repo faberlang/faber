@@ -11,10 +11,10 @@ use crate::{
     MAX_STRUCT_LAYOUT_BYTES, MirDeviceVectorLayout, MirDeviceViewElement, MirScalarLayout,
     MirStructLayout, MirType, MirValidationContext, StructLayoutRefusal, resolve_struct_layout,
 };
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::Symbol;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
 
 const DEF: DefId = DefId(7);
 

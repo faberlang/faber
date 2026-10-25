@@ -27,6 +27,7 @@
 //! never reaches — is acceptable and conservative: the structural tier is a
 //! lower bound on run-tier capability, never an upper bound.
 
+use handroll::FxHashSet;
 use radix_mir::names::MirNames;
 use radix_mir::{
     CapabilityGap, Lowerability, MirAggregateFields, MirAggregateItem, MirCallee, MirIntrinsic,
@@ -34,7 +35,6 @@ use radix_mir::{
     MirRuntimeAbi, MirRuntimeAbiFamily, MirRuntimeCall, MirStatementKind, MirTerminatorKind,
     MirValueKind, ValidatedMir,
 };
-use rustc_hash::FxHashSet;
 
 /// Slug for an unsupported MIR shape (mirrors `mir::coverage`).
 pub(crate) const SLUG_UNSUPPORTED: &str = "unsupported-mir-shape";

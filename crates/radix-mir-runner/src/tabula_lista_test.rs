@@ -7,12 +7,12 @@
 //! these pins compare as multisets.
 
 use super::*;
+use handroll::FxHashMap;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirBlockId, MirFunction, MirFunctionId, MirProgram, MirType, MirValidationContext,
 };
 use radix_types::{Primitive, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
 
 fn tabula_to_lista(
     key: Primitive,

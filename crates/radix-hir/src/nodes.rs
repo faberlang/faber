@@ -26,6 +26,7 @@
 //! - Variants should preserve source-level intent. Lower MIR/control-flow and
 //!   target-specific lowering belong in later phases.
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::{Span, Symbol, Token};
 use radix_syntax::{
     CallablePosture, FieldModifier, GenericParamKind, JsonValue, TypeFormLevel, Visibility,
@@ -34,7 +35,6 @@ use radix_types::{
     ContractRef, GenericParamDescriptor, GenericParamSort, IndexId, SemanticGenericParamDefault,
     TypeId, TypeParamConstraint,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

@@ -19,6 +19,7 @@ use crate::expr::{Operand, Value};
 use crate::items::Returns;
 use crate::names::Namer;
 use crate::ty::{Ty, classify, returns};
+use handroll::FxHashSet;
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
@@ -26,7 +27,6 @@ use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirLocal, HirParam, HirParamMode, HirStatement,
     HirStatementKind,
 };
-use rustc_hash::FxHashSet;
 
 /// A closure waiting for its synthesized top-level function to be written.
 #[derive(Clone)]

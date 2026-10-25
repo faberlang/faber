@@ -4,12 +4,12 @@ use super::evaluation::{PRAEFIXUM_STEP_BUDGET, invalid, with_initializer_mut};
 use crate::driver::AnalyzedModule;
 use crate::mir::{MirFunctionId, MirLoweringOptions, ValidatedMir, lower_analyzed_unit};
 use crate::semantic::{self, SemanticError};
+use handroll::FxHashSet;
 use radix_hir::visit::{HirVisitor, walk_local};
 use radix_hir::{DefId, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirLocal};
 use radix_lexer::Span;
 use radix_mir_runner::{BufferHost, EvaluationFailure, RunnerError, Value, evaluate_function};
 use radix_syntax::CallablePosture;
-use rustc_hash::FxHashSet;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 /// Definition id of the synthetic evaluation function. It exists only while

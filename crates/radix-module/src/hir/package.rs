@@ -23,8 +23,8 @@ use crate::hir::{
 };
 use crate::semantic::format_faber_type;
 use crate::semantic::passes::fragment_definition::{DeviceEffectKind, FragmentEffectTable};
+use handroll::FxHashMap;
 use radix_hir_fhir::{FhirPackageModule, SCHEMA_VERSION};
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 pub use radix_hir_fhir::{
@@ -1144,8 +1144,8 @@ fn device_call_cycle(metadata: &NucleumProgramMetadata) -> Option<String> {
                     .map(|callee| (module, callee.as_str())),
             );
     }
-    let mut visiting = rustc_hash::FxHashSet::default();
-    let mut visited = rustc_hash::FxHashSet::default();
+    let mut visiting = handroll::FxHashSet::default();
+    let mut visited = handroll::FxHashSet::default();
     let mut stack = Vec::new();
     let nodes = graph.keys().copied().collect::<Vec<_>>();
     for start in nodes {
@@ -1159,8 +1159,8 @@ fn device_call_cycle(metadata: &NucleumProgramMetadata) -> Option<String> {
 fn dfs_cycle<'a>(
     node: DeviceNode<'a>,
     graph: &FxHashMap<DeviceNode<'a>, Vec<DeviceNode<'a>>>,
-    visiting: &mut rustc_hash::FxHashSet<DeviceNode<'a>>,
-    visited: &mut rustc_hash::FxHashSet<DeviceNode<'a>>,
+    visiting: &mut handroll::FxHashSet<DeviceNode<'a>>,
+    visited: &mut handroll::FxHashSet<DeviceNode<'a>>,
     stack: &mut Vec<DeviceNode<'a>>,
 ) -> Option<String> {
     if visited.contains(&node) {

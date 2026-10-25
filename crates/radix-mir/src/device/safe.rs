@@ -33,8 +33,8 @@ use crate::{
     MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueKind, ValidatedMir,
 };
 use crate::{MirLocalId, MirStructLayout, resolve_struct_layout};
+use handroll::FxHashMap;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
 
 const SLUG_ABI: &str = "missing-abi-fact";
 const SLUG_LAYOUT: &str = "missing-layout-fact";
@@ -104,8 +104,8 @@ fn is_structurizable_single_lane(
 /// and structured-CFG emission without receiving their own Lane parameter.
 fn reduction_term_functions(
     program: &crate::MirProgram,
-) -> rustc_hash::FxHashSet<crate::MirFunctionId> {
-    let mut terms = rustc_hash::FxHashSet::default();
+) -> handroll::FxHashSet<crate::MirFunctionId> {
+    let mut terms = handroll::FxHashSet::default();
     for function in &program.functions {
         for block in &function.blocks {
             for statement in &block.statements {
@@ -282,7 +282,7 @@ struct DeviceSafeClassifier<'a> {
     in_single_lane_function: bool,
     /// The reduction term functions of the program (see
     /// [`reduction_term_functions`]).
-    reduction_terms: rustc_hash::FxHashSet<crate::MirFunctionId>,
+    reduction_terms: handroll::FxHashSet<crate::MirFunctionId>,
     /// C4-6b: the genus (struct) PARAMETERS of the lane-form function under
     /// visit whose layout resolves, keyed by parameter local. A read of one
     /// field (`p.f`) is the only admitted use.
@@ -362,7 +362,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             in_device_function: false,
             in_lane_form_function: false,
             in_single_lane_function: false,
-            reduction_terms: rustc_hash::FxHashSet::default(),
+            reduction_terms: handroll::FxHashSet::default(),
             genus_params: FxHashMap::default(),
             record_view_params: FxHashMap::default(),
             allows_structured_return_branch: false,

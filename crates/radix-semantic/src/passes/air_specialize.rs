@@ -16,13 +16,13 @@ use crate::{
     GenericWitness, IndexExpr, IndexId, RadixLane, RadixLaneMetadata, ResolvedGenericBinding,
     ResolvedGenericCall, Type, TypeId, TypeTable,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut};
 use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind, HirLocal,
     HirModule, HirParam, HirStatement, HirTypeParam,
 };
 use radix_lexer::{Interner, Span, Symbol};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Stable key for one concrete AIR instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

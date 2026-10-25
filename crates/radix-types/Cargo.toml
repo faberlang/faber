@@ -10,7 +10,6 @@ publish = false
 handroll = { path = "../handroll" }
 radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
-rustc-hash = "2"
 serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]

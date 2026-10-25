@@ -4,10 +4,10 @@
 //! type annotations (Rust tensor comments in Stage 7).
 
 use super::{MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable, format_figura};
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
 use radix_types::{AppliedArg, IndexExpr};
-use rustc_hash::FxHashMap;
 
 /// Recover Faber source type syntax for one resolved [`TypeId`].
 pub fn format_faber_type<F: Fn(DefId) -> String>(

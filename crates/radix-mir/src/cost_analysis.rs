@@ -17,10 +17,10 @@ use crate::{
     MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId,
     MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{Primitive, Type, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 
 /// Logarithmic cost class. `C0 = 1`, `C1 = 10`, `C2 = 100`, `C3 = 1000`.

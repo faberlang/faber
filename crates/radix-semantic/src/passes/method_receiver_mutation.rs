@@ -19,13 +19,13 @@
 //!   not followed; the rule errs toward accepting.
 
 use crate::{Type, TypeId, TypeTable};
+use handroll::FxHashSet;
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirItemKind, HirModule, HirStatement, HirStatementKind,
 };
 use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
 use radix_lexer::{Interner, Symbol};
-use rustc_hash::FxHashSet;
 
 /// `(class definition, method name)` pairs whose body mutates the receiver.
 pub(super) type MutatingMethods = FxHashSet<(DefId, Symbol)>;

@@ -18,12 +18,12 @@
 //! [`CapabilityGap::UnsupportedMirShape`]; unresolved semantic types reuse
 //! the LLVM wording (`unresolved type`) so shared semantics stay aligned.
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
 use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Slug for shapes the CLIF subset does not cover yet.
 pub const SLUG_CLIF_SUBSET: &str = "clif-subset";

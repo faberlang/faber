@@ -31,6 +31,7 @@
 //! - Unsupported features remain explicit diagnostics so later MIR work can add
 //!   support without inheriting silent behavior.
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
 use radix_hir::{
     DefId, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget, HirExpression,
@@ -68,7 +69,6 @@ use radix_semantic::{
 };
 use radix_types::{MirCollectionOp, MirKernelBuiltin, SemanticMutability};
 use register_lift::LaneSource;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::{Arc, Mutex};
 
 mod aggregate;

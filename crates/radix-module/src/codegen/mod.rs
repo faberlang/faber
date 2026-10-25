@@ -316,7 +316,7 @@ fn mir_backed_requires_driver() -> CodegenError {
     feature = "hir-haskell"
 ))]
 fn failable_facts(facts: &crate::semantic::FunctionFactTable) -> radix_hir::FailableFacts {
-    let mut err_tys = rustc_hash::FxHashMap::default();
+    let mut err_tys = handroll::FxHashMap::default();
     for (def_id, fact) in facts.iter() {
         if let Some(err_ty) = fact.err_ty {
             err_tys.insert(def_id, err_ty);
@@ -483,7 +483,7 @@ fn generate_rust_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) 
     let mut namespace_info =
         rust::build_file_import_namespaces(hir, analysis.interner(), &rust::ResolverImportsBridge(analysis.resolver()));
     let callback_identities = imported_tensor_edge_policy_callback_identities(analysis.resolver(), analysis.interner());
-    let mut emitted_tensor_policy_providers = rustc_hash::FxHashSet::default();
+    let mut emitted_tensor_policy_providers = handroll::FxHashSet::default();
     let mut policy_identity_codegen = rust::RustCodegen::new_with_types(hir, analysis.interner(), analysis.types());
     policy_identity_codegen.set_imported_namespace_type_paths(namespace_info.type_paths.clone());
     for provider in &analysis.tensor_edge_policies().provider_impls {
@@ -500,7 +500,7 @@ fn generate_rust_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) 
     // unwrapping: an `ad`-verb provider function emits `Result`
     // even without a declared `⇥` channel, so widen the imported
     // namespace effects for those members.
-    let mut provider_failable_exports = rustc_hash::FxHashMap::default();
+    let mut provider_failable_exports = handroll::FxHashMap::default();
     for (name, _, failable_exports) in &provider_modules {
         provider_failable_exports
             .entry(name.as_str())
@@ -711,7 +711,7 @@ fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) ->
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
     r#gen.set_imported_generators(go_imported_generators(analysis, hir));
     register_go_cross_file_defids(&mut r#gen, hir, analysis.resolver(), analysis.libraries());
-    let mut statics = rustc_hash::FxHashMap::default();
+    let mut statics = handroll::FxHashMap::default();
     for (def_id, fields, _, _) in analysis.resolver().imported_file_structs() {
         for field in fields {
             if field.modifier == Some(radix_syntax::FieldModifier::Const)
@@ -735,13 +735,13 @@ fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) ->
 fn go_imported_constants(
     analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
-) -> rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst> {
+) -> handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst> {
     use crate::file_interface::InterfaceConstValue;
     use crate::hir::HirExpressionKind;
     use crate::hir::visit::HirVisitor;
     struct Reads<'u> {
         analysis: &'u dyn CodegenAnalysis,
-        found: rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst>,
+        found: handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), go::ImportedConst>,
     }
     impl HirVisitor for Reads<'_> {
         fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
@@ -768,7 +768,7 @@ fn go_imported_constants(
             crate::hir::visit::walk_expr(self, expr);
         }
     }
-    let mut reads = Reads { analysis, found: rustc_hash::FxHashMap::default() };
+    let mut reads = Reads { analysis, found: handroll::FxHashMap::default() };
     crate::hir::visit::walk_program(&mut reads, hir);
     reads.found
 }
@@ -778,12 +778,12 @@ fn go_imported_constants(
 fn go_imported_generators(
     analysis: &dyn CodegenAnalysis,
     hir: &HirModule,
-) -> rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId> {
+) -> handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId> {
     use crate::hir::HirExpressionKind;
     use crate::hir::visit::HirVisitor;
     struct Reads<'u> {
         analysis: &'u dyn CodegenAnalysis,
-        found: rustc_hash::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
+        found: handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
     }
     impl HirVisitor for Reads<'_> {
         fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
@@ -806,7 +806,7 @@ fn go_imported_generators(
             crate::hir::visit::walk_expr(self, expr);
         }
     }
-    let mut reads = Reads { analysis, found: rustc_hash::FxHashMap::default() };
+    let mut reads = Reads { analysis, found: handroll::FxHashMap::default() };
     crate::hir::visit::walk_program(&mut reads, hir);
     reads.found
 }
@@ -988,7 +988,7 @@ fn generate_c_from_analyzed(_analysis: &dyn CodegenAnalysis, _hir: &HirModule) -
 #[cfg(feature = "hir-rust")]
 fn emit_provider_modules(
     analysis: &dyn CodegenAnalysis,
-    emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
+    emitted_tensor_policy_providers: &mut handroll::FxHashSet<String>,
 ) -> Result<Vec<(String, String, std::collections::BTreeSet<String>)>, CodegenError> {
     use std::collections::BTreeMap;
 
@@ -1016,7 +1016,7 @@ fn emit_provider_modules(
 #[cfg(feature = "hir-rust")]
 fn map_provider_modules(
     analysis: &dyn CodegenAnalysis,
-    emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
+    emitted_tensor_policy_providers: &mut handroll::FxHashSet<String>,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
     use crate::hir::HirItemKind;
@@ -1089,7 +1089,7 @@ fn map_provider_modules(
 fn emit_provider_module_code(
     provider: &dyn crate::codegen::input::CodegenAnalysis,
     module_name: &str,
-    emitted_tensor_policy_providers: &mut rustc_hash::FxHashSet<String>,
+    emitted_tensor_policy_providers: &mut handroll::FxHashSet<String>,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
     let namespace_info = rust::build_file_import_namespaces(

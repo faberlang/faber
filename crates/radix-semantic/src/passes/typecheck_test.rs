@@ -1978,9 +1978,9 @@ functio sink() → ignotum {
 #[test]
 fn occurs_in_catches_all_composite_variants() {
     use crate::InferVar;
+    use handroll::FxHashMap;
     use radix_lexer::Symbol;
     use radix_types::IndexExpr;
-    use rustc_hash::FxHashMap;
 
     let mut types = TypeTable::new();
     let resolver = Resolver::new();

@@ -5,6 +5,7 @@
 //! break target. Expression and explicit `fac` bodies remain compact.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     HirBlock, HirBreakableKind, HirExpression, HirExpressionKind, HirId, HirLiteral, HirParam,
@@ -13,7 +14,6 @@ use radix_hir::{
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_syntax::{ClausuraBody, ExprKind, StmtKind};
 use radix_types::{DefId, Primitive, TypeTable, USER_DEF_ID_BASE};
-use rustc_hash::FxHashMap;
 
 struct LatinSurface;
 

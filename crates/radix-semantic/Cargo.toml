@@ -31,6 +31,7 @@ single_match_else = "allow"
 
 
 [dependencies]
+handroll = { path = "../handroll" }
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
 radix-hir-fhir = { path = "../radix-hir-fhir", optional = true }
@@ -41,7 +42,6 @@ radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-syntax = { path = "../radix-syntax" }
 radix-target = { path = "../radix-target" }
 radix-types = { path = "../radix-types" }
-rustc-hash = "2"
 serde_json = "1"
 toml = "1.1.2"
 unicode-normalization = "0.1"

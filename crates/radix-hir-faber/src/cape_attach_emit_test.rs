@@ -8,6 +8,7 @@
 //! compacting the synthetic `Handled` tail into `secus ergo redde fac …`.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     HirBlock, HirCape, HirExpression, HirExpressionKind, HirId, HirLiteral, HirStatement,
@@ -16,7 +17,6 @@ use radix_hir::{
 use radix_lexer::{Interner, Span, Symbol, TokenKind};
 use radix_syntax::{SecusClause, StmtKind};
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
-use rustc_hash::FxHashMap;
 
 struct LatinSurface;
 

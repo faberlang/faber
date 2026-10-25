@@ -32,6 +32,7 @@ use crate::{
     IndexExpr, RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, Type, TypeId,
     TypeTable,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{
     HirVisitor, HirVisitorMut, walk_block, walk_expr, walk_expr_mut, walk_item, walk_program,
     walk_stmt, walk_stmt_mut,
@@ -44,7 +45,6 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_types::HIR_SYNTHETIC_DEF_ID_BASE;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Unroll budget. Same constant as `MAX_MONOMORPHIZATIONS` in MIR lowering.
 pub const UNROLL_BUDGET: usize = 64;

@@ -36,12 +36,12 @@ use crate::locale::{LocalePack, TypeBindingKind};
 use crate::{
     Primitive, Resolver, SemanticError, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirItemKind, HirModule, HirPattern,
 };
 use radix_lexer::Interner;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Name sources for rendering a coverage witness in the reader's locale.
 pub struct CoverageNames<'a> {

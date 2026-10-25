@@ -6,7 +6,7 @@
 //! reference (D8.3).
 
 use crate::DefId;
-use rustc_hash::{FxHashMap, FxHashSet};
+use handroll::{FxHashMap, FxHashSet};
 
 /// Component index per node; nodes on a cycle share an index. A node that is
 /// not on any cycle gets its own index (it is cyclic only through a self

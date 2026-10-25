@@ -6,12 +6,12 @@
 //! The index owns its data (no borrows into the sidecar) so [`super::FaberCodegen`]
 //! can carry it across `&self` render methods without lifetime parameters.
 
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirBlock, HirId, HirOwnerRef, HirPresentation, HirSourceAnchorId, HirTrivia,
 };
 use radix_lexer::Interner;
-use rustc_hash::FxHashMap;
 
 /// Anchor/owner attachment lookups for one presentation sidecar.
 #[derive(Debug)]

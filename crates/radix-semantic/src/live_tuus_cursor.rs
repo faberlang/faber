@@ -5,9 +5,9 @@
 //! Phase 2 uses the same map to reject unsupported escapes before codegen.
 
 use crate::{Type, TypeId, TypeTable};
+use handroll::FxHashMap;
 use radix_hir::{DefId, HirExpression, HirExpressionKind, HirLocal, HirModule};
 use radix_lexer::Symbol;
-use rustc_hash::FxHashMap;
 
 /// Payload `T` from `tuus<T>.cursor()` when `expr` is that zero-arg method call.
 pub fn tuus_cursor_method_payload<'a>(

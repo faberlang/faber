@@ -86,7 +86,7 @@ fn english_tokens_print_map_with_unit_key() {
     let (structs, variants) = Default::default();
     let tokens = english();
     let order = empty_order(&structs, &variants).with_tokens(&tokens);
-    let mut entries = rustc_hash::FxHashMap::default();
+    let mut entries = handroll::FxHashMap::default();
     entries.insert(MapKey::Unit, Value::Bool(false));
     let map = Value::Map(Rc::new(RefCell::new(entries)));
     assert_eq!(show(&map, order), "{none: false}");
@@ -132,7 +132,7 @@ fn default_latin_tokens_print_what_was_printed_before() {
     assert_eq!(show(&Value::Bool(false), order), "falsum");
     assert_eq!(show(&Value::Nil, order), "nihil");
     assert_eq!(show(&nested_tuple_list(), order), "[iuncta [verum, nihil]]");
-    let mut entries = rustc_hash::FxHashMap::default();
+    let mut entries = handroll::FxHashMap::default();
     entries.insert(MapKey::Unit, Value::Bool(false));
     let map = Value::Map(Rc::new(RefCell::new(entries)));
     assert_eq!(show(&map, order), "{nihil: falsum}");
@@ -207,7 +207,7 @@ fn runner_falls_back_to_latin_without_a_function_entry() {
 }
 
 fn bool_key_map() -> Value {
-    let mut entries = rustc_hash::FxHashMap::default();
+    let mut entries = handroll::FxHashMap::default();
     entries.insert(MapKey::Bool(true), Value::Int(1));
     Value::Map(Rc::new(RefCell::new(entries)))
 }
@@ -218,7 +218,7 @@ fn english_tokens_print_bool_map_key_as_true_false() {
     let tokens = english();
     let order = empty_order(&structs, &variants).with_tokens(&tokens);
     assert_eq!(show(&bool_key_map(), order), "{true: 1}");
-    let mut entries = rustc_hash::FxHashMap::default();
+    let mut entries = handroll::FxHashMap::default();
     entries.insert(MapKey::Bool(false), Value::Int(2));
     let map = Value::Map(Rc::new(RefCell::new(entries)));
     assert_eq!(show(&map, order), "{false: 2}");
@@ -230,12 +230,12 @@ fn latin_tokens_print_bool_map_key_as_verum_falsum() {
     let latin = DisplayTokens::latin();
     let order = empty_order(&structs, &variants).with_tokens(&latin);
     assert_eq!(show(&bool_key_map(), order), "{verum: 1}");
-    let mut entries = rustc_hash::FxHashMap::default();
+    let mut entries = handroll::FxHashMap::default();
     entries.insert(MapKey::Bool(false), Value::Int(2));
     let map = Value::Map(Rc::new(RefCell::new(entries)));
     assert_eq!(show(&map, order), "{falsum: 2}");
     // A composite key's bool part prints through the tokens too.
-    let mut entries = rustc_hash::FxHashMap::default();
+    let mut entries = handroll::FxHashMap::default();
     entries.insert(
         MapKey::Tuple(vec![MapKey::Bool(true), MapKey::UInt(3)]),
         Value::Int(1),

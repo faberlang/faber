@@ -103,7 +103,7 @@ pub fn emit_object(
             .iter()
             .map(|(def, variants)| (*def, variants.clone()))
             .collect(),
-        optional_params: rustc_hash::FxHashMap::default(),
+        optional_params: handroll::FxHashMap::default(),
         environments: validation
             .closure_environments
             .iter()
@@ -151,18 +151,18 @@ fn admits_none(table: &TypeTable, ty: radix_types::TypeId) -> bool {
 fn optional_params(
     program: &MirProgram,
     table: &mut TypeTable,
-) -> rustc_hash::FxHashMap<(radix_mir::MirFunctionId, usize), MirType> {
+) -> handroll::FxHashMap<(radix_mir::MirFunctionId, usize), MirType> {
     use radix_mir::{
         MirCallee, MirConstant, MirOperand, MirPlaceBase, MirStatementKind, MirTerminatorKind,
     };
-    let mut found = rustc_hash::FxHashMap::default();
+    let mut found = handroll::FxHashMap::default();
     for function in &program.functions {
-        let locals: rustc_hash::FxHashMap<_, _> = function
+        let locals: handroll::FxHashMap<_, _> = function
             .locals
             .iter()
             .map(|local| (local.id, local.ty))
             .collect();
-        let temps: rustc_hash::FxHashMap<_, _> = function
+        let temps: handroll::FxHashMap<_, _> = function
             .temps
             .iter()
             .map(|temp| (temp.id, temp.ty))

@@ -11,13 +11,13 @@ use crate::expr::Value;
 use crate::names::Namer;
 use crate::ty::{Inner, Ty, classify, returns};
 use crate::{Emitter, Local};
+use handroll::FxHashSet;
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::{
     DefId, HirConst, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind,
     HirModule, HirParamMode, HirStatementKind,
 };
-use rustc_hash::FxHashSet;
 use std::fmt::Write as _;
 
 /// A function the program defines; a genus method is one with a receiver.

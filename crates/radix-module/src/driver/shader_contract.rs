@@ -64,7 +64,7 @@
 //! an empty body) remains a source-selected generic mechanism; it declares no
 //! facts on its own.
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use handroll::{FxHashMap, FxHashSet};
 
 use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, Span};
 use crate::hir::visit::{HirVisitor, walk_expr};

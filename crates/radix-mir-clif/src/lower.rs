@@ -14,13 +14,13 @@ use cranelift_codegen::settings::{self, Configurable, Flags};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Interner;
 use radix_mir::*;
 use radix_types::{
     BitsWidth, MirMathFunction, NumericWidth, Primitive, SemanticMutability, Type, TypeId,
     TypeTable,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::abi::{self, AbiTy, RuntimeSymbol};
 
@@ -745,22 +745,22 @@ struct FunctionLower<'f, 'a> {
     collector: Option<Value>,
     generator: bool,
     /// Slots that hold a shared cell instead of their content.
-    cells: rustc_hash::FxHashSet<Slot>,
+    cells: handroll::FxHashSet<Slot>,
     /// The next scratch temporary id above every declared one.
     scratch_floor: u32,
     /// `mut` parameters passed by address: the slot, the address and the
     /// representation to write back at every exit.
     pointer_params: Vec<(Slot, Variable, Rep)>,
     /// Temporaries that hold the wide integer carrier.
-    wide_slots: rustc_hash::FxHashSet<Slot>,
+    wide_slots: handroll::FxHashSet<Slot>,
     /// Wide values known to be an `i64` extended.
-    narrow: rustc_hash::FxHashSet<Value>,
+    narrow: handroll::FxHashSet<Value>,
     /// Wide constants beyond the `i64` carrier (a `u64` literal at or above
     /// 2^63): narrowing one is declined, not trapped at run time.
-    huge: rustc_hash::FxHashSet<Value>,
+    huge: handroll::FxHashSet<Value>,
     /// The recovery region (an orphan block chain the success path skips) that
     /// defines each recovery temp: a failing conversion branches to it.
-    recovery_regions: rustc_hash::FxHashMap<MirTempId, MirBlockId>,
+    recovery_regions: handroll::FxHashMap<MirTempId, MirBlockId>,
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
@@ -795,13 +795,13 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             function_refs: FxHashMap::default(),
             collector: None,
             generator: function.is_generator,
-            cells: rustc_hash::FxHashSet::default(),
+            cells: handroll::FxHashSet::default(),
             scratch_floor: 0,
             pointer_params: Vec::new(),
-            wide_slots: rustc_hash::FxHashSet::default(),
-            narrow: rustc_hash::FxHashSet::default(),
-            huge: rustc_hash::FxHashSet::default(),
-            recovery_regions: rustc_hash::FxHashMap::default(),
+            wide_slots: handroll::FxHashSet::default(),
+            narrow: handroll::FxHashSet::default(),
+            huge: handroll::FxHashSet::default(),
+            recovery_regions: handroll::FxHashMap::default(),
         };
         lower.run(function)?;
         lower.builder.seal_all_blocks();
@@ -948,9 +948,9 @@ impl FunctionLower<'_, '_> {
                 .unwrap_or_default()
         };
         let closure_from = |roots: Vec<MirBlockId>,
-                            stop: &rustc_hash::FxHashSet<MirBlockId>|
-         -> rustc_hash::FxHashSet<MirBlockId> {
-            let mut seen: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
+                            stop: &handroll::FxHashSet<MirBlockId>|
+         -> handroll::FxHashSet<MirBlockId> {
+            let mut seen: handroll::FxHashSet<MirBlockId> = handroll::FxHashSet::default();
             let mut pending = roots;
             while let Some(id) = pending.pop() {
                 if stop.contains(&id) || !seen.insert(id) {
@@ -960,10 +960,9 @@ impl FunctionLower<'_, '_> {
             }
             seen
         };
-        let none: rustc_hash::FxHashSet<MirBlockId> = rustc_hash::FxHashSet::default();
+        let none: handroll::FxHashSet<MirBlockId> = handroll::FxHashSet::default();
         let mut reachable = closure_from(vec![function.blocks[0].id], &none);
-        let mut has_predecessor: rustc_hash::FxHashSet<MirBlockId> =
-            rustc_hash::FxHashSet::default();
+        let mut has_predecessor: handroll::FxHashSet<MirBlockId> = handroll::FxHashSet::default();
         for block in &function.blocks {
             has_predecessor.extend(radix_mir::visit::terminator_successors(
                 &block.terminator.kind,

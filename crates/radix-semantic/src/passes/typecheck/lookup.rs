@@ -1021,7 +1021,7 @@ impl TypeChecker<'_> {
     fn reject_duplicate_json_keys(&mut self, value: &radix_syntax::JsonValue) {
         match value {
             radix_syntax::JsonValue::Object(members) => {
-                let mut seen: rustc_hash::FxHashSet<&str> = rustc_hash::FxHashSet::default();
+                let mut seen: handroll::FxHashSet<&str> = handroll::FxHashSet::default();
                 let Some(interner) = self.interner else {
                     return;
                 };

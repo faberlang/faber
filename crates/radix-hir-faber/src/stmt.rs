@@ -19,13 +19,13 @@
 //!   Faber syntax accepted by the parser.
 
 use crate::surface::KeywordSurface;
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirBlock, HirCape, HirExpression, HirExpressionKind, HirLocal, HirOwnerRef,
     HirStatement, HirStatementKind, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Symbol, TokenKind};
-use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
     /// Print ` omnia` after `fac` when the synthesized `fac … dum` loop block

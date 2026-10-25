@@ -7,7 +7,7 @@ use crate::{
     MirFunction, MirLayoutKind, MirLayoutTable, MirLocalId, MirPlaceBase, MirScalarLayout,
     MirTempId, MirType,
 };
-use rustc_hash::FxHashSet;
+use handroll::FxHashSet;
 
 /// The dead non-kernel-scalar const-copy slots of one function (need
 /// a0184031): plain destinations of a DEAD const-copy Assign whose value is

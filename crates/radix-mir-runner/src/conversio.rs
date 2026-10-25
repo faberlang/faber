@@ -10,6 +10,7 @@ use super::value::{
     saturating_word_result, trapping_float_store_fails,
 };
 use super::{Runner, RunnerError};
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::{Span, Symbol};
 use radix_mir::lista_tensor_conversio::{ListaToTensorShape, resolve_lista_to_tensor_shape};
 use radix_mir::{MirConversion, MirNamedOperand, MirOperand, MirStructFieldDefaults};
@@ -18,7 +19,6 @@ use radix_types::{
     BitsWidth, FloatPolicy, InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable,
     effective_width,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 

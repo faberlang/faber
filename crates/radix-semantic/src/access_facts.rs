@@ -9,13 +9,13 @@
 //! rather than treating a definition as globally dead.
 
 use crate::{AccessMarker, Type, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirFunction,
     HirId, HirItemKind, HirLocal, HirModule, HirStatement, HirStatementKind,
 };
 use radix_lexer::Span;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Conservative storage-origin classification for one expression or binding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -82,13 +82,13 @@ pub mod lower;
 #[cfg(test)]
 #[path = "test_support.rs"]
 pub mod test_support;
+pub use handroll::FxHashMap;
+pub use handroll::FxHashSet;
 pub use lower::LoweredProgram;
 pub use lower::annotation::try_parse_nondum_annotation;
 pub use numeric_width::is_tensor_element_type;
 pub use numeric_width::tensor_element_conversio_allowed;
 pub use radix_hir::{DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue};
-pub use rustc_hash::FxHashMap;
-pub use rustc_hash::FxHashSet;
 
 pub mod catalog;
 pub mod catalog_semantic;
@@ -1021,7 +1021,7 @@ fn collect_annotation_contract_metadata(
             Ok(applications) => applications,
             Err(e) => {
                 diagnostics.extend(e);
-                rustc_hash::FxHashMap::default()
+                handroll::FxHashMap::default()
             }
         };
     AnnotationContractMetadata {
@@ -1037,7 +1037,7 @@ fn install_imported_annotation_contracts(
     registry: &mut AnnotationContractRegistry,
 ) {
     // BO-D-4: build name → DefId once (imported structs are stable for this pass).
-    let mut imported_struct_by_name = rustc_hash::FxHashMap::default();
+    let mut imported_struct_by_name = handroll::FxHashMap::default();
     for (def_id, _fields, _methods, _type_params) in resolver.imported_file_structs() {
         if let Some(sym) = resolver.get_symbol(def_id) {
             let name = interner.resolve(sym.name).to_owned();
@@ -1089,7 +1089,7 @@ fn imported_struct_def_id(
     resolver: &Resolver,
     interner: &mut Interner,
     member_name: &str,
-    imported_struct_by_name: &rustc_hash::FxHashMap<String, radix_hir::DefId>,
+    imported_struct_by_name: &handroll::FxHashMap<String, radix_hir::DefId>,
 ) -> Option<radix_hir::DefId> {
     let member_sym = interner.intern(member_name);
     if let Some(def_id) = resolver.lookup(member_sym) {

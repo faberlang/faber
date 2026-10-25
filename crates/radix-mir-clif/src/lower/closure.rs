@@ -316,9 +316,9 @@ impl FunctionLower<'_, '_> {
 /// scanning its constructions.
 pub(super) fn construction_slots(
     function: &MirFunction,
-) -> (rustc_hash::FxHashSet<Slot>, rustc_hash::FxHashSet<Slot>) {
-    let mut cells = rustc_hash::FxHashSet::default();
-    let mut environments = rustc_hash::FxHashSet::default();
+) -> (handroll::FxHashSet<Slot>, handroll::FxHashSet<Slot>) {
+    let mut cells = handroll::FxHashSet::default();
+    let mut environments = handroll::FxHashSet::default();
     for block in &function.blocks {
         for statement in &block.statements {
             let MirStatementKind::Construct {

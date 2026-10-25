@@ -154,7 +154,7 @@ fn faulting_tensor() -> TensorValue {
 #[test]
 fn residency_fault_surfaces_from_a_whole_tensor_print() {
     let interner = Interner::new();
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let order = FieldOrder::new(&empty, &empty);
     let value = Value::Tensor(Rc::new(RefCell::new(faulting_tensor())));
     let error = value
@@ -190,7 +190,7 @@ fn residency_fault_surfaces_from_an_element_read() {
 #[test]
 fn residency_invalid_storage_without_a_stored_fault_keeps_the_layout_diagnostic() {
     let interner = Interner::new();
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let order = FieldOrder::new(&empty, &empty);
     // Backing shorter than the shape: the logical read fails, no device fault.
     let mut tensor = TensorValue::try_contiguous(vec![Value::Int(1)], vec![1]).expect("tensor");

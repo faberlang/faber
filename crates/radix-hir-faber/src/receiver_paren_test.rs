@@ -5,6 +5,7 @@
 //! when it heads an output statement, where a leading `(` reads as a call.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     HirBinOp, HirCallArg, HirExpression, HirExpressionKind, HirId, HirLiteral, HirScribeKind,
@@ -12,7 +13,6 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol, TokenKind};
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
-use rustc_hash::FxHashMap;
 
 struct TestSurface;
 

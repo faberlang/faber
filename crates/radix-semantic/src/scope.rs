@@ -38,9 +38,9 @@ use crate::file_interface::{
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::{DefId, HirExpression, TensorEdgePolicyRequirement};
 use radix_lexer::{Span, Symbol as LexSymbol};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 

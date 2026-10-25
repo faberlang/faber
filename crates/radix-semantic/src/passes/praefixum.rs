@@ -43,13 +43,13 @@
 //! purity proof.
 
 use crate::{SemanticError, SemanticErrorKind, Type, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
 use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirLocal, HirModule,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_types::{AppliedArg, TypeId, TypeParamConstraint};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
 use std::collections::VecDeque;
 

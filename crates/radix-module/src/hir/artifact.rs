@@ -13,13 +13,13 @@ use crate::semantic::{
     AnnotationContractMetadata, CaptureFact, CaptureMode, FunctionFact, FunctionFactTable, FunctionProvenanceTable,
     QualifiedIdentityTable, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind, Resolver,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliProgramWire, FunctionFactTableWire, FunctionFactWire, GpuBuiltinWire,
     HirArtifactError, RadixLaneWire, ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire,
 };
 use radix_lexer::Interner;
 use radix_types::TypeTable;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 
 // ---------------------------------------------------------------------------

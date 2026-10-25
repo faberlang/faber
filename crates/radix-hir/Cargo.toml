@@ -7,11 +7,11 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
+handroll = { path = "../handroll" }
 radix-lexer = { path = "../radix-lexer" }
 radix-syntax = { path = "../radix-syntax" }
 radix-types = { path = "../radix-types" }
 postcard = { version = "1.1.3", features = ["alloc"] }
-rustc-hash = "2"
 serde = { version = "1.0.228", features = ["derive"] }
 
 [lints]

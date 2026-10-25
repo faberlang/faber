@@ -57,8 +57,8 @@ pub(super) fn arithmetic(op: MirBinOp) -> bool {
 pub(super) fn wide_temps(
     table: &TypeTable,
     function: &MirFunction,
-) -> rustc_hash::FxHashSet<MirTempId> {
-    use rustc_hash::FxHashSet;
+) -> handroll::FxHashSet<MirTempId> {
+    use handroll::FxHashSet;
     let mut candidates: FxHashSet<MirTempId> = function
         .temps
         .iter()

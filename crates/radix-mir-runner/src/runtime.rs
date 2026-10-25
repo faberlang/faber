@@ -33,6 +33,7 @@ use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
     RunnerError, gelu_f64, host::provider_identity, write_slot,
 };
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_mir::{
@@ -53,7 +54,6 @@ use radix_types::{
     IndexExpr, IndexId, MirMathFunction, NumericWidth, Primitive, Type, TypeId, TypeTable,
     effective_width,
 };
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -683,7 +683,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 Ok(Value::Map(Rc::new(RefCell::new(map))))
             }
             MirAggregateKind::Set => {
-                let mut set = rustc_hash::FxHashSet::default();
+                let mut set = handroll::FxHashSet::default();
                 let items = self.eval_ordered_fields(&aggregate.fields, span)?;
                 for item in items {
                     set.insert(item.to_key(span)?);

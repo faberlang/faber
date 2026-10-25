@@ -7,10 +7,10 @@ use crate::{
     MirDeviceViewElement, MirGenericBindings, MirKernelBuiltin, MirLayoutKind, MirLocalId,
     MirOperand, MirProjection, MirScalarLayout, MirType,
 };
+use handroll::FxHashSet;
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId};
-use rustc_hash::FxHashSet;
 
 impl Validator<'_, '_> {
     pub(crate) fn project_closure_capture(

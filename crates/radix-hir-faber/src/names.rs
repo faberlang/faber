@@ -10,10 +10,10 @@
 //! `def_N` fallback is deliberately synthetic so degraded backend output is
 //! visible instead of silently borrowing an unrelated spelling.
 
+use handroll::FxHashMap;
 use radix_hir::visit::HirVisitor;
 use radix_hir::{DefId, HirItemKind, HirModule};
 use radix_lexer::Symbol;
-use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
     /// Conversation-family identity of a compiler-owned frame struct.
@@ -116,7 +116,7 @@ impl super::FaberCodegen<'_> {
         &self,
         hir: &HirModule,
     ) -> FxHashMap<DefId, String> {
-        let mut counts: rustc_hash::FxHashMap<Symbol, usize> = rustc_hash::FxHashMap::default();
+        let mut counts: handroll::FxHashMap<Symbol, usize> = handroll::FxHashMap::default();
         for item in &hir.items {
             if let HirItemKind::Enum(enm) = &item.kind {
                 for variant in &enm.variants {
@@ -148,10 +148,10 @@ impl super::FaberCodegen<'_> {
     pub(super) fn imported_variants_needing_union_path(
         &self,
         hir: &HirModule,
-    ) -> rustc_hash::FxHashSet<DefId> {
+    ) -> handroll::FxHashSet<DefId> {
         // spelling "ns.Union.VARIANT" → (namespace, variant name) pairs.
-        let mut namespaces_by_variant: rustc_hash::FxHashMap<&str, rustc_hash::FxHashSet<&str>> =
-            rustc_hash::FxHashMap::default();
+        let mut namespaces_by_variant: handroll::FxHashMap<&str, handroll::FxHashSet<&str>> =
+            handroll::FxHashMap::default();
         let mut defs_by_spelling: Vec<(DefId, &str)> = Vec::new();
         for (def_id, spelling) in &self.imported_pattern_spellings {
             let parts: Vec<&str> = spelling.split('.').collect();
@@ -166,7 +166,7 @@ impl super::FaberCodegen<'_> {
                 .insert(namespace);
             defs_by_spelling.push((*def_id, variant));
         }
-        let local_variant_names: rustc_hash::FxHashSet<&str> = hir
+        let local_variant_names: handroll::FxHashSet<&str> = hir
             .items
             .iter()
             .filter_map(|item| match &item.kind {

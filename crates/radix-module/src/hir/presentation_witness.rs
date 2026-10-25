@@ -4,9 +4,9 @@
 //! formatter and the Faber target re-emit through the same reconciliation and
 //! must not need the `hir-fhir` artifact feature.
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_item, walk_method, walk_pattern};
 use radix_types::{AppliedArg, Type, TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 // ── Authored presentation witness reconciliation ─────────────────────────
 

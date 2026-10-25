@@ -6,10 +6,10 @@ use crate::{
     MirTerminator, MirTerminatorKind, MirType, MirValidationContext, MirValue, MirValueId,
     MirValueKind,
 };
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
 
 fn family_marker_function(op: Option<MirCollectionOp>) -> MirFunction {
     let ty = MirType::semantic(TypeId(0));

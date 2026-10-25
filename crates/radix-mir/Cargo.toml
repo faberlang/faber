@@ -14,7 +14,6 @@ radix-lexer = { path = "../radix-lexer" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-syntax = { path = "../radix-syntax" }
 radix-types = { path = "../radix-types" }
-rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
 # DDCP3-U4 (c): the execution-descriptor identity domain is a distinct typed
 # domain from artifact identity — a collision-resistant digest (never FNV).

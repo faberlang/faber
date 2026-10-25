@@ -66,8 +66,8 @@ use crate::{
 // collection-op types remain in scope for the `#[path]` test module.
 #[cfg(test)]
 use crate::{MirCollectionOp, MirIntrinsic, MirRuntimeCall};
+use handroll::FxHashSet;
 use radix_types::{Type, TypeId, TypeTable};
-use rustc_hash::FxHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 
 const PD18_MAX_CANDIDATES: usize = 25;

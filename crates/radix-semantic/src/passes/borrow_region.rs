@@ -6,6 +6,7 @@
 
 use super::borrow_region_cfg::{CfgError, CfgLocation, CfgNodeId, HirCfg, build_cfg};
 use crate::{AccessFactTable, AccessMarker, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirId, HirItemKind, HirLocal, HirModule,
@@ -15,7 +16,6 @@ use radix_intrinsics::lookup_method_for_type_id;
 use radix_lexer::Interner;
 use radix_lexer::Span;
 use radix_types::{RegionRelationship, ReturnedBorrowProvenance};
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::VecDeque;
 
 /// Borrow flavor tracked by a region.

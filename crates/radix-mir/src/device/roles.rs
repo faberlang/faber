@@ -4,9 +4,9 @@ use crate::{
     MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage,
     MirLocalId, MirProgram, MirSyntheticFunctionIdentity,
 };
+use handroll::FxHashMap;
 use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
 use radix_lexer::Interner;
-use rustc_hash::FxHashMap;
 
 /// Explicit device facts for a source-derived or source-less function.
 ///

@@ -12,7 +12,7 @@ use crate::hir::{DefId, HirFunction};
 use crate::mir::*;
 use crate::semantic::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
 use crate::test_support::test_span;
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 
 fn atomic_u32_type(types: &mut TypeTable) -> MirType {
     let element = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);

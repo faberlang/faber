@@ -35,6 +35,7 @@
 use super::method_receiver_mutation::{self, MutatingMethods};
 use crate::init_state::InitState;
 use crate::{Resolver, SemanticError, SemanticErrorKind, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirBlock, HirCape, HirCasuArm, HirExpression, HirExpressionKind, HirFunction, HirItem,
@@ -42,7 +43,6 @@ use radix_hir::{
     HirStatementKind,
 };
 use radix_lexer::{Interner, Symbol};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
 /// R2: the left side of `⇇` is a `fixum` binding or a non-`mut` parameter.

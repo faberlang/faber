@@ -66,6 +66,7 @@ use crate::{
     ShapeRelationBoundary, Type, TypeId, TypeParamConstraint, TypeTable, WarningKind,
     types::InferVar,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
     HirConversioTarget, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
@@ -76,7 +77,6 @@ use radix_hir::{
 use radix_lexer::{Interner, Symbol};
 use radix_target::Target;
 use radix_types::RuntimeExtentId;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 
 pub mod access;

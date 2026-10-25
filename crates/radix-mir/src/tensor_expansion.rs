@@ -11,7 +11,7 @@ use crate::{
     MirCollectionOp, MirFunction, MirIntrinsic, MirOperand, MirRuntimeCall, MirStatementKind,
     MirValidationContext, MirValueKind,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
+use handroll::{FxHashMap, FxHashSet};
 
 /// Source-axis mapping for a concrete, explicitly requested tensor expansion.
 #[derive(Debug, Clone, PartialEq, Eq)]

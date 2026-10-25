@@ -6,6 +6,7 @@
 //! dropped `omnia` would silently rewrite the author's source.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     HirBlock, HirBreakableKind, HirCape, HirExpression, HirExpressionKind, HirId, HirLiteral,
@@ -14,7 +15,6 @@ use radix_hir::{
 use radix_lexer::{Interner, KeywordPack, Span, Symbol, TokenKind};
 use radix_syntax::StmtKind;
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
-use rustc_hash::FxHashMap;
 
 struct LatinSurface;
 

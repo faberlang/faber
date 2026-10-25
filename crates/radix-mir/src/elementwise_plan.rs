@@ -16,9 +16,9 @@ use crate::{
     MirStatement, MirStatementKind, MirTempId, MirType, MirUnOp, MirValidationContext,
     MirValueKind, collection_ops::statement_collection_op,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Span;
 use radix_types::Type;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt;
 
 /// One typed input of an [`ElementwisePlan`].

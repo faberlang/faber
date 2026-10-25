@@ -6,8 +6,8 @@
 pub use radix_types::{IndexExpr, IndexId, IndexVar, RuntimeExtentId};
 
 use crate::{Type, TypeId, TypeTable};
+use handroll::FxHashMap;
 use radix_lexer::Symbol;
-use rustc_hash::FxHashMap;
 
 /// Substitute declared type parameters in an alias body with lowered arguments.
 ///

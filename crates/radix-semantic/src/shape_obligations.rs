@@ -6,9 +6,9 @@
 //! route.
 
 use crate::IndexId;
+use handroll::FxHashMap;
 use radix_hir::{DefId, HirId};
 use radix_lexer::Span;
-use rustc_hash::FxHashMap;
 
 /// Equality required between two dimension expressions at a runtime boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

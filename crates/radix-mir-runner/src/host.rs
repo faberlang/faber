@@ -1,9 +1,9 @@
 #![allow(clippy::needless_lifetimes)]
 
 use super::{MapKey, RunnerError, Value};
+use handroll::FxHashMap;
 use radix_lexer::{Interner, Span};
 use radix_mir::{MirDiagnosticKind, MirProvider, MirProviderKind};
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io::{self, BufRead, IsTerminal, Read, Write};

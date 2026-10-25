@@ -18,12 +18,12 @@
 
 use super::statica;
 use crate::{Resolver, SemanticError, TypeTable};
+use handroll::FxHashSet;
 use radix_hir::visit::{HirVisitor, walk_local, walk_program};
 use radix_hir::{
     DefId, HirConst, HirId, HirItem, HirItemKind, HirLocal, HirModule, HirPresentation, HirStatic,
 };
 use radix_lexer::Interner;
-use rustc_hash::FxHashSet;
 
 /// Evaluate every local compile-time constant and report the ones that are
 /// not constant or do not fit their type.

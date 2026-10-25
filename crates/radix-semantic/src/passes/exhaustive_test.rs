@@ -13,11 +13,11 @@ use crate::SemanticError;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
 use crate::{DefId, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::{
     HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirItem, HirItemKind, HirLiteral,
     HirModule, HirPattern, HirStatement, HirStatementKind, HirVariant, HirVariantField,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 
 fn expect_structured_error<'a>(
     errors: &'a [SemanticError],

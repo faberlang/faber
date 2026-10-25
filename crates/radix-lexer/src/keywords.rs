@@ -31,7 +31,7 @@
 use std::mem;
 use std::sync::OnceLock;
 
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 
 use super::token::TokenKind;
 
@@ -1557,7 +1557,7 @@ fn keyword_by_text() -> &'static FxHashMap<&'static str, &'static KeywordSpec> {
     static MAP: OnceLock<FxHashMap<&'static str, &'static KeywordSpec>> = OnceLock::new();
     MAP.get_or_init(|| {
         let mut map =
-            FxHashMap::with_capacity_and_hasher(KEYWORD_SPECS.len(), rustc_hash::FxBuildHasher);
+            FxHashMap::with_capacity_and_hasher(KEYWORD_SPECS.len(), handroll::FxBuildHasher);
         for spec in KEYWORD_SPECS {
             map.insert(spec.text, spec);
         }
@@ -1578,7 +1578,7 @@ fn keyword_by_kind() -> &'static FxHashMap<mem::Discriminant<TokenKind>, &'stati
         OnceLock::new();
     MAP.get_or_init(|| {
         let mut map =
-            FxHashMap::with_capacity_and_hasher(KEYWORD_SPECS.len(), rustc_hash::FxBuildHasher);
+            FxHashMap::with_capacity_and_hasher(KEYWORD_SPECS.len(), handroll::FxBuildHasher);
         for spec in KEYWORD_SPECS {
             if let Some(kind) = &spec.token_kind {
                 map.insert(mem::discriminant(kind), spec);

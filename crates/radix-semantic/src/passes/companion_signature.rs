@@ -36,9 +36,9 @@ use crate::{
     FuncSig, ParamType, Primitive, RadixLaneMetadata, Resolver, SemanticParamMode, Type, TypeId,
     TypeTable,
 };
+use handroll::FxHashMap;
 use radix_hir::{DefId, HirItemKind, HirTypeParam};
 use radix_lexer::Interner;
-use rustc_hash::FxHashMap;
 
 /// Companion signatures ready for typecheck's `collect_items` registration.
 #[derive(Debug, Clone, Default)]

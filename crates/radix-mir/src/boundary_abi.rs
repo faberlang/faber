@@ -75,8 +75,8 @@ use crate::{
     MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId, MirType, MirValidationContext,
     MirValueId, MirValueKind,
 };
+use handroll::FxHashMap;
 use radix_types::Type;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

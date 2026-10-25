@@ -11,8 +11,8 @@ use crate::{
     MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
     MirValidationContext, MirValue, MirValueId, MirValueKind,
 };
+use handroll::FxHashMap;
 use radix_types::TypeTable;
-use rustc_hash::FxHashMap;
 
 /// A tuple-returning source whose UNRELATED aggregate is a LIVE tuple TEMP
 /// (the rule-3 fail-closed case): the result aggregation local (built by

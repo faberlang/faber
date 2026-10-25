@@ -9,6 +9,7 @@
 use crate::surface::{KeywordSurface, TypeBindingKind};
 
 use crate::{FaberCodegen, empty_presentation};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirBlock, HirCallArg, HirCasuArm,
@@ -21,7 +22,6 @@ use radix_syntax::{CallablePosture, GenericParamKind, JsonMember, JsonValue, Vis
 use radix_types::{
     FuncSig, IndexExpr, NumericWidth, ParamType, Primitive, SemanticParamMode, Type, TypeTable,
 };
-use rustc_hash::FxHashMap;
 
 #[test]
 fn generic_applied_arg_preserves_index_kind() {

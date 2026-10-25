@@ -23,8 +23,8 @@ use crate::nodes::{
     HirStatementKind,
 };
 use crate::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
+use handroll::{FxHashMap, FxHashSet};
 use radix_types::DefId;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Capture facts for one callable body (or a whole module).
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

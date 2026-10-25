@@ -17,7 +17,6 @@ radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-types = { path = "../radix-types" }
 regex = "1"
 regex-syntax = "0.8"
-rustc-hash = "2"
 # WHY: `arbitrary_precision` keeps the digit string of a JSON number so an
 # integer token of any length reaches `inf` (inf-delivery-spec ruling 40, U8a).
 serde_json = { version = "1", features = ["arbitrary_precision"] }

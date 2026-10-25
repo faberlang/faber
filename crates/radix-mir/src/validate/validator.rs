@@ -14,10 +14,10 @@ use crate::{
     MirBlock, MirBlockId, MirFunction, MirFunctionId, MirFunctionIndex, MirGenericBindings,
     MirLocal, MirLocalId, MirParam, MirProgram, MirTemp, MirTempId, MirType, MirValueId,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::Span;
 use radix_types::FuncSig;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Validated MIR program proof — the type-level gate for all public MIR entry points.
 ///

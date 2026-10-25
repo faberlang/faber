@@ -85,11 +85,11 @@ fn unbounded_octeti_primitive_stays_opaque() {
 // compilation, and the runtime assertions pin the corrected census
 // (14 physical / 6 opaque-agg / 24 OpaqueHandle-by-design / 5 internal).
 
+use handroll::FxHashMap;
 use radix_lexer::Symbol as LexSymbol;
 use radix_types::{
     DefId, FuncSig, InferVar, InstansPrecision, MarkerFamily, NumericWidth, SemanticMutability,
 };
-use rustc_hash::FxHashMap;
 
 /// The four census buckets (goal census table; the sized-numeric row is a
 /// Physical census seat — its unmapped widths are loud errors, not opaques).

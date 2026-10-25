@@ -5,11 +5,11 @@ use super::*;
 use crate::cursor::GeneratorCursor;
 use crate::host::BufferHost;
 use crate::sermo::SermoValue;
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{MirProgram, MirType, MirValidationContext};
 use radix_types::{Type, TypeTable};
-use rustc_hash::FxHashMap;
 
 const FRAME: DefId = DefId(1);
 const STATUS: DefId = DefId(2);

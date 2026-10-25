@@ -6,7 +6,7 @@
 
 use crate::artifact::HirArtifact;
 use crate::error::HirArtifactError;
-use rustc_hash::{FxHashMap, FxHashSet};
+use handroll::{FxHashMap, FxHashSet};
 
 // ---------------------------------------------------------------------------
 // Authored type-site inventory and form validation (ATF-5)

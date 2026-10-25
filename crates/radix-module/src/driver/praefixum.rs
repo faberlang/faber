@@ -294,17 +294,17 @@ mod evaluation {
     /// `install_value` replaces the initializer, every node of the authored body
     /// leaves the live HIR.
     struct DeadNodes {
-        hirs: rustc_hash::FxHashSet<HirId>,
-        defs: rustc_hash::FxHashSet<DefId>,
-        block_ends: rustc_hash::FxHashSet<HirSourceAnchorId>,
+        hirs: handroll::FxHashSet<HirId>,
+        defs: handroll::FxHashSet<DefId>,
+        block_ends: handroll::FxHashSet<HirSourceAnchorId>,
     }
 
     impl DeadNodes {
         fn of(body: &HirExpression) -> DeadNodes {
             let mut dead = DeadNodes {
-                hirs: rustc_hash::FxHashSet::default(),
-                defs: rustc_hash::FxHashSet::default(),
-                block_ends: rustc_hash::FxHashSet::default(),
+                hirs: handroll::FxHashSet::default(),
+                defs: handroll::FxHashSet::default(),
+                block_ends: handroll::FxHashSet::default(),
             };
             dead.visit_expr(body);
             dead
@@ -402,7 +402,7 @@ mod evaluation {
                 Some(HirOwnerRef::Def(id)) => !dead.defs.contains(id),
                 None => owner.kind != radix_hir::HirTriviaOwnerKind::BlockEnd || !dead.block_ends.contains(&owner.id),
             });
-        let live_anchors: rustc_hash::FxHashSet<_> = unit
+        let live_anchors: handroll::FxHashSet<_> = unit
             .presentation
             .owners
             .iter()

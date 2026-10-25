@@ -6,13 +6,13 @@
 //! Emission only — annotation analysis belongs in semantic phases.
 
 use crate::surface::KeywordSurface;
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirExpression, HirExpressionKind,
     HirLiteral, HirOwnerRef, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Symbol, Token, TokenKind, lookup_keyword_spec};
-use rustc_hash::FxHashMap;
 
 // Registered here, not in `lib.rs`, so the module stays beside its subject.
 #[cfg(test)]

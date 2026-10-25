@@ -22,9 +22,9 @@
 
 use crate::visit::{HirVisitor, walk_expr};
 use crate::{DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule};
+use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Symbol;
 use radix_types::{Type, TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Per-function dependency evidence collected in one HIR walk.
 #[derive(Default)]

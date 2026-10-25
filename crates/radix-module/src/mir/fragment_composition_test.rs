@@ -16,7 +16,7 @@ use crate::mir::{
 };
 use crate::semantic::TypeTable;
 use crate::test_support::{test_span, test_span_between};
-use rustc_hash::{FxHashMap, FxHashSet};
+use handroll::{FxHashMap, FxHashSet};
 
 /// Plain-wrapper stand-in for the deleted production `compose` (merge-16):
 /// the tests exercise composition without an explicit metadata carrier.

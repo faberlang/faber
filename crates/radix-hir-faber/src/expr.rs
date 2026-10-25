@@ -30,6 +30,7 @@
 //! hardcoded `secus` (`e0fbae339`) is not a valid particle.
 
 use crate::surface::{FrameFamily, KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
@@ -39,7 +40,6 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_types::{Primitive, Type, TypeId};
-use rustc_hash::FxHashMap;
 
 use crate::ops::binop_left_associative;
 

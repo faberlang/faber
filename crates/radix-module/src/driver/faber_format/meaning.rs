@@ -19,10 +19,10 @@
 //! could silently skip a new field.
 
 use crate::driver::AnalyzedModule;
+use handroll::FxHashMap;
 use radix_hir::visit::{HirVisitorMut, walk_expr_mut};
 use radix_hir::{HirExpression, HirExpressionKind, HirLiteral};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
-use rustc_hash::FxHashMap;
 use std::fmt::Write as _;
 
 /// Renumbered id families. Each family gets its own first-occurrence counter.

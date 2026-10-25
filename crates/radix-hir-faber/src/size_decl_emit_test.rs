@@ -7,6 +7,7 @@
 
 use super::*;
 use crate::FaberCodegen;
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirLocal, HirModule,
@@ -15,7 +16,6 @@ use radix_hir::{
 use radix_lexer::{Interner, KeywordPack, Span, TokenKind};
 use radix_syntax::StmtKind;
 use radix_types::{DefId, TypeTable};
-use rustc_hash::FxHashMap;
 
 /// English reader surface (`en`): the pack's `size`/`const` spellings.
 struct EnSurface;

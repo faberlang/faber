@@ -413,7 +413,7 @@ fn tuple_value_keys_by_its_parts_and_reads_back() {
 
 fn field_map(
     pairs: &[(radix_lexer::Symbol, Value)],
-) -> std::rc::Rc<std::cell::RefCell<rustc_hash::FxHashMap<radix_lexer::Symbol, Value>>> {
+) -> std::rc::Rc<std::cell::RefCell<handroll::FxHashMap<radix_lexer::Symbol, Value>>> {
     std::rc::Rc::new(std::cell::RefCell::new(pairs.iter().cloned().collect()))
 }
 
@@ -433,7 +433,7 @@ fn record_displays_fields_in_written_order() {
         ]),
         std::rc::Rc::from([zed, alpha, mid]),
     );
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let text = record
         .display(&interner, FieldOrder::new(&empty, &empty), Span::default())
         .unwrap();
@@ -448,7 +448,7 @@ fn record_with_text_field_quotes_it() {
         field_map(&[(name, Value::Str("x".to_owned())), (n, Value::Int(3))]),
         std::rc::Rc::from([name, n]),
     );
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let text = record
         .display(&interner, FieldOrder::new(&empty, &empty), Span::default())
         .unwrap();
@@ -462,7 +462,7 @@ fn empty_record_prints_empty_braces() {
         field_map(&[]),
         std::rc::Rc::from(Vec::<radix_lexer::Symbol>::new()),
     );
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let text = record
         .display(&interner, FieldOrder::new(&empty, &empty), Span::default())
         .unwrap();
@@ -485,7 +485,7 @@ fn record_through_dynamic_carrier_keeps_json_shape() {
         ]),
         std::rc::Rc::from([zed, alpha, mid]),
     );
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let text = record
         .display(
             &interner,
@@ -509,8 +509,8 @@ fn enum_variant_displays_payload_in_declaration_order() {
         variant_def,
         field_map(&[(x, Value::Int(1)), (y, Value::Int(2)), (z, Value::Int(3))]),
     );
-    let structs = rustc_hash::FxHashMap::default();
-    let mut variants = rustc_hash::FxHashMap::default();
+    let structs = handroll::FxHashMap::default();
+    let mut variants = handroll::FxHashMap::default();
     variants.insert(variant_def, vec![z, x, y]);
     let mut names = DisplayNames::default();
     names.insert(variant_def, "Nuntius.Pulsus".to_owned());
@@ -826,7 +826,7 @@ fn unnamed_variant_and_dynamic_struct_keep_json_shaped_display() {
 #[test]
 fn f32_interpolation_matches_print_at_declared_width() {
     let interner = radix_lexer::Interner::new();
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let order = FieldOrder::new(&empty, &empty);
     let value = Value::Float(f64::from(200.0_f32 / 3.0_f32));
     let printed = value
@@ -866,8 +866,8 @@ fn f32_struct_field_and_list_display_at_declared_width() {
     let mut interner = radix_lexer::Interner::new();
     let field = interner.intern("a");
     let def = radix_hir::DefId(9);
-    let structs = rustc_hash::FxHashMap::default();
-    let variants = rustc_hash::FxHashMap::default();
+    let structs = handroll::FxHashMap::default();
+    let variants = handroll::FxHashMap::default();
     let mut widths = FieldFloatWidths::default();
     widths.insert((def, field), NumericWidth::F32);
     let mut names = DisplayNames::default();
@@ -914,8 +914,8 @@ fn d64_display_threads_through_lists_fields_and_templates() {
     let mut interner = radix_lexer::Interner::new();
     let field = interner.intern("price");
     let def = radix_hir::DefId(11);
-    let structs = rustc_hash::FxHashMap::default();
-    let variants = rustc_hash::FxHashMap::default();
+    let structs = handroll::FxHashMap::default();
+    let variants = handroll::FxHashMap::default();
     let mut widths = FieldFloatWidths::default();
     widths.insert((def, field), NumericWidth::D64);
     let mut names = DisplayNames::default();
@@ -1395,10 +1395,10 @@ fn ledger_value_eq_different_value_is_unequal() {
 
 #[test]
 fn ledger_value_eq_map_ignores_order() {
-    let mut first = rustc_hash::FxHashMap::default();
+    let mut first = handroll::FxHashMap::default();
     first.insert(MapKey::Str("b".to_owned()), Value::Int(1));
     first.insert(MapKey::Str("a".to_owned()), Value::Int(2));
-    let mut second = rustc_hash::FxHashMap::default();
+    let mut second = handroll::FxHashMap::default();
     second.insert(MapKey::Str("a".to_owned()), Value::Int(2));
     second.insert(MapKey::Str("b".to_owned()), Value::Int(1));
     let left = Value::Map(Rc::new(RefCell::new(first)));
@@ -1409,7 +1409,7 @@ fn ledger_value_eq_map_ignores_order() {
 #[test]
 fn ledger_value_display_follows_insertion_order() {
     let interner = radix_lexer::Interner::new();
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let order = FieldOrder::new(&empty, &empty);
     let value = ledger_value_eq_fixture(&[("b", 2), ("a", 1), ("c", 3)]);
     assert_eq!(
@@ -1421,7 +1421,7 @@ fn ledger_value_display_follows_insertion_order() {
 #[test]
 fn ledger_value_display_after_remove_and_readd() {
     let interner = radix_lexer::Interner::new();
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let order = FieldOrder::new(&empty, &empty);
     let mut ledger = LedgerValue::new();
     ledger.insert(MapKey::Str("a".to_owned()), Value::Int(1));
@@ -1456,7 +1456,7 @@ fn enum_variant_map_key_distinct_defs_distinct() {
     let first = MapKey::Enum(radix_hir::DefId(6101), Vec::new());
     let second = MapKey::Enum(radix_hir::DefId(6102), Vec::new());
     assert_ne!(first, second);
-    let mut map = rustc_hash::FxHashMap::default();
+    let mut map = handroll::FxHashMap::default();
     map.insert(first.clone(), Value::Int(1));
     map.insert(second.clone(), Value::Int(2));
     assert_eq!(map.get(&first), Some(&Value::Int(1)));
@@ -1469,7 +1469,7 @@ fn enum_variant_map_key_distinct_defs_distinct() {
 #[test]
 fn interval_displays_its_construction_literal() {
     let interner = radix_lexer::Interner::new();
-    let empty = rustc_hash::FxHashMap::default();
+    let empty = handroll::FxHashMap::default();
     let display = |value: &Value, order: FieldOrder<'_>| {
         value
             .display(&interner, order, Span::default())

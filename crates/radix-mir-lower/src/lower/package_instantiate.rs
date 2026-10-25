@@ -12,6 +12,7 @@ use super::{
     MirError, MirGenericParam, MirTensorEdgePolicyMetadata, MirTensorEdgePolicyProvider, MirTensorEdgePolicySelector,
     MirTensorLimesTemplate,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span};
 use radix_mir::device::MirDeviceFunctionMetadataMap;
@@ -31,7 +32,6 @@ use radix_semantic::file_interface::{
 };
 use radix_semantic::{IndexExpr, IndexId, Primitive, Type, TypeId, TypeTable};
 use radix_types::RuntimeExtentId;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::HashMap;
 
 const MAX_PACKAGE_MONOMORPHIZATIONS: usize = 64;

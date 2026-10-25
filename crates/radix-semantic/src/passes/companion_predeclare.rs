@@ -24,10 +24,10 @@
 
 use crate::radix_lane;
 use crate::{Resolver, SemanticError, SemanticErrorKind, Symbol, SymbolKind};
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol as LexSymbol};
 use radix_syntax::{Annotation, Program, StmtKind};
-use rustc_hash::FxHashMap;
 
 /// Pre-allocated backward companion identities ready for consumption by
 /// [`radix_lane::collect`].

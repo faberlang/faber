@@ -11,11 +11,11 @@ use crate::{
     MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator,
     MirTerminatorKind, MirType, MirValue, MirValueKind,
 };
+use handroll::{FxHashMap, FxHashSet, FxHasher};
 use radix_lexer::{Span, Symbol};
 use radix_types::{
     FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable, i64s_from_literal_index,
 };
-use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 

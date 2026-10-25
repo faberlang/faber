@@ -1310,7 +1310,7 @@ fn render_transpose(receiver: HirExpressionKind, glyph: bool) -> String {
     let mut writer = radix_codegen_shared::CodeWriter::new();
     codegen.write_expr(
         &call,
-        &rustc_hash::FxHashMap::default(),
+        &handroll::FxHashMap::default(),
         &TestSurface,
         &mut writer,
     );
@@ -1406,12 +1406,7 @@ fn render_rounding(method: &str, glyph: bool, surface: &impl KeywordSurface) -> 
         span: span(),
     };
     let mut writer = radix_codegen_shared::CodeWriter::new();
-    codegen.write_expr(
-        &call,
-        &rustc_hash::FxHashMap::default(),
-        surface,
-        &mut writer,
-    );
+    codegen.write_expr(&call, &handroll::FxHashMap::default(), surface, &mut writer);
     writer.finish()
 }
 
@@ -1481,7 +1476,7 @@ fn render_in_place_twin(unary: bool, recorded: bool) -> String {
     let mut writer = radix_codegen_shared::CodeWriter::new();
     codegen.write_expr(
         &assign,
-        &rustc_hash::FxHashMap::default(),
+        &handroll::FxHashMap::default(),
         &TestSurface,
         &mut writer,
     );

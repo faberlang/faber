@@ -7,10 +7,10 @@ use crate::{
     MirClosureValue, MirConstant, MirGenericBindings, MirNamedOperand, MirOperand, MirPlace,
     MirType,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{IndexExpr, Primitive, RuntimeExtentId, Type};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 impl Validator<'_, '_> {
     pub(crate) fn validate_aggregate(

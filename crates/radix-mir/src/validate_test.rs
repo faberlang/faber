@@ -12,13 +12,13 @@ use crate::{
     MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
     MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
 };
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{
     AppliedArg, FuncSig, IndexExpr, NumericWidth, ParamType, Primitive, RuntimeExtentId,
     SemanticParamMode, Type, TypeId, TypeTable,
 };
-use rustc_hash::FxHashMap;
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -5896,7 +5896,7 @@ fn ordered_variant_aggregate_rejects_payload_spread() {
 fn with_types_carries_struct_contracts() {
     let types = TypeTable::new();
     let mut context = MirValidationContext::new(&types);
-    let mut contracts = rustc_hash::FxHashSet::default();
+    let mut contracts = handroll::FxHashSet::default();
     contracts.insert(DefId(2));
     context.struct_contracts.insert(DefId(3), contracts);
 

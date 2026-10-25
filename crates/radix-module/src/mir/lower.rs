@@ -15,6 +15,8 @@ pub use radix_mir_lower::lower::*;
 
 // The moved module's imported scope, re-exported for its companion tests.
 #[cfg(test)]
+pub use handroll::{FxHashMap, FxHashSet};
+#[cfg(test)]
 pub use radix_hir::visit::{HirVisitor, walk_expr, walk_program};
 #[cfg(test)]
 pub use radix_hir::{
@@ -63,8 +65,6 @@ pub use radix_semantic::{
 };
 #[cfg(test)]
 pub use radix_types::{MirCollectionOp, MirKernelBuiltin, SemanticMutability};
-#[cfg(test)]
-pub use rustc_hash::{FxHashMap, FxHashSet};
 #[cfg(test)]
 pub use std::sync::{Arc, Mutex};
 

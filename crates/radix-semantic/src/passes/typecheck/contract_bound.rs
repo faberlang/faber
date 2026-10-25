@@ -13,10 +13,10 @@
 //!   bound (D1.3) — a genus whose `implet` clause names the contract with the
 //!   same arguments, or a caller's own type parameter carrying that bound.
 
+use handroll::FxHashMap;
 use radix_hir::{HirCallArg, HirTypeParam, HirTypeParamConstraint};
 use radix_lexer::Symbol;
 use radix_types::{AppliedArg, ContractRef, FuncSig, Type, TypeId, TypeParamConstraint};
-use rustc_hash::FxHashMap;
 
 use super::{InterfaceMethodInfo, TypeChecker};
 use crate::SemanticErrorKind;

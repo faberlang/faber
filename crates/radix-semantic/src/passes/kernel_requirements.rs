@@ -10,6 +10,7 @@ use crate::{
     NumericWidth, Primitive, ResolvedTensorEdgePolicy, Resolver, SemanticError, SemanticErrorKind,
     SymbolKind, TensorEdgePolicyTable, Type, TypeId, TypeTable,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirAnnotation, HirArrayElement, HirBinOp, HirBlock, HirExpression, HirExpressionKind,
@@ -19,7 +20,6 @@ use radix_hir::{
 use radix_lexer::{Interner, Span, Symbol};
 use radix_target::Target;
 use radix_types::{IndexExpr, IndexId, evaluate_index_dimension};
-use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
 /// The current device backends for which rule 18 defines portable admission.

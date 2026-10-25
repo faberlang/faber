@@ -1326,7 +1326,7 @@ impl TypeChecker<'_> {
     }
 
     fn valor_extraction_contains_unsupported_sized_numeric(&self, target: TypeId) -> bool {
-        let mut seen = rustc_hash::FxHashSet::default();
+        let mut seen = handroll::FxHashSet::default();
         self.valor_extraction_type_needs_missing_width_runtime(target, false, &mut seen)
     }
 
@@ -1336,14 +1336,14 @@ impl TypeChecker<'_> {
     /// walk mirrors [`Self::valor_extraction_type_needs_missing_width_runtime`]
     /// so nested `lista<tabula<numerus, V>>` shapes cannot slip through.
     fn valor_extraction_contains_non_textus_map_key(&self, ty: TypeId) -> bool {
-        let mut seen = rustc_hash::FxHashSet::default();
+        let mut seen = handroll::FxHashSet::default();
         self.valor_extraction_type_has_non_textus_map_key(ty, &mut seen)
     }
 
     fn valor_extraction_type_has_non_textus_map_key(
         &self,
         ty: TypeId,
-        seen: &mut rustc_hash::FxHashSet<TypeId>,
+        seen: &mut handroll::FxHashSet<TypeId>,
     ) -> bool {
         let resolved = self.resolve_inferred_type(ty);
         if !seen.insert(resolved) {
@@ -1394,7 +1394,7 @@ impl TypeChecker<'_> {
         &self,
         ty: TypeId,
         inside_from_valor_runtime: bool,
-        seen: &mut rustc_hash::FxHashSet<(TypeId, bool)>,
+        seen: &mut handroll::FxHashSet<(TypeId, bool)>,
     ) -> bool {
         let resolved = self.resolve_inferred_type(ty);
         if !seen.insert((resolved, inside_from_valor_runtime)) {
@@ -2484,7 +2484,7 @@ impl TypeChecker<'_> {
     }
 
     fn index_shapes_unify(&mut self, from_shape: crate::IndexId, to_shape: crate::IndexId) -> bool {
-        let mut subs = rustc_hash::FxHashMap::default();
+        let mut subs = handroll::FxHashMap::default();
         let mut index_unifier = crate::IndexUnifier::new(self.types, &mut subs);
         index_unifier.unify(from_shape, to_shape).is_ok()
     }

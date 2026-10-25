@@ -7,8 +7,8 @@
 use super::{IndexUnifier, IndexUnifyError};
 use crate::TypeTable;
 use crate::index::{IndexExpr, IndexVar};
+use handroll::FxHashMap;
 use radix_lexer::Symbol;
-use rustc_hash::FxHashMap;
 
 fn lit(types: &mut TypeTable, n: u64) -> crate::IndexId {
     types.intern_index(IndexExpr::Literal(n))

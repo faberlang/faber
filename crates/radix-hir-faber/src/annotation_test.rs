@@ -5,11 +5,11 @@
 //! the way `format_float_literal` does.
 
 use crate::{FaberCodegen, KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{HirAnnotation, HirAnnotationField, HirAnnotationValue};
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_types::TypeTable;
-use rustc_hash::FxHashMap;
 
 struct PlainSurface;
 

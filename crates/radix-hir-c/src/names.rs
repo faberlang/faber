@@ -13,8 +13,8 @@
 //! (`l_size_t`). A block-scope variable cannot be broken by a later typedef of
 //! that name, and no header defines an `l_`/`p_` type, so it is accepted.
 
+use handroll::FxHashSet;
 use radix_codegen_shared::sanitize_ident;
-use rustc_hash::FxHashSet;
 
 /// Claims unique identifiers within one C scope. C identifiers are
 /// case-sensitive, so uniqueness is exact.

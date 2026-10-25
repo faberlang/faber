@@ -14,6 +14,7 @@ use crate::Local;
 use crate::error::unsupported;
 use crate::expr::{Operand, Value};
 use crate::ty::Ty;
+use handroll::FxHashSet;
 use radix_codegen_shared::CodegenError;
 use radix_codegen_shared::names::prefixed_binding_name;
 use radix_hir::visit::{HirVisitor, walk_stmt};
@@ -22,7 +23,6 @@ use radix_hir::{
     HirStatementKind,
 };
 use radix_lexer::Symbol;
-use rustc_hash::FxHashSet;
 
 /// One scrutinee, held in a temporary.
 struct Subject {

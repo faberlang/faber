@@ -1,11 +1,11 @@
 use super::*;
+use handroll::FxHashSet;
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
     HirIteraMode, HirLocal, HirModule, HirParam, HirParamMode, HirStatement, HirStatementKind,
 };
 use radix_lexer::Span;
 use radix_types::TypeId;
-use rustc_hash::FxHashSet;
 
 // PRP-025: resolve_def must return Err for unknown DefId, not a sentinel.
 #[test]

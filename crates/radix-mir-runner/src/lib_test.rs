@@ -199,13 +199,13 @@ fn scalar_mut_param_propagates_through_runner_frames() {
 #[test]
 fn scalar_mut_param_field_projection_writes_back_through_runner_frames() {
     use crate::host::BufferHost;
+    use handroll::FxHashMap;
     use radix_lexer::Interner;
     use radix_mir::{
         MirLocal, MirParam, MirParamMode, MirStatement, MirStatementKind, MirTerminator,
         MirTerminatorKind, MirValue, MirValueKind,
     };
     use radix_types::{Primitive, TypeTable};
-    use rustc_hash::FxHashMap;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -331,6 +331,7 @@ fn scalar_mut_param_field_projection_writes_back_through_runner_frames() {
 #[test]
 fn closure_capture_projection_write_updates_environment_slot() {
     use crate::host::BufferHost;
+    use handroll::FxHashMap;
     use radix_lexer::Interner;
     use radix_mir::{
         MirCaptureMode, MirClosureCapture, MirClosureEnvironment, MirClosureEnvironmentId,
@@ -338,7 +339,6 @@ fn closure_capture_projection_write_updates_environment_slot() {
         MirValidationContext, MirValue, MirValueKind,
     };
     use radix_types::{Primitive, TypeTable};
-    use rustc_hash::FxHashMap;
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -3691,11 +3691,11 @@ fn width_checked_add_u64_above_i64_max_fails_closed() {
 #[test]
 fn f083_optional_variant_field_nil_fallback() {
     use crate::host::BufferHost;
+    use handroll::{FxHashMap, FxHashSet};
     use radix_hir::DefId;
     use radix_lexer::{Interner, Symbol};
     use radix_mir::{MirBlockId, MirProgram, MirValidationContext};
     use radix_types::TypeTable;
-    use rustc_hash::{FxHashMap, FxHashSet};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -3744,11 +3744,11 @@ fn f083_optional_variant_field_nil_fallback() {
 #[test]
 fn f083_required_variant_field_errors() {
     use crate::host::BufferHost;
+    use handroll::FxHashMap;
     use radix_hir::DefId;
     use radix_lexer::{Interner, Symbol};
     use radix_mir::{MirBlockId, MirProgram, MirValidationContext};
     use radix_types::TypeTable;
-    use rustc_hash::FxHashMap;
     use std::cell::RefCell;
     use std::rc::Rc;
 

@@ -5,11 +5,11 @@
 
 use crate::qualified_identity::QualifiedIdentityTable;
 use crate::{Type, TypeId, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_pattern};
 use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirItemKind, HirLocal, HirModule, HirParam, HirPattern,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
 /// One resolved use of a definition or portable import.

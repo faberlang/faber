@@ -4,8 +4,8 @@
 //! the emitters skip (S5-U2c).
 
 use crate::{MirFunction, MirLocalId, MirPlaceBase, MirTempId, MirType};
+use handroll::FxHashSet;
 use radix_types::{Type, TypeTable};
-use rustc_hash::FxHashSet;
 
 /// The dead fold-artifact slots of one function (S5-W-A1): the local and
 /// temp destinations of `Array`/`Tensor` constructs that no statement or

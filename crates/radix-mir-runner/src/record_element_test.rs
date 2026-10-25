@@ -46,7 +46,7 @@ fn with_runner<T>(body: impl FnOnce(&mut crate::Runner<'_, crate::host::BufferHo
 }
 
 fn block(scale: Symbol, values: Symbol, def: DefId, scale_value: f64, cells: &[i64]) -> Value {
-    let mut fields = rustc_hash::FxHashMap::default();
+    let mut fields = handroll::FxHashMap::default();
     fields.insert(scale, Value::Float(scale_value));
     fields.insert(
         values,

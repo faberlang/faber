@@ -6,6 +6,7 @@
 //! `ex` lockstep mode and never a collapsed single source.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirId, HirIteraMode, HirLiteral, HirRangeKind,
@@ -13,7 +14,6 @@ use radix_hir::{
 use radix_lexer::{Interner, KeywordPack, Span, Symbol, TokenKind};
 use radix_syntax::{BindingPattern, IteraMode, StmtKind};
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
-use rustc_hash::FxHashMap;
 
 struct LatinSurface;
 

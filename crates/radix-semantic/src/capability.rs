@@ -10,6 +10,7 @@ use crate::access_facts::AccessFactTable;
 use crate::function_facts::{CaptureMode, FunctionFactTable};
 use crate::passes::borrow_region::RegionFacts;
 use crate::passes::visibility_annotation::VisibilityTier;
+use handroll::FxHashMap;
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirEnum, HirExpressionKind, HirFunction, HirId, HirItemKind, HirModule, HirStruct,
@@ -17,7 +18,6 @@ use radix_hir::{
 use radix_types::{
     AccessMarker, AppliedArg, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId,
 };
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 

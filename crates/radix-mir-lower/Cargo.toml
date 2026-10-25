@@ -39,7 +39,6 @@ radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-semantic = { path = "../radix-semantic" }
 radix-syntax = { path = "../radix-syntax" }
 radix-types = { path = "../radix-types" }
-rustc-hash = "2"
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }

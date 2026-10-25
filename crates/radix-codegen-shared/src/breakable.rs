@@ -20,11 +20,11 @@
 //! backend; only `fac` bodies with a pass-through `perge` change shape.
 
 use crate::CodeWriter;
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::HirVisitor;
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirId, HirStatement, HirStatementKind,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::{Cell, RefCell};
 
 /// Breakable-scope loop shape for each C-family backend.

@@ -7,8 +7,8 @@
 //! expression for them at the `limes` site.
 
 use crate::{DefId, HirId};
+use handroll::{FxHashMap, FxHashSet};
 use radix_types::{BuiltinTensorEdgePolicy, IndexId, TypeId};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// One statically selected policy for a shifted tensor view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

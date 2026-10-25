@@ -21,9 +21,9 @@ use crate::{
     ResolvedTensorEdgePolicy, Resolver, SemanticError, SemanticErrorKind, TensorEdgePolicyTable,
     TypeId, TypeTable, WarningKind,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::{DefId, HirAnnotation, HirFunction, HirItemKind, HirModule, NucleumRole};
 use radix_lexer::{Interner, Span, Symbol};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// A kernel body performs a host operation (I/O, console, conversation).
 pub const ISSUE_HOST_EFFECT: &str = "nucleum_host_effect";

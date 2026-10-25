@@ -3,11 +3,11 @@
 //! empty instances stay tight (`Session {}`).
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind, HirLiteral};
 use radix_lexer::{Interner, Span, Symbol, TokenKind};
 use radix_types::{DefId, TypeTable, USER_DEF_ID_BASE};
-use rustc_hash::FxHashMap;
 
 struct TestSurface;
 

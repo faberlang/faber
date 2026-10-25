@@ -70,6 +70,7 @@ use crate::{
     ParamType, Primitive, Resolver, SUGGESTION_COPY, SemanticError, SemanticErrorKind,
     SemanticParamMode, Type, TypeId, TypeTable, WarningKind,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem,
@@ -77,7 +78,6 @@ use radix_hir::{
 };
 use radix_intrinsics::{is_mutating_receiver, lookup_method_for_type_id};
 use radix_lexer::Interner;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_BORROW_OF_MOVED: &str = "borrow_of_moved";
 const ISSUE_CANNOT_MOVE_WHILE_BORROWED: &str = "cannot_move_while_borrowed";

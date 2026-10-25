@@ -12,7 +12,7 @@ use super::{
     HirAspectReport, HirAspectSpan,
 };
 use crate::hir::HirId;
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 
 #[cfg(test)]
 #[path = "coverage_test.rs"]

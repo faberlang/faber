@@ -20,9 +20,9 @@ pub mod tensor_edge_policy;
 mod unavailable;
 pub mod visit;
 
+use handroll::{FxHashMap, FxHashSet};
 pub use nodes::*;
 pub use radix_types::{DefId, TypeId};
-use rustc_hash::{FxHashMap, FxHashSet};
 pub use tensor_edge_policy::{
     ResolvedTensorEdgePolicy, TensorEdgePolicyProviderImpl, TensorEdgePolicyRequirement,
     TensorEdgePolicyTable, TensorShiftContext,

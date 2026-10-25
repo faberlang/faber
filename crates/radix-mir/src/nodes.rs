@@ -18,10 +18,10 @@
 //!   only terminators decide where control moves next.
 
 use crate::{MirAtomicOp, MirCollectionOp, MirKernelBuiltin, MirKernelShaderStage};
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{IndexId, TypeId};
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 /// Stable identifier for a MIR function within one `MirProgram`.

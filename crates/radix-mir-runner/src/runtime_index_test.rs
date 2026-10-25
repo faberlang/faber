@@ -2,13 +2,13 @@
 //! bounded-lista `est` tag check.
 
 use super::*;
+use handroll::FxHashMap;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirOperand, MirProgram,
     MirRuntimeCall, MirType, MirTypeCheckOp, MirValidationContext, MirValueId,
 };
 use radix_types::{IndexExpr, Primitive, TypeTable};
-use rustc_hash::FxHashMap;
 
 /// Index an empty `map<textus, element>` with `read` deciding the MIR call's declared result
 /// type from the element type.

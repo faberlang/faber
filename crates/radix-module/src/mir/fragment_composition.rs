@@ -4,6 +4,7 @@
 pub use radix_mir_lower::fragment_composition::*;
 
 // The moved file's import scope, re-exported for its companion tests.
+pub use handroll::{FxHashMap, FxHashSet};
 pub use radix_diagnostics::DiagnosticArg;
 pub use radix_hir::DefId;
 pub use radix_lexer::{Interner, Span};
@@ -16,7 +17,6 @@ pub use radix_mir::{
     MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 pub use radix_semantic::arg_value;
-pub use rustc_hash::{FxHashMap, FxHashSet};
 
 #[cfg(test)]
 #[path = "fragment_corpus_test.rs"]

@@ -7,13 +7,13 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
+handroll = { path = "../handroll" }
 radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-target = { path = "../radix-target" }
 radix-types = { path = "../radix-types" }
-rustc-hash = "2"
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }

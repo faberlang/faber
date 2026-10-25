@@ -34,7 +34,7 @@ use crate::{
     MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTempId, MirTerminatorKind,
     MirValue, MirValueKind,
 };
-use rustc_hash::FxHashSet;
+use handroll::FxHashSet;
 
 /// Every local read anywhere in the function (statements and terminators,
 /// across all blocks). Destinations are writes, never reads; an operand's

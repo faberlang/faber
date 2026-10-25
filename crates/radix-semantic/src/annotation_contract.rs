@@ -13,13 +13,13 @@
 //! - No framework/web semantics live here — only generic schema machinery.
 
 use crate::{Resolver, SemanticError, SemanticErrorKind, SymbolKind};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
     Annotation, AnnotationField, AnnotationFieldValue, AnnotationKind, BracedAnnotation, ClassDecl,
     ClassMemberKind, ExprKind, FieldDecl, Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Compiler-owned seed that marks a genus as an annotation contract.
 const FAMILY_ANNOTATIO: &str = "annotatio";

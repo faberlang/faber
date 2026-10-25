@@ -14,6 +14,7 @@
 //! - Symbols remain interned; text is resolved lazily through the shared
 //!   [`Interner`] owned by the compile session.
 
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_field, walk_item, walk_method};
 use radix_hir::{
     DefId, HirField, HirImportItem, HirItem, HirItemKind, HirMethod, HirModule, HirParam,
@@ -21,7 +22,6 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Symbol};
 pub use radix_runtime_contract::display_tokens::DisplayTokens;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Error returned when a `DefId` is not in the name catalog.
 #[derive(Debug, Clone, Copy)]

@@ -7,13 +7,13 @@
 use std::sync::LazyLock;
 
 use crate::{Resolver, SemanticError, SemanticErrorKind, SymbolKind, Type, TypeId, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirCape, HirExpression, HirExpressionKind, HirFunction,
     HirItemKind, HirLocal, HirModule, HirObjectField, HirObjectKey, HirStatement, HirStatementKind,
     NucleumRole,
 };
 use radix_lexer::{Interner, Span, Symbol};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 const ISSUE_EFFECT: &str = "nucleum_fragment_effect";
 const ISSUE_CONTEXT: &str = "nucleum_fragment_context";

@@ -7,13 +7,13 @@
 
 use crate::passes::companion_predeclare::CompanionPredeclarations;
 use crate::{Resolver, SemanticError, SemanticErrorKind};
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_syntax::{
     Annotation, AnnotationKind, AnnotationView, ClassMemberKind, InvalidAnnotationView, Program,
     StmtKind, braced_radix_lane_view_strict, braced_radix_typus_view_strict,
 };
-use rustc_hash::FxHashMap;
 
 /// Compiler lane requested by `@ radix lane "..."`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

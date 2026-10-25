@@ -10,10 +10,10 @@ use crate::{
     MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
     ValidatedMir, validate_program, validate_program_with_device_roles,
 };
+use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::Span;
 use radix_types::{Primitive, TypeTable};
-use rustc_hash::FxHashMap;
 
 const ENTRY: DefId = DefId(1);
 const FRAGMENT: DefId = DefId(2);

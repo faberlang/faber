@@ -30,6 +30,7 @@ use super::{Lowerer, issue_args};
 use crate::builtins::forma::{self as builtin_forma};
 use crate::template_holes::{TemplateHoleAnalysis, analyze_template};
 use crate::{Primitive, SemanticErrorKind, TypeId};
+use handroll::FxHashSet;
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
@@ -38,7 +39,6 @@ use radix_hir::{
 use radix_syntax::{
     BinaryExpr, Expr, ExprKind, GenericArgExpr, Literal, TypeExpr, TypeExprKind, UnaryExpr,
 };
-use rustc_hash::FxHashSet;
 
 /// The parser's private method name for the source-only `ᵀ` suffix (the same
 /// spelling typecheck rewrites to the transpose intrinsic).

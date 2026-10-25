@@ -17,7 +17,7 @@ use super::air_purity_proof::{GateHoleIssue, GatePurityFinding, PurityTerm, gate
 use super::air_unroll_proof::{UnrollRoute, unroll_route_facts};
 use crate::semantic::TypeTable;
 use crate::semantic::passes::exhaustive::{collect_enum_variants, enum_def_from_type, pattern_variant_id};
-use rustc_hash::{FxHashMap, FxHashSet};
+use handroll::{FxHashMap, FxHashSet};
 
 #[cfg(test)]
 #[path = "report_test.rs"]

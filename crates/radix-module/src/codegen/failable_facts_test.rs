@@ -8,7 +8,7 @@
 use super::failable_facts;
 use crate::hir::DefId;
 use crate::semantic::{FunctionFact, FunctionFactTable, TypeId};
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 
 /// A failable def with a declared error type contributes to both parts; a
 /// failable def without one and a plain non-failable def stay out of the parts

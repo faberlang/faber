@@ -15,11 +15,11 @@
 use std::collections::VecDeque;
 
 use crate::{NumericWidth, Primitive, Type, TypeId, TypeTable};
+use handroll::FxHashSet;
 use radix_hir::visit::{HirVisitor, walk_block, walk_expr, walk_local};
 use radix_hir::{HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirLocal, HirModule};
 use radix_target::Target;
 use radix_types::{CapabilityGap, Lowerability};
-use rustc_hash::FxHashSet;
 
 /// `HIR`-backed application-lane targets covered by the coverage matrix.
 ///

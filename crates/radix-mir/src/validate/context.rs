@@ -7,10 +7,10 @@ use crate::{
     MirGenericBindings, MirLayoutKind, MirLayoutTable, MirScalarLayout, MirType,
     instantiate_existing_generic_type,
 };
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// One flattened payload field in the selected MIR enum ABI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -23,11 +23,11 @@
 
 use super::BorrowChecker;
 use crate::{SUGGESTION_COPY, SemanticError, SemanticErrorKind};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirArgMarker, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirStatementKind,
 };
-use rustc_hash::{FxHashMap, FxHashSet};
 
 pub(super) const ISSUE_OWN_ARG_NOT_LOCAL_BINDING: &str = "own_argument_not_local_binding";
 pub(super) const ISSUE_OWN_ARG_UNMARKED_PARAMETER: &str = "own_argument_unmarked_parameter";

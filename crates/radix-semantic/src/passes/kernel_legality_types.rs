@@ -8,9 +8,9 @@
 
 use super::kernel_legality::ModuleFacts;
 use crate::{Primitive, Type, TypeId, TypeTable};
+use handroll::FxHashSet;
 use radix_hir::DefId;
 use radix_types::FloatPolicy;
-use rustc_hash::FxHashSet;
 
 /// Family label of an atomic cell: compiler-internal workgroup state, not a
 /// host-only value.

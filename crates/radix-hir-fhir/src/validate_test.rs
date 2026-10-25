@@ -1554,7 +1554,7 @@ fn transparent_generic_alias_witness_binds_authored_args() {
     let _list_string = types.array(string_ty);
     let snapshot = types.snapshot();
     let sym_pairs = Symbol(2);
-    let alias_params = rustc_hash::FxHashMap::from_iter([(pairs_def, vec![sym_t])]);
+    let alias_params = handroll::FxHashMap::from_iter([(pairs_def, vec![sym_t])]);
     let named_head = radix_hir::HirTypeFormHead::Named {
         def_id: pairs_def,
         path: vec![sym_pairs],
@@ -1592,7 +1592,7 @@ fn transparent_generic_alias_witness_binds_authored_args() {
         "a T=string binding must not match a list<int> site witness"
     );
 
-    let undeclared_params = rustc_hash::FxHashMap::default();
+    let undeclared_params = handroll::FxHashMap::default();
     assert_eq!(
         super::transparent_generic_alias_witness(
             &snapshot,

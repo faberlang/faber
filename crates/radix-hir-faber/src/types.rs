@@ -7,6 +7,7 @@
 //! Faber arrows.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodegenError;
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{DefId, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite};
@@ -16,7 +17,6 @@ use radix_types::{
     BitsWidth, CollectionKind, IndexExpr, IndexId, MarkerFamily, Primitive, SemanticMutability,
     SemanticParamMode, TensorFamilyKind, Type, TypeId,
 };
-use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
     /// Strip nested semantic option wrappers before printing nullable syntax.
@@ -1207,7 +1207,7 @@ impl super::FaberCodegen<'_> {
 
     fn format_record_type(
         &self,
-        fields: &rustc_hash::FxHashMap<Symbol, TypeId>,
+        fields: &handroll::FxHashMap<Symbol, TypeId>,
         names: &FxHashMap<DefId, Symbol>,
         surface: &impl KeywordSurface,
     ) -> String {

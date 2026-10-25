@@ -16,6 +16,7 @@ use crate::driver::{
 use crate::locale::{KeywordSurface, LocalePack, latin_locale_pack};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
+use handroll::FxHashMap;
 use radix_hir::visit::{HirVisitor, walk_block, walk_expr, walk_function};
 use radix_hir::{
     HirExpression, HirExpressionKind, HirItem, HirItemKind, HirOwnerRef, HirTypeForm, HirTypeFormArg, HirTypeFormHead,
@@ -23,7 +24,6 @@ use radix_hir::{
 };
 use radix_syntax::TypeFormLevel;
 use radix_types::{AppliedArg, BitsWidth, Primitive, Type, TypeId};
-use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Output and diagnostics from one Faber HIR re-emission invocation.

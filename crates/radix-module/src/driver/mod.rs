@@ -1010,9 +1010,9 @@ fn imported_target_entry_fact(
 /// unchanged.
 #[cfg(feature = "mir-core")]
 fn merged_target_entry_roles(
-    local: rustc_hash::FxHashMap<crate::hir::DefId, crate::mir::MirDeviceRole>,
+    local: handroll::FxHashMap<crate::hir::DefId, crate::mir::MirDeviceRole>,
     lowered: &crate::mir::LoweredMirUnit<'_>,
-) -> Result<rustc_hash::FxHashMap<crate::hir::DefId, crate::mir::MirDeviceRole>, radix_mir::device::MirImportedEntryError>
+) -> Result<handroll::FxHashMap<crate::hir::DefId, crate::mir::MirDeviceRole>, radix_mir::device::MirImportedEntryError>
 {
     if lowered.imported_device_registrations.is_empty() {
         return Ok(local);
@@ -1879,7 +1879,7 @@ pub struct AirBackwardBundle {
     /// callees). The reverse-AD transform resolves the transposed type in
     /// O(1) via this map instead of scanning the whole `TypeTable`
     /// (D-BO-M-4-1).
-    pub matmul_transpose_types: rustc_hash::FxHashMap<crate::semantic::TypeId, crate::semantic::TypeId>,
+    pub matmul_transpose_types: handroll::FxHashMap<crate::semantic::TypeId, crate::semantic::TypeId>,
 }
 
 /// Backward-annotated primal metadata derived live from the analyzed unit at
@@ -1914,7 +1914,7 @@ fn backward_primal_metadata(analysis: &AnalyzedModule, air_program: &crate::air:
     let mut primals = Vec::new();
 
     // Build a lookup from DefId to AirFunction from the already-lowered AIR.
-    let air_functions: rustc_hash::FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = air_program
+    let air_functions: handroll::FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = air_program
         .functions
         .iter()
         .map(|f| (f.source, f))
@@ -2042,8 +2042,8 @@ pub fn prepare_air_backward_bundle(
     // Each function's map merges into one global (operand_ty → transposed_ty)
     // map carried on the bundle; TypeIds are globally interned in the shared
     // TypeTable, so a single keyed map is valid across the whole call DAG.
-    let mut matmul_transpose_types: rustc_hash::FxHashMap<crate::semantic::TypeId, crate::semantic::TypeId> =
-        rustc_hash::FxHashMap::default();
+    let mut matmul_transpose_types: handroll::FxHashMap<crate::semantic::TypeId, crate::semantic::TypeId> =
+        handroll::FxHashMap::default();
     for function in &air_program.functions {
         matmul_transpose_types.extend(crate::air::reverse_ad::ensure_matmul_transpose_types(
             function,
@@ -2130,7 +2130,7 @@ pub fn apply_air_backward_bundle<'a>(
     no_fuse: bool,
 ) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
     use crate::air::reverse_ad_callgraph::generate_companions_bottom_up;
-    use rustc_hash::FxHashMap;
+    use handroll::FxHashMap;
 
     let mut lowered = replace_air_lane_mir(lowered, bundle.air_mir)?;
     let mut fresh_ids = FreshMirFunctionIds::after(
@@ -2345,7 +2345,7 @@ fn finalize_air_backward_shapes(
         .companions
         .iter()
         .map(|entry| entry.companion)
-        .collect::<rustc_hash::FxHashSet<_>>();
+        .collect::<handroll::FxHashSet<_>>();
     let mut companion_templates = lowered
         .validated
         .program()
@@ -2369,7 +2369,7 @@ fn finalize_air_backward_shapes(
         .iter()
         .filter(|monomorphization| !monomorphization.key.shape_args.is_empty())
         .map(|monomorphization| monomorphization.key.shape_args.clone())
-        .collect::<rustc_hash::FxHashSet<_>>();
+        .collect::<handroll::FxHashSet<_>>();
     if concrete_shapes.is_empty() {
         // A symbolic companion with no concrete call-site instance is a
         // template, not executable MIR. It stays available for later package
@@ -2401,8 +2401,8 @@ fn finalize_air_backward_shapes(
     );
     let mut instances = Vec::new();
     let mut monomorphizations = Vec::new();
-    let mut instance_ids = rustc_hash::FxHashMap::default();
-    let mut instance_return_types = rustc_hash::FxHashMap::default();
+    let mut instance_ids = handroll::FxHashMap::default();
+    let mut instance_return_types = handroll::FxHashMap::default();
 
     for template in &mut companion_templates {
         let symbols = companion_shape_symbols(&types, template);
@@ -2442,7 +2442,7 @@ fn finalize_air_backward_shapes(
     let template_ids = companion_templates
         .iter()
         .map(|function| function.id)
-        .collect::<rustc_hash::FxHashSet<_>>();
+        .collect::<handroll::FxHashSet<_>>();
     let (mut program, validation) = lowered.validated.into_parts();
     rewrite_air_backward_calls(
         &mut program.functions,
@@ -2482,9 +2482,9 @@ fn finalize_air_backward_shapes(
 fn rewrite_air_backward_calls(
     functions: &mut [crate::mir::MirFunction],
     types: &crate::semantic::TypeTable,
-    companion_sources: &rustc_hash::FxHashSet<crate::hir::DefId>,
-    instances: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirFunctionId>,
-    instance_return_types: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirType>,
+    companion_sources: &handroll::FxHashSet<crate::hir::DefId>,
+    instances: &handroll::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirFunctionId>,
+    instance_return_types: &handroll::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirType>,
 ) -> Result<(), SpannedCodegenError> {
     use crate::mir::generic::{MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index};
     use crate::mir::{
@@ -2495,7 +2495,7 @@ fn rewrite_air_backward_calls(
     fn operand_ty(
         locals: &[crate::mir::MirLocal],
         temps: &[crate::mir::MirTemp],
-        values: &rustc_hash::FxHashMap<crate::mir::MirValueId, crate::mir::MirType>,
+        values: &handroll::FxHashMap<crate::mir::MirValueId, crate::mir::MirType>,
         operand: &MirOperand,
     ) -> Option<crate::mir::MirType> {
         match operand {
@@ -2516,14 +2516,14 @@ fn rewrite_air_backward_calls(
         .iter()
         .filter_map(|function| function.source.map(|source| (source, function.clone())))
         .filter(|(source, _)| companion_sources.contains(source))
-        .collect::<rustc_hash::FxHashMap<_, _>>();
+        .collect::<handroll::FxHashMap<_, _>>();
 
     for function in functions {
         // Operand types are read from the live locals and temps: an earlier
         // companion call in this function has already retyped its destination,
         // and a later call consuming it must bind against that concrete type.
         for block in &mut function.blocks {
-            let mut values = rustc_hash::FxHashMap::default();
+            let mut values = handroll::FxHashMap::default();
             for statement in &mut block.statements {
                 if let MirStatementKind::Assign { value, .. } = &statement.kind {
                     values.insert(value.id, value.ty);
@@ -4524,19 +4524,19 @@ fn collect_lane_policy_diagnostics(
     name: &str,
     diagnostics: &mut Vec<Diagnostic>,
     cli_program: Option<&crate::cli::CliProgram>,
-) -> rustc_hash::FxHashSet<DefId> {
+) -> handroll::FxHashSet<DefId> {
     // CLI codegen on HIR-direct targets (Rust, Go) never needs MIR lowering.
     // Skip lane policy checks that would reject MIR/AIR lane annotations
     // when the CLI codegen path is active (F-109). Do not expand this skip
     // to libraries — omit is a separate HirRust library path.
     if cli_program.is_some() && matches!(target, Target::HirRust | Target::HirGo) {
-        return rustc_hash::FxHashSet::default();
+        return handroll::FxHashSet::default();
     }
     // Faber-surface emit (canonical re-emit, `faber format`, `radix emit -t
     // faber`) preserves lane annotations as annotations and never lowers to
     // MIR, so the MIR-backed-target policy (a codegen gate) does not apply.
     if matches!(target, Target::HirFaber) {
-        return rustc_hash::FxHashSet::default();
+        return handroll::FxHashSet::default();
     }
     // HirRust library / package units omit AIR-lane items, companions, and
     // same-unit wrappers that reach them instead of TARGETLANE001. Single-file
@@ -4550,13 +4550,13 @@ fn collect_lane_policy_diagnostics(
                 if let Some(diag) = radix_lane_target_error(RadixLane::Air, target, name) {
                     diagnostics.push(diag);
                 }
-                return rustc_hash::FxHashSet::default();
+                return handroll::FxHashSet::default();
             }
             return omit;
         }
     }
     diagnostics.extend(collect_radix_lane_target_errors(lanes, target, name));
-    rustc_hash::FxHashSet::default()
+    handroll::FxHashSet::default()
 }
 
 /// Strip AIR-lane items, `@ radix backward` companions, and same-unit rust
@@ -4570,8 +4570,8 @@ pub fn omit_rust_library_air_items(hir: &mut HirModule, lanes: &RadixLaneMetadat
     hir.items.retain(|item| !omit.contains(&item.def_id));
 }
 
-fn rust_library_omit_defs(lanes: &RadixLaneMetadata, hir: &HirModule) -> rustc_hash::FxHashSet<DefId> {
-    let mut omit = rustc_hash::FxHashSet::default();
+fn rust_library_omit_defs(lanes: &RadixLaneMetadata, hir: &HirModule) -> handroll::FxHashSet<DefId> {
+    let mut omit = handroll::FxHashSet::default();
     for (def_id, lane) in lanes.iter() {
         if lane == RadixLane::Air {
             omit.insert(def_id);
@@ -4584,7 +4584,7 @@ fn rust_library_omit_defs(lanes: &RadixLaneMetadata, hir: &HirModule) -> rustc_h
         return omit;
     }
 
-    let mut callees_by_fn = rustc_hash::FxHashMap::default();
+    let mut callees_by_fn = handroll::FxHashMap::default();
     for item in &hir.items {
         let HirItemKind::Function(function) = &item.kind else {
             continue;
@@ -4608,7 +4608,7 @@ fn rust_library_omit_defs(lanes: &RadixLaneMetadata, hir: &HirModule) -> rustc_h
     omit
 }
 
-fn rust_library_omit_applies(hir: &HirModule, omit: &rustc_hash::FxHashSet<DefId>) -> bool {
+fn rust_library_omit_applies(hir: &HirModule, omit: &handroll::FxHashSet<DefId>) -> bool {
     if omit.is_empty() || hir.entry.is_some() {
         return false;
     }
@@ -4617,7 +4617,7 @@ fn rust_library_omit_applies(hir: &HirModule, omit: &rustc_hash::FxHashSet<DefId
         .any(|item| !omit.contains(&item.def_id) && !matches!(item.kind, HirItemKind::Import(_)))
 }
 
-fn rust_kept_item_reaches_omit(hir: &HirModule, omit: &rustc_hash::FxHashSet<DefId>) -> bool {
+fn rust_kept_item_reaches_omit(hir: &HirModule, omit: &handroll::FxHashSet<DefId>) -> bool {
     hir.items.iter().any(|item| {
         if omit.contains(&item.def_id) {
             return false;
@@ -4639,9 +4639,9 @@ const NUCLEUM_FAMILY: &str = "nucleum";
 
 /// `DefIds` that appear as the direct callee of a call expression anywhere in
 /// the unit — the check-stage stand-in for "a concrete instantiation exists".
-fn module_call_targets(module: &HirModule) -> rustc_hash::FxHashSet<DefId> {
+fn module_call_targets(module: &HirModule) -> handroll::FxHashSet<DefId> {
     struct CallCollector {
-        callees: rustc_hash::FxHashSet<DefId>,
+        callees: handroll::FxHashSet<DefId>,
     }
 
     impl HirVisitor for CallCollector {
@@ -4655,7 +4655,7 @@ fn module_call_targets(module: &HirModule) -> rustc_hash::FxHashSet<DefId> {
         }
     }
 
-    let mut collector = CallCollector { callees: rustc_hash::FxHashSet::default() };
+    let mut collector = CallCollector { callees: handroll::FxHashSet::default() };
     collector.visit_program(module);
     collector.callees
 }
@@ -4735,9 +4735,9 @@ fn nucleum_orphan_diagnostics(
     diagnostics
 }
 
-fn function_path_defs(function: &HirFunction) -> rustc_hash::FxHashSet<DefId> {
+fn function_path_defs(function: &HirFunction) -> handroll::FxHashSet<DefId> {
     struct PathCollector {
-        defs: rustc_hash::FxHashSet<DefId>,
+        defs: handroll::FxHashSet<DefId>,
     }
 
     impl HirVisitor for PathCollector {
@@ -4750,9 +4750,9 @@ fn function_path_defs(function: &HirFunction) -> rustc_hash::FxHashSet<DefId> {
     }
 
     let Some(body) = &function.body else {
-        return rustc_hash::FxHashSet::default();
+        return handroll::FxHashSet::default();
     };
-    let mut collector = PathCollector { defs: rustc_hash::FxHashSet::default() };
+    let mut collector = PathCollector { defs: handroll::FxHashSet::default() };
     collector.visit_block(body);
     collector.defs
 }

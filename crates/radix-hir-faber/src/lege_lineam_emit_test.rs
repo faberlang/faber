@@ -7,11 +7,11 @@
 //! `lege` and silently change the meaning of the source.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{HirExpression, HirExpressionKind, HirId};
 use radix_lexer::{Interner, TokenKind};
 use radix_types::TypeTable;
-use rustc_hash::FxHashMap;
 
 /// Latin surface: contextual keywords are their canonical Latin spellings.
 struct LatinSurface;

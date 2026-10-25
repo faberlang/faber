@@ -4,9 +4,9 @@
 
 use super::*;
 use crate::{MirFunctionId, MirType};
+use handroll::FxHashMap;
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
-use rustc_hash::FxHashMap;
 
 mod companion;
 mod entry_roles;

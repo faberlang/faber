@@ -53,12 +53,12 @@
 
 use crate::passes::exhaustive::discerne_definitely_covered;
 use crate::{SemanticError, SemanticErrorKind, TypeTable};
+use handroll::FxHashMap;
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind, HirModule,
     HirStatement, HirStatementKind,
     visit::{HirVisitor, walk_expr, walk_program},
 };
-use rustc_hash::FxHashMap;
 
 /// Validate that every value-returning function body returns on all paths.
 ///

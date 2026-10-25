@@ -6,7 +6,7 @@
 //! optional top-level `faber.toml` `[`paths`].source`), falling back to the
 //! in-tree `<repo>/lib/<provider>/`.
 
-use rustc_hash::FxHashMap;
+use handroll::FxHashMap;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};

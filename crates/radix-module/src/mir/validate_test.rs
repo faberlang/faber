@@ -1153,7 +1153,7 @@ fn rejects_typed_aggregate_mismatches() {
         }],
     };
     let mut context = MirValidationContext::new(&types);
-    let mut fields = rustc_hash::FxHashMap::default();
+    let mut fields = handroll::FxHashMap::default();
     fields.insert(field, number);
     context.struct_fields.insert(struct_def, fields);
 
@@ -1266,7 +1266,7 @@ fn rejects_variant_field_projection_parent_mismatch() {
     };
     let mut context = MirValidationContext::new(&types);
     context.variant_parents.insert(variant_a, enum_a);
-    let mut fields = rustc_hash::FxHashMap::default();
+    let mut fields = handroll::FxHashMap::default();
     fields.insert(field, number);
     context.variant_fields.insert(variant_a, fields);
 
@@ -1282,7 +1282,7 @@ fn validates_record_aggregate_named_fields() {
     let mut types = TypeTable::new();
     let number = ty(&types, Primitive::Numerus);
     let boolean = ty(&types, Primitive::Bivalens);
-    let mut record_fields = rustc_hash::FxHashMap::default();
+    let mut record_fields = handroll::FxHashMap::default();
     record_fields.insert(Symbol(1), number.semantic_id());
     record_fields.insert(Symbol(2), boolean.semantic_id());
     let record_ty = MirType::semantic(types.intern(Type::Record(record_fields)));
@@ -1360,7 +1360,7 @@ fn rejects_matrix_aggregate_cell_count_mismatch() {
 fn rejects_record_aggregate_field_mismatches() {
     let mut types = TypeTable::new();
     let number = ty(&types, Primitive::Numerus);
-    let mut record_fields = rustc_hash::FxHashMap::default();
+    let mut record_fields = handroll::FxHashMap::default();
     record_fields.insert(Symbol(1), number.semantic_id());
     record_fields.insert(Symbol(2), number.semantic_id());
     let record_ty = MirType::semantic(types.intern(Type::Record(record_fields)));

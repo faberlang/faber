@@ -96,12 +96,12 @@ use crate::helpers::Support;
 use crate::items::{Function, Returns};
 use crate::names::Namer;
 use crate::ty::Ty;
+use handroll::{FxHashMap, FxHashSet};
 use radix_codegen_shared::names::{DisplayTokens, NameCatalog};
 use radix_codegen_shared::{Codegen, CodegenError};
 use radix_hir::{DefId, HirModule};
 use radix_lexer::Interner;
 use radix_types::TypeTable;
-use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::Write as _;
 
 /// C backend output.

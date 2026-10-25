@@ -278,12 +278,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
 
     fn convert_map_values(
         &mut self,
-        items: &rustc_hash::FxHashMap<MapKey, Value>,
+        items: &handroll::FxHashMap<MapKey, Value>,
         source_ty: TypeId,
         target_value: TypeId,
         struct_defaults: &[MirStructFieldDefaults],
         span: Span,
-    ) -> Result<rustc_hash::FxHashMap<MapKey, Value>, RunnerError> {
+    ) -> Result<handroll::FxHashMap<MapKey, Value>, RunnerError> {
         let source_value = match self.types.get(source_ty) {
             Type::Map(_, value) => Some(*value),
             _ => None,
@@ -294,7 +294,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         if source_value == target_value {
             return Ok(items.clone());
         }
-        let mut out = rustc_hash::FxHashMap::default();
+        let mut out = handroll::FxHashMap::default();
         for (key, item) in items {
             let converted = if self.is_dynamic_source(source_value) {
                 self.extract_dynamic_value_for_type(
@@ -530,7 +530,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     /// and LLVM lowerings. When `K` and `V` are the same type the keys win.
     fn map_to_array(
         &self,
-        map: &rustc_hash::FxHashMap<MapKey, Value>,
+        map: &handroll::FxHashMap<MapKey, Value>,
         source_ty: radix_types::TypeId,
         element: radix_types::TypeId,
         span: Span,
@@ -593,7 +593,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     fn extract_struct_from_map(
         &mut self,
         def_id: radix_hir::DefId,
-        input: &rustc_hash::FxHashMap<MapKey, Value>,
+        input: &handroll::FxHashMap<MapKey, Value>,
         recovery: Option<&MirOperand>,
         struct_defaults: &[MirStructFieldDefaults],
         span: Span,
@@ -615,7 +615,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             .get(&def_id)
             .cloned()
             .unwrap_or_default();
-        let mut out = rustc_hash::FxHashMap::default();
+        let mut out = handroll::FxHashMap::default();
         for (name, ty) in fields {
             let key = MapKey::Str(self.struct_wire_field_key(def_id, name));
             let converted = match input.get(&key).cloned() {
@@ -656,7 +656,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     fn extract_struct_from_dynamic_map(
         &mut self,
         def_id: radix_hir::DefId,
-        input: &rustc_hash::FxHashMap<MapKey, Value>,
+        input: &handroll::FxHashMap<MapKey, Value>,
         struct_defaults: &[MirStructFieldDefaults],
         span: Span,
         missing_policy: MissingFieldPolicy,
@@ -1037,13 +1037,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             }
             Type::Array(_) => Some(Value::Array(Rc::new(RefCell::new(Vec::new())))),
             Type::Map(_, _) => Some(Value::Map(Rc::new(RefCell::new(
-                rustc_hash::FxHashMap::default(),
+                handroll::FxHashMap::default(),
             )))),
             Type::Ledger(_, _) => Some(Value::Ledger(Rc::new(RefCell::new(
                 crate::value::LedgerValue::default(),
             )))),
             Type::Set(_) => Some(Value::Set(Rc::new(RefCell::new(
-                rustc_hash::FxHashSet::default(),
+                handroll::FxHashSet::default(),
             )))),
             _ => None,
         }

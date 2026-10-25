@@ -9,9 +9,9 @@
 //! disagreement.
 
 use crate::resolved_use::ResolvedUseIndex;
+use handroll::{FxHashMap, FxHashSet};
 use radix_diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use radix_hir::DefId;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Stable diagnostic code for an emit-table miss.
 pub const DEF_ID_CLOSURE_CODE: &str = "DEFID001";

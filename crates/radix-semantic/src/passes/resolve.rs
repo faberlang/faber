@@ -980,7 +980,7 @@ fn push_closed_set_refusal(span: radix_lexer::Span, errors: &mut Vec<SemanticErr
 fn pattern_member_parent(
     resolver: &Resolver,
     pattern: &Pattern,
-    parents: &rustc_hash::FxHashMap<DefId, DefId>,
+    parents: &handroll::FxHashMap<DefId, DefId>,
 ) -> Option<DefId> {
     let bare_parent = |name: radix_lexer::Symbol| match resolver.lookup_variant_bare(name) {
         BareVariantLookup::Single(variant) => parents.get(&variant).copied(),
@@ -1023,7 +1023,7 @@ fn discerne_member_sets(
     interner: &Interner,
     stmt: &DiscerneStmt,
 ) -> Vec<Vec<String>> {
-    let parents: rustc_hash::FxHashMap<DefId, DefId> =
+    let parents: handroll::FxHashMap<DefId, DefId> =
         resolver.variant_parents_all().into_iter().collect();
     (0..stmt.subjects.len())
         .map(|position| {
@@ -2845,7 +2845,7 @@ pub(super) fn semantic_name_suggestion(
             .or_insert_with(|| fold_interned_symbol(interner, name));
     }
 
-    let mut exact_by_fold: rustc_hash::FxHashMap<&str, &str> = rustc_hash::FxHashMap::default();
+    let mut exact_by_fold: handroll::FxHashMap<&str, &str> = handroll::FxHashMap::default();
     let mut folded_candidates: Vec<(&str, &str)> = Vec::new();
     for &name in &visible {
         let candidate: &str = interner.resolve(name);
@@ -3435,10 +3435,10 @@ fn resolve_schema_decls(
         };
 
         let name = decl.name.name;
-        let mut seen_visible: rustc_hash::FxHashSet<radix_lexer::Symbol> =
-            rustc_hash::FxHashSet::default();
-        let mut seen_source: rustc_hash::FxHashSet<radix_lexer::Symbol> =
-            rustc_hash::FxHashSet::default();
+        let mut seen_visible: handroll::FxHashSet<radix_lexer::Symbol> =
+            handroll::FxHashSet::default();
+        let mut seen_source: handroll::FxHashSet<radix_lexer::Symbol> =
+            handroll::FxHashSet::default();
         let mut columns = Vec::with_capacity(decl.columns.len());
 
         for (order, column) in decl.columns.iter().enumerate() {

@@ -5,13 +5,13 @@
 //! async/generator posture, or capture sets from HIR walks at emit time.
 
 use crate::{Type, TypeId, TypeTable};
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirArgMarker, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule,
     HirParam, HirStatement, HirStatementKind,
 };
 use radix_lexer::Symbol;
-use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 
 /// Capture mode demanded by a free variable use inside a closure body.

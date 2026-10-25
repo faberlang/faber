@@ -19,6 +19,7 @@
 //!   emits facts present in HIR and the type/name tables.
 
 use crate::surface::KeywordSurface;
+use handroll::FxHashMap;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAvailability, HirBlock, HirConst, HirEnum, HirExpressionKind,
@@ -29,7 +30,6 @@ use radix_hir::{
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
 use radix_types::{ContractRef, SemanticGenericParamDefault, TypeId};
-use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
     pub(super) fn generate_item(

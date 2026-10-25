@@ -1,7 +1,7 @@
 use crate::TypeId;
 use crate::function_facts::{RawFnDeps, propagate_failable};
+use handroll::FxHashMap;
 use radix_hir::DefId;
-use rustc_hash::FxHashMap;
 
 fn deps_calls(callees: &[u32]) -> RawFnDeps {
     RawFnDeps {
