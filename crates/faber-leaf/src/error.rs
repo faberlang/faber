@@ -1,5 +1,9 @@
 //! Structured leaf errors. Kind is the identity; text is for the frame.
 
+#[cfg(test)]
+#[path = "error_test.rs"]
+mod tests;
+
 use std::fmt;
 use std::io;
 
@@ -43,11 +47,12 @@ impl LeafErrorKind {
         LeafErrorKind::Cancelled,
     ];
 
-    /// The fixed identity word the crossing into Faber carries.
+    /// The fixed identity word the crossing into Faber carries: the Norma
+    /// `IoFault` variant name.
     ///
-    /// These words are the Norma `IoFault` variant names; spelling is interface.
+    /// Spelling is interface.
     #[must_use]
-    pub fn word(self) -> &'static str {
+    pub fn variant_name(self) -> &'static str {
         match self {
             LeafErrorKind::NotFound => "NotFound",
             LeafErrorKind::Permission => "Permission",
@@ -66,12 +71,6 @@ impl LeafErrorKind {
             LeafErrorKind::Cancelled => "Cancelled",
         }
     }
-
-    /// The Faber spelling of this kind, as the Norma `IoFault` variant name.
-    #[must_use]
-    pub fn variant_name(self) -> &'static str {
-        self.word()
-    }
 }
 
 /// One failed leaf call.
@@ -80,12 +79,12 @@ pub struct LeafError {
     kind: LeafErrorKind,
     route: &'static str,
     path: String,
-    source: String,
+    text: String,
 }
 
 /// Fs-leaf name kept so existing fs tests and docs stay stable.
 pub type FsError = LeafError;
-/// Fs-leaf kind name kept so existing fs tests stay stable.
+/// Fs-leaf kind name kept so existing fs tests and docs stay stable.
 pub type FsErrorKind = LeafErrorKind;
 
 impl LeafError {
@@ -106,10 +105,10 @@ impl LeafError {
 
     /// The two facts a failure carries into Faber: kind word and path.
     ///
-    /// Platform text never crosses; it stays in `source` for the local frame.
+    /// Platform text never crosses; it stays in `text` for the local frame.
     #[must_use]
     pub fn facts(&self) -> (&'static str, &str) {
-        (self.kind.word(), self.path())
+        (self.kind.variant_name(), self.path())
     }
 
     #[must_use]
@@ -118,7 +117,7 @@ impl LeafError {
             kind: LeafErrorKind::InvalidArgument,
             route,
             path: String::new(),
-            source: message.into(),
+            text: message.into(),
         }
     }
 
@@ -128,17 +127,7 @@ impl LeafError {
             kind: LeafErrorKind::Closed,
             route,
             path: String::new(),
-            source: message.into(),
-        }
-    }
-
-    #[must_use]
-    pub fn unset(route: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            kind: LeafErrorKind::Unset,
-            route,
-            path: String::new(),
-            source: message.into(),
+            text: message.into(),
         }
     }
 
@@ -148,7 +137,7 @@ impl LeafError {
             kind: LeafErrorKind::Unavailable,
             route,
             path: String::new(),
-            source: message.into(),
+            text: message.into(),
         }
     }
 
@@ -158,7 +147,7 @@ impl LeafError {
             kind: LeafErrorKind::Cancelled,
             route,
             path: String::new(),
-            source: "cancelled".to_owned(),
+            text: "cancelled".to_owned(),
         }
     }
 
@@ -168,7 +157,7 @@ impl LeafError {
             kind: LeafErrorKind::IsADirectory,
             route,
             path: path.into(),
-            source: "is a directory".to_owned(),
+            text: "is a directory".to_owned(),
         }
     }
 
@@ -178,7 +167,7 @@ impl LeafError {
             kind: LeafErrorKind::NotADirectory,
             route,
             path: path.into(),
-            source: "not a directory".to_owned(),
+            text: "not a directory".to_owned(),
         }
     }
 
@@ -188,6 +177,7 @@ impl LeafError {
         let kind = match err.kind() {
             io::ErrorKind::NotFound => LeafErrorKind::NotFound,
             io::ErrorKind::PermissionDenied => LeafErrorKind::Permission,
+            // The host reports a stream the peer closed as a broken pipe.
             io::ErrorKind::BrokenPipe => LeafErrorKind::Closed,
             io::ErrorKind::AlreadyExists => LeafErrorKind::AlreadyExists,
             io::ErrorKind::InvalidInput => LeafErrorKind::InvalidArgument,
@@ -203,7 +193,7 @@ impl LeafError {
             kind,
             route,
             path,
-            source: err.to_string(),
+            text: err.to_string(),
         }
     }
 }
@@ -211,15 +201,11 @@ impl LeafError {
 impl fmt::Display for LeafError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.path.is_empty() {
-            write!(f, "{}: {}", self.route, self.source)
+            write!(f, "{}: {}", self.route, self.text)
         } else {
-            write!(f, "{} {}: {}", self.route, self.path, self.source)
+            write!(f, "{} {}: {}", self.route, self.path, self.text)
         }
     }
 }
 
 impl std::error::Error for LeafError {}
-
-#[cfg(test)]
-#[path = "error_test.rs"]
-mod tests;
