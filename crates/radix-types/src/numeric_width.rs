@@ -5,7 +5,7 @@
 //! centralized here so resolve, typecheck, conversio, and codegen share one
 //! source of truth.
 
-use crate::{FloatPolicy, Primitive, Type, TypeId, TypeTable};
+use crate::{FloatPolicy, InferVar, MarkerFamily, Primitive, Type, TypeId, TypeTable};
 use serde::{Deserialize, Serialize};
 
 /// Signed integer, unsigned integer, or float width marker.
@@ -161,23 +161,6 @@ impl WidthLowerIssue {
 }
 
 impl NumericWidth {
-    /// Default width for bare `numerus` / `fractus`.
-    ///
-    /// Returns `None` for non-numeric primitives.
-    #[must_use]
-    pub fn default_for(prim: Primitive) -> Option<Self> {
-        match prim {
-            Primitive::Numerus => Some(Self::I64),
-            Primitive::Fractus => Some(Self::F64),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn is_default_for(self, prim: Primitive) -> bool {
-        Self::default_for(prim).is_some_and(|d| self == d)
-    }
-
     /// Parse a width marker spelling for the given primitive family.
     ///
     /// # Errors
@@ -277,6 +260,7 @@ impl NumericWidth {
         self.rust_type()
     }
 
+    /// Family-local widening rank: a larger rank is strictly wider.
     fn signed_rank(self) -> Option<u8> {
         match self {
             Self::I8 => Some(0),
@@ -287,6 +271,7 @@ impl NumericWidth {
         }
     }
 
+    /// Family-local widening rank: a larger rank is strictly wider.
     fn unsigned_rank(self) -> Option<u8> {
         match self {
             Self::U8 => Some(0),
@@ -297,6 +282,11 @@ impl NumericWidth {
         }
     }
 
+    /// Family-local widening rank: a larger rank is strictly wider.
+    ///
+    /// `bf16` has no rank: its 8-bit significand is narrower than `f16`'s
+    /// 11-bit one while its exponent range is wider, so neither contains the
+    /// other and no widening edge exists between them.
     fn float_rank(self) -> Option<u8> {
         match self {
             Self::F16 => Some(0),
@@ -417,9 +407,9 @@ pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
 /// `Hex` / `Bin` / `Oct` are text-parse radices. `Be` / `Le` are endian
 /// unpack rules for `octeti` windows — same clause, not bases. (`Bits`
 /// retired with need: a bit pattern is a `bN` value, written
-/// `↦ bN`.) `Code` (D10.6) reads a
-/// `littera` as its code point (`'A' ↦ u32 via Code`); it is not a
-/// radix either.
+/// `↦ bN`.) `Code` (D10.6) reads a `littera` as its code point
+/// (`'A' ↦ u32 via Code`); it is not a radix either. Each hint is accepted in
+/// its title-case spelling and in lower case.
 #[must_use]
 pub fn is_conversio_radix_hint(marker: &str) -> bool {
     matches!(
@@ -432,29 +422,6 @@ pub fn is_conversio_radix_hint(marker: &str) -> bool {
 #[must_use]
 pub fn is_code_point_hint(marker: &str) -> bool {
     marker == "code" || marker == "Code"
-}
-
-/// Canonical lower-case key the parser stores for a `via` policy word.
-///
-/// The ten conversion policy words (`le`, `be`, `hex`, `bin`, `oct`, `code`,
-/// `floor`, `ceil`, `trunc`, `half_even`) are matched internally by this key;
-/// locale packs map each locale's surface word to it. The retired title-case
-/// spellings are not canonical and return `None`.
-#[must_use]
-pub fn conversio_policy_word(name: &str) -> Option<&'static str> {
-    match name {
-        "le" => Some("le"),
-        "be" => Some("be"),
-        "hex" => Some("hex"),
-        "bin" => Some("bin"),
-        "oct" => Some("oct"),
-        "code" => Some("code"),
-        "floor" => Some("floor"),
-        "ceil" => Some("ceil"),
-        "trunc" => Some("trunc"),
-        "half_even" => Some("half_even"),
-        _ => None,
-    }
 }
 
 /// Ascii format-pack hints: `n ↦ ascii<N> via Hex|Bin|Oct`.
@@ -586,8 +553,8 @@ pub fn lower_modular_word(
     }
     if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
         return types.intern(Type::MarkerHole {
-            family: crate::MarkerFamily::Modulus,
-            var: crate::InferVar(params[0].span.start),
+            family: MarkerFamily::Modulus,
+            var: InferVar(params[0].span.start),
         });
     }
     let Some(marker) = type_expr_width_marker(&params[0], interner) else {
@@ -634,8 +601,8 @@ pub fn lower_saturating_word(
     }
     if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
         return types.intern(Type::MarkerHole {
-            family: crate::MarkerFamily::Saturatus,
-            var: crate::InferVar(params[0].span.start),
+            family: MarkerFamily::Saturatus,
+            var: InferVar(params[0].span.start),
         });
     }
     let Some(marker) = type_expr_width_marker(&params[0], interner) else {
@@ -714,19 +681,6 @@ fn type_expr_width_marker<'a>(
     }
 }
 
-/// Largest non-negative value of an integer width (`i8` → 127, `u8` → 255);
-/// `None` for float and decimal widths.
-#[must_use]
-pub fn integer_width_max(width: NumericWidth) -> Option<u64> {
-    match width {
-        NumericWidth::I8 => Some(i8::MAX as u64),
-        NumericWidth::I16 => Some(i16::MAX as u64),
-        NumericWidth::I32 => Some(i32::MAX as u64),
-        NumericWidth::I64 => Some(i64::MAX as u64),
-        _ => width.unsigned_max(),
-    }
-}
-
 /// Significand bits (including the implicit one) and largest exponent of a
 /// float width; `None` for integer and decimal widths.
 fn float_format(width: NumericWidth) -> Option<(u32, i32)> {
@@ -757,10 +711,10 @@ pub fn float_overflows(width: NumericWidth, value: f64) -> bool {
 
 /// Whether an integer is exactly representable in a float width (ruling
 /// 20(1)): its significant bits fit the significand and it is finite there.
-#[must_use]
 // The cast only feeds an overflow-range check; rounding cannot move a
 // magnitude across a float format's finite bound in a way that matters
 // once the significand check above has passed.
+#[must_use]
 #[allow(clippy::cast_precision_loss)]
 pub fn float_holds_integer(width: NumericWidth, value: i128) -> bool {
     let Some((precision, _)) = float_format(width) else {
@@ -847,17 +801,6 @@ pub fn float_integer_conversio(
         return None;
     }
     numerus_integer_width(types, to)
-}
-
-impl NumericWidth {
-    /// Decimal digits of the width's inclusive minimum and its exclusive
-    /// maximum (`max + 1`, a power of two exact in `f64`). A truncated float `t`
-    /// fits when `min <= t && t < max_exclusive`. `None` for non-integer widths.
-    #[must_use]
-    pub fn float_truncation_bounds(self) -> Option<(String, String)> {
-        let (lo, hi) = self.integer_range()?;
-        Some((lo.to_string(), (hi + 1).to_string()))
-    }
 }
 
 /// D11.1: the `(source, target)` integer widths of a `↦` into or out of a
@@ -1187,6 +1130,15 @@ impl NumericWidth {
             ),
             _ => (None, None),
         }
+    }
+
+    /// Decimal digits of the width's inclusive minimum and its exclusive
+    /// maximum (`max + 1`, a power of two exact in `f64`). A truncated float `t`
+    /// fits when `min <= t && t < max_exclusive`. `None` for non-integer widths.
+    #[must_use]
+    pub fn float_truncation_bounds(self) -> Option<(String, String)> {
+        let (lo, hi) = self.integer_range()?;
+        Some((lo.to_string(), (hi + 1).to_string()))
     }
 }
 

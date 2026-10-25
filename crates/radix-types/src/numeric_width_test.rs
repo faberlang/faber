@@ -243,48 +243,6 @@ fn tensor_element_conversio_rejects_cross_family_sized_pair() {
 }
 
 #[test]
-fn default_for_numerus_returns_i64() {
-    assert_eq!(
-        NumericWidth::default_for(Primitive::Numerus),
-        Some(NumericWidth::I64)
-    );
-}
-
-#[test]
-fn default_for_fractus_returns_f64() {
-    assert_eq!(
-        NumericWidth::default_for(Primitive::Fractus),
-        Some(NumericWidth::F64)
-    );
-}
-
-#[test]
-fn default_for_non_numeric_returns_none() {
-    for prim in [
-        Primitive::Ascii,
-        Primitive::Textus,
-        Primitive::Bivalens,
-        Primitive::Nihil,
-        Primitive::Vacuum,
-        Primitive::Numquam,
-        Primitive::Ignotum,
-        Primitive::Octeti,
-    ] {
-        assert_eq!(
-            NumericWidth::default_for(prim),
-            None,
-            "{prim:?} should not have a numeric width"
-        );
-    }
-}
-
-#[test]
-fn is_default_for_returns_false_for_non_numeric() {
-    assert!(!NumericWidth::I64.is_default_for(Primitive::Textus));
-    assert!(!NumericWidth::F64.is_default_for(Primitive::Bivalens));
-}
-
-#[test]
 fn ascii_format_hints_are_hex_bin_oct_only() {
     for marker in ["Hex", "Bin", "Oct"] {
         assert!(
@@ -305,36 +263,10 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
     }
     // `via Bits` retired: no longer a conversio hint.
     assert!(!is_conversio_radix_hint("Bits"));
-}
-
-#[test]
-fn conversio_policy_word_lowercase() {
-    for word in [
-        "le",
-        "be",
-        "hex",
-        "bin",
-        "oct",
-        "code",
-        "floor",
-        "ceil",
-        "trunc",
-        "half_even",
-    ] {
-        assert_eq!(
-            crate::numeric_width::conversio_policy_word(word),
-            Some(word),
-            "{word} is the canonical lower-case policy word"
-        );
-    }
-    for word in ["Hex", "Floor", "HalfEven", "bits"] {
-        assert_eq!(
-            crate::numeric_width::conversio_policy_word(word),
-            None,
-            "{word} is not canonical"
-        );
-    }
-    assert!(is_conversio_radix_hint("hex"));
+    // Lower-case spellings are accepted alongside the title-case surface form.
+    assert!(is_ascii_format_hint("hex"));
+    assert!(is_conversio_radix_hint("le"));
+    assert!(is_conversio_radix_hint("code"));
 }
 
 // S03-1: lowering failures cross the producer boundary as typed issues, not
