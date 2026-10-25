@@ -12,6 +12,9 @@ pub mod sha256;
 pub use sha256::{Sha256, hex, sha256, sha256_hex};
 pub mod magnus;
 pub use magnus::{Magnus, MagnusError, Radix};
+/// FxHash (port of `rustc-hash` 2.1.3, bit-exact — see `fx` docs).
+pub mod fx;
+pub use fx::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 
 #[cfg(test)]
 #[path = "lib_test.rs"]
