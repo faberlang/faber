@@ -20,7 +20,7 @@ use radix_types::{MirCollectionOp, TypeId};
 enum Call {
     Length,
     IsEmpty,
-    /// `faber_text_<name>(text, text)`: contains, starts_with, ends_with.
+    /// `faber_text_<name>(text, text)`: contains, `starts_with`, `ends_with`.
     Test(&'static str),
     Case(bool),
     Trim,

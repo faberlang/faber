@@ -13,6 +13,7 @@ use radix_hir::{HirArrayElement, HirCallArg, HirExpression};
 use radix_intrinsics::{IntrinsicMirKind, IntrinsicReturnKind};
 use radix_lexer::Symbol;
 use radix_types::MirCollectionOp;
+use std::fmt::Write as _;
 
 impl Emitter<'_> {
     /// The list class of an expression's own type.
@@ -149,10 +150,12 @@ impl Emitter<'_> {
                 HirArrayElement::Expr(value) => {
                     let item = self.element(value, elem)?;
                     effect |= item.effect;
-                    body.push_str(&format!(
+                    write!(
+                        body,
                         "faber_list_{suffix}_push(faber_a, {target}, {}); ",
                         item.text
-                    ));
+                    )
+                    .ok();
                 }
                 HirArrayElement::Spread(value) => {
                     let list = self.expr(value)?;
@@ -163,10 +166,12 @@ impl Emitter<'_> {
                         return Err(unsupported("spread of a list of another element class"));
                     }
                     effect |= list.effect;
-                    body.push_str(&format!(
+                    write!(
+                        body,
                         "faber_list_{suffix}_push_all(faber_a, {target}, {}); ",
                         list.text
-                    ));
+                    )
+                    .ok();
                 }
                 HirArrayElement::Infer(_) => {
                     return Err(unsupported("spread or inferred list element"));

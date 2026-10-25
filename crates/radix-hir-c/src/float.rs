@@ -338,8 +338,7 @@ impl Emitter<'_> {
             IntrinsicMirKind::Collection(MirCollectionOp::Signum) => {
                 format!("faber_signum_{suffix}({})", receiver.text)
             }
-            IntrinsicMirKind::Collection(MirCollectionOp::Minimum)
-            | IntrinsicMirKind::Collection(MirCollectionOp::Maximum) => {
+            IntrinsicMirKind::Collection(MirCollectionOp::Minimum | MirCollectionOp::Maximum) => {
                 let Some(arg) = args.first() else {
                     return Err(unsupported("float method outside the subset"));
                 };

@@ -123,14 +123,13 @@ impl Emitter<'_> {
                     self.bind_subject(out, bind)?;
                 }
                 self.depth -= 1;
-                match &arm.body.kind {
-                    HirExpressionKind::Block(block) => self.block(out, block)?,
-                    _ => {
-                        self.depth += 1;
-                        let result = self.expr_statement(out, &arm.body);
-                        self.depth -= 1;
-                        result?;
-                    }
+                if let HirExpressionKind::Block(block) = &arm.body.kind {
+                    self.block(out, block)?;
+                } else {
+                    self.depth += 1;
+                    let result = self.expr_statement(out, &arm.body);
+                    self.depth -= 1;
+                    result?;
                 }
             }
         }
@@ -182,14 +181,13 @@ impl Emitter<'_> {
                 self.bind_subject(out, bind)?;
             }
             self.depth -= 1;
-            match &arm.body.kind {
-                HirExpressionKind::Block(block) => self.block(out, block)?,
-                _ => {
-                    self.depth += 1;
-                    let result = self.expr_statement(out, &arm.body);
-                    self.depth -= 1;
-                    result?;
-                }
+            if let HirExpressionKind::Block(block) = &arm.body.kind {
+                self.block(out, block)?;
+            } else {
+                self.depth += 1;
+                let result = self.expr_statement(out, &arm.body);
+                self.depth -= 1;
+                result?;
             }
             self.line(out, "} break;");
         }

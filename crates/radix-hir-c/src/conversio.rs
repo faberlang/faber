@@ -43,11 +43,10 @@ impl Kind {
 
 fn int_width_for_class(class: Ty) -> Option<u8> {
     match class {
-        Ty::Int => Some(64),
         Ty::Sized(IntWidth::I8 | IntWidth::U8) => Some(8),
         Ty::Sized(IntWidth::I16 | IntWidth::U16) => Some(16),
         Ty::Sized(IntWidth::I32 | IntWidth::U32) => Some(32),
-        Ty::Sized(IntWidth::U64) => Some(64),
+        Ty::Int | Ty::Sized(IntWidth::U64) => Some(64),
         _ => None,
     }
 }
