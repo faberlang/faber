@@ -156,7 +156,7 @@ pub struct LoweringContextMaps<'a> {
 }
 
 impl<'a> LoweringContextMaps<'a> {
-    /// Transfer the collected imported-device route map (KPC-WIRE done_when
+    /// Transfer the collected imported-device route map (KPC-WIRE `done_when`
     /// (c)): the consumer link's provider routes, handed to the lowered-unit
     /// carrier exactly once so package linking can join them to rewritten
     /// synthetic template sources. The map is left empty — a second read
