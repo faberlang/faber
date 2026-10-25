@@ -1034,26 +1034,29 @@ impl Validator<'_, '_> {
     fn validate_scan_call(
         &mut self,
         scope: &FunctionScope<'_, '_>,
-        scan: &crate::MirScanOp,
+        scan_op: &crate::MirScanOp,
         call: &MirRuntimeCall,
         span: Span,
     ) {
         if matches!(
-            scan.op,
+            scan_op.op,
             crate::MirReduceOp::ArgMax | crate::MirReduceOp::ArgMin
         ) {
             self.error(span, "scan does not admit argmax or argmin");
         }
-        if scan.total == crate::MirScanTotal::Exclusive
-            && matches!(scan.op, crate::MirReduceOp::Max | crate::MirReduceOp::Min)
+        if scan_op.total == crate::MirScanTotal::Exclusive
+            && matches!(
+                scan_op.op,
+                crate::MirReduceOp::Max | crate::MirReduceOp::Min
+            )
         {
             self.error(span, "exclusive scan does not admit max or min");
         }
-        if scan.rank == 0 {
+        if scan_op.rank == 0 {
             self.error(span, "scan source rank must be positive");
         }
-        self.validate_mir_type(scan.term_ty, span);
-        self.validate_mir_type(scan.result_element_ty, span);
+        self.validate_mir_type(scan_op.term_ty, span);
+        self.validate_mir_type(scan_op.result_element_ty, span);
         if let Some(source_ty) = call
             .args
             .first()
@@ -1063,30 +1066,30 @@ impl Validator<'_, '_> {
                 Type::Tensor(_, _) => {
                     if self
                         .static_tensor_rank(source_ty)
-                        .is_some_and(|rank| rank != usize::from(scan.rank))
+                        .is_some_and(|rank| rank != usize::from(scan_op.rank))
                     {
                         self.error(span, "scan rank differs from source tensor rank");
                     }
                 }
-                Type::Matrix(_, _) if scan.rank == 2 => {}
+                Type::Matrix(_, _) if scan_op.rank == 2 => {}
                 _ => self.error(span, "scan source is not a ranked tensor"),
             }
         }
         match self.type_kind(call.return_ty) {
             Type::Tensor(element, _) => self.require_exact(
                 MirType::semantic(*element),
-                scan.result_element_ty,
+                scan_op.result_element_ty,
                 span,
                 "scan result element type differs from its tensor type",
             ),
             _ => self.error(span, "scan result is not a tensor"),
         }
 
-        let Ok(term_captures) = usize::try_from(scan.term_captures) else {
+        let Ok(term_captures) = usize::try_from(scan_op.term_captures) else {
             self.error(span, "scan term capture count exceeds usize");
             return;
         };
-        let group_operands = scan.group.as_ref().map_or(Some(0), |group| {
+        let group_operands = scan_op.group.as_ref().map_or(Some(0), |group| {
             group.axes.iter().try_fold(0_usize, |count, axis| {
                 count.checked_add(usize::try_from(axis.captures).ok()?.checked_add(1)?)
             })
@@ -1106,18 +1109,19 @@ impl Validator<'_, '_> {
             self.error(span, "scan term helper operands are missing");
             return;
         };
-        let term_id = match call.args.get(term_function_position) {
-            Some(MirOperand::Constant(MirConstant::Function(id))) => *id,
-            _ => {
-                self.error(span, "scan term helper function is missing");
-                return;
-            }
+        let term_id = if let Some(MirOperand::Constant(MirConstant::Function(id))) =
+            call.args.get(term_function_position)
+        {
+            *id
+        } else {
+            self.error(span, "scan term helper function is missing");
+            return;
         };
         let Some(term) = scope.functions_by_id.get(&term_id) else {
             self.error(span, "scan term helper does not resolve to a function");
             return;
         };
-        if term.params.len() != term_captures + usize::from(scan.rank) + 1 {
+        if term.params.len() != term_captures + usize::from(scan_op.rank) + 1 {
             self.error(
                 span,
                 "scan term helper must take captures, coordinates, and element",
@@ -1125,7 +1129,7 @@ impl Validator<'_, '_> {
         }
         self.require_exact(
             term.return_ty,
-            scan.term_ty,
+            scan_op.term_ty,
             span,
             "scan term helper return type mismatch",
         );
@@ -1150,7 +1154,7 @@ impl Validator<'_, '_> {
             return;
         }
 
-        let Some(group) = &scan.group else {
+        let Some(group) = &scan_op.group else {
             return;
         };
         if group.axes.is_empty() {
@@ -1183,18 +1187,19 @@ impl Validator<'_, '_> {
                 self.error(span, "scan key helper position overflows usize");
                 return;
             };
-            let key_id = match call.args.get(function_position) {
-                Some(MirOperand::Constant(MirConstant::Function(id))) => *id,
-                _ => {
-                    self.error(span, "scan key helper function is missing");
-                    return;
-                }
+            let key_id = if let Some(MirOperand::Constant(MirConstant::Function(id))) =
+                call.args.get(function_position)
+            {
+                *id
+            } else {
+                self.error(span, "scan key helper function is missing");
+                return;
             };
             let Some(key_fn) = scope.functions_by_id.get(&key_id) else {
                 self.error(span, "scan key helper does not resolve to a function");
                 return;
             };
-            if key_fn.params.len() != captures + usize::from(scan.rank) {
+            if key_fn.params.len() != captures + usize::from(scan_op.rank) {
                 self.error(span, "scan key helper must take captures and coordinates");
             }
             self.require_exact(
@@ -2212,9 +2217,13 @@ impl Validator<'_, '_> {
                     self.error(span, "numeric rounding receiver is not fractus");
                 }
             }
-            MirCollectionOp::TensorRank => {
-                // Placeholder so this exhaustive dispatch compiles; the numerus contract lands in 2eecb23a-7.1.1.3.
-            }
+            // Placeholder so this exhaustive dispatch compiles; the numerus
+            // contract lands in 2eecb23a-7.1.1.3.
+            MirCollectionOp::TensorRank
+            // This is a compiler-owned operation. Its tensor/const contract is
+            // validated by radix-mir::abi::contract after lowering, rather
+            // than by the source-level collection validator.
+            | MirCollectionOp::TensorBatchedAttention => {}
             MirCollectionOp::TensorNorm => {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
@@ -2669,13 +2678,13 @@ impl Validator<'_, '_> {
                     .get(1)
                     .and_then(|arg| self.validate_operand(scope, arg, span))
                 {
-                    let updates_element = match self.type_kind(updates_ty) {
-                        Type::Tensor(element, _) => *element,
-                        _ => {
+                    let updates_element =
+                        if let Type::Tensor(element, _) = self.type_kind(updates_ty) {
+                            *element
+                        } else {
                             self.error(span, "tensor scatter-add updates is not tensor");
                             return;
-                        }
-                    };
+                        };
                     if self
                         .static_tensor_rank(updates_ty)
                         .is_some_and(|rank| rank != 2)
@@ -2788,10 +2797,6 @@ impl Validator<'_, '_> {
                     );
                 }
             }
-            // This is a compiler-owned operation. Its tensor/const contract is
-            // validated by radix-mir::abi::contract after lowering, rather
-            // than by the source-level collection validator.
-            MirCollectionOp::TensorBatchedAttention => {}
             MirCollectionOp::IntervalLength => {
                 if !first_arg_ty
                     .is_some_and(|ty| matches!(self.type_kind(ty), Type::Intervallum(..)))

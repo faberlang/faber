@@ -137,9 +137,9 @@ fn reduction_term_functions(
                 if let Some(group) = &filum.group {
                     let mut position = group_start;
                     for key in &group.keys {
-                        let function_position = match position.checked_add(key.captures as usize) {
-                            Some(position) => position,
-                            None => continue,
+                        let Some(function_position) = position.checked_add(key.captures as usize)
+                        else {
+                            continue;
                         };
                         if let Some(MirOperand::Constant(MirConstant::Function(helper))) =
                             args.get(function_position)
@@ -177,13 +177,11 @@ fn reduction_term_functions(
                 let Some(group_start) = args.len().checked_sub(group_operands) else {
                     continue;
                 };
-                let term_captures = match usize::try_from(scan.term_captures) {
-                    Ok(count) => count,
-                    Err(_) => continue,
+                let Ok(term_captures) = usize::try_from(scan.term_captures) else {
+                    continue;
                 };
-                let term_position = match 1_usize.checked_add(term_captures) {
-                    Some(position) => position,
-                    None => continue,
+                let Some(term_position) = 1_usize.checked_add(term_captures) else {
+                    continue;
                 };
                 if term_position < group_start
                     && let Some(MirOperand::Constant(MirConstant::Function(term))) =
@@ -507,6 +505,12 @@ impl<'a> DeviceSafeClassifier<'a> {
             Type::Array(inner) if self.is_vector_surrogate_element(inner) => {
                 self.record_policy(SHAPE_DEVICE_VECTOR_SURROGATE);
             }
+            // gpu-reset C4-6b follow-up: a genus LOCAL or temp in a lane-form
+            // kernel is scalarized field-by-field by the lane emitters; only
+            // its fields need value-type admission (no memory layout).
+            Type::Struct(_) if self.in_lane_form_function => {
+                self.check_genus_local_type(ty);
+            }
             Type::Array(_)
             | Type::Tuple(_)
             | Type::Map(_, _)
@@ -534,16 +538,8 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::BoundedStack { .. }
             | Type::BoundedTextus { .. }
             | Type::BoundedAscii { .. }
-            | Type::BoundedOcteti { .. } => {
-                self.record_policy(format!("device aggregate value type {semantic:?}"));
-            }
-            // gpu-reset C4-6b follow-up: a genus LOCAL or temp in a lane-form
-            // kernel is scalarized field-by-field by the lane emitters; only
-            // its fields need value-type admission (no memory layout).
-            Type::Struct(_) if self.in_lane_form_function => {
-                self.check_genus_local_type(ty);
-            }
-            Type::Struct(_) => {
+            | Type::BoundedOcteti { .. }
+            | Type::Struct(_) => {
                 self.record_policy(format!("device aggregate value type {semantic:?}"));
             }
             Type::Primitive(Primitive::Nihil) => self.record_policy(SHAPE_DEVICE_NIHIL_VALUE),
@@ -834,8 +830,8 @@ impl<'a> DeviceSafeClassifier<'a> {
             let field_read =
                 |name: &radix_lexer::Symbol| layout.fields.iter().any(|field| field.name == *name);
             let admitted = match place.projections.as_slice() {
-                [MirProjection::Index(_), MirProjection::Field(name)] => field_read(name),
-                [
+                [MirProjection::Index(_), MirProjection::Field(name)]
+                | [
                     MirProjection::Index(_),
                     MirProjection::Field(name),
                     MirProjection::Index(_) | MirProjection::VectorLane(_),
@@ -1111,25 +1107,16 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                     | MirCollectionOp::TensorGelu,
                             )
                             | MirIntrinsic::FilumReduce(_)
-                            | MirIntrinsic::Scan(_),
-                        ..
-                    },
-                ..
-            } => {
-                crate::visit::walk_stmt(self, stmt);
-            }
-            // gpu-reset rule 15 K4 / need item 4: the pointwise
-            // tensor lifts (add/sub/mul/neg) are device-safe elementwise
-            // expressions — targets that lower the `Collection` pointwise
-            // set lower these through the same tensor-expr model. Every
-            // other `MirLiftOp` keeps the wildcard rejection below, and a
-            // target that has no lift lowering still fails closed in its
-            // own emit gate.
-            MirStatementKind::RuntimeCall {
-                call:
-                    MirRuntimeCall {
-                        intrinsic:
-                            MirIntrinsic::TensorLift(
+                            | MirIntrinsic::Scan(_)
+                            // gpu-reset rule 15 K4 / need item 4: the
+                            // pointwise tensor lifts (add/sub/mul/neg) are
+                            // device-safe elementwise expressions — targets that
+                            // lower the `Collection` pointwise set lower these
+                            // through the same tensor-expr model. Every other
+                            // `MirLiftOp` keeps the wildcard rejection below, and
+                            // a target that has no lift lowering still fails
+                            // closed in its own emit gate.
+                            | MirIntrinsic::TensorLift(
                                 MirLiftOp::Add
                                 | MirLiftOp::Sub
                                 | MirLiftOp::Mul
@@ -1185,15 +1172,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirTerminatorKind::Return(_) => crate::visit::walk_terminator(self, terminator),
             // C4-2e: a structurizable lane-form kernel's acyclic Goto/Branch
             // edges are expressed by its region tree.
-            MirTerminatorKind::Goto(_) | MirTerminatorKind::Branch { .. }
-                if self.in_lane_form_function || self.in_single_lane_function =>
-            {
-                crate::visit::walk_terminator(self, terminator);
-            }
+            //
             // A structurizable lane-form kernel has no reachable `Unreachable`
             // terminator (the structurizer refuses one), so any it carries
             // sits on a dead block the region tree never visits.
-            MirTerminatorKind::Unreachable
+            MirTerminatorKind::Goto(_)
+            | MirTerminatorKind::Branch { .. }
+            | MirTerminatorKind::Unreachable
                 if self.in_lane_form_function || self.in_single_lane_function =>
             {
                 crate::visit::walk_terminator(self, terminator);

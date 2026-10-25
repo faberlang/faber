@@ -915,8 +915,7 @@ fn rms_norm_runtime_const_facts(
             if !validation
                 .layouts
                 .layout_for_type(epsilon_ty)
-                .ok()
-                .is_some_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
+                .is_ok_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
             {
                 return None;
             }
@@ -1773,8 +1772,7 @@ fn layer_norm_const_facts(
             if !validation
                 .layouts
                 .layout_for_type(epsilon_ty)
-                .ok()
-                .is_some_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
+                .is_ok_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
             {
                 return None;
             }
@@ -1802,7 +1800,7 @@ fn layer_norm_const_facts(
 fn affine_extent_agrees(affine: Dim, norm: Dim) -> bool {
     match (affine, norm) {
         (Dim::Literal(affine), Dim::Literal(norm)) => affine == norm,
-        (Dim::Literal(_), Dim::Runtime) | (Dim::Runtime, Dim::Runtime) => true,
+        (Dim::Literal(_) | Dim::Runtime, Dim::Runtime) => true,
         (Dim::Runtime, Dim::Literal(_)) => false,
     }
 }
@@ -1934,8 +1932,7 @@ fn rms_norm_const_facts(
             if !validation
                 .layouts
                 .layout_for_type(epsilon_ty)
-                .ok()
-                .is_some_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
+                .is_ok_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
             {
                 return None;
             }
