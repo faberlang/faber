@@ -72,16 +72,14 @@ pub(crate) enum Value {
 impl From<Ty> for Value {
     fn from(ty: Ty) -> Self {
         match ty {
-            Ty::Int => Value::Int,
-            // `u64` does not fit an `int64_t`, so it reads as an exact value.
+            // `u64` does not fit an `int64_t`, and `b64` fills a `uint64_t`, so
+            // both read as an exact value.
             Ty::Sized(IntWidth::U64)
             | Ty::Modular(IntWidth::U64)
-            | Ty::Saturating(IntWidth::U64) => Value::Exact,
-            Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) => Value::Int,
-            // `b64` fills a `uint64_t`, so it reads as an exact value; a
-            // narrower raw-bits cell widens to an `int64_t` like `u8`…`u32`.
-            Ty::Bits(BitsWidth::B64) => Value::Exact,
-            Ty::Bits(_) => Value::Int,
+            | Ty::Saturating(IntWidth::U64)
+            | Ty::Bits(BitsWidth::B64) => Value::Exact,
+            // A narrower raw-bits cell widens to an `int64_t` like `u8`…`u32`.
+            Ty::Int | Ty::Sized(_) | Ty::Modular(_) | Ty::Saturating(_) | Ty::Bits(_) => Value::Int,
             Ty::Text => Value::Text,
             Ty::Bool => Value::Truth,
             Ty::List(elem) => Value::List(elem),
@@ -224,7 +222,9 @@ impl Emitter<'_> {
                     radix_hir::HirNonNullKind::Index(index) => {
                         self.asserted_index(unwrapped, index)
                     }
-                    _ => Err(unsupported("non-null assertion followed by a call")),
+                    radix_hir::HirNonNullKind::Call(_) => {
+                        Err(unsupported("non-null assertion followed by a call"))
+                    }
                 }
             }
             HirExpressionKind::Literal(literal) => {
@@ -1323,7 +1323,9 @@ impl Emitter<'_> {
     fn literal(&mut self, literal: &HirLiteral) -> Result<Operand, CodegenError> {
         match literal {
             HirLiteral::Int(value) => self.int(i128::from(*value)),
-            HirLiteral::String(symbol) => {
+            // `ascii` is an ASCII-only text; the bytes are the same counted
+            // UTF-8 value a `string` literal is.
+            HirLiteral::String(symbol) | HirLiteral::Ascii(symbol) => {
                 let raw = self.names.resolve_symbol(*symbol);
                 let decoded = radix_codegen_shared::unescape_faber_text(raw);
                 Ok(Operand::new(self.text_literal(&decoded)?, Value::Text))
@@ -1338,13 +1340,6 @@ impl Emitter<'_> {
             HirLiteral::BigInt(_) => Err(unsupported("integer literal beyond u64")),
             HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
                 Ok(self.float_literal(*value))
-            }
-            // `ascii` is an ASCII-only text; the bytes are the same counted
-            // UTF-8 value a `string` literal is.
-            HirLiteral::Ascii(symbol) => {
-                let raw = self.names.resolve_symbol(*symbol);
-                let decoded = radix_codegen_shared::unescape_faber_text(raw);
-                Ok(Operand::new(self.text_literal(&decoded)?, Value::Text))
             }
             HirLiteral::Octeti(_) => Err(unsupported("byte-buffer literal")),
             HirLiteral::JsonValor(_) => Err(unsupported("json literal")),
@@ -1527,8 +1522,9 @@ impl Emitter<'_> {
             | HirBinOp::Shl
             | HirBinOp::Shr => self.bitwise(op, l, r, wide),
             // `≅` / `≇` is exact value equality, including across families.
-            HirBinOp::ApproxEq | HirBinOp::ApproxNotEq => self.comparison(op, l, r),
-            HirBinOp::Lt
+            HirBinOp::ApproxEq
+            | HirBinOp::ApproxNotEq
+            | HirBinOp::Lt
             | HirBinOp::Gt
             | HirBinOp::LtEq
             | HirBinOp::GtEq
@@ -2158,7 +2154,7 @@ impl Emitter<'_> {
             operand.text.clone_from(&value.text);
             operand.value = Value::from(class);
             operand.constant = value.constant;
-            operand.narrow = value.narrow.clone();
+            operand.narrow.clone_from(&value.narrow);
             operand
         } else {
             self.support.need(Helper::SizedStore);

@@ -18,6 +18,7 @@ use radix_hir::{
     HirModule, HirParamMode, HirStatementKind,
 };
 use rustc_hash::FxHashSet;
+use std::fmt::Write as _;
 
 /// A function the program defines; a genus method is one with a receiver.
 pub(crate) struct Function {
@@ -87,30 +88,32 @@ impl Items {
     /// `__attribute__((unused))`: library modules define many, and
     /// `-Wunused-function` is not undefined behavior.
     pub(crate) fn prototypes(&self, called: &FxHashSet<DefId>) -> String {
-        self.functions
-            .iter()
-            .map(|function| {
-                format!(
-                    "{}{};\n",
-                    storage(called, function.def_id),
-                    function.prototype
-                )
-            })
-            .collect()
+        let mut out = String::new();
+        for function in &self.functions {
+            writeln!(
+                out,
+                "{}{};",
+                storage(called, function.def_id),
+                function.prototype
+            )
+            .ok();
+        }
+        out
     }
 
     /// Every function definition, separated by blank lines.
     pub(crate) fn definitions(&self, called: &FxHashSet<DefId>) -> String {
-        self.functions
-            .iter()
-            .map(|function| {
-                format!(
-                    "{}{}\n",
-                    storage(called, function.def_id),
-                    function.definition
-                )
-            })
-            .collect()
+        let mut out = String::new();
+        for function in &self.functions {
+            writeln!(
+                out,
+                "{}{}",
+                storage(called, function.def_id),
+                function.definition
+            )
+            .ok();
+        }
+        out
     }
 }
 
@@ -182,15 +185,22 @@ impl Emitter<'_> {
                 }
                 // Constants wait for every signature: a value built with a
                 // genus's `creo` hook calls a method.
-                HirItemKind::Constant(_) => {}
+                HirItemKind::Constant(_)
+                // Collected with the genera, whose types it shares.
+                | HirItemKind::Enum(_)
+                // An alias is resolved in the type table; a use of one that
+                // names an unsupported type is rejected where it is used.
+                | HirItemKind::TypeAlias(_)
+                // A schema is an experimental application-owned heading with no
+                // runtime effect; `faber run` declares it and runs the entry. A
+                // use of the type is rejected where it is used.
+                | HirItemKind::Schema(_) => {}
                 HirItemKind::Struct(genus) => {
                     for method in &genus.methods {
                         self.signature(method.def_id, &method.func, Some(item.def_id))?;
                         functions.push((method.def_id, &method.func));
                     }
                 }
-                // Collected with the genera, whose types it shares.
-                HirItemKind::Enum(_) => {}
                 // A contract is a name for what genera provide; a value typed
                 // as one is rejected where its type is classified.
                 HirItemKind::Interface(interface) => {
@@ -198,13 +208,6 @@ impl Emitter<'_> {
                         return Err(unsupported("generic interface declaration"));
                     }
                 }
-                // An alias is resolved in the type table; a use of one that
-                // names an unsupported type is rejected where it is used.
-                HirItemKind::TypeAlias(_) => {}
-                // A schema is an experimental application-owned heading with
-                // no runtime effect; `faber run` declares it and runs the
-                // entry. A use of the type is rejected where it is used.
-                HirItemKind::Schema(_) => {}
                 HirItemKind::Import(_) => return Err(unsupported("import (library modules)")),
             }
         }
@@ -559,7 +562,7 @@ impl Emitter<'_> {
                 Some(class) => format!("return {};", zero_of(self, class)?),
                 None => "return;".to_owned(),
             };
-            body.push_str(&format!("faber_fail:\n    {failure_return}\n"));
+            write!(body, "faber_fail:\n    {failure_return}\n").ok();
         }
         let ret_text = match ret {
             Some(ty) => self.c_type(ty)?,

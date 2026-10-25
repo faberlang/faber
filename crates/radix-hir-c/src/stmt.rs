@@ -459,7 +459,9 @@ impl Emitter<'_> {
     /// A block written as a statement. A `fac` block is a breakable scope:
     /// `rumpe` inside it leaves the block, so it ends in a label when one did.
     fn plain_block(&mut self, out: &mut String, block: &HirBlock) -> Result<(), CodegenError> {
-        let scope = block.breakable.is_some_and(|kind| kind.is_scope());
+        let scope = block
+            .breakable
+            .is_some_and(radix_hir::HirBreakableKind::is_scope);
         if scope {
             let label = format!("faber_x{}", self.temps);
             self.temps += 1;
@@ -540,7 +542,7 @@ impl Emitter<'_> {
         message: Option<&HirExpression>,
     ) -> Result<(), CodegenError> {
         let test = self.condition(cond)?;
-        let text = match message {
+        let failure_text = match message {
             Some(message) => {
                 let message = self.expr(message)?;
                 if message.value != Value::Text {
@@ -553,7 +555,7 @@ impl Emitter<'_> {
         self.support.need(Helper::Trap);
         self.line(out, &format!("if (!{test}) {{"));
         self.depth += 1;
-        self.line(out, &format!("faber_abort({text});"));
+        self.line(out, &format!("faber_abort({failure_text});"));
         self.depth -= 1;
         self.line(out, "}");
         Ok(())

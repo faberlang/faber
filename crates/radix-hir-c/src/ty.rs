@@ -302,7 +302,7 @@ impl Ty {
             Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => Some(width.c_type()),
             // Raw bits live in the unsigned C cell of their own width.
             Ty::Bits(width) => Some(int_width_of_bits(width).c_type()),
-            Ty::Opt(Inner::Genus(_)) => None,
+            Ty::Opt(Inner::Genus(_)) | Ty::Genus(_) | Ty::Func(_) => None,
             Ty::Opt(inner) => inner
                 .scalar_struct()
                 .or_else(|| inner.ty().builtin_c_type()),
@@ -319,8 +319,6 @@ impl Ty {
                 (Elem::Text, Elem::Text) => Some("faber_map_text_text *"),
                 _ => None,
             },
-            Ty::Genus(_) => None,
-            Ty::Func(_) => None,
         }
     }
 }
@@ -389,11 +387,12 @@ fn map_elem(ty: Ty) -> Option<Elem> {
 /// Classify a semantic type, rejecting everything outside the subset by name.
 pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError> {
     match types.get(ty) {
-        Type::Alias(_, inner) => classify(types, *inner),
-        // A `copy` parameter's storage is its declared class: the caller
-        // passes a deep duplicate (the call-site marker drives `copy_value`),
-        // so the callee sees an ordinary value.
-        Type::Ref(SemanticMutability::Copy, inner) => classify(types, *inner),
+        // An alias is its aliased type. A `copy` parameter's storage is its
+        // declared class: the caller passes a deep duplicate (the call-site
+        // marker drives `copy_value`), so the callee sees an ordinary value.
+        Type::Alias(_, inner) | Type::Ref(SemanticMutability::Copy, inner) => {
+            classify(types, *inner)
+        }
         // A `ref` or `mut` view of a list, a genus or text is the same
         // pointer: all three already alias (R1). A view of a scalar is a
         // pointer to the caller's cell, which `classify_ref` spells for a
@@ -426,15 +425,15 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
             None => Err(unsupported(describe(types.get(ty)))),
         },
         Type::Bits(width) => Ok(Ty::Bits(*width)),
-        Type::Primitive(Primitive::Textus) => Ok(Ty::Text),
         // `ascii` is an ASCII-only text with no capacity; `ascii<N>` and
         // `string<N>` are bounded text whose capacity the typechecker proves a
         // literal fits and whose runtime conversion checks the rest. All are
         // the counted UTF-8 text value the target already emits.
-        Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. } => Ok(Ty::Text),
+        Type::Primitive(Primitive::Textus | Primitive::Ascii)
+        | Type::BoundedAscii { .. }
+        | Type::BoundedTextus { .. } => Ok(Ty::Text),
         // A bare `none` (`const none nothing ← null`): its only value is null.
         Type::Primitive(Primitive::Nihil) => Ok(Ty::None),
-        Type::BoundedTextus { .. } => Ok(Ty::Text),
         Type::Primitive(Primitive::Bivalens) => Ok(Ty::Bool),
         Type::Primitive(Primitive::Fractus)
         | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => Ok(Ty::Float),
@@ -568,7 +567,7 @@ fn describe(ty: &Type) -> &'static str {
         Type::Primitive(Primitive::Littera) => "character type",
         Type::Primitive(Primitive::Octeti) => "byte buffer type",
         Type::Primitive(Primitive::Json | Primitive::Valor) => "json or data value type",
-        Type::Primitive(Primitive::Instans) => "time instant type",
+        Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => "time instant type",
         Type::Primitive(Primitive::Ignotum) => "unknown (ignotum) type",
         Type::Primitive(Primitive::Nihil | Primitive::Numquam) => "null or never type",
         // `inf` needs an arena-backed bignum (a C port of `Magnus`); goal unit C6.
@@ -594,7 +593,6 @@ fn describe(ty: &Type) -> &'static str {
         Type::Atomic(_) => "atomic type",
         Type::Intervallum(..) => "range type",
         Type::Bits(_) => "raw-bits type",
-        Type::SizedInstans(_) => "time instant type",
         Type::Intersection(_) => "intersection type",
         Type::Set(_) => "set type",
         Type::Queue(_) | Type::BoundedQueue { .. } | Type::Stack(_) | Type::BoundedStack { .. } => {
