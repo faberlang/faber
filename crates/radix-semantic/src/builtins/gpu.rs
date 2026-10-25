@@ -28,6 +28,10 @@ fn gpu_vector_builtin_return_type(types: &mut TypeTable) -> TypeId {
 }
 
 /// Register zero-argument GPU builtin functions in the value namespace.
+///
+/// # Panics
+///
+/// Panics if a builtin's name is already defined in the resolver.
 pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut Interner) {
     for builtin in MirKernelBuiltin::ALL {
         let name = interner.intern(builtin.spelling());

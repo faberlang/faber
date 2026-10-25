@@ -1145,6 +1145,10 @@ impl Lowerer<'_> {
     /// column is the five-field heading row: public name, resolved source
     /// (`name : source` or the public name), Faber type, nullability from
     /// `T ∪ nihil`, and source order. See docs/design/relational-views.md §2.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a schema declares more columns than `u32` can address.
     pub fn lower_schema(&mut self, stmt: &Stmt, decl: &SchemaDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
         let annotations = self.lower_item_annotations(def_id, &stmt.annotations);

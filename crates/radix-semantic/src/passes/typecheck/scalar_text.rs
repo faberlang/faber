@@ -125,8 +125,7 @@ impl TypeChecker<'_> {
         };
         let raw = interner.resolve(sym);
         radix_lexer::ascii_literal::decode_ascii_literal(raw)
-            .ok()
-            .is_some_and(|decoded| decoded.chars().count() == 1)
+            .is_ok_and(|decoded| decoded.chars().count() == 1)
     }
 
     fn textus_literal_payload_is_single_scalar(&mut self, sym: Symbol) -> bool {

@@ -352,10 +352,10 @@ impl UseVisitor<'_> {
             Type::BoundedArray { element, .. }
             | Type::BoundedQueue { element, .. }
             | Type::BoundedStack { element, .. } => vec![element],
-            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {
-                Vec::new()
-            }
-            Type::TensorEdgePolicy(_) => Vec::new(),
+            Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. }
+            | Type::BoundedOcteti { .. }
+            | Type::TensorEdgePolicy(_) => Vec::new(),
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
                 vec![success, alternate]
             }

@@ -1481,9 +1481,9 @@ pub(super) fn check_vector_bracket_range_index(
 fn tensor_axis_extents(checker: &mut TypeChecker<'_>, ty: TypeId) -> Option<Vec<IndexExpr>> {
     let resolved = checker.resolve_inferred_type(ty);
     let (_, payload) = checker.types.peel_access_marker(resolved);
-    let shape = match checker.types.get(payload).clone() {
-        Type::Tensor(_, shape) | Type::Matrix(_, shape) => shape,
-        _ => return None,
+    let (Type::Tensor(_, shape) | Type::Matrix(_, shape)) = checker.types.get(payload).clone()
+    else {
+        return None;
     };
     let shape = checker.resolve_index(shape);
     let dims = match checker.types.get_index(shape).clone() {

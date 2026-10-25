@@ -1163,12 +1163,6 @@ impl Lowerer<'_> {
             crate::locale::TypeBindingKind::Collection(collection) => {
                 Some(self.lower_collection_type(collection, params))
             }
-            // The tensor family lower through dedicated shape/width syntax
-            // (`TypeExprKind::Tensor(elem, figura)` etc.), never through a flat
-            // type-argument list. Fall through to the hardcoded name paths in
-            // `lower_named_type`, which report `tensor_incomplete` etc. for
-            // bare (incomplete) family spellings.
-            crate::locale::TypeBindingKind::TensorFamily(_) => None,
             crate::locale::TypeBindingKind::ModularWord => {
                 Some(self.lower_modular_word_type(params))
             }
@@ -1182,20 +1176,26 @@ impl Lowerer<'_> {
             crate::locale::TypeBindingKind::TensorEdgePolicy(policy) => {
                 Some(self.lower_tensor_edge_policy_type(policy, params))
             }
+            crate::locale::TypeBindingKind::Ratio => Some(self.lower_ratio_type(params)),
+            // The tensor family lower through dedicated shape/width syntax
+            // (`TypeExprKind::Tensor(elem, figura)` etc.), never through a flat
+            // type-argument list. Fall through to the hardcoded name paths in
+            // `lower_named_type`, which report `tensor_incomplete` etc. for
+            // bare (incomplete) family spellings.
             // Census relational type names are reader-surface rows only in S2
             // (no HIR/MIR type yet; the real surface is S3/S4). Fall through to
             // the hardcoded name paths in `lower_named_type` (bare `series`
             // keeps its dynamic row-map special case).
-            crate::locale::TypeBindingKind::Relational(_) => None,
-            crate::locale::TypeBindingKind::Ratio => Some(self.lower_ratio_type(params)),
             // `erratum<T>` identity lowering lands in the follow-up unit.
-            crate::locale::TypeBindingKind::Erratum => None,
             // `trapped<R, T>` lowers by its canonical registry name until the
             // trap unit wires the localized spelling through.
-            crate::locale::TypeBindingKind::Trapped => None,
             // Conversation-family names lower through the builtin frame
             // structs by their canonical Latin name in `lower_named_type`.
-            crate::locale::TypeBindingKind::Frame(_) => None,
+            crate::locale::TypeBindingKind::TensorFamily(_)
+            | crate::locale::TypeBindingKind::Relational(_)
+            | crate::locale::TypeBindingKind::Erratum
+            | crate::locale::TypeBindingKind::Trapped
+            | crate::locale::TypeBindingKind::Frame(_) => None,
         }
     }
 
