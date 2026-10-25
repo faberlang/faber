@@ -495,7 +495,7 @@ impl FunctionBuilder<'_> {
         };
         let matches_ty = MirType::semantic(matches_ty);
         let texts_ty = MirType::semantic(texts_ty);
-        let textus_ty = self.expr_ty(expr)?;
+        let result_ty = self.expr_ty(expr)?;
         let regex = self.lower_expr_value(receiver)?;
         let text = self.lower_expr_value(text)?;
         let callback = self.lower_closure_function(closure, MirType::semantic(textus))?;
@@ -510,7 +510,7 @@ impl FunctionBuilder<'_> {
         Some(self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::RegexReplaceEach),
             vec![regex, text, replacements],
-            textus_ty,
+            result_ty,
             expr.span,
         ))
     }
@@ -545,16 +545,16 @@ impl FunctionBuilder<'_> {
         };
         // WHY: typecheck interns `lista<key>` when it admits the selector, so
         // the key carrier exists in the read-only type table here.
-        let Some(keys_ty) = self.types.find_array(key_ty) else {
+        let Some(key_lista_ty) = self.types.find_array(key_ty) else {
             self.errors
                 .push(MirError::missing_type(closure.span, "ordina key lista"));
             return None;
         };
-        let keys_ty = MirType::semantic(keys_ty);
+        let key_lista_ty = MirType::semantic(key_lista_ty);
         let key_fn = self.lower_closure_function(closure, MirType::semantic(key_ty))?;
         let collection_ty = MirType::semantic(receiver_ty);
         let (place, ty) = self.lower_assignment_place_with_fallback(receiver, collection_ty)?;
-        let keys = self.lower_transform_over(place.clone(), key_fn, TransformKind::Map, keys_ty, expr.span)?;
+        let keys = self.lower_transform_over(place.clone(), key_fn, TransformKind::Map, key_lista_ty, expr.span)?;
         let sorted = self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
             vec![MirOperand::Place(place.clone()), keys],
@@ -674,12 +674,12 @@ impl FunctionBuilder<'_> {
                     return None;
                 };
                 let element = *element;
-                let Some(keys_ty) = self.types.find_array(key_ty) else {
+                let Some(key_lista_ty) = self.types.find_array(key_ty) else {
                     self.errors
                         .push(MirError::missing_type(span, "sort expression key lista"));
                     return None;
                 };
-                let keys_ty = MirType::semantic(keys_ty);
+                let key_lista_ty = MirType::semantic(key_lista_ty);
                 let selector = radix_types::FuncSig {
                     type_params: Vec::new(),
                     params: vec![radix_types::ParamType {
@@ -719,7 +719,7 @@ impl FunctionBuilder<'_> {
                     span: body.span,
                 };
                 let key_fn = self.lower_closure_function(&closure, MirType::semantic(key_ty))?;
-                let keys = self.lower_transform_over(terms.clone(), key_fn, TransformKind::Map, keys_ty, span)?;
+                let keys = self.lower_transform_over(terms.clone(), key_fn, TransformKind::Map, key_lista_ty, span)?;
                 self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
                     vec![MirOperand::Place(terms), keys],

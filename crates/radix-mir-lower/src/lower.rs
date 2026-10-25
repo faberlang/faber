@@ -642,7 +642,7 @@ pub struct MirLoweringOptions {
     /// reads no stage word for these functions.
     pub stage_bindings: Arc<FxHashMap<DefId, MirKernelShaderStage>>,
     /// Optional/default parameters for package-linked callees, whose synthetic
-    /// DefIds are absent from this unit's `function_params`; the package seam
+    /// `DefIds` are absent from this unit's `function_params`; the package seam
     /// supplies their metadata here.
     pub imported_function_params: Arc<FxHashMap<DefId, Vec<ImportedCallableParam>>>,
 }
@@ -1832,11 +1832,11 @@ impl<'a> MirLowerer<'a> {
     }
 
     fn applied_genus_receiver(&self, def_id: DefId, strukt: &HirStruct) -> Option<TypeId> {
+        use radix_types::AppliedArg;
+
         if strukt.type_params.is_empty() {
             return None;
         }
-
-        use radix_types::AppliedArg;
 
         #[expect(clippy::cast_possible_truncation, reason = "TypeId is u32 by design")]
         (0..self.types.type_count()).find_map(|index| {
@@ -2913,7 +2913,7 @@ impl<'a> FunctionBuilder<'a> {
             IndexExpr::Param(symbol) if witnessed_size_params => self
                 .size_param_source(*symbol)
                 .is_some_and(|source| self.body_index_contains_runtime_extent(source, seen, witnessed_size_params)),
-            IndexExpr::Param(_) => false,
+            IndexExpr::Param(_) | IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
             IndexExpr::Runtime(_) => true,
             IndexExpr::Affine { base, .. } => {
                 self.body_index_contains_runtime_extent(*base, seen, witnessed_size_params)
@@ -2924,7 +2924,6 @@ impl<'a> FunctionBuilder<'a> {
             IndexExpr::Tuple(dimensions) => dimensions
                 .iter()
                 .any(|dimension| self.body_index_contains_runtime_extent(*dimension, seen, witnessed_size_params)),
-            IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => false,
         }
     }
 
@@ -4751,7 +4750,9 @@ impl<'a> FunctionBuilder<'a> {
         match self.normalized_type(ty) {
             Type::Primitive(Primitive::Fractus) => Some(MirOperand::Constant(MirConstant::Float(0.0))),
             Type::Primitive(Primitive::Bivalens) => Some(MirOperand::Constant(MirConstant::Bool(false))),
-            Type::Primitive(Primitive::Nihil | Primitive::Ignotum) => Some(MirOperand::Constant(MirConstant::Nil)),
+            Type::Primitive(Primitive::Nihil | Primitive::Ignotum) | Type::Option(_) => {
+                Some(MirOperand::Constant(MirConstant::Nil))
+            }
             Type::Primitive(Primitive::Vacuum) => Some(MirOperand::Constant(MirConstant::Unit)),
             Type::Primitive(Primitive::Numerus) => Some(MirOperand::Constant(MirConstant::Int(0))),
             // SizedNumeric zeros are wrapped in a typed temp: a bare constant
@@ -4784,7 +4785,6 @@ impl<'a> FunctionBuilder<'a> {
                     .push(MirError::unsupported(span, "regex match type zero-init"));
                 None
             }
-            Type::Option(_) => Some(MirOperand::Constant(MirConstant::Nil)),
             Type::Union(members) => {
                 let nihil = self.types.primitive(Primitive::Nihil);
                 if members.contains(&nihil) {
@@ -5345,11 +5345,10 @@ impl<'a> FunctionBuilder<'a> {
             .then_some(ty)
         });
         let target = d64.unwrap_or(match (lhs_width, rhs_width) {
-            (Some(NumericWidth::D64), _) => lhs_semantic,
+            (Some(NumericWidth::D64), _) | (None, None) => lhs_semantic,
             (_, Some(NumericWidth::D64)) => rhs_semantic,
             (Some(_), _) => lhs_semantic,
             (_, Some(_)) => rhs_semantic,
-            (None, None) => lhs_semantic,
         });
         Some((lhs_ty, rhs_ty, target))
     }
@@ -5459,9 +5458,8 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::Mul => Some(MirBinOp::Mul),
         HirBinOp::Div => Some(MirBinOp::Div),
         HirBinOp::Mod => Some(MirBinOp::Mod),
-        HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => Some(MirBinOp::Eq),
-        HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq => None,
-        HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq => Some(MirBinOp::NotEq),
+        HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq | HirBinOp::Is => Some(MirBinOp::Eq),
+        HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq | HirBinOp::IsNot => Some(MirBinOp::NotEq),
         HirBinOp::Lt => Some(MirBinOp::Lt),
         HirBinOp::Gt => Some(MirBinOp::Gt),
         HirBinOp::LtEq => Some(MirBinOp::LtEq),
@@ -5474,17 +5472,26 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::BitXor => Some(MirBinOp::BitXor),
         HirBinOp::Shl => Some(MirBinOp::Shl),
         HirBinOp::Shr => Some(MirBinOp::Shr),
-        HirBinOp::Is => Some(MirBinOp::Eq),
-        HirBinOp::IsNot => Some(MirBinOp::NotEq),
+        // Fuzzy comparisons are intercepted by `lower_fuzzy_comparison` before
+        // this point; the explicit arm fails closed for any future caller.
         // Membership (`Between`, `NotBetween`, `InRange`, `NotInRange`) is
         // intercepted by `lower_binary` before this point; the explicit arm
         // fails closed for any future caller.
-        HirBinOp::InRange | HirBinOp::Between | HirBinOp::NotInRange | HirBinOp::NotBetween => None,
         // Glyph products are intercepted by `lower_binary` before this point;
         // keep the explicit fail-closed arm for any future caller.
-        HirBinOp::Dot | HirBinOp::Cross | HirBinOp::TensorProduct | HirBinOp::Hadamard | HirBinOp::HadamardDiv => None,
         // `÷` (d11-6 ruling 15) has no MIR primitive yet; fail closed.
-        HirBinOp::TrueDiv => None,
+        HirBinOp::FuzzyEq
+        | HirBinOp::FuzzyNotEq
+        | HirBinOp::InRange
+        | HirBinOp::Between
+        | HirBinOp::NotInRange
+        | HirBinOp::NotBetween
+        | HirBinOp::Dot
+        | HirBinOp::Cross
+        | HirBinOp::TensorProduct
+        | HirBinOp::Hadamard
+        | HirBinOp::HadamardDiv
+        | HirBinOp::TrueDiv => None,
     }
 }
 
