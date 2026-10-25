@@ -34,7 +34,7 @@ resolver = "2"
 
 # Package-selection freeze (destination-map §10.3.3): bare `cargo build` /
 # `cargo check` stay compiler-cheap. The default set is the compiler crates
-# including the `radix` library façade; the product (faber / exempla /
+# including the `radix` library façade; the product (faber / corpus-matrix /
 # faber-hir-rust) is never a default member and is reached only via explicit
 # `-p` selection.
 default-members = [

@@ -7,7 +7,7 @@
 //! exempla corpus.
 //!
 //! Since Phase 2 the classifier is the **cross-check oracle**, not the
-//! measurement: the retired harness (`exempla::exempla_e2e::conversio_target_matrix`,
+//! measurement: the retired harness (`corpus_matrix::exempla_e2e::conversio_target_matrix`,
 //! deleted 2026-10-24 with the e2e driver) measured fixture-backed cells through
 //! the real frontend, MIR probes, and HIR emit-arm detection; `faber corpus` is
 //! the target verifier now. This module predicts the same tiers read-only for
