@@ -15,7 +15,9 @@
 //! Individual `pub const` items are the import surface for the MIR LLVM and
 //! Wasm text emitters. The paired `*_ROWS` tables are the structured view
 //! consumed by the `radix abi` renderers. Both come from one declaration list
-//! per family so a constant and its row cannot drift apart.
+//! per family so a constant and its row cannot drift apart. Declaration order
+//! is emitted order, and the payload fingerprint covers it: append rows, never
+//! reorder them.
 
 /// Host ABI version emitted by this Radix build.
 pub const ABI_VERSION: u32 = 1;
@@ -51,7 +53,8 @@ macro_rules! abi_enum_family {
             pub const $name: $alias = $value;
         )*
         /// Structured `(const_name, code)` rows, derived from the same
-        /// declaration list as the individual constants above.
+        /// declaration list as the individual constants above. Rows widen
+        /// every code to `u32`; the constants keep the declared repr type.
         pub const $rows: &[(&'static str, u32)] = &[
             $((stringify!($name), $value)),*
         ];
@@ -411,7 +414,7 @@ abi_string_family! {
 // `GENUS_FIELD_POLICY_DEFAULTABLE` (`1`): the host retains the pre-seeded
 // slot when the key is missing. The seed is the emitter-supplied
 // construction default (declared default, or the sponte zero/nihil seed
-// for optional fields). Extra JSON keys are ignored.
+// for optional fields). Keys outside the named-field table are ignored.
 // `__faber_rt_v1_valor_genus` boxes the same table shape.
 abi_enum_family! {
     GENUS_FIELD_POLICY_ROWS: type FaberRtGenusFieldPolicyV1 = u8 {
