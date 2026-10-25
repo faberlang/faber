@@ -6,7 +6,7 @@
 //! EDGE: runtime `faber::InstansPraecisio` also includes `Secunda`; this module
 //! models only the explicit `instans<N>` type-parameter spellings.
 
-use crate::{Primitive, Type, TypeId, TypeTable};
+use crate::{InferVar, MarkerFamily, Primitive, Type, TypeId, TypeTable};
 use serde::{Deserialize, Serialize};
 
 /// Declared precision for sized `instans<N>` spellings.
@@ -17,13 +17,17 @@ pub enum InstansPrecision {
     Nanos,
 }
 
+/// Rejection reason for an `instans<N>` precision argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstansPrecisionError {
+    /// The marker is not `ms`, `us`, or `ns`.
     UnknownMarker,
+    /// The argument list holds more than one marker.
     TooManyParams,
 }
 
 impl InstansPrecisionError {
+    /// Diagnostic text for this rejection.
     #[must_use]
     pub fn message(self) -> &'static str {
         match self {
@@ -60,6 +64,7 @@ impl InstansPrecisionRank {
 }
 
 impl InstansPrecision {
+    /// Rank of an explicit marker; never [`InstansPrecisionRank::Seconds`].
     #[must_use]
     pub fn rank(self) -> InstansPrecisionRank {
         match self {
@@ -83,6 +88,7 @@ impl InstansPrecision {
         }
     }
 
+    /// Source spelling of this marker.
     #[must_use]
     pub fn faber_marker(self) -> &'static str {
         match self {
@@ -94,43 +100,47 @@ impl InstansPrecision {
 }
 
 /// Lower `instans` with optional precision type arguments.
+///
+/// Zero arguments lower to bare [`Primitive::Instans`]; one marker or infer
+/// hole lowers to a sized carrier. A rejected argument is reported through
+/// `report` and lowers to [`Type::Error`].
 pub fn lower_sized_instans(
     params: &[radix_syntax::TypeExpr],
     interner: &radix_lexer::Interner,
     types: &mut TypeTable,
     report: &mut dyn FnMut(&str),
 ) -> TypeId {
-    match params.len() {
-        0 => types.primitive(Primitive::Instans),
-        1 => {
-            if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
-                return types.intern(Type::MarkerHole {
-                    family: crate::MarkerFamily::Instans,
-                    var: crate::InferVar(params[0].span.start),
-                });
-            }
-            if let Some(marker) = precision_marker_from_type_expr(&params[0], interner) {
-                match InstansPrecision::from_marker(marker) {
-                    Ok(precision) => types.sized_instans(precision),
-                    Err(err) => {
-                        report(err.message());
-                        types.intern(Type::Error)
-                    }
-                }
-            } else {
-                report("precision marker must be a bare spelling such as ms or us");
-                types.intern(Type::Error)
-            }
-        }
+    let param = match params {
+        [] => return types.primitive(Primitive::Instans),
+        [param] => param,
         _ => {
             report(InstansPrecisionError::TooManyParams.message());
+            return types.intern(Type::Error);
+        }
+    };
+    if matches!(param.kind, radix_syntax::TypeExprKind::Infer) {
+        return types.intern(Type::MarkerHole {
+            family: MarkerFamily::Instans,
+            var: InferVar(param.span.start),
+        });
+    }
+    let Some(marker) = precision_marker_from_type_expr(param, interner) else {
+        report("precision marker must be a bare spelling such as ms or us");
+        return types.intern(Type::Error);
+    };
+    match InstansPrecision::from_marker(marker) {
+        Ok(precision) => types.sized_instans(precision),
+        Err(err) => {
+            report(err.message());
             types.intern(Type::Error)
         }
     }
 }
 
+/// Bare spelling of a named marker argument; `None` for nested or non-named
+/// arguments.
 fn precision_marker_from_type_expr<'a>(
-    ty: &'a radix_syntax::TypeExpr,
+    ty: &radix_syntax::TypeExpr,
     interner: &'a radix_lexer::Interner,
 ) -> Option<&'a str> {
     match &ty.kind {
@@ -142,6 +152,8 @@ fn precision_marker_from_type_expr<'a>(
 }
 
 /// Effective precision for bare or sized `instans` types.
+///
+/// Alias layers are transparent; every other carrier yields `None`.
 #[must_use]
 pub fn effective_instans_precision(types: &TypeTable, ty: TypeId) -> Option<InstansPrecisionRank> {
     match types.get(ty) {
@@ -155,10 +167,13 @@ pub fn effective_instans_precision(types: &TypeTable, ty: TypeId) -> Option<Inst
 /// Whether two `instans` carriers are assignable via equality or coarse→fine widening.
 #[must_use]
 pub fn is_instans_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
-    let from_rank = effective_instans_precision(types, from);
-    let to_rank = effective_instans_precision(types, to);
-    match (from_rank, to_rank) {
-        (Some(a), Some(b)) => InstansPrecisionRank::is_widening_assignable(a, b),
+    match (
+        effective_instans_precision(types, from),
+        effective_instans_precision(types, to),
+    ) {
+        (Some(from_rank), Some(to_rank)) => {
+            InstansPrecisionRank::is_widening_assignable(from_rank, to_rank)
+        }
         _ => false,
     }
 }
