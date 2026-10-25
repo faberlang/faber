@@ -102,7 +102,7 @@ impl FunctionLower<'_, '_> {
         let mut operands = Vec::with_capacity(arity);
         for arg in args {
             let (value, rep) = self.scalar(arg)?;
-            let (rep, list) = if rep == Rep::List {
+            let (rep, is_list) = if rep == Rep::List {
                 let element = self.element_type(self.operand_type(arg)?)?;
                 (rep_of(table, element)?, true)
             } else {
@@ -111,7 +111,11 @@ impl FunctionLower<'_, '_> {
             if !matches!(rep, Rep::Int | Rep::Float | Rep::Bool) {
                 return Err(Decline::new(format!("list lift over {rep:?} elements")));
             }
-            operands.push(Operand { value, rep, list });
+            operands.push(Operand {
+                value,
+                rep,
+                list: is_list,
+            });
         }
         let mut length: Option<Value> = None;
         for operand in operands.iter().filter(|operand| operand.list) {

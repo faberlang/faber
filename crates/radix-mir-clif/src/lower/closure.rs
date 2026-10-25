@@ -76,8 +76,8 @@ pub(super) fn define_value_shim(
         .ok_or_else(|| Decline::new("unknown function value"))?;
     let inner = state.signature_for(callee)?;
     signature.params.push(AbiParam::new(types::I64));
-    signature.params.extend(inner.params.iter().cloned());
-    signature.returns.extend(inner.returns.iter().cloned());
+    signature.params.extend(inner.params.iter().copied());
+    signature.returns.extend(inner.returns.iter().copied());
     let mut context = state.module.make_context();
     context.func.signature = signature;
     let mut builder_context = FunctionBuilderContext::new();
