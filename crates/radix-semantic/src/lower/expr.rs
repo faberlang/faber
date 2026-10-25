@@ -58,9 +58,9 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
     // ascription's `AscriptionTarget` site, for example) still name a node in
     // the finalized HIR. The authored paren extent stays the node's span.
     if let ExprKind::Paren(inner) = &expr.kind {
-        let mut lowered = lower_expr(lowerer, inner);
-        lowered.span = expr.span;
-        return lowered;
+        let mut child = lower_expr(lowerer, inner);
+        child.span = expr.span;
+        return child;
     }
     let id = lowerer.next_hir_id();
     let span = expr.span;
@@ -138,7 +138,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
         ExprKind::Construct(ty) => lowerer.lower_construct(ty, id, expr.span),
         ExprKind::Reducta(reduction) => lower_reducta(lowerer, reduction),
-        ExprKind::Scan(scan) => lower_scan(lowerer, scan),
+        ExprKind::Scan(scan_expr) => lower_scan(lowerer, scan_expr),
         ExprKind::Sort(sort) => lower_sort(lowerer, sort),
         // `⇇` copy-into lowers to the typed HIR node; typecheck owns the
         // tensor-storage, exact-type and alias rules.
@@ -550,9 +550,8 @@ impl Lowerer<'_> {
             radix_syntax::BinOp::Is => HirBinOp::Is,
             radix_syntax::BinOp::IsNot => HirBinOp::IsNot,
             radix_syntax::BinOp::InRange => HirBinOp::InRange,
-            radix_syntax::BinOp::Between => HirBinOp::Between,
             // WHY: placeholders; the checker retargets `Between` / `NotBetween` to the range forms by right-operand type.
-            radix_syntax::BinOp::Member => HirBinOp::Between,
+            radix_syntax::BinOp::Between | radix_syntax::BinOp::Member => HirBinOp::Between,
             radix_syntax::BinOp::NotMember => HirBinOp::NotBetween,
             radix_syntax::BinOp::Maximum => {
                 return self.lower_extremum_method_call("maximus", lhs, rhs);
@@ -2252,7 +2251,7 @@ impl Lowerer<'_> {
     }
 
     /// When resolve recorded a user binding for a builtin-claimed word, emit
-    /// a name load through the lowerer's own scope table. Resolver DefIds for
+    /// a name load through the lowerer's own scope table. Resolver `DefIds` for
     /// locals are not the HIR identities later passes walk.
     fn lower_shadowed_builtin(
         &mut self,

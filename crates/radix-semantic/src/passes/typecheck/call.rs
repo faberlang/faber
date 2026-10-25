@@ -656,7 +656,7 @@ impl TypeChecker<'_> {
 
     /// Typecheck a Path receiver as an imported namespace function, if it is one.
     ///
-    /// The HIR Path DefId is the nearest value binding. A local parameter can
+    /// The HIR Path `DefId` is the nearest value binding. A local parameter can
     /// therefore own the Path while the member is still a namespace export
     /// (`shape.numel` with parameter `shape`). Lookup is by the Path's source
     /// spelling so the callee signature — including its error channel — is the
@@ -717,10 +717,10 @@ impl TypeChecker<'_> {
         Some(ret)
     }
 
-    /// Namespace spelling for a Path DefId.
+    /// Namespace spelling for a Path `DefId`.
     ///
     /// Import modules live in the resolver symbol table. A local parameter that
-    /// shadows the import uses a HIR-local DefId (1_000_000+) and is recovered
+    /// shadows the import uses a HIR-local `DefId` (`1_000_000+`) and is recovered
     /// from [`TypeChecker::binding_names`].
     fn path_namespace_name(&self, def_id: radix_hir::DefId) -> Option<radix_lexer::Symbol> {
         self.resolver

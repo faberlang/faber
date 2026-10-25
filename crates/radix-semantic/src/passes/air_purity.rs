@@ -211,8 +211,11 @@ impl AirPurityChecker<'_> {
             HirExpressionKind::Path(_)
             | HirExpressionKind::Literal(_)
             | HirExpressionKind::Insere(_)
-            | HirExpressionKind::Vacua => {}
-            HirExpressionKind::Widen { operand, .. } => self.check_expr(operand),
+            | HirExpressionKind::Vacua
+            | HirExpressionKind::Error => {}
+            HirExpressionKind::Widen { operand, .. } | HirExpressionKind::Unary(_, operand) => {
+                self.check_expr(operand);
+            }
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 if self.integer_op_unproven(*op, lhs, rhs) {
                     self.reject(expr.span, "air_integer_range_unproven");
@@ -240,7 +243,6 @@ impl AirPurityChecker<'_> {
                     self.check_expr(recovery);
                 }
             }
-            HirExpressionKind::Unary(_, operand) => self.check_expr(operand),
             HirExpressionKind::Call(callee, _, args, _) => self.check_call(callee, args, expr.span),
             // `target ⇇ value` copies into storage the target already names:
             // a mutation of the target place, rejected exactly like `←`.
@@ -577,7 +579,6 @@ impl AirPurityChecker<'_> {
             | HirExpressionKind::Format { value: inner, .. } => {
                 self.check_expr(inner);
             }
-            HirExpressionKind::Error => {}
         }
     }
 
@@ -610,7 +611,7 @@ impl AirPurityChecker<'_> {
     }
 
     /// Higher-order AIR methods may receive a named AIR function as their
-    /// combine/mapper. Keep the callback as a DefId path so the existing AIR
+    /// combine/mapper. Keep the callback as a `DefId` path so the existing AIR
     /// call graph can discover its companion; closure literals are still
     /// rejected by `check_expr` with the stable `closure` issue.
     fn check_higher_order_combine(&mut self, args: &[HirCallArg]) {

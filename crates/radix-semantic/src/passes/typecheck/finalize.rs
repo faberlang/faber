@@ -391,23 +391,23 @@ impl TypeChecker<'_> {
     fn type_has_unsolved_union_hole(&self, ty: TypeId) -> bool {
         match self.types.get(ty) {
             Type::InferUnion(_) => true,
-            Type::Array(inner) => self.type_has_unsolved_union_hole(*inner),
+            Type::Array(inner)
+            | Type::Set(inner)
+            | Type::Promissum(inner)
+            | Type::Cursor(inner)
+            | Type::Option(inner)
+            | Type::Ref(_, inner) => self.type_has_unsolved_union_hole(*inner),
             Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.type_has_unsolved_union_hole(*key) || self.type_has_unsolved_union_hole(*value)
             }
-            Type::Set(inner) => self.type_has_unsolved_union_hole(*inner),
-            Type::Promissum(inner) => self.type_has_unsolved_union_hole(*inner),
             Type::PromissumFailable(success, alternate) => {
                 self.type_has_unsolved_union_hole(*success)
                     || self.type_has_unsolved_union_hole(*alternate)
             }
-            Type::Cursor(inner) => self.type_has_unsolved_union_hole(*inner),
             Type::AsyncCursor(item, alternate) => {
                 self.type_has_unsolved_union_hole(*item)
                     || self.type_has_unsolved_union_hole(*alternate)
             }
-            Type::Option(inner) => self.type_has_unsolved_union_hole(*inner),
-            Type::Ref(_, inner) => self.type_has_unsolved_union_hole(*inner),
             Type::Record(fields) => fields
                 .values()
                 .any(|field_ty| self.type_has_unsolved_union_hole(*field_ty)),
@@ -426,12 +426,12 @@ impl TypeChecker<'_> {
                         .err
                         .is_some_and(|err| self.type_has_unsolved_union_hole(err))
             }
-            Type::Tensor(elem, _) => self.type_has_unsolved_union_hole(*elem),
-            Type::Vector(elem, _) => self.type_has_unsolved_union_hole(*elem),
-            Type::Matrix(elem, _) => self.type_has_unsolved_union_hole(*elem),
-            Type::Sparsa(elem, _) => self.type_has_unsolved_union_hole(*elem),
-            Type::Atomic(elem) => self.type_has_unsolved_union_hole(*elem),
-            Type::Intervallum(elem, _) => self.type_has_unsolved_union_hole(*elem),
+            Type::Tensor(elem, _)
+            | Type::Vector(elem, _)
+            | Type::Matrix(elem, _)
+            | Type::Sparsa(elem, _)
+            | Type::Atomic(elem)
+            | Type::Intervallum(elem, _) => self.type_has_unsolved_union_hole(*elem),
             Type::Applied(base, args) => {
                 self.type_has_unsolved_union_hole(*base)
                     || args.iter().any(|arg| match arg {
@@ -549,24 +549,24 @@ impl TypeChecker<'_> {
                     );
                 }
             }
-            Type::Array(inner) => self.collect_hole_shape_warnings(inner, span),
+            Type::Array(inner)
+            | Type::Set(inner)
+            | Type::Promissum(inner)
+            | Type::Cursor(inner)
+            | Type::Option(inner)
+            | Type::Ref(_, inner) => self.collect_hole_shape_warnings(inner, span),
             Type::Map(key, value) | Type::Ledger(key, value) => {
                 self.collect_hole_shape_warnings(key, span);
                 self.collect_hole_shape_warnings(value, span);
             }
-            Type::Set(inner) => self.collect_hole_shape_warnings(inner, span),
-            Type::Promissum(inner) => self.collect_hole_shape_warnings(inner, span),
             Type::PromissumFailable(success, alternate) => {
                 self.collect_hole_shape_warnings(success, span);
                 self.collect_hole_shape_warnings(alternate, span);
             }
-            Type::Cursor(inner) => self.collect_hole_shape_warnings(inner, span),
             Type::AsyncCursor(item, alternate) => {
                 self.collect_hole_shape_warnings(item, span);
                 self.collect_hole_shape_warnings(alternate, span);
             }
-            Type::Option(inner) => self.collect_hole_shape_warnings(inner, span),
-            Type::Ref(_, inner) => self.collect_hole_shape_warnings(inner, span),
             Type::Record(fields) => {
                 for (_, field_ty) in fields {
                     self.collect_hole_shape_warnings(field_ty, span);
@@ -591,12 +591,12 @@ impl TypeChecker<'_> {
                     self.collect_hole_shape_warnings(err, span);
                 }
             }
-            Type::Tensor(elem, _) => self.collect_hole_shape_warnings(elem, span),
-            Type::Vector(elem, _) => self.collect_hole_shape_warnings(elem, span),
-            Type::Matrix(elem, _) => self.collect_hole_shape_warnings(elem, span),
-            Type::Sparsa(elem, _) => self.collect_hole_shape_warnings(elem, span),
-            Type::Atomic(elem) => self.collect_hole_shape_warnings(elem, span),
-            Type::Intervallum(elem, _) => self.collect_hole_shape_warnings(elem, span),
+            Type::Tensor(elem, _)
+            | Type::Vector(elem, _)
+            | Type::Matrix(elem, _)
+            | Type::Sparsa(elem, _)
+            | Type::Atomic(elem)
+            | Type::Intervallum(elem, _) => self.collect_hole_shape_warnings(elem, span),
             Type::Applied(base, args) => {
                 self.collect_hole_shape_warnings(base, span);
                 for arg in args {
