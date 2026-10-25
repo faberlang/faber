@@ -16,7 +16,7 @@ fn precision(code: i32) -> InstansPraecisio {
 }
 
 fn make(value: Instans) -> *const u8 {
-    (Box::leak(Box::new(value)) as *const Instans).cast::<u8>()
+    std::ptr::from_ref(Box::leak(Box::new(value))).cast::<u8>()
 }
 
 /// # Safety

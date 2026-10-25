@@ -54,7 +54,7 @@ fn canonical(mut carrier: i128, mut scale: u32) -> (i128, u32) {
 fn make(carrier: i128, scale: u32) -> *const u8 {
     let (carrier, scale) = canonical(carrier, scale);
     let boxed = Box::new(Dec { carrier, scale });
-    (Box::leak(boxed) as *const Dec).cast::<u8>()
+    std::ptr::from_ref(Box::leak(boxed)).cast::<u8>()
 }
 
 /// # Safety

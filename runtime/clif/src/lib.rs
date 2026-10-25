@@ -654,13 +654,12 @@ pub unsafe extern "C" fn __faber_clif_v1_map_set(
     value: i64,
 ) {
     let map = unsafe { &mut *map };
-    match map_find(map, key_tag, key) {
-        Some(at) => map.entries[at] = (key_tag, key, value_tag, value),
-        None => {
-            let position = map.entries.len();
-            map.entries.push((key_tag, key, value_tag, value));
-            map_index_insert(map, position);
-        }
+    if let Some(at) = map_find(map, key_tag, key) {
+        map.entries[at] = (key_tag, key, value_tag, value);
+    } else {
+        let position = map.entries.len();
+        map.entries.push((key_tag, key, value_tag, value));
+        map_index_insert(map, position);
     }
 }
 
@@ -1404,7 +1403,7 @@ fn f16_to_f32(bits: u16) -> f32 {
     let magnitude = if exponent == 0 {
         mantissa * 2f32.powi(-24)
     } else if exponent == 0x1f {
-        if bits & 0x3ff == 0 {
+        if bits.trailing_zeros() >= 10 {
             f32::INFINITY
         } else {
             f32::NAN
@@ -2084,7 +2083,6 @@ pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
         2 => value.log10(),
         3 => value.sin(),
         4 => value.cos(),
-        5 => value.tan(),
         6 => value.cbrt(),
         _ => value.tan(),
     }
@@ -2302,12 +2300,10 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
     let (right_start, right_end, right_inclusive) = unsafe { interval_parts(right) };
     if mode == 0 {
         let start = left_start.max(right_start);
-        let (end, inclusive) = if left_end < right_end {
-            (left_end, left_inclusive)
-        } else if right_end < left_end {
-            (right_end, right_inclusive)
-        } else {
-            (left_end, left_inclusive && right_inclusive)
+        let (end, inclusive) = match left_end.cmp(&right_end) {
+            std::cmp::Ordering::Less => (left_end, left_inclusive),
+            std::cmp::Ordering::Greater => (right_end, right_inclusive),
+            std::cmp::Ordering::Equal => (left_end, left_inclusive && right_inclusive),
         };
         if start < end || (inclusive && start == end) {
             interval_box(start, end, inclusive)
@@ -2329,12 +2325,10 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
         if second.0 > first.1 {
             return std::ptr::null();
         }
-        let (end, inclusive) = if second.1 > first.1 {
-            (second.1, second.2)
-        } else if first.1 > second.1 {
-            (first.1, first.2)
-        } else {
-            (first.1, first.2 || second.2)
+        let (end, inclusive) = match second.1.cmp(&first.1) {
+            std::cmp::Ordering::Greater => (second.1, second.2),
+            std::cmp::Ordering::Less => (first.1, first.2),
+            std::cmp::Ordering::Equal => (first.1, first.2 || second.2),
         };
         interval_box(first.0, end, inclusive)
     }

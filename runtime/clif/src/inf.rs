@@ -11,7 +11,7 @@ use super::{exact_trap, text_new};
 use std::cmp::Ordering;
 
 fn make(value: Magnus) -> *const u8 {
-    (Box::leak(Box::new(value)) as *const Magnus).cast::<u8>()
+    std::ptr::from_ref(Box::leak(Box::new(value))).cast::<u8>()
 }
 
 /// # Safety
