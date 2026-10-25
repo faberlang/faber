@@ -2,6 +2,9 @@
 //!
 //! tungstenite is the framing stack (A2 / Q4). TLS reuses the HTTP rustls
 //! client path. No async runtime.
+//!
+//! Peers live in a process-global table keyed by an integer id, so
+//! `reset_handles` has to run between program executions.
 
 #[cfg(test)]
 #[path = "websocket_test.rs"]
@@ -126,24 +129,52 @@ fn expect_str<'a>(
     }
 }
 
-fn connect(args: &[Arg]) -> Result<Reply, LeafError> {
-    const ROUTE: &str = "websocket:connect";
-    let url = expect_str(ROUTE, args, 0, "url")?;
+/// An open peer stream plus the URL pieces its handshake is built from.
+struct Peer {
+    stream: HttpStream,
+    addr: String,
+    host: String,
+    port: u16,
+    target: String,
+}
+
+/// Open the TCP or TLS stream for `args`'s URL. The 60 s stream timeouts are
+/// what keep a stalled peer from blocking the caller forever.
+fn open_peer(route: &'static str, args: &[Arg]) -> Result<Peer, LeafError> {
+    let url = expect_str(route, args, 0, "url")?;
     let ca_path = match args.get(1) {
         Some(Arg::Str(path)) => Some(path.as_str()),
         _ => None,
     };
     let (secure, host, port, target) = split_ws_url(url)?;
     let addr = format!("{host}:{port}");
-    let tcp = TcpStream::connect(&addr).map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
+    let tcp = TcpStream::connect(&addr).map_err(|err| LeafError::from_io(route, &addr, &err))?;
     tcp.set_read_timeout(Some(Duration::from_secs(60)))
         .and_then(|()| tcp.set_write_timeout(Some(Duration::from_secs(60))))
-        .map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
+        .map_err(|err| LeafError::from_io(route, &addr, &err))?;
     let stream = if secure {
         wrap_tls(tcp, &host, ca_path)?
     } else {
         HttpStream::Plain(tcp)
     };
+    Ok(Peer {
+        stream,
+        addr,
+        host,
+        port,
+        target,
+    })
+}
+
+fn connect(args: &[Arg]) -> Result<Reply, LeafError> {
+    const ROUTE: &str = "websocket:connect";
+    let Peer {
+        stream,
+        host,
+        port,
+        target,
+        ..
+    } = open_peer(ROUTE, args)?;
     let handshake = format!("ws://{host}:{port}{target}");
     let request = handshake
         .into_client_request()
@@ -155,22 +186,13 @@ fn connect(args: &[Arg]) -> Result<Reply, LeafError> {
 
 fn connect_open(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "websocket:connect_open";
-    let url = expect_str(ROUTE, args, 0, "url")?;
-    let ca_path = match args.get(1) {
-        Some(Arg::Str(path)) => Some(path.as_str()),
-        _ => None,
-    };
-    let (secure, host, port, target) = split_ws_url(url)?;
-    let addr = format!("{host}:{port}");
-    let tcp = TcpStream::connect(&addr).map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
-    tcp.set_read_timeout(Some(Duration::from_secs(60)))
-        .and_then(|()| tcp.set_write_timeout(Some(Duration::from_secs(60))))
-        .map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
-    let mut stream = if secure {
-        wrap_tls(tcp, &host, ca_path)?
-    } else {
-        HttpStream::Plain(tcp)
-    };
+    let Peer {
+        mut stream,
+        addr,
+        host,
+        port,
+        target,
+    } = open_peer(ROUTE, args)?;
     let mut random = [0_u8; 16];
     fill_random(&mut random);
     let key = base64(&random);
@@ -193,13 +215,10 @@ fn connect_finish(args: &[Arg]) -> Result<Reply, LeafError> {
     let id = expect_int(ROUTE, args, 0, "id")?;
     let (mut stream, key) = with_handles(|map| match map.remove(&id) {
         Some(Socket::ClientPending(stream, key)) => Ok((stream, key)),
-        Some(Socket::Ready(socket)) => {
-            drop(socket);
-            Err(LeafError::invalid_argument(
-                ROUTE,
-                "socket is not finishing a handshake",
-            ))
-        }
+        Some(Socket::Ready(_)) => Err(LeafError::invalid_argument(
+            ROUTE,
+            "socket is not finishing a handshake",
+        )),
         None => Err(LeafError::closed(ROUTE, "socket closed")),
     })?;
     let (status, headers, tail) = read_response_head(&mut stream)?;
@@ -310,9 +329,7 @@ fn send_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
     let data = match args.get(1) {
         Some(Arg::Bytes(bytes)) => bytes.clone(),
         Some(Arg::Str(text)) => text.as_bytes().to_vec(),
-        _ => {
-            return Err(LeafError::invalid_argument(ROUTE, "missing data"));
-        }
+        _ => return Err(LeafError::invalid_argument(ROUTE, "missing data")),
     };
     with_socket(id, ROUTE, |socket| {
         socket
@@ -360,18 +377,18 @@ fn empty_text_frame(done: bool) -> Reply {
 fn close(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "websocket:close";
     let id = expect_int(ROUTE, args, 0, "id")?;
-    with_handles(|map| match map.remove(&id) {
-        Some(Socket::Ready(mut socket)) => {
+    with_handles(|map| {
+        if let Some(Socket::Ready(mut socket)) = map.remove(&id) {
             // WHY: close is best-effort teardown; the socket is discarded and
             // a close-frame error is not actionable.
             drop(socket.close(None));
         }
-        Some(Socket::ClientPending(stream, key)) => drop((stream, key)),
-        None => {}
     });
     Ok(Reply::Unit)
 }
 
+/// Run `f` with the socket taken out of the table, then put it back. The id is
+/// absent for the call, so a second caller on the same id sees `socket closed`.
 fn with_socket<T>(
     id: i64,
     route: &'static str,
@@ -419,6 +436,8 @@ fn base64(data: &[u8]) -> String {
     encoded
 }
 
+/// Split a `ws` or `wss` URL into `(secure, host, port, target)`; the host
+/// keeps IPv6 brackets and the port defaults from the scheme.
 fn split_ws_url(url: &str) -> Result<(bool, String, u16, String), LeafError> {
     let (scheme, rest) = url.split_once("://").ok_or_else(|| {
         LeafError::invalid_argument("websocket:connect", format!("invalid URL `{url}`"))
@@ -479,8 +498,8 @@ fn wrap_tls(stream: TcpStream, host: &str, ca_path: Option<&str>) -> Result<Http
             .with_root_certificates(roots)
             .with_no_client_auth(),
     );
-    // WHY: the URL host keeps its brackets for `addr` and the handshake URL, but a
-    // TLS server name is the bare IP literal.
+    // WHY: the URL host keeps its brackets for `addr` and the handshake URL,
+    // but a TLS server name is the bare IP literal.
     let bare_host = host.trim_start_matches('[').trim_end_matches(']');
     let name = ServerName::try_from(bare_host.to_owned()).map_err(|_| {
         LeafError::invalid_argument(
