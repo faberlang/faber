@@ -7,12 +7,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-radix-codegen-shared = { path = "../radix-codegen-shared" }
-radix-diagnostics = { path = "../radix-diagnostics" }
 radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
-radix-syntax = { path = "../radix-syntax" }
 radix-types = { path = "../radix-types" }
 serde = { version = "1", features = ["derive"] }
 # DDCP3-U4 (c): the execution-descriptor identity domain is a distinct typed

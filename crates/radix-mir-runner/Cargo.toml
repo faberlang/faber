@@ -19,15 +19,12 @@ regex = "1"
 regex-syntax = "0.8"
 # WHY: `arbitrary_precision` keeps the digit string of a JSON number so an
 # integer token of any length reaches `inf` (inf-delivery-spec ruling 40, U8a).
-serde_json = { version = "1", features = ["arbitrary_precision"] }
 # WHY: a Faber call re-enters the interpreter natively, so deep recursion needs
 # stack that grows on demand instead of the host thread's fixed size.
 stacker = "0.1"
-toml = "1"
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }
-tempfile = "3"
 
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.

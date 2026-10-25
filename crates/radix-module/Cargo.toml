@@ -68,7 +68,6 @@ tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
 radix-hygiene = { path = "../radix-hygiene" }
-insta = "1"
 tempfile = "3"
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
