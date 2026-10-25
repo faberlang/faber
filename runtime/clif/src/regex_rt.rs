@@ -201,15 +201,14 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_replace_each(
         .iter()
         .map(|&(_, bits)| unsafe { text_of(bits as *const u8) })
         .collect();
-    match unsafe { program(regex) }.replace_each(&unsafe { text_of(text) }, &pieces) {
-        Some(replaced) => text_new(replaced.as_bytes()),
-        None => {
-            flush();
-            let mut stderr = std::io::stderr();
-            let _ = writeln!(stderr, "error: replace-each count mismatch");
-            std::process::exit(1);
-        }
-    }
+    let Some(replaced) = unsafe { program(regex) }.replace_each(&unsafe { text_of(text) }, &pieces)
+    else {
+        flush();
+        let mut stderr = std::io::stderr();
+        let _ = writeln!(stderr, "error: replace-each count mismatch");
+        std::process::exit(1);
+    };
+    text_new(replaced.as_bytes())
 }
 
 /// The text of a match.
