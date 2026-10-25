@@ -1,15 +1,13 @@
 //! Shared traversal helpers for the Faber AST.
 //!
 //! Visitors separate "what to do at a node" from the recursive mechanics of
-//! descending through syntax. That is useful for light analyses, diagnostics,
-//! indexing, and tooling that need source-shaped traversal without owning a
-//! full semantic pass.
+//! descending through syntax.
 //!
-//! This module is intentionally conservative: the walkers visit the high-value
-//! child expressions, statements, identifiers, and type syntax currently needed
-//! by generic visitors. A compiler phase that relies on exhaustive semantics
-//! should audit the relevant AST variants instead of assuming these helpers
-//! encode every language rule.
+//! This module is intentionally conservative: the walkers visit the child
+//! expressions, statements, identifiers, and type syntax that generic visitors
+//! need today, not every field of every node. A phase that relies on
+//! exhaustive semantics must audit the AST variants it needs instead of
+//! assuming these helpers encode every language rule.
 //!
 //! INVARIANTS
 //! ==========
@@ -27,16 +25,15 @@ use std::cell::Cell;
 
 use super::ast::{
     ArrayElement, BindingPattern, BlockStmt, CapeClause, ClassMemberKind, ClausuraBody,
-    ConversioTarget, Expr, ExprKind, FuncDecl, GenericArgExpr, GenericParamDefault, Ident, IfBody,
-    ImportKind, NonNullKind, OptionalChainKind, Pattern, PatternBind, Program, SecusClause, Stmt,
-    StmtKind, TypeExpr, TypeExprKind, TypeParam,
+    ConversioTarget, Expr, ExprKind, FacStmt, FiguraExpr, FuncDecl, GenericArgExpr,
+    GenericParamDefault, Ident, IfBody, ImportKind, LiftExtent, NonNullKind, OptionalChainKind,
+    Pattern, PatternBind, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
 
 /// Maximum AST nesting depth before the walker refuses to descend further.
 ///
 /// Chosen so a `visit_*` → `walk_*` pair (two frames per node) on a debug
-/// build stays safely under a typical ~2 MiB thread stack. Realistic Faber
-/// ASTs are far shallower.
+/// build stays safely under a typical ~2 MiB thread stack.
 pub const MAX_VISIT_DEPTH: usize = 1024;
 
 /// Depth-limit diagnostic handed to [`Visitor::on_depth_exceeded`].
@@ -124,8 +121,8 @@ pub trait Visitor: Sized {
         walk_type_expr(self, ty);
     }
 
-    /// Identifier occurrence or binding selected by a walker. Default is a no-op
-    /// because identifiers are leaves.
+    /// Identifier occurrence or binding. Default is a no-op; identifiers are
+    /// leaves.
     fn visit_ident(&mut self, _ident: &Ident) {}
 
     fn visit_block(&mut self, block: &BlockStmt) {
@@ -182,15 +179,9 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 }
             }
         }
-        StmtKind::Block(block) => {
-            visitor.visit_block(block);
-        }
-        StmtKind::Expr(expr_stmt) => {
-            visitor.visit_expr(&expr_stmt.expr);
-        }
-        StmtKind::IncDec(inc_dec) => {
-            visitor.visit_expr(&inc_dec.target);
-        }
+        StmtKind::Block(block) => visitor.visit_block(block),
+        StmtKind::Expr(expr_stmt) => visitor.visit_expr(&expr_stmt.expr),
+        StmtKind::IncDec(inc_dec) => visitor.visit_expr(&inc_dec.target),
         StmtKind::Si(if_stmt) => {
             visitor.visit_expr(&if_stmt.cond);
             walk_if_body(visitor, &if_stmt.then);
@@ -243,15 +234,9 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(value);
             }
         }
-        StmtKind::Proba(test) => {
-            visitor.visit_block(&test.body);
-        }
-        StmtKind::Iace(throw) => {
-            visitor.visit_expr(&throw.value);
-        }
-        StmtKind::Mori(panic) => {
-            visitor.visit_expr(&panic.value);
-        }
+        StmtKind::Proba(test) => visitor.visit_block(&test.body),
+        StmtKind::Iace(throw) => visitor.visit_expr(&throw.value),
+        StmtKind::Mori(panic) => visitor.visit_expr(&panic.value),
         StmtKind::Interface(decl) => {
             visitor.visit_ident(&decl.name);
             for method in &decl.methods {
@@ -282,12 +267,8 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 }
             }
         }
-        StmtKind::Enum(decl) => {
-            visitor.visit_ident(&decl.name);
-        }
-        StmtKind::Union(decl) => {
-            visitor.visit_ident(&decl.name);
-        }
+        StmtKind::Enum(decl) => visitor.visit_ident(&decl.name),
+        StmtKind::Union(decl) => visitor.visit_ident(&decl.name),
         StmtKind::Import(decl) => match &decl.kind {
             ImportKind::Named { name, alias, .. } => {
                 visitor.visit_ident(name);
@@ -353,15 +334,7 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 walk_if_body(visitor, &clause.body);
             }
         }
-        StmtKind::Fac(stmt) => {
-            visitor.visit_block(&stmt.body);
-            if let Some(catch) = &stmt.catch {
-                walk_catch(visitor, catch);
-            }
-            if let Some(while_) = &stmt.while_ {
-                visitor.visit_expr(while_);
-            }
-        }
+        StmtKind::Fac(stmt) => walk_fac_stmt(visitor, stmt),
         StmtKind::Rumpe(_) | StmtKind::Perge(_) | StmtKind::Tacet(_) => {}
         StmtKind::Adfirma(stmt) => {
             visitor.visit_expr(&stmt.cond);
@@ -391,12 +364,8 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(exitus);
             }
         }
-        StmtKind::Reddet(stmt) => {
-            visitor.visit_expr(&stmt.future);
-        }
-        StmtKind::Tacebit(stmt) => {
-            visitor.visit_expr(&stmt.future);
-        }
+        StmtKind::Reddet(stmt) => visitor.visit_expr(&stmt.future),
+        StmtKind::Tacebit(stmt) => visitor.visit_expr(&stmt.future),
     }
 }
 
@@ -406,16 +375,12 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
         return;
     };
     match &expr.kind {
-        ExprKind::Ident(ident) => {
-            visitor.visit_ident(ident);
-        }
+        ExprKind::Ident(ident) => visitor.visit_ident(ident),
         ExprKind::Binary(bin) => {
             visitor.visit_expr(&bin.lhs);
             visitor.visit_expr(&bin.rhs);
         }
-        ExprKind::Unary(un) => {
-            visitor.visit_expr(&un.operand);
-        }
+        ExprKind::Unary(un) => visitor.visit_expr(&un.operand),
         ExprKind::Ternary(tern) => {
             visitor.visit_expr(&tern.cond);
             visitor.visit_expr(&tern.then);
@@ -478,20 +443,10 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             match &closure.body {
                 ClausuraBody::Expr(e) => visitor.visit_expr(e),
                 ClausuraBody::Block(b) => visitor.visit_block(b),
-                ClausuraBody::Fac(f) => {
-                    visitor.visit_block(&f.body);
-                    if let Some(catch) = &f.catch {
-                        walk_catch(visitor, catch);
-                    }
-                    if let Some(while_) = &f.while_ {
-                        visitor.visit_expr(while_);
-                    }
-                }
+                ClausuraBody::Fac(fac) => walk_fac_stmt(visitor, fac),
             }
         }
-        ExprKind::Cede(cede) => {
-            visitor.visit_expr(&cede.expr);
-        }
+        ExprKind::Cede(cede) => visitor.visit_expr(&cede.expr),
         ExprKind::Verte(verte) => {
             visitor.visit_expr(&verte.expr);
             visitor.visit_type_expr(&verte.ty);
@@ -511,9 +466,7 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_expr(opener);
             }
         }
-        ExprKind::Paren(inner) => {
-            visitor.visit_expr(inner);
-        }
+        ExprKind::Paren(inner) => visitor.visit_expr(inner),
         ExprKind::Construct(ty) => visitor.visit_type_expr(ty),
         ExprKind::Iuncta(iuncta) => {
             for ty in &iuncta.type_args {
@@ -639,9 +592,7 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             visitor.visit_expr(&sink.sink);
             visitor.visit_expr(&sink.item);
         }
-        ExprKind::Trap(trap) => {
-            visitor.visit_block(&trap.body);
-        }
+        ExprKind::Trap(trap) => visitor.visit_block(&trap.body),
         ExprKind::CallDefault(call_default) => {
             visitor.visit_expr(&call_default.call);
             visitor.visit_expr(&call_default.default);
@@ -685,8 +636,8 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
         return;
     };
     match &ty.kind {
-        // All three holes are leaves with no nested type syntax to walk. Kept
-        // in one arm: the shared empty body is intentional (clippy::match_same_arms).
+        // All three holes are leaves, so one empty arm keeps
+        // clippy::match_same_arms quiet.
         TypeExprKind::Infer | TypeExprKind::UnionHole | TypeExprKind::FieldListHole => {}
         TypeExprKind::Tensor(elem, figura)
         | TypeExprKind::Sparsa(elem, figura)
@@ -740,22 +691,22 @@ fn walk_generic_arg_expr<V: Visitor>(visitor: &mut V, arg: &GenericArgExpr) {
     }
 }
 
-fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &crate::FiguraExpr) {
+fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &FiguraExpr) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
     };
     match figura {
-        crate::FiguraExpr::Infer | crate::FiguraExpr::Literal(_) => {}
-        crate::FiguraExpr::Var(ident) => visitor.visit_ident(ident),
-        crate::FiguraExpr::Add(value, _)
-        | crate::FiguraExpr::Subtract(value, _)
-        | crate::FiguraExpr::Divide(value, _) => walk_figura_expr(visitor, value),
-        crate::FiguraExpr::Lift(extent) => match &**extent {
-            crate::LiftExtent::Literal(_) | crate::LiftExtent::Negative { .. } => {}
-            crate::LiftExtent::Name(ident) => visitor.visit_ident(ident),
-            crate::LiftExtent::Paren(term) => walk_figura_expr(visitor, term),
+        FiguraExpr::Infer | FiguraExpr::Literal(_) => {}
+        FiguraExpr::Var(ident) => visitor.visit_ident(ident),
+        FiguraExpr::Add(value, _)
+        | FiguraExpr::Subtract(value, _)
+        | FiguraExpr::Divide(value, _) => walk_figura_expr(visitor, value),
+        FiguraExpr::Lift(extent) => match &**extent {
+            LiftExtent::Literal(_) | LiftExtent::Negative { .. } => {}
+            LiftExtent::Name(ident) => visitor.visit_ident(ident),
+            LiftExtent::Paren(term) => walk_figura_expr(visitor, term),
         },
-        crate::FiguraExpr::Tuple(dims) => {
+        FiguraExpr::Tuple(dims) => {
             for dim in dims {
                 walk_figura_expr(visitor, dim);
             }
@@ -831,8 +782,21 @@ fn walk_catch<V: Visitor>(visitor: &mut V, catch: &CapeClause) {
     visitor.visit_block(&catch.body);
 }
 
-/// Walk a `secus` chain (an `else` subtree) so walker consumers do not miss
-/// its statements, catches, and nested `si`/`sin` conditionals.
+/// Walk a `fac` block: body, optional `cape` clause, and the optional postfix
+/// `dum` condition. Shared by the statement form and [`ClausuraBody::Fac`],
+/// which stores the same [`FacStmt`].
+fn walk_fac_stmt<V: Visitor>(visitor: &mut V, fac: &FacStmt) {
+    visitor.visit_block(&fac.body);
+    if let Some(catch) = &fac.catch {
+        walk_catch(visitor, catch);
+    }
+    if let Some(while_) = &fac.while_ {
+        visitor.visit_expr(while_);
+    }
+}
+
+/// Walk a `secus` chain: its statements, catches, and nested `si`/`sin`
+/// conditionals.
 fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
     match clause {
         SecusClause::Sin { stmt, .. } => {
@@ -860,7 +824,7 @@ fn walk_secus_clause<V: Visitor>(visitor: &mut V, clause: &SecusClause) {
     }
 }
 
-/// Visit identifiers in `discerne` bindings so visitors can register binding sites.
+/// Walk a `discerne` pattern: identifiers, type checks, and bindings.
 fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
     let Some(_frame) = DepthFrame::enter(visitor) else {
         return;
