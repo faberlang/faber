@@ -200,33 +200,43 @@ impl<'a> ClifCapability<'a> {
     /// type is inside the subset (scalars and the control-only shapes).
     fn type_gap(&self, ty: MirType) -> Option<Gap> {
         match self.types.get(ty.semantic_id()) {
-            Type::Primitive(Primitive::Numerus)
-            | Type::Primitive(Primitive::Fractus)
-            | Type::Primitive(Primitive::Bivalens)
-            | Type::Primitive(Primitive::Vacuum)
-            | Type::Primitive(Primitive::Numquam)
+            Type::Primitive(
+                Primitive::Numerus
+                | Primitive::Fractus
+                | Primitive::Bivalens
+                | Primitive::Vacuum
+                | Primitive::Numquam
+                | Primitive::Textus
+                | Primitive::Ascii
+                | Primitive::Littera
+                | Primitive::Regex
+                | Primitive::Match
+                | Primitive::Json
+                | Primitive::Valor
+                | Primitive::Instans
+                | Primitive::Nihil
+                | Primitive::Ignotum,
+            )
             | Type::SizedNumeric(Primitive::Numerus, _)
-            | Type::Primitive(Primitive::Textus)
+            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
             | Type::Bits(_)
-            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64) => None,
+            | Type::SizedInstans(_)
+            | Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. }
+            | Type::Struct(_)
+            | Type::Enum(_)
+            | Type::Interface(_) => None,
             Type::SizedNumeric(Primitive::Fractus, width) if width.is_float() => None,
             Type::SizedNumeric(..) => Some(Gap::Subset("sized numeric value".to_owned())),
             Type::PolicyFloat(..) => Some(Gap::Subset("policy float value".to_owned())),
-            Type::Primitive(Primitive::Ascii) => None,
-            Type::Primitive(Primitive::Littera) => None,
             Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
                 crate::lower::byte_element(self.types)
                     .is_none()
                     .then(|| Gap::Subset("byte buffer value".to_owned()))
             }
-            Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => None,
-            Type::Primitive(Primitive::Regex | Primitive::Match) => None,
-            Type::Primitive(Primitive::Json | Primitive::Valor) => None,
-            Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => None,
-            Type::Primitive(Primitive::Nihil) => None,
-            Type::Primitive(Primitive::Ignotum) => None,
-            Type::Array(element) => self.type_gap(MirType::semantic(*element)),
-            Type::BoundedArray { element, .. } => self.type_gap(MirType::semantic(*element)),
+            Type::Array(element) | Type::BoundedArray { element, .. } | Type::Cursor(element) => {
+                self.type_gap(MirType::semantic(*element))
+            }
             Type::Map(key, value) => self
                 .type_gap(MirType::semantic(*key))
                 .or_else(|| self.type_gap(MirType::semantic(*value)))
@@ -245,12 +255,9 @@ impl<'a> ClifCapability<'a> {
             | Type::Stack(_)
             | Type::BoundedStack { .. }
             | Type::Ledger(_, _) => Some(Gap::Subset("collection value".to_owned())),
-            Type::Struct(_) => None,
             Type::Record(fields) => fields
                 .values()
                 .find_map(|field| self.type_gap(MirType::semantic(*field))),
-            Type::Enum(_) => None,
-            Type::Interface(_) => None,
             Type::Tuple(elements) => elements
                 .iter()
                 .find_map(|element| self.type_gap(MirType::semantic(*element))),
@@ -308,7 +315,9 @@ impl<'a> ClifCapability<'a> {
                     Some(Gap::Subset("reference value".to_owned()))
                 }
             }
-            Type::Ref(_, inner) => self.type_gap(MirType::semantic(*inner)),
+            Type::Ref(_, inner) | Type::Promissum(inner) => {
+                self.type_gap(MirType::semantic(*inner))
+            }
             Type::ModularWord(width) | Type::SaturatingWord(width)
                 if width.integer_range().is_some() =>
             {
@@ -316,8 +325,6 @@ impl<'a> ClifCapability<'a> {
             }
             Type::ModularWord(_) => Some(Gap::Subset("wrapping value".to_owned())),
             Type::SaturatingWord(_) => Some(Gap::Subset("saturating value".to_owned())),
-            Type::Promissum(inner) => self.type_gap(MirType::semantic(*inner)),
-            Type::Cursor(element) => self.type_gap(MirType::semantic(*element)),
             Type::AsyncCursor(_, _) | Type::PromissumFailable(_, _) => {
                 Some(Gap::Subset("async value".to_owned()))
             }
@@ -330,8 +337,8 @@ impl<'a> ClifCapability<'a> {
             | Type::Vector(..)
             | Type::Matrix(..)
             | Type::Sparsa(..)
-            | Type::Atomic(_) => Some(Gap::Policy("device value".to_owned())),
-            Type::TensorEdgePolicy(_) => Some(Gap::Policy("device value".to_owned())),
+            | Type::Atomic(_)
+            | Type::TensorEdgePolicy(_) => Some(Gap::Policy("device value".to_owned())),
             Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error => {
                 Some(Gap::Layout("unresolved type".to_owned()))
             }
@@ -441,33 +448,38 @@ impl<'a> ClifCapability<'a> {
 
     fn constant_gap(constant: &MirConstant) -> Option<Gap> {
         match constant {
-            MirConstant::Int(_) | MirConstant::UInt(_) | MirConstant::Float(_) => None,
-            MirConstant::Bool(_) | MirConstant::Unit => None,
-            MirConstant::String(_) => None,
-            MirConstant::Ascii(_) => None,
+            MirConstant::Int(_)
+            | MirConstant::UInt(_)
+            | MirConstant::Float(_)
+            | MirConstant::Bool(_)
+            | MirConstant::Unit
+            | MirConstant::String(_)
+            | MirConstant::Ascii(_)
+            | MirConstant::Regex { .. }
+            | MirConstant::Nil
+            | MirConstant::Function(_)
+            | MirConstant::Magnus(_) => None,
             MirConstant::Octeti(_) => Some(Gap::Subset("byte constant".to_owned())),
-            MirConstant::Regex { .. } => None,
-            MirConstant::Nil => None,
-            MirConstant::Function(_) => None,
-            MirConstant::Magnus(_) => None,
             MirConstant::ShapeSize { .. } => Some(Gap::Policy("device constant".to_owned())),
         }
     }
 
     fn aggregate_gap(kind: &MirAggregateKind) -> Option<Gap> {
         match kind {
-            MirAggregateKind::Tuple => None,
-            MirAggregateKind::Array => None,
-            MirAggregateKind::Map | MirAggregateKind::Set => None,
-            MirAggregateKind::Record => None,
-            MirAggregateKind::Struct(_) => None,
-            MirAggregateKind::EnumVariant(_) => None,
-            MirAggregateKind::ClosureEnvironment(_) | MirAggregateKind::SharedCell => None,
+            MirAggregateKind::Tuple
+            | MirAggregateKind::Array
+            | MirAggregateKind::Map
+            | MirAggregateKind::Set
+            | MirAggregateKind::Record
+            | MirAggregateKind::Struct(_)
+            | MirAggregateKind::EnumVariant(_)
+            | MirAggregateKind::ClosureEnvironment(_)
+            | MirAggregateKind::SharedCell
+            | MirAggregateKind::Interval { .. } => None,
             MirAggregateKind::Tensor
             | MirAggregateKind::SparseTensor
             | MirAggregateKind::Vector
             | MirAggregateKind::Matrix => Some(Gap::Policy("device construction".to_owned())),
-            MirAggregateKind::Interval { .. } => None,
         }
     }
 
@@ -825,13 +837,12 @@ impl MirVisitor for ClifCapability<'_> {
 
     fn visit_callee(&mut self, callee: &MirCallee) {
         match callee {
-            MirCallee::Function(_) => {}
             MirCallee::Definition { source, .. } => {
                 if !self.function_sources.contains(source) {
                     self.record(Gap::Abi("external definition call".to_owned()));
                 }
             }
-            MirCallee::Closure(_) | MirCallee::Value(_) => {}
+            MirCallee::Function(_) | MirCallee::Closure(_) | MirCallee::Value(_) => {}
         }
         radix_mir::visit::walk_callee(self, callee);
     }

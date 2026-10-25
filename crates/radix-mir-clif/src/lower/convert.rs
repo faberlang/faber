@@ -169,12 +169,12 @@ pub(crate) fn numeric_conversion(
             IntPolicy::Trap | IntPolicy::Saturate => true,
             IntPolicy::Wrap => to.width != NumericWidth::U64,
         },
-        (Num::Int(_) | Num::Bool, Num::Float(_)) | (Num::Float(_), Num::Float(_)) => true,
+        (Num::Int(_) | Num::Bool | Num::Float(_), Num::Float(_)) => true,
         (Num::Float(_) | Num::Text, Num::Int(to)) => {
             to.policy == IntPolicy::Trap && carrier_exact(to)
         }
         (Num::Text | Num::Float(_) | Num::Int(_), Num::Bool) => true,
-        (Num::Bool, Num::Int(to)) => to.policy == IntPolicy::Trap,
+        (Num::Bool | Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         (Num::Text, Num::Float(_)) => true,
         // A letter is a one-letter text: digits and code points convert both
         // ways, and a text converts when it holds exactly one letter.
@@ -203,7 +203,6 @@ pub(crate) fn numeric_conversion(
         (Num::Int(from), Num::Inf) => from.policy == IntPolicy::Trap && carrier_exact(from),
         (Num::Inf, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
         (Num::Inf, Num::Dyn) | (Num::Dyn, Num::Inf) => true,
-        (Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
         (Num::Int(from), Num::Bits(width)) => {
@@ -883,7 +882,7 @@ impl FunctionLower<'_, '_> {
                 (self.builder.ins().fcvt_from_sint(types::F64, wide), None)
             }
             (Num::Bool, Num::Int(_)) => (self.builder.ins().uextend(types::I64, value), None),
-            (Num::Float(_), Num::Float(_)) => (value, None),
+            (Num::Float(_), Num::Float(_)) | (Num::Nil, Num::Dyn) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value)?,
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
             (Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => {
@@ -931,7 +930,6 @@ impl FunctionLower<'_, '_> {
                 let message = Box::leak(message.into_boxed_str());
                 (extracted, Some((failed, Failure::Static(message))))
             }
-            (Num::Nil, Num::Dyn) => (value, None),
             (Num::Text, Num::Ins(code)) => {
                 let code = self.builder.ins().iconst(types::I32, code);
                 let instant = self
