@@ -457,18 +457,15 @@ impl Emitter<'_> {
                 Ok(Operand::new(body, form).with_effect(effect))
             }
             (HirOrdoRow::FromNumerus, Value::Int | Value::Exact) => {
-                let mut chain = match recovery {
-                    Some(recovery) => {
-                        let fallback = self.expr(recovery)?;
-                        let Value::Genus(_) = fallback.value else {
-                            return Err(unsupported("recovery value of a different class"));
-                        };
-                        fallback.text
-                    }
-                    None => {
-                        self.support.need(Helper::Trap);
-                        "(faber_abort(\"no ordo member has this value\"), NULL)".to_owned()
-                    }
+                let mut chain = if let Some(recovery) = recovery {
+                    let fallback = self.expr(recovery)?;
+                    let Value::Genus(_) = fallback.value else {
+                        return Err(unsupported("recovery value of a different class"));
+                    };
+                    fallback.text
+                } else {
+                    self.support.need(Helper::Trap);
+                    "(faber_abort(\"no ordo member has this value\"), NULL)".to_owned()
                 };
                 let mut def = None;
                 for member in members.iter().rev() {
