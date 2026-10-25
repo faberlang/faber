@@ -3999,17 +3999,17 @@ impl Resolver {
         self.schemas.get(&def_id)
     }
 
-    /// Record one locale-pack `[types]` surface as a builtin TypeAlias def.
+    /// Record one locale-pack `[types]` surface as a builtin `TypeAlias` def.
     pub fn record_locale_pack_type_alias(&mut self, def_id: DefId, name: LexSymbol) {
         self.locale_pack_type_aliases.insert(def_id, name);
     }
 
-    /// Builtin TypeAlias defs installed from the reader-locale pack.
+    /// Builtin `TypeAlias` defs installed from the reader-locale pack.
     pub fn locale_pack_type_alias_defs(&self) -> impl Iterator<Item = DefId> + '_ {
         self.locale_pack_type_aliases.keys().copied()
     }
 
-    /// Surface spellings for locale-pack TypeAlias defs, for emit-table names.
+    /// Surface spellings for locale-pack `TypeAlias` defs, for emit-table names.
     #[must_use]
     pub fn locale_pack_type_alias_names(
         &self,
