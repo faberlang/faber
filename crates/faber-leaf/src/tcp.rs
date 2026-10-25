@@ -2,6 +2,10 @@
 //!
 //! Handles live in this crate. Norma `Socket` / `Listener` carry only the id.
 //! rustls is the TLS stack (A2 / Q4). No async runtime.
+//!
+//! WHY: no blocking socket call runs while the handle table lock is held;
+//! listeners are cloned out of the table and streams are taken out and put
+//! back around each call.
 
 #[cfg(test)]
 #[path = "tcp_test.rs"]
@@ -151,11 +155,10 @@ fn optional_bool(args: &[Arg], index: usize) -> bool {
 fn listen(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "caelum:ausculta";
     let port = expect_int(ROUTE, args, 0, "port")?;
-    if !(0..=65_535).contains(&port) {
-        return Err(LeafError::invalid_argument(ROUTE, "port out of range"));
-    }
+    let bind_port =
+        u16::try_from(port).map_err(|_| LeafError::invalid_argument(ROUTE, "port out of range"))?;
     let addr = format!("0.0.0.0:{port}");
-    let listener = TcpListener::bind(("0.0.0.0", u16::try_from(port).unwrap_or(0)))
+    let listener = TcpListener::bind(("0.0.0.0", bind_port))
         .map_err(|err| LeafError::from_io(ROUTE, &addr, &err))?;
     listener
         .set_nonblocking(false)
@@ -281,6 +284,8 @@ fn read_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
     Ok(Reply::Bytes(buf))
 }
 
+/// Remove a stream for the duration of one blocking call. A listener goes back
+/// into the table and is reported as such.
 fn take_stream(id: i64, route: &'static str) -> Result<Handle, LeafError> {
     with_handles(|map| match map.remove(&id) {
         Some(handle @ (Handle::Stream(_) | Handle::TlsClient(_) | Handle::TlsServer(_))) => {
@@ -294,6 +299,7 @@ fn take_stream(id: i64, route: &'static str) -> Result<Handle, LeafError> {
     })
 }
 
+/// Return a stream to the table after a blocking call, whatever its outcome.
 fn put_handle(id: i64, handle: Handle) {
     with_handles(|map| {
         map.insert(id, handle);
@@ -304,7 +310,7 @@ fn write_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
     const ROUTE: &str = "caelum:funde";
     let id = expect_int(ROUTE, args, 0, "id")?;
     let data = match args.get(1) {
-        Some(Arg::Bytes(value)) => value.clone(),
+        Some(Arg::Bytes(value)) => value.as_slice(),
         Some(_) => {
             return Err(LeafError::invalid_argument(ROUTE, "data must be octeti"));
         }
@@ -312,9 +318,9 @@ fn write_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
     };
     let mut handle = take_stream(id, ROUTE)?;
     let result = match &mut handle {
-        Handle::Stream(stream) => stream.write_all(&data).and_then(|()| stream.flush()),
-        Handle::TlsClient(stream) => stream.write_all(&data).and_then(|()| stream.flush()),
-        Handle::TlsServer(stream) => stream.write_all(&data).and_then(|()| stream.flush()),
+        Handle::Stream(stream) => stream.write_all(data).and_then(|()| stream.flush()),
+        Handle::TlsClient(stream) => stream.write_all(data).and_then(|()| stream.flush()),
+        Handle::TlsServer(stream) => stream.write_all(data).and_then(|()| stream.flush()),
         Handle::Listener(_) | Handle::TlsListener { .. } => {
             put_handle(id, handle);
             return Err(LeafError::invalid_argument(ROUTE, "id is a listener"));
@@ -397,6 +403,8 @@ fn pick_addr(stream: &TcpStream, remote: bool) -> std::io::Result<std::net::Sock
     }
 }
 
+// WHY: a stalled peer must fail the call after the timeout instead of
+// blocking the leaf caller forever.
 fn configure_stream(stream: &TcpStream, addr: &str, route: &'static str) -> Result<(), LeafError> {
     stream
         .set_read_timeout(Some(Duration::from_secs(60)))

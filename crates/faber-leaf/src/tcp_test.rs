@@ -1,4 +1,5 @@
 use super::{Arg, Reply, is_route, reset_handles, serve};
+use crate::LeafErrorKind;
 use std::thread;
 
 #[test]
@@ -23,6 +24,17 @@ fn serve_ok(route: &str, args: &[Arg]) -> Reply {
 fn unknown_route_is_not_this_leaf() {
     let _guard = crate::test_support::handle_table_guard();
     assert!(serve("solum:lege", &[]).is_none());
+}
+
+#[test]
+fn listen_rejects_out_of_range_port() {
+    let _guard = crate::test_support::handle_table_guard();
+    for port in [-1, 65_536] {
+        let error = serve("caelum:ausculta", &[Arg::Int(port)])
+            .expect("tcp route")
+            .expect_err("port out of range");
+        assert_eq!(error.kind(), LeafErrorKind::InvalidArgument, "{port}");
+    }
 }
 
 #[test]
