@@ -1283,6 +1283,11 @@ pub fn generate_python_cli(
 /// Also the whole-package `radix-program` build paths (`wasm.rs`, `llvm.rs`)
 /// call this through the unit's [`crate::codegen::input::CodegenAnalysis`]
 /// implementation (the analyzed-module carrier coerces).
+///
+/// # Errors
+///
+/// Returns a [`CodegenError`] (`leaf_unsupported_on_target`) when a collected
+/// route names a leaf the `target` does not support.
 pub fn reject_unsupported_leaves(
     analysis: &dyn crate::codegen::input::CodegenAnalysis,
     target: Target,

@@ -188,7 +188,7 @@ pub struct LoadedHirPackage {
 
 /// Load a FHIR package from `.fhirpkg` bytes.
 ///
-/// FPF-5 switch: the live wire is the MessagePack envelope (package schema
+/// FPF-5 switch: the live wire is the `MessagePack` envelope (package schema
 /// v2); the format crate's [`decode_package_msgpack`] runs the legacy
 /// postcard rejection (named legacy error, no fallback decode), the package
 /// version gate, the per-unit gates (unit schema version + F3 + U2.3

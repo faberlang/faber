@@ -291,7 +291,7 @@ mod evaluation {
     }
 
     /// The HIR node ids and definition ids a praefixum fold kills: when
-    /// install_value replaces the initializer, every node of the authored body
+    /// `install_value` replaces the initializer, every node of the authored body
     /// leaves the live HIR.
     struct DeadNodes {
         hirs: rustc_hash::FxHashSet<HirId>,

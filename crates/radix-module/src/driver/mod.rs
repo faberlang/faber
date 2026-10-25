@@ -4637,7 +4637,7 @@ const NUCLEUM_ORPHAN_ISSUE: &str = "nucleum_orphaned_annotation";
 /// Canonical annotation family behind `@ nucleum` / `@ kernel`.
 const NUCLEUM_FAMILY: &str = "nucleum";
 
-/// DefIds that appear as the direct callee of a call expression anywhere in
+/// `DefIds` that appear as the direct callee of a call expression anywhere in
 /// the unit — the check-stage stand-in for "a concrete instantiation exists".
 fn module_call_targets(module: &HirModule) -> rustc_hash::FxHashSet<DefId> {
     struct CallCollector {

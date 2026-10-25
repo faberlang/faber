@@ -376,6 +376,12 @@ pub fn gpu_builtin_statement(builtin: MirKernelBuiltin, return_ty: MirType) -> M
 // --- Setup helpers ---
 
 /// Setup a simple f32 scalar kernel with default (1,1,1) dimensions.
+///
+/// # Panics
+///
+/// Panics when the default kernel function does not form a storage-buffer
+/// kernel signature or does not yield kernel reflection (test/helper
+/// utilities).
 #[must_use]
 pub fn setup_simple_kernel_reflection_launch_plan() -> (TypeTable, MirType, MirKernelReflection, MirKernelLaunchPlan) {
     let mut types = TypeTable::new();
