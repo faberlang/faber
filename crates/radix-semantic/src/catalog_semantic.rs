@@ -1259,6 +1259,7 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
                 "tensor method `{method}` on a non-tensor receiver is outside the v1 AIR subset"
             )
         }
+        "unapproved_effect" => "scan expressions are outside the v1 AIR subset".to_owned(),
         _ => return None,
     })
 }

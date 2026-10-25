@@ -4573,6 +4573,10 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: tensor method `{method}` on a non-tensor receiver is outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
+[diagnostics.SEM059.issues.unapproved_effect]
+message = "@ radix lane \"{lane}\" rejects this function body: scan expressions are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
 [diagnostics.SEM060]
 message = "invalid constant initializer"
 help = "move the computation into a function, or use a `{praefixum}` block"

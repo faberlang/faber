@@ -5014,6 +5014,10 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: tensor method `{method}` on a non-tensor receiver is outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
+[diagnostics.SEM059.issues.unapproved_effect]
+message = "@ radix lane \"{lane}\" rejects this function body: scan expressions are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
 [diagnostics.SEM059.issues.closure_capture]
 message = "closure capture is not allowed here"
 help = "pass the value as a parameter instead of capturing it"
@@ -5542,6 +5546,42 @@ help = "use an extent aligned to the reduction width"
 [diagnostics.SEM010.issues.reducta_term_type_non_scalar]
 message = "reduction term type is not scalar"
 help = "use a scalar term type for the reduction"
+
+[diagnostics.SEM010.issues.scan_exclusive_extremum_unsupported]
+message = "exclusive scan does not support max or min"
+help = "use an inclusive scan for max and min"
+
+[diagnostics.SEM010.issues.scan_group_domain_unbounded]
+message = "scan group key has no bounded domain"
+help = "group by a key whose finite domain is known at compile time"
+
+[diagnostics.SEM010.issues.scan_group_key_not_integer]
+message = "scan group key type is not an integer"
+help = "group by integer keys"
+
+[diagnostics.SEM010.issues.scan_group_keys_not_literal]
+message = "scan group keys are not a literal key list"
+help = "write the group as a literal list of keys"
+
+[diagnostics.SEM010.issues.scan_operator_unsupported]
+message = "scan does not support argmax or argmin"
+help = "use sum, product, max, min, all, any, or count for a scan"
+
+[diagnostics.SEM010.issues.scan_requires_shaped_iterable]
+message = "scan source is not a shaped iterable"
+help = "scan a tensor or matrix"
+
+[diagnostics.SEM010.issues.scan_term_type_non_scalar]
+message = "scan term type is not scalar"
+help = "use a scalar term type for the scan"
+
+[diagnostics.SEM010.issues.scan_term_type_not_bool]
+message = "scan term type is not bool"
+help = "use a bivalens term for all, any, and count"
+
+[diagnostics.SEM010.issues.scan_thread_requires_nucleum_kernel]
+message = "thread scan requires a nucleum kernel"
+help = "use the thread scan only inside a nucleum kernel"
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "expected '>' after type arguments"

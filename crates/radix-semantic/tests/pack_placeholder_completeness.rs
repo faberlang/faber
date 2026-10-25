@@ -40,6 +40,9 @@ const SUPPLIED: &[(&str, &[&str])] = &[
     ("SEM065", &["binding", "name"]),
     // radix-module diagnostics/convert.rs: convert_from_mixed_script_advisory
     ("LOCALE004", &["identifier", "scripts"]),
+    // faber package/device/split_advice.rs: advice_diagnostic passes the
+    // kernel name and the advised device on every INFO001 row.
+    ("INFO001", &["kernel", "device"]),
 ];
 
 /// Known mismatches that are not fixable inside this unit's write scope.
@@ -49,7 +52,9 @@ const KNOWN_GAPS: &[(&str, &str)] = &[];
 /// Codes whose row only the `la` and `en` packs own. The six other installed
 /// packs legitimately miss LOCALE003 (reader-locale coverage gap recorded in
 /// radix-module `locale_test.rs`); a missing row there renders the base message.
-const ROW_IN_LA_AND_EN_ONLY: &[&str] = &["LOCALE003"];
+/// INFO001 is `la`/`en` only for the same reason: the six others count its rows
+/// into `locale/absent-rows-budget.toml`.
+const ROW_IN_LA_AND_EN_ONLY: &[&str] = &["LOCALE003", "INFO001"];
 
 fn load_pack(locale: &str) -> LocalePack {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
