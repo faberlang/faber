@@ -1,9 +1,11 @@
 //! Blocking entropy leaf. Serves Latin `aleator:*` routes.
 //!
-//! Seedable draws (`fractum`, `sortire`) use xoshiro256** (same split as the
-//! retired runner kernel / handroll). `octetos` and `uuid` read OS entropy
-//! and ignore `semina`. `n ≤ 0` on `semina` returns seedable draws to unseeded
-//! OS/thread entropy.
+//! Seedable draws (`fractum`, `sortire`) use `xoshiro256**` seeded through
+//! `SplitMix64`, producing the same stream as `handroll`'s generator. The seed
+//! is process-global because it has to survive across leaf calls within one
+//! execution; [`reset_seed`] clears it at the boundary so a later execution
+//! starts unseeded. `octetos` and `uuid` read OS entropy and ignore `semina`.
+//! `n ≤ 0` on `semina` returns seedable draws to unseeded OS entropy.
 
 #[cfg(test)]
 #[path = "entropy_test.rs"]
@@ -11,7 +13,7 @@ mod tests;
 
 use crate::error::LeafError;
 use crate::value::{Arg, Reply};
-use std::io::{self, Read};
+use std::io;
 use std::sync::{Mutex, MutexGuard};
 
 static RNG_STATE: Mutex<Option<Rng>> = Mutex::new(None);
@@ -137,9 +139,7 @@ fn seed(args: &[Arg]) -> Result<Reply, LeafError> {
     let n = expect_int(ROUTE, args, 0, "n")?;
     let mut guard = rng_state();
     *guard = if n > 0 {
-        let seed_value = u64::try_from(n)
-            .map_err(|_| LeafError::invalid_argument(ROUTE, "n must be positive"))?;
-        Some(Rng::seed_from_u64(seed_value))
+        Some(Rng::seed_from_u64(n.cast_unsigned()))
     } else {
         None
     };
@@ -171,6 +171,7 @@ impl Rng {
             }
         }
         if state == [0_u64; 4] {
+            // An all-zero state makes xoshiro256** emit zero forever.
             Self::seed_from_u64(degraded_seed())
         } else {
             Self { state }
@@ -191,23 +192,29 @@ impl Rng {
     }
 
     fn gen_f64(&mut self) -> f64 {
+        // Bit pattern of 1.0 from the exponent alone; OR-ing in 52 random
+        // mantissa bits lands in [1.0, 2.0), so subtracting 1.0 gives [0, 1).
         const ONE_HALF_OPEN: u64 = 0x3FF0_0000_0000_0000;
         f64::from_bits(ONE_HALF_OPEN | (self.next_u64() >> 12)) - 1.0
     }
 
     fn gen_i64_inclusive(&mut self, lo: i64, hi: i64) -> i64 {
-        let span = u64::from_le_bytes(hi.to_le_bytes())
-            .wrapping_sub(u64::from_le_bytes(lo.to_le_bytes()))
+        // Outcome count mod 2^64: the full i64 span wraps to 0, handled by
+        // drawing a raw word and reinterpreting its bits.
+        let span = hi
+            .cast_unsigned()
+            .wrapping_sub(lo.cast_unsigned())
             .wrapping_add(1);
         if span == 0 {
-            lo.wrapping_add(i64::from_le_bytes(self.next_u64().to_le_bytes()))
+            lo.wrapping_add(self.next_u64().cast_signed())
         } else {
-            let sample = self.next_u64_below(span);
-            lo.wrapping_add(i64::from_le_bytes(sample.to_le_bytes()))
+            lo.wrapping_add(self.next_u64_below(span).cast_signed())
         }
     }
 
     #[allow(clippy::cast_possible_truncation)]
+    // Both casts take one half of the 128-bit product: `low` is the low 64
+    // bits, and the high 64 bits are < 2^64 by construction.
     fn next_u64_below(&mut self, range: u64) -> u64 {
         let mut x = self.next_u64();
         let mut product = u128::from(x) * u128::from(range);
@@ -232,6 +239,8 @@ fn splitmix64(seed: &mut u64) -> u64 {
     z ^ (z >> 31)
 }
 
+/// Fill `buf` from OS entropy, falling back to the seedable generator when the
+/// OS source fails.
 pub(crate) fn fill_random(buf: &mut [u8]) {
     if os_entropy(buf).is_err() {
         with_rng(|rng| {
@@ -245,6 +254,7 @@ pub(crate) fn fill_random(buf: &mut [u8]) {
 
 #[cfg(unix)]
 fn os_entropy(buf: &mut [u8]) -> io::Result<()> {
+    use std::io::Read;
     std::fs::File::open("/dev/urandom")?.read_exact(buf)
 }
 
@@ -263,6 +273,7 @@ fn degraded_seed() -> u64 {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_nanos());
+    // Fold the 128-bit count into 64 bits: low half ⊕ high half.
     let bytes = nanos.to_le_bytes();
     let (halves, _) = bytes.as_chunks::<8>();
     let nanos_lo = u64::from_le_bytes(halves[0]);
