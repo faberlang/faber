@@ -9,7 +9,8 @@
 //! to `f64`, `f32`, `f16` and `bf16` round the exact value to nearest, ties to
 //! even, with subnormals and overflow to `±∞` (IEEE default, like
 //! [`Magnus::to_f64`]). Rounding never goes through an intermediate width, so
-//! an `f32` result is never a double rounding.
+//! an `f32` result is never a double rounding. Zero has one sign: `-0.0` and
+//! `0.0` are the same value here, so a conversion of an exact zero is `+0.0`.
 //!
 //! Every operation is bounded: a value whose numerator or denominator would
 //! pass [`CEILING_BITS`] is refused (`None`) so a caller leaves the expression
@@ -67,6 +68,9 @@ const F64: Format = Format {
 
 impl ExactRational {
     /// The integer `value`.
+    ///
+    /// Not capped: an integer past [`CEILING_BITS`] is taken as given, and the
+    /// arithmetic that follows it refuses.
     #[must_use]
     pub fn from_integer(value: Magnus) -> Self {
         Self {
@@ -99,24 +103,20 @@ impl ExactRational {
             None => (unsigned, None),
         };
         let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
-        if whole.len() + fraction.len() == 0
-            || !whole
-                .bytes()
-                .chain(fraction.bytes())
-                .all(|b| b.is_ascii_digit())
-        {
+        let digits = format!("{whole}{fraction}");
+        if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
             return None;
         }
         let exponent: i64 = match exponent {
             Some(text) => text.parse().ok()?,
             None => 0,
         };
-        let digits = Magnus::parse_decimal(&format!("{whole}{fraction}")).ok()?;
+        let magnitude = Magnus::parse_decimal(&digits).ok()?;
         let scale = exponent.checked_sub(i64::try_from(fraction.len()).ok()?)?;
         let power = Magnus::from_u64(10)
             .potentia_within(&Magnus::from_u64(scale.unsigned_abs()), CEILING_BITS)
             .ok()?;
-        let signed = if negative { -digits } else { digits };
+        let signed = if negative { -magnitude } else { magnitude };
         if scale >= 0 {
             Self::capped(signed.mul_within(&power, CEILING_BITS).ok()?, Magnus::one())
         } else {
@@ -147,6 +147,8 @@ impl ExactRational {
         Self::capped(if bits >> 63 == 1 { -num } else { num }, den)
     }
 
+    /// Refuses a numerator or denominator past [`CEILING_BITS`] and sets a
+    /// positive denominator, so `den > 0` holds for every value.
     fn capped(num: Magnus, den: Magnus) -> Option<Self> {
         if num.exceeds_ceiling(CEILING_BITS) || den.exceeds_ceiling(CEILING_BITS) {
             return None;
@@ -276,9 +278,9 @@ impl ExactRational {
     }
 
     fn round(&self, format: Format) -> f64 {
-        // Bounded by the cap, so every shift and division below succeeds; a
-        // failure would be an invariant break and reads as NaN, never a
-        // plausible wrong number.
+        // A failure would read as NaN, never a plausible wrong number, and none
+        // is reachable: `den > 0`, and a value past the format's range returns
+        // infinity before any shift, so every shift is bounded by the format.
         let magnitude = round_positive(&self.num.abs(), &self.den, format).unwrap_or(f64::NAN);
         if self.num.is_negative() {
             -magnitude
@@ -304,6 +306,8 @@ fn round_positive(num: &Magnus, den: &Magnus, format: Format) -> Option<f64> {
     };
     let exponent = if at_least_binade { diff } else { diff - 1 };
     if exponent > i64::from(format.emax) {
+        // Out of range: the shift below is bounded only while `exponent <= emax`,
+        // and `ExactRational::from_integer` admits an integer of any length.
         return Some(f64::INFINITY);
     }
     let quantum = exponent.max(i64::from(format.emin)) - i64::from(format.mantissa_bits - 1);
@@ -320,10 +324,12 @@ fn round_positive(num: &Magnus, den: &Magnus, format: Format) -> Option<f64> {
         _ => {}
     }
     if significand == 0 {
+        // Below half of the smallest subnormal.
         return Some(0.0);
     }
     let top = i64::from(significand.ilog2()) + quantum;
     if top > i64::from(format.emax) {
+        // The rounding above carried past the format's largest finite value.
         return Some(f64::INFINITY);
     }
     // `significand <= 2^53` converts exactly, and `significand * 2^quantum`

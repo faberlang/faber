@@ -154,7 +154,6 @@ fn decimal_conversion_matches_the_std_parser_on_many_spellings() {
         let point = usize::try_from(next()).unwrap() % (mantissa.len() + 1);
         let exponent = i64::try_from(next() % 700).unwrap() - 350;
         let text = format!("{}.{}e{exponent}", &mantissa[..point], &mantissa[point..]);
-        let text = text.replacen("..", ".0", 1);
         let exact = dec(&text);
         let std64: f64 = text.parse().unwrap();
         let std32: f32 = text.parse().unwrap();
