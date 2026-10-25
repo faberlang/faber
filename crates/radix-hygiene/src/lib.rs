@@ -1,7 +1,15 @@
 //! Production-source hygiene budgets for Faber workspace crates.
 //!
-//! Scans non-test Rust sources for banned patterns (`.unwrap()`, `panic!(`, and
-//! similar) and optional structural test-boundary violations.
+//! One collection pass over a crate's non-test sources feeds the banned-pattern
+//! budgets (`.unwrap()`, `panic!(`, and similar), the toolchain-spawn scan
+//! ([`scan_command_new`]), and the `FABER_*` / `RADIX_*` environment-read scan
+//! ([`scan_tool_env_reads`]).
+//!
+//! Budgets are ratchets: a crate mints them from a measured baseline and only
+//! lowers them. Structural checks that are not budgets — the companion
+//! `#[cfg(test)]` + `#[path]` module convention
+//! ([`assert_companion_tests_use_cfg_path_module_convention`]) — are called by
+//! the crates that adopt them.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -37,19 +45,36 @@ pub struct Counts {
 /// Scanner configuration for one crate integration test.
 #[derive(Debug, Clone)]
 pub struct ScanConfig {
+    /// Roots scanned recursively for production sources.
     pub source_roots: Vec<PathBuf>,
+    /// Path suffixes dropped after collection, for a `cfg(test)` harness that
+    /// lives under a scanned root.
     pub exclude_path_suffixes: Vec<String>,
+    /// Discount `self.expect(` occurrences from the `.expect(` count.
     pub subtract_self_expect: bool,
     pub check_companion_convention: bool,
 }
 
+/// One collected production source file.
 #[derive(Clone)]
 pub struct SourceFile {
     pub path: PathBuf,
+    /// The file exactly as read.
     pub content: String,
+    /// [`scrub_rust_source`] applied to `content`: one output character per
+    /// input character, line breaks preserved, comment and literal bodies
+    /// blanked.
     pub scrubbed: String,
 }
 
+/// Collect every production `.rs` file under `config.source_roots`.
+///
+/// Test code never reaches the budget count: `tests` directories and
+/// `test_support` paths are skipped during the walk, and `*_test.rs` /
+/// `.test.rs` files and `config.exclude_path_suffixes` after it.
+///
+/// A root that cannot be read contributes no files rather than failing, so a
+/// caller that must not pass vacuously asserts the result is not empty.
 #[must_use]
 pub fn collect_production_files(config: &ScanConfig) -> Vec<SourceFile> {
     let mut files = Vec::new();
@@ -102,6 +127,9 @@ fn collect_rs_files(dir: &Path, config: &ScanConfig, out: &mut Vec<SourceFile>) 
     }
 }
 
+/// Count banned patterns across `files`.
+///
+/// `subtract_self_expect` is [`ScanConfig::subtract_self_expect`].
 #[must_use]
 pub fn count_budgets(files: &[SourceFile], subtract_self_expect: bool) -> Counts {
     let mut counts = Counts::default();
@@ -121,6 +149,12 @@ pub fn count_budgets(files: &[SourceFile], subtract_self_expect: bool) -> Counts
     counts
 }
 
+/// Assert each observed count is within its ceiling.
+///
+/// # Panics
+///
+/// Panics on the first budget that `counts` exceeds, naming the pattern, the
+/// observed count, and the ceiling.
 pub fn assert_budgets(counts: Counts, budgets: Budgets) {
     assert_budget(".unwrap()", counts.unwrap, budgets.unwrap);
     assert_budget(".expect(", counts.expect, budgets.expect);
@@ -494,6 +528,9 @@ fn count_let_underscore(haystack: &str) -> usize {
 /// Count each cfg(test)-gated inline `mod NAME { … }` body, including
 /// `#[cfg(all(test, …))]` and stacked attributes. Companion `mod NAME;`
 /// wiring is not counted.
+///
+/// `scrubbed` must come from [`scrub_rust_source`], so an attribute or a `mod`
+/// spelled in a comment or a string literal is not counted.
 #[must_use]
 pub fn count_inline_test_modules(scrubbed: &str) -> usize {
     let chars: Vec<char> = scrubbed.chars().collect();
@@ -648,10 +685,7 @@ fn is_ident_continue(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || ch == '_'
 }
 
-fn looks_like_char_literal<I>(chars: &std::iter::Peekable<I>) -> bool
-where
-    I: Iterator<Item = char> + Clone,
-{
+fn looks_like_char_literal(chars: &std::iter::Peekable<std::str::Chars<'_>>) -> bool {
     let mut lookahead = chars.clone();
     let Some(first) = lookahead.next() else {
         return false;
@@ -667,10 +701,10 @@ where
 /// Detects the opening of a raw string (`r"`, `r#"`, `br##"`, ...) whose
 /// first character `first` (`r` or `b`) was just consumed. Returns the number
 /// of further characters through the opening quote and the `#` count.
-fn raw_string_open<I>(first: char, chars: &std::iter::Peekable<I>) -> Option<(usize, usize)>
-where
-    I: Iterator<Item = char> + Clone,
-{
+fn raw_string_open(
+    first: char,
+    chars: &std::iter::Peekable<std::str::Chars<'_>>,
+) -> Option<(usize, usize)> {
     let mut lookahead = chars.clone();
     let mut consumed = 0;
     if first == 'b' {
@@ -692,18 +726,18 @@ where
     }
 }
 
-fn closes_raw_string<I>(chars: &std::iter::Peekable<I>, hashes: usize) -> bool
-where
-    I: Iterator<Item = char> + Clone,
-{
+fn closes_raw_string(chars: &std::iter::Peekable<std::str::Chars<'_>>, hashes: usize) -> bool {
     let mut lookahead = chars.clone();
     (0..hashes).all(|_| lookahead.next() == Some('#'))
 }
 
 /// Strip comments and string/char literal bodies so budget scans see code only.
+///
+/// Output stays character-for-character aligned with the input (blanked
+/// characters, preserved newlines), so a line or character offset found in the
+/// scrubbed text addresses the same character in the original.
 #[must_use]
-// State machine for full-file scrubbing is naturally long; split deferred.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines)] // single six-state machine; arms keep their transitions local
 pub fn scrub_rust_source(source: &str) -> String {
     #[derive(Clone, Copy)]
     enum State {
@@ -723,7 +757,7 @@ pub fn scrub_rust_source(source: &str) -> String {
 
     while let Some(ch) = chars.next() {
         let was_ident = prev_ident;
-        prev_ident = ch.is_ascii_alphanumeric() || ch == '_';
+        prev_ident = is_ident_continue(ch);
         match state {
             State::Code => match ch {
                 'r' | 'b' if !was_ident => {
@@ -768,7 +802,7 @@ pub fn scrub_rust_source(source: &str) -> String {
                         if next.is_ascii_alphabetic() || next == '_' {
                             // Lifetime: skip the identifier but keep emitting spaces
                             while let Some(&c) = chars.peek() {
-                                if c.is_ascii_alphanumeric() || c == '_' {
+                                if is_ident_continue(c) {
                                     chars.next();
                                     out.push(' ');
                                 } else {
