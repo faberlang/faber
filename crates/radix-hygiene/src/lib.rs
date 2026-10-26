@@ -238,7 +238,7 @@ pub struct EnvRead {
 /// 2026-10-14 exempts from the `FABER_*` / `RADIX_*` environment-read ban.
 ///
 /// Exempt: any path with a `tests` or `test_support` component, a `*_test.rs`
-/// or `test_support.rs` file, a `golden.rs` file, and the `crates/exempla`
+/// or `test_support.rs` file, a `golden.rs` file, and the `crates/corpus-matrix`
 /// corpus e2e harness. Production sources such as
 /// `crates/faber/src/package/mod.rs` are not exempt.
 #[must_use]
@@ -262,7 +262,7 @@ pub fn is_env_harness_path(path: &Path) -> bool {
     }
     components
         .windows(2)
-        .any(|pair| pair[0] == "crates" && pair[1] == "exempla")
+        .any(|pair| pair[0] == "crates" && pair[1] == "corpus-matrix")
 }
 
 const ENV_READ_NEEDLES: [&str; 2] = ["env::var(", "env::var_os("];
