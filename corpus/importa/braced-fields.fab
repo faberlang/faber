@@ -1,0 +1,39 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_record", "import_field_list", "import_field", "ex_field", "visibilitas_field", "nomen_field", "ut_field", "nota_stmt", "expression", "literal"]
+category = "package"
+summary = "A braced import record spells its field names with the reader pack: from, visibility, name and as in en."
+syntax = "import { from = <source>, visibility = public, name = <name>, as = <alias> }"
+aliases = ["import"]
+related = ["importa", "ex", "publica", "ut", "nomen"]
+locale = "en"
++++
+# =============================================================================
+# importa — braced record fields are reader-pack words
+# =============================================================================
+#
+# What this teaches:
+#   • The five record field names (source, visibility, name, alias, wildcard
+#     alias) are keywords like the rest of the surface: an `en` file writes
+#     `from`, `visibility`, `name`, `as` and `all`; the Latin `ex`,
+#     `visibilitas`, `nomen`, `ut` and `omnia` belong to `la` files.
+#   • `visibility = public` is the only visibility value; `name` and `as`
+#     bind the imported module like the sugar form `import from … name as alias`.
+#
+# Common mistakes:
+#   • Writing the Latin field words in an `en` file — `PARSE050
+#     wrong_locale_import_field` names the word to write instead
+#     (`braced-field-latin-reject.fab`).
+#
+# See also: importa, ex, publica, ut, nomen
+# =============================================================================
+
+# importa — braced record with every field except the wildcard alias
+#
+# EXPECTED OUTPUT:
+#   braced-fields
+
+import { from = "norma:text", visibility = public, name = text, as = t }
+
+print "braced-fields"

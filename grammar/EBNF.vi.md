@@ -187,7 +187,7 @@ import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_f
 # [088] ex_field
 ex_field ::= 'từ' '=' STRING
 # [089] visibilitas_field
-visibilitas_field ::= 'visibilitas' '=' publica
+visibilitas_field ::= 'hiển_thị' '=' publica
 # [090] nomen_field
 nomen_field ::= 'tên' '=' IDENTIFIER
 # [091] ut_field
@@ -702,7 +702,7 @@ NO_NEWLINE ::=
 | [`import_field_list`](#import-field-list) | `#import-field-list` | live |
 | [`import_field`](#import-field) | `#import-field` | live |
 | [`ex_field`](#ex-field) | `#từ-field` | live |
-| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live |
+| [`visibilitas_field`](#visibilitas-field) | `#hiển_thị-field` | live |
 | [`nomen_field`](#nomen-field) | `#tên-field` | live |
 | [`ut_field`](#ut-field) | `#như-field` | live |
 | [`omnia_field`](#omnia-field) | `#tất_cả-field` | live |
@@ -1063,7 +1063,7 @@ productions. It is not a second keyword authority.
 | Boolean | `đúng` | true |
 | Conversion | `thông_qua` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 | Diagnostics | `xem` | debug |
-| Declarations | `visibilitas` | visibility field |
+| Declarations | `hiển_thị` | visibility field |
 
 ## Comma Separator Table {#comma-separator-law}
 
@@ -1601,6 +1601,8 @@ importa ex "norma:consolum" fixum dic ut output
 ```
 
 A record import needs its `từ = "…"` source (`missing_import_source`), and `tất_cả` cannot be combined with `tên` or `như` (`mixed_wildcard_and_named_import`).
+
+The five record field names are reader-pack keywords like the rest of the surface: the `en` reader spells `từ`, `hiển_thị`, `tên`, `như` and `tất_cả` as `from`, `visibility`, `name`, `as` and `all` (`import { from = "norma:text", name = text, as = t }`), and every other pack spells them with its own words. A field word from another locale is `PARSE050 wrong_locale_import_field`, not `unknown_import_field`.
 
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `công_khai` is the re-export marker. Missing named binding

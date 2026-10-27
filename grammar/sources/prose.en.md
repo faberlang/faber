@@ -524,6 +524,8 @@ importa ex "norma:consolum" fixum dic ut output
 
 A record import needs its `ex = "…"` source (`missing_import_source`), and `omnia` cannot be combined with `nomen` or `ut` (`mixed_wildcard_and_named_import`).
 
+The five record field names are reader-pack keywords like the rest of the surface: the `en` reader spells `ex`, `visibilitas`, `nomen`, `ut` and `omnia` as `from`, `visibility`, `name`, `as` and `all` (`import { from = "norma:text", name = text, as = t }`), and every other pack spells them with its own words. A field word from another locale is `PARSE050 wrong_locale_import_field`, not `unknown_import_field`.
+
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `publica` is the re-export marker. Missing named binding
 defaults to the

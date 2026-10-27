@@ -32,6 +32,7 @@ insere = "嵌入"
 privata = "私有"
 protecta = "保護"
 publica = "公開"
+visibilitas = "可見性"
 sponte = "可選"
 casu = "分支"
 ceterum = "預設"
@@ -967,27 +968,31 @@ help = "檢查匯入語法"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "未知的匯入欄位"
-help = "使用 ex、visibilitas、nomen、ut 或 omnia"
+help = "使用 {ex}、{visibilitas}、{nomen}、{ut} 或 {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "匯入欄位 `{field}` 未在此讀取器表面宣告"
+help = "對此檔案的讀取器語系使用 `{expected}`"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "重複的匯入欄位 `{field}`"
 help = "每個匯入欄位只能出現一次；請移除重複的欄位"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "匯入記錄需要 ex 來源"
-help = "在匯入記錄加入 ex = \"path\""
+message = "匯入記錄需要 {ex} 來源"
+help = "在匯入記錄加入 {ex} = \"path\""
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "萬用字元匯入不可同時命名綁定"
-help = "單獨使用 omnia，或使用 nomen/ut 進行具名匯入"
+help = "單獨使用 {omnia}，或使用 {nomen}/{ut} 進行具名匯入"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "無效匯入可見性"
-help = "使用 privata 或 publica"
+help = "使用 {privata} 或 {publica}"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "無法從 {path} 推斷匯入名稱"
-help = "為 {path} 撰寫 nomen 或明確別名"
+help = "為 {path} 撰寫 {nomen} 或明確別名"
 
 [diagnostics.SEM001]
 message = "未定義變數"

@@ -32,6 +32,7 @@ insere = "nhúng"
 privata = "riêng_tư"
 protecta = "bảo_vệ"
 publica = "công_khai"
+visibilitas = "hiển_thị"
 sponte = "tự_nguyện"
 casu = "trường_hợp"
 ceterum = "mặc_định"
@@ -923,27 +924,31 @@ help = "kiểm tra cú pháp import"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "trường import không xác định"
-help = "dùng ex, visibilitas, nomen, ut, hoặc omnia"
+help = "dùng {ex}, {visibilitas}, {nomen}, {ut}, hoặc {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "trường import `{field}` chưa được khai báo trên bề mặt reader này"
+help = "dùng `{expected}` cho locale reader của tệp này"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "trường import `{field}` trùng lặp"
 help = "mỗi trường import chỉ được xuất hiện một lần; xóa trường bị lặp"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "bản ghi import yêu cầu nguồn ex"
-help = "thêm ex = \"path\" vào bản ghi import"
+message = "bản ghi import yêu cầu nguồn {ex}"
+help = "thêm {ex} = \"path\" vào bản ghi import"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "import wildcard không thể đồng thời đặt tên một binding"
-help = "dùng riêng omnia, hoặc dùng nomen/ut cho import có tên"
+help = "dùng riêng {omnia}, hoặc dùng {nomen}/{ut} cho import có tên"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "visibility của import không hợp lệ"
-help = "dùng privata hoặc publica"
+help = "dùng {privata} hoặc {publica}"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "không thể suy ra tên import từ {path}"
-help = "ghi rõ nomen hoặc bí danh tường minh cho {path}"
+help = "ghi rõ {nomen} hoặc bí danh tường minh cho {path}"
 
 [diagnostics.SEM001]
 message = "biến chưa được định nghĩa"

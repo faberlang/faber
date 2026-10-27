@@ -1,0 +1,37 @@
++++
+term = "importa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_record", "import_field_list", "import_field", "ex_field", "nota_stmt", "expression", "literal"]
+category = "package"
+canonical = false
+summary = "The English record field word from in a la file is an unknown import field (expect parse error)."
+syntax = "importa { from = \"norma:text\" } — rejected in a la file; write ex"
+related = ["importa", "ex"]
+locale = "la"
+no_expected = "rejects"
+diagnostic = "PARSE050:unknown_import_field"
++++
+# =============================================================================
+# importa — English record field word in a la file (expect parse error)
+# =============================================================================
+#
+# What this teaches:
+#   • Locale surfaces are sealed in both directions — the la spelling of the
+#     source field is `ex`, so the English `from` is not a field of a la record
+#   • Parse error — `PARSE050:unknown_import_field` lists the la field words
+#
+# Common mistakes:
+#   • writing `from`, `visibility`, `name`, `as` or `all` in a la record —
+#     write `ex`, `visibilitas`, `nomen`, `ut` or `omnia`
+#
+# See also: importa, ex
+# =============================================================================
+
+# English record field word in a la file (expect parse error)
+#
+# DELIBERATE: this exemplum keeps the English field word (`from`) on purpose, to
+# pin the PARSE050 `unknown_import_field` diagnostic in a la file.
+
+importa { from = "norma:text" }
+
+nota "unreachable"
