@@ -1,0 +1,37 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "array_literal", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "An unhandled lista-to-tensor length mismatch in main ends the run with one trap line."
+syntax = "<lista> ↦ <tensor-type-with-literal-Figura>"
+related = ["↦", "⇥", "⊥", "fac", "cape", "tensor", "Figura"]
+locale = "en"
+no_expected = "traps-by-design"
++++
+
+# =============================================================================
+# ↦ — An unhandled length mismatch ends the run.
+# =============================================================================
+#
+# What this teaches:
+#   • The `main` body is exempt from the handler rule, so a bare `ys ↦ tensor<int, [4]>` compiles; when `ys` does not hold exactly four items the conversion fails with nothing to catch it.
+#   • The run prints the output written before the failure, then one trap line on stderr, and exits with the conversion class (65, EX_DATAERR) from the trap contract.
+#
+# Common mistakes:
+#   • Treating `main` as a handler — the same conversion inside `fac … cape`, behind `⊥`, or in a `⇥ string` function is catchable (see lista-tensor-length-fallible.fab).
+#
+# See also: ↦, ⇥, ⊥, fac, cape, tensor, Figura
+# =============================================================================
+
+# EXPECTED failure:
+#   before
+#   (stderr) error: tensor conversion expected 4 elements, got 1
+
+main {
+    let list<int> short ← [1]
+    print "before"
+    let tensor<int, [4]> t ← short ↦ tensor<int, [4]>
+    print t.sum()
+}

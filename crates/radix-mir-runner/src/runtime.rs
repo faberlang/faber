@@ -5228,10 +5228,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 if message
                     == radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG =>
             {
-                let mut error = RunnerError::internal_with_issue(
+                // WHY: a length that does not fill the shape is a failed
+                // conversion (rule 11: a size mismatch is a recoverable
+                // error, never a silent reshape), so it carries the
+                // conversion code: `⊥`, `fac … cape` and `⇥` handle it and an
+                // unhandled one takes the conversion exit class.
+                let mut error = RunnerError::conversion_with_issue(
                     span,
                     format!("tensor conversion expected {expected} elements, got {actual}"),
-                    "conversion_length_mismatch",
+                    crate::RUNNER_CONVERSION_LENGTH_MISMATCH,
                 );
                 error.args = vec![
                     ("expected".to_owned(), expected.to_string()),

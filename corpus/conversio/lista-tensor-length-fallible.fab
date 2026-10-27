@@ -1,0 +1,76 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "alternate_exit_clause", "redde_stmt", "fac_stmt", "cape_clause", "fixum_decl", "array_literal", "conversio_expr", "inline_default", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "A lista whose length does not fill the tensor Figura is a failed conversion: ⇥, fac/cape and ⊥ all see it."
+syntax = "<lista> ↦ <tensor-type-with-literal-Figura> [⊥ <fallback>]"
+related = ["↦", "⇥", "⊥", "fac", "cape", "tensor", "Figura"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — A lista of the wrong length is a failed tensor conversion.
+# =============================================================================
+#
+# What this teaches:
+#   • Fallible fill — `ys ↦ tensor<int, [4]>` succeeds only when `ys` holds exactly four items. A shorter or longer lista is a failed conversion, never a silent reshape or truncation.
+#   • Three postures — the failure is handled like every other `↦` failure: a `fac { … } cape err { … }` block catches it, a `⇥ string` function hands it to its caller, and `⊥ fallback` supplies a value at the site.
+#
+# Common mistakes:
+#   • Writing the conversion in a plain helper with no handler — outside `main` the checker refuses it (SEM011 failable_conversio_requires_handler); pick `⊥`, `fac`/`cape`, or `⇥ string`.
+#   • Expecting a failure inside `main` to be caught without a handler — it ends the run (see lista-tensor-length-uncaught.fab).
+#
+# See also: ↦, ⇥, ⊥, fac, cape, tensor, Figura, tensor-construct-length.fab
+# =============================================================================
+
+# The conversion lowered inside a `⇥ string` function: the mismatch leaves as
+# the function's error.
+fn viaChannel(list<int> ys) → tensor<int, [4]> ⇥ string {
+    return ys ↦ tensor<int, [4]>
+}
+
+# The conversion written directly inside `fac … cape`.
+fn caughtDirect(list<int> ys) → int {
+    do {
+        let tensor<int, [4]> t ← ys ↦ tensor<int, [4]>
+        return t.sum()
+    }
+    catch err {
+        return -1
+    }
+}
+
+# The failure crosses a `⇥ string` call before the handler sees it.
+fn caughtChannel(list<int> ys) → int {
+    do {
+        let tensor<int, [4]> t ← viaChannel(ys)
+        return t.sum()
+    }
+    catch err {
+        return -2
+    }
+}
+
+# `⊥` at the conversion site.
+fn coalescedConversion(list<int> ys) → int {
+    let tensor<int, [4]> fallback ← [9, 9, 9, 9] ↦ tensor<int, [4]>
+    let tensor<int, [4]> t ← ys ↦ tensor<int, [4]> ⊥ fallback
+    return t.sum()
+}
+
+main {
+    let list<int> exact ← [1, 2, 3, 4]
+    let list<int> short ← [1]
+    let list<int> long ← [1, 2, 3, 4, 5]
+
+    print caughtDirect(exact)
+    print caughtDirect(short)
+    print caughtDirect(long)
+    print caughtChannel(exact)
+    print caughtChannel(short)
+    print coalescedConversion(exact)
+    print coalescedConversion(short)
+    print coalescedConversion(long)
+}
