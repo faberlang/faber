@@ -1341,7 +1341,11 @@ fn format_write_counts_refused_files_and_never_writes_them() {
     let drift_arg = drift.to_str().expect("utf8 path");
 
     let report = run_faber_capture(&["format", refused_arg, drift_arg], None);
-    assert_eq!(report.status.code(), Some(1));
+    assert_eq!(
+        report.status.code(),
+        Some(65),
+        "a refused source is a data error"
+    );
     assert_eq!(
         stdout_lines(&report).last().map(String::as_str),
         Some(
@@ -1352,8 +1356,8 @@ fn format_write_counts_refused_files_and_never_writes_them() {
     let written = run_faber_capture(&["format", "--write", refused_arg, drift_arg], None);
     assert_eq!(
         written.status.code(),
-        Some(1),
-        "a refused file fails the run"
+        Some(65),
+        "a refused file fails the run as a data error"
     );
     assert_eq!(
         stdout_lines(&written),
@@ -1394,9 +1398,9 @@ fn format_text_modes_print_no_summary() {
 }
 
 #[test]
-fn format_usage_errors_exit_two() {
+fn format_usage_errors_exit_sixty_four() {
     let output = run_faber_capture(&["format", "--write", "--check", "x.fab"], None);
-    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.status.code(), Some(64));
 }
 
 // ── membership-glyph 3a: `∈` / `∉` survive the format round trip ──────────

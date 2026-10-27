@@ -421,18 +421,18 @@ fn package_check_refuses_the_manifest_target_build_refuses() {
     )
     .expect("manifest");
     let mut errors = Vec::new();
-    for operation in ["check", "build", "build-explicit"] {
+    for op in ["check", "build", "build-explicit"] {
         let output = Command::new(std::env::current_exe().expect("test executable"))
             .args([
                 "--exact",
                 "package::tests::manifest_target_command_probe",
                 "--nocapture",
             ])
-            .env("FABER_MANIFEST_TARGET_PROBE", operation)
+            .env("FABER_MANIFEST_TARGET_PROBE", op)
             .env("FABER_MANIFEST_TARGET_PROBE_INPUT", dir.path())
             .output()
             .expect("run package command probe");
-        assert_eq!(output.status.code(), Some(1), "{operation}: {output:?}");
+        assert_eq!(output.status.code(), Some(78), "{op}: {output:?}");
         let stderr = String::from_utf8(output.stderr).expect("diagnostic UTF-8");
         assert!(
             stderr.contains("build.target 'ada' is not a build target"),

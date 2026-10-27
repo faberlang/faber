@@ -434,5 +434,5 @@ entry = "main.fab"
         stderr.contains("`faber check --air` package mode is not supported"),
         "package input with --air must print the unsupported message:\n{stderr}"
     );
-    assert_eq!(Some(1), output.status.code());
+    assert_eq!(Some(64), output.status.code());
 }

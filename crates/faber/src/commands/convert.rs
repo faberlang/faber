@@ -8,6 +8,7 @@
 //! See `docs/operator/convert-command.md`.
 
 use super::format::{RewriteTally, RewriteVerb};
+use faber_cli::exit_status;
 use faber_cli::package::available_locales;
 use std::fs;
 use std::io::Read;
@@ -32,7 +33,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
         let mut source = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut source) {
             eprintln!("error: failed to read <stdin>: {err}");
-            std::process::exit(1);
+            std::process::exit(exit_status::FAILURE);
         }
         let path = Path::new("<stdin>");
         match convert_single_doc(path, &command.to, command.from.as_deref(), &source) {
@@ -40,7 +41,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
                 print!("{converted}");
                 return;
             }
-            Err(()) => std::process::exit(1),
+            Err(status) => std::process::exit(status),
         }
     }
 
@@ -48,13 +49,13 @@ pub fn cmd_convert(command: &ConvertCommand) {
         Ok(files) => files,
         Err(message) => {
             eprintln!("error: {message}");
-            std::process::exit(1);
+            std::process::exit(exit_status::FAILURE);
         }
     };
 
     if files.is_empty() {
         eprintln!("error: no .fab files found to convert");
-        std::process::exit(1);
+        std::process::exit(exit_status::FAILURE);
     }
 
     if command.stdout && files.len() > 1 {
@@ -62,7 +63,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
             "error: --stdout accepts exactly one input file, found {}; use --check or --write for multiple files",
             files.len()
         );
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
 
     // Modes (mutually exclusive at the CLI parse boundary): `--stdout` prints
@@ -76,7 +77,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                tally.refused += 1;
+                tally.refuse(exit_status::FAILURE);
                 continue;
             }
         };
@@ -84,8 +85,8 @@ pub fn cmd_convert(command: &ConvertCommand) {
         let converted =
             match convert_single_doc(path, &command.to, command.from.as_deref(), &source) {
                 Ok(converted) => converted,
-                Err(()) => {
-                    tally.refused += 1;
+                Err(status) => {
+                    tally.refuse(status);
                     continue;
                 }
             };
@@ -117,7 +118,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
 
     if command.stdout {
         if tally.refused > 0 {
-            std::process::exit(1);
+            std::process::exit(tally.refusal_status);
         }
         return;
     }
@@ -125,14 +126,21 @@ pub fn cmd_convert(command: &ConvertCommand) {
     let total = files.len();
     if report_only {
         println!("{}", tally.report_summary(total));
-        if tally.changed + tally.refused > 0 {
-            std::process::exit(1);
+        if tally.refused > 0 {
+            std::process::exit(tally.refusal_status);
+        }
+        if tally.changed > 0 {
+            // Drift is a report, not a classed failure.
+            std::process::exit(exit_status::FAILURE);
         }
         return;
     }
     println!("{}", tally.write_summary(total));
-    if tally.refused + tally.write_failed > 0 {
-        std::process::exit(1);
+    if tally.refused > 0 {
+        std::process::exit(tally.refusal_status);
+    }
+    if tally.write_failed > 0 {
+        std::process::exit(exit_status::FAILURE);
     }
 }
 
@@ -145,24 +153,24 @@ fn validate_target_locale(locale: &str) {
         "error: unknown or unsupported reader locale '{locale}'; embedded pack locales: {}",
         available.join(" ")
     );
-    std::process::exit(1);
+    exit_status::exit_usage();
 }
 
-/// Convert ONE source document to the target locale surface. `Err(())` means
-/// a diagnostic was already printed.
+/// Convert ONE source document to the target locale surface. `Err(status)`
+/// means a diagnostic was already printed; `status` is its exit status.
 fn convert_single_doc(
     path: &Path,
     to: &str,
     from: Option<&str>,
     source: &str,
-) -> Result<String, ()> {
+) -> Result<String, i32> {
     #[cfg(not(feature = "hir-faber"))]
     {
         drop((path, to, from, source));
         eprintln!(
             "error: reader-locale conversion requires a faber build with feature `hir-faber`"
         );
-        Err(())
+        Err(exit_status::FAILURE)
     }
     #[cfg(feature = "hir-faber")]
     {

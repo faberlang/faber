@@ -29,7 +29,7 @@ fn embedded_locales_list() -> String {
 
 fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnostic {
     let embedded_locales = embedded_locales_list();
-    crate::package_diagnostic_error(format!(
+    crate::exit_status::config_diagnostic_error(format!(
         "failed to load reader locale '{locale}': {err}\n\
          next action: choose one of the embedded reader locales ({embedded_locales})"
     ))
@@ -94,8 +94,10 @@ pub(crate) fn resolve_diagnostics_locale_pack(
         let trimmed = locale.trim();
         if trimmed.is_empty() {
             return Err(Box::new(
-                crate::package_diagnostic_error("--diagnostics-locale must not be empty")
-                    .with_arg("flag", "--diagnostics-locale"),
+                crate::exit_status::usage_diagnostic_error(
+                    "--diagnostics-locale must not be empty",
+                )
+                .with_arg("flag", "--diagnostics-locale"),
             ));
         }
         return load_locale_pack_for_input(input, Some(trimmed));
@@ -137,7 +139,7 @@ fn selected_locale<'a>(
         let trimmed = locale.trim();
         if trimmed.is_empty() {
             return Err(Box::new(
-                crate::package_diagnostic_error("--locale must not be empty")
+                crate::exit_status::usage_diagnostic_error("--locale must not be empty")
                     .with_arg("flag", "--locale"),
             ));
         }
@@ -167,7 +169,7 @@ fn load_selected_locale_pack(
     })?;
     if pack.metadata.id != locale {
         return Err(Box::new(
-            crate::package_diagnostic_error(format!(
+            crate::exit_status::config_diagnostic_error(format!(
                 "reader locale '{locale}' selected embedded pack with id '{}'",
                 pack.metadata.id
             ))
@@ -209,7 +211,7 @@ fn load_locale_pack_from_file(
 ) -> Result<LocalePack, Box<Diagnostic>> {
     let pack = LocalePack::from_toml_path(pack_path).map_err(|err| {
         Box::new(
-            crate::package_diagnostic_error(format!(
+            crate::exit_status::config_diagnostic_error(format!(
                 "failed to load reader locale '{locale}' pack '{}': {err}\n\
                  next action: fix the package pack path",
                 pack_path.display()
@@ -222,7 +224,7 @@ fn load_locale_pack_from_file(
 
     if pack.metadata.id != locale {
         return Err(Box::new(
-            crate::package_diagnostic_error(format!(
+            crate::exit_status::config_diagnostic_error(format!(
                 "reader locale '{locale}' selected pack '{}' with id '{}'",
                 pack_path.display(),
                 pack.metadata.id
@@ -259,7 +261,7 @@ pub fn locale_pack_for_emit_with_diagnostic(
 ) -> Result<Option<LocalePack>, Box<Diagnostic>> {
     let locale = match cli_locale {
         Some(locale) if locale.trim().is_empty() => {
-            return Err(Box::new(crate::package_diagnostic_error(
+            return Err(Box::new(crate::exit_status::usage_diagnostic_error(
                 "--locale must not be empty",
             )));
         }

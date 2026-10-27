@@ -66,7 +66,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
         eprintln!("    faber explain ≡");
         eprintln!("    faber explain ==");
         eprintln!("    faber explain --list");
-        std::process::exit(2);
+        faber_cli::exit_status::exit_usage();
     };
 
     if diagnostic_explain::is_diagnostic_query(&term) {

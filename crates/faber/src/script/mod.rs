@@ -274,6 +274,22 @@ pub fn interpret_source<H: Host>(
     run_named(name, source, host).map(|_| ())
 }
 
+/// The tool's exit status for a run that failed before or while running.
+///
+/// Front-end error diagnostics are the source's fault ([`exit_status::DATA_ERROR`]
+/// or the class they carry). A MIR or runner failure keeps
+/// [`exit_status::FAILURE`]: it may be the program's own trap, whose status is
+/// the program's, not the tool's.
+#[cfg(feature = "runner")]
+pub fn status_for_run_source_error(error: &RunSourceError) -> i32 {
+    match error {
+        RunSourceError::Frontend(diagnostics) => {
+            faber_cli::exit_status::status_for_diagnostics(diagnostics)
+        }
+        RunSourceError::Mir(_) | RunSourceError::Stepper(_) => faber_cli::exit_status::FAILURE,
+    }
+}
+
 /// Run source via the runner, printing errors and exiting the process on failure.
 #[cfg(feature = "runner")]
 pub fn interpret_source_or_exit(name: &str, source: &str, host: &mut StdioHost) {
@@ -285,7 +301,7 @@ pub fn interpret_source_or_exit(name: &str, source: &str, host: &mut StdioHost) 
         }
         Err(error) => {
             print_run_source_error(&error);
-            std::process::exit(1);
+            std::process::exit(status_for_run_source_error(&error));
         }
     }
 }

@@ -72,7 +72,7 @@ pub(crate) mod update;
 mod update_test;
 
 use crate::cli::Command;
-use clap::Parser;
+use faber_cli::exit_status;
 use faber_cli::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use faber_cli::package;
 use radix::services::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
@@ -189,7 +189,7 @@ pub(super) fn validate_deny_codes(codes: &[String]) {
     for code in codes {
         if !radix::module::is_known_diagnostic_code(code) {
             eprintln!("error: unknown diagnostic code '{code}' passed to --deny");
-            std::process::exit(1);
+            exit_status::exit_usage();
         }
     }
 }
@@ -226,7 +226,7 @@ pub(super) fn eprint_io_error(path: &std::path::Path, err: &std::io::Error) -> !
 
 /// Parse argv and dispatch to the selected command handler.
 pub fn run() {
-    let cli = crate::cli::Cli::parse();
+    let cli = exit_status::parse_cli::<crate::cli::Cli>();
     #[cfg(feature = "runner")]
     if let Some(source) = cli.eval_source {
         cmd_eval(&source, cli.eval_args);
@@ -238,7 +238,7 @@ pub fn run() {
     }
     let Some(command) = cli.command else {
         eprintln!("error: no subcommand provided; use `faber --help` for usage");
-        std::process::exit(1);
+        exit_status::exit_usage();
     };
     dispatch(command);
 }
@@ -293,7 +293,7 @@ fn dispatch(command: Command) {
                 eprintln!(
                     "error: package verification is not supported yet; use `faber verify <single-file.fab>`"
                 );
-                std::process::exit(1);
+                exit_status::exit_usage();
             }
             cmd_verify_file(VerifyCommand {
                 input: args.input,
@@ -409,11 +409,11 @@ fn cmd_check(args: crate::cli::CheckArgs) {
     let package_shaped = args.package || package::should_treat_as_package_from_args(&args.input);
     if args.lower && !package_shaped {
         eprintln!("error: `check --lower` needs a file or package path, not stdin");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
     if args.device.is_some() && !package_shaped {
         eprintln!("error: `check --device` needs a file or package path, not stdin");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
     if args.air {
         // ALA-1: the advisory AIR report is single-file only. Plain
@@ -431,7 +431,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
         if !input_is_plain_file {
             let message = check_air::PACKAGE_AIR_MESSAGE;
             eprintln!("{message}");
-            std::process::exit(1);
+            exit_status::exit_usage();
         }
         cmd_check_file(
             CheckCommand {
@@ -510,7 +510,7 @@ fn cmd_verify_library(args: crate::cli::VerifyLibraryArgs) {
         }
         Err(diagnostics) => {
             eprint_compile_diagnostics(&diagnostics);
-            std::process::exit(1);
+            exit_status::exit_for_diagnostics(&diagnostics);
         }
     }
 }
@@ -522,7 +522,7 @@ fn reject_reader_locale_without_package(
 ) {
     if let Some(message) = locale_without_package_error(locale, input, force_package) {
         eprintln!("error: {message}");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
 }
 
@@ -534,7 +534,7 @@ fn print_inspection(result: radix::services::SourceInspection) {
         eprintln!("{error}");
     }
     if !result.success {
-        std::process::exit(1);
+        exit_status::exit_data_error();
     }
 }
 
@@ -566,7 +566,7 @@ fn cmd_inspect_parse(input: &[String]) {
 fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
     if load.is_some() {
         eprintln!("error: `faber hir --load` is not supported; use `radix hir --load`");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
     let (name, source) = read_source(input);
     print_inspection(radix::services::hir_inspection_for_source(&name, &source));
@@ -582,7 +582,7 @@ fn cmd_inspect_mir(input: &[String]) {
             for message in messages {
                 eprintln!("{message}");
             }
-            std::process::exit(1);
+            exit_status::exit_data_error();
         }
     }
 }
@@ -604,7 +604,7 @@ fn mir_dump_config(input: &[String]) -> radix::module::Config {
         Err(diagnostic) => {
             let diagnostic = package::attach_path_diagnostic_context(diagnostic);
             eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
-            std::process::exit(1);
+            exit_status::exit_for_diagnostic(&diagnostic);
         }
     }
 }
@@ -621,7 +621,7 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
         // Cross-reference: must stay verbatim with
         // crates/radix-cli/src/commands/check.rs `PACKAGE_CHECK_MESSAGE`.
         eprintln!("{PACKAGE_CHECK_MESSAGE}");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
     let (name, source) = read_source(&command.input);
     let mut result =
@@ -650,7 +650,7 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
     if success {
         eprintln!("ok: {name}");
     } else {
-        std::process::exit(1);
+        exit_status::exit_data_error();
     }
 }
 
@@ -670,6 +670,6 @@ fn cmd_verify_file(command: VerifyCommand) {
         );
     }
     if !result.success {
-        std::process::exit(1);
+        exit_status::exit_data_error();
     }
 }

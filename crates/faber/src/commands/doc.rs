@@ -101,7 +101,7 @@ pub fn cmd_doc(command: &DocCommand) {
         Ok(files) => files,
         Err(diagnostics) => {
             super::eprint_compile_diagnostics(&diagnostics);
-            std::process::exit(1);
+            faber_cli::exit_status::exit_for_diagnostics(&diagnostics);
         }
     };
     if command.json {
