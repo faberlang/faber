@@ -130,7 +130,7 @@ fn octeti_tensor_runtime_extent_length_mismatch_is_recoverable() {
     )
     .expect_err("wrong length");
     assert_eq!(err.code, "runner_conversion");
-    assert_eq!(err.issue, "runner_octeti_tensor_length_mismatch");
+    assert_eq!(err.issue, "runner_list_b8_tensor_length_mismatch");
     let recovery = MirOperand::Constant(MirConstant::Int(42));
     let value = convert_extents(
         vec![0_u8; 24],
@@ -314,7 +314,7 @@ fn octeti_tensor_length_mismatch_is_recoverable_conversion() {
     for bytes in [vec![0_u8; 7], vec![0_u8; 9], Vec::new()] {
         let err = convert(bytes, F32, &[2], "Le", None).expect_err("wrong length");
         assert_eq!(err.code, "runner_conversion");
-        assert_eq!(err.issue, "runner_octeti_tensor_length_mismatch");
+        assert_eq!(err.issue, "runner_list_b8_tensor_length_mismatch");
     }
 }
 

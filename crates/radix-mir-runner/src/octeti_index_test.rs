@@ -166,7 +166,7 @@ fn octeti_index_range_out_of_bounds_fails() {
     )
     .expect_err("out-of-range octeti window must fail");
     assert_eq!(
-        err.issue, "runner_octeti_index_out_of_bounds",
+        err.issue, "runner_list_b8_index_out_of_bounds",
         "expected live octeti OOB fail, got: {err:?}"
     );
     assert_eq!(err.arg("start"), Some("0"));

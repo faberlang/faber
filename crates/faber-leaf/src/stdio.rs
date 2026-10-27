@@ -116,7 +116,7 @@ fn expect_byte_list(route: &'static str, args: &[Arg]) -> Result<Vec<u8>, LeafEr
             .map(|arg| match arg {
                 Arg::Int(value) => u8::try_from(*value)
                     .map_err(|_| LeafError::invalid_argument(route, "byte must be 0..=255")),
-                _ => Err(LeafError::invalid_argument(route, "data must be octeti")),
+                _ => Err(LeafError::invalid_argument(route, "data must be list<b8>")),
             })
             .collect(),
     }
