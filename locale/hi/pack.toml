@@ -963,7 +963,7 @@ help = "उपयोग से पहले चर घोषित करें{
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "अज्ञात identifier"
-help = "आउटपुट कथन के लिए कोष्ठक के बिना `{spelling} <expr>` लिखें"
+help = "`{spelling}` आउटपुट कथन है, फ़ंक्शन नहीं: कंसोल फ़ंक्शन आयात करें (`{importa} {ex} \"norma:console\" {fixum} print`, फिर `print(...)` लिखें), या पहले मान को बाँधें (`{sit} _ x ← …`, फिर `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "अज्ञात record field"

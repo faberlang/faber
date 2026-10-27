@@ -1003,7 +1003,7 @@ help = "在使用前宣告變數{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "未知識別符"
-help = "若要輸出陳述式，請寫不帶括號的 `{spelling} <expr>`"
+help = "`{spelling}` 是輸出陳述式，不是函式：匯入主控台函式（`{importa} {ex} \"norma:console\" {fixum} print`，然後寫 `print(...)`），或先綁定該值（`{sit} _ x ← …`，然後寫 `{spelling} x`）"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "未知記錄欄位"

@@ -963,7 +963,7 @@ help = "ประกาศตัวแปรก่อนใช้{?suggestion|; 
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "ตัวระบุไม่รู้จัก"
-help = "เขียน `{spelling} <expr>` โดยไม่มีวงเล็บสำหรับคำสั่งส่งออก"
+help = "`{spelling}` เป็นคำสั่งส่งออก ไม่ใช่ฟังก์ชัน: นำเข้าฟังก์ชันคอนโซล (`{importa} {ex} \"norma:console\" {fixum} print` แล้วเขียน `print(...)`) หรือผูกค่าก่อน (`{sit} _ x ← …` แล้วเขียน `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "ฟิลด์เรกคอร์ดไม่รู้จัก"

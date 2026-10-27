@@ -959,7 +959,7 @@ help = "صرح عن المعرف قبل استخدامه{?suggestion|؛ هل ق�
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "معرف غير معروف"
-help = "اكتب `{spelling} <expr>` بدون أقواس لجملة الإخراج"
+help = "`{spelling}` جملة إخراج وليست دالة: استورد دالة وحدة التحكم (`{importa} {ex} \"norma:console\" {fixum} print` ثم اكتب `print(...)`)، أو اربط القيمة أولاً (`{sit} _ x ← …` ثم `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "record field غير معروف"

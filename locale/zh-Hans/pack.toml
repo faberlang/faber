@@ -1003,7 +1003,7 @@ help = "先声明标识符再使用{?suggestion|；你是不是想用 |？}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "未知标识符"
-help = "若要输出语句，请写不带括号的 `{spelling} <expr>`"
+help = "`{spelling}` 是输出语句，不是函数：导入控制台函数（`{importa} {ex} \"norma:console\" {fixum} print`，然后写 `print(...)`），或先绑定该值（`{sit} _ x ← …`，然后写 `{spelling} x`）"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "未知 record field"
