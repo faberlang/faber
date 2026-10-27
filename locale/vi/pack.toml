@@ -1137,6 +1137,10 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "tên giá trị {name} không thể chiếm vị trí extent trong chú thích kiểu"
 help = "viết `size {name}` để tường minh phép nâng tại điểm lưu này, ví dụ `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "kích thước hoặc hình dạng trong lời gọi generic không được hỗ trợ"
+help = "dùng hằng số, tên kích thước, hoặc giá trị viết `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "phân rã mảng yêu cầu bộ khởi tạo"
 help = "sửa cấu trúc AST để hạ mức"

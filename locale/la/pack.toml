@@ -1950,6 +1950,10 @@ help = "scribe `magnitudo {name}` ut iter elevandi in hoc reposito demonstretur,
 message = "nomen valoris locum magnitudinis tenere non potest"
 help = "scribe `magnitudo w` ut valor ut testimonium magnitudinis utatur"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "vocatio generica argumentum magnitudinis vel figurae sustinere non potest"
+help = "utere constante aut nomine magnitudinis aut valore `magnitudo w` scripto"
+
 [diagnostics.SEM008.issues.unknown_type_name]
 message = "unknown type name"
 help = "fix the AST construct for lowering"

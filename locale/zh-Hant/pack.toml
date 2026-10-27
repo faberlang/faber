@@ -1181,6 +1181,10 @@ help = "修正用於降階的 AST 結構"
 message = "值名稱 {name} 不能佔據注記的 extent 位置"
 help = "在此儲存位置寫出 `size {name}` 以顯式提升，例如 `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "泛型呼叫的尺寸或形狀引數不受支援"
+help = "使用常數、尺寸名稱或寫出 `size w` 的值"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "陣列解構需要初始化器"
 help = "修正用於降階的 AST 結構"

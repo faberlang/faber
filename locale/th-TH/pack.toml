@@ -1149,6 +1149,10 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "ชื่อค่า {name} ใช้ตำแหน่ง extent ในคำประกาศไม่ได้"
 help = "เขียน `size {name}` เพื่อระบุการยกในตำแหน่งจัดเก็บนี้ เช่น `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "ขนาดหรือรูปร่างในการเรียก generic ไม่รองรับ"
+help = "ใช้ค่าคงที่ ชื่อขนาด หรือค่าที่เขียนเป็น `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "การแยกโครงสร้าง array ต้องมี initializer"
 help = "แก้โครงสร้าง AST สำหรับ lowering"

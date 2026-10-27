@@ -2235,6 +2235,10 @@ help = "write `size {name}` to spell the lift at this store, as in `tf32[2, size
 message = "value name cannot occupy a size slot"
 help = "write `size w` to use the value as a size witness"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "generic call size or shape argument is unsupported"
+help = "use a constant, a size name, or a value written `size w`"
+
 [diagnostics.SEM008.issues.unknown_type_name]
 message = "unknown type name"
 help = "fix the AST construct for lowering"
