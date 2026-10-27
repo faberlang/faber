@@ -12,7 +12,7 @@
 use super::*;
 use radix_mir_runner::BufferHost;
 
-const REACH_UTIL: &str = "@ publica\nfunctio usata() → textus {\n    redde adjutrix()\n}\n\nfunctio adjutrix() → textus {\n    redde \"usata\"\n}\n\n@ publica\nfunctio non_usata() → textus {\n    redde \"non_usata\"\n}\n";
+const REACH_UTIL: &str = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio usata() → textus {\n    redde adjutrix()\n}\n\nfunctio adjutrix() → textus {\n    redde \"usata\"\n}\n\n@ publica\nfunctio non_usata() → textus {\n    redde \"non_usata\"\n}\n";
 const REACH_MAIN: &str = "import from \"reachlib:vals\" vals\n\nfn run() → string {\n    return vals.usata()\n}\n\nmain {\n    print run()\n}\n";
 
 /// Package whose entry imports the `reachlib:vals` library fixture under a
@@ -128,8 +128,8 @@ fn package_mir_unused_library_function_not_lowered() {
 // `dupla`; both modules also export an unused function. The fixpoint must
 // keep `computa` (entry → outer) AND `dupla` (outer → inner) while dropping
 // `otiosa` and `inanis`.
-const REACH_INNER: &str = "@ publica\nfunctio dupla(numerus value) → numerus {\n    redde value * 2\n}\n\n@ publica\nfunctio inanis(numerus value) → numerus {\n    redde value\n}\n";
-const REACH_OUTER: &str = "importa ex \"reachlib:inner\" inner\n\n@ publica\nfunctio computa(numerus value) → numerus {\n    redde inner.dupla(value) + 1\n}\n\n@ publica\nfunctio otiosa(numerus value) → numerus {\n    redde value\n}\n";
+const REACH_INNER: &str = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio dupla(numerus value) → numerus {\n    redde value * 2\n}\n\n@ publica\nfunctio inanis(numerus value) → numerus {\n    redde value\n}\n";
+const REACH_OUTER: &str = "+++\nlocale = \"la\"\n+++\nimporta ex \"reachlib:inner\" inner\n\n@ publica\nfunctio computa(numerus value) → numerus {\n    redde inner.dupla(value) + 1\n}\n\n@ publica\nfunctio otiosa(numerus value) → numerus {\n    redde value\n}\n";
 const REACH_NESTED_MAIN: &str =
     "import from \"reachlib:outer\" outer\n\nmain {\n    print outer.computa(4)\n}\n";
 

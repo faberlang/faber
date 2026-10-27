@@ -16,7 +16,9 @@ fn pack(id: &str) -> crate::locale::LocalePack {
 }
 
 fn latin_config() -> Config {
-    Config::default().with_target(Target::HirRust)
+    Config::default()
+        .with_latin_locale()
+        .with_target(Target::HirRust)
 }
 
 fn english_config() -> Config {

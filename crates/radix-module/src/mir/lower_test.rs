@@ -27,8 +27,12 @@ use crate::mir::type_contains_param;
 use crate::mir::validate_program;
 use std::path::PathBuf;
 
+fn la_config() -> Config {
+    Config::default().with_latin_locale()
+}
+
 fn analyze(source: &str) -> AnalyzedModule {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
@@ -128,7 +132,7 @@ fn decimal_literal_executes_at_the_exact_scaled_carrier() {
     // intermediation rounds and the runner's re-derivation lands out of range.
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "decimal-exact-carrier.fab",
         r"incipit {
     sit d64 x ← 92233720368.54775807
@@ -149,7 +153,7 @@ fn decimal_potentia_executes_exactly_at_the_scaled_carrier() {
     // landing on the exact 2.25.
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "decimal-potentia.fab",
         r"incipit {
     sit d64 a ← 1.5
@@ -167,7 +171,7 @@ fn decimal_literal_switch_matches_at_the_exact_carrier() {
     // the scrutinee, so the case compares Int carrier against Int carrier.
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "decimal-exact-switch.fab",
         r#"incipit {
     sit d64 x ← 4.2
@@ -366,7 +370,7 @@ fn top_level_conversio_init_rejects_as_top_level_binding() {
     // compile-time-evaluable `=` initializer (D5.9), which `↤` (a runtime
     // conversion) can never be — `generis`'s own grammar only accepts `=`.
     // There is no static equivalent for this fixture; assert the rejection.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let source = r#"
 sit numerus answer ↤ "42"
 
@@ -478,7 +482,7 @@ incipit {
 
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "scalar-mut-param.fab",
         source,
         &mut host,
@@ -489,7 +493,7 @@ incipit {
 
 #[test]
 fn runtime_size_declaration_rejects_negative_lift_and_accepts_nonnegative() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let negative = r#"+++
 locale = "en"
 +++
@@ -689,7 +693,7 @@ fn gpu_builtin_call_never_reaches_mir_lowering() {
     // A thread-id builtin is a raw lane id (gpu-reset rule 12.5): user source
     // that calls one is rejected at check time, so HIR-to-MIR lowering only
     // sees builtin reads the compiler binds itself (lane parameters).
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let errors = crate::driver::analyze_source(
         &session,
         "test.fab",
@@ -1735,7 +1739,7 @@ fn lowers_rumpe_inside_fac_to_breakable_exit() {
 #[test]
 fn rejects_statement_level_stream_ad_for_mir() {
     let result = crate::driver::compile(
-        &crate::Session::new(crate::Config::default()),
+        &crate::Session::new(crate::Config::default().with_latin_locale()),
         "stream-ad.fab",
         r"functio f() → vacuum { ad 'noop:ping' { tuus { rumpe } } }",
         ModuleCompileRequest::default(),
@@ -2111,7 +2115,7 @@ fn lockstep_itera_unequal_lengths_abort_fail_closed() {
     let mut host = crate::mir::BufferHost::default();
     let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         crate::mir::run_source(
-            &Session::new(Config::default().with_target(Target::HirTypeScript)),
+            &Session::new(la_config().with_target(Target::HirTypeScript)),
             "lockstep-mismatch.fab",
             r"incipit {
   varia lista<numerus> ks ← [1, 2, 3]
@@ -2135,7 +2139,7 @@ fn lockstep_itera_unequal_lengths_abort_fail_closed() {
 fn lockstep_itera_runs_aligned_walks_with_shared_coordinate() {
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "lockstep-run.fab",
         r#"incipit {
   varia lista<numerus> ks ← [1, 2, 3]
@@ -2160,7 +2164,7 @@ fn range_product_two_axes_walk_row_major_leftmost_outermost() {
     // range is the outer axis, so (i, j) visits row-major leftmost-outermost.
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "range-product-n2.fab",
         r"incipit {
   itera ab 0‥2, 0‥3 sit i, j {
@@ -2179,7 +2183,7 @@ fn range_product_three_axes_preserve_every_binder() {
     // row proves i, j, and p each contribute their axis digit.
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "range-product-n3.fab",
         r"incipit {
   itera ab 0‥2, 0‥2, 0‥2 sit i, j, p {
@@ -2198,7 +2202,7 @@ fn range_product_keeps_per_axis_step_and_inclusive_bounds() {
     // exclusive stepped walk (0, 2), axis 1 is inclusive (0, 1, 2).
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "range-product-semantics.fab",
         r"incipit {
   itera ab 0‥4 per 2, 0…2 sit i, j {
@@ -2257,7 +2261,7 @@ fn range_product_rumpe_exits_innermost_axis_and_perge_continues_it() {
     // would print again where "2" appears.
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "range-product-rumpe.fab",
         r"incipit {
   itera ab 0‥2, 0‥3 sit i, j {
@@ -2279,7 +2283,7 @@ fn range_product_rumpe_exits_innermost_axis_and_perge_continues_it() {
 
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "range-product-perge.fab",
         r"incipit {
   itera ab 0‥2, 0‥3 sit i, j {
@@ -2520,7 +2524,7 @@ incipit {
 "#;
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "borrowed-itera.fab",
         source,
         &mut host,
@@ -2606,7 +2610,7 @@ incipit {
 }"#;
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "textus-itera.fab",
         source,
         &mut host,
@@ -2644,7 +2648,7 @@ fn textus_itera_de_and_scalar_receivers_keep_fail_closed_decline() {
   }
 }";
     // D19.4: a non-iterable source is now rejected at typecheck, before MIR.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let Err(errors) = crate::driver::analyze_source(&session, "test.fab", scalar_case, AnalyzeRequest::default())
     else {
         panic!("scalar itera ex must fail closed at analysis")
@@ -2765,7 +2769,7 @@ fn rejects_deferred_control_flow_constructs_with_explicit_diagnostics() {
 
     // A bare arm name that is not a member of the matched set never binds: the
     // resolver refuses it at analysis, so it no longer reaches MIR lowering.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let Err(discerne_errors) = crate::driver::analyze_source(
         &session,
         "test.fab",
@@ -2940,7 +2944,7 @@ fn runs_trap_type_narrowed_collection_member_projection() {
         ";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "trap-narrowed-list.fab",
         source,
         &mut host,
@@ -3404,7 +3408,7 @@ functio lectio() → numerus {
 
 #[test]
 fn edge_empty_lista_ascribed_to_tabula_rejects_semantically() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let errors = crate::driver::analyze_source(
         &session,
         "test.fab",
@@ -4101,7 +4105,7 @@ fn rejects_unsupported_runtime_method_shapes() {
     // Need: a method absent from a builtin receiver's registry is
     // refused at the checker as `unknown_method`, so the call never reaches
     // MIR lowering. The fail-closed boundary moved from lowering to analysis.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let diagnostics = crate::driver::analyze_source(
         &session,
         "test.fab",
@@ -4154,7 +4158,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
         }),
     });
 
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let unit = crate::driver::analyze_source(
         &session,
         "test.fab",
@@ -4777,7 +4781,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "reducta-initial.fab",
         source,
         &mut host,
@@ -4802,7 +4806,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "reducta-arg-all-nan.fab",
         source,
         &mut host,
@@ -4833,7 +4837,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "reducta-two-key-group.fab",
         source,
         &mut host,
@@ -4859,7 +4863,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "axis-reduction-rank-three.fab",
         source,
         &mut host,
@@ -4892,7 +4896,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "reducta-group-immutable.fab",
         source,
         &mut host,
@@ -4915,7 +4919,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     let errors = crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "reducta-group-out-of-range.fab",
         source,
         &mut host,
@@ -4946,7 +4950,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     let errors = crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "reducta-two-key-out-of-range.fab",
         source,
         &mut host,
@@ -4975,7 +4979,7 @@ incipit {
 }";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "cumulata-initial.fab",
         source,
         &mut host,
@@ -5431,7 +5435,7 @@ fn lowers_nested_captured_closure_environment_layout() {
 #[test]
 fn rejects_legacy_typed_ad_statement_for_mir() {
     let result = crate::driver::compile(
-        &crate::Session::new(crate::Config::default()),
+        &crate::Session::new(crate::Config::default().with_latin_locale()),
         "legacy-ad.fab",
         r#"incipit {
   ad "fasciculus:lege" ("salve.txt") → textus textus ⇥ textus {
@@ -6514,7 +6518,7 @@ incipit {
     // shape-occurrence derivation), so the unbound child fails closed at
     // analysis with SEM014 instead of surfacing an unresolved param at MIR
     // lowering.
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(la_config().with_target(Target::HirTypeScript));
     let Err(errors) = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) else {
         panic!("unbound child shape must fail closed")
     };
@@ -7132,7 +7136,7 @@ fn analyze_exemplum_for_mir_async(rel: &str) -> AnalyzedModule {
         .join(rel);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read {}: {err}", path.display()));
     let session = Session::new(
-        Config::default()
+        la_config()
             .with_target(Target::MirLlvm)
             .with_dev_locale_root(),
     );
@@ -7562,7 +7566,7 @@ main {
 "#;
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "reduction-max.fab",
         source,
         &mut host,
@@ -7669,7 +7673,7 @@ functio collection(lista<numerus> values, numerus bound) → lista<numerus> {
     redde values ⤒ bound
 }
 
-functio tensor(tensor<f32, [3]> values, f32 bound) → tensor<f32, [3]> {
+functio tensorium(tensor<f32, [3]> values, f32 bound) → tensor<f32, [3]> {
     redde values ⤒ bound
 }
 
@@ -7702,7 +7706,7 @@ incipit {
 ";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "minmax-infix-clamp.fab",
         source,
         &mut host,
@@ -7751,7 +7755,7 @@ fn run_lines(body: &str) -> Result<Vec<String>, String> {
     let mut host = crate::mir::BufferHost::default();
     let source = format!("incipit {{\n{body}\n}}");
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "decimal-exact-until-store.fab",
         &source,
         &mut host,
@@ -7840,7 +7844,7 @@ fn decimal_store_positions_all_round_at_the_slot() {
     // list element. Unstored, it prints exactly.
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(la_config().with_target(Target::HirTypeScript)),
         "decimal-store-positions.fab",
         r"functio cubus(d64 x) → d64 {
     redde x * x * x

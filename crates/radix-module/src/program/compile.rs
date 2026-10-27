@@ -2719,10 +2719,10 @@ fn parse_program_for_namespace_exports(
     let peeled = crate::driver::peel_raw_source(name, source).ok()?;
     let lex_result = match code_pack {
         Some(pack) => crate::lexer::lex_with_locale_pack(peeled.body, pack),
-        None => match crate::driver::default_code_pack(&crate::driver::Config::default()) {
-            Some(pack) => crate::lexer::lex_with_locale_pack(peeled.body, &pack),
-            None => crate::lexer::lex(peeled.body),
-        },
+        None => {
+            let pack = crate::driver::default_code_pack(&crate::driver::Config::default()).ok()?;
+            crate::lexer::lex_with_locale_pack(peeled.body, &pack)
+        }
     };
     if !lex_result.success() {
         return None;

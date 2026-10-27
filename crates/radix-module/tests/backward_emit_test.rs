@@ -13,7 +13,11 @@ use radix_module::codegen::Target;
 use radix_module::driver::{Config, ModuleCompileRequest, Session, compile};
 
 fn llvm_session() -> Session {
-    Session::new(Config::new().with_target(Target::MirLlvm))
+    Session::new(
+        Config::new()
+            .with_latin_locale()
+            .with_target(Target::MirLlvm),
+    )
 }
 
 /// Tensor AIR functions annotated with `@ radix backward` must emit the

@@ -15,6 +15,7 @@ use crate::mir::{BufferHost, RunSourceError, RunnerError, run_source};
 fn run_stdout(name: &str, source: &str) -> Vec<String> {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_dev_locale_root(),
     );
@@ -35,6 +36,7 @@ fn run_stdout(name: &str, source: &str) -> Vec<String> {
 fn run_trapped(name: &str, source: &str) -> Vec<RunnerError> {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_dev_locale_root(),
     );

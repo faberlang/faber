@@ -52,7 +52,7 @@ fn analyze(
 ) -> Result<crate::driver::AnalyzedModule, Vec<Diagnostic>> {
     let config = match locale {
         Some(locale) => Config::new().with_locale_pack(locale),
-        None => Config::default(),
+        None => Config::default().with_latin_locale(),
     };
     let session = Session::new(config);
     analyze_source(&session, "intrinsic_locale.fab", source, AnalyzeRequest::default())

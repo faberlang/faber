@@ -6,7 +6,11 @@ use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::mir::{BufferHost, MirLoweringOptions, lower_analyzed_unit, run_source};
 
 fn session() -> Session {
-    Session::new(Config::default().with_target(Target::HirTypeScript))
+    Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    )
 }
 
 #[test]

@@ -29,7 +29,7 @@ proba "pass case" {
 "#,
     )
     .expect("write");
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let source = fs::read_to_string(&path).expect("read");
     let report = run_proba_source(
         &session,
@@ -60,7 +60,7 @@ proba "the broken one" {
 "#,
     )
     .expect("write");
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let source = fs::read_to_string(&path).expect("read");
     let report = run_proba_source(
         &session,
@@ -505,7 +505,7 @@ fn cmd_test_json_report_emits_blocked_census() {
 #[test]
 fn empty_selection_json_is_not_success_without_changing_exit_policy() {
     let report = run_proba_source(
-        &Session::new(Config::default()),
+        &Session::new(Config::default().with_latin_locale()),
         "empty_selection.fab",
         r#"proba "one equals one" { adfirma 1 ≡ 1 }"#,
         &TestSelection {

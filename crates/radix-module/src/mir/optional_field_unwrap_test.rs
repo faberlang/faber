@@ -12,7 +12,11 @@ use crate::driver::AnalyzedModule;
 use crate::driver::{AnalyzeRequest, Config, Session};
 
 fn analyze(source: &str) -> AnalyzedModule {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).unwrap_or_else(
         |diagnostics| {
             panic!(

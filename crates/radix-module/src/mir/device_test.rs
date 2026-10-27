@@ -157,7 +157,7 @@ fn assert_rejected_goto_policy(result: radix_types::Lowerability, message: &str)
 }
 
 fn classify_source(source: &str) -> radix_types::Lowerability {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
@@ -181,7 +181,7 @@ genus Worker {
     }
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
 
@@ -1528,7 +1528,7 @@ functio k(f32 x) → f32 {
     redde x
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let (def_id, func) = first_function_item(&analysis);
@@ -1547,7 +1547,7 @@ functio helper(f32 x) → f32 {
     redde x
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let (def_id, func) = first_function_item(&analysis);
@@ -1575,7 +1575,7 @@ functio k(f32 x) → f32 {
     redde x
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);
@@ -1608,7 +1608,7 @@ functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = device_roles_from_hir(&analysis.hir);

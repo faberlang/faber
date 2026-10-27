@@ -20,7 +20,12 @@ fn diagnostics_with(config: Config, source: &str) -> Vec<crate::Diagnostic> {
 }
 
 fn latin(source: &str) -> Vec<crate::Diagnostic> {
-    diagnostics_with(Config::default().with_target(Target::HirRust), source)
+    diagnostics_with(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirRust),
+        source,
+    )
 }
 
 fn english(source: &str) -> Vec<crate::Diagnostic> {

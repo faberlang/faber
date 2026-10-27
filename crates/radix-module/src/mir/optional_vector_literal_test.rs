@@ -10,7 +10,11 @@ use crate::mir::{BufferHost, run_source};
 
 #[test]
 fn vector_literal_returned_into_optional_slot_lowers_as_the_vector() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let mut host = BufferHost::default();
     let result = run_source(
         &session,

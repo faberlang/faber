@@ -10,7 +10,11 @@ use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::hir::HirId;
 
 fn analyze(source: &str) -> AnalyzedModule {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
@@ -408,7 +412,11 @@ functio vecmat(vector<f32, 3> v, matrix<f32, [3, 2]> m) → vector<f32, 2> {
 
 #[test]
 fn rejects_glyph_vector_matrix_dot_inner_dimension_mismatch_at_typecheck() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let Err(errors) = crate::driver::analyze_source(
         &session,
         "test.fab",

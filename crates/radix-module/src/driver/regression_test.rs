@@ -5,7 +5,7 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session};
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 use std::path::PathBuf;
 
 // ── faber roundtrip / annotation ──
@@ -162,7 +162,7 @@ fn statement_level_ad_does_not_roundtrip_through_faber_codegen() {
   }
 }"#;
     let result = compile(
-        &test_session(Target::HirRust),
+        &test_session_la(Target::HirRust),
         "test.fab",
         source,
         ModuleCompileRequest::default(),
@@ -178,7 +178,7 @@ fn statement_level_ad_does_not_roundtrip_through_faber_codegen() {
 
 #[test]
 fn rejects_old_verte_aliases_as_postfix_operators() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     for alias in &["qua", "innatum", "novum"] {
         let source = format!("incipit {{ nota 42 {alias} textus }}");
         let result = compile(&session, "test.fab", &source, ModuleCompileRequest::default());
@@ -221,7 +221,7 @@ fn faber_output_prefers_compact_closure_syntax() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compact_fac_closure_body_typechecks_with_redde() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ predicate ← numerus n → bivalens ∴ fac {
     redde n ≻ 1
@@ -235,7 +235,7 @@ fn compact_fac_closure_body_typechecks_with_redde() {
 
 #[test]
 fn compact_fac_closure_rejects_redde_without_explicit_return_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ predicate ← numerus n ∴ fac {
     redde n ≻ 1
@@ -255,7 +255,7 @@ fn compact_fac_closure_rejects_redde_without_explicit_return_type() {
 
 #[test]
 fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit (numerus) → bivalens predicate ← numerus n ∴ fac {
     redde n ≻ 1
@@ -281,7 +281,7 @@ fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn compact_fac_closure_accepts_iace_with_explicit_error_channel() {
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r#"incipit {
   sit _ failer ← numerus n ⇥ textus ∴ fac {
     iace "bad"
@@ -299,7 +299,7 @@ fn compact_fac_closure_accepts_iace_with_explicit_error_channel() {
 
 #[test]
 fn compact_fac_closure_rejects_iace_without_local_error_channel() {
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r#"functio outer() ⇥ textus {
   sit _ failer ← numerus n ∴ fac {
     iace "bad"
@@ -324,7 +324,7 @@ fn compact_fac_closure_rejects_iace_without_local_error_channel() {
 
 #[test]
 fn compact_fac_closure_accepts_local_cape_without_error_channel() {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     let source = r#"incipit {
   sit _ handled ← numerus n ∴ fac {
     iace "bad"
@@ -340,7 +340,7 @@ fn compact_fac_closure_accepts_local_cape_without_error_channel() {
 
 #[test]
 fn compact_fac_closure_cape_body_typechecks_with_redde() {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     let source = r#"functio parseFlag(textus value) → bivalens ⇥ textus {
   si value ≡ "bad" ergo iace "bad"
   redde verum
@@ -361,7 +361,7 @@ incipit {
 
 #[test]
 fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ predicate ← clausura numerus n {
     redde n ≻ 1
@@ -387,7 +387,7 @@ fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn legacy_block_closure_body_typechecks_with_redde() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ predicate ← clausura numerus n → bivalens {
     redde n ≻ 1
@@ -403,7 +403,7 @@ fn legacy_block_closure_body_typechecks_with_redde() {
 
 #[test]
 fn namespace_function_call_in_condition_no_longer_leaves_infer_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"importa ex "../../norma/consolum" consolum
 
 incipit {
@@ -427,7 +427,7 @@ incipit {
 
 #[test]
 fn namespace_function_call_statements_no_longer_leave_infer_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"importa ex "../../norma/consolum" consolum
 
 incipit {
@@ -445,7 +445,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn itera_de_array_index_no_longer_leaves_infer_types() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ xs ← [10, 20, 30]
   itera de xs sit idx {
@@ -464,7 +464,7 @@ fn itera_de_array_index_no_longer_leaves_infer_types() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn itera_ab_range_no_longer_leaves_infer_types() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   itera ab 0‥5 sit i {
     nota i
@@ -482,7 +482,7 @@ fn itera_ab_range_no_longer_leaves_infer_types() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn itera_ab_inclusive_range_glyph_compiles() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   itera ab 0…5 sit i {
     nota i
@@ -499,7 +499,7 @@ fn itera_ab_inclusive_range_glyph_compiles() {
 
 #[test]
 fn deferred_local_assignment_can_drive_inference() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   varia value
   value = 42
@@ -518,7 +518,7 @@ fn deferred_local_assignment_can_drive_inference() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_supports_extended_binary_operators() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ a ← 1
   sit _ b ← 2
@@ -539,7 +539,7 @@ fn compile_supports_extended_binary_operators() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_supports_extended_unary_operators() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ flag ← verum
   sit textus ∪ nihil maybe ← nulla
@@ -563,7 +563,7 @@ fn compile_supports_extended_unary_operators() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_lowers_top_level_proba_to_rust_test_function() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"proba "one plus one equals two" {
   adfirma 1 + 1 ≡ 2
 }
@@ -583,7 +583,7 @@ incipit {}"#;
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_lowers_proba_omit_and_futurum_as_ignored_tests() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"proba "case one" omitte "blocked" {
   adfirma falsum
 }
@@ -614,7 +614,7 @@ incipit {}"#;
 
 #[test]
 fn compile_lowers_probandum_nested_cases_without_lowering_errors() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"probandum "suite" {
   praepara omnia {
     sit _ x ← 1
@@ -642,7 +642,7 @@ fn compile_lowers_probandum_nested_cases_without_lowering_errors() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_probandum_hooks_scope_local_to_suite_and_omnia_to_nested() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"probandum "outer" {
   praepara omnia {
     nota "HOOK_ALL"
@@ -695,7 +695,7 @@ fn compile_probandum_hooks_scope_local_to_suite_and_omnia_to_nested() {
 
 #[test]
 fn ex_destructured_object_fields_can_be_used_in_arithmetic() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ point ← Point { x = 4, y = 6 }
   ex point sit x, y
@@ -720,7 +720,7 @@ genus Point {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn typed_constructor_uses_type_namespace_after_value_shadowing() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"genus persona {
   varia textus nomen
 }
@@ -742,7 +742,7 @@ functio main() → vacuum {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn object_destructured_aliases_can_be_used_in_arithmetic() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio totalis(Point point) → numerus {
   sit { x ut left, y } ← point
   redde left + y
@@ -763,7 +763,7 @@ genus Point {
 
 #[test]
 fn array_destructured_vars_can_be_used_in_arithmetic() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ coords ← [100, 200]
   varia [x, y] ← coords
@@ -783,7 +783,7 @@ fn array_destructured_vars_can_be_used_in_arithmetic() {
 
 #[test]
 fn method_return_values_can_participate_in_numeric_comparisons() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio accessArray(lista<numerus> items, numerus index) → numerus {
   si index ≺ 0 aut index ≥ items.longitudo() {
     mori "Index out of bounds"
@@ -808,7 +808,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn repeated_owned_calls_no_longer_report_use_after_move() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio sumArray(lista<numerus> nums) → numerus {
   varia numerus total ← 0
   itera ex nums sit n {
@@ -847,7 +847,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn assignment_and_tempta_flow_no_longer_report_use_after_move() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio process(textus name) → vacuum {
   varia _ resource ← "pending"
   fac {
@@ -878,7 +878,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit lista<numerus> empty_list ← []
   sit _ first ← [1, 2, 3]
@@ -895,7 +895,7 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
             .all(|d| d.issue() != Some("common_type_mismatch"))
     );
 
-    let context_free_session = test_session(Target::HirRust);
+    let context_free_session = test_session_la(Target::HirRust);
     let context_free_source = r"incipit {
   sit _ empty_list ← []
 }";
@@ -919,7 +919,7 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
 #[cfg(feature = "hir-rust")]
 #[test]
 fn typed_vacua_inhabits_declared_empty_collections() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio empty_numbers() → lista<numerus> {
   sit lista<numerus> xs ← vacua
   redde xs
@@ -940,7 +940,7 @@ functio empty_counts() → tabula<textus, numerus> {
 
 #[test]
 fn context_free_vacua_requires_declared_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio empty() → vacuum {
   sit _ xs ← vacua
 }";
@@ -956,7 +956,7 @@ fn context_free_vacua_requires_declared_type() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn cursor_iteration_accumulator_from_empty_array_no_longer_reports_inference_error() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"@ cursor
 functio rangeSync(numerus n) → numerus {
   itera ab 0‥n sit i {
@@ -985,7 +985,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn optional_chain_no_longer_reports_lowering_stub() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"genus User {
   varia textus name = "Anon"
   varia lista<numerus> nums = [1, 2, 3]
@@ -1011,7 +1011,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_emits_option_map_and_and_then_for_optional_chain() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"genus User {
   varia textus name = "Anon"
 }
@@ -1039,7 +1039,7 @@ incipit {
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_output_translates_stdlib_lista_methods() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   varia _ xs ← [1, 2]
   xs.appende(3)
@@ -1059,7 +1059,7 @@ fn rust_output_translates_stdlib_lista_methods() {
 
 #[test]
 fn struct_construction_requires_fields_and_checks_defaults() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let missing = r#"genus User {
   varia textus name
   varia textus email sponte
@@ -1098,7 +1098,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_emits_coalesce_unwrap() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit textus ∪ nihil name ← nulla
   sit _ display ← name vel "Anonymous"
@@ -1114,7 +1114,7 @@ fn rust_output_emits_coalesce_unwrap() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_wraps_sponte_fields_in_verte_struct_literals() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"genus User {
   varia textus name
   varia textus email sponte
@@ -1145,7 +1145,7 @@ incipit {
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
 #[test]
 fn rust_output_applies_nullable_field_defaults_in_verte_struct_literals() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"genus User {
   varia textus name
   varia textus nickname = "Anonymous"
@@ -1183,7 +1183,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn ignotum_callee_no_longer_reports_not_callable() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio invoke(ignotum callee) → ignotum {
   redde callee(1)
 }
@@ -1204,7 +1204,7 @@ incipit {
 
 #[test]
 fn elige_accepts_enum_variant_case_values() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"ordo Color { rubrum, viridis, caeruleum }
 
 incipit {
@@ -1226,7 +1226,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn ordo_exemplum_no_longer_reports_elige_literal_error() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     // Uses relative path from crate root
     let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/ordo/ordo.fab");
     let source = std::fs::read_to_string(&source_path).expect("read ordo exemplum");
@@ -1241,7 +1241,7 @@ fn ordo_exemplum_no_longer_reports_elige_literal_error() {
 
 #[test]
 fn optional_params_no_longer_require_all_arguments() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio greet(textus nomen, textus titulus sponte) → textus {
   si titulus est nihil {
     redde nomen
@@ -1282,7 +1282,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn nullable_union_type_forms_are_canonicalized() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"typus MaybeValue = textus ∪ numerus ∪ nihil
 typus EitherValue = textus ∪ numerus
 
@@ -1316,7 +1316,7 @@ functio nullable_direct() → textus ∪ nihil {
 
 #[test]
 fn plain_union_does_not_accept_nihil_without_nullable_member() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio badplain() → textus ∪ numerus {
   redde nulla
 }";
@@ -1333,7 +1333,7 @@ fn plain_union_does_not_accept_nihil_without_nullable_member() {
 
 #[test]
 fn degenerate_nihil_only_union_is_rejected() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio bad() → nihil ∪ nihil {
   redde nulla
 }";
@@ -1353,7 +1353,7 @@ fn degenerate_nihil_only_union_is_rejected() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn array_method_call_no_longer_reports_non_struct_member_error() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ numbers ← [1, 2, 3]
   sit _ doubled ← numbers.mappata(numerus x ∴ x * 2)
@@ -1367,7 +1367,7 @@ fn array_method_call_no_longer_reports_non_struct_member_error() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn interface_method_call_no_longer_reports_non_struct_member_error() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"implendum Drawable {
   functio draw() → vacuum
 }
@@ -1390,7 +1390,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compact_inferred_closure_argument_uses_expected_method_signature() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ numbers ← [1, 2, 3]
   nota numbers.mappata(_ x ∴ x * 2)
@@ -1405,7 +1405,7 @@ fn compact_inferred_closure_argument_uses_expected_method_signature() {
 #[ignore = "PARSE001: json_quoted_key errors from config[\"name\"] syntax; feature incomplete, placeholder until index chain syntax is implemented"]
 #[test]
 fn object_member_and_index_chains_no_longer_report_index_errors() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ config ← { name = "test", value = 42 }
   nota config["name"]
@@ -1428,7 +1428,7 @@ fn object_member_and_index_chains_no_longer_report_index_errors() {
 #[ignore = "SEM014: cannot_infer_expression_type for compact closure; feature incomplete, placeholder until closure inference is implemented"]
 #[test]
 fn array_method_closure_argument_no_longer_reports_argument_type_mismatch() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ numbers ← [1, 2, 3]
   nota numbers.map(clausura numerus x: x * 2)
@@ -1446,7 +1446,7 @@ fn array_method_closure_argument_no_longer_reports_argument_type_mismatch() {
 #[ignore = "PARSE001: syntax errors in genus definition prevent compilation; feature incomplete, placeholder until ego field assignment is implemented"]
 #[test]
 fn ego_field_assignment_no_longer_reports_assignment_type_mismatch() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"genus Circulus {
   varia numerus diameter = 1
   functio crescere(numerus factor) → vacuum {
@@ -1471,7 +1471,7 @@ incipit {
 #[ignore = "PARSE001: json_quoted_key in object literal; feature incomplete, placeholder until objectum return type is implemented"]
 #[test]
 fn objectum_return_type_no_longer_reports_unknown_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio getResponse() → objectum {
   redde { body = "ok" }
 }
@@ -1495,7 +1495,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit lista<quidlibet> docs ← [] ∷ lista<quidlibet>
   nota docs
@@ -1514,7 +1514,7 @@ fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn conversio_type_params_no_longer_report_unknown_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ n ← "ff" ↦ i32 via Hex
   nota n
@@ -1533,7 +1533,7 @@ fn conversio_type_params_no_longer_report_unknown_type() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn verte_vel_no_longer_reports_invalid_cast() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ data ← 42
   sit _ asText ← data ∷ textus
@@ -1558,7 +1558,7 @@ fn verte_vel_no_longer_reports_invalid_cast() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_converts_textus_literals_to_owned_strings() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio pick(bivalens flag) → textus {
   si flag {
     redde "yes"
@@ -1594,7 +1594,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_wraps_optional_local_initializers_in_some() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit textus ∪ nihil actualName ← "Marcus"
   sit textus ∪ nihil maybe ← nulla
@@ -1615,7 +1615,7 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_or_for_option_coalesce() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit textus ∪ nihil a ← nulla
   sit textus ∪ nihil b ← nulla
@@ -1632,7 +1632,7 @@ fn rust_output_uses_or_for_option_coalesce() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_debug_format_for_collection_scribe() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit lista<textus> names ← ["a", "b"]
   nota names
@@ -1647,7 +1647,7 @@ fn rust_output_uses_debug_format_for_collection_scribe() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_scalar_display_helpers_for_scribe() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit fractus f ← 1.0
   sit bivalens b ← verum
@@ -1671,7 +1671,7 @@ fn rust_output_uses_scalar_display_helpers_for_scribe() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_avoids_redundant_parentheses_in_common_contexts() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio sum(numerus a, numerus b) → numerus {
   redde a + b
 }
@@ -1704,7 +1704,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_normalizes_relative_import_paths() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"importa ex "./norma/consolum" publica consolum
 importa ex "./commands/greet" publica greet
 
@@ -1728,7 +1728,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn ego_field_access_no_longer_reports_non_struct_member_error() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"genus Counter {
   varia numerus count = 0
   functio inc() → numerus {
@@ -1749,7 +1749,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn typed_array_index_assignment_no_longer_reports_assignment_type_mismatch() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   varia lista<numerus> numbers ← [3, 7]
   numbers[0] ← 9
@@ -1771,7 +1771,7 @@ fn typed_array_index_assignment_no_longer_reports_assignment_type_mismatch() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_format_macro_for_scriptum() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ value ← 7
   nota scriptum("valor: §", value)
@@ -1786,7 +1786,7 @@ fn rust_output_uses_format_macro_for_scriptum() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ first ← "prima"
   sit _ second ← "secunda"
@@ -1806,7 +1806,7 @@ fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_string_literal_format_application() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ value ← 7
   nota "valor: §"(value)
@@ -1821,7 +1821,7 @@ fn rust_output_uses_string_literal_format_application() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_uses_numbered_string_literal_format_application() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ first ← "prima"
   sit _ second ← "secunda"
@@ -1841,7 +1841,7 @@ fn rust_output_uses_numbered_string_literal_format_application() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_output_supports_unicode_textus_index_and_range_slice() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ ch ← "Salve, §!"[7]
   sit _ prefix ← "hello world"[0‥5]
@@ -1860,7 +1860,7 @@ fn rust_output_supports_unicode_textus_index_and_range_slice() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_compile_accepts_explicit_infer_type_marker() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     // Ruling g bans `→ _` signature holes; the return is pinned to `numerus`
     // and the legal binding holes (`fixum _` / `varia _`) stay the test's
     // subject.
@@ -1896,7 +1896,7 @@ incipit {
 #[ignore = "slow: spawns external toolchain smoke (cargo/go/tsc); run with --ignored"]
 #[test]
 fn typescript_output_supports_unicode_textus_index_and_range_slice() {
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r#"incipit {
   sit _ ch ← "Salve, §!"[7]
   sit _ prefix ← "hello world"[0‥5]
@@ -1919,7 +1919,7 @@ fn typescript_output_supports_unicode_textus_index_and_range_slice() {
 #[ignore = "slow: spawns external toolchain smoke (cargo/go/tsc); run with --ignored"]
 #[test]
 fn go_output_supports_unicode_textus_index_and_range_slice() {
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let source = r#"incipit {
   sit _ ch ← "Salve, §!"[7]
   sit _ prefix ← "hello world"[0‥5]
@@ -1946,7 +1946,7 @@ fn hir_smoke_regression_guard_rust_rejects_mangled_emit() {
         eprintln!("rustc not found on PATH; skipping rust smoke regression-guard");
         return;
     }
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let result = compile(
         &session,
         "guard.fab",
@@ -1969,7 +1969,7 @@ fn hir_smoke_regression_guard_go_rejects_mangled_emit() {
         eprintln!("go not found on PATH; skipping go smoke regression-guard");
         return;
     }
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let result = compile(&session, "guard.fab", "incipit { nota 42 }", ModuleCompileRequest::default());
     assert!(result.success());
     let Some(crate::Output::Go(output)) = result.output else {
@@ -1989,7 +1989,7 @@ fn hir_smoke_regression_guard_typescript_rejects_mangled_emit() {
         eprintln!("tsc/deno not found on PATH; skipping typescript smoke regression-guard");
         return;
     }
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let result = compile(&session, "guard.fab", "incipit { nota 42 }", ModuleCompileRequest::default());
     assert!(result.success());
     let Some(crate::Output::TypeScript(output)) = result.output else {
@@ -2039,7 +2039,7 @@ incipit {
 }
 ";
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "loop_call.fab",
         source,
         ModuleCompileRequest::default(),
@@ -2060,7 +2060,7 @@ fn recovered_parse_co_reports_parse_and_semantic_errors() {
     // item (`broken`) is dropped (its span contains the parse-error spans);
     // the clean item (`uses_undefined`) is analyzed and emits its use-site
     // resolve error.
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"
 functio broken() → numerus {
     redde ∷ numerus

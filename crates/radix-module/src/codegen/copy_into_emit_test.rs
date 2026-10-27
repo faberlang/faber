@@ -19,7 +19,12 @@ double(a, varia b)
 ";
 
 fn compile(target: Target, source: &str) -> crate::CompileResult {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default())
 }
 

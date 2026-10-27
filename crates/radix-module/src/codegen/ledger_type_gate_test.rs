@@ -9,7 +9,12 @@ use crate::driver::{Config, ModuleCompileRequest, Session};
 const SOURCE: &str = "functio f(tabulae<textus, numerus> a) → tabulae<textus, numerus> { redde a }\nincipit {\n}\n";
 
 fn issues(target: Target) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let result = crate::driver::compile(&session, "<test>", SOURCE, ModuleCompileRequest::default());
     result
         .diagnostics
@@ -65,6 +70,7 @@ fn en_compile(body: &str) -> (bool, Vec<String>) {
     let source = format!("+++\nlocale = \"en\"\n+++\n{body}");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_dev_locale_root(),
     );

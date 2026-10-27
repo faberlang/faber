@@ -996,7 +996,9 @@ rustc = ""
     .expect("write lock");
     fs::write(
         locked_interfaces.join("fs/path.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio locked_label() → textus {
   redde "locked"
@@ -1006,7 +1008,9 @@ functio locked_label() → textus {
     .expect("write locked norma interface");
     fs::write(
         library_home.join("norma/src/fs/path.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio fallback_label() → textus {
   redde "fallback"
@@ -5408,12 +5412,14 @@ fn compile_package_preserves_file_stem_named_type_under_import_alias() {
     write_temp_library_fixture(
         library_home.path(),
         "Thing",
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Thing {
     varia textus name
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("alias-stem-type-entry");
@@ -8366,12 +8372,17 @@ source = "src"
 kind = "lib"
 target = "ts"
 targets = ["ts"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("lalib/src/math.fab"),
-        r#"# Public import: importa ex "lalib:math" math
+        r#"+++
+locale = "la"
++++
+# Public import: importa ex "lalib:math" math
 
 @ publica
 genus Vector3 {
@@ -9099,12 +9110,14 @@ fn check_package_types_top_level_json_solve_namespace_call() {
     write_temp_library_fixture(
         library_home.path(),
         "json/solve",
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio solve(textus json) → valor {
     redde json ↦ valor
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("top-level-json-solve-entry");
@@ -9452,14 +9465,16 @@ fn compile_package_rejects_private_library_type_through_file_namespace_alias() {
     write_temp_library_fixture(
         library_home.path(),
         "types",
-        r"
+        r#"+++
+locale = "la"
++++
 @ privata
 genus Secretum {
 }
 
 genus Publicum {
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("private-library-type-entry");
@@ -9492,7 +9507,9 @@ fn compile_package_rejects_private_library_function_through_file_namespace_alias
     write_temp_library_fixture(
         library_home.path(),
         "helpers",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ privata
 functio secretum() → textus {
     redde "hidden"
@@ -10437,12 +10454,14 @@ fn transitive_nested_lista_lista_textus_typechecks() {
     write_temp_library_fixture(
         library_home.path(),
         "nested_lista_probe",
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio vacua_tabula() → lista<lista<textus>> {
     redde vacua
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("transitive-nested-lista-entry");
@@ -10476,7 +10495,9 @@ fn transitive_import_text_via_fixture_library_compiles() {
     write_temp_library_fixture(
         library_home.path(),
         "transitive_fixture",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:text" chorda
 
 @ publica
@@ -10523,7 +10544,9 @@ fn transitive_library_import_cycle_is_rejected() {
     write_temp_library_fixture(
         library_home.path(),
         "cycle_a",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:cycle_b" cycle_b
 
 functio label() → textus {
@@ -10534,7 +10557,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "cycle_b",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:cycle_a" cycle_a
 
 functio label() → textus {
@@ -10611,7 +10636,9 @@ fn transitive_library_diamond_dedupes_shared_dependency() {
     write_temp_library_fixture(
         library_home.path(),
         "shared_d",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio tag() → textus {
     redde "d"
@@ -10621,7 +10648,9 @@ functio tag() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "dep_b",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:shared_d" shared_d
 
 @ publica
@@ -10633,7 +10662,9 @@ functio via_b() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "dep_c",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:shared_d" shared_d
 
 @ publica
@@ -10645,7 +10676,9 @@ functio via_c() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "leaf_a",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:dep_b" dep_b
 importa ex "norma:dep_c" dep_c
 
@@ -10705,7 +10738,9 @@ fn transitive_library_import_closure_preserves_publica_visibility() {
     write_temp_library_fixture(
         library_home.path(),
         "child",
-        r#"
+        r#"+++
+locale = "la"
++++
 functio label() → textus {
     redde "child"
 }
@@ -10714,7 +10749,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "parent",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:child" publica child
 
 functio parent_label() → textus {
@@ -10771,7 +10808,9 @@ fn publica_library_import_surfaces_as_nested_namespace_binding() {
     write_temp_library_fixture(
         library_home.path(),
         "child",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio label() → textus {
     redde "child"
@@ -10781,7 +10820,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "parent",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:child" publica child
 
 functio parent_label() → textus {
@@ -10824,7 +10865,9 @@ fn privata_transitive_library_import_does_not_surface_as_nested_namespace_bindin
     write_temp_library_fixture(
         library_home.path(),
         "child",
-        r#"
+        r#"+++
+locale = "la"
++++
 functio label() → textus {
     redde "child"
 }
@@ -10833,7 +10876,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "parent",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:child" child
 
 functio parent_label() → textus {
@@ -13935,12 +13980,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"@ publica
+        r#"+++
+locale = "la"
++++
+@ publica
 functio nil() → vacuum {
     tacet
 }
@@ -14031,12 +14081,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"@ publica
+        r#"+++
+locale = "la"
++++
+@ publica
 functio nil() → vacuum {
     tacet
 }
@@ -14109,21 +14164,29 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testlib/src/inner.fab"),
-        r"@ interna
+        r#"+++
+locale = "la"
++++
+@ interna
 functio dupla(numerus value) → numerus {
     redde value * 2
 }
-",
+"#,
     )
     .expect("write nested library module");
     fs::write(
         lib_root.join("testlib/src/outer.fab"),
-        r#"importa ex "testlib:inner" inner
+        r#"+++
+locale = "la"
++++
+importa ex "testlib:inner" inner
 
 @ publica
 functio computa(numerus value) → numerus {
@@ -14192,12 +14255,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"@ radix lane "air"
+        r#"+++
+locale = "la"
++++
+@ radix lane "air"
 functio inner(tensor<f32, [2,2]> a, tensor<f32, [2,2]> b) → tensor<f32, [2,2]> {
     redde a + b
 }
@@ -14414,12 +14482,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"importa ex "testgrad:tensor" tensor
+        r#"+++
+locale = "la"
++++
+importa ex "testgrad:tensor" tensor
 
 @ publica
 functio nil() → vacuum {
@@ -14441,15 +14514,18 @@ functio simple_loss(
     .expect("write gradient module");
     fs::write(
         lib_root.join("testgrad/src/tensor.fab"),
-        r"functio fill(f32 v) → f32 {
+        r#"+++
+locale = "la"
++++
+functio fill(f32 v) → f32 {
     redde v
 }
-",
+"#,
     )
     .expect("write tensor module");
     fs::write(
         lib_root.join("testgrad/src/math.fab"),
-        "fixum f32 epsilon = 0.00001\n",
+        "+++\nlocale = \"la\"\n+++\nfixum f32 epsilon = 0.00001\n",
     )
     .expect("write math module");
 

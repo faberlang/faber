@@ -62,6 +62,7 @@ fn run_causal_softmax_source(rows: usize, cols: usize, flat: &[f64]) -> Vec<f64>
     );
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_dev_locale_root(),
     );

@@ -933,10 +933,8 @@ fn resolve_library_interface_locale_pack(
             Some(locale) => {
                 load_library_locale_pack(locale_loader, &module.interface_path, Some(&locale))
             }
-            // The library declares no locale: read the interface under the
-            // Latin identity surface (canonical spellings accepted). The faber
-            // product default (`DEFAULT_CODE_LOCALE = "en"`) applies to
-            // consumer files, never to a library module's own source.
+            // The library declares no locale: the caller reads the interface
+            // under the no-locale default (`en`).
             None => Ok(None),
         },
     }
@@ -961,9 +959,8 @@ fn load_library_locale_pack(
 /// The `[reader] locale` the module's own package manifest declares, when any.
 ///
 /// This never falls back to the product default: `None` means the library
-/// package declares no locale, so the interface seam can keep its Latin
-/// identity fallback instead of silently reading the library under the
-/// consumer's default locale.
+/// package declares no locale, and the interface seam then applies the
+/// no-locale default itself.
 fn library_declared_reader_locale(interface_path: &Path) -> Option<String> {
     let spec = crate::discovery::discover_package(interface_path).ok()?;
     let manifest_path = crate::frontmatter::manifest_path_for_spec(&spec)?;
@@ -989,19 +986,15 @@ fn read_and_parse_library_interface(
         peeled.frontmatter.as_ref(),
         library_cache.locale_loader,
     )?;
-    // TEMPORARY STAGING: with no declared locale the interface
-    // reads the no-locale default (`en` while `RADIX_DEFAULT_CODE_LOCALE=en`);
-    // unset keeps the pack-less Latin identity fallback. The resolved pack is
-    // cached so interface analysis reads the same surface.
+    // With no declared locale the interface reads the no-locale default (`en`).
+    // The resolved pack is cached so interface analysis reads the same surface.
     let locale_pack = match locale_pack {
-        Some(pack) => Some(pack),
-        None => radix_module::driver::default_code_pack(&radix_module::driver::Config::default()),
+        Some(pack) => pack,
+        None => radix_module::driver::default_code_pack(&radix_module::driver::Config::default())
+            .map_err(|diagnostic| *diagnostic)?,
     };
     // Library interfaces may declare bodyless functions bound by target manifests (G4).
-    let tokens = match locale_pack.as_ref() {
-        Some(pack) => radix_module::lexer::lex_with_locale_pack(peeled.body, pack),
-        None => radix_module::lexer::lex(peeled.body),
-    };
+    let tokens = radix_module::lexer::lex_with_locale_pack(peeled.body, &locale_pack);
     let parse = parser::parse_with_options(
         tokens,
         parser::ParseOptions {
@@ -1036,7 +1029,7 @@ fn read_and_parse_library_interface(
         analysis: None,
         file_interface: None,
         expanded_imports: Vec::new(),
-        locale_pack,
+        locale_pack: Some(locale_pack),
     })
 }
 

@@ -76,7 +76,11 @@ incipit { }
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_access_plain_lista_traps_not_silent_default() {
-    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirRust),
+    );
     let unit = analyze_source(
         &session,
         "access.fab",
@@ -111,7 +115,11 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_access_plain_tabula_traps_missing_key() {
-    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirRust),
+    );
     let unit = analyze_source(
         &session,
         "map.fab",
@@ -144,7 +152,11 @@ fn rust_regex_conversio_compiles_through_the_runtime_constructor() {
     // RD-1/RD-9: the conversion is the one compile point and it is failable;
     // the emitted program calls `faber::Regex::new` (never the engine crate
     // directly, never a `MustCompile`-style wrapper) and consumes its `Result`.
-    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirRust),
+    );
     let unit = analyze_source(
         &session,
         "regex.fab",

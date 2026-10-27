@@ -12,7 +12,11 @@ fn run(body: &str) -> (Vec<String>, Vec<(String, String)>) {
 
 /// `items` are top-level declarations; `body` is the `incipit` block.
 fn run_items(items: &str, body: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let source = format!("{items}\nincipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "inf.fab", &source, &mut host) {

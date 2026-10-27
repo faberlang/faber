@@ -19,7 +19,12 @@ incipit {
 ";
 
 fn emit(target: Target) -> String {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let result = crate::driver::compile(&session, "float-int.fab", SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "{target} compilation failed: {:?}", result.diagnostics);
     match result.output.expect("output") {

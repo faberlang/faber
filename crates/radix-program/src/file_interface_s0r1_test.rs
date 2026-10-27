@@ -32,6 +32,7 @@ functio origin() → Vector<3>
 fn provider_interface() -> FileInterface {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_bodyless_functions(),
     );
@@ -64,6 +65,7 @@ fn analyze_consumer(
 ) -> Result<radix_module::driver::AnalyzedModule, Vec<radix_module::diagnostics::Diagnostic>> {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_bodyless_functions(),
     );
@@ -229,6 +231,7 @@ functio probe(lista<numerus> ∪ textus u) → vacuum {
 fn solved_union_provider_interface() -> FileInterface {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_bodyless_functions(),
     );
@@ -311,6 +314,7 @@ fn export_probe_fixture_materializes_solved_union_param() {
         .expect("installed en pack should load");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_locale_pack(en_pack),
     );
@@ -376,6 +380,7 @@ functio appellans(tensor<f32, [4, 8]> x) → tensor<f32, [4, 8]> {
 fn twin_provider_interface() -> FileInterface {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_bodyless_functions(),
     );
@@ -448,6 +453,7 @@ fn twin_signature_consumer_round_trip_binds_concrete_shapes() {
     let interface = twin_provider_interface();
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_bodyless_functions(),
     );

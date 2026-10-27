@@ -9,7 +9,11 @@ use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn session() -> Session {
-    Session::new(Config::default().with_target(Target::HirTypeScript))
+    Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    )
 }
 
 fn run_and_expect(name: &str, source: &str, expected: &[&str]) {
@@ -87,7 +91,7 @@ fn complementata_returns_complement_on_numerus() {
 
 #[test]
 fn complement_methods_reject_fractus_at_sem011() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     for call in ["x.complementa()", "x.complementata()"] {
         let source = format!(
             "incipit {{

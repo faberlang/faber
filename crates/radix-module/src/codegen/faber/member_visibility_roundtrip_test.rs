@@ -16,6 +16,7 @@ fn pack(locale: &str) -> LocalePack {
 fn reemit(source: &str, to: &str) -> String {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_dev_locale_root(),
     );

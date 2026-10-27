@@ -86,9 +86,6 @@ pub fn analyze_source_with_config(source: &str, config: PassConfig) -> AnalyzedF
             pack as &dyn radix_lexer::KeywordPack,
         ))
     } else {
-        if std::env::var("RADIX_DEFAULT_CODE_LOCALE").as_deref() == Ok("en") {
-            panic!("pack-less analysis: pick a locale (use the _la helpers)");
-        }
         parse(lex(source))
     };
     if !parsed.errors.is_empty() {

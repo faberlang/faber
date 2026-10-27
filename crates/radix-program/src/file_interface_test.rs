@@ -27,7 +27,9 @@ fn analyze_with(config: Config, source: &str) -> radix_module::driver::AnalyzedM
 
 fn analyze(source: &str) -> radix_module::driver::AnalyzedModule {
     analyze_with(
-        Config::default().with_target(radix_module::codegen::Target::HirRust),
+        Config::default()
+            .with_latin_locale()
+            .with_target(radix_module::codegen::Target::HirRust),
         source,
     )
 }
@@ -47,7 +49,11 @@ fn imported_json_struct_keeps_conversion_opt_in() {
         )
         .expect("extract model interface");
         let consumer = analyze_source(
-            &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+            &Session::new(
+                Config::default()
+                    .with_latin_locale()
+                    .with_target(radix_module::codegen::Target::HirRust),
+            ),
             "consumer.fab",
             r#"importa ex "model:types" model
 functio encode(model.Data value) → json ⇥ textus { redde value ↦ json }
@@ -163,7 +169,11 @@ fn extract_file_interface_round_trips_public_commune_fields() {
     assert_eq!(export.variants[1].fields.len(), 2);
 
     analyze_source(
-        &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+        &Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_target(radix_module::codegen::Target::HirRust),
+        ),
         "consumer.fab",
         r#"importa ex "shape:errors" shape
 
@@ -231,6 +241,7 @@ fn extract_callable_contracts_marks_bodyless_functions() {
     // manifests, G4); the extracted contract carries that fact.
     let analysis = analyze_with(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_bodyless_functions(),
         "functio salve() → textus\n",
@@ -268,6 +279,7 @@ functio helper(f32 x) → f32 {
 fn signature_only_fragment_export_fails_closed() {
     let session = radix_module::driver::Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(radix_module::codegen::Target::HirRust)
             .with_bodyless_functions(),
     );
@@ -427,7 +439,11 @@ fn extract_file_interface_carries_nondum_gates() {
 
 fn analyze_nondum_consumer(source: &str) -> Result<(), Vec<radix_module::diagnostics::Diagnostic>> {
     analyze_source(
-        &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+        &Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_target(radix_module::codegen::Target::HirRust),
+        ),
         "consumer.fab",
         source,
         AnalyzeRequest {
@@ -553,7 +569,7 @@ fn extract_file_interface_carries_nondum_method_gates() {
 fn imported_nondum_method_is_refused_through_the_extracted_interface() {
     let analyze_consumer = |body: &str| {
         analyze_source(
-            &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+            &Session::new(Config::default().with_latin_locale().with_target(radix_module::codegen::Target::HirRust)),
             "consumer.fab",
             &format!(
                 "importa ex \"model:types\" model\nincipit {{\n    varia model.Nexus n ← model.Nexus {{ id = 1 }}\n{body}\n}}\n"

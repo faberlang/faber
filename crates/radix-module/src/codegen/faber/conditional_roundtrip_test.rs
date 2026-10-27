@@ -14,6 +14,7 @@ fn reemit(source: &str, to: &str) -> String {
         .unwrap_or_else(|err| panic!("installed {to} pack should load: {err:?}"));
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_dev_locale_root(),
     );
@@ -51,6 +52,7 @@ fn reemit_issues(source: &str) -> Vec<String> {
         .expect("installed en pack should load");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_dev_locale_root()
             .with_locale_pack(crate::locale::latin_locale_pack()),

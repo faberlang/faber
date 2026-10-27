@@ -10,7 +10,11 @@ const TAB: &str =
     "genus Tab {\n    fixum numerus Z = 3\n    fixum textus NOMEN = \"tabula\"\n    varia numerus w = 1\n}\n";
 
 fn run(body: &str) -> Result<Vec<String>, String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let source = format!("{TAB}incipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     match run_source(&session, "static_field_read.fab", &source, &mut host) {
@@ -92,7 +96,11 @@ fn static_field_read_through_an_imported_genus_inlines_the_interface_initializer
             annotation_contract: None,
         }),
     });
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let unit = crate::driver::analyze_source(
         &session,
         "test.fab",
@@ -137,7 +145,7 @@ fn imported_module_constant_read_and_index_lower_to_the_interface_value() {
         file_interfaces: BTreeMap::from([("constantia".to_owned(), interface)]),
         ..ModuleImportContract::default()
     };
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     let source = "importa ex \"./constantia\" constantia\n\
         functio pick(lista<numerus> xs) → numerus { redde xs[constantia.BASE] }\n";
     let unit = crate::driver::analyze_source(
@@ -182,7 +190,7 @@ fn imported_list_constant_index_lowers_to_the_interface_list() {
         file_interfaces: BTreeMap::from([("constantia".to_owned(), interface)]),
         ..ModuleImportContract::default()
     };
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     let source = "importa ex \"./constantia\" constantia\n\
         functio pick(numerus i) → numerus { redde constantia.TABLE[i] }\n";
     let unit = crate::driver::analyze_source(

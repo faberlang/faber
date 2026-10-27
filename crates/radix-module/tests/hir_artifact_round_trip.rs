@@ -217,7 +217,7 @@ fn run_round_trip(fixture_path: &str, session: &Session, surface: &KeywordSurfac
 #[cfg(all(feature = "hir-rust", feature = "hir-ts", feature = "hir-go", feature = "hir-swift"))]
 #[test]
 fn hir_artifact_round_trip_library_import() {
-    let config = Config::default().with_dev_locale_root();
+    let config = Config::default().with_latin_locale().with_dev_locale_root();
     let session = Session::new(config);
     let pack = latin_locale_pack();
     let surface = KeywordSurface::new(&pack);
@@ -238,7 +238,7 @@ fn hir_artifact_round_trip_library_import() {
 #[cfg(all(feature = "hir-rust", feature = "hir-ts", feature = "hir-go", feature = "hir-swift"))]
 #[test]
 fn hir_artifact_round_trip_all() {
-    let config = Config::default().with_dev_locale_root();
+    let config = Config::default().with_latin_locale().with_dev_locale_root();
     let session = Session::new(config);
     let pack = latin_locale_pack();
     let surface = KeywordSurface::new(&pack);
@@ -286,7 +286,7 @@ fn structural_end_count_parity_across_splicing_paths() {
         }
     }
 
-    let config = Config::default().with_dev_locale_root();
+    let config = Config::default().with_latin_locale().with_dev_locale_root();
     let session = Session::new(config);
 
     // Exercises the splicing paths: fac…dum wrap, proba body.

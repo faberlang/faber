@@ -774,7 +774,7 @@ functio outer(f32 x) → f32 {
     redde inner(x)
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
@@ -806,7 +806,7 @@ functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
@@ -997,7 +997,11 @@ fn kernel_caller_to_uncarried_compute_rejects_host_callable() {
 fn lower_source(source: &str) -> Result<(), Vec<crate::mir::MirError>> {
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("load English locale pack");
-    let session = Session::new(Config::default().with_resolved_locale_pack(pack));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack),
+    );
     let analysis = driver::analyze_source(&session, "projected.fab", source, AnalyzeRequest::default()).unwrap_or_else(
         |diagnostics| {
             panic!(

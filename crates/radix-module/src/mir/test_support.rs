@@ -12,7 +12,7 @@ use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
 use crate::driver::ModuleCompileRequest;
 use crate::driver::compile;
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 use crate::{CompileResult, Output};
 
 /// Format one diagnostic with code, issue, and named args (MIR probe error strings).
@@ -38,7 +38,7 @@ pub fn diagnostic_facts_message(diagnostics: &[Diagnostic]) -> String {
 
 #[must_use]
 pub fn compile_target_result(target: Target, name: &str, source: &str) -> CompileResult {
-    compile(&test_session(target), name, source, ModuleCompileRequest::default())
+    compile(&test_session_la(target), name, source, ModuleCompileRequest::default())
 }
 
 /// Compile source to the given target and return the emitted text.

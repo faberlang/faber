@@ -22,6 +22,7 @@ fn pack(locale: &str) -> LocalePack {
 fn reemit(source: &str, to: &str) -> String {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_dev_locale_root(),
     );
@@ -87,6 +88,7 @@ fn field_annotation_with_payload_survives_format() {
     let source = std::fs::read_to_string(&path).expect("corpus/json/json.fab should exist");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_dev_locale_root()
             .with_locale_pack(crate::locale::latin_locale_pack()),
