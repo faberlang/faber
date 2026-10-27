@@ -959,7 +959,7 @@ help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "định danh không xác định"
-help = "viết `{spelling} <expr>` không có ngoặc đơn cho câu lệnh xuất"
+help = "`{spelling}` là câu lệnh xuất, không phải hàm: nhập hàm console (`{importa} {ex} \"norma:console\" {fixum} print`, rồi viết `print(...)`), hoặc gán giá trị trước (`{sit} _ x ← …`, rồi viết `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "trường bản ghi không xác định"

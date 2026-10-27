@@ -1208,7 +1208,7 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "unknown identifier"
-help = "write `{spelling} <expr>` without parentheses for the output statement"
+help = "`{spelling}` is the output statement, not a function: import the console function (`{importa} {ex} \"norma:console\" {fixum} print`, then write `print(...)`), or bind the value first (`{sit} _ x ← …`, then `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "unknown record field"

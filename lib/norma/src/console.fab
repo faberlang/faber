@@ -104,6 +104,15 @@ fn write_line(string msg) → void ⇥ fault.IoFault {
     return call 'consolum:scribe' (msg) ↦ void
 }
 
+# Convenience spelling of `write_line`: one line to stdout with a newline.
+# Import it as `import from "norma:console" { print }` and call `print("hi")`;
+# formatting stays in the caller's file (`print("§"(x))`). Same route as
+# `write_line`.
+@ public
+fn print(string msg) → void ⇥ fault.IoFault {
+    return call 'consolum:scribe' (msg) ↦ void
+}
+
 # Write line to stdout with newline (async route; Faber blocks)
 @ public
 fn write_line_async(string msg) → void ⇥ fault.IoFault {

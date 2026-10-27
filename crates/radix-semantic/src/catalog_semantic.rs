@@ -1074,7 +1074,7 @@ fn semantic_undefined_variable_help(args: &[DiagnosticArg]) -> Option<String> {
         "scribe_callee" => {
             let spelling = arg_value(args, "spelling")?;
             Some(format!(
-                "write `{spelling} <expr>` without parentheses for the output statement"
+                "`{spelling}` is the output statement, not a function: import the console function (`import from \"norma:console\" const print`, then write `print(...)`), or bind the value first (`let _ x ← …`, then `{spelling} x`)"
             ))
         }
         "unknown_identifier" => {

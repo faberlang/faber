@@ -976,6 +976,36 @@ fn normalized_diagnostics_render_against_installed_pack_rows_without_prose_asser
 }
 
 #[test]
+fn scribe_callee_help_names_both_ways_out_in_every_installed_pack() {
+    // `print (a + b) * 2` cannot be fixed by dropping the parentheses, so the
+    // help must point at the imported console function and at the `let` binding.
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let pack = installed_pack(locale);
+        let diagnostic = semantic_diagnostic(
+            SemanticErrorKind::VariableUndefined,
+            vec![
+                diagnostic_arg("issue", "scribe_callee"),
+                diagnostic_arg("spelling", "print"),
+            ],
+        );
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} scribe_callee should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} scribe_callee row should exist"));
+        let help = rendered.help.unwrap_or_default();
+        assert!(
+            help.contains("norma:console"),
+            "{locale} help should name the console import: {help}"
+        );
+        assert!(help.contains("print(...)"), "{locale} help should show the call form: {help}");
+        assert!(
+            !help.contains("{"),
+            "{locale} help should leave no unfilled placeholder: {help}"
+        );
+    }
+}
+
+#[test]
 fn installed_latin_pack_has_structural_templates_for_catalog_codes() {
     let pack = latin_locale_pack();
     for diagnostic in [
