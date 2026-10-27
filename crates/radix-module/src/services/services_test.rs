@@ -238,13 +238,14 @@ fn cmd_targets_mir_backed_targets_use_supported_wording() {
 }
 
 #[test]
-fn faber_surface_fhir_row_is_package_and_run_capable() {
-    // Stage 4: `faber targets` distinguishes FHIR package build/load/run from
-    // the radix unit-artifact surface (which stays run=no package=no).
+fn faber_surface_fhir_row_is_package_capable_and_not_run() {
+    // Stage 4: `faber targets` distinguishes FHIR package build from the radix
+    // unit-artifact surface (which stays run=no package=no). `faber run` does
+    // not load an envelope, so the Faber surface carries no `run` either.
     let faber = target_capabilities_for_surface(TargetCommandSurface::Faber, crate::codegen::Target::HirFhir);
     assert!(faber.check);
     assert!(faber.build);
-    assert!(faber.run);
+    assert!(!faber.run);
     assert!(faber.package);
     assert!(
         faber.note.contains("faber build --target fhir"),
@@ -257,7 +258,8 @@ fn faber_surface_fhir_row_is_package_and_run_capable() {
 #[test]
 fn cmd_targets_llvm_host_and_llvm_text_keep_separate_rows() {
     // The emit-only llvm-text row keeps run/package off the radix surface;
-    // llvm-host is the product target whose Faber row is fully capable.
+    // llvm-host is the product target whose Faber row builds and packages;
+    // `faber run` takes no target, so no row here claims `run`.
     let text_radix = target_capabilities(crate::codegen::Target::MirLlvm);
     assert!(text_radix.check);
     assert!(text_radix.build);
@@ -272,8 +274,13 @@ fn cmd_targets_llvm_host_and_llvm_text_keep_separate_rows() {
 
     let host_faber = target_capabilities_for_surface(TargetCommandSurface::Faber, crate::codegen::Target::MirLlvmHost);
     assert!(host_faber.build);
-    assert!(host_faber.run);
+    assert!(!host_faber.run);
     assert!(host_faber.package);
+    assert!(
+        !host_faber.note.contains("build/run --target"),
+        "llvm-host note must not advertise a `faber run` target: {}",
+        host_faber.note
+    );
 }
 
 #[test]
@@ -312,7 +319,7 @@ fn cmd_targets_keeps_faber_package_capabilities_off_radix_surface() {
         assert!(!radix.package);
         assert!(radix.note.contains(delegated_note), "unexpected Radix note: {}", radix.note);
         assert!(faber.build);
-        assert!(faber.run);
+        assert!(!faber.run);
         assert!(faber.package);
         assert!(
             faber.note.contains("via `faber build --target"),
