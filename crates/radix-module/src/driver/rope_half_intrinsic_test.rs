@@ -36,6 +36,7 @@ fn run_unit_rope(method: &str) -> Vec<f64> {
     );
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_dev_locale_root(),
     );

@@ -22,7 +22,12 @@ const VECTOR_ISSUE: &str = "vector_lift_unsupported_on_target";
 const MATRIX_ISSUE: &str = "matrix_lift_unsupported_on_target";
 
 fn issues(target: Target, body: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
     let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
     result
@@ -88,7 +93,12 @@ const MASKED: &[(&str, &str)] = &[
 ];
 
 fn masked_issues(target: Target, body: &str) -> (Vec<String>, bool) {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let source = format!(
         "functio masked(vector<bivalens, 3> k, vector<f32, 3> a, vector<f32, 3> b, matrix<bivalens, [2, 2]> j, matrix<f32, [2, 2]> m, matrix<f32, [2, 2]> n) {{\n{body}\n}}\nincipit {{\n}}\n"
     );
@@ -204,7 +214,12 @@ fn rust_emits_the_lifted_register_forms() {
 fn swift_python_and_haskell_never_emit_the_lifted_register_forms() {
     for target in [Target::HirSwift, Target::HirPython, Target::HirHaskell] {
         for body in LIFTED.iter().chain(LIFTED_MATRIX) {
-            let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+            let session = Session::new(
+                Config::default()
+                    .with_latin_locale()
+                    .with_target(target)
+                    .with_dev_locale_root(),
+            );
             let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
             let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
             // Swift and Python may stop earlier on the vector type itself;

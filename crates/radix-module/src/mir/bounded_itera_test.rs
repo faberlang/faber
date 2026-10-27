@@ -9,7 +9,7 @@ use crate::mir::MirLoweringOptions;
 use crate::mir::{dump_program, lower_analyzed_unit, validate_program};
 
 fn session() -> Session {
-    Session::new(Config::default())
+    Session::new(Config::default().with_latin_locale())
 }
 
 #[test]

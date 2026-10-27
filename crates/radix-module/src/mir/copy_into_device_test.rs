@@ -14,7 +14,11 @@ use metal::{CompileOptions, Device, MTLResourceOptions, MTLSize};
 /// Run a host `incipit` through the MIR runner and parse its one printed
 /// tensor line (`[1.0, 2.0, ...]`).
 fn runner_values(source: &str) -> Vec<f32> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let mut host = BufferHost::default();
     run_source(&session, "copy-into-device.fab", source, &mut host)
         .unwrap_or_else(|error| panic!("{source}: {error:?}"));

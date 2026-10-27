@@ -9,7 +9,11 @@ use crate::mir::run_source;
 
 fn run_lines(source: &str) -> Vec<String> {
     let mut host = BufferHost::default();
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     if let Err(error) = run_source(&session, "test.fab", source, &mut host) {
         panic!("ordering fixture should run: {error:?}");
     }

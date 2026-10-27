@@ -3,7 +3,7 @@
 //! backend without a bignum carrier (TypeScript has one since U6t; the rest may
 //! not print a wrong program).
 
-use super::test_support::compile_for_target_and_get_result;
+use super::test_support::compile_for_target_and_get_result_la;
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
 use crate::driver::AnalyzeRequest;
@@ -23,7 +23,12 @@ fn diagnostics_with(config: Config, source: &str) -> Vec<Diagnostic> {
 }
 
 fn latin(source: &str) -> Vec<Diagnostic> {
-    diagnostics_with(Config::default().with_target(ConfigTarget::HirRust), source)
+    diagnostics_with(
+        Config::default()
+            .with_latin_locale()
+            .with_target(ConfigTarget::HirRust),
+        source,
+    )
 }
 
 fn english(source: &str) -> Vec<Diagnostic> {
@@ -159,7 +164,11 @@ fn inf_operations_lower_to_mir_with_no_gate() {
         "functio f(inf a) → inf { redde -a }\nincipit { nota f(3) }\n",
         "functio f(inf a) → inf { redde a.potentia(2) }\nincipit { nota f(3) }\n",
     ] {
-        let session = crate::driver::Session::new(Config::default().with_target(ConfigTarget::MirSexp));
+        let session = crate::driver::Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_target(ConfigTarget::MirSexp),
+        );
         let unit = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default())
             .unwrap_or_else(|diagnostics| panic!("analysis of {source}: {diagnostics:?}"));
         crate::mir::dump_analyzed_unit(unit.application_view())
@@ -170,7 +179,7 @@ fn inf_operations_lower_to_mir_with_no_gate() {
 /// Value flow never changes a value, so it keeps lowering.
 #[test]
 fn inf_value_flow_still_lowers_to_mir() {
-    let result = compile_for_target_and_get_result(INF_FILE, Target::MirSexp);
+    let result = compile_for_target_and_get_result_la(INF_FILE, Target::MirSexp);
     assert!(
         !result
             .diagnostics
@@ -192,7 +201,7 @@ fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
         // HirPython carries `inf` as its own `int` (inf-U6p).
         (Target::HirHaskell, "HirHaskell"),
     ] {
-        let result = compile_for_target_and_get_result(INF_FILE, target);
+        let result = compile_for_target_and_get_result_la(INF_FILE, target);
         let diagnostic = expect(&result.diagnostics, "CODEGEN001", "inf_target_unsupported");
         assert_eq!(arg_of(diagnostic, "type"), Some("inf"), "{name}");
         assert_eq!(arg_of(diagnostic, "target"), Some(name), "{name}");
@@ -203,7 +212,7 @@ fn every_hir_backend_fails_closed_with_a_named_diagnostic() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn the_rust_backend_carries_inf() {
-    let result = compile_for_target_and_get_result(INF_FILE, Target::HirRust);
+    let result = compile_for_target_and_get_result_la(INF_FILE, Target::HirRust);
     assert_accepts(&result.diagnostics);
 }
 
@@ -212,7 +221,7 @@ fn the_rust_backend_carries_inf() {
 #[test]
 fn the_go_backend_carries_inf() {
     for source in [INF_FILE, INF_BIG_LITERAL] {
-        let result = compile_for_target_and_get_result(source, Target::HirGo);
+        let result = compile_for_target_and_get_result_la(source, Target::HirGo);
         assert_accepts(&result.diagnostics);
     }
 }
@@ -223,7 +232,7 @@ fn the_go_backend_carries_inf() {
 #[test]
 fn the_python_backend_carries_inf() {
     for source in [INF_FILE, INF_BIG_LITERAL] {
-        let result = compile_for_target_and_get_result(source, Target::HirPython);
+        let result = compile_for_target_and_get_result_la(source, Target::HirPython);
         assert_accepts(&result.diagnostics);
     }
 }
@@ -232,14 +241,14 @@ fn the_python_backend_carries_inf() {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn typescript_carries_inf_as_bigint() {
-    let result = compile_for_target_and_get_result(INF_FILE, Target::HirTypeScript);
+    let result = compile_for_target_and_get_result_la(INF_FILE, Target::HirTypeScript);
     assert_accepts(&result.diagnostics);
 }
 
 /// The Faber re-emitter carries `inf` (it only re-spells types).
 #[test]
 fn the_faber_reemitter_keeps_inf() {
-    let result = compile_for_target_and_get_result(INF_FILE, Target::HirFaber);
+    let result = compile_for_target_and_get_result_la(INF_FILE, Target::HirFaber);
     assert_accepts(&result.diagnostics);
 }
 
@@ -248,7 +257,7 @@ fn the_faber_reemitter_keeps_inf() {
 #[test]
 fn the_faber_reemitter_prints_nothing_for_an_implicit_widening() {
     let source = "sit u64 u ← 5\nsit inf w ← u\nnota w\n";
-    let result = compile_for_target_and_get_result(&format!("incipit {{\n{source}}}\n"), Target::HirFaber);
+    let result = compile_for_target_and_get_result_la(&format!("incipit {{\n{source}}}\n"), Target::HirFaber);
     assert_accepts(&result.diagnostics);
     let Some(crate::Output::Faber(output)) = result.output else {
         panic!("expected Faber output: {:?}", result.diagnostics);
@@ -263,7 +272,7 @@ fn the_faber_reemitter_prints_nothing_for_an_implicit_widening() {
 #[test]
 fn every_mir_backend_fails_closed() {
     for target in [Target::MirLlvm, Target::MirWasm] {
-        let result = compile_for_target_and_get_result(INF_FILE, target);
+        let result = compile_for_target_and_get_result_la(INF_FILE, target);
         let code = result
             .diagnostics
             .iter()

@@ -7,7 +7,7 @@ use radix::program::analyze_prepared_program_name;
 use std::path::PathBuf;
 
 fn session() -> Session {
-    Session::new(Config::default())
+    Session::new(Config::default().with_latin_locale())
 }
 
 fn run(source: &str, selection: TestSelection) -> ProbaReport {

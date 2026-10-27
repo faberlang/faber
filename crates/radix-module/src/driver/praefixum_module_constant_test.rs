@@ -10,7 +10,7 @@ use crate::driver::{AnalyzeRequest, AnalyzedModule, Config, Session, analyze_sou
 use crate::hir::{HirExpressionKind, HirItemKind, HirLiteral};
 
 fn analyze_ok(source: &str) -> AnalyzedModule {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     analyze_source(&session, "module_constant.fab", source, AnalyzeRequest::default())
         .unwrap_or_else(|diagnostics| panic!("analysis failed: {diagnostics:?}"))
 }

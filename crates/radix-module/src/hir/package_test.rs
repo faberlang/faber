@@ -8,7 +8,7 @@ use crate::locale::{KeywordSurface, latin_locale_pack};
 use crate::mir::MirLoweringOptions;
 
 fn analyze(name: &str, source: &str) -> AnalyzedModule {
-    analyze_with(name, source, Config::default())
+    analyze_with(name, source, Config::default().with_latin_locale())
 }
 
 fn analyze_with(name: &str, source: &str, config: Config) -> AnalyzedModule {
@@ -550,7 +550,11 @@ fn nucleum_package_round_trip_preserves_visibility_roles() {
 
 #[test]
 fn signature_only_device_import_fails_closed() {
-    let session = Session::new(Config::default().with_bodyless_functions());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_bodyless_functions(),
+    );
     let Err(err) = analyze_source(
         &session,
         "iface.fab",

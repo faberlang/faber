@@ -47,7 +47,7 @@ use radix_module::locale::{KeywordSurface, latin_locale_pack};
     feature = "hir-swift"
 ))]
 fn analyze(source: &str) -> radix_module::driver::AnalyzedModule {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     analyze_source(&session, "conversio-assign.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 

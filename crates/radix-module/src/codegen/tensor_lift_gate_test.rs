@@ -11,7 +11,12 @@ sit tensor<f32, [2]> b ← [2.0, 1.0] ↦ tensor<f32, [2]>
 ";
 
 fn issues(target: Target, body: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
     let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
     result
@@ -112,7 +117,12 @@ fn swift_python_and_haskell_reject_the_lifted_forms() {
         for body in &LIFTED[1..] {
             // Swift and Python may stop earlier on the tensor type itself;
             // they must still fail, never emit.
-            let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+            let session = Session::new(
+                Config::default()
+                    .with_latin_locale()
+                    .with_target(target)
+                    .with_dev_locale_root(),
+            );
             let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
             let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
             assert!(result.output.is_none(), "{target:?} `{body}` emitted code");
@@ -225,7 +235,12 @@ fn rust_emits_whole_tensor_equality() {
 fn swift_python_and_haskell_never_emit_whole_tensor_equality() {
     for target in [Target::HirSwift, Target::HirPython, Target::HirHaskell] {
         for body in WHOLE_EQUALITY {
-            let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+            let session = Session::new(
+                Config::default()
+                    .with_latin_locale()
+                    .with_target(target)
+                    .with_dev_locale_root(),
+            );
             let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
             let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
             assert!(result.output.is_none(), "{target:?} `{body}` emitted code");

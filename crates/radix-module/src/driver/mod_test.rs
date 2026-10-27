@@ -13,7 +13,7 @@ use crate::diagnostics::DiagnosticArg;
 use crate::driver::reemit_faber;
 #[cfg(feature = "hir-faber")]
 use crate::driver::{Config, Session};
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 
 // -- shared helpers (available to child test modules via super::) --
 
@@ -62,6 +62,7 @@ pub(crate) fn faber_roundtrip(source: &str) -> String {
     let pack = crate::locale::latin_locale_pack();
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_resolved_locale_pack(pack.clone())
             .with_dev_locale_root(),
     );
@@ -106,6 +107,7 @@ pub(crate) fn faber_emit(name: &str, source: &str) -> crate::driver::FaberReemit
     let pack = crate::locale::latin_locale_pack();
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_resolved_locale_pack(pack.clone())
             .with_dev_locale_root(),
@@ -136,7 +138,7 @@ functio loss() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::HirRust),
+        &test_session_la(Target::HirRust),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -171,7 +173,7 @@ functio keep() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::HirRust),
+        &test_session_la(Target::HirRust),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -219,7 +221,7 @@ functio wrapper() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::HirRust),
+        &test_session_la(Target::HirRust),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -258,7 +260,7 @@ functio keep() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::HirRust),
+        &test_session_la(Target::HirRust),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -293,7 +295,7 @@ functio loss() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::HirSwift),
+        &test_session_la(Target::HirSwift),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -322,7 +324,7 @@ functio direct() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::MirWasm),
+        &test_session_la(Target::MirWasm),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -353,7 +355,7 @@ functio loss() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::MirWasm),
+        &test_session_la(Target::MirWasm),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -391,7 +393,7 @@ functio loss() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::HirFaber),
+        &test_session_la(Target::HirFaber),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -427,7 +429,7 @@ functio loss() → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::MirWasm),
+        &test_session_la(Target::MirWasm),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -459,7 +461,7 @@ functio sum(numerus a, numerus b) → numerus {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "lane.fab",
         source,
         ModuleCompileRequest::default(),
@@ -483,7 +485,7 @@ functio sum(numerus a, numerus b) → numerus {
 fn go_target_policy_runs_for_programs_without_cli() {
     // F-047: non-Rust/Go targets must not silently skip target-policy dispatch.
     // Target::HirGo syntax checks fire before semantic analysis.
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let source = r"incipit {
   nota 42
 }";
@@ -496,7 +498,7 @@ fn go_target_policy_runs_for_programs_without_cli() {
 fn go_cli_program_accepts_modular_word() {
     // D11.6 U6go: the Go modular-word gate is lifted on the CLI-program path
     // as on the ordinary path; `modulus<W>` reaches codegen.
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let source = r#"
 @ cli "tool"
 incipit argumenta args {
@@ -520,7 +522,7 @@ incipit argumenta args {
 #[cfg(feature = "hir-go")]
 #[test]
 fn go_program_accepts_modular_word() {
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let source = "incipit {\n  varia modulus<u8> x ← 250\n  nota x + 10\n}\n";
     let result = compile(&session, "wrap.fab", source, ModuleCompileRequest::default());
 
@@ -533,7 +535,7 @@ fn typescript_target_policy_does_not_silently_fail() {
     // F-047 regression: the old _ => {} catch-all silently swallowed
     // non-Rust/Go targets. The explicit match arms ensure every Target
     // variant is considered.
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r"incipit {
   nota 42
 }";
@@ -550,7 +552,7 @@ fn typescript_target_policy_does_not_silently_fail() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_rust_success_emits_output() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   nota 42
 }";
@@ -565,7 +567,7 @@ fn compile_rust_success_emits_output() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn en_cli_program_emits_english_display_tokens() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"+++
 locale = "en"
 +++
@@ -605,7 +607,7 @@ fn compile_faber_success_emits_output() {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn compile_typescript_success_emits_output() {
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r"incipit {
   nota 42
 }";
@@ -617,7 +619,7 @@ fn compile_typescript_success_emits_output() {
 
 #[test]
 fn typescript_output_preserves_diagnostic_severity() {
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r"incipit {
   sit _ unused ← 1
 }";
@@ -648,7 +650,7 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 "#;
 
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "backward.fab",
         source,
         ModuleCompileRequest::default(),
@@ -686,7 +688,7 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 #[cfg(feature = "mir-llvm")]
 #[test]
 fn mir_lowering_error_carries_source_span() {
-    let session = test_session(Target::MirLlvm);
+    let session = test_session_la(Target::MirLlvm);
     let source = "functio id<T>(T a) → T { redde a }\nincipit { nota id }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     let diag = result
@@ -772,8 +774,11 @@ fn deny_policy_does_not_touch_info_or_errors() {
 fn deny_warnings_suppresses_output_after_promotion() {
     use crate::driver::{Config, ModuleCompileRequest, Session, WarnPolicy};
 
-    let session =
-        Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }),
+    );
     let result = compile(
         &session,
         "deny-unused.fab",
@@ -833,8 +838,11 @@ fn deny_code_promotes_prefer_string_template_specifically() {
 fn deny_warnings_promotes_prefer_string_template_in_real_compile() {
     use crate::driver::{Config, Session, WarnPolicy};
 
-    let session =
-        Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }),
+    );
     let result = compile(
         &session,
         "pst-deny-warnings.fab",
@@ -871,7 +879,9 @@ fn deny_code_promotes_prefer_string_template_in_real_compile() {
     use crate::driver::{Config, Session, WarnPolicy};
 
     let session = Session::new(
-        Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: false, deny_codes: vec!["WARN018".into()] }),
+        Config::default()
+            .with_latin_locale()
+            .with_warn_policy(WarnPolicy { deny_all_warnings: false, deny_codes: vec!["WARN018".into()] }),
     );
     let result = compile(
         &session,
@@ -913,8 +923,11 @@ incipit {
 fn deny_all_does_not_promote_two_operand_concat() {
     use crate::driver::{Config, Session, WarnPolicy};
 
-    let session =
-        Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }),
+    );
     let result = compile(
         &session,
         "pst-two-operand.fab",
@@ -959,8 +972,11 @@ incipit {
 fn deny_all_does_not_promote_pure_variable_chain() {
     use crate::driver::{Config, Session, WarnPolicy};
 
-    let session =
-        Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }),
+    );
     let result = compile(
         &session,
         "pst-pure-variable-chain.fab",
@@ -1005,7 +1021,7 @@ incipit {
 #[test]
 fn call_argument_type_mismatch_renders_code_file_line_and_expected_got() {
     let source = "incipit {\n    tacet\n}\n";
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let analysis = super::analyze_source(&session, "probe.fab", source, AnalyzeRequest::default()).expect("analyze");
     let start = u32::try_from(source.find("tacet").expect("tacet")).expect("fits u32");
     let errors = vec![crate::mir::MirError {
@@ -1079,7 +1095,7 @@ incipit { nota _auxilium() }
 fn leading_underscore_is_warning_by_default() {
     use crate::driver::{Config, Session};
 
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let result = compile(
         &session,
         "lead-underscore.fab",
@@ -1100,8 +1116,11 @@ fn leading_underscore_is_warning_by_default() {
 fn deny_warnings_promotes_leading_underscore_in_real_compile() {
     use crate::driver::{Config, Session, WarnPolicy};
 
-    let session =
-        Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }),
+    );
     let result = compile(
         &session,
         "lead-underscore-deny.fab",
@@ -1122,7 +1141,7 @@ fn deny_warnings_promotes_leading_underscore_in_real_compile() {
 /// any pack lookup; `..` and `.` have no separator and need their own clauses.
 #[test]
 fn frontmatter_locale_rejects_path_shaped_ids() {
-    let config = crate::driver::Config::default();
+    let config = crate::driver::Config::default().with_latin_locale();
     for id in ["/etc", "la/extra", "..", ".", "..\\x", "a/../b"] {
         let diagnostic =
             super::resolve_frontmatter_locale_pack(&config, id).expect_err("path-shaped locale ids must be rejected");

@@ -105,16 +105,21 @@ pub const AIR_REPORT_HEADER: &str =
 /// (lex/parse/CLI errors) — the plain check pipeline already reported those,
 /// and a report over a broken module would be noise.
 #[must_use]
-pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
-    // TEMPORARY STAGING: a pack-less source reads the
-    // no-locale default while `RADIX_DEFAULT_CODE_LOCALE=en`; unset keeps the
-    // historical pack-less (Latin) reading.
-    let code_pack =
-        radix::module::driver::default_code_pack(&radix::module::driver::Config::default());
-    let lex_result = match code_pack.as_ref() {
-        Some(pack) => radix::module::lexer::lex_with_locale_pack(source, pack),
-        None => radix::module::lexer::lex(source),
+pub fn advisory_rows(name: &str, source: &str) -> Option<Vec<AirRow>> {
+    // The source's own `+++ locale = "…" +++` declaration wins; a source with
+    // no declared locale reads the no-locale default (`en`). A pack that fails
+    // to load yields no report.
+    let peeled = radix::module::driver::peel_raw_source(name, source).ok()?;
+    let declared = peeled
+        .frontmatter
+        .as_ref()
+        .and_then(radix::module::driver::FileFrontmatter::locale);
+    let code_pack = match declared {
+        Some(locale_id) => faber_cli::package::embedded_conversion_locale_pack(locale_id).ok()?,
+        None => radix::module::driver::default_code_pack(&radix::module::driver::Config::default())
+            .ok()?,
     };
+    let lex_result = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
     if !lex_result.success() {
         return None;
     }

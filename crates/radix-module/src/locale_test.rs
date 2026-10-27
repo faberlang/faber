@@ -1583,6 +1583,7 @@ fn en_empty_named_binding_rhs_claims_as_marker() {
     let reference = compile(
         &Session::new(
             Config::default()
+                .with_latin_locale()
                 .with_target(Target::HirRust)
                 .with_resolved_locale_pack(pack),
         ),
@@ -1618,6 +1619,7 @@ fn marker_named_bindings_warn_under_en_and_la_packs() {
         let result = compile(
             &Session::new(
                 Config::default()
+                    .with_latin_locale()
                     .with_target(Target::HirRust)
                     .with_resolved_locale_pack(pack),
             ),
@@ -2080,7 +2082,7 @@ fn census_diagnostic_rows_render_from_their_raising_families() {
     for locale in ["la", "en", "th-TH", "ar", "zh-Hans", "zh-Hant", "vi", "hi"] {
         let pack = owned_pack(locale);
         for (key, family, source) in cases {
-            let compiler = crate::Compiler::new(crate::Config::default());
+            let compiler = crate::Compiler::new(crate::Config::default().with_latin_locale());
             let result = compiler.compile_str("render.fab", source);
             let diag = result
                 .diagnostics

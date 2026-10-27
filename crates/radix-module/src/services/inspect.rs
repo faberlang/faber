@@ -57,19 +57,23 @@ pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let result = lex_reader_surface(&source_file);
+    let result = match lex_reader_surface(&source_file) {
+        Ok(result) => result,
+        Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
+    };
     SourceInspection { text: lex_json(&source_file, &result), success: result.success(), errors: Vec::new() }
 }
 
 /// Lex the peeled body under the file's own frontmatter reader locale, as check
 /// and compile do; no frontmatter locale falls back to the no-locale default.
-fn lex_reader_surface(source_file: &crate::driver::SourceFile) -> crate::lexer::LexResult {
-    let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref())
-        .or_else(|| crate::driver::default_code_pack(&crate::driver::Config::default()));
-    match pack.as_ref() {
-        Some(pack) => crate::lexer::lex_with_locale_pack(source_file.content.as_str(), pack),
-        None => crate::lexer::lex(source_file.content.as_str()),
-    }
+fn lex_reader_surface(source_file: &crate::driver::SourceFile) -> Result<crate::lexer::LexResult, String> {
+    let pack = match crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref())
+    {
+        Some(pack) => pack,
+        None => crate::driver::default_code_pack(&crate::driver::Config::default())
+            .map_err(|diagnostic| diagnostic.message)?,
+    };
+    Ok(crate::lexer::lex_with_locale_pack(source_file.content.as_str(), &pack))
 }
 
 fn lex_json(source_file: &crate::driver::SourceFile, result: &crate::lexer::LexResult) -> String {
@@ -148,7 +152,10 @@ pub fn parse_inspection_for_source(name: &str, source: &str) -> SourceInspection
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let lex_result = lex_reader_surface(&source_file);
+    let lex_result = match lex_reader_surface(&source_file) {
+        Ok(result) => result,
+        Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
+    };
     if !lex_result.success() {
         return SourceInspection {
             text: String::new(),
@@ -423,7 +430,7 @@ pub fn cli_ir_inspection_for_source(name: &str, source: &str) -> SourceInspectio
 fn parse_inspect_program(
     source_file: &crate::driver::SourceFile,
 ) -> Result<(crate::syntax::Program, crate::lexer::Interner), Vec<String>> {
-    let lex_result = lex_reader_surface(source_file);
+    let lex_result = lex_reader_surface(source_file).map_err(|error| vec![error])?;
     if !lex_result.success() {
         return Err(lexer_error_lines(source_file, &lex_result.errors));
     }

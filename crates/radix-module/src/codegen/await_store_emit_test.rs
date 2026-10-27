@@ -16,7 +16,7 @@ functio caller() fiet → vacuum {
 }";
 
 fn emit(target: Target, source: &str) -> String {
-    let session = Session::new(Config::default().with_target(target));
+    let session = Session::new(Config::default().with_latin_locale().with_target(target));
     let result = compile(&session, "await-store.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "{:?}", result.diagnostics);
     match result.output {

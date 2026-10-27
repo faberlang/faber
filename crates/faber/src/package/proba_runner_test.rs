@@ -384,7 +384,7 @@ probandum "suite_b" {
 }
 "#;
     let by_name = run_proba_source(
-        &Session::new(Config::default()),
+        &Session::new(Config::default().with_latin_locale()),
         "sel.fab",
         source,
         &TestSelection {
@@ -403,7 +403,7 @@ probandum "suite_b" {
     assert_eq!(by_name.results[0].name, "beta");
 
     let by_suite = run_proba_source(
-        &Session::new(Config::default()),
+        &Session::new(Config::default().with_latin_locale()),
         "sel.fab",
         source,
         &TestSelection {

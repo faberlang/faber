@@ -376,6 +376,7 @@ fn resolved_use_locals_survive_the_fhir_round_trip() {
     let source = include_str!("../../../../corpus/importa/selective-import.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -405,6 +406,7 @@ fn display_tokens_survive_the_fhir_round_trip() {
     let la_source = "+++\nlocale = \"la\"\n+++\n\nfunctio salve() { }";
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -442,6 +444,7 @@ fn selective_import_rust_emit_is_identical_after_load() {
     let source = include_str!("../../../../corpus/importa/selective-import.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -478,6 +481,7 @@ fn load_unit_for(source: &str) -> Result<AnalyzedModule, HirArtifactError> {
 
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -578,6 +582,7 @@ fn insere_local_static_loads() {
     let source = std::fs::read_to_string(&path).expect("insere-local fixture reads");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -607,6 +612,7 @@ fn finite_nan_scalar_round_trips() {
     let source = std::fs::read_to_string(&path).expect("finite-nan fixture reads");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -674,6 +680,7 @@ fn serve_typed_round_trips() {
     let source = std::fs::read_to_string(&path).expect("serve-typed fixture reads");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -707,6 +714,7 @@ fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
     let source = "fixum lista<b8> b = |de ad|\n\nincipit {\n    nota b\n}\n";
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -736,6 +744,7 @@ fn closure_parameter_hole_survives_the_fhir_round_trip() {
     );
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -784,6 +793,7 @@ fn transparent_alias_annotation_survives_the_fhir_round_trip() {
     );
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -806,6 +816,7 @@ fn union_alias_annotation_survives_the_fhir_round_trip() {
     let source = include_str!("../../../../corpus/unio/unio.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -828,6 +839,7 @@ fn transparent_generic_alias_annotation_survives_the_fhir_round_trip() {
     let source = include_str!("../../../../corpus/typus/generic-alias.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -854,6 +866,7 @@ fn alias_chain_round_trips() {
     let source = std::fs::read_to_string(&path).expect("alias-chain fixture reads");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -876,6 +889,7 @@ fn genus_union_alias_survives_the_fhir_round_trip() {
     let source = include_str!("../../../../corpus/unio/overlap.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -899,6 +913,7 @@ fn inferred_constructor_map_survives_the_fhir_round_trip() {
     let source = "+++\nlocale = \"en\"\n+++\n\nfn pondus() \u{2192} map<string, int> {\n    return _ { \"x\": 7, \"y\": 9 }\n}\n";
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -921,6 +936,7 @@ fn genus_ascribed_literal_survives_the_fhir_round_trip() {
     let source = include_str!("../../../../corpus/genus/ascribed-literal.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -943,6 +959,7 @@ fn genus_inferred_constructor_survives_the_fhir_round_trip() {
     let source = include_str!("../../../../corpus/genus/inferred-constructor.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -964,6 +981,7 @@ fn genus_inferred_constructor_optional_survives_the_fhir_round_trip() {
     let source = include_str!("../../../../corpus/genus/inferred-constructor-optional.fab");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -989,6 +1007,7 @@ fn fhir_artifact_keeps_inferred_set_literal_hole() {
     let source = "+++\nlocale = \"en\"\n+++\n\nmain {\n    let set<int> s ← _ [1, 2]\n    print s.length()\n}\n";
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );
@@ -1968,7 +1987,11 @@ fn struct_field_type_sites_remap_to_struct_owner_once() {
                   fn identity(int value) → int { return value }\n";
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("load English locale pack");
-    let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack));
+    let session = crate::driver::Session::new(
+        crate::driver::Config::default()
+            .with_latin_locale()
+            .with_locale_pack(pack),
+    );
     let unit = crate::driver::analyze_source(&session, "field-sites.fab", source, AnalyzeRequest::default())
         .expect("analyze struct field type sites");
     let artifact = from_analyzed(&unit, "field-sites", "field-sites.fab");
@@ -2039,7 +2062,7 @@ fn hir_artifact_round_trip_acceptance() {
     // Source matching the hello-world fixture.
     let source = "incipit {\n    nota \"Salve, Munde!\"\n}\n";
 
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let unit = crate::driver::analyze_source(&session, "test.faber", source, AnalyzeRequest::default())
         .expect("analyze hello-world fixture");
 
@@ -2093,7 +2116,7 @@ fn runtime_tensor_shape_boundary_survives_fhir_round_trip_and_recovers() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../corpus/tensor/runtime-shape-boundary.fab"
     ));
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let mut direct = analyze_source(&session, "runtime-shape-boundary.fab", source, AnalyzeRequest::default())
         .expect("runtime shape boundary fixture analyzes");
     let latin = crate::locale::latin_locale_pack();
@@ -2135,7 +2158,7 @@ fn tensor_edge_policy_facts_survive_fhir_round_trip() {
     };
     use radix_types::{BuiltinTensorEdgePolicy, IndexExpr, Primitive, RuntimeExtentId, Type};
 
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let mut unit = crate::driver::analyze_source(
         &session,
         "edge-policy-round-trip.fab",
@@ -2316,7 +2339,11 @@ fn resolve(tf32[3] source) → f32 ⇥ string {
     fs::write(&consumer_path, consumer_source).expect("consumer module");
 
     let _library_home = LibraryHomeOverride::set(&home);
-    let session = Session::new(Config::default().with_library_home(home.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_library_home(home.clone()),
+    );
     let direct = crate::program::analyze_prepared_program_path(&session, &consumer_path, consumer_source)
         .expect("analyze imported custom-policy consumer");
     assert!(
@@ -2365,7 +2392,7 @@ fn conversio_assign_fhir_artifact_round_trip_preserves_operator() {
     // through unchanged, and every claimed HIR backend must re-emit it.
     let source = "incipit {\n  varia numerus count ← 0\n  count ↤ \"42\" ⊥ 0\n  nota count\n}\n";
 
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let unit = crate::driver::analyze_source(&session, "conversio-assign.faber", source, AnalyzeRequest::default())
         .expect("analyze ↤ fixture");
 
@@ -2409,7 +2436,7 @@ fn capability_provenance_survives_serialize_and_load() {
     use crate::driver::{AnalyzeRequest, Session, analyze_source};
     use crate::hir::serialize::from_analyzed;
 
-    let session = Session::new(crate::driver::Config::default());
+    let session = Session::new(crate::driver::Config::default().with_latin_locale());
     let unit = analyze_source(
         &session,
         "prov.fab",
@@ -2464,7 +2491,7 @@ incipit {
 }
 "#;
 
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let mut unit = crate::driver::analyze_source(&session, "gpd.fab", source, AnalyzeRequest::default())
         .expect("analyze generic-default source");
 
@@ -2590,8 +2617,11 @@ incipit {
     nota lane_probe()
 }
 "#;
-    let session =
-        crate::driver::Session::new(crate::driver::Config::default().with_target(crate::codegen::Target::MirWasm));
+    let session = crate::driver::Session::new(
+        crate::driver::Config::default()
+            .with_latin_locale()
+            .with_target(crate::codegen::Target::MirWasm),
+    );
     let unit = crate::driver::analyze_source(&session, "lane.fab", source, AnalyzeRequest::default())
         .expect("analyze lane source");
     let lane_def = unit
@@ -2625,7 +2655,7 @@ functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vac
     copy_coordinate(input, varia output)
 }
 ";
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let unit = crate::driver::analyze_source(&session, "kernel-requirements.fab", source, AnalyzeRequest::default())
         .expect("analyze kernel requirement fixture");
     let original = unit.kernel_requirements.clone();
@@ -2674,7 +2704,7 @@ functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vac
     copy_coordinate(input, varia output)
 }
 ";
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let mut unit = crate::driver::analyze_source(&session, "kernel-parameter.fab", source, AnalyzeRequest::default())
         .expect("analyze kernel parameter fixture");
     let position = unit.kernel_requirements.kernels[0]
@@ -2705,7 +2735,7 @@ functio copy_four(tensor<f32, [4]> input, varia tensor<u32, [4]> output) → vac
     }
 }
 ";
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let mut unit = crate::driver::analyze_source(&session, "kernel-wire.fab", source, AnalyzeRequest::default())
         .expect("analyze kernel wire fixture");
     let baseline = crate::hir::serialize::from_analyzed(&unit, "kernel-wire", "kernel-wire.fab").kernel_requirements;
@@ -2736,6 +2766,7 @@ fn zz_debug_presentation() {
     let source = std::fs::read_to_string(root.join("ad/serve-typed.fab")).unwrap();
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(crate::codegen::Target::HirRust),
     );
@@ -2815,6 +2846,7 @@ fn size_generic_genus_applied_to_size_survives_round_trip() {
     );
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirRust),
     );

@@ -118,6 +118,7 @@ fn box_contract() -> ModuleImportContract {
 fn analyze_box(source: &str) -> Result<AnalyzedModule, Vec<Diagnostic>> {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_defer_imported_praefixum(),
     );

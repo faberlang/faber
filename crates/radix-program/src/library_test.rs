@@ -281,7 +281,7 @@ fn norma_http_generates_ordinary_rust_module() {
     fs::create_dir_all(root.join("norma/src")).expect("mkdir norma");
     fs::write(
         root.join("norma/src/http.fab"),
-        "functio get(textus url) → numerus { redde 0 }\n",
+        "+++\nlocale = \"la\"\n+++\nfunctio get(textus url) → numerus { redde 0 }\n",
     )
     .expect("write http.fab");
 
@@ -338,7 +338,7 @@ fn library_surfaces_for(
     (exports, declarations)
 }
 
-const VISIBILITY_TIERS_SOURCE: &str = "
+const VISIBILITY_TIERS_SOURCE: &str = "+++\nlocale = \"la\"\n+++
 @ publica
 functio aperta() → vacuum { }
 
@@ -380,7 +380,7 @@ fn unmarked_library_declaration_is_module_private_in_declaration_surface() {
 /// Bodyless binding declarations (bound by a target binding manifest) follow
 /// the same D5.1 rule as bodied ones: `@ publica` exports them, unmarked keeps
 /// them module-private. There is no by-construction export exception.
-const BODYLESS_BINDING_SOURCE: &str = "
+const BODYLESS_BINDING_SOURCE: &str = "+++\nlocale = \"la\"\n+++
 @ publica
 functio ligata(textus via) → textus ⇥ textus
 

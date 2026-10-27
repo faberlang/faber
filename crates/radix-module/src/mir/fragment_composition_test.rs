@@ -651,7 +651,7 @@ functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
@@ -688,7 +688,7 @@ functio k(f32 x) → f32 {
     redde ping(x)
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let errors = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
@@ -714,7 +714,7 @@ functio k(f32 x) → f32 {
 ";
     let budget = ExpansionBudget { max_concrete_instances: 0, ..ExpansionBudget::DOCUMENTED_DEFAULTS };
     with_budget_override(budget, || {
-        let session = Session::new(Config::default());
+        let session = Session::new(Config::default().with_latin_locale());
         let analysis =
             driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
         let errors = crate::mir::lower_analyzed_unit(analysis.application_view(), MirLoweringOptions::default())
@@ -991,7 +991,7 @@ functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
@@ -1222,7 +1222,7 @@ functio k(f32 x) → f32 {
     redde helper(x)
 }
 ";
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);

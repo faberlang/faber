@@ -10,7 +10,11 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn run(source: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "sink-into.fab", source, &mut host) {
         Ok(()) => Vec::new(),

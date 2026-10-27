@@ -70,7 +70,7 @@ fn lex_inspection_records_latin_keyword_identity_under_reader_locale() {
 
 #[test]
 fn lex_inspection_latin_surface_keys_keywords_by_their_own_spelling() {
-    let result = lex_inspection_for_source("la.fab", "functio salve() { }\n");
+    let result = lex_inspection_for_source("la.fab", "+++\nlocale = \"la\"\n+++\nfunctio salve() { }\n");
     let payload = json(&result.text);
     let first = &payload["tokens"][0];
 

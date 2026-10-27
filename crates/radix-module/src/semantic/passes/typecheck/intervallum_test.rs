@@ -3,7 +3,12 @@
 use crate::{Compiler, Config, Target};
 
 fn compile(source: &str) -> crate::CompileResult {
-    Compiler::new(Config::default().with_target(Target::HirRust)).compile_str("test.fab", source)
+    Compiler::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirRust),
+    )
+    .compile_str("test.fab", source)
 }
 
 fn rust_code(result: crate::CompileResult) -> String {

@@ -8,6 +8,7 @@ use crate::mir::{BufferHost, run_source};
 fn run(body: &str) -> Vec<String> {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_latin_locale(),
     );
@@ -37,6 +38,7 @@ fn malformed_unicode_escape_keeps_the_text_as_written() {
 fn unknown_escape_is_rejected_by_the_runner() {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_latin_locale(),
     );

@@ -15,7 +15,7 @@ use radix_diagnostics::Diagnostic;
 
 fn analyze_file(path: &Path) -> Result<AnalyzedModule, Vec<Diagnostic>> {
     let source = fs::read_to_string(path).expect("read source");
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     analyze_source(&session, &path.display().to_string(), &source, AnalyzeRequest::default())
 }
 
@@ -33,6 +33,7 @@ fn debug_hir(unit: &AnalyzedModule) -> String {
 fn faber_output(main: &Path, source: &str) -> String {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(crate::codegen::Target::HirFaber)
             .with_dev_locale_root(),
     );

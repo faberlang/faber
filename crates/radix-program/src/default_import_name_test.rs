@@ -120,12 +120,12 @@ fn two_default_imports_of_one_module_name_collide() {
 
 #[test]
 fn library_default_import_binds_declared_module_name() {
-    // The provider package declares no reader locale, so its source is Latin.
+    // The provider package declares the Latin reader locale for its source.
     let home = test_temp_dir("default-import-library-home");
     write(
         home.path(),
         "probe/faber.toml",
-        "[package]\nname = \"probe\"\n[library]\nprovider = \"probe\"\n[paths]\nsource = \"src\"\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n",
+        "[package]\nname = \"probe\"\n[reader]\nlocale = \"la\"\n[library]\nprovider = \"probe\"\n[paths]\nsource = \"src\"\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n",
     );
     write(
         home.path(),
@@ -163,7 +163,7 @@ fn library_internal_default_import_binds_declared_module_name() {
     write(
         home.path(),
         "probe/faber.toml",
-        "[package]\nname = \"probe\"\n[library]\nprovider = \"probe\"\n[paths]\nsource = \"src\"\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n",
+        "[package]\nname = \"probe\"\n[reader]\nlocale = \"la\"\n[library]\nprovider = \"probe\"\n[paths]\nsource = \"src\"\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n",
     );
     write(
         home.path(),

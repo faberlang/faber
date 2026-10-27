@@ -20,7 +20,7 @@ functio tere(inf a, exactus<inf> b, modulus<inf> c, saturatus<inf> d) → inf {
 
 #[test]
 fn an_inf_module_round_trips_through_the_package_with_its_spellings() {
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let analysis =
         analyze_source(&session, "main.fab", INF_SOURCE, AnalyzeRequest::default()).expect("analyze inf source");
     let pkg = build_package(

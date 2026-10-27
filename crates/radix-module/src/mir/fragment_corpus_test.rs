@@ -36,7 +36,7 @@ fn assert_wrapper_route(source: &str) {
 }
 
 fn session() -> Session {
-    Session::new(Config::default())
+    Session::new(Config::default().with_latin_locale())
 }
 
 fn analyze(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<Diagnostic>> {

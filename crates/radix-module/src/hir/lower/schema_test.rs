@@ -129,7 +129,7 @@ fn schema_artifact_round_trip_preserves_ordered_metadata() {
     use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
     use handroll::Sha256;
 
-    let session = Session::new(Config::default());
+    let session = Session::new(Config::default().with_latin_locale());
     let unit =
         analyze_source(&session, "schema_test.fab", PERSONA_BREVIS, AnalyzeRequest::default()).expect("analysis");
     let content_hash = {
@@ -156,6 +156,7 @@ fn canonical_reemits_schema_decl() {
     let pack = crate::locale::latin_locale_pack();
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
+            .with_latin_locale()
             .with_resolved_locale_pack(pack.clone())
             .with_dev_locale_root(),
     );

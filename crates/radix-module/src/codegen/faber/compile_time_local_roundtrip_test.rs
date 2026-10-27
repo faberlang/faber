@@ -18,6 +18,7 @@ fn pack(locale: &str) -> LocalePack {
 fn reemit(source: &str, to: &str) -> String {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_dev_locale_root(),
     );
@@ -64,6 +65,7 @@ fn en_to_la_round_trip_keeps_the_equals_glyph() {
 fn rust_emits_an_ordinary_immutable_local() {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirRust)
             .with_dev_locale_root(),
     );

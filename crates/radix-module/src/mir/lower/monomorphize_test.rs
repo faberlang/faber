@@ -26,7 +26,11 @@ use crate::driver::{AnalyzeRequest, Config, Session};
 use crate::semantic::IndexId;
 
 fn analyzed_unit(source: &str) -> AnalyzedModule {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 

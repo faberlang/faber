@@ -415,19 +415,15 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
     let Ok(peeled) = radix::module::driver::peel_raw_source(&display_name, &raw_source) else {
         return false;
     };
-    // TEMPORARY STAGING: the pack-less fallback reads the
-    // no-locale default while `RADIX_DEFAULT_CODE_LOCALE=en`; unset keeps the
-    // historical pack-less (Latin) reading.
-    let code_pack = package::default_config_with_locale(radix::module::Target::HirTypeScript)
+    // The no-locale default is `en`; a default pack that fails to load is a
+    // failed read, not a Latin fallback.
+    let Some(code_pack) = package::default_config_with_locale(radix::module::Target::HirTypeScript)
         .ok()
         .and_then(|config| config.locale_pack)
-        .or_else(|| {
-            radix::module::driver::default_code_pack(&radix::module::driver::Config::default())
-        });
-    let lex = match code_pack.as_ref() {
-        Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
-        None => radix::module::lexer::lex(peeled.body),
+    else {
+        return false;
     };
+    let lex = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
     let parse = radix::module::parser::parse(lex);
     let Some(program) = parse.program else {
         return false;

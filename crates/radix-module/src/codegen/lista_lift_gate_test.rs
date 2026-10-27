@@ -17,7 +17,12 @@ sit lista<u8> bytes ← [1, 2, 3]
 ";
 
 fn issues(target: Target, body: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
     let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
     result
@@ -89,7 +94,12 @@ fn rust_emits_the_runner_only_list_forms() {
 fn swift_and_haskell_never_emit_the_runner_only_list_forms() {
     for target in [Target::HirSwift, Target::HirHaskell] {
         for body in RUNNER_ONLY {
-            let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+            let session = Session::new(
+                Config::default()
+                    .with_latin_locale()
+                    .with_target(target)
+                    .with_dev_locale_root(),
+            );
             let source = format!("incipit {{\n{PRELUDE}{body}\n}}\n");
             let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
             assert!(result.output.is_none(), "{target:?} `{body}` emitted code");
@@ -107,6 +117,7 @@ fn python_lowers_the_runner_only_list_forms() {
     for body in RUNNER_ONLY {
         let session = Session::new(
             Config::default()
+                .with_latin_locale()
                 .with_target(Target::HirPython)
                 .with_dev_locale_root(),
         );
