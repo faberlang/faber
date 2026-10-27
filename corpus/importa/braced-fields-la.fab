@@ -1,0 +1,35 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_record", "import_field_list", "import_field", "ex_field", "visibilitas_field", "nomen_field", "ut_field", "nota_stmt", "expression", "literal"]
+category = "package"
+summary = "A braced import record spells its field names with the reader pack: ex, visibilitas, nomen and ut in la."
+syntax = "importa { ex = <source>, visibilitas = publica, nomen = <name>, ut = <alias> }"
+aliases = ["import"]
+related = ["importa", "ex", "publica", "ut", "nomen"]
+locale = "la"
++++
+# =============================================================================
+# importa — braced record fields in a Latin file
+# =============================================================================
+#
+# What this teaches:
+#   • The Latin file spells the five record field names `ex`, `visibilitas`,
+#     `nomen`, `ut` and `omnia`; the same fields are `from`, `visibility`,
+#     `name`, `as` and `all` in an `en` file (`braced-fields.fab`).
+#
+# Common mistakes:
+#   • Writing the English field words in a Latin file —
+#     `braced-field-english-reject-la.fab`.
+#
+# See also: importa, ex, publica, ut, nomen
+# =============================================================================
+
+# importa — braced record with every field except the wildcard alias
+#
+# EXPECTED OUTPUT:
+#   braced-fields-la
+
+importa { ex = "norma:text", visibilitas = publica, nomen = text, ut = t }
+
+nota "braced-fields-la"

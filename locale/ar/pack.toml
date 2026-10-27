@@ -32,6 +32,7 @@ insere = "تضمين"
 privata = "خاص"
 protecta = "محمي"
 publica = "عام"
+visibilitas = "الظهور"
 sponte = "اختياري"
 casu = "حالة"
 ceterum = "افتراضي"
@@ -923,7 +924,11 @@ help = "تحقق من صياغة الاستيراد"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "حقل استيراد غير معروف"
-help = "استخدم {ex} أو visibilitas أو nomen أو {ut} أو {omnia}"
+help = "استخدم {ex} أو {visibilitas} أو {nomen} أو {ut} أو {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "حقل الاستيراد `{field}` غير معلن في سطح القارئ هذا"
+help = "استخدم `{expected}` للغة القارئ في هذا الملف"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "حقل استيراد مكرر `{field}`"
@@ -935,7 +940,7 @@ help = "أضف {ex} = \"path\" إلى import record"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import لا يمكنه تسمية binding أيضا"
-help = "استخدم {omnia} وحده، أو nomen/{ut} لاستيراد named"
+help = "استخدم {omnia} وحده، أو {nomen}/{ut} لاستيراد named"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "visibility للاستيراد غير صالحة"
@@ -943,7 +948,7 @@ help = "استخدم {privata} أو {publica}"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "تعذر استنتاج اسم الاستيراد من {path}"
-help = "اكتب nomen أو alias صريحا لـ {path}"
+help = "اكتب {nomen} أو alias صريحا لـ {path}"
 
 [diagnostics.SEM001]
 message = "متغير غير معرف"

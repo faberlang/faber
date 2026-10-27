@@ -100,6 +100,13 @@ pub enum KeywordOwner {
     /// Import visibility surface.
     ImportVisibility,
 
+    /// Field name inside a braced import record (`visibilitas = publica`).
+    ///
+    /// The record's other field names are the existing identities `ex`,
+    /// `nomen`, `ut` and `omnia`; the parser resolves all five through the
+    /// reader pack.
+    ImportField,
+
     /// Type-parameter modifier surface.
     TypeParameter,
 
@@ -336,6 +343,7 @@ const IMPORT_VISIBILITY_ANNOTATION_OR_MEMBER: &[KeywordOwner] = &[
     KeywordOwner::AnnotationName,
     KeywordOwner::MemberIdentifier,
 ];
+const IMPORT_FIELD: &[KeywordOwner] = &[KeywordOwner::ImportField];
 const ENTRY_FUNCTION_OR_PARAM_OR_MEMBER: &[KeywordOwner] = &[
     KeywordOwner::EntryModifier,
     KeywordOwner::FunctionModifier,
@@ -624,6 +632,15 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         text: "publica",
         token_kind: Some(TokenKind::Publica),
         scope: KeywordScope::Contextual(IMPORT_VISIBILITY_ANNOTATION_OR_MEMBER),
+        category: KeywordKind::Modifier,
+    },
+    // `visibilitas` names the visibility field of a braced import record
+    // (`import { from = "…", visibility = public }`). It is claimed only in that
+    // field-name slot and stays an ordinary identifier everywhere else.
+    KeywordSpec {
+        text: "visibilitas",
+        token_kind: None,
+        scope: KeywordScope::Contextual(IMPORT_FIELD),
         category: KeywordKind::Modifier,
     },
     KeywordSpec {
@@ -1660,6 +1677,7 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::AnnotationName
         | KeywordOwner::AnnotationModifier
         | KeywordOwner::ImportVisibility
+        | KeywordOwner::ImportField
         | KeywordOwner::TypeParameter
         | KeywordOwner::ParameterMode
         | KeywordOwner::AliasMarker

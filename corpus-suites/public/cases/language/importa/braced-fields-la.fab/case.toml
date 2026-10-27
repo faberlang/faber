@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/importa/braced-fields-la.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/braced-fields-la.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -187,7 +187,7 @@ import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_f
 # [088] ex_field
 ex_field ::= '取自' '=' STRING
 # [089] visibilitas_field
-visibilitas_field ::= 'visibilitas' '=' publica
+visibilitas_field ::= '可見性' '=' publica
 # [090] nomen_field
 nomen_field ::= '名稱' '=' IDENTIFIER
 # [091] ut_field
@@ -702,7 +702,7 @@ NO_NEWLINE ::=
 | [`import_field_list`](#import-field-list) | `#import-field-list` | live |
 | [`import_field`](#import-field) | `#import-field` | live |
 | [`ex_field`](#ex-field) | `#取自-field` | live |
-| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live |
+| [`visibilitas_field`](#visibilitas-field) | `#可見性-field` | live |
 | [`nomen_field`](#nomen-field) | `#名稱-field` | live |
 | [`ut_field`](#ut-field) | `#作為-field` | live |
 | [`omnia_field`](#omnia-field) | `#全部-field` | live |
@@ -1063,7 +1063,7 @@ productions. It is not a second keyword authority.
 | Boolean | `真` | true |
 | Conversion | `經由` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 | Diagnostics | `檢視` | debug |
-| Declarations | `visibilitas` | visibility field |
+| Declarations | `可見性` | visibility field |
 
 ## Comma Separator Table {#comma-separator-law}
 
@@ -1601,6 +1601,8 @@ importa ex "norma:consolum" fixum dic ut output
 ```
 
 A record import needs its `取自 = "…"` source (`missing_import_source`), and `全部` cannot be combined with `名稱` or `作為` (`mixed_wildcard_and_named_import`).
+
+The five record field names are reader-pack keywords like the rest of the surface: the `en` reader spells `取自`, `可見性`, `名稱`, `作為` and `全部` as `from`, `visibility`, `name`, `as` and `all` (`import { from = "norma:text", name = text, as = t }`), and every other pack spells them with its own words. A field word from another locale is `PARSE050 wrong_locale_import_field`, not `unknown_import_field`.
 
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `公開` is the re-export marker. Missing named binding

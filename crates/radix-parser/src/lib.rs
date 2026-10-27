@@ -1952,6 +1952,10 @@ mod annotation_locale_test;
 mod annotation_line_test;
 
 #[cfg(test)]
+#[path = "import_field_locale_test.rs"]
+mod import_field_locale_test;
+
+#[cfg(test)]
 #[path = "comma_law_test.rs"]
 mod comma_law_test;
 

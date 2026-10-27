@@ -34,6 +34,10 @@ pub(super) const RETIRED_ABSTRACTUS: &str = "abstractus";
 /// Retired genus `extends` clause keyword (DECISIONS D8.1).
 const RETIRED_SUB: &str = "sub";
 
+/// Keyword identities of the five braced import record field names, in
+/// grammar order: source, visibility, binding name, alias, wildcard alias.
+const IMPORT_FIELD_KEYS: &[&str] = &["ex", "visibilitas", "nomen", "ut", "omnia"];
+
 /// Whether a parsed statement is a declaration that may appear only at top
 /// level (DECISIONS D22.1): a `functio` or a type declaration. Methods live in
 /// `genus` bodies, which parse through their own member loop, not a block.
@@ -2133,29 +2137,26 @@ impl Parser {
             }
             seen_fields.push(field.name);
 
-            match field_name.as_str() {
-                "ex" => {
+            // Field names are keyword identities resolved through the reader
+            // pack, so only the active locale's own words are accepted.
+            match self.import_field_identity(&field_name) {
+                Some("ex") => {
                     path = Some(self.parse_string()?);
                     path_span = Some(self.previous_span());
                 }
-                "visibilitas" => {
+                Some("visibilitas") => {
                     visibility = self.parse_import_visibility_value()?;
                 }
-                "nomen" => {
+                Some("nomen") => {
                     name = Some(self.parse_decl_name()?);
                 }
-                "ut" => {
+                Some("ut") => {
                     alias = Some(self.parse_ident()?);
                 }
-                "omnia" => {
+                Some("omnia") => {
                     wildcard_alias = Some(self.parse_ident()?);
                 }
-                _ => {
-                    return Err(Self::invalid_import_error_at(
-                        "unknown_import_field",
-                        field.span,
-                    ));
-                }
+                _ => return Err(self.unknown_import_field_error(&field_name, field.span)),
             }
 
             if !self.consume_item_separator(&TokenKind::RBrace, "import_fields")? {
@@ -2198,12 +2199,43 @@ impl Parser {
         let span = token.span;
         match token.kind {
             TokenKind::Ident(sym) | TokenKind::Underscore(sym) => Ok(Ident { name: sym, span }),
-            TokenKind::Ex => Ok(self.keyword_ident("ex", span)),
-            TokenKind::Ut => Ok(self.keyword_ident("ut", span)),
+            TokenKind::Ex => Ok(self.keyword_ident(&self.keyword_surface("ex"), span)),
+            TokenKind::Ut => Ok(self.keyword_ident(&self.keyword_surface("ut"), span)),
             _ => Err(ParseError::structured(ParseErrorKind::Expected, span)
                 .with_arg("expected", "identifier")
                 .with_arg("issue", "import_field_name")),
         }
+    }
+
+    /// The keyword identity an import record field word claims on the active
+    /// reader surface, if any.
+    ///
+    /// Resolves through the pack (`from` is `ex` in en), so a word the pack does
+    /// not declare for one of the five field identities claims nothing.
+    fn import_field_identity(&self, word: &str) -> Option<&'static str> {
+        let key = self.keyword_claim_key_for_text(word)?;
+        IMPORT_FIELD_KEYS
+            .iter()
+            .copied()
+            .find(|field| *field == key)
+    }
+
+    /// `unknown_import_field`, or `wrong_locale_import_field` when the word is
+    /// a canonical field spelling the active pack re-spells.
+    fn unknown_import_field_error(&self, word: &str, span: radix_lexer::Span) -> ParseError {
+        if let Some(latin) = IMPORT_FIELD_KEYS
+            .iter()
+            .copied()
+            .find(|field| *field == word)
+        {
+            let expected = self.keyword_surface(latin);
+            if expected != word {
+                return Self::invalid_import_error_at("wrong_locale_import_field", span)
+                    .with_arg("field", word)
+                    .with_arg("expected", expected);
+            }
+        }
+        Self::invalid_import_error_at("unknown_import_field", span)
     }
 
     fn parse_import_visibility_value(&mut self) -> Result<Visibility, ParseError> {

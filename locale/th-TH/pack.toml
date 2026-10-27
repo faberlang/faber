@@ -32,6 +32,7 @@ insere = "ฝัง"
 privata = "ส่วนตัว"
 protecta = "ป้องกัน"
 publica = "สาธารณะ"
+visibilitas = "การมองเห็น"
 sponte = "สมัครใจ"
 casu = "กรณี"
 ceterum = "อื่น"
@@ -923,23 +924,27 @@ help = "ตรวจไวยากรณ์การนำเข้า"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "ฟิลด์การนำเข้าไม่รู้จัก"
-help = "ใช้ ex, visibilitas, nomen, ut หรือ omnia"
+help = "ใช้ {ex}, {visibilitas}, {nomen}, {ut} หรือ {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "ฟิลด์การนำเข้า `{field}` ไม่ได้ประกาศในพื้นผิว reader นี้"
+help = "ใช้ `{expected}` สำหรับ locale ของไฟล์นี้"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "ฟิลด์การนำเข้า `{field}` ซ้ำ"
 help = "แต่ละฟิลด์การนำเข้าปรากฏได้เพียงครั้งเดียว; ลบฟิลด์ที่ซ้ำออก"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "เรกคอร์ดการนำเข้าต้องมีแหล่งที่มา ex"
-help = "เพิ่ม ex = \"path\" ในเรกคอร์ดการนำเข้า"
+message = "เรกคอร์ดการนำเข้าต้องมีแหล่งที่มา {ex}"
+help = "เพิ่ม {ex} = \"path\" ในเรกคอร์ดการนำเข้า"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "การนำเข้า wildcard ไม่สามารถตั้งชื่อ binding ร่วมได้"
-help = "ใช้ omnia เพียงอย่างเดียว หรือใช้ nomen/ut สำหรับการนำเข้าที่มีชื่อ"
+help = "ใช้ {omnia} เพียงอย่างเดียว หรือใช้ {nomen}/{ut} สำหรับการนำเข้าที่มีชื่อ"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "visibility ของการนำเข้าไม่ถูกต้อง"
-help = "ใช้ publica"
+help = "ใช้ {publica}"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
 message = "`privata` ถูกนำออกจากการนำเข้าแล้ว; การนำเข้าไม่ re-export โดยค่าเริ่มต้น"
@@ -947,7 +952,7 @@ help = "ลบเครื่องหมายออก หรือใช้ p
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "ไม่สามารถอนุมานชื่อการนำเข้าจาก {path} ได้"
-help = "ระบุ nomen หรือ alias ที่ชัดเจนสำหรับ {path}"
+help = "ระบุ {nomen} หรือ alias ที่ชัดเจนสำหรับ {path}"
 
 [diagnostics.SEM001]
 message = "ตัวแปรไม่ได้กำหนด"
