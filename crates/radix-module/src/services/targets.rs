@@ -338,7 +338,7 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
 /// `run` is false in every row on purpose: `faber run` interprets source and
 /// takes no `--target`, so no target is "run" by this table. The one target
 /// route `faber run` reaches (a device selected with `--device`) is owned by
-/// `DeviceChoice::run_target` in the `faber` crate, and `faber targets` sets
+/// `DeviceChoice::run_target_spelling` in the `faber` crate, and `faber targets` sets
 /// the `run` column from it. Keeping the flag here would be a second list.
 fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabilities {
     let mut capabilities = radix_target_capabilities(target);

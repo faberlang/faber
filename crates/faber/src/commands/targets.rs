@@ -18,8 +18,8 @@
 //! report by construction.
 
 use crate::cli::FaberCliTarget;
-use faber_cli::package::DeviceChoice;
 use clap::ValueEnum;
+use faber_cli::package::DeviceChoice;
 use radix::module::codegen::Target;
 use radix::services::{
     TargetCapabilities, TargetCommandSurface, target_capabilities_for_surface, target_leaves_label,
@@ -104,13 +104,13 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[(
 ///
 /// `faber run` interprets source and takes no `--target`; the only targets it
 /// reaches are the device routes selected by `--device`, so this is derived
-/// from [`DeviceChoice::run_target`], the same match that maps a device choice
+/// from [`DeviceChoice::run_target_spelling`], the same match that maps a device choice
 /// to its route. A built FMIR image, a FHIR envelope, a native host
 /// executable and a Rust package are build outputs, never `faber run` inputs.
 fn faber_run_reaches(target: Target) -> bool {
     DeviceChoice::value_variants()
         .iter()
-        .any(|choice| choice.run_target() == Some(target))
+        .any(|choice| choice.run_target_spelling() == Some(target.to_string().as_str()))
 }
 
 /// One rendered capability row.
