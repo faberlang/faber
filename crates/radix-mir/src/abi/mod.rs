@@ -28,7 +28,7 @@ pub use lane_index::{
 };
 pub use launch::*;
 pub use resource::*;
-pub use signature::resolve_parameter_alias;
+pub use signature::ParameterAliases;
 pub(crate) use signature::{
     append_gather_axis_extent_resources, append_matmul_runtime_extent_resources, grid_reduce_node,
     grid_reduce_partial_layout, scan_node, scan_partial_layout,

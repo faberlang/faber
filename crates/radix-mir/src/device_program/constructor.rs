@@ -2073,7 +2073,7 @@ fn lane_grid_plan(
         }));
     }
     let lane_domain_local = lane_domain_local
-        .map(|local| crate::abi::resolve_parameter_alias(function, local))
+        .map(|local| crate::abi::ParameterAliases::new(function).resolve(local))
         .ok_or_else(|| "lane kernel has no carried lane-domain source identity".to_owned())?;
     let Some((source_resource, source)) = resources
         .iter()

@@ -26,7 +26,7 @@
 //! a custom policy, a fill (`coalesce`) and any use of the view other than an
 //! element read or an extent are refused by name.
 
-use crate::abi::{LaneIndexProof, resolve_parameter_alias};
+use crate::abi::{LaneIndexProof, ParameterAliases};
 use crate::static_shape_fold::{ShapeFoldError, ShapeFoldKind};
 use crate::{
     MirAggregateFields, MirAggregateItem, MirBinOp, MirBuiltinEdgePolicy, MirCollectionOp,
@@ -301,7 +301,7 @@ fn shift_operands(
         return Err(refuse(ERR_SHIFT_VIEW_SHAPE, "shift arity"));
     };
     let base = match Key::of_operand(base) {
-        Some(Key::Local(local)) => resolve_parameter_alias(function, MirLocalId(local)),
+        Some(Key::Local(local)) => ParameterAliases::new(function).resolve(MirLocalId(local)),
         _ => return Err(refuse(ERR_SHIFT_VIEW_SHAPE, "base is not a parameter")),
     };
     let Some(param) = function.params.iter().find(|param| param.local == base) else {
