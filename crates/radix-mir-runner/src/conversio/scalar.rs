@@ -24,6 +24,7 @@ use super::*;
 use crate::value::round_float_at_slot;
 use handroll::Magnus;
 use radix_codegen_shared::hints::{self, EndianHint};
+use radix_runtime_contract::trap::text as trap_text;
 use radix_types::IndexExpr;
 use radix_types::exact_rational::ExactRational;
 
@@ -141,11 +142,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     })
                     .collect::<Option<Vec<_>>>();
                 let Some(bytes) = bytes else {
-                    return self.recover_or_fail(
-                        recovery,
-                        span,
-                        "octeti to textus conversion failed",
-                    );
+                    return self.recover_or_fail(recovery, span, trap_text::BYTES_TO_TEXT_FAILED);
                 };
                 return self.decode_textus_octeti(bytes, recovery, span);
             }
@@ -168,7 +165,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         match String::from_utf8(bytes) {
             Ok(text) => Ok(Value::Str(text)),
-            Err(_) => self.recover_or_fail(recovery, span, "octeti to textus conversion failed"),
+            Err(_) => self.recover_or_fail(recovery, span, trap_text::BYTES_TO_TEXT_FAILED),
         }
     }
 
@@ -415,7 +412,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         let Some(endian) = self.endian_hint(params) else {
             return Err(RunnerError::internal(
                 span,
-                "unsupported conversio to numerus from Octeti",
+                "unsupported conversio to numerus from list<b8>",
             ));
         };
         let need = match width {
@@ -423,11 +420,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             NumericWidth::I32 | NumericWidth::U32 => 4,
             NumericWidth::I64 | NumericWidth::U64 => 8,
             _ => {
-                return self.recover_or_fail(recovery, span, "octeti endian width unsupported");
+                return self.recover_or_fail(
+                    recovery,
+                    span,
+                    trap_text::BYTES_ENDIAN_WIDTH_UNSUPPORTED,
+                );
             }
         };
         if bytes.len() != need {
-            return self.recover_or_fail(recovery, span, "octeti endian width mismatch");
+            return self.recover_or_fail(recovery, span, trap_text::BYTES_ENDIAN_WIDTH_MISMATCH);
         }
         match (width, endian) {
             (NumericWidth::I16, EndianHint::Be) => Ok(Value::Int(i64::from(i16::from_be_bytes(
@@ -466,7 +467,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             (NumericWidth::U64, EndianHint::Le) => {
                 Ok(Value::UInt(u64::from_le_bytes(octeti_array(&bytes))))
             }
-            _ => self.recover_or_fail(recovery, span, "octeti endian width unsupported"),
+            _ => self.recover_or_fail(recovery, span, trap_text::BYTES_ENDIAN_WIDTH_UNSUPPORTED),
         }
     }
 
@@ -601,10 +602,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         {
             return match recovery {
                 Some(recovery) => self.eval_recovery(recovery, span),
-                None => Err(RunnerError::internal(
-                    span,
-                    radix_runtime_contract::trap::text::NUMERUS_OVERFLOW,
-                )),
+                None => Err(RunnerError::internal(span, trap_text::NUMERUS_OVERFLOW)),
             };
         }
         Ok(converted)
@@ -730,7 +728,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 }
                 return Err(RunnerError::internal(
                     span,
-                    "unsupported conversio to fractus from Octeti",
+                    "unsupported conversio to fractus from list<b8>",
                 ));
             }
             other => other,
@@ -807,18 +805,22 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         let Some(endian) = self.endian_hint(params) else {
             return Err(RunnerError::internal(
                 span,
-                "unsupported conversio to fractus from Octeti",
+                "unsupported conversio to fractus from list<b8>",
             ));
         };
         let need = match width {
             NumericWidth::F32 => 4,
             NumericWidth::F64 => 8,
             _ => {
-                return self.recover_or_fail(recovery, span, "octeti endian width unsupported");
+                return self.recover_or_fail(
+                    recovery,
+                    span,
+                    trap_text::BYTES_ENDIAN_WIDTH_UNSUPPORTED,
+                );
             }
         };
         if bytes.len() != need {
-            return self.recover_or_fail(recovery, span, "octeti endian width mismatch");
+            return self.recover_or_fail(recovery, span, trap_text::BYTES_ENDIAN_WIDTH_MISMATCH);
         }
         match (width, endian) {
             (NumericWidth::F32, EndianHint::Be) => Ok(Value::Float(f64::from(f32::from_be_bytes(
@@ -833,7 +835,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             (NumericWidth::F64, EndianHint::Le) => {
                 Ok(Value::Float(f64::from_le_bytes(octeti_array(&bytes))))
             }
-            _ => self.recover_or_fail(recovery, span, "octeti endian width unsupported"),
+            _ => self.recover_or_fail(recovery, span, trap_text::BYTES_ENDIAN_WIDTH_UNSUPPORTED),
         }
     }
 
@@ -923,7 +925,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             other => {
                 return Err(RunnerError::internal(
                     span,
-                    format!("unsupported conversio to octeti from {other:?}"),
+                    format!("unsupported conversio to list<b8> from {other:?}"),
                 ));
             }
         })
@@ -945,7 +947,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             let Value::Octeti(bytes) = value else {
                 return Err(RunnerError::internal(
                     span,
-                    "octeti conversio carried a non-octeti value",
+                    "list<b8> conversio carried a non-list<b8> value",
                 ));
             };
             return Ok(Value::Array(Rc::new(RefCell::new(
@@ -1440,7 +1442,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         let IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {
             return Err(RunnerError::internal(
                 span,
-                "bounded octeti requires a literal capacity",
+                "bounded list<b8> requires a literal capacity",
             ));
         };
         let capacity = usize::try_from(*capacity).unwrap_or(usize::MAX);
@@ -1450,12 +1452,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             other => {
                 return Err(RunnerError::internal(
                     span,
-                    format!("bounded octeti conversio requires an octeti source, got {other:?}"),
+                    format!("bounded list<b8> conversio requires a list<b8> source, got {other:?}"),
                 ));
             }
         };
         if bytes.len() > capacity {
-            self.recover_or_fail(recovery, span, "octeti to bounded octeti conversion failed")
+            self.recover_or_fail(recovery, span, trap_text::BYTES_TO_BOUNDED_FAILED)
         } else {
             Ok(Value::Octeti(bytes))
         }
@@ -1486,12 +1488,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                         .map(Value::Str)
                         .map_err(|_| RunnerError::internal(span, "ascii bytes failed UTF-8 decode"))
                 } else {
-                    self.recover_or_fail(recovery, span, "octeti to ascii conversion failed")
+                    self.recover_or_fail(recovery, span, trap_text::BYTES_TO_ASCII_FAILED)
                 }
             }
             _ => Err(RunnerError::internal(
                 span,
-                "ascii conversio requires textus or octeti source",
+                "ascii conversio requires textus or list<b8> source",
             )),
         }
     }

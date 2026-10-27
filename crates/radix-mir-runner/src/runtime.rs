@@ -4924,7 +4924,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         .collect::<Result<Vec<_>, _>>()?;
                     let Some((start, end)) = window_inside(start, end, bytes.len()) else {
                         return Err(window_failure(
-                            RunnerError::internal(span, "octeti index out of bounds"),
+                            RunnerError::internal(span, "list<b8> index out of bounds"),
                             start,
                             end,
                             bytes.len(),
@@ -5016,7 +5016,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 if let Some((start, end)) = window_bounds(index, span)? {
                     let Some((start, end)) = window_inside(start, end, bytes.len()) else {
                         return Err(window_failure(
-                            RunnerError::internal(span, "octeti index out of bounds"),
+                            RunnerError::internal(span, "list<b8> index out of bounds"),
                             start,
                             end,
                             bytes.len(),
@@ -5033,7 +5033,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .map(|byte| Value::Int(i64::from(*byte)))
                     .ok_or_else(|| {
                         index_failure(
-                            RunnerError::internal(span, "octeti index out of bounds"),
+                            RunnerError::internal(span, "list<b8> index out of bounds"),
                             idx,
                             bytes.len(),
                         )
@@ -6204,13 +6204,13 @@ pub(crate) fn integer_tag_matches(value: &Value, target: &Type) -> bool {
 fn byte_from_value(value: &Value, span: Span) -> Result<u8, RunnerError> {
     match value {
         Value::Int(value) => u8::try_from(*value)
-            .map_err(|_| RunnerError::internal(span, "octeti append byte out of range")),
+            .map_err(|_| RunnerError::internal(span, "list<b8> append byte out of range")),
         // A `b8` cell holds its unsigned pattern.
         Value::UInt(value) => u8::try_from(*value)
-            .map_err(|_| RunnerError::internal(span, "octeti append byte out of range")),
+            .map_err(|_| RunnerError::internal(span, "list<b8> append byte out of range")),
         _ => Err(RunnerError::internal(
             span,
-            "octeti append requires numerus byte",
+            "list<b8> append requires numerus byte",
         )),
     }
 }

@@ -3433,7 +3433,7 @@ static inline _Noreturn void faber_conv_fail(int kind, int why) {
         faber_trap(why == FABER_CONV_NEGATIVE ? "ascii_pack_negative_source"
                                               : "ascii_pack_width_overflow");
     case FABER_CONV_BYTES_TEXT:
-        faber_trap("octeti to textus conversion failed");
+        faber_trap("list<b8> to textus conversion failed");
     case FABER_CONV_INT_INT:
         faber_trap("numerus to numerus conversion out of range");
     default:

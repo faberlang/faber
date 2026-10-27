@@ -25,7 +25,7 @@ fn bounded_octeti_store_over_the_bound_traps_with_the_rust_text() {
     let error = run("let list<b8> raw ← |61 62 63|\nlet list<b8, 2> a ← raw ↦ list<b8, 2>\nprint a.length()")
         .expect_err("overflow must fail");
     assert!(
-        format!("{error:?}").contains("octeti to bounded octeti conversion failed"),
+        format!("{error:?}").contains("list<b8> to bounded list<b8> conversion failed"),
         "got: {error:?}"
     );
 }

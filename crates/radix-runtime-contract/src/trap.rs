@@ -77,6 +77,30 @@ pub mod text {
     /// A keyed read of a map (or ledger) whose key is absent.
     pub const MAP_MISSING_KEY: &str = "tabula missing key";
 
+    /// An index into a byte list (`list<b8>`) that is out of range.
+    pub const BYTES_INDEX_TRAP: &str = "list<b8> index trap";
+
+    /// A byte list (`list<b8>`) read as an endian-ordered scalar whose length
+    /// is not the scalar's width.
+    pub const BYTES_ENDIAN_WIDTH_MISMATCH: &str = "list<b8> endian width mismatch";
+
+    /// An endian-ordered scalar conversion of a byte list at a width the
+    /// conversion does not cover.
+    pub const BYTES_ENDIAN_WIDTH_UNSUPPORTED: &str = "list<b8> endian width unsupported";
+
+    /// A byte list that is not valid UTF-8 converted to text.
+    pub const BYTES_TO_TEXT_FAILED: &str = "list<b8> to textus conversion failed";
+
+    /// A byte list that is not ASCII converted to ascii text.
+    pub const BYTES_TO_ASCII_FAILED: &str = "list<b8> to ascii conversion failed";
+
+    /// A byte list longer than the capacity of the bounded byte list it is
+    /// converted to.
+    pub const BYTES_TO_BOUNDED_FAILED: &str = "list<b8> to bounded list<b8> conversion failed";
+
+    /// A byte list whose length does not fill the tensor it is converted to.
+    pub const BYTES_TENSOR_LENGTH_MISMATCH: &str = "list<b8> tensor length mismatch";
+
     /// The window as slice bounds when it lies fully inside `len` items: the
     /// start is not negative, not past the end, and the end is not past `len`.
     /// A window outside is the failure [`list_window_outside`] or

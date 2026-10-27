@@ -120,7 +120,7 @@ fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
     assert!(code.contains("std::str::from_utf8("), "expected from_utf8, got:\n{code}");
     assert!(
         code.contains("faber::trap::ok(std::str::from_utf8(")
-            && code.contains("faber::Trap::Other(\"octeti to textus conversion failed: invalid UTF-8\")"),
+            && code.contains("faber::Trap::Other(\"list<b8> to textus conversion failed: invalid UTF-8\")"),
         "expected expect, got:\n{code}"
     );
 }

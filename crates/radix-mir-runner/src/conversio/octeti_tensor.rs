@@ -19,6 +19,7 @@ use radix_codegen_shared::hints::{self, EndianHint};
 use radix_lexer::{Span, Symbol};
 use radix_mir::MirOperand;
 use radix_mir::lista_tensor_conversio::literal_tensor_dims;
+use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{NumericWidth, Type, TypeId, effective_width};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -98,21 +99,21 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Type::Tensor(element_ty, _) = self.types.get(target_ty) else {
             return Err(RunnerError::internal(
                 span,
-                "octeti tensor conversio target is not a tensor",
+                "list<b8> tensor conversio target is not a tensor",
             ));
         };
         let element_ty = *element_ty;
         let Some(shape) = literal_tensor_dims(target_ty, self.types).or(shape) else {
             return Err(RunnerError::internal_with_issue(
                 span,
-                "octeti tensor conversio needs a shape operand for run-time extents",
+                "list<b8> tensor conversio needs a shape operand for run-time extents",
                 SHAPE_OPERAND_MISSING_ISSUE,
             ));
         };
         let Some(element) = self.octeti_tensor_element(element_ty) else {
             return Err(RunnerError::internal(
                 span,
-                "octeti tensor element unsupported",
+                "list<b8> tensor element unsupported",
             ));
         };
         // An 8-bit element has no byte order (ruling B6): the checker admits
@@ -123,7 +124,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Some(endian) = endian.or((element.width() == 1).then_some(EndianHint::Le)) else {
             return Err(RunnerError::internal(
                 span,
-                "octeti tensor conversio needs a Be or Le hint",
+                "list<b8> tensor conversio needs a Be or Le hint",
             ));
         };
         let expected = shape
@@ -133,7 +134,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             })
             .filter(|expected| *expected == bytes.len());
         if expected.is_none() {
-            return self.recover_or_fail(recovery, span, "octeti tensor length mismatch");
+            return self.recover_or_fail(recovery, span, trap_text::BYTES_TENSOR_LENGTH_MISMATCH);
         }
         let storage = match element {
             Element::Dense(kind) => decode_dense(kind, bytes, endian),
@@ -162,7 +163,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Type::Tensor(element_ty, _) = self.types.get(source_ty) else {
             return Err(RunnerError::internal(
                 span,
-                "tensor octeti conversio source is not a tensor",
+                "tensor list<b8> conversio source is not a tensor",
             ));
         };
         let Some(endian) = hints::endian_hint(params, |param| {
@@ -170,13 +171,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }) else {
             return Err(RunnerError::internal(
                 span,
-                "tensor octeti conversio needs a Be or Le hint",
+                "tensor list<b8> conversio needs a Be or Le hint",
             ));
         };
         let Some(element) = self.octeti_tensor_element(*element_ty) else {
             return Err(RunnerError::internal(
                 span,
-                "tensor octeti element unsupported",
+                "tensor list<b8> element unsupported",
             ));
         };
         let width = element.width();
@@ -188,7 +189,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Some(values) = tensor.logical_values() else {
             return Err(RunnerError::internal(
                 span,
-                "tensor octeti conversio could not read the tensor elements",
+                "tensor list<b8> conversio could not read the tensor elements",
             ));
         };
         let mut bytes = Vec::with_capacity(values.len() * width);
@@ -201,7 +202,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 _ => {
                     return Err(RunnerError::internal(
                         span,
-                        "tensor octeti conversio met a non-numeric element",
+                        "tensor list<b8> conversio met a non-numeric element",
                     ));
                 }
             };

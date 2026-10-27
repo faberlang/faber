@@ -4013,7 +4013,7 @@ impl<'a> FunctionBuilder<'a> {
     fn lower_octeti_literal(&mut self, sym: Symbol, ty: Option<TypeId>, span: Span) -> Option<MirOperand> {
         if ty.is_none() {
             self.errors
-                .push(MirError::missing_type(span, "octeti literal"));
+                .push(MirError::missing_type(span, "list<b8> literal"));
             return None;
         }
         let Some(interner) = self.context.interner else {
@@ -4021,8 +4021,10 @@ impl<'a> FunctionBuilder<'a> {
         };
         let raw = interner.resolve(sym);
         let Ok(bytes) = radix_lexer::octeti_literal::decode_octeti_hex(raw) else {
-            self.errors
-                .push(MirError::unsupported(span, "octeti literal failed decode before MIR lowering"));
+            self.errors.push(MirError::unsupported(
+                span,
+                "list<b8> literal failed decode before MIR lowering",
+            ));
             return None;
         };
         // Need: a byte literal is a `lista<b8>`, so it lowers to a
