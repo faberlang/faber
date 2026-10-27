@@ -711,16 +711,30 @@ fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) ->
     r#gen.set_imported_generators(go_imported_generators(analysis, hir));
     register_go_cross_file_defids(&mut r#gen, hir, analysis.resolver(), analysis.libraries());
     let mut statics = handroll::FxHashMap::default();
+    let mut imported_structs = Vec::new();
     for (def_id, fields, _, _) in analysis.resolver().imported_file_structs() {
+        let mut instance_fields = Vec::with_capacity(fields.len());
         for field in fields {
-            if field.modifier == Some(radix_syntax::FieldModifier::Const)
-                && let Some(init) = field.init
-            {
-                statics.insert((def_id, field.name), init.clone());
+            if field.modifier == Some(radix_syntax::FieldModifier::Const) {
+                if let Some(init) = field.init {
+                    statics.insert((def_id, field.name), init);
+                }
+                continue;
             }
+            // The resolver rebuilt this default in the importer's symbol and
+            // type space; the declaring file's own expression indexes a
+            // different interner and must never be read here.
+            instance_fields.push(go::ImportedStructField {
+                name: field.name,
+                ty: field.ty,
+                sponte: field.optional,
+                init: field.init,
+            });
         }
+        imported_structs.push((def_id, instance_fields));
     }
     r#gen.set_imported_static_fields(statics);
+    r#gen.set_imported_structs(imported_structs);
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
 }
