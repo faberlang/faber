@@ -116,9 +116,13 @@ fn map_tensor_edge_policy_table(wire: radix_hir_fhir::TensorEdgePolicyTableWire)
                 policy: map_tensor_edge_policy(provider.policy),
             })
             .collect(),
-        // The FHIR wire does not carry `ordo` order rows yet; a loaded
-        // artifact lowers enum ordering without them.
-        ordo_order: radix_hir::OrdoOrderTable::default(),
+        ordo_order: radix_hir::OrdoOrderTable {
+            comparisons: wire
+                .ordo_order
+                .into_iter()
+                .map(|row| (row.lhs, row.rows))
+                .collect(),
+        },
     }
 }
 

@@ -234,7 +234,7 @@ fn unit_wire_uses_the_named_keys_in_order() {
 #[test]
 fn tensor_edge_policy_facts_survive_named_msgpack_round_trip() {
     use crate::artifact::{
-        ResolvedTensorEdgePolicyWire, TensorEdgePolicyCallWire,
+        OrdoOrderComparisonWire, ResolvedTensorEdgePolicyWire, TensorEdgePolicyCallWire,
         TensorEdgePolicyFunctionRequirementsWire, TensorEdgePolicyProviderImplWire,
         TensorEdgePolicyRequirementWire, TensorShiftContextWire,
     };
@@ -293,6 +293,10 @@ fn tensor_edge_policy_facts_survive_named_msgpack_round_trip() {
             element_type,
             rank: 2,
             policy: ResolvedTensorEdgePolicyWire::Builtin(BuiltinTensorEdgePolicy::Reflect),
+        }],
+        ordo_order: vec![OrdoOrderComparisonWire {
+            lhs: HirId(0),
+            rows: vec![(DefId(0), 10), (DefId(0), -3), (DefId(0), i64::MIN)],
         }],
     };
 

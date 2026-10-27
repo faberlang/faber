@@ -2810,6 +2810,30 @@ fn validate_tensor_shift_context(
     checks.check_hir(context.shift_expression)
 }
 
+/// Every `ordo` order row must name a comparison site and member variants that
+/// exist in the artifact's arenas, and each site may carry at most one row set
+/// (the live table is keyed by the left-operand id, so a duplicate would
+/// silently overwrite).
+fn validate_ordo_order_rows(
+    table: &crate::artifact::TensorEdgePolicyTableWire,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    let mut sites = FxHashSet::default();
+    for comparison in &table.ordo_order {
+        checks.check_hir(comparison.lhs)?;
+        if !sites.insert(comparison.lhs) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate ordo order row for HirId({})", comparison.lhs.0),
+            });
+        }
+        for (variant, _) in &comparison.rows {
+            checks.check_def(*variant)?;
+        }
+    }
+    Ok(())
+}
+
 fn validate_tensor_edge_policy_ids(
     table: &crate::artifact::TensorEdgePolicyTableWire,
     checks: &IntegrityChecks<'_>,
@@ -2848,7 +2872,7 @@ fn validate_tensor_edge_policy_ids(
         checks.check_type(provider.element_type)?;
         validate_resolved_tensor_edge_policy(&provider.policy, checks)?;
     }
-    Ok(())
+    validate_ordo_order_rows(table, checks)
 }
 
 fn validate_shape_obligation_table(
@@ -4549,6 +4573,7 @@ pub(crate) fn validate_referential_integrity(
             });
         }
     }
+    validate_ordo_order_rows(edge_policies, &checks)?;
     validate_nested_provider_edge_policy_tables(&artifact.provider_units)?;
 
     // 9. Presentation sidecar (anchors from v2, authored types from v9): every

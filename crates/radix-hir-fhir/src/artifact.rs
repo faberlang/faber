@@ -643,7 +643,12 @@ pub struct FunctionProvenanceTableWire {
 /// version 48 on, a serialized-shape change is also caught mechanically: the
 /// header hash is derived from the live type definitions, so a layout change
 /// that forgot this bump still fails closed on decode.
-pub const SCHEMA_VERSION: u32 = 48;
+/// Version 49 adds `TensorEdgePolicyTableWire::ordo_order`, the resolved
+/// `ordo` order rows (declared discriminants per `≺ ≻ ≤ ≥` comparison site)
+/// that backends read to lower an enum comparison as a rank lookup; schema-v48
+/// artifacts fail closed. Before it the wire carried no order rows, so a loaded
+/// unit lowered an `ordo` comparison as a plain operator and gave wrong results.
+pub const SCHEMA_VERSION: u32 = 49;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -895,6 +900,20 @@ pub struct TensorEdgePolicyProviderImplWire {
     pub policy: ResolvedTensorEdgePolicyWire,
 }
 
+/// Resolved `ordo` order rows of one `≺ ≻ ≤ ≥` comparison site (schema v49).
+///
+/// Typecheck records them keyed by the comparison's left-operand HIR id; every
+/// backend lowers the comparison as an integer comparison over the declared
+/// discriminants. `rows` keeps the live order: one `(variant, discriminant)`
+/// pair per member, in declaration order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrdoOrderComparisonWire {
+    /// Left-operand HIR id of the comparison.
+    pub lhs: radix_hir::HirId,
+    /// `(variant, declared discriminant)` per member of the compared `ordo`.
+    pub rows: Vec<(DefId, i64)>,
+}
+
 /// Deterministic portable representation of the neutral HIR sidecar.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TensorEdgePolicyTableWire {
@@ -906,6 +925,9 @@ pub struct TensorEdgePolicyTableWire {
     pub limes_contexts: Vec<(radix_hir::HirId, TensorShiftContextWire)>,
     pub function_requirements: Vec<TensorEdgePolicyFunctionRequirementsWire>,
     pub provider_impls: Vec<TensorEdgePolicyProviderImplWire>,
+    /// Resolved `ordo` order rows per comparison site, sorted by `lhs`
+    /// (schema v49).
+    pub ordo_order: Vec<OrdoOrderComparisonWire>,
 }
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
