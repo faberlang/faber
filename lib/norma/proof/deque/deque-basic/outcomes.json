@@ -1,11 +1,5 @@
 {
   "targets": {
-    "rust": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "error[E0308]",
-      "reason": "Rust emit lowers the norma:deque genus to an unbounded `Deque<T>` impl, so cargo rejects the generated crate with E0308 at the first observed error: `self.tail.push(l_moved.clone())` passes `&T` where `T` is expected because `T: Clone` was never bound (E0277 follows for the `cloned()` calls). The emitted call sites also pass `faber::Valor` to `append`/`prepend`/`from_list`. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
-    },
     "clif": {
       "outcome": "known-fail",
       "phase": "build",

@@ -1,11 +1,5 @@
 {
   "targets": {
-    "rust": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "the method `get` exists for struct `HashMap<K, V>`, but its trait bounds were not satisfied",
-      "reason": "Rust emit lowers the norma:sorted_map genus and its file-scope helpers to unbounded <K, V> generics, so cargo rejects the generated crate with E0599: HashMap::get, contains_key and remove need K: Eq + Hash, Vec::clone and sort need K: Clone and K: Ord, and the emitted call sites pass faber::Valor instead of K. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
-    },
     "c": {
       "outcome": "known-fail",
       "phase": "emit",
