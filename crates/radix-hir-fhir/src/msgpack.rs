@@ -53,6 +53,7 @@ use crate::package::{
     PACKAGE_SCHEMA_VERSION, PackageDependencyWire, PackageIdentityWire, validate_dependencies,
     validate_local_links, validate_module_table,
 };
+use crate::shape::wire_shape_hash;
 use crate::validate::validate_referential_integrity;
 use radix_hir::{HirModule, HirPresentation, LibraryRegistry};
 use radix_types::{DefId, ResolvedGenericCall, TypeTableSnapshot};
@@ -86,6 +87,15 @@ pub enum MsgpackError {
         /// Version this codec accepts.
         expected: u32,
     },
+    /// The unit value carries a wire-shape hash that differs from this
+    /// codec's own derived hash: a serialized type changed without a
+    /// `SCHEMA_VERSION` bump (fail-closed, mirrors the postcard gate).
+    UnsupportedWireShape {
+        /// Shape hash encoded in the unit value.
+        found: u64,
+        /// Shape hash of this codec's type definitions.
+        expected: u64,
+    },
     /// The decoded artifact failed the referential-integrity gate (U2.3).
     Invalid(HirArtifactError),
     /// The package value carries a package schema version this codec does
@@ -111,6 +121,11 @@ impl std::fmt::Display for MsgpackError {
             Self::UnsupportedSchemaVersion { found, expected } => write!(
                 f,
                 "unsupported msgpack unit schema version {found} (expected {expected})"
+            ),
+            Self::UnsupportedWireShape { found, expected } => write!(
+                f,
+                "msgpack unit wire shape {found:#018x} differs from this build's {expected:#018x} \
+                 (a serialized type changed without a schema version bump); rebuild the artifact"
             ),
             Self::Invalid(inner) => write!(f, "invalid msgpack artifact: {inner}"),
             Self::UnsupportedPackageSchemaVersion { found, expected } => write!(
@@ -1243,6 +1258,7 @@ struct FunctionFactTableDto {
 #[derive(Serialize, Deserialize)]
 struct HirArtifactDto {
     schema_version: u32,
+    shape_hash: u64,
     source_identity: SourceIdentity,
     hir: HirModule,
     presentation: HirPresentation,
@@ -1273,6 +1289,7 @@ impl From<HirArtifact> for HirArtifactDto {
     fn from(artifact: HirArtifact) -> Self {
         Self {
             schema_version: artifact.schema_version,
+            shape_hash: artifact.shape_hash,
             source_identity: artifact.source_identity,
             hir: artifact.hir,
             presentation: artifact.presentation,
@@ -1314,6 +1331,7 @@ impl From<&HirArtifact> for HirArtifactDto {
     fn from(artifact: &HirArtifact) -> Self {
         Self {
             schema_version: artifact.schema_version,
+            shape_hash: artifact.shape_hash,
             source_identity: artifact.source_identity.clone(),
             hir: artifact.hir.clone(),
             presentation: artifact.presentation.clone(),
@@ -1361,6 +1379,7 @@ impl From<HirArtifactDto> for HirArtifact {
     fn from(dto: HirArtifactDto) -> Self {
         Self {
             schema_version: dto.schema_version,
+            shape_hash: dto.shape_hash,
             source_identity: dto.source_identity,
             hir: dto.hir,
             presentation: dto.presentation,
@@ -1640,6 +1659,20 @@ fn gate_module_versions(module: &Value) -> Result<(), MsgpackError> {
             },
         ));
     }
+    // The derived wire-shape hash rides beside the version; a unit written by
+    // a build whose serialized types differ fails closed with attribution.
+    let unit_shape = named_field(unit_entries, "shape_hash")?
+        .as_u64()
+        .ok_or_else(|| MsgpackError::Decode("unit shape_hash must be a uint".to_string()))?;
+    if unit_shape != wire_shape_hash() {
+        return Err(MsgpackError::InvalidPackage(
+            FhirPackageError::UnsupportedUnitWireShape {
+                module: path,
+                found: unit_shape,
+                expected: wire_shape_hash(),
+            },
+        ));
+    }
     Ok(())
 }
 
@@ -1758,6 +1791,23 @@ pub fn decode_msgpack(bytes: &[u8]) -> Result<HirArtifact, MsgpackError> {
         return Err(MsgpackError::UnsupportedSchemaVersion {
             found: u32::try_from(found).unwrap_or(u32::MAX),
             expected: SCHEMA_VERSION,
+        });
+    }
+
+    // The derived wire-shape hash is the second named header field.
+    let found_shape = version_entries
+        .iter()
+        .find(|(key, _)| matches!(key, Value::Str(k) if k == "shape_hash"))
+        .and_then(|(_, v)| v.as_u64())
+        .ok_or_else(|| {
+            MsgpackError::Decode(
+                "unit value must carry shape_hash as a named uint field".to_string(),
+            )
+        })?;
+    if found_shape != wire_shape_hash() {
+        return Err(MsgpackError::UnsupportedWireShape {
+            found: found_shape,
+            expected: wire_shape_hash(),
         });
     }
 

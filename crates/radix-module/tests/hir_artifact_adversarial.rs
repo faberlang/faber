@@ -66,6 +66,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
 
     radix_hir_fhir::HirArtifact {
         schema_version: SCHEMA_VERSION,
+        shape_hash: radix_hir_fhir::wire_shape_hash(),
         source_identity: SourceIdentity { content_hash: "abc123".to_string(), relative_path: "test.faber".to_string() },
         hir,
         presentation: radix_hir::HirPresentation {

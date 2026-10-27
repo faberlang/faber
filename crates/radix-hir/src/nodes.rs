@@ -2356,6 +2356,11 @@ pub struct HirTriviaAttachment {
 /// Lives in the analyzed-unit/artifact envelope — never on `HirModule` — so
 /// semantic consumers stay trivia-blind while the HIR value and its
 /// presentation always travel together.
+///
+/// Wire note: the artifact codec is positional `postcard`, so a field added
+/// here shifts every later byte and no field may carry `#[serde(default)]` to
+/// suggest compatibility. A layout change is caught by the derived wire-shape
+/// hash in `radix-hir-fhir` and must ship with a `SCHEMA_VERSION` bump.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HirPresentation {
     pub owners: Vec<HirTriviaOwner>,
@@ -2373,20 +2378,17 @@ pub struct HirPresentation {
     /// Whether the entry block came from an explicit `incipit` statement
     /// (versus implicit top-level statements). Emission fidelity: only an
     /// explicit entry re-emits the `incipit` wrapper.
-    #[serde(default)]
     pub entry_explicit: bool,
 
     /// Ids of `Si` expressions lowered from `requirit`/`reice` guard
     /// statements. Emission re-sugars exactly these back to guard form;
     /// structurally identical authored conditionals stay braced.
-    #[serde(default)]
     pub guard_si_ids: Vec<HirId>,
 
     /// Ids of `Discerne` expressions lowered from `elige` (en `switch`)
     /// statements. Emission re-sugars exactly these back to the `elige`
     /// vocabulary with a `ceterum` default arm; authored `discerne`
     /// statements keep the `discerne`/`casu _` spelling.
-    #[serde(default)]
     pub elige_expr_ids: Vec<HirId>,
 
     /// Ids of `MethodCall` expressions lowered from a source-only glyph form:
@@ -2396,7 +2398,6 @@ pub struct HirPresentation {
     /// exactly these ids instead of the method call (`.transpose()`, `.floor()`).
     /// The id only marks a glyph-authored method twin: emission picks `ᵀ` or the
     /// rounding delimiters from the rewritten twin's name.
-    #[serde(default)]
     pub glyph_ids: Vec<HirId>,
 
     /// Ids of the outer `MethodCall` expressions lowered from an authored
@@ -2404,7 +2405,6 @@ pub struct HirPresentation {
     /// `.sqrt().sqrt()` shape, so this dedicated set is the only record that
     /// the outer call came from the single glyph; Faber re-emission prints
     /// `∜` for exactly these ids. Defaulted so older serialized HIR loads.
-    #[serde(default)]
     pub radical_quarta_ids: Vec<HirId>,
 
     /// Ids of the expressions typecheck produced by desugaring a numeric
@@ -2414,7 +2414,6 @@ pub struct HirPresentation {
     /// method spelling in the source locale for exactly these ids, so
     /// `faber format` stays surface-faithful instead of respelling the call
     /// as an operator, an assignment, or a block with temporaries.
-    #[serde(default)]
     pub numeric_twin_ids: Vec<HirId>,
 
     /// Ids of the expressions typecheck produced by rewriting an authored
@@ -2422,7 +2421,6 @@ pub struct HirPresentation {
     /// typed zero (`Type {}`) HIR. The rewrite keeps the literal's node id;
     /// Faber re-emission prints `empty`/`vacua` for exactly these ids, so
     /// `faber format` stays surface-faithful instead of printing `T {}`.
-    #[serde(default)]
     pub empty_dense_ids: Vec<HirId>,
 
     /// Ids of the expressions typecheck produced by desugaring an authored
@@ -2431,7 +2429,6 @@ pub struct HirPresentation {
     /// rewrite keeps the hole node's id; Faber re-emission prints the hole
     /// for exactly these ids, so `faber format` stays surface-faithful instead
     /// of printing the typed constructor or bare literal it became.
-    #[serde(default)]
     pub inferred_constructor_ids: Vec<HirId>,
 
     /// Ids of the expressions typecheck produced by expanding an authored
@@ -2440,25 +2437,21 @@ pub struct HirPresentation {
     /// Faber re-emission prints the authored method call for exactly these
     /// ids, so `faber format` stays surface-faithful instead of printing the
     /// expansion.
-    #[serde(default)]
     pub axis_sugar: Vec<HirAxisSugar>,
 
     /// Initializer-expression ids of wildcard-bound declarations
     /// (`sit T _ ← expr`), which lower to bare expression statements.
     /// Emission restores the authored discard binding for exactly these.
-    #[serde(default)]
     pub discard_binding_stmts: Vec<HirDiscardBinding>,
 
     /// Authored destructuring declarations (`fixum [a, rest r] ← xs`,
     /// `fixum {x, y} ← p`, and destructuring `itera` binders), which lower to
     /// a run of ordinary locals. Emission re-sugars exactly these runs back to
     /// the authored pattern.
-    #[serde(default)]
     pub destructure_bindings: Vec<HirDestructureBinding>,
 
     /// Definitions whose awaited initializer was authored with `↢` rather
     /// than the `figendum` or `variandum` morphology.
-    #[serde(default)]
     pub await_assignment_bindings: Vec<DefId>,
 
     /// Locals declared as compile-time constants (`fixum T x = e`, DECISIONS
@@ -2466,13 +2459,11 @@ pub struct HirPresentation {
     /// the ones whose initializer is a compile-time fact so typecheck applies
     /// the `=` store rule, the constant pass evaluates them, and Faber
     /// re-emission prints `=` rather than `←`.
-    #[serde(default)]
     pub compile_time_locals: Vec<DefId>,
 
     /// Authored `ordo` enumerations, keyed by the enum's def id. Emission
     /// re-sugars exactly these with the `ordo` vocabulary and member
     /// discriminants; authored `discretio` unions are unaffected.
-    #[serde(default)]
     pub ordo_enums: Vec<HirOrdoEnum>,
 
     /// Authored qualified variant paths (`module.Union.VARIANT`) carried
@@ -2480,7 +2471,6 @@ pub struct HirPresentation {
     /// The source path is presentation data: semantic identity remains the
     /// `DefId`, while Faber re-emission uses this spelling to avoid silently
     /// shortening an authored path.
-    #[serde(default)]
     pub variant_paths: Vec<HirVariantPath>,
 
     /// Authored type occurrences, one record per authored root type position.
@@ -2489,19 +2479,16 @@ pub struct HirPresentation {
     /// with the same semantic `TypeId` keep independent forms. Missing
     /// records mean synthesized/hand-built HIR and emit canonically; present
     /// records are validated fail-closed at emission and in FHIR.
-    #[serde(default)]
     pub authored_types: Vec<HirAuthoredTypeUse>,
 
     /// Authored by-label member reads (`p.gw`) that lowering rewrote to the
     /// constant-index node for the same position. Emission re-sugars exactly
     /// these ids back to the label spelling; `p[1]` keeps its index form.
-    #[serde(default)]
     pub tuple_label_accesses: Vec<HirTupleLabelAccess>,
 
     /// Authored build-time embeds (`insere "path"`, D8.10) whose initializer
     /// lowering folded to a literal. Faber re-emission prints the embed for
     /// exactly these expression ids instead of the embedded bytes.
-    #[serde(default)]
     pub insere_exprs: Vec<HirInsere>,
 
     /// Template applications (`"…"(…)` and `` `…`(…) ``) whose authored text
@@ -2509,19 +2496,16 @@ pub struct HirPresentation {
     /// positional `§` form and reorders labeled actuals into positional
     /// slots; Faber re-emission prints the authored text and the actual labels
     /// for exactly these expression ids.
-    #[serde(default)]
     pub template_holes: Vec<HirTemplateHoles>,
 
     /// The file's `regio` (en `module`) declaration, when authored (D7.7).
     /// Emission re-renders it first; its doc block is the module doc.
-    #[serde(default)]
     pub region: Option<HirRegion>,
 
     /// Function modifier bindings (`errors e`, `options o`, `exit code`),
     /// in authored order. Each lowers to a runtime-provided local with no
     /// source statement; this records which modifier introduced it so Faber
     /// re-emission writes the modifier back into the signature.
-    #[serde(default)]
     pub function_modifier_bindings: Vec<HirFunctionModifierBinding>,
 }
 

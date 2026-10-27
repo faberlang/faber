@@ -29,6 +29,17 @@ pub enum HirArtifactError {
         expected: u32,
     },
 
+    /// The artifact's wire shape (types, field order, enum variants) differs
+    /// from the shape this loader reads, although the schema version matched:
+    /// a serialized type changed without a `SCHEMA_VERSION` bump. Positional
+    /// `postcard` cannot decode such a payload, so it fails closed.
+    UnsupportedWireShape {
+        /// Shape hash encoded in the artifact.
+        found: u64,
+        /// Shape hash of this loader's own type definitions.
+        expected: u64,
+    },
+
     /// A serialized index references a slot that does not exist in the
     /// target arena (constructed during arena reconstruction in U2.3).
     DanglingIndex {
@@ -76,6 +87,13 @@ impl fmt::Display for HirArtifactError {
                 write!(
                     f,
                     "unsupported HIR artifact schema version {found} (expected {expected})"
+                )
+            }
+            Self::UnsupportedWireShape { found, expected } => {
+                write!(
+                    f,
+                    "HIR artifact wire shape {found:#018x} differs from this build's {expected:#018x} \
+                     (a serialized type changed without a schema version bump); rebuild the artifact"
                 )
             }
             Self::DanglingIndex {

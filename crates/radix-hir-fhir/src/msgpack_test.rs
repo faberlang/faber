@@ -40,8 +40,9 @@ fn get<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
 }
 
 /// The unit's named top-level keys, in declaration order.
-const UNIT_KEYS: [&str; 22] = [
+const UNIT_KEYS: [&str; 23] = [
     "schema_version",
+    "shape_hash",
     "source_identity",
     "hir",
     "presentation",
@@ -206,7 +207,10 @@ fn unit_wire_uses_the_named_keys_in_order() {
     assert_eq!(top_keys(&value), UNIT_KEYS);
 
     // §2 row 1: version is a uint fact.
-    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(47)));
+    assert_eq!(
+        get(&value, &["schema_version"]),
+        Some(&Value::Uint(u64::from(SCHEMA_VERSION)))
+    );
 
     // §2 row 2: source identity map with its named keys.
     assert!(matches!(
@@ -721,7 +725,10 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
     // modules[0] is src/aux.fab; its record carries the named module keys.
     let aux = at(&value, &[Step::Key("modules"), Step::Idx(0)]).expect("modules[0]");
     assert_eq!(top_keys(aux), MODULE_KEYS);
-    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(47)));
+    assert_eq!(
+        get(aux, &["unit_schema_version"]),
+        Some(&Value::Uint(u64::from(SCHEMA_VERSION)))
+    );
 
     // The unit is a nested named map with the unit keys — not bin.
     let unit = get(aux, &["unit"]).expect("nested unit");
@@ -784,6 +791,44 @@ fn package_msgpack_rejects_unsupported_manifest_unit_version() {
         }
         other => panic!("expected manifest unit version rejection, got {other:?}"),
     }
+}
+
+#[test]
+fn package_msgpack_rejects_a_foreign_unit_wire_shape() {
+    let bytes = encode_package_msgpack(&multi_module_package()).expect("encode");
+    let patched = patch_uint(
+        &bytes,
+        &[
+            Step::Key("modules"),
+            Step::Idx(1),
+            Step::Key("unit"),
+            Step::Key("shape_hash"),
+        ],
+        wire_shape_hash() ^ 1,
+    );
+    match decode_package_msgpack(&patched) {
+        Err(MsgpackError::InvalidPackage(FhirPackageError::UnsupportedUnitWireShape {
+            module,
+            found,
+            expected,
+        })) => {
+            assert_eq!(module, "src/lib/math.fab");
+            assert_eq!(found, wire_shape_hash() ^ 1);
+            assert_eq!(expected, wire_shape_hash());
+        }
+        other => panic!("expected unit wire-shape rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn msgpack_unit_decode_rejects_a_foreign_wire_shape() {
+    let mut artifact = stub_artifact();
+    artifact.shape_hash = wire_shape_hash() ^ 1;
+    let bytes = encode_msgpack(&artifact).expect("encode");
+    assert!(matches!(
+        decode_msgpack(&bytes),
+        Err(MsgpackError::UnsupportedWireShape { .. })
+    ));
 }
 
 #[test]

@@ -83,6 +83,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
     let types = TypeTable::new();
     HirArtifact {
         schema_version: SCHEMA_VERSION,
+        shape_hash: crate::wire_shape_hash(),
         source_identity: SourceIdentity {
             content_hash: "abc123".to_string(),
             relative_path: "test.faber".to_string(),

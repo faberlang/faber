@@ -41,6 +41,7 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
 
     HirArtifact {
         schema_version: SCHEMA_VERSION,
+        shape_hash: radix_hir_fhir::wire_shape_hash(),
         source_identity: SourceIdentity {
             content_hash: content_hash.to_string(),
             relative_path: relative_path.to_string(),
