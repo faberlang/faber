@@ -22,6 +22,7 @@ pub mod library;
 mod reference_parse;
 
 pub mod diagnostic_explain;
+pub mod exit_status;
 pub mod explain;
 pub mod package;
 pub mod postprocess;

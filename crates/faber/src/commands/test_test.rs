@@ -368,7 +368,7 @@ targets = ["rust"]
 
     let message = result.expect_err("analysis failure must be an Err, not a process exit");
     assert!(
-        message.ends_with("error: package analysis failed"),
+        message.rendered.ends_with("error: package analysis failed"),
         "summary line closes the message: {message}"
     );
 }

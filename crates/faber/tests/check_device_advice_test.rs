@@ -74,6 +74,6 @@ fn partitions_need_a_device_that_can_span() {
         &["--device", "cuda", "--partitions", "2"],
         &acceptance("a1-rungs"),
     );
-    assert_eq!(code, Some(1), "{stderr}");
+    assert_eq!(code, Some(64), "{stderr}");
     assert!(advice(&stderr).is_empty(), "{stderr}");
 }

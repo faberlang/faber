@@ -525,9 +525,11 @@ pub fn resolve_cpu_threads(
     if let Some(threads) = cli {
         if selection != DeviceSelection::Cpu {
             return Err(Box::new(
-                crate::package_diagnostic_error("`--threads` is valid only with `--device cpu`")
-                    .with_arg("issue", "E_THREADS_REQUIRES_CPU")
-                    .with_arg("device", selection.spelling()),
+                crate::exit_status::usage_diagnostic_error(
+                    "`--threads` is valid only with `--device cpu`",
+                )
+                .with_arg("issue", "E_THREADS_REQUIRES_CPU")
+                .with_arg("device", selection.spelling()),
             ));
         }
         return Ok(std::num::NonZeroU32::new(threads));

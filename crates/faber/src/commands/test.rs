@@ -3,6 +3,7 @@
 use super::run_stats;
 use super::test_stats::{self, TestStatsArtifact};
 use crate::cli::{TestArgs, TestOutputFormat};
+use faber_cli::exit_status;
 use faber_cli::input_shape::locale_without_package_error;
 use faber_cli::package;
 use proba::{
@@ -67,7 +68,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         false,
     ) {
         eprintln!("error: {message}");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
     // Keep an explicit reader-locale missing path on the stable package
     // diagnostic identity instead of leaking the raw discovery I/O error.
@@ -89,12 +90,12 @@ pub(super) fn cmd_test(args: &TestArgs) {
         Ok(selection) => selection,
         Err(diag) => {
             eprintln!("error: {}", diag.message);
-            std::process::exit(1);
+            exit_status::exit_for_diagnostic(&diag);
         }
     };
     if let Some(message) = gpu_selection_refusal(selection) {
         eprintln!("{message}");
-        std::process::exit(2);
+        exit_status::exit_usage();
     }
     // Rule 16.9: `--threads` > manifest `[device] threads` > half the cores;
     // the flag is valid only with the CPU device.
@@ -102,7 +103,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         Ok(workers) => workers,
         Err(diag) => {
             eprintln!("error: {}", diag.message);
-            std::process::exit(1);
+            exit_status::exit_for_diagnostic(&diag);
         }
     };
     let input_route = package::test_input_route(&input_path, args.no_package);
@@ -145,7 +146,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         eprintln!(
             "error: --ignored is not supported on the MIR runner; use omitte/futurum cases with default run (they skip) or --include-ignored to list them"
         );
-        std::process::exit(2);
+        exit_status::exit_usage();
     }
 
     let stats_requested = args.stats || args.stats_file.is_some();
@@ -153,7 +154,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         eprintln!(
             "error: test statistics require executing cases; --list does not run the interpreter"
         );
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
 
     let warn_policy = radix::module::driver::WarnPolicy {
@@ -174,7 +175,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
             Ok(target) => target,
             Err(diag) => {
                 eprintln!("error: {}", diag.message);
-                std::process::exit(1);
+                exit_status::exit_for_diagnostic(&diag);
             }
         };
     let config = match package::config_with_locale(
@@ -186,7 +187,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         Ok((config, _locale_pack)) => config.with_warn_policy(warn_policy),
         Err(diag) => {
             eprintln!("error: {}", diag.message);
-            std::process::exit(1);
+            exit_status::exit_for_diagnostic(&diag);
         }
     };
     // Rule 16.3: `reference` (and `cpu` outside the CPU session) lower `@
@@ -223,12 +224,12 @@ pub(super) fn cmd_test(args: &TestArgs) {
             Ok(run) => run,
             Err(failure) => {
                 eprintln!("{failure}");
-                std::process::exit(1);
+                std::process::exit(failure.status);
             }
         },
         package::TestInputRoute::ManifestLessDirectory => {
             eprintln!("error: {}", package::MANIFEST_LESS_TEST_MESSAGE);
-            std::process::exit(1);
+            exit_status::exit_usage();
         }
     };
 
@@ -369,7 +370,7 @@ fn run_single_file_with_options(
         Ok(result) => result,
         Err(error) => {
             print_run_error(&error);
-            std::process::exit(1);
+            std::process::exit(crate::script::status_for_run_source_error(&error));
         }
     }
 }
@@ -475,7 +476,7 @@ fn run_package_with_options(
     proba_filter: Option<&TestSourceFilter>,
     include_ignored: bool,
     focused: bool,
-) -> Result<(ProbaReport, bool, RunMetadata), String> {
+) -> Result<(ProbaReport, bool, RunMetadata), PackageAnalysisFailure> {
     let package = match package::analyze_package_for_tests(config, input, proba_filter) {
         Ok(package) => package,
         Err(diagnostics) => return Err(package_analysis_failure(&diagnostics)),
@@ -1079,12 +1080,33 @@ fn replay_output(result: &CaseResult) {
 /// The stderr text for a package analysis failure: rendered diagnostics (when
 /// any) followed by the summary line. Returned, not printed, so library code
 /// never exits the process; the CLI entry prints it and exits 1.
-fn package_analysis_failure(diagnostics: &[radix::module::diagnostics::Diagnostic]) -> String {
+/// A package-route analysis failure: the rendered diagnostics and the exit
+/// status their class gives (a source error unless a diagnostic names another
+/// class).
+#[derive(Debug)]
+struct PackageAnalysisFailure {
+    rendered: String,
+    status: i32,
+}
+
+impl std::fmt::Display for PackageAnalysisFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.rendered)
+    }
+}
+
+fn package_analysis_failure(
+    diagnostics: &[radix::module::diagnostics::Diagnostic],
+) -> PackageAnalysisFailure {
     let rendered = render_package_analysis_diagnostics(diagnostics);
-    if rendered.is_empty() {
+    let message = if rendered.is_empty() {
         "error: package analysis failed".to_owned()
     } else {
         format!("{rendered}\nerror: package analysis failed")
+    };
+    PackageAnalysisFailure {
+        rendered: message,
+        status: exit_status::status_for_compile_failure(diagnostics),
     }
 }
 

@@ -112,7 +112,7 @@ check the table before re-guessing.
 The stable core:
 
 ```bash
-faber check <file-or-package>        # full check; prints ok or diagnostics; exit 1 on error
+faber check <file-or-package>        # full check; prints ok or diagnostics; exit 65 on error
 cat file.fab | faber check -         # stdin, import-free sources only; needs a frontmatter `locale` (see below)
 faber run <file-or-package>          # interpreted execution (MIR runner, always; `faber run -` is not supported)
 faber -c '+++
@@ -125,6 +125,15 @@ faber init <dir>                     # scaffold: faber.toml ([package], [paths],
 faber doctor                         # resolved library home and per-library availability (`norma:*` is embedded in the binary)
 faber explain --list                 # glyph / keyword / grammar-term reference
 ```
+
+Exit statuses of the tool (not of the program it runs; a program's own exit
+code passes through): `0` success (warnings alone are success), `65` the source
+has error diagnostics (`check`, `build`, `run`, `test`, `emit`, `format`; a
+warning promoted by `--deny` / `--deny-warnings` counts), `64` bad
+command-line arguments (including an unknown `--deny` code), `78` a bad
+`faber.toml` key or a locale pack that fails to load, `1` only a failure with no
+known class (unreadable file, failed write, failing `faber test` cases,
+`faber format` drift). Branch on the status, not on stderr text.
 
 Build from the repo, not from an installed binary, when behavior matters:
 installed `faber` binaries go stale and lag the grammar, which shows up as false

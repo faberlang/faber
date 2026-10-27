@@ -15,7 +15,9 @@
 use crate::cli::{FmirRunArgs, ReplArgs, RunArgs};
 use crate::script::{
     interpret_source, interpret_source_or_exit, print_run_source_error, raw_exit_code,
+    status_for_run_source_error,
 };
+use faber_cli::exit_status;
 use faber_cli::input_shape::locale_without_package_error;
 use faber_cli::package::{self, DeviceChoice};
 use radix::module::diagnostics::Diagnostic;
@@ -36,7 +38,7 @@ pub(super) fn cmd_run(args: RunArgs) {
     let input_path = package::absolutize_path(&args.path);
     if let Some(message) = fmir_image_input_error(&input_path) {
         eprintln!("error: {message}");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
     if let Some(message) = locale_without_package_error(
         args.locale.as_deref(),
@@ -44,7 +46,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         false,
     ) {
         eprintln!("error: {message}");
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
 
     if let Some(seed) = args.shuffle_seed {
@@ -63,16 +65,18 @@ pub(super) fn cmd_run(args: RunArgs) {
     let selection = match resolve_route_selection(&args, &input_path) {
         Ok(selection) => selection,
         Err(diagnostic) => {
+            let status = exit_status::status_for_run_diagnostic(&diagnostic);
             eprint_route_diagnostics(&[*diagnostic]);
-            std::process::exit(1);
+            std::process::exit(status);
         }
     };
     // Rule 16.9: `--threads` > manifest `[device] threads` > half the cores.
     let threads = match package::resolve_cpu_threads(args.threads, selection, &input_path) {
         Ok(threads) => threads.map(std::num::NonZeroU32::get),
         Err(diagnostic) => {
+            let status = exit_status::status_for_run_diagnostic(&diagnostic);
             eprint_route_diagnostics(&[*diagnostic]);
-            std::process::exit(1);
+            std::process::exit(status);
         }
     };
 
@@ -131,7 +135,7 @@ fn interpret_path(
             Ok(archive) => archive,
             Err(diagnostic) => {
                 eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                std::process::exit(1);
+                exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
             }
         };
         let config =
@@ -139,7 +143,7 @@ fn interpret_path(
                 Ok(config) => config,
                 Err(diagnostic) => {
                     eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                    std::process::exit(1);
+                    exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
                 }
             };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
@@ -157,7 +161,7 @@ fn interpret_path(
                 archive.remap_diagnostics(&mut diagnostics);
                 eprint_archive_diagnostics(&diagnostics);
                 drop(archive);
-                std::process::exit(1);
+                exit_status::exit_for_run_diagnostics(&diagnostics);
             }
             drop(archive);
             return;
@@ -168,7 +172,7 @@ fn interpret_path(
                 Err(diagnostic) => {
                     eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
                     drop(archive);
-                    std::process::exit(1);
+                    exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
                 }
             };
             let started = Instant::now();
@@ -184,7 +188,7 @@ fn interpret_path(
                     eprint_archive_diagnostics(&diagnostics);
                     eprint_device_run_note(&diagnostics);
                     drop(archive);
-                    std::process::exit(1);
+                    exit_status::exit_for_run_diagnostics(&diagnostics);
                 }
                 Ok(outcome) => {
                     let exit = i32::from(outcome.result.is_err());
@@ -204,7 +208,7 @@ fn interpret_path(
                         eprint_archive_diagnostics(&diagnostics);
                         eprint_device_run_note(&diagnostics);
                         drop(archive);
-                        std::process::exit(1);
+                        exit_status::exit_for_run_diagnostics(&diagnostics);
                     }
                 }
             }
@@ -219,7 +223,7 @@ fn interpret_path(
             eprint_archive_diagnostics(&diagnostics);
             eprint_device_run_note(&diagnostics);
             drop(archive);
-            std::process::exit(1);
+            exit_status::exit_for_run_diagnostics(&diagnostics);
         }
         return;
     }
@@ -229,7 +233,7 @@ fn interpret_path(
             Ok(config) => config,
             Err(diagnostic) => {
                 super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                std::process::exit(1);
+                exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
             }
         };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
@@ -242,7 +246,7 @@ fn interpret_path(
         {
             if let Err(diagnostics) = result {
                 eprint_route_diagnostics(&diagnostics);
-                std::process::exit(1);
+                exit_status::exit_for_run_diagnostics(&diagnostics);
             }
             return;
         }
@@ -251,7 +255,7 @@ fn interpret_path(
                 Ok(metadata) => metadata,
                 Err(diagnostic) => {
                     super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                    std::process::exit(1);
+                    exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
                 }
             };
             let started = Instant::now();
@@ -265,7 +269,7 @@ fn interpret_path(
                 Err(diagnostics) => {
                     super::eprint_compile_diagnostics(&diagnostics);
                     eprint_device_run_note(&diagnostics);
-                    std::process::exit(1);
+                    exit_status::exit_for_run_diagnostics(&diagnostics);
                 }
                 Ok(outcome) => {
                     let exit = i32::from(outcome.result.is_err());
@@ -282,7 +286,7 @@ fn interpret_path(
                     if let Err(diagnostics) = outcome.result {
                         super::eprint_compile_diagnostics(&diagnostics);
                         eprint_device_run_note(&diagnostics);
-                        std::process::exit(1);
+                        exit_status::exit_for_run_diagnostics(&diagnostics);
                     }
                 }
             }
@@ -295,7 +299,7 @@ fn interpret_path(
         ) {
             super::eprint_compile_diagnostics(&diagnostics);
             eprint_device_run_note(&diagnostics);
-            std::process::exit(1);
+            exit_status::exit_for_run_diagnostics(&diagnostics);
         }
         return;
     }
@@ -308,7 +312,7 @@ fn interpret_path(
         eprintln!(
             "error: run statistics require a package input; stats are not supported for a single `.fab` file"
         );
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
     // An explicit GPU request can never be served here (N1.1 fail closed:
     // "package has no device program"). `reference` and `cpu` need no device program: it runs
@@ -322,7 +326,7 @@ fn interpret_path(
             "error: explicit device selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
             selection.spelling()
         );
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
 
     let source = match fs::read_to_string(path) {
@@ -334,7 +338,7 @@ fn interpret_path(
         Ok(config) => config,
         Err(diagnostic) => {
             super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-            std::process::exit(1);
+            exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
         }
     };
     // gpu-reset C2-U6c: a lone `.fab` file runs on the in-process device
@@ -353,7 +357,7 @@ fn interpret_path(
         ) {
             if let Err(diagnostics) = result {
                 eprint_route_diagnostics(&diagnostics);
-                std::process::exit(1);
+                exit_status::exit_for_run_diagnostics(&diagnostics);
             }
             return;
         }
@@ -383,7 +387,7 @@ pub(super) fn single_file_run_process_code(
 ) -> i32 {
     match result {
         Ok(status) => raw_exit_code(status),
-        Err(_) => 1,
+        Err(error) => status_for_run_source_error(&error),
     }
 }
 
@@ -851,7 +855,7 @@ fn ensure_partitions_cpu_route(
         return Ok(());
     }
     Err(Box::new(
-        faber_cli::package_diagnostic_error(
+        exit_status::usage_diagnostic_error(
             "`--partitions` is valid only with `--device cpu` or `--device metal`",
         )
         .with_arg("issue", "E_PARTITIONS_REQUIRES_CPU")
@@ -978,7 +982,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
         Err(diagnostics) => {
             eprint_route_diagnostics(&diagnostics);
             eprintln!("fmir image load failed");
-            std::process::exit(1);
+            exit_status::exit_for_run_diagnostics(&diagnostics);
         }
     };
     let selection = args
@@ -996,7 +1000,7 @@ pub(super) fn cmd_fmir_run_image(args: FmirRunArgs) {
     ) {
         eprint_route_diagnostics(&diagnostics);
         eprintln!("fmir image execution failed");
-        std::process::exit(1);
+        exit_status::exit_for_run_diagnostics(&diagnostics);
     }
 }
 

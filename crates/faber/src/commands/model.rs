@@ -89,7 +89,7 @@ fn cmd_model_inspect(args: ModelInspectArgs) {
             "error: unsupported file format: {} (expected .safetensors)",
             path.display()
         );
-        std::process::exit(1);
+        faber_cli::exit_status::exit_usage();
     }
 
     let data = match fs::read(path) {

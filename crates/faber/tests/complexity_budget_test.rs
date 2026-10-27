@@ -138,8 +138,8 @@ fn check_complexity_budget_invalid_values_fail_with_clap_standard_error() {
         assert_ne!(code, Some(0), "budget {invalid} must be rejected");
         assert_eq!(
             code,
-            Some(2),
-            "clap standard error exit for {invalid}:\n{stderr}"
+            Some(64),
+            "clap usage error exit for {invalid}:\n{stderr}"
         );
         assert!(
             stderr.contains("invalid value") && stderr.contains("--complexity-budget"),
