@@ -3573,6 +3573,14 @@ help = "文本含引号时请使用 «...»"
 message = "该字符串转义了 `\\\"`；请用 «…» 改写，无需任何转义"
 help = "文本含引号时请使用 «...»"
 
+[diagnostics.WARN035]
+message = "此模板混用了普通占位符和带编号占位符；普通占位符读取 {reads}"
+help = "请为每个占位符编号（`§0`、`§1`……），让它们各自读取你想要的参数"
+
+[diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
+message = "此模板混用了普通占位符和带编号占位符；普通占位符读取 {reads}"
+help = "请为每个占位符编号（`§0`、`§1`……），让它们各自读取你想要的参数"
+
 [llm]
 system_prompt_snippet = "Emit Simplified Chinese reader-locale Faber using Chinese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged. 当字符串包含引号字符（\" 或 '）时，请用 «…» 书写：法式引号无需任何转义。"
 exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]

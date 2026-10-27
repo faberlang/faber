@@ -274,6 +274,12 @@ pub enum WarningKind {
     /// `«…»` wraps the same text with no escape needed for `"` or `'`.
     /// Warn-only (operator proposal 4, 2026-10-13).
     PreferGuillemetQuote,
+    /// One template literal holds both plain holes (`§`, `§{name}`) and
+    /// numbered holes (`§N`). Plain holes count from 0 in their own order and
+    /// ignore the numbered ones, which routinely reads a different argument
+    /// than the author meant. Warn-only; numbering is unchanged (operator
+    /// ruling 2026-10-14, template-hole rule P5).
+    MixedTemplateHoles,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

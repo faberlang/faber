@@ -43,6 +43,9 @@ const SUPPLIED: &[(&str, &[&str])] = &[
     // faber package/device/split_advice.rs: advice_diagnostic passes the
     // kernel name and the advised device on every INFO001 row.
     ("INFO001", &["kernel", "device"]),
+    // radix-semantic lower/expr.rs: lower_template_application passes the
+    // plain holes' `<hole>=§<position>` list on every WARN035 row.
+    ("WARN035", &["reads"]),
 ];
 
 /// Known mismatches that are not fixable inside this unit's write scope.

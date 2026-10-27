@@ -1539,15 +1539,35 @@ They are not interchangeable synonyms.
 | `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
 
 `§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
-§{label} names a hole with an identifier label; the label is unique within
-its template and may use a keyword spelling under the contextual law. Named
-holes are not available in `ascii` literals, where `§` remains forbidden.
+§{label} names a hole with an identifier label; the label may repeat within
+its template (see the hole rules below) and may use a keyword spelling under
+the contextual law. Named holes are not available in `ascii` literals, where
+`§` remains forbidden.
 
-A numbered hole `§N` means argument N; the same number may appear any number
-of times and one value serves all of them. A template needs max(N)+1 values,
-and every number below the highest must be read by some hole (an unread value
-is `template_application_arity_mismatch`). Plain `§` holes stay positional,
-one value each.
+Hole rules (P1-P5):
+
+- **P1, numbered holes select.** A numbered hole `§N` means argument N; the
+  same number may appear any number of times and one value serves all of
+  them. A template needs max(N)+1 values, so the count of holes does not
+  matter, and a value past the highest number is
+  `template_application_arity_mismatch`.
+- **P2, no gaps.** Every number below the highest must be read by some hole.
+  `"§0 and §2"` leaves argument 1 unread and is `template_hole_index_gap`,
+  whether or not the value count happens to match.
+- **P3, forma follows.** A backtick `forma` template obeys the same rules; its
+  parameter list holds one entry per distinct position.
+- **P4, a label is one position.** A repeated label reads the position its
+  first occurrence was assigned, takes one value, and consumes no extra
+  position (see Format-Template Application). The argument is evaluated once, however many
+  holes read it.
+- **P5, mixing warns.** Plain holes (an unnumbered `§`, named or not) count
+  from 0 in their own order and ignore numbered holes, so `"§0 and §"("a")` is `a and a` and
+  `"§ § §0"("a", "b")` is `a b a`. A literal that holds both kinds is the
+  warning `WARN035` (`mixed_plain_numbered_template_holes`); it names the
+  argument each plain hole reads and suggests numbering every hole. The
+  numbering itself does not change.
+
+Plain `§` holes stay positional, one value each.
 
 **Rendered templates** (`textus`): `"..."(...)` and `«...»(...)` lower to
 `scriptum("...", args...)`.
@@ -1629,11 +1649,18 @@ erased at lowering, so "§{greet} world"(greet: "salve") lowers identically
 to the positional form `"§ world"("salve")` and its canonical
 `scriptum("§ world", "salve")` form.
 
-A numbered hole `§N` means argument N; the same number may appear any number
-of times and one value serves all of them. A template needs max(N)+1 values,
-and every number below the highest must be read by some hole (an unread value
-is `template_application_arity_mismatch`). Plain `§` holes stay positional,
-one value each.
+The hole rules P1-P5 (stated with the template literal forms above) in use:
+
+```fab
+# P1: one value serves every occurrence of a number; renders "her, her, her, and me".
+"§0, §0, §0, and §1"("her", "me")
+# P2: rejected, template_hole_index_gap (argument 1 is never read).
+"§0 and §2"("a", "b", "c")
+# P4: a repeated label is one position and one value; renders "x and x".
+"§{n} and §{n}"(n: "x")
+# P5: accepted with WARN035; the plain hole reads argument 0, so this renders "a and a".
+"§0 and §"("a")
+```
 
 This lowers to the compiler's `scriptum("...", args...)` form. Use the string-template form in ordinary source; reserve `scriptum(...)` for explicit desugaring examples and compiler-facing documentation.
 

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/scriptum/template-mixed-holes.fab"
+group = "language"
+input_root = "corpus"
+input = "scriptum/template-mixed-holes.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

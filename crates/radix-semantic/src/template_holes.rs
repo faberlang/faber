@@ -63,6 +63,39 @@ impl TemplateHoleAnalysis {
         (max_position.saturating_add(1), distinct.len())
     }
 
+    /// Describe what each plain hole reads when the literal mixes plain holes
+    /// (`§`, `§{label}`) with numbered holes (`§N`).
+    ///
+    /// Plain holes count from 0 in their own order and ignore the numbered
+    /// ones, so the mix routinely reads a different value than the author
+    /// meant. Returns `None` unless the literal holds at least one of each.
+    /// Otherwise returns the plain holes in source order, each spelled as
+    /// `<hole>=§<position>` (`§=§0`, `§{name}=§1`) and joined by `, `; a
+    /// repeated label is listed once.
+    #[must_use]
+    pub fn plain_numbered_mix(&self) -> Option<String> {
+        let numbered = self
+            .holes
+            .iter()
+            .any(|hole| matches!(hole.kind, HoleKind::Index(_)));
+        if !numbered {
+            return None;
+        }
+        let mut reads: Vec<String> = Vec::new();
+        for hole in &self.holes {
+            let spelling = match &hole.kind {
+                HoleKind::Index(_) => continue,
+                HoleKind::Auto => "§".to_owned(),
+                HoleKind::Named(label) => format!("§{{{label}}}"),
+            };
+            let entry = format!("{spelling}=§{}", hole.position);
+            if !reads.contains(&entry) {
+                reads.push(entry);
+            }
+        }
+        (!reads.is_empty()).then(|| reads.join(", "))
+    }
+
     /// The smallest required value slot that no hole addresses.
     ///
     /// A missing position exists exactly when [`Self::value_slots`] reports a
