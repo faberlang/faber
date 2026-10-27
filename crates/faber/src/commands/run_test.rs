@@ -854,3 +854,22 @@ main {
     assert!(result.is_ok(), "reference run failed: {result:?}");
     assert_eq!(stdout, vec!["4.5".to_owned(), "7.5".to_owned()]);
 }
+
+#[test]
+fn fmir_image_input_error_names_the_image_runner_for_binary_images() {
+    let dir = temp_dir("fmir-image-input");
+    let binary = dir.join("image.fmir");
+    let text = dir.join("image.fmir.txt");
+    let source = dir.join("main.fab");
+    for path in [&binary, &text, &source] {
+        std::fs::write(path, b"x").expect("write file");
+    }
+    let message = fmir_image_input_error(&binary).expect("binary image refused");
+    assert!(message.contains("not a runnable input for `faber run`"));
+    assert!(message.contains("faber __fmir-run"));
+    let message = fmir_image_input_error(&text).expect("text image refused");
+    assert!(message.contains("not a runnable input for `faber run`"));
+    assert!(!message.contains("__fmir-run"));
+    assert!(fmir_image_input_error(&source).is_none());
+    assert!(fmir_image_input_error(&dir.join("missing.fmir")).is_none());
+}

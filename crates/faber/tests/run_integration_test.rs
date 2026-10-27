@@ -389,6 +389,47 @@ target = "fmir-text"
     assert_no_generated_rust(&package);
 }
 
+/// `faber run` takes source, never a built image: a `.fmir` / `.fmir.txt`
+/// file is refused by name (never read as Faber source), and the package it
+/// was built from still runs.
+#[test]
+fn run_refuses_built_fmir_images_by_name() {
+    let package = write_basic_package("run-fmir-image", "main { print \"hi\" }");
+    let package_arg = package.to_str().expect("utf8 package path");
+
+    for (target, image, runner_hint) in [
+        ("fmir", "target/faber-mir/image.fmir", true),
+        ("fmir-text", "target/faber-mir/image.fmir.txt", false),
+    ] {
+        let (_, stderr, ok) = run_faber(&["build", "--target", target, package_arg]);
+        assert!(ok, "{target} build failed:\n{stderr}");
+        let image_path = package.join(image);
+        assert!(image_path.is_file(), "missing built image {image_path:?}");
+
+        let (stdout, stderr, status) =
+            run_faber_status(&["run", image_path.to_str().expect("utf8 image path")]);
+        assert!(!status.success(), "{target} image must be refused");
+        assert!(stdout.is_empty(), "refused run printed:\n{stdout}");
+        assert!(
+            stderr.contains("not a runnable input for `faber run`"),
+            "expected the refusal message, got:\n{stderr}"
+        );
+        assert_eq!(
+            stderr.contains("faber __fmir-run"),
+            runner_hint,
+            "image-runner hint mismatch for {target}:\n{stderr}"
+        );
+        assert!(
+            !stderr.contains("UTF-8"),
+            "must never report a decode error:\n{stderr}"
+        );
+    }
+
+    let (stdout, stderr, ok) = run_faber(&["run", package_arg]);
+    assert!(ok, "package run failed:\n{stderr}");
+    assert_eq!(stdout.trim(), "hi");
+}
+
 #[cfg(feature = "hir-rust")]
 #[test]
 fn build_reader_locale_accepts_direct_entry_file_input() {
