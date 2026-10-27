@@ -1,11 +1,5 @@
 {
   "targets": {
-    "rust": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "is not a future",
-      "reason": "Rust emit lowers the `@ future` verbs of the norma:http facade (get, post, put, delete, patch, send_request) to `async fn` bodies that `.await` the synchronous `norma:http/client` function of the same name, so cargo rejects the generated crate with `Result<Response, IoFault>` is not a future. Any program importing the facade fails to build on rust; the runner target passes."
-    },
     "c": {
       "outcome": "known-fail",
       "phase": "emit",

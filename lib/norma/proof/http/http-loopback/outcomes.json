@@ -12,12 +12,6 @@
       "diagnostic_contains": "clif-subset",
       "reason": "The clif package builder declines this case before any code is generated: the MIR capability classifier reports the `clif-subset` issue, so the `norma:http` loopback is never lowered. The clif lane carries no `http:*` port for this family yet; re-measure this row when that port lands."
     },
-    "rust": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "error[E0308]",
-      "reason": "Rust emit lowers `let string ∪ none sent ← incoming.req.header(\"x-client\")` to `let l_sent: Option<String> = Some(l_incoming.req.header(...))`: the already-optional header result is wrapped in Some, so cargo rejects the generated crate with E0308 (expected `String`, found `Option<String>`). The stored-promise E0562 reason is gone with the split open_pending/finish_pending exchange; the runner passes and the exchange assertions are untouched."
-    },
     "go": {
       "outcome": "known-fail",
       "phase": "build",
