@@ -115,9 +115,12 @@ fn classify(diag: &Diagnostic, back_end_is_source: bool) -> i32 {
 }
 
 fn fold(statuses: &[i32]) -> i32 {
+    // The tool's own classes first (usage, config, source data), then any other
+    // class a diagnostic carried — a run-time trap's sysexits class.
     [USAGE, CONFIG, DATA_ERROR]
         .into_iter()
         .find(|class| statuses.contains(class))
+        .or_else(|| statuses.iter().copied().find(|status| *status != FAILURE))
         .unwrap_or(FAILURE)
 }
 
