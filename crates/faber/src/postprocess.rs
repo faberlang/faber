@@ -205,7 +205,6 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
-        | Target::MirFmirBundle
         | Target::MirAmd => Ok(code.to_string()),
         Target::HirTypeScript => format_typescript_code(code),
     }
@@ -243,7 +242,6 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
-        | Target::MirFmirBundle
         | Target::MirAmd => Ok(code.to_string()),
         Target::HirTypeScript => lint_typescript_code(code),
     }

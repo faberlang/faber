@@ -118,7 +118,6 @@ pub use manifest::{
 #[cfg(feature = "runner")]
 pub use manifest::{manifest_device_choice, resolve_cpu_threads, resolve_device_selection};
 #[cfg(feature = "runner")]
-pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "runner")]
 pub use mir::with_lowered_package_mir;
 #[cfg(feature = "hir-ts")]
@@ -206,7 +205,6 @@ fn is_mir_backed_target(target: Target) -> bool {
             | Target::MirScena
             | Target::MirFmir
             | Target::MirFmirBinary
-            | Target::MirFmirBundle
     )
 }
 

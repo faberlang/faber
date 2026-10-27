@@ -143,20 +143,6 @@ fn cmd_targets_fmir_delegated_capabilities() {
     );
     assert_eq!(target_name(crate::codegen::Target::MirFmirBinary), "fmir");
     assert_eq!(target_extension(crate::codegen::Target::MirFmirBinary), "fmir");
-
-    let fmir_bin = target_capabilities(crate::codegen::Target::MirFmirBundle);
-    assert!(!fmir_bin.package);
-    assert!(!fmir_bin.build);
-    assert!(!fmir_bin.run);
-    assert!(
-        fmir_bin
-            .note
-            .contains("delegated to `faber build --target fmir-bin`"),
-        "unexpected fmir-bin note: {}",
-        fmir_bin.note
-    );
-    assert_eq!(target_name(crate::codegen::Target::MirFmirBundle), "fmir-bin");
-    assert_eq!(target_extension(crate::codegen::Target::MirFmirBundle), "run");
 }
 
 #[test]
@@ -311,10 +297,6 @@ fn cmd_targets_keeps_faber_package_capabilities_off_radix_surface() {
             crate::codegen::Target::MirFmirBinary,
             "delegated to `faber build --target fmir`",
         ),
-        (
-            crate::codegen::Target::MirFmirBundle,
-            "delegated to `faber build --target fmir-bin`",
-        ),
     ] {
         let radix = target_capabilities_for_surface(TargetCommandSurface::Radix, target);
         let faber = target_capabilities_for_surface(TargetCommandSurface::Faber, target);
@@ -345,7 +327,6 @@ fn cmd_targets_discovery_hides_legacy_scena() {
 
     assert!(names.contains(&"fmir-text"));
     assert!(names.contains(&"fmir"));
-    assert!(names.contains(&"fmir-bin"));
     assert!(!names.contains(&"scena"), "scena must stay hidden from target discovery");
 }
 
@@ -412,7 +393,6 @@ fn rust_and_runner_declare_the_n2_leaves() {
         crate::codegen::Target::HirRust,
         crate::codegen::Target::MirFmir,
         crate::codegen::Target::MirFmirBinary,
-        crate::codegen::Target::MirFmirBundle,
     ] {
         assert_eq!(target_leaves(target), Leaf::ALL, "{target} must declare N2 leaves");
     }

@@ -32,7 +32,6 @@ fn universe_spelling(target: Target) -> &'static str {
         Target::MirScena => "scena",
         Target::MirFmir => "fmir-text",
         Target::MirFmirBinary => "fmir",
-        Target::MirFmirBundle => "fmir-bin",
     }
 }
 
@@ -70,7 +69,6 @@ fn all_is_exactly_the_variant_set() {
         "scena",
         "fmir-text",
         "fmir",
-        "fmir-bin",
     ]
     .into();
     let all: Vec<&'static str> = Target::ALL

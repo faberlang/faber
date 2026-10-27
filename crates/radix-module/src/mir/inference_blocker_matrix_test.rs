@@ -62,7 +62,6 @@ fn target_surface_blocker_matches_radix_runtime_capabilities() {
         Target::MirWgsl,
         Target::MirFmir,
         Target::MirFmirBinary,
-        Target::MirFmirBundle,
     ] {
         let capabilities = target_capabilities_for_surface(TargetCommandSurface::Radix, target);
         assert!(capabilities.check);
@@ -73,7 +72,7 @@ fn target_surface_blocker_matches_radix_runtime_capabilities() {
         );
     }
 
-    for delegated in [Target::MirFmir, Target::MirFmirBinary, Target::MirFmirBundle] {
+    for delegated in [Target::MirFmir, Target::MirFmirBinary] {
         let capabilities = target_capabilities_for_surface(TargetCommandSurface::Radix, delegated);
         assert!(capabilities.note.contains("delegated to `faber build"));
     }

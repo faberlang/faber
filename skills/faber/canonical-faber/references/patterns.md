@@ -160,7 +160,7 @@ canon-violation · Evidence: the compiler rejects both annotations (`SEM018`); a
 
 ## legacy-scena-target
 
-**New MIR package work targets `fmir-text`, `fmir`, or `fmir-bin`; hidden legacy `scena` is retired.**
+**New MIR package work targets `fmir-text` or `fmir`; hidden legacy `scena` is retired.**
 
 canon-violation · Evidence: `faber targets` lists the live target names. Scope: manifests and build configuration (`faber.toml`), not `.fab` bodies.
 

@@ -274,30 +274,6 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         }
     }
 
-    if is_package && target == Target::MirFmirBundle {
-        #[cfg(not(feature = "runner"))]
-        exit_runner_feature_unavailable();
-        #[cfg(feature = "runner")]
-        {
-            let bundle = match radix::program::mir::build_package_fmir_binary_bundle(
-                &config,
-                &input_path,
-                &[],
-                command.release,
-                &super::mir::faber_mir_seams(),
-            ) {
-                Ok(bundle) => bundle,
-                Err(diagnostics) => report_diagnostics_and_exit(
-                    &diagnostics,
-                    locale_pack.as_ref(),
-                    "fmir-bin bundle build failed",
-                ),
-            };
-            println!("{}", bundle.entrypoint_path.display());
-            return;
-        }
-    }
-
     if is_package && target == Target::HirFhir {
         #[cfg(not(feature = "hir-fhir"))]
         exit_target_feature_unavailable(Target::HirFhir);
@@ -780,7 +756,6 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
                 | Target::MirScena
                 | Target::MirFmir
                 | Target::MirFmirBinary
-                | Target::MirFmirBundle
                 | Target::HirFhir
                 | Target::MirLlvmHost
                 | Target::MirWasm

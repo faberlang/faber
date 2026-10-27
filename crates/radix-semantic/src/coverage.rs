@@ -100,7 +100,6 @@ pub fn from_target(target: Target) -> Option<HirCoverageTarget> {
         | Target::MirScena
         | Target::MirFmir
         | Target::MirFmirBinary
-        | Target::MirFmirBundle
         | Target::HirFhir => None,
         Target::HirRust => Some(HirCoverageTarget::Rust),
         Target::HirTypeScript => Some(HirCoverageTarget::TypeScript),
