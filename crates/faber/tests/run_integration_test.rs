@@ -3719,3 +3719,65 @@ fn tiny_linear_device_relu_metal_route_prints_the_reference_fixture() {
 fn tiny_linear_device_two_matmul_metal_route_prints_the_reference_fixture() {
     assert_metal_route_matches_reference_fixture("tiny-linear-device-two-matmul");
 }
+
+/// A whole-grid reduction with a `coalesce` fallback over an empty run-time
+/// sized tensor.
+const EMPTY_REDUCTION_PACKAGE: &str = r#"@ kernel
+@ public
+fn mx<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [4]> out) → void {
+    out[0] ← reduce via max from src at [i, j] thread lane let v { return v } coalesce 7.5
+}
+
+@ cli "empty-reduce"
+@ operand int rows
+@ operand int cols
+main args args {
+    let int rows ← args.rows
+    let int cols ← args.cols
+    const size R ← rows
+    const size C ← cols
+    mut tensor<f32, [R, C]> src ← tf32[R, C] {}
+    mut tensor<f32, [4]> out ← tf32[4] {}
+    mx(src, mut out)
+    print out[0]
+}
+"#;
+
+/// Operator ruling 2026-10-14: a zero-length reduction source returns its
+/// `coalesce` fallback on every device, as on the host. The device used to
+/// refuse the zero extent (`geometry_zero_extent`) on `--device cpu` and abort
+/// the process on `--device metal`; the dispatcher now decides at launch from
+/// the run-time extent and stores the fallback. Each device agrees with the
+/// reference, empty (a zero in either axis) and not. The Metal leg skips
+/// without a Metal device; `FABER_REQUIRE_METAL` makes that a failure.
+#[test]
+fn empty_grid_reduction_returns_its_coalesce_fallback_on_every_device() {
+    let package = write_basic_package("empty-grid-reduction", EMPTY_REDUCTION_PACKAGE);
+    let path = package.join("src").join("main.fab").display().to_string();
+    for (rows, cols, want) in [("0", "5", "7.5"), ("7", "0", "7.5"), ("7", "5", "0.0")] {
+        for device in ["reference", "cpu", "metal"] {
+            let (stdout, stderr, status) =
+                run_faber_status(&["run", "--device", device, &path, "--", rows, cols]);
+            let program = if device == "reference" {
+                stdout.as_str()
+            } else if let Some((receipt, program)) = stdout.split_once('\n')
+                && receipt.starts_with("device: selected backend `")
+            {
+                program
+            } else {
+                #[cfg(target_os = "macos")]
+                assert!(
+                    device != "metal" || !metal_required(),
+                    "FABER_REQUIRE_METAL is set but {rows}x{cols} did not run on a Metal device:\n{stdout}\n{stderr}"
+                );
+                eprintln!("no {device} device: skipped");
+                continue;
+            };
+            assert!(
+                status.success(),
+                "{device} {rows}x{cols} failed:\n{stdout}\n{stderr}"
+            );
+            assert_eq!(program.trim(), want, "{device} {rows}x{cols}");
+        }
+    }
+}

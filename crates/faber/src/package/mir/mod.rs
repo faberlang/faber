@@ -812,6 +812,7 @@ fn session_dispatcher(
         super::device::CpuLaneEngine::shared().install(cpu);
     }
     let extents = image.extents;
+    let empty_reductions = image.empty_reductions;
     let genus_layouts = image.genus_layouts;
     let fault_sites = image.fault_sites;
     let backward = std::mem::take(&mut image.backward);
@@ -870,6 +871,9 @@ fn session_dispatcher(
         .borrow_mut()
         .set_scalars_by_buffer(backend == super::device::DeviceImageBackend::Cuda);
     dispatcher.borrow_mut().set_extents(extents);
+    dispatcher
+        .borrow_mut()
+        .set_empty_reductions(empty_reductions);
     dispatcher.borrow_mut().set_write_maps(write_maps);
     if backend == super::device::DeviceImageBackend::MetalSpanned {
         dispatcher.borrow_mut().set_span(lane_ranges);

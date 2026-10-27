@@ -419,7 +419,7 @@ fn stages(n: u64) -> [CallGeometry; 2] {
     let unit = grid_reduce_unit();
     match launch_stages_for_call(&unit, &[vec![n], vec![24]]).expect("stages") {
         LaunchStages::Staged(stages) => stages,
-        LaunchStages::Single(_) | LaunchStages::Scan(_) => {
+        LaunchStages::Single(_) | LaunchStages::Scan(_) | LaunchStages::Empty => {
             panic!("a GridReduce call is two stages")
         }
     }
@@ -487,13 +487,65 @@ fn grid_reduce_n_is_the_source_tensor_not_the_destination() {
     assert_eq!(first.grid, [1024, 1, 1]);
 }
 
+/// An empty ungrouped reduced source is no launch at all (operator ruling
+/// 2026-10-14): there is nothing to fold, so the dispatcher stores the
+/// reduction's `coalesce` fallback and skips both stages. Any other zero
+/// extent still has no launch geometry.
 #[test]
-fn grid_reduce_refuses_zero_extents_rank_mismatch_and_the_single_entry() {
+fn grid_reduce_over_an_empty_source_is_no_launch() {
     let unit = grid_reduce_unit();
     assert_eq!(
         launch_stages_for_call(&unit, &[vec![0], vec![24]]),
+        Ok(LaunchStages::Empty)
+    );
+    // The same call with one element is the usual two stages.
+    assert!(matches!(
+        launch_stages_for_call(&unit, &[vec![1], vec![24]]),
+        Ok(LaunchStages::Staged(_))
+    ));
+    // A zero extent in the written resource is not an empty reduction.
+    assert_eq!(
+        launch_stages_for_call(&unit, &[vec![8], vec![0]]),
+        Err(error(GEOMETRY_ZERO_EXTENT, &[("resource", "1")]))
+    );
+}
+
+/// A grouped reduction has one bucket per output cell and the plan carries no
+/// per-bucket fallback, so its empty source stays refused.
+#[test]
+fn a_grouped_grid_reduce_still_refuses_an_empty_source() {
+    let unit = grid_reduce_unit();
+    let CollectionKernelPlan::GridReduce {
+        source_resource,
+        rank,
+        workgroup,
+        partials_cap,
+        partial_layout,
+        ..
+    } = unit.plan
+    else {
+        unreachable!()
+    };
+    let grouped = KernelUnit {
+        plan: CollectionKernelPlan::GridReduce {
+            source_resource,
+            rank,
+            group_shape: Some(vec![24]),
+            workgroup,
+            partials_cap,
+            partial_layout,
+        },
+        ..unit
+    };
+    assert_eq!(
+        launch_stages_for_call(&grouped, &[vec![0], vec![24]]),
         Err(error(GEOMETRY_ZERO_EXTENT, &[("resource", "0")]))
     );
+}
+
+#[test]
+fn grid_reduce_refuses_rank_mismatch_and_the_single_entry() {
+    let unit = grid_reduce_unit();
     assert_eq!(
         launch_stages_for_call(&unit, &[vec![4, 4], vec![24]])
             .unwrap_err()
