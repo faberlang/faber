@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 454,
-    "analyzable": 512
+    "capable": 456,
+    "analyzable": 514
   },
   "terms": [
     {
@@ -780,8 +780,8 @@
     {
       "term": "scriptum",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "secus",

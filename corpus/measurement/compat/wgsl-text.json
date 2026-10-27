@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 512
+    "analyzable": 514
   },
   "terms": [
     {
@@ -781,7 +781,7 @@
       "term": "scriptum",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 3
     },
     {
       "term": "secus",
