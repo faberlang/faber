@@ -912,7 +912,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     .ok_or_else(|| {
                         RunnerError::internal(
                             span,
-                            "lista to octeti conversion requires byte-valued numerus elements",
+                            "lista to list<b8> conversion requires byte-valued numerus elements",
                         )
                     })?;
                 Value::Octeti(bytes)
