@@ -1112,6 +1112,79 @@ fn matmul_signature_not_carrying_contract_returns_none() {
 }
 
 #[test]
+fn matmul_signature_with_fused_tail_operands_builds_the_same_plan() {
+    // `y ⇇ x.matmul(w) + b` carries the bias `b` as a third input. It is a
+    // data-flow buffer of the fused elementwise tail, not a recipe operand:
+    // the plan is the one the bare `x.matmul(w)` signature builds.
+    let shapes = MatMulShapes {
+        m: 16,
+        k: 8,
+        n: 32,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
+    let contract = CollectionOpContract::MatMul {
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        },
+    };
+    let bare = matmul_signature(shapes, 4, 2);
+    let mut with_tail = matmul_signature(shapes, 4, 2);
+    let mut bias = with_tail.extra_inputs[0].clone();
+    bias.binding = 2;
+    bias.element_count = shapes.m * shapes.n;
+    bias.source_local = Some(MirLocalId(2));
+    with_tail.extra_inputs.push(bias);
+    let want = CollectionKernelPlan::from_contract(
+        &bare,
+        &contract,
+        MirCollectionOp::TensorMatMul,
+        Some(shapes),
+    )
+    .expect("the bare matmul signature builds a plan");
+    let got = CollectionKernelPlan::from_contract(
+        &with_tail,
+        &contract,
+        MirCollectionOp::TensorMatMul,
+        Some(shapes),
+    )
+    .expect("tail operands must not turn a matmul with a fused tail into a decomposition");
+    assert_eq!(got, want);
+}
+
+#[test]
+fn matmul_signature_without_a_right_operand_returns_none() {
+    // The right operand is the first extra input; a signature with none has
+    // no recipe operand to count, whatever else it carries.
+    let shapes = MatMulShapes {
+        m: 16,
+        k: 8,
+        n: 32,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
+    let mut signature = matmul_signature(shapes, 4, 2);
+    signature.extra_inputs.clear();
+    let contract = CollectionOpContract::MatMul {
+        dispatch: MatMulDispatch::Literal {
+            dispatch_x: 4,
+            dispatch_y: 2,
+        },
+    };
+    assert!(
+        CollectionKernelPlan::from_contract(
+            &signature,
+            &contract,
+            MirCollectionOp::TensorMatMul,
+            Some(shapes),
+        )
+        .is_none(),
+        "a matmul signature with no right operand must not build a plan"
+    );
+}
+
+#[test]
 fn signature_not_carrying_contract_returns_none() {
     // Output count disagrees with the contract's partial count: the
     // signature was not built from this contract.
