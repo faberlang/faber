@@ -2388,8 +2388,74 @@ fn output_code(output: &crate::Output) -> &str {
         crate::Output::TypeScript(o) => &o.code,
         crate::Output::Go(o) => &o.code,
         crate::Output::Swift(o) => &o.code,
+        crate::Output::Python(o) => &o.code,
         crate::Output::Faber(o) => &o.code,
         _ => unreachable!("unexpected output variant in round-trip test"),
+    }
+}
+
+/// Need: an `ordo` comparison orders by declared discriminant, and a
+/// loaded unit must carry the order rows that say so. Without them it lowered
+/// the comparison as a plain operator and gave wrong results on every target.
+#[test]
+fn ordo_order_rows_survive_the_fhir_round_trip() {
+    use crate::codegen::{Target, generate_from_analyzed};
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    // `done` is declared after `pending` but orders before it.
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "enum Status {\n    pending = 10,\n    active,\n    done = -3\n}\n\n",
+        "main {\n    print Status.done ≺ Status.pending\n}\n",
+    );
+    let latin = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin);
+    let targets = [
+        #[cfg(feature = "hir-rust")]
+        Target::HirRust,
+        #[cfg(feature = "hir-ts")]
+        Target::HirTypeScript,
+        #[cfg(feature = "hir-go")]
+        Target::HirGo,
+        #[cfg(feature = "hir-swift")]
+        Target::HirSwift,
+        #[cfg(feature = "hir-python")]
+        Target::HirPython,
+    ];
+    assert!(!targets.is_empty(), "at least one HIR target feature must be enabled");
+
+    for target in targets {
+        let session = Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_dev_locale_root()
+                .with_target(target),
+        );
+        let direct = analyze_source(&session, "ordo-order.fab", source, AnalyzeRequest::default())
+            .expect("ordo comparison fixture analyzes");
+        let direct_rows = &direct.tensor_edge_policies.ordo_order;
+        assert_eq!(
+            direct_rows.comparisons.len(),
+            1,
+            "analysis records the order rows of the one comparison for {target:?}"
+        );
+
+        let artifact = from_analyzed(&direct, "ordo-order", "ordo-order.fab");
+        let bytes = postcard::to_allocvec(&artifact).expect("serialize ordo artifact");
+        let loaded = load_fhir(&bytes).expect("ordo artifact must load");
+
+        assert_eq!(
+            &loaded.tensor_edge_policies.ordo_order, direct_rows,
+            "the loaded unit must carry the direct unit's order rows for {target:?}"
+        );
+        let direct_output = generate_from_analyzed(target, &direct, &surface).expect("direct ordo codegen");
+        let loaded_output = generate_from_analyzed(target, &loaded, &surface).expect("loaded ordo codegen");
+        assert_eq!(
+            output_code(&direct_output),
+            output_code(&loaded_output),
+            "the loaded unit must compare ordo values by declared discriminant like the direct unit for {target:?}"
+        );
     }
 }
 

@@ -12,11 +12,11 @@ use radix_hir_fhir::{
     FunctionProvenanceTableWire, FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, KernelExtentConditionWire,
     KernelNumericPolicyWire, KernelPrimitiveWire, KernelRangeExprWire, KernelRequirementFailureWire,
     KernelRequirementWire, KernelRequirementsWire, KernelTargetRequirementWire, KernelTargetWire,
-    KernelTrappingStoreWire, KernelValueRangeWire, KernelWidthRequirementWire, LastUseWire, RadixBackwardWire,
-    RadixLaneEntryWire, RadixLaneWire, RegionRelationshipWire, ResolvedTensorEdgePolicyWire, ResolvedUseKeyWire,
-    ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity, TensorEdgePolicyCallWire,
-    TensorEdgePolicyFunctionRequirementsWire, TensorEdgePolicyProviderImplWire, TensorEdgePolicyRequirementWire,
-    TensorEdgePolicyTableWire, TensorShiftContextWire,
+    KernelTrappingStoreWire, KernelValueRangeWire, KernelWidthRequirementWire, LastUseWire, OrdoOrderComparisonWire,
+    RadixBackwardWire, RadixLaneEntryWire, RadixLaneWire, RegionRelationshipWire, ResolvedTensorEdgePolicyWire,
+    ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity,
+    TensorEdgePolicyCallWire, TensorEdgePolicyFunctionRequirementsWire, TensorEdgePolicyProviderImplWire,
+    TensorEdgePolicyRequirementWire, TensorEdgePolicyTableWire, TensorShiftContextWire,
 };
 use std::collections::BTreeMap;
 
@@ -232,6 +232,13 @@ fn tensor_edge_policies_wire(table: &radix_hir::TensorEdgePolicyTable) -> Tensor
         })
         .collect();
     provider_impls.sort_by_key(|row| (row.policy_type.0, row.element_type.0, row.rank));
+    let mut ordo_order: Vec<_> = table
+        .ordo_order
+        .comparisons
+        .iter()
+        .map(|(lhs, rows)| OrdoOrderComparisonWire { lhs: *lhs, rows: rows.clone() })
+        .collect();
+    ordo_order.sort_by_key(|row| row.lhs.0);
 
     TensorEdgePolicyTableWire {
         calls,
@@ -242,6 +249,7 @@ fn tensor_edge_policies_wire(table: &radix_hir::TensorEdgePolicyTable) -> Tensor
         limes_contexts,
         function_requirements,
         provider_impls,
+        ordo_order,
     }
 }
 
