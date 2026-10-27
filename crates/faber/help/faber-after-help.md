@@ -92,9 +92,9 @@ Common flows:
     land in target/faber-llvm/{debug|release}/ (modules/, link-manifest.toml,
     runtime/identity.toml, binary). Compiled artifacts are executed by the
     target ecosystem, not by faber. Requires a coherent LLVM toolchain
-    (llvm-as + clang, plus opt for release) and a buildable hosts/llvm
-    staticlib; unsupported host triples fail with a structured
-    diagnostic. `-t llvm-text` stays emit-only (radix emit).
+    (llvm-as + clang, plus opt for release) and a buildable runtime/llvm
+    staticlib (the in-tree faber-host-llvm crate); unsupported host triples
+    fail with a structured diagnostic. `-t llvm-text` stays emit-only (radix emit).
 
   Test selection (proba cases run on the runner, not a Cargo harness):
     faber test .
