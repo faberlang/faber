@@ -44,6 +44,7 @@ impl TypeChecker<'_> {
         def_id: DefId,
         annotations: &[radix_hir::HirAnnotation],
         func: &mut HirFunction,
+        genus_type_params: &[radix_hir::HirTypeParam],
     ) {
         self.reject_json_annotations_on_site(annotations, "functio");
         let previous_function_def = self.current_function_def.replace(def_id);
@@ -57,6 +58,10 @@ impl TypeChecker<'_> {
                 .iter()
                 .map(|param| (param.name, param.kind))
                 .collect(),
+        );
+        let previous_genus_type_params = std::mem::replace(
+            &mut self.current_genus_type_params,
+            genus_type_params.iter().map(|param| param.name).collect(),
         );
         let previous_size_param_defs = std::mem::replace(
             &mut self.current_size_param_defs,
@@ -183,6 +188,7 @@ impl TypeChecker<'_> {
         self.allow_inferred_return = prev_allow_inferred;
         self.pop_scope();
         self.current_generic_param_kinds = previous_generic_param_kinds;
+        self.current_genus_type_params = previous_genus_type_params;
         self.current_size_param_defs = previous_size_param_defs;
         self.current_size_param_by_name = previous_size_param_names;
         self.current_generic_bounds = previous_generic_bounds;
@@ -295,7 +301,7 @@ impl TypeChecker<'_> {
     pub fn check_item(&mut self, item: &mut HirItem) {
         match &mut item.kind {
             HirItemKind::Function(func) => {
-                self.check_function(item.def_id, &item.annotations, func);
+                self.check_function(item.def_id, &item.annotations, func, &[]);
             }
             HirItemKind::Constant(const_item) => self.check_const(item.def_id, const_item),
             HirItemKind::Struct(struct_item) => {
@@ -320,7 +326,12 @@ impl TypeChecker<'_> {
                     }
                 }
                 for method in &mut struct_item.methods {
-                    self.check_function(method.def_id, &method.annotations, &mut method.func);
+                    self.check_function(
+                        method.def_id,
+                        &method.annotations,
+                        &mut method.func,
+                        &struct_item.type_params,
+                    );
                 }
                 self.current_member_owner = outer_owner;
             }
