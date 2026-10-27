@@ -1137,6 +1137,10 @@ help = "أصلح تركيب AST للتخفيض"
 message = "اسم القيمة {name} لا يمكن أن يشغل موضع مدى في التعليق"
 help = "اكتب `size {name}` لتهجئة الرفع في هذا الموضع، مثل `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "وسيط الحجم أو الشكل في استدعاء generic غير مدعوم"
+help = "استخدم ثابتًا أو اسم حجم أو قيمة مكتوبة `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring يتطلب initializer"
 help = "أصلح تركيب AST للتخفيض"

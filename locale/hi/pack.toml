@@ -1149,6 +1149,10 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "मान का नाम {name} एनोटेशन के extent स्थान पर नहीं रह सकता"
 help = "इस स्टोर पर लिफ्ट लिखने के लिए `size {name}` लिखें, जैसे `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "generic call का size या shape argument समर्थित नहीं है"
+help = "constant, size name, या `size w` के रूप में लिखा value उपयोग करें"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring के लिए initializer आवश्यक है"
 help = "lowering के लिए AST construct ठीक करें"

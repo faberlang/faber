@@ -1181,6 +1181,10 @@ help = "修正用于 lowering 的 AST construct"
 message = "值名称 {name} 不能占据注解的 extent 位置"
 help = "在此存储位置写出 `size {name}` 以显式提升，例如 `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "泛型调用的大小或形状实参不受支持"
+help = "使用常量、大小名称或写出 `size w` 的值"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring 需要 initializer"
 help = "修正用于 lowering 的 AST construct"
