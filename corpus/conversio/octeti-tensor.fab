@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "Bulk typed reinterpretation of list<b8> as a tensor via Be|Le."
 syntax = "list<b8> ↦ tensor<E, [shape]> via Be|Le"
-related = ["↦", "octeti", "tensor", "float"]
+related = ["↦", "list<b8>", "tensor", "float"]
 locale = "en"
 +++
 # =============================================================================

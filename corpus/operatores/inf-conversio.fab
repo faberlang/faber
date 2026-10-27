@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "`inf` crosses the byte and dynamic-value boundaries exactly: `list<b8> via Be|Le` is minimal two's complement both ways, and `valor` carries an integer of any size."
 syntax = "<inf> ↦ list<b8> via Be|Le | list<b8> ↦ inf via Be|Le | <inf> ↦ valor | <valor> ↦ inf [⊥ <default>]"
-related = ["inf", "octeti", "valor", "↦", "⊥"]
+related = ["inf", "list<b8>", "valor", "↦", "⊥"]
 locale = "en"
 +++
 # =============================================================================

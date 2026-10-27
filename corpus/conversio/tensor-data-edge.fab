@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "GGUF/safetensors-style data edge: list<b8> fixture → LE dims + flat lista<f32> → ↦ tensor<f32, [2, 8]>."
 syntax = "<lista<f32>> ↦ tensor<f32, [2, 8]> ⊥ <recovery-tensor>"
-related = ["↦", "⊥", "octeti", "lista", "tensor"]
+related = ["↦", "⊥", "list<b8>", "lista", "tensor"]
 locale = "en"
 +++
 # =============================================================================

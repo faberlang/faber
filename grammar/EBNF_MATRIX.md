@@ -111,6 +111,7 @@ pages of the documentation site.
 | <a id="iuncta"></a>`iuncta` | ✓ | ✓ | ✓ | ✓ |
 | <a id="lege"></a>`lege` | ✓ | ✓ | ✓ | ✓ |
 | <a id="lineam"></a>`lineam` | ✓ | ✓ | ✓ | ✓ |
+| <a id="list-b8"></a>`list<b8>` | ✓ | ✓ | ✓ | ✓ |
 | <a id="lista"></a>`lista` | ✓ | ✓ | ✓ | ✓ |
 | <a id="mone"></a>`mone` | ✓ | ✓ | ✓ | ✓ |
 | <a id="mori"></a>`mori` | ✓ | ✓ | ✓ | ✓ |
@@ -119,7 +120,6 @@ pages of the documentation site.
 | <a id="numerus"></a>`numerus` | ✓ | ◐ | ✓ | ✓ |
 | <a id="numquam"></a>`numquam` | ✓ | ✓ | ✓ | ✓ |
 | <a id="objectum"></a>`objectum` | ✓ | ✓ | ✓ | ✓ |
-| <a id="octeti"></a>`octeti` | ✓ | ✓ | ✓ | ✓ |
 | <a id="omitte"></a>`omitte` | ✓ | ✓ | ✓ | ✓ |
 | <a id="omnia"></a>`omnia` | ✓ | ✓ | ✓ | ✓ |
 | <a id="operandus"></a>`operandus` | ✓ | ✓ | ✓ | ✓ |
@@ -288,6 +288,7 @@ pages of the documentation site.
 | <a id="iuncta"></a>`iuncta` | ✓ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="lege"></a>`lege` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
 | <a id="lineam"></a>`lineam` | ✓ | ✓ | ✓ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="list-b8"></a>`list<b8>` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="lista"></a>`lista` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ◐ |
 | <a id="mone"></a>`mone` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="mori"></a>`mori` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
@@ -296,7 +297,6 @@ pages of the documentation site.
 | <a id="numerus"></a>`numerus` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="numquam"></a>`numquam` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="objectum"></a>`objectum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="octeti"></a>`octeti` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="omitte"></a>`omitte` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="omnia"></a>`omnia` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="operandus"></a>`operandus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |

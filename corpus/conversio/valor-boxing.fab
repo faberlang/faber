@@ -6,7 +6,7 @@ category = "conversion"
 canonical = true
 summary = "T ↦ valor boxing for scalar, byte, collection, genus, and tensor carriers."
 syntax = "<typed-expression> ↦ valor"
-related = ["↦", "valor", "octeti", "lista", "tabula", "genus", "tensor"]
+related = ["↦", "valor", "list<b8>", "lista", "tabula", "genus", "tensor"]
 locale = "en"
 +++
 # =============================================================================

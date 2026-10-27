@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "Bulk typed reinterpretation of list<b8> as a tensor whose extent is a size parameter witnessed by a tensor argument axis."
 syntax = "list<b8> ↦ tensor<E, [N]> via Be|Le"
-related = ["↦", "octeti", "tensor", "size"]
+related = ["↦", "list<b8>", "tensor", "size"]
 locale = "en"
 +++
 # =============================================================================
