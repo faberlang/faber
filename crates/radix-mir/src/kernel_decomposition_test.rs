@@ -3109,3 +3109,273 @@ fn unrepresentable_gather_layout_fails_closed() {
     decompose_kernel_function(&function, &validation)
         .expect_err("unrepresentable gather layout must fail closed");
 }
+
+// -----------------------------------------------------------------------
+// Explicit output parameter: the store `y ⇇ d` of an
+// indexed-view kernel must reach the final subchain's output or fail closed.
+// -----------------------------------------------------------------------
+
+/// `y ⇇ d` — a plain copy of a local into a (possibly output) parameter.
+fn copy_statement(destination: u32, source: u32, ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(destination)),
+            value: MirValue {
+                id: MirValueId(destination),
+                kind: MirValueKind::Operand(MirOperand::Place(MirPlace::local(MirLocalId(source)))),
+                ty,
+                span: test_span(),
+            },
+        },
+        span: test_span(),
+    }
+}
+
+/// An indexed-view kernel `(x, w, v, b, mut y, id) → vacuum`:
+///
+/// ```text
+/// c = x · w;  e = c · v;  d = e + b;  y ⇇ d
+/// ```
+///
+/// Locals: x0 w1 v2 b3 y4 id5, c6 e7 d8. The two matmuls split into two
+/// subchains; the add folds into the second and the copy stores `y`.
+fn two_matmul_output_parameter_function(types: &mut TypeTable) -> MirFunction {
+    let x = rank2_tensor_ty(types, [4, 3]);
+    let w = rank2_tensor_ty(types, [3, 2]);
+    let v = rank2_tensor_ty(types, [2, 2]);
+    let r2 = rank2_tensor_ty(types, [4, 2]);
+    let id = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
+    let vacuum = MirType::semantic(types.intern(Type::Primitive(Primitive::Vacuum)));
+    let mut function = device_function(
+        &[(0, x), (1, w), (2, v), (3, r2), (4, r2), (5, id)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 6, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[6, 2], 7, r2),
+            assign_statement(8, 7, 3, r2),
+            copy_statement(4, 8, r2),
+        ],
+        None,
+        vacuum,
+    );
+    function.params[4].mode = MirParamMode::MutRef;
+    function
+}
+
+#[test]
+fn final_subchain_binds_the_output_parameter() {
+    let mut types = TypeTable::new();
+    let function = two_matmul_output_parameter_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("a two-matmul body storing into an output parameter decomposes");
+
+    assert_eq!(decomposition.subchains.len(), 2, "one subchain per matmul");
+    assert_eq!(
+        decomposition.subchains[0].output_param, None,
+        "the first matmul's product is a data-flow buffer, not the output"
+    );
+    assert_eq!(
+        decomposition.subchains[1].output_param,
+        Some(MirLocalId(4)),
+        "the final subchain stores into `y`"
+    );
+    assert!(
+        decomposition.subchains[1].outputs.is_empty(),
+        "the output parameter is not a consumed-output local: {:?}",
+        decomposition.subchains[1].outputs
+    );
+
+    // The final subchain is the indexed-view kernel the source is: its inputs
+    // in read order, then the output parameter, then the unread index.
+    let synthetic = decomposition.subchain_function(&function, 1, validation.types.as_table());
+    let params: Vec<(MirLocalId, MirParamMode)> = synthetic
+        .params
+        .iter()
+        .map(|param| (param.local, param.mode))
+        .collect();
+    assert_eq!(
+        params,
+        vec![
+            (MirLocalId(6), MirParamMode::Owned),
+            (MirLocalId(2), MirParamMode::Owned),
+            (MirLocalId(3), MirParamMode::Owned),
+            (MirLocalId(4), MirParamMode::MutRef),
+            (MirLocalId(5), MirParamMode::Owned),
+        ],
+        "c, v, b, then y and the index"
+    );
+    // The first subchain keeps the contract-shaped surface.
+    let first = decomposition.subchain_function(&function, 0, validation.types.as_table());
+    let first_params: Vec<MirLocalId> = first.params.iter().map(|param| param.local).collect();
+    assert_eq!(first_params, vec![MirLocalId(0), MirLocalId(1)]);
+}
+
+#[test]
+fn explicit_output_signature_binds_the_output_parameter_and_the_index() {
+    let mut types = TypeTable::new();
+    let function = two_matmul_output_parameter_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation).expect("decomposes");
+    let synthetic = decomposition.subchain_function(&function, 1, validation.types.as_table());
+    let interner = radix_lexer::Interner::new();
+
+    let signature = crate::device_program_plans::explicit_output_subchain_signature(
+        &synthetic,
+        MirLocalId(4),
+        &validation,
+        &interner,
+    )
+    .expect("the final subchain reads as an indexed-view kernel");
+
+    assert_eq!(signature.output.source_local, Some(MirLocalId(4)));
+    assert_eq!(signature.output.element_count, 8);
+    assert_eq!(signature.input.source_local, Some(MirLocalId(6)));
+    let extra: Vec<Option<MirLocalId>> = signature
+        .extra_inputs
+        .iter()
+        .map(|resource| resource.source_local)
+        .collect();
+    assert_eq!(
+        extra,
+        vec![Some(MirLocalId(2)), Some(MirLocalId(3))],
+        "the right operand, then the fused tail's bias"
+    );
+    assert_eq!(
+        signature.builtin_inputs.len(),
+        1,
+        "the index parameter is the invocation builtin the indexed output relies on"
+    );
+}
+
+#[test]
+fn a_store_to_the_output_parameter_before_the_final_subchain_fails_closed() {
+    // `y ⇇ c` stores in the first subchain; the second matmul has nothing to
+    // bind the store to, so the body must refuse rather than drop it.
+    let mut types = TypeTable::new();
+    let mut function = two_matmul_output_parameter_function(&mut types);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    function.blocks[0]
+        .statements
+        .insert(1, copy_statement(4, 6, r2));
+    let validation = MirValidationContext::new(&types);
+    let error = decompose_kernel_function(&function, &validation)
+        .expect_err("an early store to the output parameter must not be dropped");
+    assert!(
+        error.message.contains("only the final subchain"),
+        "named refusal: {}",
+        error.message
+    );
+}
+
+#[test]
+fn reading_the_output_parameter_fails_closed() {
+    // The second matmul consumes `y`: a write-only output cannot also be an
+    // input of the same kernel.
+    let mut types = TypeTable::new();
+    let mut function = two_matmul_output_parameter_function(&mut types);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    function.blocks[0].statements[2] = assign_statement(8, 4, 3, r2);
+    let validation = MirValidationContext::new(&types);
+    let error = decompose_kernel_function(&function, &validation)
+        .expect_err("a read of the output parameter must not decompose");
+    assert!(
+        error.message.contains("reads its output parameter"),
+        "named refusal: {}",
+        error.message
+    );
+}
+
+#[test]
+fn storing_to_two_output_parameters_fails_closed() {
+    let mut types = TypeTable::new();
+    let mut function = two_matmul_output_parameter_function(&mut types);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    // `b` becomes a second written output parameter.
+    function.params[3].mode = MirParamMode::MutRef;
+    function.blocks[0].statements.push(copy_statement(3, 8, r2));
+    // `d = e + b` now reads the second output; use `e` alone instead.
+    function.blocks[0].statements[2] = copy_statement(8, 7, r2);
+    let validation = MirValidationContext::new(&types);
+    let error = decompose_kernel_function(&function, &validation)
+        .expect_err("two output parameters must not decompose into one final output");
+    assert!(
+        error.message.contains("more than one output parameter"),
+        "named refusal: {}",
+        error.message
+    );
+}
+
+#[test]
+fn a_recipe_result_copied_through_a_stage_local_binds_the_parameter() {
+    // `e ← c·v; y ⇇ e` with no fused tail: the contract-shaped surface would
+    // name the stage local `e` as the output (the synthetic does not even
+    // declare `y`), so the copy to `y` must ride the indexed-view reading.
+    let mut types = TypeTable::new();
+    let mut function = two_matmul_output_parameter_function(&mut types);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    function.blocks[0].statements.truncate(2);
+    function.blocks[0].statements.push(copy_statement(4, 7, r2));
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("a recipe result copied into the output parameter decomposes");
+    assert_eq!(decomposition.subchains.len(), 2);
+    assert_eq!(decomposition.subchains[1].output_param, Some(MirLocalId(4)));
+}
+
+#[test]
+fn a_recipe_result_forwarded_straight_into_the_parameter_keeps_the_contract_surface() {
+    // The lowering's `y ⇇ c.matmul(v)`: the recipe writes a result temp and
+    // the next statement forwards it into `y`, which the contract-shaped
+    // signature already binds as the recipe output.
+    let mut types = TypeTable::new();
+    let mut function = two_matmul_output_parameter_function(&mut types);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    function.temps.push(MirTemp {
+        id: MirTempId(0),
+        ty: r2,
+        span: test_span(),
+    });
+    function.blocks[0].statements.truncate(1);
+    function.blocks[0].statements.push(MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::temp(MirTempId(0))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                args: vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(6))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                ],
+                return_ty: r2,
+            },
+        },
+        span: test_span(),
+    });
+    function.blocks[0]
+        .statements
+        .push(assign_from_temp(4, MirTempId(0), r2));
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("a mut-out recipe tail decomposes");
+    assert_eq!(decomposition.subchains.len(), 2);
+    assert_eq!(
+        decomposition.subchains[1].output_param, None,
+        "the recipe result IS the output parameter: nothing to rebind"
+    );
+}
+
+#[test]
+fn a_returned_output_parameter_keeps_the_return_form_surface() {
+    // A function that returns its output parameter already binds it as the
+    // last subchain's output through the consumed-output pass.
+    let mut types = TypeTable::new();
+    let mut function = two_matmul_output_parameter_function(&mut types);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    function.return_ty = r2;
+    function.blocks[0].terminator.kind =
+        MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(4)))));
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("a returned output parameter decomposes");
+    assert_eq!(decomposition.subchains[1].output_param, None);
+    assert_eq!(decomposition.subchains[1].outputs, vec![MirLocalId(4)]);
+}

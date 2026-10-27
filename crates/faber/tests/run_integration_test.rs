@@ -3690,6 +3690,11 @@ fn tiny_linear_device_relu_reference_route_prints_the_reference_fixture() {
     assert_reference_route_matches_reference_fixture("tiny-linear-device-relu");
 }
 
+#[test]
+fn tiny_linear_device_two_matmul_reference_route_prints_the_reference_fixture() {
+    assert_reference_route_matches_reference_fixture("tiny-linear-device-two-matmul");
+}
+
 /// Metal runs the matmul and the fused bias add as one kernel that stores
 /// `x·W + b` into the output parameter `y`; the bias must reach the output.
 #[cfg(target_os = "macos")]
@@ -3703,4 +3708,14 @@ fn tiny_linear_device_metal_route_prints_the_reference_fixture() {
 #[test]
 fn tiny_linear_device_relu_metal_route_prints_the_reference_fixture() {
     assert_metal_route_matches_reference_fixture("tiny-linear-device-relu");
+}
+
+/// Two matmuls cannot be one recipe kernel, so Metal runs one kernel per matmul
+/// and the final one stores `(x·W)·V + b` into the output parameter `y`. The
+/// decomposed kernel used to bind the second matmul's result local instead, and
+/// `y` printed its zeros.
+#[cfg(target_os = "macos")]
+#[test]
+fn tiny_linear_device_two_matmul_metal_route_prints_the_reference_fixture() {
+    assert_metal_route_matches_reference_fixture("tiny-linear-device-two-matmul");
 }

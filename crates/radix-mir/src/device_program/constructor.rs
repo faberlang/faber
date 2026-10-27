@@ -20,9 +20,9 @@ use crate::abi::{
 use crate::device::{MirCompanionMap, MirDeviceFunctionMetadataMap};
 use crate::device_plan_compiler::LibraryOperation;
 use crate::device_program_plans::{
-    elementwise_subchain_signature_for_emission, is_transformer_recipe_op,
-    kernel_plan_for_function, scan_plan, subchain_has_runtime_shaped_buffer,
-    subchain_signature_for_emission_with_source,
+    elementwise_subchain_signature_for_emission, explicit_output_subchain_signature,
+    is_transformer_recipe_op, kernel_plan_for_function, scan_plan,
+    subchain_has_runtime_shaped_buffer, subchain_signature_for_emission_with_source,
     transformer_subchain_signature_for_emission_with_source,
 };
 use crate::device_semantics::{
@@ -1031,8 +1031,27 @@ impl<'a> KernelBuilder<'a> {
                         detail: error.message,
                     }
                 })?;
-            let signature = match &contract {
-                Some(contract) => subchain_signature_for_emission_with_source(
+            // The subchain that stores into the source's explicit output
+            // parameter is the indexed-view kernel the source is: its output
+            // IS that parameter, never a recipe result local.
+            let explicit_signature = subchain
+                .output_param
+                .map(|output_param| {
+                    explicit_output_subchain_signature(
+                        &synthetic,
+                        output_param,
+                        &subchain_validation,
+                        self.interner,
+                    )
+                })
+                .transpose()
+                .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                    function: function.id,
+                    detail: error.message,
+                })?;
+            let signature = match (explicit_signature, &contract) {
+                (Some(signature), _) => signature,
+                (None, Some(contract)) => subchain_signature_for_emission_with_source(
                     &synthetic,
                     contract,
                     &subchain_validation,
@@ -1043,7 +1062,7 @@ impl<'a> KernelBuilder<'a> {
                     function: function.id,
                     detail: error.message,
                 })?,
-                None => {
+                (None, None) => {
                     // A transformer-recipe subchain (`TensorSumAxis` /
                     // `TensorSoftmax` / `TensorLayerNorm` / the GI3-1
                     // inference recipes) has no `CollectionOpContract`
