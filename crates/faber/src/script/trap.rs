@@ -160,7 +160,9 @@ where
                 match trap {
                     HostTrap::Exit(code) => Ok(exit_code_from_i32(code)),
                     // `TrapHost::abort` already wrote `abort: <reason>` to stderr.
-                    HostTrap::Abort(_) => Ok(ExitCode::FAILURE),
+                    HostTrap::Abort(reason) => Ok(ExitCode::from(
+                        radix::module::runtime_contract::trap::abort_exit_class(&reason),
+                    )),
                 }
             } else {
                 Err(payload)

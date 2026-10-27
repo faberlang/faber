@@ -1,7 +1,7 @@
 //! Runtime contract types — re-exported from leaf `radix-runtime-contract`
 //! (display, frame, instans, sparsa, tensor).
 
-pub use radix_runtime_contract::{display, display_tokens, frame, instans, sparsa, tensor};
+pub use radix_runtime_contract::{display, display_tokens, frame, instans, sparsa, tensor, trap};
 
 use crate::locale::LocalePack;
 use display_tokens::DisplayTokens;

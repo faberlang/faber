@@ -479,6 +479,13 @@ pub const TRAP: RuntimeSymbol = RuntimeSymbol {
     params: &[Ptr, I64],
     ret: None,
 };
+/// Trap with a conversion failure message: (pointer, length). Never returns;
+/// the exit status is the conversion class.
+pub const TRAP_CONVERSION: RuntimeSymbol = RuntimeSymbol {
+    name: "__faber_clif_v1_trap_conversion",
+    params: &[Ptr, I64],
+    ret: None,
+};
 /// Trap on a failed implicit store: (value, suffix pointer, suffix length,
 /// unsigned-slot flag). The runtime words it `error: <value><suffix>`, adding
 /// the unsigned-slot note for a negative value.
@@ -988,6 +995,7 @@ pub const RUNTIME_SYMBOLS: &[RuntimeSymbol] = &[
     TEXT_INDEX,
     ABORT_TEXT,
     TRAP,
+    TRAP_CONVERSION,
     TRAP_STORE,
     PARSE_INT,
     PARSE_F64,

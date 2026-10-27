@@ -184,10 +184,14 @@ fn interpret_path(
                     eprint_archive_diagnostics(&diagnostics);
                     eprint_device_run_note(&diagnostics);
                     drop(archive);
-                    std::process::exit(1);
+                    std::process::exit(run_failure_status(&diagnostics));
                 }
                 Ok(outcome) => {
-                    let exit = i32::from(outcome.result.is_err());
+                    let exit = outcome
+                        .result
+                        .as_ref()
+                        .err()
+                        .map_or(0, |diagnostics| run_failure_status(diagnostics));
                     let artifact = RunStatsArtifact::new(
                         metadata,
                         outcome.stats,
@@ -204,7 +208,7 @@ fn interpret_path(
                         eprint_archive_diagnostics(&diagnostics);
                         eprint_device_run_note(&diagnostics);
                         drop(archive);
-                        std::process::exit(1);
+                        std::process::exit(run_failure_status(&diagnostics));
                     }
                 }
             }
@@ -219,7 +223,7 @@ fn interpret_path(
             eprint_archive_diagnostics(&diagnostics);
             eprint_device_run_note(&diagnostics);
             drop(archive);
-            std::process::exit(1);
+            std::process::exit(run_failure_status(&diagnostics));
         }
         return;
     }
@@ -265,10 +269,14 @@ fn interpret_path(
                 Err(diagnostics) => {
                     super::eprint_compile_diagnostics(&diagnostics);
                     eprint_device_run_note(&diagnostics);
-                    std::process::exit(1);
+                    std::process::exit(run_failure_status(&diagnostics));
                 }
                 Ok(outcome) => {
-                    let exit = i32::from(outcome.result.is_err());
+                    let exit = outcome
+                        .result
+                        .as_ref()
+                        .err()
+                        .map_or(0, |diagnostics| run_failure_status(diagnostics));
                     let artifact = RunStatsArtifact::new(
                         metadata,
                         outcome.stats,
@@ -282,7 +290,7 @@ fn interpret_path(
                     if let Err(diagnostics) = outcome.result {
                         super::eprint_compile_diagnostics(&diagnostics);
                         eprint_device_run_note(&diagnostics);
-                        std::process::exit(1);
+                        std::process::exit(run_failure_status(&diagnostics));
                     }
                 }
             }
@@ -295,7 +303,7 @@ fn interpret_path(
         ) {
             super::eprint_compile_diagnostics(&diagnostics);
             eprint_device_run_note(&diagnostics);
-            std::process::exit(1);
+            std::process::exit(run_failure_status(&diagnostics));
         }
         return;
     }
@@ -377,14 +385,33 @@ fn interpret_path(
 /// Process status scripta gates observe for a single-file runner result.
 ///
 /// Success yields `0`. An explicit `process.exit_process(code)` yields that
-/// Unix-masked code. Frontend / MIR / runner failures yield `1`.
+/// Unix-masked code. Frontend / MIR failures yield `1`; a run-time failure
+/// yields its sysexits class (`radix::module::runtime_contract::trap`).
 pub(super) fn single_file_run_process_code(
     result: Result<ExitCode, radix::module::mir::RunSourceError>,
 ) -> i32 {
     match result {
         Ok(status) => raw_exit_code(status),
+        Err(radix::module::mir::RunSourceError::Stepper(errors)) => errors
+            .first()
+            .map_or(1, radix::module::mir::RunnerError::exit_status),
         Err(_) => 1,
     }
+}
+
+/// Process status of a failed package run: the sysexits class a runner failure
+/// carries (`exit_status` on its diagnostic), 1 for any other diagnostic.
+fn run_failure_status(diagnostics: &[Diagnostic]) -> i32 {
+    diagnostics
+        .iter()
+        .find_map(|diagnostic| {
+            diagnostic
+                .args
+                .iter()
+                .find(|arg| arg.name == "exit_status")
+                .and_then(|arg| arg.value.parse().ok())
+        })
+        .unwrap_or(1)
 }
 
 fn exit_interpreted(result: Result<ExitCode, radix::module::mir::RunSourceError>) {

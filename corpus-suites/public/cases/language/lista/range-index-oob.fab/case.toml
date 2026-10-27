@@ -12,6 +12,6 @@ check_only = true
 outcome = "pass"
 
 [targets.runner.expect]
-exit_nonzero = true
+exit = 70
 stderr_contains = "list range 0‥9 outside 0‥3"
 check_only = false

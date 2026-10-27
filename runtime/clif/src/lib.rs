@@ -38,6 +38,7 @@ use std::sync::OnceLock;
 
 use radix_runtime_contract::display::{display_bivalens, display_fractus};
 use radix_runtime_contract::display_tokens::DisplayTokens;
+use radix_runtime_contract::trap::{TrapKind, abort_exit_status, exit_status, trap_line};
 
 // The program's `incipit`, emitted into the linked object by the backend.
 unsafe extern "C" {
@@ -194,11 +195,17 @@ fn return_wide(value: i128) -> i64 {
     value as i64
 }
 
-fn exact_trap(message: &str) -> ! {
+/// End the run with the one trap line `error: <message>` and the failure
+/// kind's sysexits class (`radix_runtime_contract::trap`).
+pub(crate) fn exit_trap(message: &str, kind: TrapKind) -> ! {
     flush();
     let mut stderr = std::io::stderr();
-    let _ = writeln!(stderr, "error: {message}");
-    std::process::exit(1);
+    let _ = writeln!(stderr, "{}", trap_line(message));
+    std::process::exit(exit_status(kind));
+}
+
+fn exact_trap(message: &str) -> ! {
+    exit_trap(message, TrapKind::ProgramLogic)
 }
 
 /// Exact product of two intermediates; outside the exact range is an overflow.
@@ -1856,9 +1863,10 @@ pub unsafe extern "C" fn __faber_clif_v1_list_extremum(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_abort_text(handle: *const u8) -> ! {
     flush();
+    let reason = text_str(unsafe { text_bytes(handle) });
     let mut stderr = std::io::stderr();
-    let _ = writeln!(stderr, "abort: {}", text_str(unsafe { text_bytes(handle) }));
-    std::process::exit(1);
+    let _ = writeln!(stderr, "abort: {reason}");
+    std::process::exit(abort_exit_status(&reason));
 }
 
 /// Report a failed run and exit with the runner's code (D5).
@@ -1875,9 +1883,24 @@ pub unsafe extern "C" fn __faber_clif_v1_trap(message: *const u8, length: i64) -
     } else {
         unsafe { std::slice::from_raw_parts(message, length) }
     };
-    let mut stderr = std::io::stderr();
-    let _ = writeln!(stderr, "error: {}", String::from_utf8_lossy(bytes));
-    std::process::exit(1);
+    exit_trap(&String::from_utf8_lossy(bytes), TrapKind::ProgramLogic)
+}
+
+/// Report a failed conversion that nothing handles and exit with the
+/// conversion class (65).
+///
+/// # Safety
+///
+/// `message` is null or points to `length` readable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_trap_conversion(message: *const u8, length: i64) -> ! {
+    let length = usize::try_from(length).unwrap_or(0);
+    let bytes = if message.is_null() {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(message, length) }
+    };
+    exit_trap(&String::from_utf8_lossy(bytes), TrapKind::Conversion)
 }
 
 /// Report a failed implicit store and exit with the runner's code (D5).
@@ -1907,9 +1930,7 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_store(
     if value < 0 && unsigned_slot != 0 {
         message.push_str(" (a negative value cannot be stored in an unsigned slot)");
     }
-    let mut stderr = std::io::stderr();
-    let _ = writeln!(stderr, "error: {message}");
-    std::process::exit(1);
+    exit_trap(&message, TrapKind::ProgramLogic)
 }
 
 /// [`__faber_clif_v1_trap_store`] for an exact intermediate beyond the 64-bit
@@ -1938,9 +1959,7 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_store_wide(
     if value < 0 && unsigned_slot != 0 {
         message.push_str(" (a negative value cannot be stored in an unsigned slot)");
     }
-    let mut stderr = std::io::stderr();
-    let _ = writeln!(stderr, "error: {message}");
-    std::process::exit(1);
+    exit_trap(&message, TrapKind::ProgramLogic)
 }
 
 /// The outcome of the latest parse: 0 ok, 1 malformed integer, 2 integer out

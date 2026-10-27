@@ -582,7 +582,7 @@ fn run_reader_locale_accepts_direct_entry_file_input() {
 
 #[test]
 fn run_unhandled_failable_call_in_main_panics_with_the_error_message() {
-    // D17.8 (fi6c): a failure directly in `main` is a panic: exit code 1, the
+    // D17.8 (fi6c): a failure directly in `main` is a panic: exit code 70, the
     // output before it kept, and the error value reported on stderr.
     let source = write_single_file(
         "run-unhandled-failable-call-panics",
@@ -607,8 +607,8 @@ main {
 
     assert_eq!(
         status.code(),
-        Some(1),
-        "a panic exits with code 1:\n{stderr}"
+        Some(70),
+        "a panic exits with code 70:\n{stderr}"
     );
     assert_eq!(stdout, "2\n", "output before the panic is kept");
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: the runtime abort message is the CLI stderr contract.
@@ -2645,9 +2645,10 @@ fn run_accepts_a_fitting_constant_argument_for_a_narrow_parameter() {
 }
 
 #[test]
-fn run_panic_prints_abort_reason_to_stderr_and_exits_one() {
+fn run_panic_prints_abort_reason_to_stderr_and_exits_seventy() {
     // `faber run` surfaces a runner abort the way the runner's own
-    // `StdioHost::abort` does: `abort: <message>` on stderr, exit 1, with
+    // `StdioHost::abort` does: `abort: <message>` on stderr, exit 70 (the
+    // program-logic class of the trap contract), with
     // stdout written before the trap still flushed.
     let file = write_single_file(
         "run-panic-abort",
@@ -2657,7 +2658,7 @@ fn run_panic_prints_abort_reason_to_stderr_and_exits_one() {
     let (stdout, stderr, status) =
         run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
 
-    assert_eq!(status.code(), Some(1), "panic must exit 1:\n{stderr}");
+    assert_eq!(status.code(), Some(70), "panic must exit 70:\n{stderr}");
     assert_eq!(stdout, "before\n");
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: runtime abort reason is the stderr contract.
     assert!(
@@ -2676,13 +2677,63 @@ fn run_negative_integer_exponent_trap_prints_reason_to_stderr() {
     let (stdout, stderr, status) =
         run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
 
-    assert_eq!(status.code(), Some(1), "trap must exit 1:\n{stderr}");
+    assert_eq!(status.code(), Some(70), "trap must exit 70:\n{stderr}");
     assert_eq!(stdout, "before\n");
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: runtime abort reason is the stderr contract.
     assert!(
         stderr.contains("abort: numerus potentia failed: negative exponent"),
         "expected trap reason on stderr:\n{stderr}"
     );
+}
+
+/// Run a single-file program that traps and return its exit status and the
+/// first stderr line. The statuses are the sysexits classes of the trap
+/// contract (`radix::module::runtime_contract::trap`), not 1.
+fn trap_exit(label: &str, source: &str) -> (Option<i32>, String) {
+    let file = write_single_file(label, source);
+    let (_stdout, stderr, status) =
+        run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
+    let line = stderr.lines().next().unwrap_or_default().to_owned();
+    (status.code(), line)
+}
+
+#[test]
+fn run_conversion_failure_exits_sixty_five_with_one_error_line() {
+    let (code, line) = trap_exit(
+        "run-trap-conversion",
+        "main {\n    print \"salve\" ↦ bool\n}\n",
+    );
+    assert_eq!(code, Some(65), "{line}");
+    assert_eq!(line, "error: text to bivalens conversion failed");
+}
+
+#[test]
+fn run_index_trap_exits_seventy_with_one_error_line() {
+    let (code, line) = trap_exit(
+        "run-trap-index",
+        "main {\n    let string s ← \"ab\"\n    let int i ← 5\n    print s[i]\n}\n",
+    );
+    assert_eq!(code, Some(70), "{line}");
+    assert_eq!(line, "error: text index out of bounds");
+}
+
+#[test]
+fn run_unhandled_missing_file_exits_sixty_six() {
+    let (code, line) = trap_exit(
+        "run-trap-not-found",
+        "import from \"norma:fs\" fs\nimport from \"norma:fault\" fault\nfn read_text(string path) → string ⇥ fault.IoFault {\n    return fs.read_file<string>(path)\n}\nmain {\n    print read_text(\"/nonexistent/faber-trap-contract\")\n}\n",
+    );
+    assert_eq!(code, Some(66), "{line}");
+    assert!(line.starts_with("abort: ERR001 "), "{line}");
+}
+
+#[test]
+fn run_explicit_process_exit_keeps_its_own_status() {
+    let (code, _line) = trap_exit(
+        "run-trap-exit-process",
+        "import from \"norma:process\" process\nmain {\n    process.exit_process(3)\n}\n",
+    );
+    assert_eq!(code, Some(3));
 }
 
 const KERNEL_SOURCE: &str = r#"

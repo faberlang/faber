@@ -489,7 +489,7 @@ fn division_by_zero_exits_one_with_a_named_trap() {
         (program, table)
     };
     let run = build_and_run("divzero", &program, &table, &mut Interner::new());
-    assert_eq!(run.status.code(), Some(1));
+    assert_eq!(run.status.code(), Some(70));
     assert_eq!(
         String::from_utf8_lossy(&run.stdout),
         "3628800\n1.5\ntrue\n",
@@ -553,7 +553,7 @@ fn exact_intermediates_pass_the_i64_carrier() {
         "stderr: {}",
         String::from_utf8_lossy(&run.stderr)
     );
-    assert_eq!(run.status.code(), Some(1));
+    assert_eq!(run.status.code(), Some(70));
     assert!(
         String::from_utf8_lossy(&run.stderr).contains("numerus overflow"),
         "stderr: {}",

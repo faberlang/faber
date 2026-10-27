@@ -422,7 +422,8 @@ fn runtime_error_emits_stats_before_cli_failure_for_both_sinks() {
     assert!(!output.status.success(), "runtime error must fail the CLI");
     let (prefix, stdout_artifact) = framed_artifact(&output.stdout);
     assert_eq!(prefix, b"before\n");
-    assert_eq!(stdout_artifact.run.exit, 1);
+    // The recorded exit is the process status: the program-logic class (70).
+    assert_eq!(stdout_artifact.run.exit, 70);
     let disk_artifact: RunStatsArtifact =
         serde_json::from_slice(&fs::read(&stats_file).expect("runtime stats file"))
             .expect("runtime file schema");
