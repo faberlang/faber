@@ -468,7 +468,8 @@ impl TypeChecker<'_> {
         sig: &FuncSig,
         param_vars: &mut FxHashMap<Symbol, TypeId>,
     ) {
-        if self.current_generic_param_kinds.is_empty() {
+        if self.current_generic_param_kinds.is_empty() && self.current_genus_type_params.is_empty()
+        {
             return;
         }
         let own: FxHashSet<Symbol> = sig.type_params.iter().map(|param| param.name).collect();
@@ -482,7 +483,10 @@ impl TypeChecker<'_> {
             collect_type_param_symbols(err, self.types, &mut seen, &mut symbols);
         }
         for sym in symbols {
-            if own.contains(&sym) || !self.current_generic_param_kinds.contains_key(&sym) {
+            if own.contains(&sym)
+                || !(self.current_generic_param_kinds.contains_key(&sym)
+                    || self.current_genus_type_params.contains(&sym))
+            {
                 continue;
             }
             param_vars
