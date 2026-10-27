@@ -600,7 +600,10 @@ reminders, not a second EBNF.
   shape witness such as `Box<tf32[4]>`. `size` (la `magnitudo`) parameters
   follow the type parameters (`<T, size N>`, `max_dynamic<size Figura>` in
   `corpus/summa/max-min.fab`); an applied natural-number argument is a
-  capacity fact, not a width marker.
+  capacity fact, not a width marker. A call passes an explicit size behind
+  the same word, as `axis` is passed: `mk<int, size 4>(xs)`,
+  `tensor.construct<int, size [4]>(xs)`; a bare natural there is
+  `SEM057 size_marker_required`.
 
 ### Kernel fragments versus graphics fragments
 

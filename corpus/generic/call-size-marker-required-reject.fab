@@ -1,0 +1,26 @@
++++
+term = "size"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "incipit_stmt", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "call_type_args", "call_type_arg", "call_size_arg", "argument_list", "argument", "expression", "literal"]
+category = "type"
+canonical = false
+summary = "A bare natural in a generic call's argument list is not a size: the size marker is required, as `axis` is."
+syntax = "make<int, size 4>(xs)"
+related = ["tensor", "size", "generic", "axis"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:size_marker_required"
++++
+
+# An explicit size argument says what the number means, the way `axis 1` does:
+# `make<int, size 4>(xs)`. A bare `4` is SEM057 size_marker_required; write
+# `size 4` (or `size [4]` for a whole shape).
+
+fn make<T, size N>(list<T> xs) → tensor<T, [N]> ⇥ string {
+    return xs ↦ tensor<T, [N]>
+}
+
+main {
+    let list<int> data ← [5, 6, 7, 8]
+    let tensor<int, [4]> row ← make<int, 4>(data)
+}

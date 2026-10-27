@@ -26,7 +26,7 @@ const MUT_MAIN: &str = r#"import from "./util" * as utilModule
 main {
     let tensor<f32, [2, 2]> input ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
     mut tensor<f32, [2, 2]> output ← [[0.0, 0.0], [0.0, 0.0]] ↦ tensor<f32, [2, 2]>
-    utilModule.copy_into<2, 2>(input, mut output)
+    utilModule.copy_into<size 2, size 2>(input, mut output)
     print output.get([1, 0]) coalesce (0.0 ∷ f32)
 }
 "#;

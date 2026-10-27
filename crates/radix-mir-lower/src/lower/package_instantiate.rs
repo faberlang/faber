@@ -877,22 +877,27 @@ impl PackageInstantiate<'_> {
         }
         let type_params: Vec<_> = params.iter().filter(|param| !param.is_shape).collect();
         let shape_params: Vec<_> = params.iter().filter(|param| param.is_shape).collect();
-        if type_params.is_empty() && !shape_params.is_empty() {
-            if explicit.len() != shape_params.len() {
+        // The explicit list binds by marker: a `size` argument (a NATURAL or
+        // shape spelling, or a caller-owned symbolic `Param` the calling
+        // instance's shape bindings resolve, GSF-1) binds the next magnitudo
+        // param, every other argument the next Typus param.
+        let (type_args, size_args): (Vec<MirType>, Vec<MirType>) = explicit
+            .iter()
+            .copied()
+            .partition(|concrete| !self.explicit_arg_is_size(*concrete));
+        if !size_args.is_empty() {
+            if size_args.len() != shape_params.len() {
                 self.errors.push(MirError::validation(
                     span,
                     format!(
-                        "generic call supplied {} type arguments for {} parameters",
-                        explicit.len(),
+                        "generic call supplied {} size arguments for {} parameters",
+                        size_args.len(),
                         shape_params.len()
                     ),
                 ));
                 return false;
             }
-            for (param, concrete) in shape_params.iter().zip(explicit.iter().copied()) {
-                // Size-only generics: NATURAL typeArguments bind magnitudo
-                // params; a caller-owned symbolic `Param` resolves through
-                // the calling instance's shape bindings (GSF-1 forwarding).
+            for (param, concrete) in shape_params.iter().zip(size_args.iter().copied()) {
                 let index = match self.explicit_shape_witness(concrete, parent_shapes, span) {
                     ExplicitShapeWitness::Found(index) => index,
                     ExplicitShapeWitness::MissingReported => return false,
@@ -906,53 +911,84 @@ impl PackageInstantiate<'_> {
                 };
                 shape_bindings.insert(param.name, canonical_index(self.types, index));
             }
+        }
+        if type_args.is_empty() {
             return true;
         }
-        if explicit.len() != type_params.len() {
+        if type_args.len() != type_params.len() {
             self.errors.push(MirError::validation(
                 span,
                 format!(
                     "generic call supplied {} type arguments for {} parameters",
-                    explicit.len(),
+                    type_args.len(),
                     type_params.len()
                 ),
             ));
             return false;
         }
-        for (param, concrete) in type_params.iter().zip(explicit.iter().copied()) {
+        for (param, concrete) in type_params.iter().zip(type_args.iter().copied()) {
             type_bindings.insert(param.name, concrete);
         }
         true
     }
 
-    /// Index witness of an explicit magnitudo argument: a NATURAL spelling
-    /// maps to its literal index; a caller-owned symbolic `Param` resolves
-    /// through the calling instance's shape bindings (GSF-1 forwarding —
-    /// package instances are concretized at creation, so the parent map is
-    /// authoritative at bind time). Anything else fails closed so wrong-kind
-    /// rejection is preserved.
+    /// Whether an explicit call argument is a `size` argument: the marker
+    /// reaches MIR in the spelling of the lowered `Type::Param`
+    /// (`radix_types::parse_explicit_size`).
+    fn explicit_arg_is_size(&self, concrete: MirType) -> bool {
+        self.explicit_size_of(concrete).is_some()
+    }
+
+    fn explicit_size_of(&self, concrete: MirType) -> Option<radix_types::ExplicitSize<'_>> {
+        let Type::Param(sym) = self.types.get(concrete.semantic_id()) else {
+            return None;
+        };
+        radix_types::parse_explicit_size(self.interner.resolve(*sym))
+    }
+
+    /// Index witness of an explicit `size` argument: a NATURAL maps to its
+    /// literal index, a bracketed shape to its tuple of literals, and a
+    /// caller-owned symbolic `size` param resolves through the calling
+    /// instance's shape bindings (GSF-1 forwarding — package instances are
+    /// concretized at creation, so the parent map is authoritative at bind
+    /// time). Anything else fails closed so wrong-kind rejection is
+    /// preserved.
     fn explicit_shape_witness(
         &mut self,
         concrete: MirType,
         parent_shapes: &MirShapeBindings,
         span: Span,
     ) -> ExplicitShapeWitness {
-        let Type::Param(sym) = self.types.get(concrete.semantic_id()) else {
+        let unresolved = |this: &mut Self| {
+            this.errors.push(MirError::validation(
+                span,
+                "generic call signature has unresolved type parameter",
+            ));
+            ExplicitShapeWitness::MissingReported
+        };
+        let Some(size) = self.explicit_size_of(concrete) else {
             return ExplicitShapeWitness::MissingUnreported;
         };
-        let sym = *sym;
-        if let Some(value) = radix_types::parse_natural_capacity(self.interner.resolve(sym)) {
-            return if let Some(index) = find_literal_index(self.types, value) {
-                ExplicitShapeWitness::Found(index)
-            } else {
-                self.errors.push(MirError::validation(
-                    span,
-                    "generic call signature has unresolved type parameter",
-                ));
-                ExplicitShapeWitness::MissingReported
-            };
-        }
-        if let Some(index) = parent_shapes.get(&sym).copied() {
+        let name = match size {
+            radix_types::ExplicitSize::Natural(value) => {
+                return match find_literal_index(self.types, value) {
+                    Some(index) => ExplicitShapeWitness::Found(index),
+                    None => unresolved(self),
+                };
+            }
+            radix_types::ExplicitSize::Shape(dims) => {
+                return match super::monomorphize::find_literal_shape_index(self.types, &dims) {
+                    Some(index) => ExplicitShapeWitness::Found(index),
+                    None => unresolved(self),
+                };
+            }
+            radix_types::ExplicitSize::Name(name) => name.to_owned(),
+        };
+        if let Some(index) = self
+            .interner
+            .lookup(&name)
+            .and_then(|sym| parent_shapes.get(&sym).copied())
+        {
             ExplicitShapeWitness::Found(index)
         } else {
             self.errors.push(MirError::validation(
@@ -1128,7 +1164,14 @@ impl PackageInstantiate<'_> {
             return None;
         }
         let shape_bindings = self.shape_bindings_from_key(key);
-        if !finalize_function(self.types, &mut instance, type_bindings, &shape_bindings, &mut self.errors) {
+        if !finalize_function(
+            self.types,
+            &mut instance,
+            self.interner,
+            type_bindings,
+            &shape_bindings,
+            &mut self.errors,
+        ) {
             return None;
         }
         if super::monomorphize::function_contains_param(self.types, &instance) {
@@ -1206,7 +1249,14 @@ impl PackageInstantiate<'_> {
             return false;
         }
         let shape_bindings = MirShapeBindings::default();
-        if !finalize_function(self.types, &mut clone, bindings, &shape_bindings, &mut self.errors) {
+        if !finalize_function(
+            self.types,
+            &mut clone,
+            self.interner,
+            bindings,
+            &shape_bindings,
+            &mut self.errors,
+        ) {
             return false;
         }
         self.created.push(clone);
@@ -1367,20 +1417,6 @@ impl PackageInstantiate<'_> {
         bindings: &MirGenericBindings,
         span: Span,
     ) -> bool {
-        // Shape params of the generic being instantiated (GSF-1): forwarded
-        // size witnesses in nested callee type args stay symbolic through
-        // typus substitution.
-        let shape_params: FxHashSet<radix_lexer::Symbol> = function
-            .source
-            .and_then(|source| self.generic_params.get(&source))
-            .map(|params| {
-                params
-                    .iter()
-                    .filter(|param| param.is_shape)
-                    .map(|param| param.name)
-                    .collect()
-            })
-            .unwrap_or_default();
         for param in &mut function.params {
             param.ty = match self.substitute_ty(param.ty, bindings, span) {
                 Some(ty) => ty,
@@ -1445,14 +1481,14 @@ impl PackageInstantiate<'_> {
                         };
                     }
                     MirStatementKind::Call { callee, .. } => {
-                        if !self.substitute_callee(callee, bindings, &shape_params, span) {
+                        if !self.substitute_callee(callee, bindings, span) {
                             return false;
                         }
                     }
                 }
             }
             if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
-                && !self.substitute_callee(callee, bindings, &shape_params, span)
+                && !self.substitute_callee(callee, bindings, span)
             {
                 return false;
             }
@@ -1460,26 +1496,17 @@ impl PackageInstantiate<'_> {
         true
     }
 
-    fn substitute_callee(
-        &mut self,
-        callee: &mut MirCallee,
-        bindings: &MirGenericBindings,
-        shape_params: &FxHashSet<radix_lexer::Symbol>,
-        span: Span,
-    ) -> bool {
+    fn substitute_callee(&mut self, callee: &mut MirCallee, bindings: &MirGenericBindings, span: Span) -> bool {
         let MirCallee::Definition { type_args, .. } = callee else {
             return true;
         };
         for type_arg in type_args {
-            // GSF-1: a forwarded size witness stays a symbolic `Param` in
+            // GSF-1: a marked size argument stays a symbolic `Param` in
             // callee type args — the package rewrite resolves it through the
             // calling instance's shape bindings. Substituting it here would
             // reject the caller-owned magnitudo symbol as an unresolved type
             // parameter.
-            if let Type::Param(sym) = self.types.get(type_arg.semantic_id())
-                && shape_params.contains(sym)
-                && !bindings.contains_key(sym)
-            {
+            if self.explicit_arg_is_size(*type_arg) {
                 continue;
             }
             *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
@@ -1665,7 +1692,14 @@ impl PackageInstantiate<'_> {
                 continue;
             };
             let type_bindings = MirGenericBindings::default();
-            if !finalize_function(self.types, function, &type_bindings, &shape_bindings, &mut self.errors) {
+            if !finalize_function(
+                self.types,
+                function,
+                self.interner,
+                &type_bindings,
+                &shape_bindings,
+                &mut self.errors,
+            ) {
                 continue;
             }
             if super::monomorphize::function_contains_param(self.types, function) {
@@ -1877,6 +1911,7 @@ fn tensor_shape_for_operand(
 fn finalize_function(
     types: &mut TypeTable,
     function: &mut MirFunction,
+    interner: &Interner,
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
     errors: &mut Vec<MirError>,
@@ -1950,14 +1985,14 @@ fn finalize_function(
                     };
                 }
                 MirStatementKind::Call { callee, .. } => {
-                    if !finalize_callee(types, callee, type_bindings, shape_bindings, span, errors) {
+                    if !finalize_callee(types, callee, interner, type_bindings, shape_bindings, span, errors) {
                         return false;
                     }
                 }
             }
         }
         if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
-            && !finalize_callee(types, callee, type_bindings, shape_bindings, span, errors)
+            && !finalize_callee(types, callee, interner, type_bindings, shape_bindings, span, errors)
         {
             return false;
         }
@@ -1973,6 +2008,7 @@ fn finalize_function(
 fn finalize_callee(
     types: &mut TypeTable,
     callee: &mut MirCallee,
+    interner: &Interner,
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
     span: Span,
@@ -1982,13 +2018,12 @@ fn finalize_callee(
         return true;
     };
     for type_arg in type_args {
-        // GSF-1: a forwarded size witness is a symbolic `Param` owned by the
+        // GSF-1: a marked size argument is a symbolic `Param` owned by the
         // caller's shape bindings — the package rewrite resolves it against
         // the calling instance, so finalization must leave it symbolic
         // rather than reject it as an unresolved type parameter.
         if let Type::Param(sym) = types.get(type_arg.semantic_id())
-            && shape_bindings.contains_key(sym)
-            && !type_bindings.contains_key(sym)
+            && radix_types::parse_explicit_size(interner.resolve(*sym)).is_some()
         {
             continue;
         }

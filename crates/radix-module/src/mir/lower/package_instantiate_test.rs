@@ -1700,7 +1700,7 @@ fn failed_size_only_explicit_type_arg_reports_once() {
     const SOURCE: DefId = DefId(88);
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
-    let nine = interner.intern("9");
+    let nine = interner.intern(&radix_types::spell_explicit_size("9"));
     let explicit_nine = MirType::semantic(types.intern(Type::Param(nine)));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     let template = MirFunction {

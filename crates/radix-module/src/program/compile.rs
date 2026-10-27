@@ -2648,6 +2648,9 @@ fn interface_index_snapshot(figura: &FiguraExpr, interner: &crate::lexer::Intern
             }
             radix_syntax::LiftExtent::Negative { .. } => None,
             radix_syntax::LiftExtent::Paren(inner) => interface_index_snapshot(inner, interner),
+            // A whole-shape lift lives only in a call's type-argument list,
+            // never in a signature, so there is no interface snapshot.
+            radix_syntax::LiftExtent::Shape(_) => None,
         },
         FiguraExpr::Infer => None,
     }

@@ -286,7 +286,11 @@ impl TypeChecker<'_> {
             self.reject_invalid_explicit_type_args(&sig, explicit_type_args, args, span)
         {
             return error_ty;
-        } else if self.reject_type_arg_domain_misses(&sig, explicit_type_args, span) {
+        } else if self.reject_type_arg_domain_misses(
+            &sig,
+            &self.split_explicit_args(explicit_type_args).0,
+            span,
+        ) {
             self.typecheck_call_arg_exprs(args);
             return self.error_type;
         } else {
@@ -495,76 +499,46 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Call-site instantiation for an explicit argument prefix. A positional
-    /// size prefix (all NATURAL literals, or size witnesses on a size-only
-    /// callee) binds the magnitudo descriptors in order; otherwise the
-    /// prefix binds the leading Typus params and every remaining Typus slot
-    /// falls to a fresh infer for argument-driven solving.
+    /// Call-site instantiation for an explicit argument list. The list binds
+    /// by marker: an unmarked argument binds the next Typus param, a `size`
+    /// argument binds the next magnitudo param, and the two cursors advance
+    /// independently. Every Typus slot the list leaves unbound falls to a
+    /// fresh infer, and every unbound size slot stays an index hole, both
+    /// solved from the arguments.
     fn bind_explicit_type_args(
         &mut self,
         sig: &FuncSig,
         explicit_type_args: &[TypeId],
         shape_symbols: &FxHashSet<Symbol>,
     ) -> CallInstantiation {
+        let (type_args, size_args) = self.split_explicit_args(explicit_type_args);
         let mut param_vars = FxHashMap::default();
         let mut explicit_bound = FxHashSet::default();
-        let size_prefix = self.explicit_args_are_magnitudo_list(explicit_type_args)
-            || (sig
-                .type_params
-                .iter()
-                .all(|param| param.sort != GenericParamSort::Typus)
-                && self.explicit_args_are_size_witnesses(explicit_type_args));
-        if size_prefix {
-            // Positional size prefix: every zipped descriptor is a
-            // magnitudo param (sort-checked by the arity validator).
-            let mut shape_vars = self.shape_vars_for(shape_symbols);
-            self.bind_explicit_magnitudo_args(
-                sig,
-                explicit_type_args,
-                &mut shape_vars,
-                &mut explicit_bound,
-            );
-            for param in &sig.type_params {
-                if param.sort == GenericParamSort::Typus {
-                    let infer = self.fresh_infer();
-                    param_vars.insert(param.name, infer);
-                }
-            }
-            self.seed_rigid_enclosing_params(sig, &mut param_vars);
-            (
-                self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
-                param_vars,
-                shape_vars,
-                explicit_bound,
-            )
-        } else {
-            // Type prefix binds the leading typus params; the rest are
-            // instantiated as fresh infers so inference can solve them.
-            for (param, ty) in sig
-                .type_params
-                .iter()
-                .filter(|param| param.sort == GenericParamSort::Typus)
-                .zip(explicit_type_args.iter())
-            {
-                param_vars.insert(param.name, *ty);
-                explicit_bound.insert(param.name);
-            }
-            for param in &sig.type_params {
-                if param.sort == GenericParamSort::Typus {
-                    param_vars
-                        .entry(param.name)
-                        .or_insert_with(|| self.fresh_infer());
-                }
-            }
-            self.seed_rigid_enclosing_params(sig, &mut param_vars);
-            let mut shape_vars = self.shape_vars_for(shape_symbols);
-            (
-                self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
-                param_vars,
-                shape_vars,
-                explicit_bound,
-            )
+        for (param, ty) in sig
+            .type_params
+            .iter()
+            .filter(|param| param.sort == GenericParamSort::Typus)
+            .zip(type_args.iter())
+        {
+            param_vars.insert(param.name, *ty);
+            explicit_bound.insert(param.name);
         }
+        for param in &sig.type_params {
+            if param.sort == GenericParamSort::Typus {
+                param_vars
+                    .entry(param.name)
+                    .or_insert_with(|| self.fresh_infer());
+            }
+        }
+        self.seed_rigid_enclosing_params(sig, &mut param_vars);
+        let mut shape_vars = self.shape_vars_for(shape_symbols);
+        self.bind_explicit_magnitudo_args(sig, &size_args, &mut shape_vars, &mut explicit_bound);
+        (
+            self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
+            param_vars,
+            shape_vars,
+            explicit_bound,
+        )
     }
 
     /// Z1: reject a size-slot argument whose compile-time value is negative.
@@ -665,10 +639,14 @@ impl TypeChecker<'_> {
 
     /// Returns the shared error type when explicit args are invalid for `sig`.
     ///
-    /// A NATURAL-only list binds the leading magnitudo descriptors
-    /// positionally; a non-natural list counts Typus params. Either way the
-    /// prefix may omit only a trailing defaulted suffix (GPD-3), and every
-    /// bound argument must match its descriptor's declared sort.
+    /// The list is split by marker into type arguments and `size` arguments
+    /// (`split_explicit_args`). Each side binds its own sort's params in
+    /// declared order: the type side must cover the non-defaulted Typus
+    /// prefix once it starts (a list of only `size` arguments leaves every
+    /// type to inference), and the size side must cover the non-defaulted
+    /// magnitudo prefix. A `size` argument on a callee that declares no
+    /// magnitudo param is `size_marker_unexpected`; one past the last
+    /// declared magnitudo param is an arity miss.
     fn reject_invalid_explicit_type_args(
         &mut self,
         sig: &FuncSig,
@@ -678,86 +656,74 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         debug_assert_ne!(explicit_type_args, []);
 
-        if self.explicit_args_are_magnitudo_list(explicit_type_args) {
-            // Only the zipped prefix may reject on sort: a Typus descriptor
-            // beyond the explicit prefix is an arity miss, not a sort miss.
-            for param in sig.type_params.iter().take(explicit_type_args.len()) {
-                if param.sort == GenericParamSort::Typus {
-                    self.reject_type_arg_sort(param, span);
-                    return self.reject_explicit_args(args);
-                }
-            }
-            if !crate::types::generic_explicit_prefix_len_in_range(
-                &sig.type_params,
-                explicit_type_args.len(),
-            ) {
-                self.wrong_arity("wrong_number_of_type_arguments", span);
-                return self.reject_explicit_args(args);
-            }
-            return None;
-        }
-
-        let type_param_count = sig
+        let (type_args, size_args) = self.split_explicit_args(explicit_type_args);
+        let typus: Vec<&radix_types::GenericParamDescriptor> = sig
             .type_params
             .iter()
             .filter(|param| param.sort == GenericParamSort::Typus)
-            .count();
-        // Trailing defaults make the defaulted Typus params a suffix of the
-        // Typus list, so the required prefix is the non-defaulted Typus count.
-        let typus_min = sig
+            .collect();
+        let magnitudo: Vec<&radix_types::GenericParamDescriptor> = sig
             .type_params
             .iter()
-            .filter(|param| param.sort == GenericParamSort::Typus)
-            .take_while(|param| param.default.is_none())
-            .count();
-        if type_param_count == 0 {
-            // GSF-1: a size-only callee also accepts caller-owned symbolic
-            // magnitudo witnesses (`sink<T, D>(x)` inside
-            // `forward<magnitudo T, magnitudo D>`). Non-`Param` witnesses
-            // keep the literal-surface rejection below.
-            if !sig.type_params.is_empty()
-                && self.explicit_args_are_size_witnesses(explicit_type_args)
-            {
-                if !crate::types::generic_explicit_prefix_len_in_range(
-                    &sig.type_params,
-                    explicit_type_args.len(),
-                ) {
-                    self.wrong_arity("wrong_number_of_type_arguments", span);
-                    return self.reject_explicit_args(args);
-                }
-                return None;
-            }
-            if sig.type_params.iter().any(|param| {
-                param.sort == GenericParamSort::Magnitudo
-                    && explicit_type_args.iter().any(|ty| {
-                        matches!(self.types.get(*ty), Type::Param(sym)
-                            if self.magnitudo_literal_of(*ty).is_none()
-                                && !self.is_size_param_symbol(*sym))
-                    })
-            }) {
-                self.reject_type_arg_sort(&sig.type_params[0], span);
-                return self.reject_explicit_args(args);
-            }
+            .filter(|param| param.sort == GenericParamSort::Magnitudo)
+            .collect();
+        if sig.type_params.is_empty() {
             self.wrong_arity("callee_type_args_unsupported", span);
             return self.reject_explicit_args(args);
         }
-        let len = explicit_type_args.len();
-        if len < typus_min || len > type_param_count {
+        if magnitudo.is_empty() && !size_args.is_empty() {
+            // The marker is written where the callee declares no `size`
+            // parameter at all, as `axis` is on a parameter not declared
+            // `axis`.
+            self.error_issue(
+                SemanticErrorKind::ModeMismatch,
+                crate::ISSUE_SIZE_MARKER_UNEXPECTED,
+                span,
+            );
+            return self.reject_explicit_args(args);
+        }
+        if size_args.len() > magnitudo.len() {
             self.wrong_arity("wrong_number_of_type_arguments", span);
             return self.reject_explicit_args(args);
         }
-        for (param, ty) in sig
-            .type_params
-            .iter()
-            .filter(|param| param.sort == GenericParamSort::Typus)
-            .zip(explicit_type_args.iter())
-        {
-            if self.magnitudo_literal_of(*ty).is_some() {
-                self.reject_type_arg_sort(param, span);
+        if type_args.len() > typus.len() {
+            // A caller's own type param handed to a size-only callee is a
+            // wrong-sort argument; any other extra type has no slot at all.
+            if typus.is_empty()
+                && let Some(first_size) = magnitudo.first()
+                && type_args
+                    .iter()
+                    .any(|ty| matches!(self.types.get(*ty), Type::Param(_)))
+            {
+                self.reject_type_arg_sort(first_size, span);
                 return self.reject_explicit_args(args);
             }
+            let issue = if typus.is_empty() {
+                "callee_type_args_unsupported"
+            } else {
+                "wrong_number_of_type_arguments"
+            };
+            self.wrong_arity(issue, span);
+            return self.reject_explicit_args(args);
         }
-        if explicit_type_args
+        // Trailing defaults make the defaulted params of each sort a suffix
+        // of that sort's list, so the required prefix is its non-defaulted
+        // count. Types are checked once the list names any; sizes likewise.
+        let typus_min = typus
+            .iter()
+            .take_while(|param| param.default.is_none())
+            .count();
+        let magnitudo_min = magnitudo
+            .iter()
+            .take_while(|param| param.default.is_none())
+            .count();
+        if (!type_args.is_empty() && type_args.len() < typus_min)
+            || (!size_args.is_empty() && size_args.len() < magnitudo_min)
+        {
+            self.wrong_arity("wrong_number_of_type_arguments", span);
+            return self.reject_explicit_args(args);
+        }
+        if type_args
             .iter()
             .any(|ty| self.infer_union_var_of(*ty).is_some())
         {
@@ -807,7 +773,12 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> bool {
         let mut rejected = false;
-        for (param, witness) in sig.type_params.iter().zip(witnesses.iter()) {
+        for (param, witness) in sig
+            .type_params
+            .iter()
+            .filter(|param| param.sort == GenericParamSort::Typus)
+            .zip(witnesses.iter())
+        {
             if self.type_arg_rejects_domain(param.name, &param.constraint, *witness, span) {
                 rejected = true;
             }
@@ -1413,35 +1384,34 @@ impl TypeChecker<'_> {
         )
     }
 
-    fn magnitudo_literal_of(&self, ty: TypeId) -> Option<u64> {
+    /// Whether an explicit call argument is a `size` argument. The marker
+    /// travels in the spelling of the lowered `Type::Param`
+    /// (`radix_types::parse_explicit_size`); a plain `Param` or any other
+    /// type is a type argument.
+    fn explicit_arg_is_size(&self, ty: TypeId) -> bool {
+        self.explicit_size_of(ty).is_some()
+    }
+
+    fn explicit_size_of(&self, ty: TypeId) -> Option<radix_types::ExplicitSize<'_>> {
         let Type::Param(sym) = self.types.get(ty) else {
             return None;
         };
-        let name = self.interner?.resolve(*sym);
-        radix_types::parse_natural_capacity(name)
+        radix_types::parse_explicit_size(self.interner?.resolve(*sym))
     }
 
-    fn explicit_args_are_magnitudo_list(&self, explicit_type_args: &[TypeId]) -> bool {
-        !explicit_type_args.is_empty()
-            && explicit_type_args
-                .iter()
-                .all(|ty| self.magnitudo_literal_of(*ty).is_some())
-    }
-
-    /// True when every explicit argument is a `Param`-spelled size witness —
-    /// a NATURAL literal or a caller-owned symbolic magnitudo param (GSF-1).
-    fn explicit_args_are_size_witnesses(&self, explicit_type_args: &[TypeId]) -> bool {
-        !explicit_type_args.is_empty()
-            && explicit_type_args
-                .iter()
-                .all(|ty| match self.types.get(*ty) {
-                    Type::Param(sym) => {
-                        self.magnitudo_literal_of(*ty).is_some()
-                            || self.is_size_param_symbol(*sym)
-                            || self.hir_value_binding_def(*sym).is_some()
-                    }
-                    _ => false,
-                })
+    /// Split an explicit argument list by marker into its type arguments and
+    /// its `size` arguments, each in written order.
+    fn split_explicit_args(&self, explicit_type_args: &[TypeId]) -> (Vec<TypeId>, Vec<TypeId>) {
+        let mut type_args = Vec::new();
+        let mut size_args = Vec::new();
+        for ty in explicit_type_args {
+            if self.explicit_arg_is_size(*ty) {
+                size_args.push(*ty);
+            } else {
+                type_args.push(*ty);
+            }
+        }
+        (type_args, size_args)
     }
 
     /// Whether `sym` names a caller-owned compile-time size parameter. HIR
@@ -1458,24 +1428,34 @@ impl TypeChecker<'_> {
             .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
     }
 
-    /// Index witness of an explicit magnitudo argument: NATURAL spellings
-    /// lower to literal indices, symbolic params forward as rigid
-    /// `IndexExpr::Param` so the caller's shape identity is preserved.
+    /// Index witness of an explicit `size` argument: a NATURAL lowers to a
+    /// literal index, a bracketed shape to a tuple of literals, a caller
+    /// `size` param forwards as a rigid `IndexExpr::Param` so the caller's
+    /// shape identity is preserved, and an in-scope value is the run-time
+    /// extent of that binding.
     fn explicit_size_witness_index(&mut self, ty: TypeId) -> Option<IndexId> {
-        let Type::Param(sym) = self.types.get(ty) else {
-            return None;
-        };
-        let sym = *sym;
-        let name = self.interner?.resolve(sym);
-        match radix_types::parse_natural_capacity(name) {
-            Some(value) => Some(self.types.intern_index(IndexExpr::Literal(value))),
-            None if self.is_size_param_symbol(sym) => {
-                Some(self.types.intern_index(IndexExpr::Param(sym)))
+        let size = self.explicit_size_of(ty)?;
+        match size {
+            radix_types::ExplicitSize::Natural(value) => {
+                Some(self.types.intern_index(IndexExpr::Literal(value)))
             }
-            None => self.hir_value_binding_def(sym).map(|def_id| {
-                self.types
-                    .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)))
-            }),
+            radix_types::ExplicitSize::Shape(dims) => {
+                let dims = dims
+                    .into_iter()
+                    .map(|value| self.types.intern_index(IndexExpr::Literal(value)))
+                    .collect();
+                Some(self.types.intern_index(IndexExpr::Tuple(dims)))
+            }
+            radix_types::ExplicitSize::Name(name) => {
+                let sym = self.interner?.lookup(name)?;
+                if self.is_size_param_symbol(sym) {
+                    return Some(self.types.intern_index(IndexExpr::Param(sym)));
+                }
+                self.hir_value_binding_def(sym).map(|def_id| {
+                    self.types
+                        .intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(def_id)))
+                })
+            }
         }
     }
 
@@ -1500,7 +1480,12 @@ impl TypeChecker<'_> {
         shape_vars: &mut FxHashMap<Symbol, IndexId>,
         explicit_bound: &mut FxHashSet<Symbol>,
     ) {
-        for (param, ty) in sig.type_params.iter().zip(explicit_type_args.iter()) {
+        for (param, ty) in sig
+            .type_params
+            .iter()
+            .filter(|param| param.sort == GenericParamSort::Magnitudo)
+            .zip(explicit_type_args.iter())
+        {
             if let Some(index) = self.explicit_size_witness_index(*ty) {
                 shape_vars.insert(param.name, index);
                 explicit_bound.insert(param.name);

@@ -705,6 +705,11 @@ fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &FiguraExpr) {
             LiftExtent::Literal(_) | LiftExtent::Negative { .. } => {}
             LiftExtent::Name(ident) => visitor.visit_ident(ident),
             LiftExtent::Paren(term) => walk_figura_expr(visitor, term),
+            LiftExtent::Shape(dims) => {
+                for dim in dims {
+                    walk_figura_expr(visitor, dim);
+                }
+            }
         },
         FiguraExpr::Tuple(dims) => {
             for dim in dims {

@@ -143,6 +143,14 @@ Parameter and field markers:
 - `coalesce` (la `vel`) — default expression on a declaration slot
 - generic parameters live in `<>` after the name: `fn f<T, size N>(…)`, type parameters first,
   `size` (la `magnitudo`) size parameters after them; there is no `prae typus` parameter form
+- explicit generic arguments at a call echo the kind the signature declares: an explicit size
+  carries the `size` marker (la `magnitudo`), `mk<int, size 4>(xs)` for `fn mk<T, size N>`,
+  `tensor.construct<int, size [4]>(xs)` for a whole shape (`size [2, 3]`, naturals only), and
+  `f<size n>(x)` for an in-scope integer. The list binds by marker (a `size` argument binds the
+  next `size` parameter, an unmarked one the next type parameter), and the marker is required:
+  a bare `mk<int, 4>(xs)` is `SEM057 size_marker_required`, `size` on a callee with no `size`
+  parameter is `size_marker_unexpected` (`corpus/generic/call-size-args.fab`,
+  `corpus/conversio/lista-tensor-explicit-shape.fab`)
 
 Recoverable errors:
 

@@ -2331,6 +2331,14 @@ help = "use an integer width no wider than 32 bits"
 message = "kernel intermediate extent {extent} exceeds the portable integer range"
 help = "keep intermediate values within the portable integer range"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "a shape after `size` in a call's type arguments admits natural-number dimensions only"
+help = "write each dimension as a natural number, as in `size [2, 3]`; pass a symbolic or run-time dimension through a `size` name instead"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "a bracketed shape after `size` is only admitted in a call's type arguments"
+help = "write the shape directly, as in `tensor<f32, [2, 3]>`, or use `size [2, 3]` in a call such as `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "CLI validation error"
 help = "fix the CLI annotation contract before emitting runnable CLI code"
@@ -4766,6 +4774,14 @@ help = "write the marker at the call as the signature declares it, for example `
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "the `axis` marker is written here but the parameter is not declared `axis`"
 help = "remove the `axis` marker, or declare the parameter `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "this argument is a `size` argument and must be written with the `size` marker"
+help = "write the marker as the signature declares the parameter, for example `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "the `size` marker is written here but the callee declares no `size` parameter"
+help = "remove the `size` marker, or declare the parameter `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"

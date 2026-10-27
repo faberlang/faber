@@ -12,7 +12,7 @@ fn make<size H, size W>() → tf32[H, W] {
 }
 main {
     mut int w ← 4
-    let tf32[3, 4] a ← make<3, size w>()
+    let tf32[3, 4] a ← make<size 3, size w>()
     print a.shape().get(0)
     print a.shape().get(1)
 }
@@ -39,7 +39,7 @@ fn session() -> Session {
 }
 
 // Known gap (Z2-MIR residual): a spelled runtime lift in the call slot
-// (`make<3, size w>()`) has no caller->callee channel for its value — the
+// (`make<size 3, size w>()`) has no caller->callee channel for its value — the
 // callee's size param needs a synthetic scalar argument (or equivalent
 // operand-backed passing) for pure creators with no tensor argument to
 // carry the witness. Check-level binding, the bare-name did-you-mean, the
@@ -72,7 +72,7 @@ fn slot_pin_opaque_return_store_runs() {
 }
 
 // Known gap (Z2-MIR residual): a spelled runtime lift in the call slot
-// (`make<3, size w>()`) has no caller->callee channel for its value — the
+// (`make<size 3, size w>()`) has no caller->callee channel for its value — the
 // callee's size param needs a synthetic scalar argument (or equivalent
 // operand-backed passing) for pure creators with no tensor argument to
 // carry the witness. Check-level binding, the bare-name did-you-mean, the
@@ -110,7 +110,7 @@ fn make<size H, size W>() → tf32[H, W] {
     return out
 }
 main {
-    let tf32[2, 3] a ← make<2, 3>()
+    let tf32[2, 3] a ← make<size 2, size 3>()
     print a.shape().get(0)
     print a.shape().get(1)
     print a.flatten()
@@ -137,7 +137,7 @@ fn make<size H, size W>() → tf32[H, W] {
 }
 main {
     do {
-        let tf32[2, 3] a ← make<2, 3>()
+        let tf32[2, 3] a ← make<size 2, size 3>()
         print "returned"
     }
     catch err {
@@ -190,7 +190,7 @@ fn make<size H, size W>() → tf32[H, W] {
     return out
 }
 main {
-    let tf32[_, _] a ← make<2, 3>()
+    let tf32[_, _] a ← make<size 2, size 3>()
     mut f32 sum ← 0.0
     mut int coords ← 0
     mut int visits ← 0

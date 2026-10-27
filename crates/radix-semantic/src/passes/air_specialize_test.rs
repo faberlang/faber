@@ -164,7 +164,7 @@ fn generic_rope_method_argument_is_specialized_with_the_instance() {
         r#"
 @ radix lane "air"
 functio generic_rope<magnitudo D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {
-    redde x.rope_norm<D>(0, table)
+    redde x.rope_norm<magnitudo D>(0, table)
 }
 
 incipit {

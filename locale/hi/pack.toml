@@ -1541,6 +1541,14 @@ help = "32 बिट से अधिक चौड़ाई वाला पू�
 message = "कर्नेल intermediate extent {extent} पोर्टेबल पूर्णांक श्रेणी से अधिक है"
 help = "intermediate मानों को पोर्टेबल पूर्णांक श्रेणी के भीतर रखें"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "call के type arguments में `size` के बाद का shape केवल प्राकृतिक संख्या dimensions स्वीकार करता है"
+help = "हर dimension को प्राकृतिक संख्या के रूप में लिखें, जैसे `size [2, 3]`; symbolic या run-time dimension `size` नाम से पास करें"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "`size` के बाद bracketed shape केवल call के type arguments में स्वीकार है"
+help = "shape सीधे लिखें, जैसे `tensor<f32, [2, 3]>`, या call में `size [2, 3]` उपयोग करें, जैसे `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "CLI सत्यापन त्रुटि"
 help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
@@ -3236,6 +3244,14 @@ help = "call पर marker वैसा ही लिखें जैसा sign
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "यहां `axis` marker लिखा है लेकिन parameter `axis` घोषित नहीं है"
 help = "`axis` marker हटाएं, या parameter को `axis int` घोषित करें"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "यह argument एक `size` argument है और इसे `size` marker के साथ लिखा जाना चाहिए"
+help = "marker वैसा ही लिखें जैसा signature parameter घोषित करता है, उदाहरण के लिए `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "यहां `size` marker लिखा है लेकिन callee कोई `size` parameter घोषित नहीं करता"
+help = "`size` marker हटाएं, या parameter को `size N` घोषित करें"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "unmarked value को `own` में bind नहीं कर सकते"

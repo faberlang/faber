@@ -23,7 +23,7 @@ locale = "en"
 #   • `const size ROWS = 2` is the static form; it folds in extent positions
 #   • a size name sits in an extent position: `tf32[ROWS, N]`
 #   • a creator takes its extents as size parameters and the call lifts them
-#     with literals: `make<2, 3>()`
+#     with literals: `make<size 2, size 3>()`
 #
 # See also: tensor, size, generic, magnitudo
 # =============================================================================
@@ -52,7 +52,7 @@ main {
     print grid.shape().get(0)
     print grid.shape().get(1)
 
-    let tf32[_, _] made ← make<2, 3>()
+    let tf32[_, _] made ← make<size 2, size 3>()
     print made.shape().get(0)
     print made.shape().get(1)
     print made.flatten()

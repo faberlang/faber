@@ -2197,6 +2197,11 @@ fn resolve_lift_extent(
         radix_syntax::LiftExtent::Paren(term) => {
             resolve_figura_expr(resolver, interner, term, errors);
         }
+        radix_syntax::LiftExtent::Shape(dims) => {
+            for dim in dims {
+                resolve_figura_expr(resolver, interner, dim, errors);
+            }
+        }
     }
 }
 
@@ -2237,6 +2242,9 @@ fn lift_extent_span(extent: &radix_syntax::LiftExtent) -> radix_lexer::Span {
         radix_syntax::LiftExtent::Negative { span, .. } => *span,
         radix_syntax::LiftExtent::Literal(_) => radix_lexer::Span::default(),
         radix_syntax::LiftExtent::Paren(term) => generic_figura_span(term),
+        radix_syntax::LiftExtent::Shape(dims) => {
+            dims.first().map(generic_figura_span).unwrap_or_default()
+        }
     }
 }
 

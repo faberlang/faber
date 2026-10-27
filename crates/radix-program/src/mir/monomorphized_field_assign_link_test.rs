@@ -74,13 +74,13 @@ fn typed_seam() → int {
     do {
         let tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
         let tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
-        let util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
+        let util.Box<4, 4> made ← util.make<size 4, size 4>(ln1, wq)
         let list<util.Box<4, 4>> layers ← [made]
         let tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
         mut int total ← 0
         for from layers let layer {
             let util.Box<4, 4> typed ← util.Box { ln1 = layer.ln1, wq = layer.wq }
-            total ← util.axis0_cells<2, 4, 4>(x, typed)
+            total ← util.axis0_cells<size 2, size 4, size 4>(x, typed)
             total ← total + util.width_of(typed.wq)
         }
         return total
@@ -131,9 +131,9 @@ fn typed_seam_wrong_size_arg() → int {
     do {
         let tensor<f32, [4]> ln1 ← flat(4) ↦ tensor<f32, [4]>
         let tensor<f32, [4, 4]> wq ← flat(16) ↦ tensor<f32, [4, 4]>
-        let util.Box<4, 4> made ← util.make<4, 4>(ln1, wq)
+        let util.Box<4, 4> made ← util.make<size 4, size 4>(ln1, wq)
         let tensor<f32, [2, 4]> x ← flat(8) ↦ tensor<f32, [2, 4]>
-        return util.axis0_cells<2, 8, 4>(x, made)
+        return util.axis0_cells<size 2, size 8, size 4>(x, made)
     }
     catch err {
         return 0

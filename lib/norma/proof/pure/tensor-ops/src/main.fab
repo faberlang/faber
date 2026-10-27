@@ -5,7 +5,10 @@ locale = "en"
 # Pure-module proof for norma:tensor. The tensors are built with the language's
 # own conversion, then each wrapper is called with inferred type arguments.
 # `construct` takes its shape from the annotation of the store it feeds, with
-# the element type inferred or written (`construct<int>`).
+# the element type inferred or written (`construct<int>`). Where no annotation
+# supplies the shape (an argument position), an explicit call writes the whole
+# shape behind the `size` marker (`construct<int, size [4]>`, or shape-only
+# `construct<size [2, 2]>`).
 # Output must match under `faber run` and a `faber build` Rust binary.
 
 import from "norma:tensor" tensor
@@ -28,4 +31,10 @@ main {
     print tensor.flatten(built)
     let tensor<int, [4]> row ← tensor.construct<int>(cells)
     print tensor.sum(row)
+
+    let tensor<int, [4]> sized ← tensor.construct<int, size [4]>(cells)
+    print tensor.sum(sized)
+    let tensor<int, [2, 2]> shaped ← tensor.construct<size [2, 2]>(cells)
+    print tensor.flatten(shaped)
+    print tensor.sum(tensor.construct<int, size [4]>(cells))
 }

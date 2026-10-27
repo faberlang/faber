@@ -173,7 +173,7 @@ const GT19_ROPE_SOURCE: &str = r#"
 @ radix lane "air"
 @ radix backward "rope_backward"
 functio rot(tf32[2, 8] x, tf32[2, 4, 3] table) → fractus {
-    sit tensor<f32, [2, 8]> y ← x.rope_norm<8>(8, table)
+    sit tensor<f32, [2, 8]> y ← x.rope_norm<magnitudo 8>(8, table)
     redde y.media()
 }
 

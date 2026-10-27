@@ -1237,29 +1237,40 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         };
-        let Type::Param(symbol) = self.types.get(generic_arg) else {
-            self.errors.push(MirError::validation(
-                span,
-                format!("{method_name} generic dimension is not a magnitudo argument"),
-            ));
-            return None;
+        let size = match self.types.get(generic_arg) {
+            Type::Param(symbol) => self
+                .context
+                .interner
+                .and_then(|interner| radix_types::parse_explicit_size(interner.resolve(*symbol))),
+            _ => None,
         };
-        let spelling = self
+        let name = match size {
+            Some(radix_types::ExplicitSize::Natural(value)) => {
+                #[expect(
+                    clippy::cast_possible_wrap,
+                    reason = "Faber natural capacities are bounded before MIR lowering"
+                )]
+                return Some(MirOperand::Constant(MirConstant::Int(value as i64)));
+            }
+            Some(radix_types::ExplicitSize::Name(name)) => name,
+            Some(radix_types::ExplicitSize::Shape(_)) | None => {
+                self.errors.push(MirError::validation(
+                    span,
+                    format!("{method_name} generic dimension is not a magnitudo argument"),
+                ));
+                return None;
+            }
+        };
+        let symbol = self
             .context
             .interner
-            .map(|interner| interner.resolve(*symbol))
-            .unwrap_or_default();
-        if let Some(value) = radix_types::parse_natural_capacity(spelling) {
-            #[expect(
-                clippy::cast_possible_wrap,
-                reason = "Faber natural capacities are bounded before MIR lowering"
-            )]
-            return Some(MirOperand::Constant(MirConstant::Int(value as i64)));
-        }
-        let Some(shape) = (0..self.types.index_count()).find_map(|ordinal| {
-            #[expect(clippy::cast_possible_truncation, reason = "IndexId is a bounded arena index")]
-            let id = IndexId(ordinal as u32);
-            matches!(self.types.get_index(id), IndexExpr::Param(found) if *found == *symbol).then_some(id)
+            .and_then(|interner| interner.lookup(name));
+        let Some(shape) = symbol.and_then(|symbol| {
+            (0..self.types.index_count()).find_map(|ordinal| {
+                #[expect(clippy::cast_possible_truncation, reason = "IndexId is a bounded arena index")]
+                let id = IndexId(ordinal as u32);
+                matches!(self.types.get_index(id), IndexExpr::Param(found) if *found == symbol).then_some(id)
+            })
         }) else {
             self.errors.push(MirError::validation(
                 span,

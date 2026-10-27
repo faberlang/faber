@@ -398,8 +398,9 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
             GenericParamSort::Typus if is_limes => "clampa".to_owned(),
             GenericParamSort::Typus => dtype.param.clone(),
             // The tensor probe has width three, so two is an admitted even
-            // dimension for the generic RoPE row.
-            GenericParamSort::Magnitudo => "2".to_owned(),
+            // dimension for the generic RoPE row; a size argument carries
+            // the (Latin) `magnitudo` marker.
+            GenericParamSort::Magnitudo => "magnitudo 2".to_owned(),
         })
         .collect::<Vec<_>>();
     let generic_suffix = if generic_args.is_empty() {

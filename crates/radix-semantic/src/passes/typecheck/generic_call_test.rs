@@ -114,8 +114,8 @@ incipit {
 
 #[test]
 fn explicit_magnitudo_natural_args_bind_at_call_site() {
-    // gradus nn.fab: `linear_from_raw<2, 2, 2>(...)` — NATURAL typeArguments
-    // on magnitudo params.
+    // gradus nn.fab: `linear_from_raw<size 2, size 2, size 2>(...)` — `size`
+    // typeArguments on magnitudo params.
     accepts(
         r"functio take<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
     redde x
@@ -123,7 +123,7 @@ fn explicit_magnitudo_natural_args_bind_at_call_site() {
 
 incipit {
     sit tensor<f32, [2, 2]> a ← vacua
-    sit tensor<f32, [2, 2]> b ← take<2, 2>(a)
+    sit tensor<f32, [2, 2]> b ← take<magnitudo 2, magnitudo 2>(a)
     nota b.longitudo()
 }",
     );
@@ -132,7 +132,7 @@ incipit {
 #[test]
 fn generic_call_forwards_symbolic_magnitudo_args_to_generic_callee() {
     // GSF-1: a generic caller must pass its own magnitudo witnesses on to a
-    // generic callee (`forward<T, D>` spelling `sink<T, D>(x)`), not report
+    // generic callee (`forward<T, D>` spelling `sink<size T, size D>(x)`), not report
     // SEM008 unknown_type_name at the symbolic callee argument.
     accepts(
         r"functio sink<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
@@ -140,12 +140,12 @@ fn generic_call_forwards_symbolic_magnitudo_args_to_generic_callee() {
 }
 
 functio forward<magnitudo T, magnitudo D>(tensor<f32, [T, D]> x) → tensor<f32, [T, D]> {
-    redde sink<T, D>(x)
+    redde sink<magnitudo T, magnitudo D>(x)
 }
 
 incipit {
     sit tensor<f32, [3, 5]> a ← vacua
-    sit tensor<f32, [3, 5]> b ← forward<3, 5>(a)
+    sit tensor<f32, [3, 5]> b ← forward<magnitudo 3, magnitudo 5>(a)
     nota b.longitudo()
 }",
     );
@@ -160,12 +160,12 @@ fn generic_call_forwards_mixed_symbolic_and_natural_magnitudo_args() {
 }
 
 functio forward<magnitudo T>(tensor<f32, [T, 4]> x) → tensor<f32, [T, 4]> {
-    redde sink<T, 4>(x)
+    redde sink<magnitudo T, magnitudo 4>(x)
 }
 
 incipit {
     sit tensor<f32, [3, 4]> a ← vacua
-    sit tensor<f32, [3, 4]> b ← forward<3>(a)
+    sit tensor<f32, [3, 4]> b ← forward<magnitudo 3>(a)
     nota b.longitudo()
 }",
     );
@@ -225,7 +225,7 @@ fn generic_call_symbolic_forwarding_rejects_typus_param_in_size_slot() {
 }
 
 functio wrong<A>(tensor<f32, [2, 4]> x) → tensor<f32, [2, 4]> {
-    redde sink<A, 4>(x)
+    redde sink<A, magnitudo 4>(x)
 }
 
 incipit { tacet }",
@@ -242,7 +242,7 @@ fn explicit_magnitudo_natural_args_reject_wrong_arity() {
 
 incipit {
     sit tensor<f32, [2, 2]> a ← vacua
-    sit tensor<f32, [2, 2]> b ← take<2>(a)
+    sit tensor<f32, [2, 2]> b ← take<magnitudo 2>(a)
 }",
         "wrong_number_of_type_arguments",
     );
@@ -1026,7 +1026,7 @@ fn imported_namespace_generic_call_binds_explicit_magnitudo_args() {
         r#"importa ex "./math" math
 
 functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
-    redde math.add<4, 8>(a, b)
+    redde math.add<magnitudo 4, magnitudo 8>(a, b)
 }"#,
     );
     assert!(

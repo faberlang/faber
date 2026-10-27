@@ -4,7 +4,7 @@
 //! §Proposal): a body-visible size parameter (`size`/`magnitudo`) names a
 //! value — safe widening at use, so it reads as an `int` (la `numerus`)
 //! anywhere in the body — and assignment to it is rejected. It stays legal
-//! in the generic argument slot of `rope_norm<d>(...)`; a type param `T`
+//! in the generic argument slot of `rope_norm<size d>(...)`; a type param `T`
 //! still is not a value.
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
@@ -34,7 +34,7 @@ fn rejects_with_issue(source: &str, issue: &str) {
 }
 
 const ROPE_Q_PROBE: &str = r"functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, varia tensor<T, [D, d]> output) → vacuum {
-    output ⇇ input.rope_norm<d>(0, rota)
+    output ⇇ input.rope_norm<magnitudo d>(0, rota)
 }";
 
 #[test]

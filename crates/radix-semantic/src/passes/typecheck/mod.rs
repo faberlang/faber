@@ -1207,6 +1207,10 @@ mod optional_chain_call_test;
 mod axis_marker_test;
 
 #[cfg(test)]
+#[path = "explicit_size_marker_test.rs"]
+mod explicit_size_marker_test;
+
+#[cfg(test)]
 #[path = "axis_sugar_test.rs"]
 mod axis_sugar_test;
 

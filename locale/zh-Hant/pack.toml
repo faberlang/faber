@@ -1569,6 +1569,14 @@ help = "請使用不超過 32 位元的整數寬度"
 message = "核心中間範圍 {extent} 超出可攜式整數範圍"
 help = "讓中間值維持在可攜式整數範圍內"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "呼叫型別引數中 `size` 之後的形狀只接受自然數維度"
+help = "將每個維度寫成自然數，例如 `size [2, 3]`；符號維度或執行期維度請透過 `size` 名稱傳遞"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "`size` 之後的方括號形狀只允許出現在呼叫的型別引數中"
+help = "直接寫出形狀，例如 `tensor<f32, [2, 3]>`，或在呼叫中使用 `size [2, 3]`，例如 `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "CLI 驗證錯誤"
 help = "在產生可執行的 CLI 程式碼前，修正 CLI 註解契約"
@@ -3264,6 +3272,14 @@ help = "在呼叫處依簽章宣告寫出標記，例如 `f(axis 1)`"
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "此處寫了 `axis` 標記，但參數未宣告為 `axis`"
 help = "移除 `axis` 標記，或將參數宣告為 `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "此引數是 `size` 引數，必須以 `size` 標記寫出"
+help = "依簽章對參數的宣告寫出標記，例如 `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "此處寫了 `size` 標記，但被呼叫的函式未宣告任何 `size` 參數"
+help = "移除 `size` 標記，或將參數宣告為 `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "無法將未標記的值繫結為 `own`"

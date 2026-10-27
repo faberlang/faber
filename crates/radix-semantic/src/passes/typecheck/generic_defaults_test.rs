@@ -181,7 +181,7 @@ fn partial_size_prefix_defaults_trailing_suffix() {
 }
 
 incipit {
-    sit _ n ← tag<9>(1)
+    sit _ n ← tag<magnitudo 9>(1)
 }",
     );
     accepts(&fixture);
@@ -254,7 +254,21 @@ incipit {
 }
 
 #[test]
-fn natural_size_arg_on_typus_param_rejects_wrong_sort() {
+fn size_arg_on_typus_only_callee_rejects_unexpected_marker() {
+    let fixture = compile(
+        r#"functio id<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    sit _ x ← id<magnitudo 64>("salve")
+}"#,
+    );
+    rejects_with_issue(&fixture, "size_marker_unexpected");
+}
+
+#[test]
+fn bare_natural_in_explicit_list_requires_the_size_marker() {
     let fixture = compile(
         r#"functio id<T>(T x) → T {
     redde x
@@ -264,21 +278,40 @@ incipit {
     sit _ x ← id<64>("salve")
 }"#,
     );
-    rejects_with_issue(&fixture, "generic_type_arg_sort");
+    rejects_with_issue(&fixture, "size_marker_required");
 }
 
 #[test]
-fn natural_prefix_leading_with_typus_param_rejects_wrong_sort() {
+fn bare_natural_beside_defaulted_size_requires_the_size_marker() {
     let fixture = compile(
         r"functio duo<T, magnitudo D = 4>(numerus x) → numerus {
     redde x
 }
 
 incipit {
-    sit _ n ← duo<7>(1)
+    sit _ n ← duo<numerus, 7>(1)
 }",
     );
-    rejects_with_issue(&fixture, "generic_type_arg_sort");
+    rejects_with_issue(&fixture, "size_marker_required");
+}
+
+#[test]
+fn marked_size_after_type_binds_the_defaulted_size_param() {
+    let fixture = compile(
+        r"functio duo<T, magnitudo D = 4>(numerus x) → numerus {
+    redde x
+}
+
+incipit {
+    sit _ n ← duo<numerus, magnitudo 7>(1)
+}",
+    );
+    accepts(&fixture);
+    let explicit = binding_named(&fixture, "T");
+    assert_eq!(explicit.source, GenericBindingSource::Explicit);
+    let size = binding_named(&fixture, "D");
+    assert_eq!(size.source, GenericBindingSource::Explicit);
+    assert_size_witness(&fixture, size, 7);
 }
 
 #[test]
