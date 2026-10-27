@@ -40,15 +40,11 @@ locale = "en"
 # =============================================================================
 
 main {
-    let f64 x ← 81.0
-    print √ x
-    print √ x + 1.0
-    print √ (x + 63.0)
-    let f64 cube ← 8.0
-    print ∛ cube
-    let f64 negative ← -8.0
-    print ∛ negative
-    print ∜ x
-    let f64 sixteen ← 16.0
-    print ∜ sixteen
+    print √ 81.0
+    print √ 81.0 + 1.0
+    print √ (81.0 + 63.0)
+    print ∛ 8.0
+    print ∛ -8.0
+    print ∜ 81.0
+    print ∜ 16.0
 }
