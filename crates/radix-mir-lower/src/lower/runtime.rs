@@ -835,6 +835,12 @@ impl FunctionBuilder<'_> {
 
         let mut lowered_receiver = self.lower_expr_value(receiver)?;
         let expr_ty = self.expr_ty(expr)?;
+        if matches!(
+            op,
+            MirCollectionOp::ScalarMath(_) | MirCollectionOp::Absolute | MirCollectionOp::Signum
+        ) {
+            lowered_receiver = self.settle_unsized_float_receiver(receiver, lowered_receiver, expr_ty, expr.span)?;
+        }
         // A bounded cord (`ascii<N>` / `textus<N>`) receiver widens to the
         // unbounded `textus` carrier before a text-receiver runtime call, the
         // same copy `↦ textus` performs (D7). The checker already resolves
@@ -1051,6 +1057,35 @@ impl FunctionBuilder<'_> {
             return Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Some(value)), expr_ty, expr.span));
         }
         Some(value)
+    }
+
+    /// A same-as-receiver float intrinsic (`x.sqrt()`, `x.abs()`, ...) returns
+    /// its receiver's type, but a float literal receiver has no width of its
+    /// own: it is the unsized `fractus` until a store gives it one. When the
+    /// store repaints the call to a sized slot (`let f64 y ← (8.0).cbrt()`) the
+    /// receiver has to take that width too, or the call's result and receiver
+    /// types disagree. The width is applied here, at the receiver's own value,
+    /// exactly as the store would apply it to the literal.
+    fn settle_unsized_float_receiver(
+        &mut self,
+        receiver: &HirExpression,
+        lowered: MirOperand,
+        result_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let receiver_ty = self.expr_ty(receiver)?;
+        let unsized_float = matches!(
+            self.normalized_type(receiver_ty.semantic_id()),
+            Type::Primitive(Primitive::Fractus)
+        );
+        let sized_float = matches!(
+            self.normalized_type(result_ty.semantic_id()),
+            Type::SizedNumeric(Primitive::Fractus, _)
+        );
+        if unsized_float && sized_float {
+            return Some(self.assign_temp(MirValueKind::Operand(lowered), result_ty, span));
+        }
+        Some(lowered)
     }
 
     fn lower_tensor_limes(

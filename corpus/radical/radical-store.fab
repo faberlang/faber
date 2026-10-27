@@ -1,0 +1,86 @@
++++
+term = "√"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "unary_expr", "additive_expr", "expression", "literal", "call_expr", "member_suffix", "nota_stmt"]
+category = "arithmetic"
+summary = "A radical or float method on a literal receiver stored into a typed float binding: the literal has no width until the store gives it one."
+syntax = "let f64 y ← ∛ 8.0 | let f64 y ← (8.0).sqrt()"
+related = ["radical-scalar", "radical-tensor", "radical-int-reject"]
+locale = "en"
++++
+
+# =============================================================================
+# √ ∛ ∜ and float methods on a literal, stored into a typed binding.
+# =============================================================================
+#
+# What this teaches:
+#   • A float literal has no width of its own. `(8.0).cbrt()` and `∛ 8.0` are
+#     computed on the bare value, and the width belongs to the cell that
+#     receives the result, here `f64`
+#   • The same holds for the other scalar float methods (`sqrt`, `cbrt`, `exp`,
+#     `ln`, `log10`, `sin`, `cos`, `tan`, `abs`) and for a store through
+#     assignment, a return, an argument or a field
+#   • A variable receiver, a literal receiver and a glyph receiver all agree
+#
+# Common mistakes:
+#   • expecting the literal receiver to need its own `f64` annotation: the
+#     slot it is stored into is the only place a width is written
+#
+# EXPECTED stdout:
+#   2.0
+#   2.0
+#   2.0
+#   3.0
+#   2.0
+#   2.5
+#   1.0
+#   2.0
+#   1.0
+#   9.0
+#   3.0
+#   4.0
+#   2.0
+#
+# See also: radical-scalar, radical-tensor, radical-int-reject
+# =============================================================================
+
+class Probe {
+    let f64 root
+}
+
+fn halve(f64 x) → f64 {
+    return x ÷ 2.0
+}
+
+fn cube_root_of_eight() → f64 {
+    return (8.0).cbrt()
+}
+
+main {
+    let f64 glyph ← ∛ 8.0
+    let f64 method ← (8.0).cbrt()
+    let f64 fourth ← ∜ 16.0
+    let f64 square ← (9.0).sqrt()
+    let f64 eight ← 8.0
+    let f64 variable ← eight.cbrt()
+    let f64 magnitude ← (-2.5).abs()
+    let f64 unit ← (0.0).exp()
+    let f64 decade ← (100.0).log10()
+    let f64 trig ← (0.0).sin() + (0.0).cos()
+    mut f64 later ← 0.0
+    later ← (81.0).sqrt()
+    let Probe probe ← Probe { root = (27.0).cbrt() }
+    print glyph
+    print method
+    print fourth
+    print square
+    print variable
+    print magnitude
+    print unit
+    print decade
+    print trig
+    print later
+    print probe.root
+    print halve((64.0).sqrt())
+    print cube_root_of_eight()
+}

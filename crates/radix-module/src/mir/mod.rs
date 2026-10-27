@@ -37,6 +37,9 @@ mod wgsl_text;
 pub mod test_support;
 
 #[cfg(test)]
+#[path = "float_literal_receiver_test.rs"]
+mod float_literal_receiver_test;
+#[cfg(test)]
 #[path = "itera_apud_indexed_test.rs"]
 mod itera_apud_indexed_tests;
 #[cfg(test)]
