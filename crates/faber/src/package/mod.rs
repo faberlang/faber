@@ -116,7 +116,9 @@ pub use manifest::{
     read_manifest,
 };
 #[cfg(feature = "runner")]
-pub use manifest::{manifest_device_choice, resolve_cpu_threads, resolve_device_selection};
+pub use manifest::{
+    manifest_device_choice, resolve_cpu_threads, resolve_cuda_libdevice, resolve_device_selection,
+};
 #[cfg(feature = "runner")]
 #[cfg(feature = "runner")]
 pub use mir::with_lowered_package_mir;

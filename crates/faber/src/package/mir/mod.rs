@@ -109,6 +109,8 @@ fn device_section_builder(
     }
     let device_inputs = resolve_device_inputs(prepared, lowered, &program, diagnostic_path)?;
     let selection = prepared.device_selection.unwrap_or(DeviceSelection::Auto);
+    let cuda_libdevice =
+        super::resolve_cuda_libdevice(diagnostic_path).map_err(|diagnostic| vec![*diagnostic])?;
     let section = super::device::device_section_for_program(
         &program,
         &semantics,
@@ -118,6 +120,7 @@ fn device_section_builder(
             selection,
             inputs: &device_inputs,
             ptx_target: super::device::ptx_target_for(None),
+            cuda_libdevice: cuda_libdevice.as_deref(),
             repeating_steps: step_count,
         },
     )?;
@@ -760,7 +763,13 @@ fn session_dispatcher(
         session, backend, ..
     } = admitted;
     let image_start = Instant::now();
-    let (mut image, omitted, image_timing) = device_image_for_lowered(lowered, backend)?;
+    let cuda_libdevice = if backend == super::device::DeviceImageBackend::Cuda {
+        super::resolve_cuda_libdevice(input).map_err(|diagnostic| vec![*diagnostic])?
+    } else {
+        None
+    };
+    let (mut image, omitted, image_timing) =
+        device_image_for_lowered(lowered, backend, cuda_libdevice.as_deref())?;
     let image_build_ns = image_start.elapsed().as_nanos() as u64;
     if image.kernels.is_empty() {
         let reasons = omitted
