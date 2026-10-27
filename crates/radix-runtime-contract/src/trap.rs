@@ -32,6 +32,12 @@
 //! `128+N` (those belong to shells and signals), and `process.exit_process(n)`
 //! still exits `n` exactly as written.
 //!
+//! ## The trap text
+//!
+//! The words of a Faber-raised failure are defined once, in [`text`]. The
+//! runner, the clif lowering and the clif runtime all take their message from
+//! there, so the same trap reads the same on every lane.
+//!
 //! KEEP IN SYNC: `runtime/clif/src/lib.rs` takes its class from this table
 //! through `exit_trap`; the runner takes it from `RunnerError::exit_status`.
 
@@ -47,6 +53,57 @@ pub const ABORT_LINE_PREFIX: &str = "abort: ";
 #[must_use]
 pub fn trap_line(text: &str) -> String {
     format!("{TRAP_LINE_PREFIX}{text}")
+}
+
+/// The text of each Faber-raised failure that more than one lane raises.
+///
+/// A lane never spells one of these inline: the runner, the clif lowering and
+/// the clif runtime all call into this module, so the trap line is
+/// byte-identical across lanes.
+pub mod text {
+    /// An exact intermediate or a checked operation left its range.
+    pub const NUMERUS_OVERFLOW: &str = "numerus overflow";
+
+    /// An index or window bound into a collection that is negative. It is its
+    /// own failure, not the collection's out-of-bounds one, on every lane.
+    pub const NEGATIVE_INDEX: &str = "expected non-negative numerus index";
+
+    /// A scalar index read of a text that is past the last character.
+    pub const TEXT_INDEX_OUT_OF_BOUNDS: &str = "text index out of bounds";
+
+    /// A scalar index read of a list that is past the last item.
+    pub const LIST_INDEX_OUT_OF_BOUNDS: &str = "array index out of bounds";
+
+    /// A keyed read of a map (or ledger) whose key is absent.
+    pub const MAP_MISSING_KEY: &str = "tabula missing key";
+
+    /// The window as slice bounds when it lies fully inside `len` items: the
+    /// start is not negative, not past the end, and the end is not past `len`.
+    /// A window outside is the failure [`list_window_outside`] or
+    /// [`text_window_outside`] words.
+    #[must_use]
+    pub fn window_inside(start: i128, end: i128, len: usize) -> Option<(usize, usize)> {
+        if 0 <= start && start <= end && end <= i128::try_from(len).ok()? {
+            Some((usize::try_from(start).ok()?, usize::try_from(end).ok()?))
+        } else {
+            None
+        }
+    }
+
+    /// A list window `xs[lo‥hi]` that does not lie fully inside the list.
+    /// The bounds are the half-open window as signed values (an inclusive end
+    /// already advanced by one); `len` is the list length.
+    #[must_use]
+    pub fn list_window_outside(start: i128, end: i128, len: usize) -> String {
+        format!("list range {start}‥{end} outside 0‥{len}")
+    }
+
+    /// A text window `s[lo‥hi]` that does not lie fully inside the text, in
+    /// characters; same bounds convention as [`list_window_outside`].
+    #[must_use]
+    pub fn text_window_outside(start: i128, end: i128, len: usize) -> String {
+        format!("text range {start}‥{end} outside 0‥{len}")
+    }
 }
 
 /// What failed, at the grain that decides the exit class.

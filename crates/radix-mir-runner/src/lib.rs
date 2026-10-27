@@ -67,6 +67,7 @@ use radix_mir::{
     ValidatedMir,
 };
 use radix_runtime_contract::display_tokens::DisplayTokens;
+use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 use regex_program::RegexProgram;
 use std::cell::RefCell;
@@ -3454,7 +3455,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         {
                             let mut borrow = cell.borrow_mut();
                             let slot = borrow.get_mut(idx).ok_or_else(|| {
-                                RunnerError::internal(span, "array index out of bounds")
+                                RunnerError::internal(span, trap_text::LIST_INDEX_OUT_OF_BOUNDS)
                             })?;
                             *slot = assigned;
                         }
@@ -3465,7 +3466,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         {
                             let mut borrow = lanes.borrow_mut();
                             let slot = borrow.get_mut(idx).ok_or_else(|| {
-                                RunnerError::internal(span, "array index out of bounds")
+                                RunnerError::internal(span, trap_text::LIST_INDEX_OUT_OF_BOUNDS)
                             })?;
                             *slot = assigned;
                         }

@@ -159,3 +159,20 @@ fn any_other_abort_is_program_logic() {
         assert_eq!(abort_exit_class(reason), 70, "{reason:?}");
     }
 }
+
+#[test]
+fn the_window_texts_name_the_bounds_and_the_length() {
+    use super::text::{list_window_outside, text_window_outside};
+    assert_eq!(list_window_outside(0, 9, 3), "list range 0‥9 outside 0‥3");
+    assert_eq!(text_window_outside(-1, 2, 4), "text range -1‥2 outside 0‥4");
+}
+
+#[test]
+fn a_window_is_inside_only_when_it_fits_the_length() {
+    use super::text::window_inside;
+    assert_eq!(window_inside(0, 3, 3), Some((0, 3)));
+    assert_eq!(window_inside(3, 3, 3), Some((3, 3)));
+    assert_eq!(window_inside(0, 9, 3), None);
+    assert_eq!(window_inside(2, 1, 3), None);
+    assert_eq!(window_inside(-1, 2, 3), None);
+}

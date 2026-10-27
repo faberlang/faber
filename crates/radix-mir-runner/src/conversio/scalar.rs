@@ -601,7 +601,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         {
             return match recovery {
                 Some(recovery) => self.eval_recovery(recovery, span),
-                None => Err(RunnerError::internal(span, "numerus overflow")),
+                None => Err(RunnerError::internal(
+                    span,
+                    radix_runtime_contract::trap::text::NUMERUS_OVERFLOW,
+                )),
             };
         }
         Ok(converted)

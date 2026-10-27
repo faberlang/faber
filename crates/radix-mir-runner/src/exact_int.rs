@@ -29,7 +29,7 @@ pub(crate) const EXACT_MIN: i128 = i64::MIN as i128;
 /// Largest value an exact integer may hold.
 pub(crate) const EXACT_MAX: i128 = u64::MAX as i128;
 
-const OVERFLOW: &str = "numerus overflow";
+const OVERFLOW: &str = radix_runtime_contract::trap::text::NUMERUS_OVERFLOW;
 const DIVISION: &str = "numerus division failed";
 const NEGATIVE_SHIFT: &str = "negative shift count";
 
