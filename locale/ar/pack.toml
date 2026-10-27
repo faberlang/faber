@@ -1137,6 +1137,10 @@ help = "أصلح تركيب AST للتخفيض"
 message = "اسم القيمة {name} لا يمكن أن يشغل موضع مدى في التعليق"
 help = "اكتب `size {name}` لتهجئة الرفع في هذا الموضع، مثل `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "وسيط الحجم أو الشكل في استدعاء generic غير مدعوم"
+help = "استخدم ثابتًا أو اسم حجم أو قيمة مكتوبة `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring يتطلب initializer"
 help = "أصلح تركيب AST للتخفيض"
@@ -1524,6 +1528,14 @@ help = "استخدم عرض عدد صحيح لا يتجاوز 32 بت"
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "امتداد القيمة الوسيطة للنواة {extent} يتجاوز مدى الأعداد الصحيحة المحمول"
 help = "أبقِ القيم الوسيطة ضمن مدى الأعداد الصحيحة المحمول"
+
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "الشكل بعد `size` في وسائط النوع للاستدعاء يقبل أبعادا من الأعداد الطبيعية فقط"
+help = "اكتب كل بعد كعدد طبيعي، مثلا `size [2, 3]`؛ ومرر البعد الرمزي أو وقت التشغيل عبر اسم `size`"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "الشكل المحصور بين أقواس بعد `size` مسموح فقط في وسائط النوع للاستدعاء"
+help = "اكتب الشكل مباشرة، مثلا `tensor<f32, [2, 3]>`، أو استخدم `size [2, 3]` في استدعاء مثل `construct<f32, size [2, 3]>(data)`"
 
 [diagnostics.SEM009]
 message = "خطأ في CLI validation"
@@ -3220,6 +3232,14 @@ help = "اكتب العلامة عند الاستدعاء كما يعلنها ا
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "علامة `axis` مكتوبة هنا لكن المعامل غير معلن كـ `axis`"
 help = "أزل علامة `axis`، أو أعلن المعامل `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "هذا الوسيط وسيط `size` ويجب كتابته بعلامة `size`"
+help = "اكتب العلامة كما يعلن التوقيع المعامل، مثلا `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "علامة `size` مكتوبة هنا لكن الدالة المستدعاة لا تعلن أي معامل `size`"
+help = "أزل علامة `size`، أو أعلن المعامل `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "لا يمكن ربط قيمة غير معلَّمة في `own`"

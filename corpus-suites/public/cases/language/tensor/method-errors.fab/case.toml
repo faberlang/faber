@@ -12,6 +12,6 @@ check_only = true
 outcome = "pass"
 
 [targets.runner.expect]
-exit = 70
+exit = 65
 stderr_contains = "tensor conversion expected 4 elements, got 3"
 check_only = false

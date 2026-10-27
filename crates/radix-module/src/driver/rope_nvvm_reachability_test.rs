@@ -24,7 +24,7 @@ locale = "en"
 @ kernel
 @ public
 fn rope_probe(tensor<f32, [4]> x, tensor<f32, [1, 2, 3]> table) → tensor<f32, [4]> {{
-    return x.{method}<4>(0, table)
+    return x.{method}<size 4>(0, table)
 }}
 "#
     )

@@ -59,9 +59,11 @@ pub use vocabulary::{
 /// compiler crate.
 pub const USER_DEF_ID_BASE: u32 = 0x0000_1000;
 pub use index::{
-    IndexArithmeticError, IndexExpr, IndexId, IndexVar, RuntimeExtentId, add_index_constant,
-    compose_index_affine_constant, compute_cotangent_reduction_axes, divide_index_exact,
-    evaluate_index_dimension, i64s_from_literal_index, parse_natural_capacity,
+    EXPLICIT_SIZE_MARKER, ExplicitSize, IndexArithmeticError, IndexExpr, IndexId, IndexVar,
+    RuntimeExtentId, add_index_constant, compose_index_affine_constant,
+    compute_cotangent_reduction_axes, divide_index_exact, evaluate_index_dimension,
+    i64s_from_literal_index, parse_explicit_size, parse_natural_capacity, parse_spelled_shape,
+    spell_explicit_size, spell_natural_shape,
 };
 pub use instans_precision::{
     InstansPrecision, InstansPrecisionError, InstansPrecisionRank, effective_instans_precision,

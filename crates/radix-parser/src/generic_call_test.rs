@@ -130,27 +130,90 @@ fn parses_multiple_type_args_on_direct_call() {
     ));
 }
 
+fn size_lift(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::LiftExtent {
+    let radix_syntax::GenericArgExpr::Size(radix_syntax::FiguraExpr::Lift(lift)) = arg else {
+        panic!("expected a marked size argument, got {arg:?}");
+    };
+    lift
+}
+
 #[test]
 fn parses_natural_type_args_on_direct_call() {
-    // gradus nn.fab: `return linear_from_raw<2, 2, 2>(raw_x, raw_w, raw_b)`
+    // gradus nn.fab: `return linear_from_raw<size 2, size 2, size 2>(raw_x, raw_w, raw_b)`
     // PARSE030.expected_expression when call-site typeArguments rejected NATURAL.
     let result = parse_ok_la(
         r"incipit {
-    sit _ x ← linear_from_raw<2, 2, 2>(a, b, c)
+    sit _ x ← linear_from_raw<magnitudo 2, magnitudo 2, magnitudo 2>(a, b, c)
 }",
     );
     let call = first_call_expr(&result);
     assert_eq!(call.type_args.len(), 3);
     for arg in &call.type_args {
-        let TypeExprKind::Named(name, params) = &generic_arg_type(arg).kind else {
-            panic!(
-                "expected NATURAL type argument, got {:?}",
-                generic_arg_type(arg).kind
-            );
-        };
-        assert!(params.is_empty());
-        assert_eq!(result.interner.resolve(name.name), "2");
+        assert!(matches!(
+            size_lift(arg),
+            radix_syntax::LiftExtent::Literal(2)
+        ));
     }
+}
+
+#[test]
+fn parses_whole_shape_after_the_size_marker() {
+    let result = parse_ok_la(
+        r"incipit {
+    sit _ x ← construe<numerus, magnitudo [2, 3]>(data)
+}",
+    );
+    let call = first_call_expr(&result);
+    assert_eq!(call.type_args.len(), 2);
+    assert!(matches!(
+        generic_arg_type(&call.type_args[0]).kind,
+        TypeExprKind::Named(_, _)
+    ));
+    let radix_syntax::LiftExtent::Shape(dims) = size_lift(&call.type_args[1]) else {
+        panic!("expected a shape operand");
+    };
+    assert_eq!(dims.len(), 2);
+    assert!(matches!(dims[0], radix_syntax::FiguraExpr::Literal(2)));
+    assert!(matches!(dims[1], radix_syntax::FiguraExpr::Literal(3)));
+}
+
+#[test]
+fn parses_the_empty_and_single_dimension_shapes() {
+    let result = parse_ok_la(
+        r"incipit {
+    sit _ x ← construe<magnitudo [4]>(data)
+}",
+    );
+    let call = first_call_expr(&result);
+    let radix_syntax::LiftExtent::Shape(dims) = size_lift(&call.type_args[0]) else {
+        panic!("expected a shape operand");
+    };
+    assert_eq!(dims.len(), 1);
+
+    let result = parse_ok_la(
+        r"incipit {
+    sit _ x ← construe<magnitudo []>(data)
+}",
+    );
+    let call = first_call_expr(&result);
+    let radix_syntax::LiftExtent::Shape(dims) = size_lift(&call.type_args[0]) else {
+        panic!("expected a shape operand");
+    };
+    assert!(dims.is_empty());
+}
+
+#[test]
+fn parses_a_size_name_operand_beside_a_type() {
+    let result = parse_ok_la(
+        r"incipit {
+    sit _ x ← mk<numerus, magnitudo n>(data)
+}",
+    );
+    let call = first_call_expr(&result);
+    assert!(matches!(
+        size_lift(&call.type_args[1]),
+        radix_syntax::LiftExtent::Name(_)
+    ));
 }
 
 #[test]

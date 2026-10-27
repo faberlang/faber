@@ -1,0 +1,70 @@
++++
+term = "tensor"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "fac_stmt", "cape_clause", "fixum_decl", "array_literal", "conversio_expr", "inline_default", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "tensor.construct of a lista that does not fill the Figura fails through ⇥ string: fac/cape and ⊥ see it."
+syntax = "tensor.construct(<lista>) [⊥ <fallback>]"
+related = ["tensor", "↦", "⇥", "⊥", "fac", "cape", "Figura"]
+locale = "en"
++++
+
+# =============================================================================
+# tensor.construct — the bridge reports a wrong length on its ⇥ string channel.
+# =============================================================================
+#
+# What this teaches:
+#   • `tensor.construct(ys)` is `ys ↦ tensor<T, Shape>` behind a `⇥ string` signature. The shape comes from the store (`let tensor<int, [4]> t ← …`) or the element type is named (`tensor.construct<int>(ys)`).
+#   • A lista that does not fill the shape is a failure the caller handles: `fac { … } cape err { … }` catches it and `⊥ fallback` supplies a value.
+#
+# Common mistakes:
+#   • Calling `tensor.construct` outside `main` with no handler — the call is failable, so the checker asks for `⊥`, `fac`/`cape`, or a `⇥` channel on the caller.
+#
+# See also: tensor, ↦, ⇥, ⊥, fac, cape, Figura, lista-tensor-length-fallible.fab
+# =============================================================================
+
+import from "norma:tensor" tensor
+
+# The shape comes from the store.
+fn caughtStore(list<int> ys) → int {
+    do {
+        let tensor<int, [4]> t ← tensor.construct(ys)
+        return t.sum()
+    }
+    catch err {
+        return -3
+    }
+}
+
+# The element type is named.
+fn caughtNamed(list<int> ys) → int {
+    do {
+        let tensor<int, [4]> t ← tensor.construct<int>(ys)
+        return t.sum()
+    }
+    catch err {
+        return -4
+    }
+}
+
+# `⊥` on the failable call.
+fn coalescedConstruct(list<int> ys) → int {
+    let tensor<int, [4]> fallback ← [8, 8, 8, 8] ↦ tensor<int, [4]>
+    let tensor<int, [4]> t ← tensor.construct(ys) ⊥ fallback
+    return t.sum()
+}
+
+main {
+    let list<int> exact ← [1, 2, 3, 4]
+    let list<int> short ← [1]
+    let list<int> long ← [1, 2, 3, 4, 5]
+
+    print caughtStore(exact)
+    print caughtStore(short)
+    print caughtStore(long)
+    print caughtNamed(exact)
+    print caughtNamed(short)
+    print coalescedConstruct(exact)
+    print coalescedConstruct(short)
+}

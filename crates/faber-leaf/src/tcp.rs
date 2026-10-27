@@ -312,7 +312,7 @@ fn write_bytes(args: &[Arg]) -> Result<Reply, LeafError> {
     let data = match args.get(1) {
         Some(Arg::Bytes(value)) => value.as_slice(),
         Some(_) => {
-            return Err(LeafError::invalid_argument(ROUTE, "data must be octeti"));
+            return Err(LeafError::invalid_argument(ROUTE, "data must be list<b8>"));
         }
         None => return Err(LeafError::invalid_argument(ROUTE, "missing data")),
     };

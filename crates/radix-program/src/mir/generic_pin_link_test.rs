@@ -27,7 +27,7 @@ main {
     let tensor<f32, [3, 4]> t ← [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] ↦ tensor<f32, [3, 4]>
     let list<int> ids ← [0, 1, 2]
     do {
-        let tensor<f32, [3, 4]> r ← utilModule.gather<3, 4, 3>(t, ids)
+        let tensor<f32, [3, 4]> r ← utilModule.gather<size 3, size 4, size 3>(t, ids)
         let list<int, _> s ← r.shape()
         print s.length()
         print s[0]
@@ -45,7 +45,7 @@ main {
     let tensor<f32, [3, 4]> t ← [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] ↦ tensor<f32, [3, 4]>
     let list<int> ids ← [0, 1]
     do {
-        let tensor<f32, [2, 4]> r ← utilModule.gather<3, 4, 2>(t, ids)
+        let tensor<f32, [2, 4]> r ← utilModule.gather<size 3, size 4, size 2>(t, ids)
         let list<int, _> s ← r.shape()
         print s.length()
     }

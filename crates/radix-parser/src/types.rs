@@ -987,24 +987,31 @@ impl Parser {
             return Ok(FiguraExpr::Infer);
         }
 
-        if self.eat(&TokenKind::LBracket) {
-            let mut dims = Vec::new();
-            if !self.check(&TokenKind::RBracket) {
-                loop {
-                    let span = self.current_span();
-                    dims.push(self.nested(ParseErrorKind::TypeInvalid, span, |parser| {
-                        parser.parse_figura()
-                    })?);
-                    if !self.consume_item_separator(&TokenKind::RBracket, "figura_dimensions")? {
-                        break;
-                    }
-                }
-            }
-            self.expect_issue(&TokenKind::RBracket, "shape_dimensions_end")?;
-            return Ok(FiguraExpr::Tuple(dims));
+        if self.check(&TokenKind::LBracket) {
+            return Ok(FiguraExpr::Tuple(self.parse_figura_dimensions()?));
         }
 
         self.parse_figura_additive()
+    }
+
+    /// Parse the bracketed dimension list `[ figura (, figura)* ]` (empty
+    /// allowed); the caller has checked the opening `[`.
+    fn parse_figura_dimensions(&mut self) -> Result<Vec<FiguraExpr>, ParseError> {
+        self.advance();
+        let mut dims = Vec::new();
+        if !self.check(&TokenKind::RBracket) {
+            loop {
+                let span = self.current_span();
+                dims.push(self.nested(ParseErrorKind::TypeInvalid, span, |parser| {
+                    parser.parse_figura()
+                })?);
+                if !self.consume_item_separator(&TokenKind::RBracket, "figura_dimensions")? {
+                    break;
+                }
+            }
+        }
+        self.expect_issue(&TokenKind::RBracket, "shape_dimensions_end")?;
+        Ok(dims)
     }
 
     fn parse_figura_additive(&mut self) -> Result<FiguraExpr, ParseError> {
@@ -1040,8 +1047,12 @@ impl Parser {
     }
 
     /// Parse the primary payload of a spelled lift: an integer literal
-    /// (optionally negated), a name, or a parenthesized figura term.
+    /// (optionally negated), a name, a parenthesized figura term, or a
+    /// bracketed shape.
     fn parse_figura_lift_extent(&mut self) -> Result<LiftExtent, ParseError> {
+        if self.check(&TokenKind::LBracket) {
+            return Ok(LiftExtent::Shape(self.parse_figura_dimensions()?));
+        }
         if self.eat(&TokenKind::Minus) {
             let TokenKind::Integer(value) = self.peek().kind else {
                 return Err(self.invalid_type_error("figura_arithmetic_requires_natural_constant"));

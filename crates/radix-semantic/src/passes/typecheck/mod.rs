@@ -612,6 +612,11 @@ pub(crate) struct TypeChecker<'a> {
     /// `Type::Param`, so the active declaration row is needed to distinguish
     /// a caller-owned `magnitudo` witness from a caller-owned type parameter.
     pub current_generic_param_kinds: FxHashMap<Symbol, radix_syntax::GenericParamKind>,
+    /// Type parameters of the genus whose method is being checked. They stay
+    /// rigid inside the method body exactly like the method's own generics:
+    /// a callee signature that mentions one (`out.append(x)` over `list<T>`)
+    /// keeps `T` rather than instantiating a fresh inference variable.
+    pub current_genus_type_params: FxHashSet<Symbol>,
 
     /// `DefIds` of the active function's `magnitudo` (size) generic params.
     /// A size name in value position lowers as a `Path` on its `HirTypeParam`
@@ -966,6 +971,7 @@ impl<'a> TypeChecker<'a> {
             ordo_members: FxHashMap::default(),
             type_params_by_def: FxHashMap::default(),
             current_generic_param_kinds: FxHashMap::default(),
+            current_genus_type_params: FxHashSet::default(),
             current_size_param_defs: FxHashSet::default(),
             current_size_param_by_name: FxHashMap::default(),
             current_return: None,
@@ -1201,6 +1207,10 @@ mod optional_chain_call_test;
 mod axis_marker_test;
 
 #[cfg(test)]
+#[path = "explicit_size_marker_test.rs"]
+mod explicit_size_marker_test;
+
+#[cfg(test)]
 #[path = "axis_sugar_test.rs"]
 mod axis_sugar_test;
 
@@ -1414,6 +1424,9 @@ mod compound_guard_narrowing_test;
 #[cfg(test)]
 #[path = "diverging_guard_narrowing_test.rs"]
 mod diverging_guard_narrowing_test;
+#[cfg(test)]
+#[path = "genus_optional_into_plain_test.rs"]
+mod genus_optional_into_plain_test;
 #[cfg(test)]
 #[path = "member_privacy_test.rs"]
 mod member_privacy_test;

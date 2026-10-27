@@ -1149,6 +1149,10 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "ชื่อค่า {name} ใช้ตำแหน่ง extent ในคำประกาศไม่ได้"
 help = "เขียน `size {name}` เพื่อระบุการยกในตำแหน่งจัดเก็บนี้ เช่น `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "ขนาดหรือรูปร่างในการเรียก generic ไม่รองรับ"
+help = "ใช้ค่าคงที่ ชื่อขนาด หรือค่าที่เขียนเป็น `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "การแยกโครงสร้าง array ต้องมี initializer"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1536,6 +1540,14 @@ help = "ใช้ความกว้างจำนวนเต็มไม่
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "extent ตัวกลางของเคอร์เนล {extent} เกินช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
 help = "เก็บค่าตัวกลางให้อยู่ในช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
+
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "รูปร่างหลัง `size` ในอาร์กิวเมนต์ชนิดของการเรียกรับได้เฉพาะมิติที่เป็นจำนวนธรรมชาติ"
+help = "เขียนแต่ละมิติเป็นจำนวนธรรมชาติ เช่น `size [2, 3]` และส่งมิติแบบสัญลักษณ์หรือขณะรันผ่านชื่อ `size`"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "รูปร่างในวงเล็บเหลี่ยมหลัง `size` ใช้ได้เฉพาะในอาร์กิวเมนต์ชนิดของการเรียก"
+help = "เขียนรูปร่างตรง ๆ เช่น `tensor<f32, [2, 3]>` หรือใช้ `size [2, 3]` ในการเรียก เช่น `construct<f32, size [2, 3]>(data)`"
 
 [diagnostics.SEM009]
 message = "ข้อผิดพลาดในการตรวจสอบ CLI"
@@ -3232,6 +3244,14 @@ help = "เขียนเครื่องหมาย ณ จุดเรี�
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "เครื่องหมาย `axis` ถูกเขียนไว้ที่นี่ แต่พารามิเตอร์ไม่ได้ประกาศเป็น `axis`"
 help = "ลบเครื่องหมาย `axis` ออก หรือประกาศพารามิเตอร์เป็น `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "อาร์กิวเมนต์นี้เป็นอาร์กิวเมนต์ `size` และต้องเขียนด้วยเครื่องหมาย `size`"
+help = "เขียนเครื่องหมายตามที่ลายเซ็นประกาศพารามิเตอร์ไว้ เช่น `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "เครื่องหมาย `size` ถูกเขียนไว้ที่นี่ แต่ฟังก์ชันที่เรียกไม่ได้ประกาศพารามิเตอร์ `size`"
+help = "ลบเครื่องหมาย `size` ออก หรือประกาศพารามิเตอร์เป็น `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "ไม่สามารถผูกค่าที่ไม่ได้ทำเครื่องหมายเข้าเป็น `own` ได้"

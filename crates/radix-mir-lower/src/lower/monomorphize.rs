@@ -939,23 +939,28 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             .iter()
             .filter(|param| param.kind == ParamKind::Magnitudo)
             .collect::<Vec<_>>();
-        // Size-only generics: NATURAL typeArguments bind magnitudo params,
-        // and a caller-owned symbolic `Param` resolves through the calling
-        // instance's shape bindings (GSF-1 forwarding). Mixed/Typus callees
-        // keep D1 (type args zip Typus; shapes from witnesses).
-        if type_params.is_empty() && !shape_params.is_empty() {
-            if explicit_type_args.len() != shape_params.len() {
+        // The explicit list binds by marker: a `size` argument (a NATURAL or
+        // shape spelling, or a caller-owned symbolic size `Param` that
+        // resolves through the calling instance's shape bindings, GSF-1)
+        // binds the next magnitudo param, every other argument the next
+        // Typus param, and the two cursors advance independently.
+        let (type_args, size_args): (Vec<MirType>, Vec<MirType>) = explicit_type_args
+            .iter()
+            .copied()
+            .partition(|concrete| !self.explicit_arg_is_size(*concrete));
+        if !size_args.is_empty() {
+            if size_args.len() != shape_params.len() {
                 self.lowerer.errors.push(MirError::validation(
                     span,
                     format!(
-                        "generic call supplied {} type arguments for {} parameters",
-                        explicit_type_args.len(),
+                        "generic call supplied {} size arguments for {} parameters",
+                        size_args.len(),
                         shape_params.len()
                     ),
                 ));
                 return None;
             }
-            for (param, concrete) in shape_params.iter().zip(explicit_type_args.iter().copied()) {
+            for (param, concrete) in shape_params.iter().zip(size_args.iter().copied()) {
                 let index = match self.explicit_shape_witness(caller_source, concrete, span) {
                     ExplicitShapeWitness::Found(index) => index,
                     ExplicitShapeWitness::MissingReported => return None,
@@ -969,20 +974,22 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 };
                 shape_bindings.insert(param.name, canonical_index(self.types(), index));
             }
+        }
+        if type_args.is_empty() {
             return Some(());
         }
-        if explicit_type_args.len() != type_params.len() {
+        if type_args.len() != type_params.len() {
             self.lowerer.errors.push(MirError::validation(
                 span,
                 format!(
                     "generic call supplied {} type arguments for {} parameters",
-                    explicit_type_args.len(),
+                    type_args.len(),
                     type_params.len()
                 ),
             ));
             return None;
         }
-        for (param, concrete) in type_params.iter().zip(explicit_type_args.iter().copied()) {
+        for (param, concrete) in type_params.iter().zip(type_args.iter().copied()) {
             if let Some(existing) = bindings.get(&param.name).copied() {
                 if existing != concrete {
                     self.lowerer.errors.push(MirError::validation(
@@ -998,25 +1005,24 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         Some(())
     }
 
-    fn magnitudo_literal_of(&self, ty: MirType) -> Option<u64> {
-        let Type::Param(sym) = self.types().get(ty.semantic_id()) else {
-            return None;
-        };
-        let sym = *sym;
-        radix_types::parse_natural_capacity(self.lowerer.interner.resolve(sym))
+    /// Whether an explicit call argument is a `size` argument: the marker
+    /// reaches MIR in the spelling of the lowered `Type::Param`
+    /// (`radix_types::parse_explicit_size`).
+    fn explicit_arg_is_size(&self, concrete: MirType) -> bool {
+        self.explicit_size_of(concrete).is_some()
     }
 
-    /// Index witness of an explicit magnitudo argument: a NATURAL spelling
-    /// maps to its literal index, a caller-owned symbolic `Param` stays the
-    /// rigid param node (GSF-1 forwarding) — the key derivation resolves it
-    /// through the calling instance's shape bindings. Anything else fails
-    /// closed so wrong-kind rejection is preserved.
-    fn explicit_shape_witness(
-        &mut self,
-        caller_source: Option<DefId>,
-        concrete: MirType,
-        span: Span,
-    ) -> ExplicitShapeWitness {
+    fn explicit_size_of(&self, concrete: MirType) -> Option<radix_types::ExplicitSize<'_>> {
+        let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
+            return None;
+        };
+        radix_types::parse_explicit_size(self.lowerer.interner.resolve(*sym))
+    }
+
+    /// `DefId` of the local or parameter spelled `sym` that a run-time
+    /// `size n` argument names, searched in the whole program and then in the
+    /// calling function's parameters.
+    fn value_binding_named(&self, caller_source: Option<DefId>, sym: Symbol) -> Option<DefId> {
         struct LocalFinder {
             name: Symbol,
             found: Option<DefId>,
@@ -1034,24 +1040,9 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 radix_hir::visit::walk_local(self, local);
             }
         }
-        let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
-            return ExplicitShapeWitness::MissingUnreported;
-        };
-        let sym = *sym;
-        if let Some(value) = self.magnitudo_literal_of(concrete) {
-            return if let Some(index) = find_literal_index(self.types(), value) {
-                ExplicitShapeWitness::Found(index)
-            } else {
-                self.lowerer.errors.push(MirError::validation(
-                    span,
-                    "generic call signature has unresolved type parameter",
-                ));
-                ExplicitShapeWitness::MissingReported
-            };
-        }
         let mut finder = LocalFinder { name: sym, found: None };
         finder.visit_program(self.lowerer.unit.hir);
-        let value_binding = finder.found.or_else(|| {
+        finder.found.or_else(|| {
             caller_source.and_then(|source| {
                 self.lowerer
                     .unit
@@ -1068,8 +1059,51 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                         _ => None,
                     })
             })
-        });
-        if let Some(binding) = value_binding {
+        })
+    }
+
+    /// Index witness of an explicit `size` argument: a NATURAL maps to its
+    /// literal index, a bracketed shape to its tuple of literals, a name to
+    /// the run-time extent of an in-scope value, or to a caller-owned
+    /// symbolic `size` param kept as the rigid param node (GSF-1 forwarding),
+    /// whose key derivation resolves it through the calling instance's shape
+    /// bindings. Anything else fails closed so wrong-kind rejection is
+    /// preserved.
+    fn explicit_shape_witness(
+        &mut self,
+        caller_source: Option<DefId>,
+        concrete: MirType,
+        span: Span,
+    ) -> ExplicitShapeWitness {
+        let unresolved = |this: &mut Self| {
+            this.lowerer.errors.push(MirError::validation(
+                span,
+                "generic call signature has unresolved type parameter",
+            ));
+            ExplicitShapeWitness::MissingReported
+        };
+        let Some(size) = self.explicit_size_of(concrete) else {
+            return ExplicitShapeWitness::MissingUnreported;
+        };
+        let name = match size {
+            radix_types::ExplicitSize::Natural(value) => {
+                return match find_literal_index(self.types(), value) {
+                    Some(index) => ExplicitShapeWitness::Found(index),
+                    None => unresolved(self),
+                };
+            }
+            radix_types::ExplicitSize::Shape(dims) => {
+                return match find_literal_shape_index(self.types(), &dims) {
+                    Some(index) => ExplicitShapeWitness::Found(index),
+                    None => unresolved(self),
+                };
+            }
+            radix_types::ExplicitSize::Name(name) => name.to_owned(),
+        };
+        let Some(sym) = self.lowerer.interner.lookup(&name) else {
+            return unresolved(self);
+        };
+        if let Some(binding) = self.value_binding_named(caller_source, sym) {
             return self.lowerer.unit.shape_obligations.call_size_bindings.values().flatten()
                 .find(|row| matches!(self.types().get_index(row.witness), IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(found)) if *found == binding))
                 .map_or(ExplicitShapeWitness::MissingUnreported, |row| ExplicitShapeWitness::Found(row.witness));
@@ -1381,21 +1415,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     }
 
     fn substitute_function(&mut self, function: &mut MirFunction, bindings: &MirGenericBindings, span: Span) -> bool {
-        // Shape params of the generic being instantiated (GSF-1): forwarded
-        // size witnesses in nested callee type args stay symbolic through
-        // typus substitution; the key derivation resolves them through the
-        // calling instance's shape bindings.
-        let shape_params: FxHashSet<Symbol> = function
-            .source
-            .and_then(|source| self.generic_param_order.get(&source))
-            .map(|params| {
-                params
-                    .iter()
-                    .filter(|param| param.kind == ParamKind::Magnitudo)
-                    .map(|param| param.name)
-                    .collect()
-            })
-            .unwrap_or_default();
         for param in &mut function.params {
             if !self.substitute_ty_in_place(&mut param.ty, bindings, span) {
                 return false;
@@ -1422,12 +1441,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
 
         for block in &mut function.blocks {
             for statement in &mut block.statements {
-                if !self.substitute_statement(statement, bindings, &shape_params, span) {
+                if !self.substitute_statement(statement, bindings, span) {
                     return false;
                 }
             }
             if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
-                && !self.substitute_callee(callee, bindings, &shape_params, span)
+                && !self.substitute_callee(callee, bindings, span)
             {
                 return false;
             }
@@ -1439,7 +1458,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         &mut self,
         statement: &mut MirStatement,
         bindings: &MirGenericBindings,
-        shape_params: &FxHashSet<Symbol>,
         span: Span,
     ) -> bool {
         match &mut statement.kind {
@@ -1465,32 +1483,24 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 };
                 true
             }
-            MirStatementKind::Call { callee, .. } => self.substitute_callee(callee, bindings, shape_params, span),
+            MirStatementKind::Call { callee, .. } => self.substitute_callee(callee, bindings, span),
             MirStatementKind::RuntimeCall { call, .. } => self.substitute_runtime_call(call, bindings, span),
             MirStatementKind::Construct { aggregate, .. } => self.substitute_aggregate(aggregate, bindings, span),
         }
     }
 
-    fn substitute_callee(
-        &mut self,
-        callee: &mut MirCallee,
-        bindings: &MirGenericBindings,
-        shape_params: &FxHashSet<Symbol>,
-        span: Span,
-    ) -> bool {
+    fn substitute_callee(&mut self, callee: &mut MirCallee, bindings: &MirGenericBindings, span: Span) -> bool {
         let MirCallee::Definition { source, type_args } = callee else {
             return true;
         };
         for type_arg in type_args.iter_mut() {
-            // GSF-1: a forwarded size witness stays a symbolic `Param` in
-            // callee type args — it is not a typus binding and is resolved
-            // through the calling instance's shape bindings at key
-            // derivation. Substituting it here would reject the caller-owned
-            // magnitudo symbol as an unresolved type parameter.
-            if let Type::Param(sym) = self.types().get(type_arg.semantic_id())
-                && shape_params.contains(sym)
-                && !bindings.contains_key(sym)
-            {
+            // GSF-1: a marked size argument (`size D`, `size n`) stays a
+            // symbolic `Param` in callee type args — it is not a typus
+            // binding and is resolved through the calling instance's shape
+            // bindings at key derivation. Substituting it here would reject
+            // the caller-owned magnitudo symbol as an unresolved type
+            // parameter.
+            if self.explicit_arg_is_size(*type_arg) {
                 continue;
             }
             *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
@@ -2114,6 +2124,26 @@ fn find_literal_index(types: &TypeTable, value: u64) -> Option<IndexId> {
         #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
         let id = IndexId(index as u32);
         matches!(types.get_index(id), IndexExpr::Literal(found) if *found == value).then_some(id)
+    })
+}
+
+/// Interned `IndexExpr::Tuple` node whose dimensions are exactly these
+/// literal extents (an explicit `size [2, 3]` witness), if present. The
+/// typechecker interns the witness when it binds the call, so a well-formed
+/// call always finds it here.
+pub(super) fn find_literal_shape_index(types: &TypeTable, dims: &[u64]) -> Option<IndexId> {
+    (0..types.index_count()).find_map(|index| {
+        #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
+        let id = IndexId(index as u32);
+        let IndexExpr::Tuple(found) = types.get_index(id) else {
+            return None;
+        };
+        (found.len() == dims.len()
+            && found
+                .iter()
+                .zip(dims)
+                .all(|(dim, value)| matches!(types.get_index(*dim), IndexExpr::Literal(v) if v == value)))
+        .then_some(id)
     })
 }
 

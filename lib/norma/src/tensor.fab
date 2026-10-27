@@ -34,6 +34,10 @@ fn construct<T, size Shape>(list<T> data) → tensor<T, Shape> ⇥ string {
 # store, and the element type may be named:
 #   let tensor<T, Figura> t ← tensor.construct(data)
 #   let t ← tensor.construct<T>(data)
+# Where no store annotation supplies the shape (an argument or return position),
+# the explicit form writes the whole shape behind the `size` marker:
+#   tensor.construct<T, size [4]>(data)
+#   tensor.construct<T, size [2, 3]>(data)
 # Data-driven construction is also the conversion (the target type is the operand):
 #   data ↦ tensor<T, Figura>
 

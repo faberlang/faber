@@ -1,14 +1,14 @@
-//! Unit test for the `rope_half<dim>(pos, rope_table)` intrinsic: the source
+//! Unit test for the `rope_half<magnitudo dim>(pos, rope_table)` intrinsic: the source
 //! spelling of the half-split (Qwen / GPT-NeoX `rotate_half`) RoPE pairing.
 //!
 //! The registry row added for `rope_half` maps it to
 //! `MirCollectionOp::TensorRopeHalf`; this proves, through the full language
 //! frontend (lex → parse → semantic → HIR → MIR) plus the CPU runner, that:
-//! - `x.rope_half<4>(0, table)` lowers to `TensorRopeHalf` and the runner
+//! - `x.rope_half<size 4>(0, table)` lowers to `TensorRopeHalf` and the runner
 //!   rotates the half-split pairs `(x[k], x[k + dim/2])`: with cos = 0 and
 //!   sin = 1 the unit at `x[0]` lands at `x[2]` (the pair partner for `k = 0`
 //!   at `dim = 4`), not at `x[1]`;
-//! - the same input through `rope_norm<4>` rotates the consecutive pairs
+//! - the same input through `rope_norm<magnitudo 4>` rotates the consecutive pairs
 //!   `(x[2k], x[2k+1])` and lands the unit at `x[1]`, so the two spellings
 //!   select distinct pairings.
 //!
@@ -21,7 +21,7 @@ use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
 
 /// Run an `incipit` block over the rank-1 fixture tensor `[1, 0, 0, 0]` with
-/// the pinned `(0, 0, 1)` table, apply `x.<method><4>(0, table)`, and return
+/// the pinned `(0, 0, 1)` table, apply `x.<method><magnitudo 4>(0, table)`, and return
 /// the `nota` result.
 fn run_unit_rope(method: &str) -> Vec<f64> {
     let source = format!(
@@ -30,7 +30,7 @@ fn run_unit_rope(method: &str) -> Vec<f64> {
     sit tensor<f32, [4]> x ← flat ↦ tensor<f32, [4]>
     sit lista<f32> table_flat ← [0.0, 0.0, 1.0, 0.0, 0.0, 1.0]
     sit tensor<f32, [1, 2, 3]> rope_table ← table_flat ↦ tensor<f32, [1, 2, 3]>
-    sit tensor<f32, [4]> y ← x.{method}<4>(0, rope_table)
+    sit tensor<f32, [4]> y ← x.{method}<magnitudo 4>(0, rope_table)
     nota y
 }}"
     );

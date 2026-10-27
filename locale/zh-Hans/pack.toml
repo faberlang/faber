@@ -1181,6 +1181,10 @@ help = "修正用于 lowering 的 AST construct"
 message = "值名称 {name} 不能占据注解的 extent 位置"
 help = "在此存储位置写出 `size {name}` 以显式提升，例如 `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "泛型调用的大小或形状实参不受支持"
+help = "使用常量、大小名称或写出 `size w` 的值"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring 需要 initializer"
 help = "修正用于 lowering 的 AST construct"
@@ -1568,6 +1572,14 @@ help = "使用不超过 32 bits 的 integer width"
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "kernel intermediate extent {extent} 超出 portable integer range"
 help = "把 intermediate values 保持在 portable integer range 内"
+
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "调用类型参数中 `size` 之后的 shape 只接受自然数维度"
+help = "把每个维度写成自然数，例如 `size [2, 3]`；符号维度或运行时维度请通过 `size` 名称传递"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "`size` 之后的方括号 shape 只允许出现在调用的类型参数中"
+help = "直接写出 shape，例如 `tensor<f32, [2, 3]>`，或在调用中使用 `size [2, 3]`，例如 `construct<f32, size [2, 3]>(data)`"
 
 [diagnostics.SEM009]
 message = "CLI validation 无效"
@@ -3264,6 +3276,14 @@ help = "在调用处按 signature 声明写出 marker，例如 `f(axis 1)`"
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "此处写了 `axis` marker，但 parameter 未声明为 `axis`"
 help = "移除 `axis` marker，或把 parameter 声明为 `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "此 argument 是 `size` argument，必须用 `size` marker 写出"
+help = "按 signature 对 parameter 的声明写出 marker，例如 `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "此处写了 `size` marker，但被调用的函数未声明任何 `size` parameter"
+help = "移除 `size` marker，或把 parameter 声明为 `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "不能把 unmarked 值绑定到 `own`"

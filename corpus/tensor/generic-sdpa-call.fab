@@ -26,7 +26,9 @@ locale = "la"
 #
 # Common mistakes:
 #   • Spelling a concrete `_2x8` overload instead of `magnitudo` params.
-#   • Expecting explicit shape args at the call site (`sdpa<f32, 2, 8>(…)`).
+#   • Writing an explicit size argument without its marker (`sdpa<f32, 2, 8>(…)`):
+#     a size argument carries `size`, as in `sdpa<f32, size 2, size 8>(…)`
+#     (SEM057 size_marker_required).
 #
 # See also: tensor, magnitudo, functio, matmul
 # =============================================================================

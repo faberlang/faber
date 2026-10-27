@@ -98,6 +98,14 @@ pub(super) enum SyntheticHelperKey {
         return_ty: MirType,
         error_ty: MirType,
     },
+    /// A `lista ↦ tensor` count check run inside a handler: `TensorFromFlat`
+    /// over a flat list and its shape operand.
+    TensorFromFlat {
+        flat_ty: MirType,
+        shape_ty: MirType,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
     /// A checked list trim: `Slice` (the window) or `Take` (the prefix), with
     /// the receiver and index parameter types.
     CheckedTrim {
@@ -1229,29 +1237,40 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         };
-        let Type::Param(symbol) = self.types.get(generic_arg) else {
-            self.errors.push(MirError::validation(
-                span,
-                format!("{method_name} generic dimension is not a magnitudo argument"),
-            ));
-            return None;
+        let size = match self.types.get(generic_arg) {
+            Type::Param(symbol) => self
+                .context
+                .interner
+                .and_then(|interner| radix_types::parse_explicit_size(interner.resolve(*symbol))),
+            _ => None,
         };
-        let spelling = self
+        let name = match size {
+            Some(radix_types::ExplicitSize::Natural(value)) => {
+                #[expect(
+                    clippy::cast_possible_wrap,
+                    reason = "Faber natural capacities are bounded before MIR lowering"
+                )]
+                return Some(MirOperand::Constant(MirConstant::Int(value as i64)));
+            }
+            Some(radix_types::ExplicitSize::Name(name)) => name,
+            Some(radix_types::ExplicitSize::Shape(_)) | None => {
+                self.errors.push(MirError::validation(
+                    span,
+                    format!("{method_name} generic dimension is not a magnitudo argument"),
+                ));
+                return None;
+            }
+        };
+        let symbol = self
             .context
             .interner
-            .map(|interner| interner.resolve(*symbol))
-            .unwrap_or_default();
-        if let Some(value) = radix_types::parse_natural_capacity(spelling) {
-            #[expect(
-                clippy::cast_possible_wrap,
-                reason = "Faber natural capacities are bounded before MIR lowering"
-            )]
-            return Some(MirOperand::Constant(MirConstant::Int(value as i64)));
-        }
-        let Some(shape) = (0..self.types.index_count()).find_map(|ordinal| {
-            #[expect(clippy::cast_possible_truncation, reason = "IndexId is a bounded arena index")]
-            let id = IndexId(ordinal as u32);
-            matches!(self.types.get_index(id), IndexExpr::Param(found) if *found == *symbol).then_some(id)
+            .and_then(|interner| interner.lookup(name));
+        let Some(shape) = symbol.and_then(|symbol| {
+            (0..self.types.index_count()).find_map(|ordinal| {
+                #[expect(clippy::cast_possible_truncation, reason = "IndexId is a bounded arena index")]
+                let id = IndexId(ordinal as u32);
+                matches!(self.types.get_index(id), IndexExpr::Param(found) if *found == symbol).then_some(id)
+            })
         }) else {
             self.errors.push(MirError::validation(
                 span,
@@ -4875,7 +4894,128 @@ impl FunctionBuilder<'_> {
         span: Span,
     ) -> Option<MirOperand> {
         let flat = self.lower_expr_value(source)?;
+        if self.tensor_from_flat_is_handled(target) {
+            let flat_ty = self.expr_ty(source)?;
+            return self.lower_handled_tensor_from_flat(flat, flat_ty, target, return_ty, span);
+        }
         self.lower_tensor_from_flat_conversio(flat, target, return_ty, span)
+    }
+
+    /// Whether a recovery-free `lista ↦ tensor` conversion runs inside a
+    /// `fac … cape` handler or a `capta` boundary, against a target whose
+    /// extents are all literal. Its count check is a recoverable failure (a
+    /// length that does not fill the shape is a failed conversion), and the
+    /// bare `TensorFromFlat` call has no error edge, so under a handler it goes
+    /// through a failable helper (see [`Self::lower_handled_tensor_from_flat`]).
+    /// A symbolic or run-time shape keeps the bare call: its operand reads
+    /// package-finalized shape sizes in the caller, which a helper would hide
+    /// from the finalizer. Device bodies keep the bare op.
+    fn tensor_from_flat_is_handled(&self, target: TypeId) -> bool {
+        self.device_role.is_none()
+            && (!self.handlers.is_empty() || !self.traps.is_empty())
+            && matches!(
+                resolve_lista_to_tensor_shape(target, self.types),
+                Some(ListaToTensorShape::Literal(_))
+            )
+    }
+
+    /// `TensorFromFlat` inside a handler: the same seam as a bounded append
+    /// (`is_bounded_append_under_handler`). The count check runs in a
+    /// `(flat, shape) ⇥ textus` helper, so its mismatch leaves the helper
+    /// frame as the `textus` error and the caller's `TryCall` routes it to the
+    /// enclosing `cape` block or `capta` boundary.
+    fn lower_handled_tensor_from_flat(
+        &mut self,
+        flat: MirOperand,
+        flat_ty: MirType,
+        target: TypeId,
+        return_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let shape = self.lower_lista_to_tensor_shape(flat.clone(), target, span)?;
+        let shape_ty = MirType::semantic(lista_numerus_type(self.types)?);
+        let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+        let helper = self.push_tensor_from_flat_helper(flat_ty, shape_ty, return_ty, textus, span);
+        self.lower_failable_call(MirCallee::Function(helper), vec![flat, shape], return_ty, textus, None, span)
+    }
+
+    /// The helper body, for `(flat, shape) ⇥ textus → tensor`: one
+    /// `TensorFromFlat` over a placeholder receiver, the form the bare
+    /// conversion builds.
+    fn push_tensor_from_flat_helper(
+        &mut self,
+        flat_ty: MirType,
+        shape_ty: MirType,
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> MirFunctionId {
+        let key = SyntheticHelperKey::TensorFromFlat { flat_ty, shape_ty, return_ty, error_ty };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return id;
+        }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            Some(error_ty),
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let mut locals = Vec::with_capacity(2);
+        for ty in [flat_ty, shape_ty] {
+            let local = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode: MirParamMode::Owned, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable: false, span });
+            locals.push(local);
+        }
+        let entry = nested.fresh_block(span);
+        nested.switch_to(entry);
+        let seed = nested.construct_temp(
+            MirAggregateKind::Tensor,
+            MirAggregateFields::Ordered(Vec::new()),
+            return_ty,
+            span,
+        );
+        let tensor = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),
+            vec![
+                seed,
+                MirOperand::Place(MirPlace::local(locals[0])),
+                MirOperand::Place(MirPlace::local(locals[1])),
+            ],
+            return_ty,
+            span,
+        );
+        nested.terminate_current(MirTerminatorKind::Return(Some(tensor)), span);
+        let blocks = nested.finish_blocks();
+        self.errors.extend(nested.errors);
+        self.synthetic_functions.push(MirFunction {
+            id,
+            source: None,
+            name: None,
+            params: nested.params,
+            locals: nested.locals,
+            temps: nested.temps,
+            blocks,
+            return_ty,
+            error_ty: Some(error_ty),
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span,
+        });
+        self.synthetic_helpers.insert(key, id);
+        id
     }
 
     /// `tensor<E, [N]> ↦ vector<E, N>`: flatten the tensor to its element

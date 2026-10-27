@@ -3918,7 +3918,7 @@ impl Parser {
     ///
     /// A call-site list is unambiguously a `typeArguments` position, so every
     /// argument keeps the explicit `Type` shape — including NATURAL
-    /// (`linear_from_raw<2, 2, 2>(…)`) — instead of the kinded split used by
+    /// (`linear_from_raw<size 2, size 2, size 2>(…)`) — instead of the kinded split used by
     /// generic-head applications.
     fn finish_type_args_list(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
         let mut args = Vec::new();

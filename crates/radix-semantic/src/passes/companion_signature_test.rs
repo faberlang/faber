@@ -295,7 +295,7 @@ fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
 #[test]
 fn generic_companion_explicit_shape_args_bind_both_dimensions() {
     let source = generic_companion_probe_source(
-        "sit _ grads ← loss_backward<2, 2>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<magnitudo 2, magnitudo 2>(x, w, nil(), upstream)",
         "",
     );
     let result = analyze_result(&source);
@@ -444,8 +444,8 @@ incipit {
 #[test]
 fn generic_companion_wrong_arity_type_args_still_rejected() {
     for call in [
-        "sit _ grads ← loss_backward<2>(x, w, nil(), upstream)",
-        "sit _ grads ← loss_backward<2, 2, 4>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<magnitudo 2>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<magnitudo 2, magnitudo 2, magnitudo 4>(x, w, nil(), upstream)",
     ] {
         let source = generic_companion_probe_source(call, "");
         let errors = analyze_errors(&source);

@@ -1929,6 +1929,10 @@ pub enum LiftExtent {
     Negative { value: u64, span: Span },
     /// Parenthesized figura term: `size (H + 1)`.
     Paren(Box<FiguraExpr>),
+    /// Whole shape: `size [4]`, `size [2, 3]` (empty is rank-0 `[]`). Each
+    /// dimension is a figura term; the call-argument position this form
+    /// serves admits natural-literal dimensions only.
+    Shape(Vec<FiguraExpr>),
 }
 
 /// Syntactic variants inside [`TypeExpr`].

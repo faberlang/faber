@@ -3,7 +3,7 @@
 //! Need (GPU research S05) landed the registry row (`rope_half` →
 //! `MirCollectionOp::TensorRopeHalf`) and the source → MIR → CPU-runner proof.
 //! This probe closes the missing device-path question: where does
-//! `x.rope_half<4>(pos, table)` stop on the Metal lane?
+//! `x.rope_half<size 4>(pos, table)` stop on the Metal lane?
 //!
 //! The answer proven here: the spelling reaches the device emitter and the
 //! first failing seam is a typed fact, not the spelling.
@@ -31,7 +31,7 @@ use crate::codegen::Target;
 use crate::diagnostics::{Diagnostic, DiagnosticPhase};
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-/// The reachable source shape: `rope_half<4>` with a literal position over the
+/// The reachable source shape: `rope_half<size 4>` with a literal position over the
 /// pinned `[1, 2, 3]` angle table, written through the indexed-view ABI.
 const ROPE_HALF_LITERAL_POS: &str = r#"+++
 locale = "en"
@@ -40,7 +40,7 @@ locale = "en"
 @ kernel
 @ public
 fn ropam(tensor<f32, [4]> x, tensor<f32, [1, 2, 3]> table, mut tensor<f32, [4]> out, u32 i) → void {
-    out ⇇ x.rope_half<4>(0, table)
+    out ⇇ x.rope_half<size 4>(0, table)
 }
 "#;
 
@@ -52,7 +52,7 @@ locale = "en"
 @ kernel
 @ public
 fn ropam(tensor<f32, [4]> x, tensor<f32, [1, 2, 3]> table) → tensor<f32, [4]> {
-    return x.rope_half<4>(0, table)
+    return x.rope_half<size 4>(0, table)
 }
 "#;
 
@@ -64,7 +64,7 @@ locale = "en"
 @ kernel
 @ public
 fn ropam(tensor<f32, [4]> x, u32 pos, tensor<f32, [1, 2, 3]> table) → tensor<f32, [4]> {
-    return x.rope_half<4>(pos, table)
+    return x.rope_half<size 4>(pos, table)
 }
 "#;
 
@@ -92,7 +92,7 @@ fn arg_value<'a>(diagnostic: &'a Diagnostic, name: &str) -> Option<&'a str> {
         .map(|arg| arg.value.as_str())
 }
 
-/// S05 family-1, green half: `rope_half<4>` with a literal position reaches
+/// S05 family-1, green half: `rope_half<size 4>` with a literal position reaches
 /// Metal text and the body is the half-split rotate, distinct from the
 /// consecutive-pair `rope_norm` body.
 #[test]

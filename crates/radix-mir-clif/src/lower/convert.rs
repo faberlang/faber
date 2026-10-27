@@ -727,7 +727,10 @@ impl FunctionLower<'_, '_> {
                     .ok_or_else(|| Decline::new("length result"))?;
                 let need = self.builder.ins().iconst(types::I64, i64::from(bytes));
                 let wrong = self.builder.ins().icmp(IntCC::NotEqual, length, need);
-                let failure = Some((wrong, Failure::Static("octeti endian width mismatch")));
+                let failure = Some((
+                    wrong,
+                    Failure::Static(trap_text::BYTES_ENDIAN_WIDTH_MISMATCH),
+                ));
                 if float {
                     let float = self
                         .builder

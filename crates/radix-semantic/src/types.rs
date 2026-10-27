@@ -54,6 +54,12 @@ pub const ISSUE_CALL_MARKER_MISMATCH: &str = "call_marker_mismatch";
 /// Call argument carries `mut`/`own`/`copy` against a read-only parameter.
 pub const ISSUE_CALL_MARKER_ON_READ_ONLY: &str = "call_marker_on_read_only";
 
+/// A call's explicit size argument was written without the `size` marker.
+pub const ISSUE_SIZE_MARKER_REQUIRED: &str = "size_marker_required";
+
+/// A call's explicit `size` argument has no `size` parameter to bind.
+pub const ISSUE_SIZE_MARKER_UNEXPECTED: &str = "size_marker_unexpected";
+
 /// Own-bind from a live unmarked source. Suggest `copy` (D-6).
 pub const ISSUE_UNMARKED_INTO_OWN: &str = "unmarked_into_own";
 

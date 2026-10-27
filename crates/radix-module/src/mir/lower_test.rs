@@ -5616,7 +5616,7 @@ functio describe(Resultatus<numerus> r) → textus {
         .expect("generic enum payload MIR validates");
 }
 
-/// A generic `rope_norm<d>(pos)` template lowers its compile-time dimension to
+/// A generic `rope_norm<magnitudo d>(pos)` template lowers its compile-time dimension to
 /// the existing symbolic shape-size MIR constant, so the non-AIR MIR
 /// monomorphizer can bind it later. The path must never resolve to a runtime
 /// local.
@@ -5624,7 +5624,7 @@ functio describe(Resultatus<numerus> r) → textus {
 fn generic_rope_dim_lowers_to_symbolic_shape_size_operand() {
     let source = r"
 functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, varia tensor<T, [D, d]> output) → vacuum {
-    output ⇇ input.rope_norm<d>(0, rota)
+    output ⇇ input.rope_norm<magnitudo d>(0, rota)
 }
 ";
     let unit = analyze(source);
@@ -6148,7 +6148,7 @@ functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → t
 
 incipit {
     sit tensor<f32, [2, 2]> a ← vacua
-    sit tensor<f32, [2, 2]> b ← take<2, 2, 2>(a)
+    sit tensor<f32, [2, 2]> b ← take<magnitudo 2, magnitudo 2, magnitudo 2>(a)
     nota b.longitudo()
 }
 ";

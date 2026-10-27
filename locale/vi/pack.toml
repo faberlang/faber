@@ -1137,6 +1137,10 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "tên giá trị {name} không thể chiếm vị trí extent trong chú thích kiểu"
 help = "viết `size {name}` để tường minh phép nâng tại điểm lưu này, ví dụ `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "kích thước hoặc hình dạng trong lời gọi generic không được hỗ trợ"
+help = "dùng hằng số, tên kích thước, hoặc giá trị viết `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "phân rã mảng yêu cầu bộ khởi tạo"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1524,6 +1528,14 @@ help = "dùng độ rộng số nguyên không quá 32 bit"
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "phạm vi trung gian của kernel {extent} vượt quá phạm vi số nguyên di động"
 help = "giữ các giá trị trung gian trong phạm vi số nguyên di động"
+
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "hình dạng sau `size` trong các đối số kiểu của lời gọi chỉ nhận các chiều là số tự nhiên"
+help = "viết mỗi chiều là một số tự nhiên, ví dụ `size [2, 3]`; truyền chiều tượng trưng hoặc lúc chạy qua một tên `size`"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "hình dạng trong ngoặc vuông sau `size` chỉ được phép trong các đối số kiểu của lời gọi"
+help = "viết hình dạng trực tiếp, ví dụ `tensor<f32, [2, 3]>`, hoặc dùng `size [2, 3]` trong lời gọi như `construct<f32, size [2, 3]>(data)`"
 
 [diagnostics.SEM009]
 message = "lỗi xác thực CLI"
@@ -3220,6 +3232,14 @@ help = "viết dấu tại lời gọi đúng như chữ ký khai báo, ví dụ
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "dấu `axis` được viết ở đây nhưng parameter không được khai báo `axis`"
 help = "xóa dấu `axis`, hoặc khai báo parameter là `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "đối số này là đối số `size` và phải được viết với dấu `size`"
+help = "viết dấu đúng như chữ ký khai báo tham số, ví dụ `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "dấu `size` được viết ở đây nhưng hàm được gọi không khai báo parameter `size` nào"
+help = "xóa dấu `size`, hoặc khai báo parameter là `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "không thể liên kết một giá trị không có dấu vào `own`"

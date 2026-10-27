@@ -1964,6 +1964,20 @@ impl super::FaberCodegen<'_> {
             if idx > 0 {
                 writer.write(", ");
             }
+            // A marked size argument travels as a `Param` spelled with the
+            // size marker (`radix_types::parse_explicit_size`): re-emit the
+            // marker in the reader surface, then its operand.
+            if let Type::Param(sym) = self.types.get(*ty)
+                && let Some(operand) = self
+                    .interner
+                    .resolve(*sym)
+                    .strip_prefix(radix_types::EXPLICIT_SIZE_MARKER)
+            {
+                writer.write(surface.keyword(TokenKind::Magnitudo));
+                writer.write(" ");
+                writer.write(operand);
+                continue;
+            }
             writer.write(&self.type_to_faber(*ty, names, surface));
         }
         writer.write(">");

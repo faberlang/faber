@@ -366,3 +366,67 @@ pub fn parse_natural_capacity(name: &str) -> Option<u64> {
     }
     name.parse().ok()
 }
+
+/// Spelling prefix that marks a call's explicit size argument. An explicit
+/// argument list carries types and sizes in one `Vec<TypeId>`, so a size is a
+/// `Type::Param` whose name is this prefix (the stable registry key of the
+/// `size` marker, which every reader locale spells its own way) followed by
+/// the operand: a natural (`magnitudo 4`), a bracketed shape of naturals
+/// (`magnitudo [2, 3]`), or a name (`magnitudo n`, a caller `size` param or
+/// an in-scope value read at run time). A plain `Param` is a type.
+pub const EXPLICIT_SIZE_MARKER: &str = "magnitudo ";
+
+/// The operand a call's explicit size argument names, read back from the
+/// spelling [`spell_explicit_size`] writes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExplicitSize<'a> {
+    /// `size 4`: a compile-time natural.
+    Natural(u64),
+    /// `size [2, 3]`: a compile-time shape of naturals (`[]` is rank 0).
+    Shape(Vec<u64>),
+    /// `size n`: a caller `size` param or an in-scope value.
+    Name(&'a str),
+}
+
+/// Spell one marked explicit size argument as the `Param` name it travels as.
+#[must_use]
+pub fn spell_explicit_size(operand: &str) -> String {
+    format!("{EXPLICIT_SIZE_MARKER}{operand}")
+}
+
+/// Read a `Param` name back as a marked explicit size argument; `None` when
+/// the name is a plain type parameter.
+#[must_use]
+pub fn parse_explicit_size(spelling: &str) -> Option<ExplicitSize<'_>> {
+    let operand = spelling.strip_prefix(EXPLICIT_SIZE_MARKER)?;
+    if let Some(value) = parse_natural_capacity(operand) {
+        return Some(ExplicitSize::Natural(value));
+    }
+    if let Some(dims) = parse_spelled_shape(operand) {
+        return Some(ExplicitSize::Shape(dims));
+    }
+    (!operand.is_empty()).then_some(ExplicitSize::Name(operand))
+}
+
+/// Spell a whole compile-time shape (`size [2, 3]`) as the operand of a
+/// marked size argument: `[2, 3]`, or `[]` for rank 0.
+/// [`parse_spelled_shape`] reads it back.
+#[must_use]
+pub fn spell_natural_shape(dims: &[u64]) -> String {
+    let parts = dims.iter().map(u64::to_string).collect::<Vec<_>>();
+    format!("[{}]", parts.join(", "))
+}
+
+/// Read back a [`spell_natural_shape`] spelling: `[` natural dimensions
+/// separated by `, ` `]`. Any other text is not a spelled shape.
+#[must_use]
+pub fn parse_spelled_shape(name: &str) -> Option<Vec<u64>> {
+    let inner = name.strip_prefix('[')?.strip_suffix(']')?;
+    if inner.is_empty() {
+        return Some(Vec::new());
+    }
+    inner
+        .split(", ")
+        .map(parse_natural_capacity)
+        .collect::<Option<Vec<_>>>()
+}

@@ -80,7 +80,7 @@ fn empty_octeti_to_lista_u8_is_empty() {
 fn octeti_to_lista_unsized_numerus_fails_closed() {
     let err = eval_octeti_to_lista(vec![0xde], None).expect_err("unsized lista must fail");
     assert_eq!(
-        err.issue, "runner_octeti_to_lista_conversion_requires_lista_u8",
+        err.issue, "runner_list_b8_to_lista_conversion_requires_lista_u8",
         "expected u8-only reject, got: {err:?}"
     );
 }

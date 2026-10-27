@@ -668,24 +668,38 @@ fn request_for_target(
     if call.explicit_args.len() != params.len() {
         return None;
     }
-    let mut args = call.explicit_args.iter().copied();
+    // The explicit list binds by marker: a `size` argument fills the next
+    // size parameter, an unmarked argument the next type parameter.
+    let (size_args, type_args): (Vec<TypeId>, Vec<TypeId>) =
+        call.explicit_args.iter().copied().partition(|ty| {
+            matches!(source_types.get(*ty), Type::Param(symbol)
+                if radix_types::parse_explicit_size(call.caller_interner.resolve(*symbol)).is_some())
+        });
+    let mut size_args = size_args.into_iter();
+    let mut type_args = type_args.into_iter();
     params
         .iter()
         .map(|param| {
-            let ty = args.next()?;
             let witness = match param.kind {
                 GenericParamKind::Magnitudo => {
+                    let ty = size_args.next()?;
                     let Type::Param(symbol) = source_types.get(ty) else {
                         return None;
                     };
-                    let value =
-                        radix_types::parse_natural_capacity(call.caller_interner.resolve(*symbol))?;
+                    // Old-artifact fallback: only a natural size has a
+                    // literal witness; a shape or a name stays fail-closed.
+                    let radix_types::ExplicitSize::Natural(value) =
+                        radix_types::parse_explicit_size(call.caller_interner.resolve(*symbol))?
+                    else {
+                        return None;
+                    };
                     GenericWitness::Magnitudo(intern_index_canonical(
                         target_types,
                         IndexExpr::Literal(value),
                     ))
                 }
                 GenericParamKind::Typus => {
+                    let ty = type_args.next()?;
                     GenericWitness::Typus(crate::mir::cli_plan::import_semantic_type(
                         &source_types,
                         target_types,

@@ -1691,6 +1691,7 @@ impl Lowerer<'_> {
             radix_syntax::LiftExtent::Name(ident) => FiguraExpr::Var(ident.clone()),
             radix_syntax::LiftExtent::Paren(term) => (**term).clone(),
             radix_syntax::LiftExtent::Negative { .. } => return Err(FIGURA_LIFT_PRIMARY_MSG),
+            radix_syntax::LiftExtent::Shape(_) => return Err(crate::figura::FIGURA_LIFT_SHAPE_MSG),
         };
         self.figura_lift_nesting += 1;
         let lowered = self.lower_figura_expr(&figura);
