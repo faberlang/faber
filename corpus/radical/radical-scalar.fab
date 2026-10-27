@@ -1,0 +1,54 @@
++++
+term = "√"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "unary_expr", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+summary = "Prefix radicals √ ∛ ∜ on a float: square, cube and fourth root, sugar for .sqrt() and .cbrt()."
+syntax = "√ <float expression> | ∛ <float expression> | ∜ <float expression>"
+related = ["tensor", "radical-tensor", "radical-int-reject"]
+locale = "en"
++++
+
+# =============================================================================
+# √ ∛ ∜ — prefix radicals over a float.
+# =============================================================================
+#
+# What this teaches:
+#   • `√ x` is sugar for `x.sqrt()`, `∛ x` for `x.cbrt()`, and `∜ x` for
+#     `x.sqrt().sqrt()`; the glyph reaches exactly as far as the method does
+#   • The radical is a prefix operator that binds like unary `-`: `√ x + 1.0`
+#     means `(√ x) + 1.0`, never `√ (x + 1.0)`
+#   • `∛` is the real cube root, so a negative operand has a negative root
+#   • The formatter writes the glyph spaced from its operand
+#
+# Common mistakes:
+#   • expecting `√ x + 1.0` to take the whole sum under the root — write
+#     `√ (x + 1.0)` for that
+#   • using a radical on an `int` — convert to a float first (see
+#     radical-int-reject)
+#
+# EXPECTED stdout:
+#   9.0
+#   10.0
+#   12.0
+#   2.0
+#   -2.0
+#   3.0
+#   2.0
+#
+# See also: tensor, radical-tensor, radical-int-reject
+# =============================================================================
+
+main {
+    let f64 x ← 81.0
+    print √ x
+    print √ x + 1.0
+    print √ (x + 63.0)
+    let f64 cube ← 8.0
+    print ∛ cube
+    let f64 negative ← -8.0
+    print ∛ negative
+    print ∜ x
+    let f64 sixteen ← 16.0
+    print ∜ sixteen
+}

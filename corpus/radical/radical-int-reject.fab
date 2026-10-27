@@ -1,0 +1,33 @@
++++
+term = "√"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A prefix radical on an int is refused as an unknown method: the glyph reaches only as far as .sqrt() does."
+syntax = "√ <int expression>"
+related = ["radical-scalar", "radical-tensor"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM004:unknown_method"
++++
+
+# =============================================================================
+# √ — the radical is sugar for `.sqrt()`, never wider.
+# =============================================================================
+#
+# What this teaches:
+#   • `√ n` means `n.sqrt()` and is legal exactly where that method is legal:
+#     floats and float tensors
+#   • An `int` has no `.sqrt()`, so `√ n` is `SEM004 unknown_method`, the same
+#     refusal as calling the method itself
+#   • The fix is an explicit conversion first: `√ (n ↦ f64)`
+#
+# See also: radical-scalar, radical-tensor
+# =============================================================================
+
+# √ over an int: refused, an int has no .sqrt().
+main {
+    let int n ← 81
+    print √ n
+}
