@@ -1,0 +1,16 @@
+{
+  "targets": {
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "undefined: time.MILLISECOND",
+      "reason": "The Go package emitter binds `norma:time` calls to the Go `time` package instead of emitting Norma time-leaf helpers, so the generated `main.go` calls `time.MILLISECOND` and `go build` stops with `undefined: time.MILLISECOND`. Re-measure this row when the Go package emitter lowers the Norma time module."
+    }
+  }
+}

@@ -1,0 +1,32 @@
++++
+locale = "en"
++++
+
+# norma:fs/path called directly: join, parent, file_name, extension, resolve,
+# home and temp_dir. Only environment-independent facts are asserted (the temp
+# directory and home are non-empty absolute paths; the projections are exact).
+import from "norma:fs/path" path
+
+main {
+    let string joined ← path.join(["alpha", "beta", "notes.txt"])
+    print joined
+    print path.parent(joined)
+    print path.file_name(joined)
+    print path.extension(joined)
+    print path.extension(path.join(["alpha", "noext"])).length()
+
+    let string tmp ← path.temp_dir()
+    assert tmp.length() ≻ 0
+    assert tmp.slice(0, 1) ≡ "/"
+    let string home ← path.home()
+    assert home.length() ≻ 0
+
+    # resolve: a relative path gains the working directory and is absolute.
+    let string absolute ← path.resolve("fs-path-leaf-nonexistent")
+    assert absolute.slice(0, 1) ≡ "/"
+    assert path.file_name(absolute) ≡ "fs-path-leaf-nonexistent"
+
+    # resolve on an existing directory is its own canonical form.
+    assert path.resolve(path.resolve(tmp)) ≡ path.resolve(tmp)
+    print "fs-path-leaf-ok"
+}

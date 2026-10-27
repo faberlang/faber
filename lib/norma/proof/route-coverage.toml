@@ -1,0 +1,10 @@
+# Public Norma routes with no proof case, and why. The generator
+# (scripta/generate-corpus-suite.py --suite norma --check) fails on a public
+# route that no case reaches and that is not recorded here, and on a record
+# whose route a case already covers.
+#
+# A route belongs here only when no case can call it today. When a case lands
+# for it, delete the record.
+
+[not-applicable]
+"norma:tensor.construct" = "construct<T, size Shape> declares a size parameter, and every call form is refused at the call site with SEM008 generic_call_size_shape_unsupported (explicit type arguments, and the nested tensor<..> argument the shipped exempla use, alike); the other tensor wrappers infer their shape from a tensor argument and are covered by pure/tensor-ops."

@@ -1,0 +1,121 @@
++++
+locale = "en"
++++
+
+# http-facade: the norma:http facade verbs, called through the facade rather
+# than the leaves behind it. Server verbs run a live loopback exchange on one
+# thread (the client half is split with the leaf's open_pending /
+# finish_pending); the client I/O verbs run against a just-stopped port, where
+# every one faults with ConnectionRefused without needing a concurrent peer.
+
+import from "norma:fault" fault
+import from "norma:http" http
+import from "norma:http/client" client
+import from "norma:http/headers" headers
+import from "norma:http/response" response
+import from "norma:http/server" server
+import from "norma:text" text
+import from "norma:value" value
+
+fn refused(fault.IoFault f) → bool {
+    match f {
+        case ConnectionRefused let path { return true }
+        default { return false }
+    }
+}
+
+async_main {
+    # listen / accept / respond: the raw-frame server path.
+    let int handle ← http.listen([0 ↦ value])
+    let int port ↤ call 'http:port' (handle)
+    assert port ≻ 0
+    let string base ← "http://127.0.0.1:§"(port)
+    let headers.Headers none ← http.empty_headers()
+
+    let client.Request first ← client.open_pending("GET", base + "/raw", none, "")
+    let value request ← http.accept(handle)
+    assert (value.get(request, "method") ↦ string ⊥ "") ≡ "GET"
+    assert (value.get(request, "path") ↦ string ⊥ "") ≡ "/raw"
+    let string request_id ← value.get(request, "id") ↦ string ⊥ ""
+    let list<value> no_headers ← []
+    http.respond([request_id ↦ value, 200 ↦ value, no_headers ↦ value, "raw-body" ↦ value])
+    let client.Receive got ← client.finish_pending(first)
+    assert got.status ≡ 200
+    let client.Chunk body ← http.receive(got)
+    assert body.text ≡ "raw-body"
+
+    # respond_open / respond_chunk / respond_finish: the raw chunked path.
+    let client.Request second ← client.open_pending("GET", base + "/stream", none, "")
+    let value streamed ← http.accept(handle)
+    let string stream_id ← value.get(streamed, "id") ↦ string ⊥ ""
+    let int writer ← http.respond_open([stream_id ↦ value, 200 ↦ value, no_headers ↦ value])
+    http.respond_chunk([writer ↦ value, "chunk-one" ↦ value])
+    http.respond_finish([writer ↦ value, false ↦ value])
+    let client.Receive got_stream ← client.finish_pending(second)
+    mut string text ← ""
+    mut bool done ← false
+    while not done {
+        let client.Chunk piece ← http.receive(got_stream)
+        text ← text + piece.text
+        done ← piece.done
+    }
+    assert text ≡ "chunk-one"
+
+    # Pure facade constructors and re-exports.
+    assert text.decode(http.encode_chunked(text.encode("hello"))).length() ≻ 5
+    assert http.empty_headers().length() ≡ 0
+    assert http.request_from_target("GET", "/a?b=1", none, "").path ≡ "/a"
+    assert http.response_of(204, none, "").status ≡ 204
+    let client.Url url ← http.split_url("http://Example.com:8080/a/b?x=1#f")
+    assert url.host ≡ "example.com"
+    assert http.url_is_absolute(url)
+    assert http.host_header(url) ≡ "example.com:8080"
+    assert http.request_target(url) ≡ "/a/b?x=1"
+    assert http.empty_client().agent ≡ 0
+
+    # keep_alive follows the Connection header.
+    mut headers.Headers closing ← http.empty_headers()
+    if closing.append("Connection", "close") {
+    }
+    assert http.keep_alive(none)
+    assert not http.keep_alive(closing)
+
+    http.stop(handle)
+
+    # bind / bind_tls: bind yields a live port; a certificate that does not
+    # exist is refused with a fault.
+    let server.Listener server_listener ← http.bind(0)
+    assert server_listener.port() ≻ 0
+    server_listener.stop()
+    mut bool tls_refused ← false
+    do {
+        http.bind_tls(0, "/nonexistent/cert.pem", "/nonexistent/key.pem")
+    }
+    catch err {
+        tls_refused ← true
+    }
+    assert tls_refused
+
+    # session: a reusable client handle.
+    let client.Client session ← http.session()
+    assert session.agent ≻ 0
+
+    # Client I/O verbs against a stopped port.
+    let int gone ↤ call 'http:listen' ([0 ↦ value])
+    let int dead_port ↤ call 'http:port' (gone)
+    let void stopped ↤ call 'http:stop' (gone)
+    let string dead ← "http://127.0.0.1:§/"(dead_port)
+    mut int refusals ← 0
+    do { await_const response.Response r1 ← http.get(dead) } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { await_const response.Response r2 ← http.post(dead, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { await_const response.Response r3 ← http.put(dead, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { await_const response.Response r4 ← http.delete(dead) } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { await_const response.Response r5 ← http.patch(dead, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    mut map<string, string> pairs ← {}
+    pairs.put("x-verb", "pairs")
+    do { await_const response.Response r6 ← http.send_request("OPTIONS", dead, pairs, "") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { http.open_request("GET", dead, none, "") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    assert refusals ≡ 7
+
+    print "http-facade-ok"
+}

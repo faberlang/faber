@@ -1,0 +1,152 @@
++++
+locale = "en"
++++
+
+# http-server-streams: the server's streaming and listener-construction
+# surface over live loopback exchanges on one thread. Each client exchange is
+# split (open_pending writes the request, finish_pending reads the head) so
+# the server side runs between the halves. Covers reply_with, a chunked reply
+# (open / write / write_chunk / finish / finish_stream), the raw respond_open /
+# respond_chunk / respond_finish writer verbs, bind_tls on a missing certificate, an SSE reply
+# (open_sse / write_event / send_event, event_bytes, event_chunk), keep_alive,
+# keep_alive_version, bind_at, bind_limited, bind_full and stop.
+
+import from "norma:fault" fault
+import from "norma:http/client" client
+import from "norma:http/headers" headers
+import from "norma:http/response" response
+import from "norma:http/server" server
+import from "norma:http/sse" sse
+import from "norma:text" text
+
+fn drain(client.Receive got) → string ⇥ fault.IoFault {
+    mut string body ← ""
+    mut bool done ← false
+    while not done {
+        let client.Chunk chunk ← got.next()
+        body ← body + chunk.text
+        done ← chunk.done
+    }
+    return body
+}
+
+main {
+    # bind_at, bind_limited and bind_full each yield a live ephemeral port.
+    let server.Listener at ← server.bind_at(0, "127.0.0.1")
+    assert at.port() ≻ 0
+    server.stop(at.handle)
+    let server.Listener limited ← server.bind_limited(0, 4096)
+    assert limited.port() ≻ 0
+    limited.stop()
+    let server.Listener listener ← server.bind_full(0, 4096, "127.0.0.1")
+    let int port ← listener.port()
+    assert port ≻ 0
+    let string base ← "http://127.0.0.1:§"(port)
+    let headers.Headers none ← headers.empty()
+
+    # reply_with: a prebuilt Response goes out as the reply.
+    let client.Request first ← client.open_pending("GET", base + "/with", none, "")
+    let server.Incoming one ← listener.accept()
+    assert one.req.path ≡ "/with"
+    mut headers.Headers with_headers ← headers.empty()
+    if with_headers.append("x-via", "reply_with") {
+    }
+    server.reply_with(one, response.of(202, with_headers, "prebuilt"))
+    let client.Receive got_with ← client.finish_pending(first)
+    assert got_with.status ≡ 202
+    assert drain(got_with) ≡ "prebuilt"
+    assert (got_with.headers.get("x-via") coalesce "") ≡ "reply_with"
+
+    # Chunked reply: Stream.write, server.write_chunk, Stream.finish.
+    let client.Request second ← client.open_pending("GET", base + "/chunks", none, "")
+    let server.Incoming two ← listener.accept()
+    let server.Stream stream ← server.open(two, 200, headers.empty())
+    stream.write(text.encode("alpha-"))
+    server.write_chunk(stream, text.encode("beta-"))
+    server.write_chunk(stream, text.encode("gamma"))
+    stream.finish(false)
+    let client.Receive got_chunks ← client.finish_pending(second)
+    assert got_chunks.status ≡ 200
+    assert drain(got_chunks) ≡ "alpha-beta-gamma"
+
+    # finish_stream is the function form of Stream.finish.
+    let client.Request third ← client.open_pending("GET", base + "/finish", none, "")
+    let server.Incoming three ← listener.accept()
+    let server.Stream plain ← server.open(three, 200, headers.empty())
+    server.write_chunk(plain, text.encode("tail"))
+    server.finish_stream(plain, false)
+    let client.Receive got_finish ← client.finish_pending(third)
+    assert drain(got_finish) ≡ "tail"
+
+    # Bounded reads through the client's receive / receive_n / next_n on a
+    # content-length reply (a chunked frame larger than the limit is refused).
+    let client.Request fourth ← client.open_pending("GET", base + "/bounded", none, "")
+    let server.Incoming four ← listener.accept()
+    server.reply(four, 200, headers.empty(), "0123456789")
+    let client.Receive got_bounded ← client.finish_pending(fourth)
+    let client.Chunk head ← client.receive_n(got_bounded, 4)
+    assert head.text ≡ "0123"
+    let client.Chunk middle ← got_bounded.next_n(3)
+    assert middle.text ≡ "456"
+    let client.Chunk rest ← client.receive(got_bounded)
+    assert rest.text ≡ "789"
+
+    # SSE reply: open_sse, Stream.write_event, send_event; the client reads the
+    # event stream back and the sse codec parses it.
+    let client.Request fifth ← client.open_pending("GET", base + "/events", none, "")
+    let server.Incoming five ← listener.accept()
+    let server.Stream events ← server.open_sse(five)
+    events.write_event(sse.Event { name = "one", data = "first", id = "", retry = "" })
+    server.send_event(events, sse.Event { name = "two", data = "second", id = "", retry = "" })
+    events.finish(false)
+    let client.Receive got_events ← client.finish_pending(fifth)
+    assert (got_events.headers.get("content-type") coalesce "") ≡ "text/event-stream"
+    let list<sse.Event> parsed ← sse.parse(drain(got_events))
+    assert parsed.length() ≡ 2
+    assert (parsed.get(0) coalesce sse.Event { name = "", data = "", id = "", retry = "" }).name ≡ "one"
+    assert (parsed.get(1) coalesce sse.Event { name = "", data = "", id = "", retry = "" }).data ≡ "second"
+
+    # event_bytes is the wire text as bytes; event_chunk adds the framing.
+    let sse.Event sample ← sse.Event { name = "n", data = "d", id = "", retry = "" }
+    assert text.decode(server.event_bytes(sample)) ≡ "event: n\ndata: d\n\n"
+    assert server.event_chunk(sample).length() ≻ server.event_bytes(sample).length()
+
+    # The raw-frame writer verbs on the leaf: respond_open, respond_chunk and
+    # respond_finish drive one chunked reply by writer handle.
+    let client.Request sixth ← client.open_pending("GET", base + "/raw-stream", none, "")
+    let server.Incoming six ← listener.accept()
+    let list<value> bare ← []
+    let int writer ← server.respond_open([six.id ↦ value, 200 ↦ value, bare ↦ value])
+    server.respond_chunk([writer ↦ value, "raw-" ↦ value])
+    server.respond_chunk([writer ↦ value, "frames" ↦ value])
+    server.respond_finish([writer ↦ value, false ↦ value])
+    let client.Receive got_raw ← client.finish_pending(sixth)
+    assert drain(got_raw) ≡ "raw-frames"
+
+    # bind_tls: a certificate that does not exist is refused with a fault.
+    mut bool tls_refused ← false
+    do {
+        server.bind_tls(0, "/nonexistent/cert.pem", "/nonexistent/key.pem")
+    }
+    catch err {
+        tls_refused ← true
+    }
+    assert tls_refused
+
+    # keep_alive: HTTP/1.1 defaults on, Connection: close turns it off, and
+    # HTTP/1.0 defaults off unless it names keep-alive.
+    mut headers.Headers closing ← headers.empty()
+    if closing.append("Connection", "close") {
+    }
+    mut headers.Headers keeping ← headers.empty()
+    if keeping.append("Connection", "Keep-Alive") {
+    }
+    assert server.keep_alive(headers.empty())
+    assert not server.keep_alive(closing)
+    assert not server.keep_alive_version("HTTP/1.0", headers.empty())
+    assert server.keep_alive_version("HTTP/1.0", keeping)
+    assert server.keep_alive_version("HTTP/1.1", keeping)
+
+    listener.stop()
+    print "http-server-streams-ok"
+}

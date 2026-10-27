@@ -1,0 +1,26 @@
++++
+locale = "en"
++++
+
+# norma:random wrapper routes: seed, random_float and uuid. Only properties
+# that hold for every draw are asserted (range, shape, seeded replay).
+import from "norma:random" random
+
+main {
+    random.seed(11)
+    let float first ← random.random_float()
+    let float second ← random.random_float()
+    assert first ≥ 0.0 and first ≺ 1.0
+    assert second ≥ 0.0 and second ≺ 1.0
+    random.seed(11)
+    assert random.random_float() ≡ first
+    assert random.random_float() ≡ second
+
+    let string id ← random.uuid()
+    assert id.length() ≡ 36
+    assert id.slice(8, 9) ≡ "-"
+    assert id.slice(14, 15) ≡ "4"
+    assert id ≢ random.uuid()
+
+    print "entropy-wrappers-ok"
+}

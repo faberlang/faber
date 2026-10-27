@@ -1,0 +1,30 @@
++++
+locale = "en"
++++
+
+# norma:machine.sample: one host snapshot. Only invariants that hold on any
+# host are asserted (non-negative counters, total at least busy per core, used
+# memory within total memory); no core count or byte value is pinned.
+import from "norma:machine" machine
+
+main {
+    let machine.Sample first ← machine.sample(2000)
+    assert first.age_ms ≥ 0
+    assert first.memory.total_bytes ≥ 0
+    assert first.memory.used_bytes ≥ 0
+    assert first.memory.used_bytes ≤ first.memory.total_bytes
+    for from first.cores let core {
+        assert core.busy_ns ≥ 0
+        assert core.total_ns ≥ core.busy_ns
+    }
+    for from first.procs let proc {
+        assert proc.pid ≥ 0
+        assert proc.cpu_ns ≥ 0
+    }
+
+    # A zero deadline returns the previous snapshot immediately, marked stale.
+    let machine.Sample again ← machine.sample(0)
+    assert again.stale
+
+    print "machine-sample-ok"
+}

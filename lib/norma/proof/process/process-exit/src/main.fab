@@ -1,0 +1,12 @@
++++
+locale = "en"
++++
+
+# norma:process.exit_process ends the program with the requested status. The
+# line printed before the call reaches stdout; nothing after it runs.
+import from "norma:process" process
+
+main {
+    print "before-exit"
+    process.exit_process(3)
+}

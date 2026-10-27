@@ -1,0 +1,23 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:tensor. The tensors are built with the language's
+# own conversion, then each wrapper is called with inferred type arguments.
+# Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:tensor" tensor
+
+main {
+    let tensor<int, [2, 2]> grid ← [[1, 2], [3, 4]] ↦ tensor<int, [2, 2]>
+    let list<int> back ← tensor.flatten(grid)
+    print back
+    let tensor<int, [2, 2]> scaled ← tensor.apply(grid, int x ∴ x + 1)
+    let list<int> bumped ← tensor.flatten(scaled)
+    print bumped
+    print tensor.sum(scaled)
+    print tensor.product([2, 3, 4])
+
+    let tensor<f32, [4]> wide ← [0.5, 1.5, 2.0, 4.0] ↦ tensor<f32, [4]>
+    print tensor.sum_f32(wide)
+}

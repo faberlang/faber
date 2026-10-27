@@ -1,0 +1,32 @@
++++
+locale = "en"
++++
+
+# norma:time clock wrappers: now, active, the unit constants, sleep and the
+# interval Ticker. Only monotone and range facts are asserted, never a
+# specific instant.
+import from "norma:time" time
+
+main {
+    assert time.MILLISECOND() ≡ 1
+    assert time.SECOND() ≡ 1000
+    assert time.MINUTE() ≡ 60000
+    assert time.HOUR() ≡ 3600000
+    assert time.DAY() ≡ 86400000
+
+    let instant<ns> before ← time.now()
+    time.sleep(2)
+    let instant<ns> after ← time.now()
+    assert after ≥ before
+
+    let int cpu ← time.active()
+    assert cpu ≥ 0
+
+    let int mark ← time.monotonic()
+    let time.Ticker ticker ← time.interval(1)
+    let instant<ns> tick ← ticker.next()
+    assert tick ≥ before
+    assert time.monotonic() ≥ mark
+
+    print "clock-wrappers-ok"
+}
