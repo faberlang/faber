@@ -1575,6 +1575,10 @@ mod tensor_minus_test;
 mod scalar_math_test;
 
 #[cfg(test)]
+#[path = "float_literal_receiver_test.rs"]
+mod float_literal_receiver_test;
+
+#[cfg(test)]
 #[path = "tensor_math_test.rs"]
 mod tensor_math_test;
 

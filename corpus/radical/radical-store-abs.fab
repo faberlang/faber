@@ -1,0 +1,33 @@
++++
+term = "√"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "unary_expr", "expression", "literal", "call_expr", "member_suffix", "nota_stmt"]
+category = "arithmetic"
+summary = "A negated float literal receiver of abs stored into an f32 binding: the store's width reaches the literal."
+syntax = "let f32 y ← (-2.0).abs()"
+related = ["radical-store", "radical-scalar"]
+locale = "en"
++++
+
+# =============================================================================
+# `abs` on a negated float literal, stored into an f32 binding.
+# =============================================================================
+#
+# What this teaches:
+#   • A float literal has no width until it is stored: `(-2.0).abs()` takes the
+#     `f32` of the binding it lands in, the same way `2.0 * 3.0` does
+#   • A chain over a literal (`(-4.0).abs().sqrt()`) takes the width the same way
+#
+# See also: radical-store, radical-scalar
+#
+# EXPECTED stdout:
+#   2.0
+#   2.0
+# =============================================================================
+
+main {
+    let f32 magnitude ← (-2.0).abs()
+    let f32 chain ← (-4.0).abs().sqrt()
+    print magnitude
+    print chain
+}

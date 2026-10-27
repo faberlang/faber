@@ -2848,7 +2848,7 @@ fn is_decimal_text_literal(expr: &HirExpression) -> bool {
     }
 }
 
-fn numeric_literal_family(expr: &HirExpression) -> Option<Primitive> {
+pub(super) fn numeric_literal_family(expr: &HirExpression) -> Option<Primitive> {
     match &expr.kind {
         HirExpressionKind::Literal(HirLiteral::Int(_) | HirLiteral::BigInt(_)) => {
             Some(Primitive::Numerus)
