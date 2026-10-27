@@ -17,6 +17,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Interner;
 use radix_mir::*;
+use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{
     BitsWidth, MirMathFunction, NumericWidth, Primitive, SemanticMutability, Type, TypeId,
     TypeTable,
@@ -1704,13 +1705,10 @@ impl FunctionLower<'_, '_> {
             if let (MirProjection::Index(index), Rep::Text) = (projection, current_rep) {
                 let (index, index_rep) = self.scalar(index)?;
                 if index_rep == Rep::Tuple {
-                    let window = self
+                    // The runtime ends the run itself on a window outside the text.
+                    current = self
                         .call_runtime(&abi::TEXT_RANGE, &[current, index])?
                         .ok_or_else(|| Decline::new("text window result"))?;
-                    let zero = self.builder.ins().iconst(types::I64, 0);
-                    let outside = self.builder.ins().icmp(IntCC::Equal, window, zero);
-                    self.trap_if(outside, "textus index out of bounds")?;
-                    current = window;
                     continue;
                 }
                 if index_rep != Rep::Int {
@@ -2530,9 +2528,7 @@ impl FunctionLower<'_, '_> {
                     let window = self
                         .call_runtime(&abi::LIST_RANGE, &[handle, index])?
                         .ok_or_else(|| Decline::new("list window result"))?;
-                    let zero = self.builder.ins().iconst(types::I64, 0);
-                    let outside = self.builder.ins().icmp(IntCC::Equal, window, zero);
-                    self.trap_if(outside, "list window out of bounds")?;
+                    // The runtime ends the run itself on a window outside the list.
                     let Some(destination) = destination else {
                         return Ok(());
                     };
@@ -5383,7 +5379,7 @@ impl FunctionLower<'_, '_> {
     }
 
     fn overflow_guard(&mut self, flag: Value) -> Lowered<()> {
-        self.trap_if(flag, "numerus overflow")
+        self.trap_if(flag, trap_text::NUMERUS_OVERFLOW)
     }
 
     /// Floor division (`remainder == false`) or floor remainder, with a zero
@@ -5413,7 +5409,7 @@ impl FunctionLower<'_, '_> {
         let negated = {
             let (negated, flag) = self.builder.ins().ssub_overflow(zero, a);
             let guarded = self.builder.ins().band(flag, is_minus_one);
-            self.trap_if(guarded, "numerus overflow")?;
+            self.trap_if(guarded, trap_text::NUMERUS_OVERFLOW)?;
             negated
         };
         Ok(if remainder {

@@ -38,6 +38,7 @@ use std::sync::OnceLock;
 
 use radix_runtime_contract::display::{display_bivalens, display_fractus};
 use radix_runtime_contract::display_tokens::DisplayTokens;
+use radix_runtime_contract::trap::text::{self as trap_text, window_inside};
 use radix_runtime_contract::trap::{TrapKind, abort_exit_status, exit_status, trap_line};
 
 // The program's `incipit`, emitted into the linked object by the backend.
@@ -680,7 +681,7 @@ pub unsafe extern "C" fn __faber_clif_v1_map_get(map: *const Map, key_tag: i32, 
     let map = unsafe { &*map };
     match map_find(map, key_tag, key) {
         Some(at) => map.entries[at].3,
-        None => unsafe { __faber_clif_v1_trap(c"key not found".as_ptr().cast(), 13) },
+        None => exact_trap(trap_text::MAP_MISSING_KEY),
     }
 }
 
@@ -997,8 +998,25 @@ pub unsafe extern "C" fn __faber_clif_v1_list_len(list: *const List) -> i64 {
     i64::try_from(unsafe { list_ref(list) }.items.len()).unwrap_or(i64::MAX)
 }
 
-fn index_out_of_bounds() -> ! {
-    unsafe { __faber_clif_v1_trap(c"array index out of bounds".as_ptr().cast(), 25) }
+/// End the run on a failed index read: a negative index is the negative index
+/// failure, any other is the collection's own out-of-bounds failure.
+fn index_trap(index: i64, out_of_bounds: &str) -> ! {
+    exact_trap(if index < 0 {
+        trap_text::NEGATIVE_INDEX
+    } else {
+        out_of_bounds
+    })
+}
+
+fn index_out_of_bounds(index: i64) -> ! {
+    index_trap(index, trap_text::LIST_INDEX_OUT_OF_BOUNDS)
+}
+
+/// End the run on a window with a negative bound.
+fn window_trap_if_negative(start: i64, end: i64) {
+    if start < 0 || end < 0 {
+        exact_trap(trap_text::NEGATIVE_INDEX);
+    }
 }
 
 /// Element bits at `index`; an index out of range ends the run.
@@ -1014,7 +1032,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_get(list: *const List, index: i64)
         .and_then(|at| list.items.get(at))
     {
         Some(&(_, bits)) => bits,
-        None => index_out_of_bounds(),
+        None => index_out_of_bounds(index),
     }
 }
 
@@ -1036,7 +1054,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_set(
         .and_then(|at| list.items.get_mut(at))
     {
         Some(slot) => *slot = (tag, bits),
-        None => index_out_of_bounds(),
+        None => index_out_of_bounds(index),
     }
 }
 
@@ -1541,7 +1559,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_index(handle: *const u8, index: i6
             let mut buffer = [0_u8; 4];
             text_new(found.encode_utf8(&mut buffer).as_bytes())
         }
-        None => unsafe { __faber_clif_v1_trap(c"text index out of bounds".as_ptr().cast(), 24) },
+        None => index_trap(index, trap_text::TEXT_INDEX_OUT_OF_BOUNDS),
     }
 }
 
@@ -2403,8 +2421,8 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(interval: *const L
     list_new_from(items)
 }
 
-/// A copy of the range of a text (in characters) an interval names; null when
-/// the range does not lie fully inside the text.
+/// A copy of the range of a text (in characters) an interval names; a range
+/// that does not lie fully inside the text ends the run.
 ///
 /// # Safety
 ///
@@ -2415,24 +2433,21 @@ pub unsafe extern "C" fn __faber_clif_v1_text_range(
     interval: *const List,
 ) -> *const u8 {
     let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    window_trap_if_negative(start, end);
     let text = text_str(unsafe { text_bytes(text) });
     let chars: Vec<char> = text.chars().collect();
-    let end = if inclusive {
-        end.checked_add(1)
-    } else {
-        Some(end)
-    };
-    match (usize::try_from(start), end.map(usize::try_from)) {
-        (Ok(start), Some(Ok(end))) if start <= end && end <= chars.len() => {
+    let (start, end) = (i128::from(start), i128::from(end) + i128::from(inclusive));
+    match window_inside(start, end, chars.len()) {
+        Some((start, end)) => {
             let window: String = chars[start..end].iter().collect();
             text_new(window.as_bytes())
         }
-        _ => std::ptr::null(),
+        None => exact_trap(&trap_text::text_window_outside(start, end, chars.len())),
     }
 }
 
-/// A copy of the range of a list an interval names; null when the range does
-/// not lie fully inside the list.
+/// A copy of the range of a list an interval names; a range that does not lie
+/// fully inside the list ends the run.
 ///
 /// # Safety
 ///
@@ -2443,17 +2458,12 @@ pub unsafe extern "C" fn __faber_clif_v1_list_range(
     interval: *const List,
 ) -> *mut List {
     let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    window_trap_if_negative(start, end);
     let items = &unsafe { list_ref(list) }.items;
-    let end = if inclusive {
-        end.checked_add(1)
-    } else {
-        Some(end)
-    };
-    match (usize::try_from(start), end.map(usize::try_from)) {
-        (Ok(start), Some(Ok(end))) if start <= end && end <= items.len() => {
-            list_new_from(items[start..end].to_vec())
-        }
-        _ => std::ptr::null_mut(),
+    let (start, end) = (i128::from(start), i128::from(end) + i128::from(inclusive));
+    match window_inside(start, end, items.len()) {
+        Some((start, end)) => list_new_from(items[start..end].to_vec()),
+        None => exact_trap(&trap_text::list_window_outside(start, end, items.len())),
     }
 }
 

@@ -37,6 +37,7 @@ use radix_mir::{MirBinOp, MirFunctionId};
 use radix_runtime_contract::display::{display_bivalens, display_fractus, display_text_payload};
 use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_runtime_contract::instans::Instans;
+use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{FloatPolicy, NumericWidth, Type, TypeId, TypeTable};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -1499,13 +1500,10 @@ impl Value {
     pub fn as_index(&self, span: Span) -> Result<usize, RunnerError> {
         match self {
             Value::Int(value) => usize::try_from(*value)
-                .map_err(|_| RunnerError::internal(span, "expected non-negative numerus index")),
+                .map_err(|_| RunnerError::internal(span, trap_text::NEGATIVE_INDEX)),
             Value::UInt(value) => usize::try_from(*value)
-                .map_err(|_| RunnerError::internal(span, "expected non-negative numerus index")),
-            _ => Err(RunnerError::internal(
-                span,
-                "expected non-negative numerus index",
-            )),
+                .map_err(|_| RunnerError::internal(span, trap_text::NEGATIVE_INDEX)),
+            _ => Err(RunnerError::internal(span, trap_text::NEGATIVE_INDEX)),
         }
     }
 
@@ -2601,7 +2599,7 @@ fn check_int_width(
 }
 
 pub fn width_checked_neg(v: i64, width: NumericWidth, span: Span) -> Result<i64, RunnerError> {
-    check_int_width(-(v as i128), width, span, "numerus overflow")
+    check_int_width(-(v as i128), width, span, trap_text::NUMERUS_OVERFLOW)
 }
 
 pub fn width_checked_add(
@@ -2610,7 +2608,12 @@ pub fn width_checked_add(
     width: NumericWidth,
     span: Span,
 ) -> Result<i64, RunnerError> {
-    check_int_width(a as i128 + b as i128, width, span, "numerus overflow")
+    check_int_width(
+        a as i128 + b as i128,
+        width,
+        span,
+        trap_text::NUMERUS_OVERFLOW,
+    )
 }
 
 pub fn width_checked_sub(
@@ -2619,7 +2622,12 @@ pub fn width_checked_sub(
     width: NumericWidth,
     span: Span,
 ) -> Result<i64, RunnerError> {
-    check_int_width(a as i128 - b as i128, width, span, "numerus overflow")
+    check_int_width(
+        a as i128 - b as i128,
+        width,
+        span,
+        trap_text::NUMERUS_OVERFLOW,
+    )
 }
 
 pub fn width_checked_mul(
@@ -2628,7 +2636,12 @@ pub fn width_checked_mul(
     width: NumericWidth,
     span: Span,
 ) -> Result<i64, RunnerError> {
-    check_int_width(a as i128 * b as i128, width, span, "numerus overflow")
+    check_int_width(
+        a as i128 * b as i128,
+        width,
+        span,
+        trap_text::NUMERUS_OVERFLOW,
+    )
 }
 
 /// Floor division (ruling 14). A zero divisor reports `numerus division
@@ -2694,7 +2707,7 @@ pub fn uint_width_checked_neg(
     if v == 0 {
         Ok(0)
     } else {
-        Err(RunnerError::internal(span, "numerus overflow"))
+        Err(RunnerError::internal(span, trap_text::NUMERUS_OVERFLOW))
     }
 }
 
@@ -2704,7 +2717,12 @@ pub fn uint_width_checked_add(
     width: NumericWidth,
     span: Span,
 ) -> Result<u64, RunnerError> {
-    check_uint_width(a as u128 + b as u128, width, span, "numerus overflow")
+    check_uint_width(
+        a as u128 + b as u128,
+        width,
+        span,
+        trap_text::NUMERUS_OVERFLOW,
+    )
 }
 
 pub fn uint_width_checked_sub(
@@ -2715,8 +2733,8 @@ pub fn uint_width_checked_sub(
 ) -> Result<u64, RunnerError> {
     let result = a
         .checked_sub(b)
-        .ok_or_else(|| RunnerError::internal(span, "numerus overflow"))?;
-    check_uint_width(result as u128, width, span, "numerus overflow")
+        .ok_or_else(|| RunnerError::internal(span, trap_text::NUMERUS_OVERFLOW))?;
+    check_uint_width(result as u128, width, span, trap_text::NUMERUS_OVERFLOW)
 }
 
 pub fn uint_width_checked_mul(
@@ -2725,7 +2743,12 @@ pub fn uint_width_checked_mul(
     width: NumericWidth,
     span: Span,
 ) -> Result<u64, RunnerError> {
-    check_uint_width(a as u128 * b as u128, width, span, "numerus overflow")
+    check_uint_width(
+        a as u128 * b as u128,
+        width,
+        span,
+        trap_text::NUMERUS_OVERFLOW,
+    )
 }
 
 pub fn uint_width_checked_div(
@@ -3085,7 +3108,7 @@ pub fn scalar_text_index(text: &str, index: usize, span: Span) -> Result<Value, 
     let ch = text
         .chars()
         .nth(index)
-        .ok_or_else(|| RunnerError::internal(span, "text index out of bounds"))?;
+        .ok_or_else(|| RunnerError::internal(span, trap_text::TEXT_INDEX_OUT_OF_BOUNDS))?;
     if ch.is_ascii() {
         ascii1_from_scalar(ch, span)
     } else {
@@ -3188,3 +3211,40 @@ pub fn format_template_shaped(
 #[cfg(test)]
 #[path = "f16_bf16_slot_round_test.rs"]
 mod f16_bf16_slot_round_test;
+
+/// The `(start, end, inclusive)` window of an interval index, or `None` for a
+/// plain element index. Tests the carrier shape directly: the fallible
+/// `interval_parts` builds (and the caller then drops) a `RunnerError` for
+/// every non-interval value, which is every ordinary `xs[i]`.
+fn window_interval(value: &Value) -> Option<(Value, Value, bool)> {
+    let Value::Tuple(parts) = value else {
+        return None;
+    };
+    // A stepped window carries its step as a fourth part (`window_step`).
+    let ([start, end, Value::Bool(inclusive)] | [start, end, Value::Bool(inclusive), _]) =
+        parts.as_slice()
+    else {
+        return None;
+    };
+    Some((start.clone(), end.clone(), *inclusive))
+}
+
+/// The half-open bounds of a range index (an inclusive end advanced by one),
+/// `None` when the index is not a range. A negative bound is the negative
+/// index failure, as for a scalar index.
+pub(crate) fn window_bounds(
+    index: &Value,
+    span: Span,
+) -> Result<Option<(i128, i128)>, RunnerError> {
+    let Some((start, end, inclusive)) = window_interval(index) else {
+        return Ok(None);
+    };
+    let signed = |bound: &Value| match bound {
+        Value::Int(value) if *value >= 0 => Ok(i128::from(*value)),
+        Value::UInt(value) => Ok(i128::from(*value)),
+        _ => Err(RunnerError::internal(span, trap_text::NEGATIVE_INDEX)),
+    };
+    let start = signed(&start)?;
+    let end = signed(&end)? + i128::from(inclusive);
+    Ok(Some((start, end)))
+}

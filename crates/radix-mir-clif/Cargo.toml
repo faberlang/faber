@@ -20,6 +20,7 @@ cranelift-object = "=0.136.2"
 radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
 radix-mir = { path = "../radix-mir" }
+radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-types = { path = "../radix-types" }
 
 [lints]

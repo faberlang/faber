@@ -27,7 +27,7 @@ use super::tensor_edge::{
 use super::value::{
     GradientStorage, LedgerValue, MapKey, MatrixValue, TensorEdgeOp, TensorInverseMap, TensorValue,
     Value, as_text_str, coordinate_fits, format_template_shaped, inverse_view_coordinate,
-    round_float, uint_width_checked_add, values_equal, width_checked_add,
+    round_float, uint_width_checked_add, values_equal, width_checked_add, window_bounds,
 };
 use super::{
     CallOutcome, RUNNER_BOUNDED_LISTA_LENGTH_MISMATCH, RUNNER_LISTA_LENGTH_MISMATCH, Runner,
@@ -49,6 +49,10 @@ use radix_runtime_contract::tensor::{
     ERR_FORMA_ELEMENT_COUNT, ERR_FORMA_RESHAPE_COUNT, ERR_MATMUL_ARGUMENT_RANK,
     ERR_MATMUL_INNER_DIMENSION, ERR_MATMUL_RECEIVER_RANK, ERR_PONDE_INVALID_INDEX,
     tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
+};
+use radix_runtime_contract::trap::text::{
+    LIST_INDEX_OUT_OF_BOUNDS, MAP_MISSING_KEY, NUMERUS_OVERFLOW, TEXT_INDEX_OUT_OF_BOUNDS,
+    list_window_outside, text_window_outside, window_inside,
 };
 use radix_types::{
     IndexExpr, IndexId, MirMathFunction, NumericWidth, Primitive, Type, TypeId, TypeTable,
@@ -1360,22 +1364,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // a list is a copied range, fully in bounds or a failure.
                 if let (Value::Array(cell), Type::Array(_)) =
                     (&receiver, self.types.get(return_ty.semantic_id()))
-                    && let Some((start, end)) =
-                        window_bounds(&index, span, "list window out of bounds")?
+                    && let Some((start, end)) = window_bounds(&index, span)?
                 {
                     let items = cell.borrow();
-                    if start > end || end > items.len() {
+                    let Some((start, end)) = window_inside(start, end, items.len()) else {
                         return Err(window_failure(
                             RunnerError::internal_with_issue(
                                 span,
-                                format!("list range {start}‥{end} outside 0‥{}", items.len()),
+                                list_window_outside(start, end, items.len()),
                                 "runner_list_window_out_of_bounds",
                             ),
                             start,
                             end,
                             items.len(),
                         ));
-                    }
+                    };
                     let step = window_step(&index, span)?;
                     return Ok(array_value(
                         items[start..end].iter().step_by(step).cloned().collect(),
@@ -3703,7 +3706,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         .ok_or_else(|| RunnerError::internal(span, "tensor abs element"))?
                         .abs();
                     super::exact_int::exact_carrier(exact, int_width)
-                        .ok_or_else(|| RunnerError::internal(span, "numerus overflow"))?
+                        .ok_or_else(|| RunnerError::internal(span, NUMERUS_OVERFLOW))?
                 }
                 _ => {
                     return Err(RunnerError::internal(
@@ -4913,22 +4916,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // A semantically octeti local can retain the array carrier
                 // after a lista<u8> assignment; normalize its window back to
                 // octeti so endian conversion sees the declared source type.
-                if let Some((start, end)) =
-                    window_bounds(index, span, "octeti index out of bounds")?
-                {
+                if let Some((start, end)) = window_bounds(index, span)? {
                     let bytes = cell
                         .borrow()
                         .iter()
                         .map(|item| byte_from_value(item, span))
                         .collect::<Result<Vec<_>, _>>()?;
-                    if start > end || end > bytes.len() {
+                    let Some((start, end)) = window_inside(start, end, bytes.len()) else {
                         return Err(window_failure(
                             RunnerError::internal(span, "octeti index out of bounds"),
                             start,
                             end,
                             bytes.len(),
                         ));
-                    }
+                    };
                     let step = window_step(index, span)?;
                     return Ok(Value::Octeti(
                         bytes[start..end].iter().step_by(step).copied().collect(),
@@ -4938,7 +4939,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let items = cell.borrow();
                 items.get(idx).cloned().ok_or_else(|| {
                     index_failure(
-                        RunnerError::internal(span, "array index out of bounds"),
+                        RunnerError::internal(span, LIST_INDEX_OUT_OF_BOUNDS),
                         idx,
                         items.len(),
                     )
@@ -4951,7 +4952,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let lanes = lanes.borrow();
                 lanes.get(idx).cloned().ok_or_else(|| {
                     index_failure(
-                        RunnerError::internal(span, "array index out of bounds"),
+                        RunnerError::internal(span, LIST_INDEX_OUT_OF_BOUNDS),
                         idx,
                         lanes.len(),
                     )
@@ -4972,22 +4973,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 // textus substring). Like a list window, it must lie fully
                 // inside the text or the program dies; an empty range at the
                 // end is allowed.
-                if let Some((start, end)) =
-                    window_bounds(index, span, "textus index out of bounds")?
-                {
+                if let Some((start, end)) = window_bounds(index, span)? {
                     let len = text.chars().count();
-                    if start > end || end > len {
+                    let Some((start, end)) = window_inside(start, end, len) else {
                         return Err(window_failure(
                             RunnerError::internal_with_issue(
                                 span,
-                                format!("text range {start}‥{end} outside 0‥{len}"),
+                                text_window_outside(start, end, len),
                                 "runner_text_range_out_of_bounds",
                             ),
                             start,
                             end,
                             len,
                         ));
-                    }
+                    };
                     let step = window_step(index, span)?;
                     let window: String = text
                         .chars()
@@ -5007,24 +5006,22 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Ok(Value::Ascii(byte))
                 } else {
                     Err(index_failure(
-                        RunnerError::internal(span, "text index out of bounds"),
+                        RunnerError::internal(span, TEXT_INDEX_OUT_OF_BOUNDS),
                         idx,
                         1,
                     ))
                 }
             }
             Value::Octeti(bytes) => {
-                if let Some((start, end)) =
-                    window_bounds(index, span, "octeti index out of bounds")?
-                {
-                    if start > end || end > bytes.len() {
+                if let Some((start, end)) = window_bounds(index, span)? {
+                    let Some((start, end)) = window_inside(start, end, bytes.len()) else {
                         return Err(window_failure(
                             RunnerError::internal(span, "octeti index out of bounds"),
                             start,
                             end,
                             bytes.len(),
                         ));
-                    }
+                    };
                     let step = window_step(index, span)?;
                     return Ok(Value::Octeti(
                         bytes[start..end].iter().step_by(step).copied().collect(),
@@ -5047,14 +5044,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 cell.borrow()
                     .get(&key)
                     .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "tabula missing key"))
+                    .ok_or_else(|| RunnerError::internal(span, MAP_MISSING_KEY))
             }
             Value::Ledger(cell) => {
                 let key = index.to_key(span)?;
                 cell.borrow()
                     .get(&key)
                     .cloned()
-                    .ok_or_else(|| RunnerError::internal(span, "tabula missing key"))
+                    .ok_or_else(|| RunnerError::internal(span, MAP_MISSING_KEY))
             }
             // Scalar flat-lane index over a tensor (itera ex element gather);
             // tensors define every lane by construction, so bounds are the
@@ -5528,7 +5525,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if let Some(exact_value) = super::exact_int::int_value(&value) {
             let width = self.resolve_int_width(return_ty);
             return super::exact_int::exact_carrier(exact(exact_value), width)
-                .ok_or_else(|| RunnerError::internal(span, "numerus overflow"));
+                .ok_or_else(|| RunnerError::internal(span, NUMERUS_OVERFLOW));
         }
         let numeric = match value {
             Value::Float(v) => f(v),
@@ -5631,7 +5628,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // 2026-10-01/02). A `wrapping<u8>` store of 300 is 44 and a
         // `saturating<u8>` store of 300 is 255, but the sum itself is 300.
         if let Some(width) = self.word_family_width_of(return_ty) {
-            let overflow = || RunnerError::internal(span, "numerus overflow");
+            let overflow = || RunnerError::internal(span, NUMERUS_OVERFLOW);
             let mut total: i128 = 0;
             for value in &values {
                 let v = super::exact_int::int_value(value)
@@ -5677,7 +5674,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64
         );
         if !float_result && !values.iter().any(|v| matches!(v, Value::Float(_))) {
-            let overflow = || RunnerError::internal(span, "numerus overflow");
+            let overflow = || RunnerError::internal(span, NUMERUS_OVERFLOW);
             let mut total: i128 = 0;
             for value in &values {
                 let v = super::exact_int::int_value(value)
@@ -6425,23 +6422,6 @@ fn interval_members(
     Ok(members)
 }
 
-/// The `(start, end, inclusive)` window of an interval index, or `None` for a
-/// plain element index. Tests the carrier shape directly: the fallible
-/// `interval_parts` builds (and the caller then drops) a `RunnerError` for
-/// every non-interval value, which is every ordinary `xs[i]`.
-fn window_interval(value: &Value) -> Option<(Value, Value, bool)> {
-    let Value::Tuple(parts) = value else {
-        return None;
-    };
-    // A stepped window carries its step as a fourth part (`window_step`).
-    let ([start, end, Value::Bool(inclusive)] | [start, end, Value::Bool(inclusive), _]) =
-        parts.as_slice()
-    else {
-        return None;
-    };
-    Some((start.clone(), end.clone(), *inclusive))
-}
-
 /// The positive stride of a range index: `1` for an unstepped window, the
 /// `per` step of `s[a‥b per n]` otherwise. A zero or negative step dies.
 fn window_step(index: &Value, span: Span) -> Result<usize, RunnerError> {
@@ -6469,7 +6449,7 @@ fn window_step(index: &Value, span: Span) -> Result<usize, RunnerError> {
 /// is not a range. An inclusive range ending at `usize::MAX` reports `overflow`.
 /// Attach the structured facts of an out-of-bounds window read (`start`, `end`,
 /// `len`) so a caller keys on the numbers, never on the rendered message.
-fn window_failure(mut error: RunnerError, start: usize, end: usize, len: usize) -> RunnerError {
+fn window_failure(mut error: RunnerError, start: i128, end: i128, len: usize) -> RunnerError {
     error.args.extend([
         ("start".to_owned(), start.to_string()),
         ("end".to_owned(), end.to_string()),
@@ -6486,25 +6466,6 @@ fn index_failure(mut error: RunnerError, index: usize, len: usize) -> RunnerErro
         ("len".to_owned(), len.to_string()),
     ]);
     error
-}
-
-fn window_bounds(
-    index: &Value,
-    span: Span,
-    overflow: &'static str,
-) -> Result<Option<(usize, usize)>, RunnerError> {
-    let Some((start, end, inclusive)) = window_interval(index) else {
-        return Ok(None);
-    };
-    let start = start.as_index(span)?;
-    let end = end.as_index(span)?;
-    let end = if inclusive {
-        end.checked_add(1)
-            .ok_or_else(|| RunnerError::internal(span, overflow))?
-    } else {
-        end
-    };
-    Ok(Some((start, end)))
 }
 
 fn interval_parts(
@@ -7074,7 +7035,7 @@ fn matmul_exact(
     (m, k, n): (i64, i64, i64),
     span: Span,
 ) -> Result<Vec<i128>, RunnerError> {
-    let overflow = || RunnerError::internal(span, "numerus overflow");
+    let overflow = || RunnerError::internal(span, NUMERUS_OVERFLOW);
     let (m, k, n) = matmul_dims(m, k, n);
     let mut out = vec![0_i128; m.saturating_mul(n)];
     for i in 0..m {
@@ -7107,9 +7068,7 @@ fn matmul_i64(
     let cells = matmul_exact(&wide(left), &wide(right), (m, k, n), span)?;
     cells
         .into_iter()
-        .map(|cell| {
-            i64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))
-        })
+        .map(|cell| i64::try_from(cell).map_err(|_| RunnerError::internal(span, NUMERUS_OVERFLOW)))
         .collect()
 }
 
@@ -7125,9 +7084,7 @@ fn matmul_u64(
     let cells = matmul_exact(&wide(left), &wide(right), (m, k, n), span)?;
     cells
         .into_iter()
-        .map(|cell| {
-            u64::try_from(cell).map_err(|_| RunnerError::internal(span, "numerus overflow"))
-        })
+        .map(|cell| u64::try_from(cell).map_err(|_| RunnerError::internal(span, NUMERUS_OVERFLOW)))
         .collect()
 }
 
@@ -7264,7 +7221,7 @@ fn numeric_add(
 /// finished cell reaches the caller's element-width store. Any non-integer
 /// element keeps the historical width-checked `numeric_add` fold.
 fn sum_axis_cell(values: &[&Value], width: NumericWidth, span: Span) -> Result<Value, RunnerError> {
-    let overflow = || RunnerError::internal(span, "numerus overflow");
+    let overflow = || RunnerError::internal(span, NUMERUS_OVERFLOW);
     let ints: Option<Vec<_>> = values
         .iter()
         .map(|value| super::exact_int::int_value(value))
