@@ -117,6 +117,25 @@ impl DeviceChoice {
         }
     }
 
+    /// The emit target whose device route this choice launches under
+    /// `faber run`, or `None` when the choice runs on the interpreter alone.
+    ///
+    /// `faber run` takes no `--target` and executes no emitted artifact: it
+    /// interprets source. A device choice is the only way a target's route
+    /// is reached from it (`metal` launches the Metal route, `cuda` the
+    /// NVVM/PTX route owned by the LLVM target). `faber targets` derives its
+    /// `run` column from this match, so the report cannot claim a target
+    /// that `faber run` has no way to select; the match is exhaustive, so a
+    /// new choice must decide here.
+    #[must_use]
+    pub const fn run_target(self) -> Option<Target> {
+        match self {
+            Self::Auto | Self::Reference | Self::Cpu => None,
+            Self::Metal => Some(Target::MirMetal),
+            Self::Cuda => Some(Target::MirLlvm),
+        }
+    }
+
     /// Stable command and diagnostic spelling.
     #[must_use]
     pub const fn spelling(self) -> &'static str {

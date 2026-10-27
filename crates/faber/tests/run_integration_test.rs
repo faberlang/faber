@@ -92,8 +92,8 @@ fn targets_reports_faber_package_capability_for_fmir_targets() {
             .find(|line| line.starts_with(&prefix))
             .unwrap_or_else(|| panic!("missing {target} row:\n{stdout}"));
         assert!(
-            row.contains("check=yes build=yes run=yes package=yes"),
-            "Faber package FMIR target row must show package build/run truth:\n{row}"
+            row.contains("check=yes build=yes run=no package=yes"),
+            "Faber package FMIR target row must show package build truth and no run (faber run refuses built images):\n{row}"
         );
         assert!(
             row.contains("faber build --target"),
@@ -113,6 +113,47 @@ fn targets_reports_faber_package_capability_for_fmir_targets() {
         wgsl.contains("run=no package=no") && wgsl.contains("not GPU launch or package runtime"),
         "systems emit targets must remain non-package/non-runtime claims:\n{wgsl}"
     );
+}
+
+#[test]
+fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
+    let (stdout, stderr, ok) = run_faber(&["targets"]);
+    assert!(ok, "faber targets failed:\n{stderr}");
+
+    // `faber run` interprets source and takes no `--target`; the only target
+    // routes it reaches are the `--device metal|cuda` launches.
+    let runnable: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.contains(" run=yes "))
+        .filter_map(|line| line.split_whitespace().next())
+        .collect();
+    assert!(
+        runnable.iter().all(|name| ["metal-text", "llvm-text"].contains(name)),
+        "only the device routes may report run=yes, got {runnable:?}:\n{stdout}"
+    );
+
+    for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
+        let prefix = format!("{name} ");
+        let row = stdout
+            .lines()
+            .find(|line| line.starts_with(&prefix))
+            .unwrap_or_else(|| panic!("missing {name} row:\n{stdout}"));
+        assert!(row.contains(" run=no "), "{name} is not run by `faber run`:\n{row}");
+        assert!(
+            !row.contains("build/run --target") && !row.contains("faber run --target"),
+            "{name} note must not advertise a `faber run` target:\n{row}"
+        );
+    }
+
+    // And the dispatch agrees: `faber run` takes no `--target` for any of them.
+    for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
+        let (_, stderr, status) = run_faber_status(&["run", "--target", name, "."]);
+        assert!(!status.success(), "`faber run --target {name}` must be refused");
+        assert!(
+            stderr.contains("--target"),
+            "refusal must name the unexpected `--target` flag:\n{stderr}"
+        );
+    }
 }
 
 fn run_faber_status(args: &[&str]) -> (String, String, std::process::ExitStatus) {
