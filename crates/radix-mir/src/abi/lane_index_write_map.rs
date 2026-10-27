@@ -106,8 +106,9 @@ pub fn lane_write_maps(
 // Passing a written tensor through an unanalysed call or constructing directly
 // into it can hide additional writes. Do not publish an incomplete write map.
 fn known_stores_only(function: &MirFunction, local: MirLocalId) -> bool {
+    let aliases = super::ParameterAliases::new(function);
     let touches = |place: &MirPlace| match place.base {
-        MirPlaceBase::Local(base) => super::resolve_parameter_alias(function, base) == local,
+        MirPlaceBase::Local(base) => aliases.resolve(base) == local,
         MirPlaceBase::Temp(_) => false,
     };
     let argument = |arg: &MirOperand| {

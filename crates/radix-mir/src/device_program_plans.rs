@@ -421,6 +421,7 @@ fn live_recipe_statements(
 /// declaration facts plus the source local its lone tensor argument reads.
 /// The caller admits exactly one per kernel (one recipe per kernel).
 fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumReduceOp, MirLocalId)> {
+    let aliases = crate::abi::ParameterAliases::new(function);
     let mut declarations = Vec::new();
     for block in &function.blocks {
         for statement in &block.statements {
@@ -451,7 +452,7 @@ fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumReduceO
             // Composition binds a callee's tensor parameter by a whole copy of
             // the caller's: the declaration reads the parameter's buffer
             // through the copy.
-            let source_local = crate::abi::resolve_parameter_alias(function, source_local);
+            let source_local = aliases.resolve(source_local);
             declarations.push((filum.clone(), source_local));
         }
     }
