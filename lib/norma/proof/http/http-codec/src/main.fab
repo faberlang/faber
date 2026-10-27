@@ -22,16 +22,18 @@ main {
     print text.decode(chunked.decode(framed))
     print chunked.encode(text.encode("")).length()
 
-    # sse: stringify and parse are inverses for a named event with an id.
-    let sse.Event event ← sse.Event { name = "tick", data = "one\ntwo", id = "7", retry = "" }
+    # sse: stringify and parse are inverses for a named event with an id; the
+    # omitted retry field takes its default from the sse module.
+    let sse.Event event ← sse.Event { name = "tick", data = "one\ntwo", id = "7" }
     let string wire ← sse.stringify(event)
     print wire
     let list<sse.Event> parsed ← sse.parse(wire)
     print parsed.length()
-    let sse.Event first ← parsed.get(0) coalesce sse.Event { name = "", data = "", id = "", retry = "" }
+    let sse.Event first ← parsed.get(0) coalesce sse.Event { name = "", data = "", id = "" }
     print first.name
     print first.data
     print first.id
+    print first.retry.length()
 
     # headers: case-folded get, every value in append order.
     mut headers.Headers hs ← headers.empty()
