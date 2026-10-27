@@ -2504,6 +2504,14 @@ pub struct HirPresentation {
     #[serde(default)]
     pub insere_exprs: Vec<HirInsere>,
 
+    /// Template applications (`"…"(…)` and `` `…`(…) ``) whose authored text
+    /// holds named holes (`§{label}`). Lowering erases the labels to the
+    /// positional `§` form and reorders labeled actuals into positional
+    /// slots; Faber re-emission prints the authored text and the actual labels
+    /// for exactly these expression ids.
+    #[serde(default)]
+    pub template_holes: Vec<HirTemplateHoles>,
+
     /// The file's `regio` (en `module`) declaration, when authored (D7.7).
     /// Emission re-renders it first; its doc block is the module doc.
     #[serde(default)]
@@ -2536,6 +2544,20 @@ pub struct HirFunctionModifierBinding {
     /// The runtime-provided `HirLocal` the modifier introduced.
     pub local: DefId,
     pub kind: HirFunctionModifierKind,
+}
+
+/// The authored form of a template application that names its holes.
+///
+/// `expr` is the application's own expression id (the `Scriptum` node, or the
+/// `forma` capture's outer node). `template` is the authored literal text with
+/// its `§{label}` holes, which the lowered node no longer carries.
+/// `labeled_actuals` lists the actuals in authored order as
+/// `(label, positional slot)`; it is empty when the actuals were positional.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirTemplateHoles {
+    pub expr: HirId,
+    pub template: Symbol,
+    pub labeled_actuals: Vec<(Symbol, u32)>,
 }
 
 /// One authored build-time embed: the folded literal's id and its path.

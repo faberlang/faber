@@ -746,6 +746,58 @@ fn scalar_math_and_vector_lift_survive_reemission() {
 }
 
 #[test]
+fn radical_glyphs_survive_reemission_on_scalar_and_tensor() {
+    // `√`, `∛` and `∜` are prefix sugar for the sqrt/cbrt method twins and the
+    // nested sqrt pair; re-emission keeps each authored glyph (the fourth root
+    // never prints as `radix().radix()`), and a nested authored `√ √ x` stays
+    // two square roots.
+    let code = assert_idempotent(
+        "functio s(f32 x) → f32 {\n    redde √ x + ∛ x + ∜ x\n}\nfunctio t(tensor<f32, [3]> v) → tensor<f32, [3]> {\n    redde √ v + ∛ v + ∜ v\n}\nfunctio u(f32 x) → f32 {\n    redde √ √ x\n}\nfunctio w(f32 x) → f32 {\n    redde ∜ (x + 1.0)\n}\n",
+    );
+    for expected in [
+        "redde √ x + ∛ x + ∜ x",
+        "redde √ v + ∛ v + ∜ v",
+        "redde √ √ x",
+        "redde ∜ (x + 1.0)",
+    ] {
+        assert!(code.contains(expected), "`{expected}` must survive:\n{code}");
+    }
+    assert!(!code.contains("radix().radix()"), "∜ must not respell as nested roots:\n{code}");
+}
+
+#[test]
+fn template_hole_labels_survive_reemission() {
+    // `§{label}` holes lower to the positional `§` form; re-emission restores
+    // the authored template text and, for labeled actuals, the labels in
+    // authored order. Repeated labels, numbered, plain and mixed holes all
+    // keep their text.
+    let source = concat!(
+        "functio f() → textus {\n",
+        "    sit textus labeled ← \"§{greet} §{who}\"(who: \"mundus\", greet: \"salve\")\n",
+        "    sit textus repeated ← \"§{n} et §{n}\"(n: \"x\")\n",
+        "    sit textus erased ← \"§{greet} mundus\"(\"salve\")\n",
+        "    sit textus mixed ← \"§{greet} §\"(\"salve\", \"mundus\")\n",
+        "    sit textus numbered ← \"§1 et §0 et §0\"(\"a\", \"b\")\n",
+        "    sit textus plain ← \"§ et §\"(\"a\", \"b\")\n",
+        "    sit _ captured ← `ubi id = §{id}`(id: \"42\")\n",
+        "    redde labeled\n",
+        "}\n",
+    );
+    let code = assert_idempotent(source);
+    for expected in [
+        "\"§{greet} §{who}\"(who: \"mundus\", greet: \"salve\")",
+        "\"§{n} et §{n}\"(n: \"x\")",
+        "\"§{greet} mundus\"(\"salve\")",
+        "\"§{greet} §\"(\"salve\", \"mundus\")",
+        "\"§1 et §0 et §0\"(\"a\", \"b\")",
+        "\"§ et §\"(\"a\", \"b\")",
+        "`ubi id = §{id}`(id: \"42\")",
+    ] {
+        assert!(code.contains(expected), "`{expected}` must survive:\n{code}");
+    }
+}
+
+#[test]
 fn reduction_sum_reemits_source_shape() {
     let code = assert_idempotent(
         "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] sit s { redde s }\n}\n",
