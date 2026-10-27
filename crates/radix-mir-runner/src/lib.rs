@@ -95,6 +95,12 @@ pub(crate) const RUNNER_CODE_CONVERSION: &str = "runner_conversion";
 
 /// Malformed input to the failable JSON parser follows its text alternate exit.
 pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
+
+/// A flat `lista` whose length does not fill the target tensor's shape
+/// (`ys ↦ tensor<E, [..]>`, `tensor.construct`). It is a recoverable
+/// conversion failure carrying the `expected` and `actual` element counts,
+/// like every other `↦` failure: `⊥`, `fac … cape` and `⇥` see it.
+pub(crate) const RUNNER_CONVERSION_LENGTH_MISMATCH: &str = "conversion_length_mismatch";
 /// A statement of a conversion's recovery region left the frame (its failure
 /// followed the alternate exit). The frame is already popped, so the
 /// conversion statement reports `FrameReturned` instead of writing a result.
@@ -229,6 +235,23 @@ impl RunnerError {
             issue: issue.to_owned(),
             span,
             code: RUNNER_CODE_INTERNAL,
+            args: Vec::new(),
+        }
+    }
+
+    /// Recoverable conversion failure with a stable named issue, for a failure
+    /// whose identity is a structured fact (the caller adds its `args`) rather
+    /// than a slug of the message.
+    pub(crate) fn conversion_with_issue(
+        span: Span,
+        message: impl Into<String>,
+        issue: &'static str,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            issue: issue.to_owned(),
+            span,
+            code: RUNNER_CODE_CONVERSION,
             args: Vec::new(),
         }
     }
@@ -2402,6 +2425,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                                 error.issue.as_str(),
                                 "runner_collection_push_capacity"
                                     | RUNNER_JSON_PARSE_FAILED
+                                    | RUNNER_CONVERSION_LENGTH_MISMATCH
                                     | "runner_tensor_shape_mismatch"
                                     | "runner_tensor_shape_invalid_extent"
                             ) =>
@@ -4486,6 +4510,10 @@ mod arg_extremum_test;
 #[cfg(test)]
 #[path = "queue_stack_test.rs"]
 mod queue_stack_test;
+
+#[cfg(test)]
+#[path = "tensor_from_flat_failure_test.rs"]
+mod tensor_from_flat_failure_test;
 
 #[cfg(test)]
 #[path = "set_none_key_test.rs"]
