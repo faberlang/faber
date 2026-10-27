@@ -928,7 +928,7 @@ productions. It is not a second keyword authority.
 | Params | `đối_số` | CLI arguments modifier |
 | Expression | `tăng_dần` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `hoặc` | or |
-| Grammar | `trục` | keyword literal derived from the production |
+| Params | `trục` | axis marker word: a parameter declares it (`trục int a`), a call echoes it (`t.mean(trục 1)`); shared source spelling; contextual |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `bắt` | local handler |
 | Error | `bẫy` | capture boundary (error channel reified as a value) |
@@ -995,7 +995,7 @@ productions. It is not a second keyword authority.
 | Error | `chết` | panic |
 | Declarations | `tên` | import binding name |
 | Boolean | `không` | not |
-| Grammar | `không_ổn_định` | keyword literal derived from the production |
+| Annotation | `không_ổn_định` | availability marker `@ không_ổn_định` (en `@ unstable`) |
 | Literals | `nan` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `ghi_chú` | note |
 | Annotation | `hạt_nhân` | kernel annotation |

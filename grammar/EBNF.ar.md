@@ -928,7 +928,7 @@ productions. It is not a second keyword authority.
 | Params | `وسائط` | CLI arguments modifier |
 | Expression | `تصاعدي` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `أو` | or |
-| Grammar | `محور` | keyword literal derived from the production |
+| Params | `محور` | axis marker word: a parameter declares it (`محور int a`), a call echoes it (`t.mean(محور 1)`); shared source spelling; contextual |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `التقط` | local handler |
 | Error | `فخ` | capture boundary (error channel reified as a value) |
@@ -995,7 +995,7 @@ productions. It is not a second keyword authority.
 | Error | `انهر` | panic |
 | Declarations | `اسم` | import binding name |
 | Boolean | `ليس` | not |
-| Grammar | `غير_مستقر` | keyword literal derived from the production |
+| Annotation | `غير_مستقر` | availability marker `@ غير_مستقر` (en `@ unstable`) |
 | Literals | `nan` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `اعرض` | note |
 | Annotation | `نواة` | kernel annotation |

@@ -928,7 +928,7 @@ productions. It is not a second keyword authority.
 | Params | `तर्क` | CLI arguments modifier |
 | Expression | `आरोही` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `या` | or |
-| Grammar | `अक्ष` | keyword literal derived from the production |
+| Params | `अक्ष` | axis marker word: a parameter declares it (`अक्ष int a`), a call echoes it (`t.mean(अक्ष 1)`); shared source spelling; contextual |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `पकड़ो` | local handler |
 | Error | `जाल` | capture boundary (error channel reified as a value) |
@@ -995,7 +995,7 @@ productions. It is not a second keyword authority.
 | Error | `मरोजाओ` | panic |
 | Declarations | `नाम` | import binding name |
 | Boolean | `नहीं` | not |
-| Grammar | `अस्थिर` | keyword literal derived from the production |
+| Annotation | `अस्थिर` | availability marker `@ अस्थिर` (en `@ unstable`) |
 | Literals | `nan` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `दिखाओ` | note |
 | Annotation | `कर्नेल` | kernel annotation |

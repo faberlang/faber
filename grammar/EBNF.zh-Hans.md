@@ -928,7 +928,7 @@ productions. It is not a second keyword authority.
 | Params | `参数` | CLI arguments modifier |
 | Expression | `升序` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `或` | or |
-| Grammar | `轴` | keyword literal derived from the production |
+| Params | `轴` | axis marker word: a parameter declares it (`轴 int a`), a call echoes it (`t.mean(轴 1)`); shared source spelling; contextual |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `捕获` | local handler |
 | Error | `陷阱` | capture boundary (error channel reified as a value) |
@@ -995,7 +995,7 @@ productions. It is not a second keyword authority.
 | Error | `崩溃` | panic |
 | Declarations | `名称` | import binding name |
 | Boolean | `非` | not |
-| Grammar | `不稳定` | keyword literal derived from the production |
+| Annotation | `不稳定` | availability marker `@ 不稳定` (en `@ unstable`) |
 | Literals | `nan` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `显示` | note |
 | Annotation | `内核` | kernel annotation |
