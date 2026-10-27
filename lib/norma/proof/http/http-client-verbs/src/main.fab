@@ -1,0 +1,104 @@
++++
+locale = "en"
++++
+
+# http-client-verbs: the synchronous client verbs. A verb blocks until the
+# response head arrives, and this suite is single-threaded, so the verbs are
+# exercised on the two faults that need no concurrent peer:
+#
+#   - against a just-stopped port every verb faults with ConnectionRefused;
+#   - against a live listener that never answers, a verb on a short-timeout
+#     session writes its request and then faults when the read times out (the
+#     fault variant is host-dependent, so only the fault is asserted), and the
+#     listener then accepts the request the verb wrote, so method, target and
+#     body are checked from the server side.
+
+import from "norma:fault" fault
+import from "norma:http/client" client
+import from "norma:http/headers" headers
+import from "norma:http/server" server
+
+fn refused(fault.IoFault f) → bool {
+    match f {
+        case ConnectionRefused let path { return true }
+        default { return false }
+    }
+}
+
+main {
+    let int handle ↤ call 'http:listen' ([0 ↦ value])
+    let int port ↤ call 'http:port' (handle)
+    let string live ← "http://127.0.0.1:§"(port)
+
+    # A second listener, stopped at once, leaves a port nothing answers on.
+    let int gone ↤ call 'http:listen' ([0 ↦ value])
+    let int dead_port ↤ call 'http:port' (gone)
+    let void stopped ↤ call 'http:stop' (gone)
+    let string dead ← "http://127.0.0.1:§/"(dead_port)
+
+    mut headers.Headers extra ← headers.empty()
+    if extra.append("x-verb", "with") {
+    }
+    mut map<string, string> pairs ← {}
+    pairs.put("x-verb", "pairs")
+
+    # Every verb against the dead port: ConnectionRefused.
+    mut int refusals ← 0
+    do { client.get_with(dead, extra) } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.post(dead, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.post_with(dead, extra, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.put(dead, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.put_with(dead, extra, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.patch(dead, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.patch_with(dead, extra, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.delete(dead) } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.delete_with(dead, extra) } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.send("OPTIONS", dead, extra, "") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.send_request("PUT", dead, pairs, "b") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    do { client.open("GET", dead, extra, "") } catch err { if refused(err) { refusals ← refusals + 1 } }
+    assert refusals ≡ 12
+
+    # Every session verb against the live, silent listener: a fault, then the
+    # request the verb wrote is waiting at the listener.
+    let client.Client session ← client.session_timeout(150)
+    mut int timeouts ← 0
+
+    do { client.get_on(session, live + "/get") } catch err { timeouts ← timeouts + 1 }
+    let server.Incoming got ← server.accept_incoming(handle)
+    assert got.req.method ≡ "GET"
+    assert got.req.path ≡ "/get"
+
+    do { client.post_on(session, live + "/post", "post-body") } catch err { timeouts ← timeouts + 1 }
+    let server.Incoming posted ← server.accept_incoming(handle)
+    assert posted.req.method ≡ "POST"
+    assert posted.req.body ≡ "post-body"
+
+    do { client.put_on(session, live + "/put", "put-body") } catch err { timeouts ← timeouts + 1 }
+    let server.Incoming put ← server.accept_incoming(handle)
+    assert put.req.method ≡ "PUT"
+    assert put.req.body ≡ "put-body"
+
+    do { client.patch_on(session, live + "/patch", "patch-body") } catch err { timeouts ← timeouts + 1 }
+    let server.Incoming patched ← server.accept_incoming(handle)
+    assert patched.req.method ≡ "PATCH"
+    assert patched.req.body ≡ "patch-body"
+
+    do { client.delete_on(session, live + "/delete") } catch err { timeouts ← timeouts + 1 }
+    let server.Incoming deleted ← server.accept_incoming(handle)
+    assert deleted.req.method ≡ "DELETE"
+    assert deleted.req.path ≡ "/delete"
+
+    do { client.send_on(session, "OPTIONS", live + "/send", extra, "") } catch err { timeouts ← timeouts + 1 }
+    let server.Incoming sent ← server.accept_incoming(handle)
+    assert sent.req.method ≡ "OPTIONS"
+    assert (sent.req.header("x-verb") coalesce "") ≡ "with"
+
+    do { client.open_on(session, "GET", live + "/open", extra, "") } catch err { timeouts ← timeouts + 1 }
+    let server.Incoming opened ← server.accept_incoming(handle)
+    assert opened.req.path ≡ "/open"
+
+    assert timeouts ≡ 7
+
+    let void closed ↤ call 'http:stop' (handle)
+    print "http-client-verbs-ok"
+}

@@ -1,0 +1,11 @@
+faber
+true
+20
+true
+true
+require_strings-ok
+key not textus: n
+missing key: gone
+ConnectionRefused:127.0.0.1:1
+NotFound:/nope
+other

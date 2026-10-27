@@ -1,0 +1,21 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:sink's Collector: the in-memory sink keeps what
+# it received, flush is a no-op, and to_list hands back a copy. Output must
+# match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:sink" sink
+
+main {
+    mut sink.Collector c ← sink.Collector { }
+    c.sink("alpha")
+    c.sink("beta")
+    c.flush()
+    let list<string> got ← c.to_list()
+    print got
+    c.sink("gamma")
+    print got.length()
+    print c.to_list().length()
+}

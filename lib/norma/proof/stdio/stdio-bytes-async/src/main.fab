@@ -1,0 +1,12 @@
++++
+locale = "en"
++++
+
+# console.write_bytes_async (consolum:funde through the async wrapper): raw
+# bytes reach stdout unchanged, in order, with no added framing.
+import from "norma:console" console
+
+async_main {
+    await_const void _ ← console.write_bytes_async(|62 79 74 65 73 2d 61 73 79 6e 63 0a|)
+    console.write_line("stdio-bytes-async-ok")
+}

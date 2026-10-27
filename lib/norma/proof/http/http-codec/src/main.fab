@@ -1,0 +1,84 @@
++++
+locale = "en"
++++
+
+# http-codec: the pure HTTP surface with no socket. Chunked and SSE codecs,
+# request and response value types, header lookups and URL helpers on the
+# client leaf. Output must match
+# under `faber run` and a `faber build` Rust binary.
+
+import from "norma:http/chunked" chunked
+import from "norma:http/client" client
+import from "norma:http/headers" headers
+import from "norma:http/request" httpreq
+import from "norma:http/response" response
+import from "norma:http/sse" sse
+import from "norma:text" text
+
+main {
+    # chunked: encode frames one chunk plus the last-chunk, decode reverses it.
+    let list<b8> framed ← chunked.encode(text.encode("abc"))
+    print text.decode(framed)
+    print text.decode(chunked.decode(framed))
+    print chunked.encode(text.encode("")).length()
+
+    # sse: stringify and parse are inverses for a named event with an id.
+    let sse.Event event ← sse.Event { name = "tick", data = "one\ntwo", id = "7", retry = "" }
+    let string wire ← sse.stringify(event)
+    print wire
+    let list<sse.Event> parsed ← sse.parse(wire)
+    print parsed.length()
+    let sse.Event first ← parsed.get(0) coalesce sse.Event { name = "", data = "", id = "", retry = "" }
+    print first.name
+    print first.data
+    print first.id
+
+    # headers: case-folded get, every value in append order.
+    mut headers.Headers hs ← headers.empty()
+    print hs.append("Accept", "text/html")
+    print hs.append("accept", "application/json")
+    print hs.append("bad name", "x")
+    print hs.length()
+    print hs.get("ACCEPT") coalesce "none"
+    print hs.values("accept")
+
+    # request: path, query and decoded query fields from a target.
+    let httpreq.Request req ← httpreq.from_target("GET", "/search?q=a%20b&n=2#frag", hs, "")
+    print req.method
+    print req.path
+    print req.query
+    print req.query_field("q") coalesce "none"
+    print req.query_field("n") coalesce "none"
+    print req.query_field("missing") is none
+    print req.header("Accept") coalesce "none"
+
+    # response: status classes and header lookup.
+    mut headers.Headers rh ← headers.empty()
+    print rh.append("X-Mode", "test")
+    let response.Response ok ← response.of(204, rh, "")
+    print ok.is_ok()
+    print ok.is_informational()
+    print ok.is_redirect()
+    print ok.is_client_error()
+    print ok.is_server_error()
+    print ok.header("x-mode") coalesce "none"
+    print response.of(101, rh, "").is_informational()
+    print response.of(302, rh, "").is_redirect()
+    print response.of(404, rh, "").is_client_error()
+    print response.of(503, rh, "").is_server_error()
+
+    # client URL helpers.
+    let client.Url url ← client.split("http://Example.com:8080/a/b?x=1#f")
+    print url.host
+    print url.port
+    print client.is_absolute(url)
+    print client.is_absolute(client.split("no-scheme"))
+    print client.host_header(url)
+    print client.host_header(client.split("https://example.com/"))
+    print client.request_target(url)
+    print client.request_target(client.split("http://h/p"))
+    print client.empty().agent
+    mut map<string, string> pairs ← {}
+    pairs.put("X-One", "1")
+    print client.headers_from_map(pairs).get("x-one") coalesce "none"
+}

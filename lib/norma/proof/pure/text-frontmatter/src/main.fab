@@ -1,0 +1,43 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for text.split_frontmatter: a fenced document splits into
+# its metadata and body wires; a missing or unclosed fence fails on the error
+# channel. Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:text" text
+
+main {
+    let list<string> parts ← text.split_frontmatter("+++\nkey = 1\n+++\nbody line\n", "+++")
+    print parts.length()
+    print parts.get(0) coalesce "?"
+    print parts.get(1) coalesce "?"
+
+    mut string unopened ← ""
+    do {
+        text.split_frontmatter("no fence here", "+++")
+    }
+    catch err {
+        unopened ← err
+    }
+    print unopened
+
+    mut string unclosed ← ""
+    do {
+        text.split_frontmatter("+++\nkey = 1\n", "+++")
+    }
+    catch err {
+        unclosed ← err
+    }
+    print unclosed
+
+    mut string bare ← ""
+    do {
+        text.split_frontmatter("+++\n+++\n", "")
+    }
+    catch err {
+        bare ← err
+    }
+    print bare
+}
