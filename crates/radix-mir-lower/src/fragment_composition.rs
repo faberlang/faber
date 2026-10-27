@@ -25,10 +25,10 @@ use radix_lexer::{Interner, Span};
 use radix_mir::device::MirDeviceFunctionMetadataMap;
 use radix_mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirBlock, MirBlockId, MirCallee, MirConversion, MirDeviceRole,
-    MirFunction, MirFunctionId, MirFunctionOrigin, MirIntrinsic, MirKeyValueOperand, MirLocal, MirLocalId,
-    MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirParam, MirParamMode,
-    MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId,
-    MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
+    MirFilumReduceOp, MirFunction, MirFunctionId, MirFunctionOrigin, MirIntrinsic, MirKeyValueOperand, MirLocal,
+    MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirParam,
+    MirParamMode, MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp,
+    MirTempId, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 use radix_semantic::arg_value;
 use std::cell::Cell;
@@ -1607,8 +1607,32 @@ impl Alpha {
     fn intrinsic(&mut self, intrinsic: &MirIntrinsic, ids: &mut IdGen) -> MirIntrinsic {
         match intrinsic {
             MirIntrinsic::Convert(conversion) => MirIntrinsic::Convert(self.conversion(conversion, ids)),
+            MirIntrinsic::FilumReduce(filum) => MirIntrinsic::FilumReduce(self.filum_reduce(filum, ids)),
             other => other.clone(),
         }
+    }
+
+    /// A declared `filum` carries its own binder locals and the captured term
+    /// body, all in the enclosing function's id space, so cloning the node into
+    /// a caller renames them with the rest of the callee. The term-function
+    /// form (`term_captures` set) names the term function's own parameter
+    /// locals instead, which the clone does not touch.
+    fn filum_reduce(&mut self, filum: &MirFilumReduceOp, ids: &mut IdGen) -> MirFilumReduceOp {
+        let mut filum = filum.clone();
+        if filum.term_captures.is_some() {
+            return filum;
+        }
+        filum.term_binder = self.local(filum.term_binder);
+        filum.term_result = self.local(filum.term_result);
+        for coordinate in &mut filum.coordinates {
+            coordinate.local = self.local(coordinate.local);
+        }
+        filum.term_body = filum
+            .term_body
+            .iter()
+            .map(|stmt| remap_stmt(stmt, self, ids))
+            .collect();
+        filum
     }
 
     fn conversion(&mut self, conversion: &MirConversion, ids: &mut IdGen) -> MirConversion {
