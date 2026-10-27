@@ -188,6 +188,14 @@ pub struct ManifestDevice {
     /// diagnostic naming this key ([`manifest_device_threads`]).
     #[serde(default)]
     pub threads: Option<toml::Value>,
+
+    /// Path to NVIDIA `libdevice.10.bc`, linked into CUDA modules that call
+    /// libdevice math. A relative path is resolved against the directory of
+    /// `faber.toml`. When absent the library is located from `CUDA_HOME`,
+    /// `CUDA_PATH`, then the standard CUDA installation (those variables only
+    /// locate the toolkit; they never configure the build).
+    #[serde(default)]
+    pub cuda_libdevice: Option<String>,
 }
 
 /// Configuration for shader artifact packaging.
@@ -449,6 +457,53 @@ pub fn manifest_device_threads(
     Ok(Some(count))
 }
 
+/// The `[device] cuda_libdevice` path of a manifest, resolved against the
+/// manifest's directory. `None` when the key is absent.
+///
+/// # Errors
+/// Fails when the key is present but empty.
+pub fn manifest_device_cuda_libdevice(
+    device: &ManifestDevice,
+    manifest_path: &Path,
+) -> Result<Option<std::path::PathBuf>, Box<Diagnostic>> {
+    let Some(value) = device.cuda_libdevice.as_deref() else {
+        return Ok(None);
+    };
+    if value.trim().is_empty() {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml device.cuda_libdevice must not be empty")
+                .with_file(manifest_path.display().to_string())
+                .with_arg("issue", "package_device_cuda_libdevice_empty")
+                .with_arg("key", "device.cuda_libdevice"),
+        ));
+    }
+    let path = std::path::PathBuf::from(value);
+    if path.is_absolute() {
+        return Ok(Some(path));
+    }
+    let base = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    Ok(Some(base.join(path)))
+}
+
+/// Resolve the explicit CUDA libdevice path for the package that owns
+/// `input_path`: the `[device] cuda_libdevice` key of its discovered
+/// `faber.toml`. `None` when there is no manifest or the key is absent.
+///
+/// # Errors
+/// Fails when the discovered manifest cannot be read or the key is invalid.
+pub fn resolve_cuda_libdevice(
+    input_path: &Path,
+) -> Result<Option<std::path::PathBuf>, Box<Diagnostic>> {
+    let Ok(layout) = super::discover_build_layout(input_path) else {
+        return Ok(None);
+    };
+    if !layout.manifest_path.exists() {
+        return Ok(None);
+    }
+    let manifest = read_manifest(&layout.manifest_path)?;
+    manifest_device_cuda_libdevice(&manifest.device, &layout.manifest_path)
+}
+
 /// Resolve the CPU device worker count for a route (gpu-reset rule 16.9):
 /// CLI `--threads N` > manifest `[device] threads` > `None` (the device
 /// default, half the available cores). One precedence for `faber run` and
@@ -617,6 +672,8 @@ pub(crate) fn validate_manifest(
                 .with_arg("steps", steps.to_string()),
         ));
     }
+
+    manifest_device_cuda_libdevice(&manifest.device, path)?;
 
     if let Some(product) = &manifest.product {
         validate_product(product, path)?;

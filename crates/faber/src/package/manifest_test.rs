@@ -173,6 +173,41 @@ fn cpu_threads_precedence_flag_then_manifest_then_default() {
     assert_eq!(resolve(None, &without_key), None, "the device default");
 }
 
+// ── `[device] cuda_libdevice` explicit libdevice path ────────────────────
+
+#[test]
+fn absent_cuda_libdevice_key_is_none() {
+    let device = device_table("device = \"cuda\"\n");
+    assert_eq!(
+        manifest_device_cuda_libdevice(&device, Path::new("/pkg/faber.toml")).expect("absent key"),
+        None
+    );
+}
+
+#[test]
+fn cuda_libdevice_resolves_against_the_manifest_directory() {
+    let device = device_table("cuda_libdevice = \"vendor/libdevice.10.bc\"\n");
+    assert_eq!(
+        manifest_device_cuda_libdevice(&device, Path::new("/pkg/faber.toml"))
+            .expect("relative path"),
+        Some(std::path::PathBuf::from("/pkg/vendor/libdevice.10.bc"))
+    );
+    let device = device_table("cuda_libdevice = \"/opt/cuda/libdevice.10.bc\"\n");
+    assert_eq!(
+        manifest_device_cuda_libdevice(&device, Path::new("/pkg/faber.toml"))
+            .expect("absolute path"),
+        Some(std::path::PathBuf::from("/opt/cuda/libdevice.10.bc"))
+    );
+}
+
+#[test]
+fn empty_cuda_libdevice_key_fails_closed() {
+    let device = device_table("cuda_libdevice = \" \"\n");
+    let err = manifest_device_cuda_libdevice(&device, Path::new("/pkg/faber.toml"))
+        .expect_err("an empty path is a contradiction");
+    assert_eq!(err.issue(), Some("package_device_cuda_libdevice_empty"));
+}
+
 #[test]
 fn manifest_threads_apply_only_on_the_cpu_device() {
     let dir = threads_package("reference", "threads = 4\n");
