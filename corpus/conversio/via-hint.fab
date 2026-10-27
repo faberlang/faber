@@ -6,7 +6,7 @@ category = "conversion"
 summary = "A convert hint is a via clause on the conversion: `x ↦ u32 via Hex`. The clause binds tighter than the ⊥ default and chains."
 syntax = "<expr> ↦ <type> via Hex|Bin|Oct|Be|Le|Code [⊥ <default>]"
 aliases = ["via clause", "convert hint"]
-related = ["↦", "⊥", "Bits", "Code", "octeti"]
+related = ["↦", "⊥", "Bits", "Code", "list<b8>"]
 locale = "en"
 +++
 # =============================================================================

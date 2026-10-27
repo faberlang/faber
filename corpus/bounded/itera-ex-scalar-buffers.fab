@@ -6,7 +6,7 @@ category = "collection"
 canonical = false
 summary = "Value iteration over runtime-length list<b8, N> / ascii<N> / string<N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
 syntax = "for from list<b8, N> | ascii<N> | string<N> let x { }"
-related = ["bytes", "ascii", "string", "ex", "itera", "longitudo"]
+related = ["list<b8>", "ascii", "string", "ex", "itera", "longitudo"]
 locale = "en"
 no_expected = "declaration-only"
 +++

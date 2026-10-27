@@ -7,7 +7,7 @@ category = "conversion"
 summary = "The Bits conversio hint is retired: a bit pattern is a b16, b32 or b64 value, and ↦ bN reads or writes it — u16↔f16, u16↔bf16, u32↔f32, u64↔f64 only."
 syntax = "u16|u32|u64 ↦ b16|b32|b64 ↦ f16|bf16|f32|f64 and f16|bf16|f32|f64 ↦ b16|b32|b64 ↦ u16|u32|u64"
 aliases = ["Bits hint"]
-related = ["↦", "fractus", "octeti"]
+related = ["↦", "fractus", "list<b8>"]
 locale = "la"
 +++
 # =============================================================================

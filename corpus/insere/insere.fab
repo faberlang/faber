@@ -7,7 +7,7 @@ category = "comptime"
 canonical = true
 summary = "Embeds a package file into a module constant at build time."
 syntax = "const <type> <name> = embed \"<path>\""
-related = ["fixum", "textus", "octeti", "praefixum"]
+related = ["fixum", "textus", "list<b8>", "praefixum"]
 locale = "en"
 +++
 # =============================================================================

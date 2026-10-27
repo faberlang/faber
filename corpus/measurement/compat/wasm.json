@@ -484,6 +484,12 @@
       "analyzable": 2
     },
     {
+      "term": "list<b8>",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 3
+    },
+    {
       "term": "lista",
       "rule": "keyword",
       "capable": 7,
@@ -590,12 +596,6 @@
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
-    },
-    {
-      "term": "octeti",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 3
     },
     {
       "term": "omitte",

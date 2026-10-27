@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 summary = "Decline: bounded textus<N> cannot convert directly to list<b8, M>."
 syntax = "textus<N> ↦ list<b8, M>"
-related = ["↦", "textus", "octeti"]
+related = ["↦", "textus", "list<b8>"]
 locale = "en"
 +++
 

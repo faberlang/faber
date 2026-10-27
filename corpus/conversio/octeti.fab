@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "Text and byte conversio between textus, ascii, and list<b8>."
 syntax = "<expression> ↦ list<b8> | <expression> ↦ textus | <expression> ↦ ascii"
-related = ["↦", "octeti", "textus", "chorda"]
+related = ["↦", "list<b8>", "textus", "chorda"]
 locale = "en"
 +++
 # =============================================================================

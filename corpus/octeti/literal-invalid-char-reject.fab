@@ -1,12 +1,12 @@
 +++
-term = "octeti"
+term = "list<b8>"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = false
 summary = "Byte-list literals take hex digits only: |zz| rejects with SEM011:octeti_literal_invalid_character naming the offending character."
 syntax = "|zz|"
-related = ["octeti", "b8"]
+related = ["list<b8>", "b8"]
 locale = "en"
 no_expected = "rejects"
 diagnostic = "SEM011:octeti_literal_invalid_character"

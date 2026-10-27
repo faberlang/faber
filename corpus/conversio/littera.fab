@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "A char (littera) is a one-letter string: numbers convert to their digits, and code points use the Code hint."
 syntax = "<n> ↦ string | ascii | char, <char> ↦ int | string, <string> ↦ char, <char> ↦ u32 via Code, <n> ↦ char via Code"
-related = ["↦", "char", "string", "ascii", "bytes", "Code"]
+related = ["↦", "char", "string", "ascii", "list<b8>", "Code"]
 locale = "en"
 +++
 # =============================================================================
