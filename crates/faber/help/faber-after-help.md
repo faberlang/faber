@@ -114,7 +114,7 @@ Common flows:
 
   Interpret source (runner, no Cargo) — `faber run` is interpreted execution,
   always; `faber script` retired and folded into it:
-    faber run crates/exempla/corpus/incipit/salve-munde.fab
+    faber run corpus/incipit/salve-munde.fab
     faber run path/to/pkg           # package directory or faber.toml
     faber run app.zip               # source archive
     faber run script.fab -- alpha beta
@@ -127,7 +127,7 @@ Common flows:
     this release; the rest return with the native host (core-norma N2).
 
   Single-file check (non-package):
-    faber check crates/exempla/corpus/salve-munde.fab
+    faber check corpus/incipit/salve-munde.fab
 
   Format and convert complete Faber source units:
     faber format path/to/file.fab           (report drift, writes nothing; exit 1)
@@ -158,13 +158,13 @@ Common flows:
     path/to/pkg/target/faber-mir/exe/run alpha beta
 
   Inspect phases without a package (radix-compatible aliases):
-    faber lex crates/exempla/corpus/salve-munde.fab
-    faber parse crates/exempla/corpus/salve-munde.fab
+    faber lex corpus/incipit/salve-munde.fab
+    faber parse corpus/incipit/salve-munde.fab
 
   MIR probe emit on single `.fab` files (systems lane; package MIR image targets use `build`):
-    faber emit -t llvm-text crates/exempla/corpus/incipit/salve-munde.fab
-    faber emit -t wgsl-text crates/exempla/corpus/vector/kernel.fab
-    faber emit --reflection -t wgsl-text crates/exempla/corpus/vector/kernel.fab
+    faber emit -t llvm-text corpus/incipit/salve-munde.fab
+    faber emit -t wgsl-text corpus/vector/kernel.fab
+    faber emit --reflection -t wgsl-text corpus/vector/kernel.fab
 
 Output contract:
   - `build`: path of written artifact on stdout; diagnostics on stderr
