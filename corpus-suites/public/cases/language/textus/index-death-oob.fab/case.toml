@@ -12,6 +12,6 @@ check_only = true
 outcome = "pass"
 
 [targets.runner.expect]
-exit_nonzero = true
+exit = 70
 stderr_contains = "text index out of bounds"
 check_only = false

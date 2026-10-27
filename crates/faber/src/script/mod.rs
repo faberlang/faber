@@ -286,7 +286,11 @@ pub fn status_for_run_source_error(error: &RunSourceError) -> i32 {
         RunSourceError::Frontend(diagnostics) => {
             faber_cli::exit_status::status_for_diagnostics(diagnostics)
         }
-        RunSourceError::Mir(_) | RunSourceError::Stepper(_) => faber_cli::exit_status::FAILURE,
+        // A runner trap carries its class from the shared trap table.
+        RunSourceError::Stepper(errors) => errors
+            .first()
+            .map_or(faber_cli::exit_status::FAILURE, |error| error.exit_status()),
+        RunSourceError::Mir(_) => faber_cli::exit_status::FAILURE,
     }
 }
 

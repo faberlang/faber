@@ -191,7 +191,9 @@ fn interpret_path(
                     exit_status::exit_for_run_diagnostics(&diagnostics);
                 }
                 Ok(outcome) => {
-                    let exit = i32::from(outcome.result.is_err());
+                    let exit = outcome.result.as_ref().err().map_or(0, |diagnostics| {
+                        exit_status::status_for_run_diagnostics(diagnostics)
+                    });
                     let artifact = RunStatsArtifact::new(
                         metadata,
                         outcome.stats,
@@ -272,7 +274,9 @@ fn interpret_path(
                     exit_status::exit_for_run_diagnostics(&diagnostics);
                 }
                 Ok(outcome) => {
-                    let exit = i32::from(outcome.result.is_err());
+                    let exit = outcome.result.as_ref().err().map_or(0, |diagnostics| {
+                        exit_status::status_for_run_diagnostics(diagnostics)
+                    });
                     let artifact = RunStatsArtifact::new(
                         metadata,
                         outcome.stats,
@@ -381,7 +385,8 @@ fn interpret_path(
 /// Process status scripta gates observe for a single-file runner result.
 ///
 /// Success yields `0`. An explicit `process.exit_process(code)` yields that
-/// Unix-masked code. Frontend / MIR / runner failures yield `1`.
+/// Unix-masked code. Frontend / MIR failures yield `1`; a run-time failure
+/// yields its sysexits class (`radix::module::runtime_contract::trap`).
 pub(super) fn single_file_run_process_code(
     result: Result<ExitCode, radix::module::mir::RunSourceError>,
 ) -> i32 {

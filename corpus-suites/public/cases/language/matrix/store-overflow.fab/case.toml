@@ -12,6 +12,6 @@ check_only = true
 outcome = "pass"
 
 [targets.runner.expect]
-exit_nonzero = true
+exit = 70
 stderr_contains = "200 does not fit in `i8`"
 check_only = false

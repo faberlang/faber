@@ -1454,7 +1454,7 @@ impl FunctionLower<'_, '_> {
                     .builder
                     .ins()
                     .iadd_imm_s(message, abi::TEXT_HEADER as i64);
-                let reference = self.runtime_ref(&abi::TRAP)?;
+                let reference = self.runtime_ref(&abi::TRAP_CONVERSION)?;
                 self.builder.ins().call(reference, &[bytes, length]);
                 self.builder.ins().trap(TrapCode::unwrap_user(1));
             }

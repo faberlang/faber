@@ -34,6 +34,9 @@ pub const CONFIG: i32 = 78;
 /// Fact name that classes a package-layer diagnostic. The value is
 /// [`CLASS_CONFIG`] or [`CLASS_USAGE`].
 pub const CLASS_ARG: &str = "exit_class";
+/// Diagnostic arg the runner sets to a trap's sysexits class (see
+/// `radix_runtime_contract::trap`).
+const TRAP_STATUS_ARG: &str = "exit_status";
 
 /// [`CLASS_ARG`] value for a manifest or locale-pack failure.
 pub const CLASS_CONFIG: &str = "config";
@@ -75,6 +78,16 @@ pub fn status_for_run_diagnostic(diag: &Diagnostic) -> i32 {
 }
 
 fn classify(diag: &Diagnostic, back_end_is_source: bool) -> i32 {
+    // A run-time trap carries the class the shared trap table chose for it
+    // (radix-runtime-contract); that wins over the tool's own phase rules.
+    if let Some(status) = diag
+        .args
+        .iter()
+        .find(|arg| arg.name == TRAP_STATUS_ARG)
+        .and_then(|arg| arg.value.parse::<i32>().ok())
+    {
+        return status;
+    }
     let tagged = diag.args.iter().find(|arg| arg.name == CLASS_ARG);
     match tagged.map(|arg| arg.value.as_str()) {
         Some(CLASS_CONFIG) => return CONFIG,
