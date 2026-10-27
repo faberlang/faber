@@ -19,8 +19,8 @@ locale = "en"
 #   • Both directions — `n ↦ b32 ↦ f32` reads a pattern held in a u32 as a float, and `x ↦ b32 ↦ u32` takes the pattern out of a float (plus the u16/f16 and u64/f64 twins).
 #   • Exact pairs only — b16 pairs with f16, b32 with f32, b64 with f64; anything else rejects.
 #   • Bit-identical for the pinned payloads; the runner seam re-canonicalizes non-0x7E00 NaN spellings (0xFE00→0x7E00) — see the bits-f16 goal ledger residual.
-#   • The chain — `octeti[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32` widens the f16 value exactly, with no intermediate binding.
-#   • Extended composition law, observable side — `octeti[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32` equals the oracle f32 value. The direct `octeti[0‥2] ↦ f16 via Le` window row is unshipped (OQ1); the equivalence to it is the derived claim, not executed here.
+#   • The chain — `list<b8>[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32` widens the f16 value exactly, with no intermediate binding.
+#   • Extended composition law, observable side — `list<b8>[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32` equals the oracle f32 value. The direct `list<b8>[0‥2] ↦ f16 via Le` window row is unshipped (OQ1); the equivalence to it is the derived claim, not executed here.
 #   • A pattern is not a value conversion — the same u16 window prints 15872.0 without the marker and 1.5 through `b16 ↦ f16`.
 #
 # Common mistakes:
@@ -28,7 +28,7 @@ locale = "en"
 #   • Wrong width — `n ↦ b16 ↦ f32` rejects: a b16 reads as a 16-bit float only.
 #   • A float source is never a pattern source for a number — `1.0 ↦ f64` is the value; spell the u64 bit pattern with the typed-literal form (`4607182418800017408 ∷ u64`).
 #
-# See also: ↦, int, float, octeti
+# See also: ↦, int, float, list<b8>
 # =============================================================================
 
 

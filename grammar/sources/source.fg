@@ -783,6 +783,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Iteration | `per` | range step |
 # | Iteration | `usque` | range until inclusive |
 # | Params | `argumenta` | CLI arguments modifier |
+# | Params | `axis` | axis marker word: a parameter declares it (`axis int a`), a call echoes it (`t.mean(axis 1)`); shared source spelling; contextual |
 # | Params | `ceteri` | rest |
 # | Params | `errata` | error channel |
 # | Params | `exitus` | exit code |
@@ -804,6 +805,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Builtin | `lineam` | line |
 # | Builtin | `scriptum` | write |
 # | Annotation | `fragment` | nucleum fragment |
+# | Annotation | `nondum` | availability marker `@ nondum` (en `@ unstable`) |
 # | Annotation | `nucleum` | kernel annotation |
 # | Annotation | `radix` | compiler-reserved annotation family |
 # | Annotation | `lane` | `@ radix` compiler-lane directive |
@@ -995,7 +997,7 @@ const_init     := insere_expr | expression
 # escape is rejected, and a missing file is a compile error. The file is a
 # build input, read once at compile time. The result's type follows the slot,
 # the declared type of the constant or field: `textus` requires the file to be
-# valid UTF-8; `octeti` reads the raw bytes. A `_` slot, or no slot, is `SEM061`
+# valid UTF-8; `lista<b8>` reads the raw bytes. A `_` slot, or no slot, is `SEM061`
 # `insere_type_required`; any other concrete slot type is `SEM061`
 # `insere_type_invalid`.
 insere_expr    := 'insere' STRING
@@ -1471,11 +1473,11 @@ gradient_place := expression  (* semantic analysis requires a direct call_expr a
 # rejection: one default per expression.
 cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
 # `via` (D11.9) is the convert-hint clause: a modifier of the conversion, not
-# part of the target type (`"ff" ↦ i32 via Hex`, `octeti[0‥2] ↦ u16 via Le`).
+# part of the target type (`"ff" ↦ i32 via Hex`, `lista<b8>[0‥2] ↦ u16 via Le`).
 # It binds tighter than the `⊥` default: `x ↦ u32 via Hex ⊥ 0` is
 # `(x ↦ u32 via Hex) ⊥ 0`. The retired spellings — the hint as a further type
 # argument (`ascii<N, Hex>`, `littera<Code>`) and as a bracketed tail
-# (`octeti<16><Le>`) — are parse errors (`conversio_hint_type_argument`,
+# (`lista<b8, 16><Le>`) — are parse errors (`conversio_hint_type_argument`,
 # `conversio_hint_tail_argument`), not productions of this grammar.
 conversio_expr        := '↦' (type_annotation | interval_target) via_clause? inline_default?
 # `interval_target` is the interval clamp: `15 ↦ 0‥10` clamps the value into the

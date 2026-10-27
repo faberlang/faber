@@ -55,6 +55,7 @@ product default); `la` spellings differ (`print` is `nota`, `fn` is `functio`).
 | ------------------ | --------- |
 | `x = 5`, `x += 1`, `x++` | the only runtime store is `←` (`x ← x + 1`); postfix `x ↑` / `x ↓` are statements. `=` exists only for compile-time-known values: field defaults, `type` aliases, enum members, annotation metadata, module constants. A bare `x = 6` statement reports only `PARSE030 expected_expression` |
 | `out[:] = x`, `memcpy`, `out ← x` into a `mut` tensor param | `←` only rebinds a name; writing into existing tensor storage is the copy-into statement `out ⇇ x` (rules in `references/grammar.md`, Copy-Into; a whole-tensor `←` into a `mut` tensor param is `SEM057 mut_tensor_param_rebind`, a provisional rule under reconsideration). `sink ⇇ "text"` (the old callable sink) is `SEM012 transfer_sink_retired`: output is `print x` |
+| `bytes`, `byte` (la `octeti`, `octetus`) | not Faber types, just unknown names: write `list<b8>` for a byte string (la `lista<b8>`), `b8` for a raw byte, `u8` for a numeric byte |
 | `print(x)` / `println(x)` | line-level statement: `print x` (en) / `nota x` (la), never a call (`SEM001 scribe_callee`) |
 | `==`, `!=`, `!x`, `&&`, `\|\|`, `->`, `<-` | the glyph and word forms: equality is `≡` (negation `≢`), logic is `and` / `or` / `not` (la `et` / `aut` / `non`), a return type follows `→`, a store is `←`. `==`, `!=`, `!x` and `<-` report `PARSE030 expected_expression`; `&&` and `\|\|` report `LEX004 unexpected_character`; `fn f(int a) -> int { … }` leaves the function without a body (`PARSE012`) |
 | `x qua T`, `x innatum T`, `novum T { … }`, `x ⊕ 2`, `x ⊛ 3` | old cast, construction and operator spellings that no longer exist. The three words are ordinary identifiers now, so the error appears as unknown names (`SEM001`), not as a syntax error; `⊕` and `⊛` report `LEX004 unexpected_character`. Convert with `x ↦ T`, construct with `T { field = expr }` |
@@ -111,7 +112,7 @@ check the table before re-guessing.
 The stable core:
 
 ```bash
-faber check <file-or-package>        # full check; prints ok or diagnostics; exit 1 on error
+faber check <file-or-package>        # full check; prints ok or diagnostics; exit 65 on error
 cat file.fab | faber check -         # stdin, import-free sources only; needs a frontmatter `locale` (see below)
 faber run <file-or-package>          # interpreted execution (MIR runner, always; `faber run -` is not supported)
 faber -c '+++
@@ -124,6 +125,15 @@ faber init <dir>                     # scaffold: faber.toml ([package], [paths],
 faber doctor                         # resolved library home and per-library availability (`norma:*` is embedded in the binary)
 faber explain --list                 # glyph / keyword / grammar-term reference
 ```
+
+Exit statuses of the tool (not of the program it runs; a program's own exit
+code passes through): `0` success (warnings alone are success), `65` the source
+has error diagnostics (`check`, `build`, `run`, `test`, `emit`, `format`; a
+warning promoted by `--deny` / `--deny-warnings` counts), `64` bad
+command-line arguments (including an unknown `--deny` code), `78` a bad
+`faber.toml` key or a locale pack that fails to load, `1` only a failure with no
+known class (unreadable file, failed write, failing `faber test` cases,
+`faber format` drift). Branch on the status, not on stderr text.
 
 Build from the repo, not from an installed binary, when behavior matters:
 installed `faber` binaries go stale and lag the grammar, which shows up as false

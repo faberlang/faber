@@ -117,7 +117,9 @@ fn textus_to_littera_is_failable() {
 
 #[test]
 fn octeti_window_to_ascii_accepts() {
-    test_support::assert_accepts("functio f(octeti b) → ascii { redde b[0‥1] ↦ ascii ⊥ 'nihil' }");
+    test_support::assert_accepts(
+        "functio f(lista<b8> b) → ascii { redde b[0‥1] ↦ ascii ⊥ 'nihil' }",
+    );
 }
 
 // --- Code hint: code points --------------------------------------------------

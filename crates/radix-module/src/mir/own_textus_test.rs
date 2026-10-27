@@ -4,7 +4,11 @@ use crate::driver::{AnalyzeRequest, Config, Session};
 
 #[test]
 fn lowers_own_textus_param_as_by_value_mir_storage() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let source = r#"
 functio consume(own textus buffer) → textus {
     redde buffer

@@ -5,15 +5,15 @@ use std::borrow::Cow;
 
 use super::{
     AnalyzedProgram, BTreeMap, CliPlanningMode, Config, DeviceSelection, Diagnostic,
-    FMIR_BIN_ARTIFACT_DIR, FMIR_BIN_ENTRYPOINT_FILE, FMIR_IMAGE_FILE, FMIR_TEXT_IMAGE_FILE,
-    FmirPackageImage, FmirPackageImageFormat, Host, MirSeams, PACKAGE_MIR_MANIFEST_FILE,
-    PackageFmirBinaryBundle, PackageFmirImage, PackageFmirTextImage, PackageMirArtifact, Path,
-    PathBuf, RunnerKernelPolicy, RunnerStats, fmir_package_image_from_lowered, fs, load_fmir_image,
-    load_fmir_text_image, mir_diag, mir_issue_diag, package_artifact_dir, package_artifact_root,
-    package_fmir_binary_image, package_fmir_text_image, package_mir_manifest,
-    run_fmir_package_image, run_fmir_package_image_with_stats, validate_package_mir_manifest,
-    with_prepared_package_mir, with_prepared_package_mir_from_loaded,
-    with_prepared_package_mir_with_cli_mode, write_package_image,
+    FMIR_IMAGE_FILE, FMIR_TEXT_IMAGE_FILE, FmirPackageImage, FmirPackageImageFormat, Host,
+    MirSeams, PACKAGE_MIR_MANIFEST_FILE, PackageFmirImage, PackageFmirTextImage,
+    PackageMirArtifact, Path, PathBuf, RunnerKernelPolicy, RunnerStats,
+    fmir_package_image_from_lowered, fs, load_fmir_image, load_fmir_text_image, mir_diag,
+    mir_issue_diag, package_artifact_dir, package_artifact_root, package_fmir_binary_image,
+    package_fmir_text_image, package_mir_manifest, run_fmir_package_image,
+    run_fmir_package_image_with_stats, validate_package_mir_manifest, with_prepared_package_mir,
+    with_prepared_package_mir_from_loaded, with_prepared_package_mir_with_cli_mode,
+    write_package_image,
 };
 
 /// The started package run's diagnostic-statistics outcome (RSM route
@@ -341,50 +341,6 @@ pub fn run_package_fmir_built_image<H: Host + ?Sized>(
 
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
-pub fn build_package_fmir_binary_bundle(
-    config: &Config,
-    input: &Path,
-    argumenta: &[String],
-    release: bool,
-    seams: &MirSeams,
-) -> Result<PackageFmirBinaryBundle, Vec<Diagnostic>> {
-    with_prepared_package_mir_with_cli_mode(
-        config,
-        input,
-        argumenta,
-        CliPlanningMode::FmirTextRuntime,
-        seams,
-        |prepared, lowered| {
-            let package_root = package_artifact_root(input)?;
-            let artifact_root =
-                package_artifact_dir(&package_root, &prepared.entry_path, FMIR_BIN_ARTIFACT_DIR)?;
-            let image = package_fmir_binary_image(prepared, lowered, &package_root, seams)?;
-            let image_path = write_package_image(
-                &artifact_root,
-                &prepared.entry_path,
-                FMIR_IMAGE_FILE,
-                &image,
-            )?;
-
-            let entrypoint_path = artifact_root.join(FMIR_BIN_ENTRYPOINT_FILE);
-            (seams.bin_runner_writer)(
-                &artifact_root,
-                &entrypoint_path,
-                &prepared.entry_path,
-                &image,
-                release,
-            )?;
-
-            Ok(PackageFmirBinaryBundle {
-                entrypoint_path,
-                image_path,
-            })
-        },
-    )
-}
-
-/// # Errors
-/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir_artifact<H: Host + ?Sized>(
     config: &Config,
     artifact: &PackageMirArtifact,
@@ -616,19 +572,4 @@ pub fn fmir_image_route_decision(
         declared_selection,
         declared_artifacts,
     })
-}
-
-/// # Errors
-/// Returns an error when the input or persisted artifact is invalid.
-pub fn run_fmir_image_bytes_with_stdio(
-    image_bytes: &[u8],
-    diagnostic_path: &Path,
-    argumenta: Vec<String>,
-    seams: &MirSeams,
-) -> Result<(), Vec<Diagnostic>> {
-    let loaded = load_fmir_image(image_bytes, diagnostic_path, seams.toolchain_version)?;
-    let selection = loaded.route_selection()?;
-    admit_runner_route(&loaded, selection)?;
-    let mut host = radix_mir_runner::StdioHost::with_argumenta(argumenta);
-    run_fmir_package_image(loaded, &mut host, selection.kernel_policy())
 }

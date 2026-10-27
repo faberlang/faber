@@ -3,6 +3,7 @@
 //! type vocabulary stay on that surface. Reader-locale conversion lives in
 //! `faber convert` (`commands/convert.rs`).
 
+use faber_cli::exit_status;
 use radix::module::codegen::Target;
 use radix::module::driver::{Config, Session, peel_raw_source, split_frontmatter};
 use std::fs;
@@ -27,7 +28,7 @@ pub fn cmd_format(command: &FormatCommand) {
         let mut source = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut source) {
             eprintln!("error: failed to read <stdin>: {err}");
-            std::process::exit(1);
+            std::process::exit(exit_status::FAILURE);
         }
         let path = Path::new("<stdin>");
         match format_single_doc(path, &source) {
@@ -35,7 +36,7 @@ pub fn cmd_format(command: &FormatCommand) {
                 print!("{formatted}");
                 return;
             }
-            Err(()) => std::process::exit(1),
+            Err(status) => std::process::exit(status),
         }
     }
 
@@ -43,13 +44,13 @@ pub fn cmd_format(command: &FormatCommand) {
         Ok(files) => files,
         Err(message) => {
             eprintln!("error: {message}");
-            std::process::exit(1);
+            std::process::exit(exit_status::FAILURE);
         }
     };
 
     if files.is_empty() {
         eprintln!("error: no .fab files found to format");
-        std::process::exit(1);
+        std::process::exit(exit_status::FAILURE);
     }
 
     // `--stdout` is tightened to EXACTLY ONE input file. Multiple files with
@@ -59,7 +60,7 @@ pub fn cmd_format(command: &FormatCommand) {
             "error: --stdout accepts exactly one input file, found {}; use --check or --write for multiple files",
             files.len()
         );
-        std::process::exit(1);
+        exit_status::exit_usage();
     }
 
     // Modes (mutually exclusive at the CLI parse boundary): `--stdout` prints
@@ -73,15 +74,15 @@ pub fn cmd_format(command: &FormatCommand) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                tally.refused += 1;
+                tally.refuse(exit_status::FAILURE);
                 continue;
             }
         };
 
         let formatted = match format_single_doc(path, &source) {
             Ok(formatted) => formatted,
-            Err(()) => {
-                tally.refused += 1;
+            Err(status) => {
+                tally.refuse(status);
                 continue;
             }
         };
@@ -111,7 +112,7 @@ pub fn cmd_format(command: &FormatCommand) {
 
     if command.stdout {
         if tally.refused > 0 {
-            std::process::exit(1);
+            std::process::exit(tally.refusal_status);
         }
         return;
     }
@@ -119,14 +120,21 @@ pub fn cmd_format(command: &FormatCommand) {
     let total = files.len();
     if report_only {
         println!("{}", tally.report_summary(total));
-        if tally.changed + tally.refused > 0 {
-            std::process::exit(1);
+        if tally.refused > 0 {
+            std::process::exit(tally.refusal_status);
+        }
+        if tally.changed > 0 {
+            // Drift is a report, not a classed failure.
+            std::process::exit(exit_status::FAILURE);
         }
         return;
     }
     println!("{}", tally.write_summary(total));
-    if tally.refused + tally.write_failed > 0 {
-        std::process::exit(1);
+    if tally.refused > 0 {
+        std::process::exit(tally.refusal_status);
+    }
+    if tally.write_failed > 0 {
+        std::process::exit(exit_status::FAILURE);
     }
 }
 
@@ -170,6 +178,9 @@ pub(super) struct RewriteTally {
     pub(super) changed: usize,
     /// Files refused (unreadable, or a diagnostic was printed); never written.
     pub(super) refused: usize,
+    /// Exit status for the refusals: the first classed refusal's status, else
+    /// [`exit_status::FAILURE`].
+    pub(super) refusal_status: i32,
     /// Files that rewrote but could not be written.
     pub(super) write_failed: usize,
 }
@@ -180,7 +191,16 @@ impl RewriteTally {
             verb,
             changed: 0,
             refused: 0,
+            refusal_status: exit_status::FAILURE,
             write_failed: 0,
+        }
+    }
+
+    /// Count one refused file whose refusal has exit `status`.
+    pub(super) fn refuse(&mut self, status: i32) {
+        self.refused += 1;
+        if self.refusal_status == exit_status::FAILURE {
+            self.refusal_status = status;
         }
     }
 
@@ -237,14 +257,15 @@ impl RewriteTally {
 /// Convert ONE source document to an explicit target locale surface
 /// (`faber convert --to <LOCALE>`). Same HIR round-trip as the former
 /// reader-locale conversion mode (canonical HIR surface).
-/// `Err(())` means a diagnostic was already printed.
+/// `Err(status)` means a diagnostic was already printed; `status` is the exit
+/// status its class gives.
 #[cfg(feature = "hir-faber")]
 pub(super) fn convert_single_doc(
     path: &Path,
     to: &str,
     from: Option<&str>,
     source: &str,
-) -> Result<String, ()> {
+) -> Result<String, i32> {
     let name = path.display().to_string();
     let session = match format_session(path, from, source) {
         Ok(session) => session,
@@ -254,7 +275,7 @@ pub(super) fn convert_single_doc(
                 radix::services::DiagnosticMode::Normal,
                 None,
             );
-            return Err(());
+            return Err(exit_status::status_for_diagnostic(&diagnostic));
         }
     };
     let emit_pack = match faber_cli::package::embedded_conversion_locale_pack(to) {
@@ -265,7 +286,7 @@ pub(super) fn convert_single_doc(
                 radix::services::DiagnosticMode::Normal,
                 None,
             );
-            return Err(());
+            return Err(exit_status::status_for_diagnostic(&diagnostic));
         }
     };
     let result = radix::module::driver::reemit_faber(&session, &emit_pack, &name, source);
@@ -290,13 +311,13 @@ pub(super) fn convert_single_doc(
         if !had_error {
             eprintln!("error: {}: conversion failed", path.display());
         }
-        return Err(());
+        return Err(exit_status::DATA_ERROR);
     };
     match converted_source_for_write(path, source, &output.code, to) {
         Ok(converted) => Ok(converted),
         Err(message) => {
             eprintln!("error: {message}");
-            Err(())
+            Err(exit_status::DATA_ERROR)
         }
     }
 }
@@ -306,9 +327,9 @@ pub(super) fn convert_single_doc(
 /// write/stdout (frontmatter preserved). `Err(())` means a diagnostic was
 /// already printed.
 #[cfg(not(feature = "hir-faber"))]
-fn format_single_doc(_path: &Path, _source: &str) -> Result<String, ()> {
+fn format_single_doc(_path: &Path, _source: &str) -> Result<String, i32> {
     eprintln!("error: formatting requires a faber build with feature `hir-faber`");
-    Err(())
+    Err(exit_status::FAILURE)
 }
 
 #[cfg(not(feature = "hir-faber"))]
@@ -317,13 +338,13 @@ pub(super) fn convert_single_doc(
     _to: &str,
     _from: Option<&str>,
     _source: &str,
-) -> Result<String, ()> {
+) -> Result<String, i32> {
     eprintln!("error: reader-locale conversion requires a faber build with feature `hir-faber`");
-    Err(())
+    Err(exit_status::FAILURE)
 }
 
 #[cfg(feature = "hir-faber")]
-fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
+fn format_single_doc(path: &Path, source: &str) -> Result<String, i32> {
     let name = path.display().to_string();
     let session = match format_session(path, None, source) {
         Ok(session) => session,
@@ -333,7 +354,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
                 radix::services::DiagnosticMode::Normal,
                 None,
             );
-            return Err(());
+            return Err(exit_status::status_for_diagnostic(&diagnostic));
         }
     };
     let Some(emit_pack) = session.config.locale_pack.as_ref() else {
@@ -349,7 +370,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
             radix::services::DiagnosticMode::Normal,
             None,
         );
-        return Err(());
+        return Err(exit_status::FAILURE);
     };
     let result = radix::module::driver::reemit_faber(&session, emit_pack, &name, source);
 
@@ -367,14 +388,14 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
         if !had_error {
             eprintln!("error: {}: format failed", path.display());
         }
-        return Err(());
+        return Err(exit_status::DATA_ERROR);
     };
 
     match formatted_source_for_write(path, source, &output.code) {
         Ok(formatted) => Ok(formatted),
         Err(message) => {
             eprintln!("error: {message}");
-            Err(())
+            Err(exit_status::DATA_ERROR)
         }
     }
 }

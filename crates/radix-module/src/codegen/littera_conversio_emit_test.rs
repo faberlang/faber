@@ -14,7 +14,7 @@ incipit {
     sit littera u ← t ↦ littera ⊥ '?'
     sit u32 c ← d ↦ u32 via Code
     sit littera b ← 65 ↦ littera via Code ⊥ '?'
-    sit octeti raw ← |68 69|
+    sit lista<b8> raw ← |68 69|
     sit ascii h ← raw[0‥1] ↦ ascii ⊥ 'nn'
     nota a
     nota n

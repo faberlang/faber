@@ -200,7 +200,7 @@ main {
 ```
 
 Teaching exemplars: `corpus/operatores/inf.fab` (the whole surface), `inf-conversio.fab`
-(`bytes via Be`/`Le`, `value`), `approx-integers.fab` (the exact integer `≈` rule). `inf` is host-only
+(`list<b8> via Be`/`Le`, `value`), `approx-integers.fab` (the exact integer `≈` rule). `inf` is host-only
 (not a tensor element, not in a kernel or an AIR lane). Swift, Haskell, LLVM and Wasm have no unbounded
 carrier and fail closed by name (`inf_target_unsupported`, `llvm_target_inf_unsupported`,
 `mir_wasm_unsupported`); see "The unbounded integer `inf`" in `grammar/EBNF.md` before promising a

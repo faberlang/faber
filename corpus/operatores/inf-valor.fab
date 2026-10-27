@@ -30,7 +30,7 @@ locale = "en"
 # operatores/inf-valor — `valor ↦ inf` on every integer and non-integer payload
 #
 # WHY: pins the one-way `valor ↦ inf` row (ruling 40) apart from the byte rows
-# of operatores/inf-conversio, so a carrier that has `valor` but no `octeti`
+# of operatores/inf-conversio, so a carrier that has `valor` but no `list<b8>`
 # can still prove it. A valor is not printed itself; each row prints the `inf`
 # taken out of it, or the `⊥` fallback.
 #

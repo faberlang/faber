@@ -133,7 +133,6 @@ fn test_executed_lane_target(
             | Target::MirScena
             | Target::MirFmir
             | Target::MirFmirBinary
-            | Target::MirFmirBundle
     ) {
         return Ok(config.target);
     }
@@ -177,18 +176,6 @@ fn test_device_section_builder(
     Ok(None)
 }
 
-/// The moved mir tests never write an fmir-bin runner crate.
-#[cfg(feature = "package-mir")]
-fn test_bin_runner_writer(
-    _artifact_root: &Path,
-    _entrypoint_path: &Path,
-    _diagnostic_path: &Path,
-    _image: &[u8],
-    _release: bool,
-) -> Result<(), Vec<Diagnostic>> {
-    Ok(())
-}
-
 /// Test package-MIR seams for the moved mir tests (RP5).
 #[cfg(feature = "package-mir")]
 pub fn test_mir_seams() -> MirSeams {
@@ -198,7 +185,6 @@ pub fn test_mir_seams() -> MirSeams {
         library_cache_for_config: test_library_cache_for_config,
         device_config_for_input: test_device_config_for_input,
         device_section_builder: test_device_section_builder,
-        bin_runner_writer: test_bin_runner_writer,
         toolchain_version: "test-toolchain",
     }
 }

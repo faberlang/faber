@@ -17,7 +17,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn latin_source_session() -> Session {
-    Session::new(Config::default().with_dev_locale_root())
+    Session::new(Config::default().with_latin_locale().with_dev_locale_root())
 }
 
 fn emit_once(source: &str) -> String {
@@ -75,7 +75,11 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
     for (locale, surface, source, invalid_source, missing_via_source, operators) in cases {
         let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
             .unwrap_or_else(|error| panic!("{locale} pack loads: {error:?}"));
-        let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        let session = Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_resolved_locale_pack(pack.clone()),
+        );
         let emit = |input: &str| {
             let result = reemit_faber(&session, &pack, "reducta.fab", input);
             assert!(
@@ -123,7 +127,12 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
 #[test]
 fn scan_surface_round_trips_with_total_order_and_thread_body() {
     let source = "+++\nlocale = \"la\"\n+++\n@ nucleum\nfunctio prefix(tensor<f32, [4]> xs) → tensor<f32, [4]> {\n    redde scan via summa total exclusive ex xs apud [i] order descendens filum lane sit value { redde value }\n}\n";
-    let session = Session::new(Config::default().with_dev_locale_root().with_latin_locale());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_dev_locale_root()
+            .with_latin_locale(),
+    );
     let pack = crate::locale::latin_locale_pack();
     let emit = |input: &str| {
         let result = reemit_faber(&session, &pack, "scan.fab", input);
@@ -179,7 +188,11 @@ fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
         };
         let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
             .unwrap_or_else(|error| panic!("{locale} pack loads: {error:?}"));
-        let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        let session = Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_resolved_locale_pack(pack.clone()),
+        );
         let emit = |input: &str| {
             let result = reemit_faber(&session, &pack, "sort.fab", input);
             assert!(
@@ -200,7 +213,11 @@ fn sort_expression_round_trips_in_latin_and_english_and_typechecks() {
         assert_eq!(emit(&first), first, "{locale} sort output is not idempotent");
 
         // Typecheck types the node on every target: no sort issue is raised.
-        let mut check_session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        let mut check_session = Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_resolved_locale_pack(pack.clone()),
+        );
         check_session.config.target = Target::HirRust;
         let diagnostics = match analyze_source(&check_session, "sort-check.fab", &first, AnalyzeRequest::default()) {
             Ok(unit) => unit.diagnostics,
@@ -301,6 +318,7 @@ fn emit_imported_variant_case(source: &str, locale: &str) -> String {
     };
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirFaber)
             .with_locale_pack(pack.clone()),
     );
@@ -407,7 +425,11 @@ locale = "la"
 
     let _library_home = LibraryHomeGuard::set(&home);
     let latin = crate::locale::latin_locale_pack();
-    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_locale_pack(latin.clone()),
+    );
     let name = consumer_path.display().to_string();
     let prepared = prepare_program_module_for_name(&name, source, &session).expect("prepare imported variant source");
     let analysis = analyze_source(
@@ -466,7 +488,11 @@ locale = "la"
 fn canonical_revalidation_rejects_swapped_same_typed_sites() {
     let source = "functio swap() → numerus {\n    sit lista<exactus<u32>> first ← vacua\n    sit lista<u32> second ← vacua\n    redde 0\n}\n";
     let latin = crate::locale::latin_locale_pack();
-    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_locale_pack(latin.clone()),
+    );
     let prepared =
         prepare_program_module_for_name("swapped-sites.fab", source, &session).expect("prepare swapped-site source");
     let analysis = analyze_source(
@@ -506,7 +532,11 @@ fn canonical_revalidation_rejects_swapped_same_typed_sites() {
 #[test]
 fn canonical_revalidation_rejects_analysis_errors() {
     let latin = crate::locale::latin_locale_pack();
-    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_locale_pack(latin.clone()),
+    );
     let source = "functio noop() → vacuum { }\n";
     let prepared = prepare_program_module_for_name("revalidation.fab", source, &session).expect("prepare valid source");
     let analysis = analyze_source(
@@ -645,7 +675,11 @@ fn empty_at_a_dense_slot_reemits_as_empty_in_each_locale() {
     for (locale, source, expected, forbidden) in cases {
         let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
             .unwrap_or_else(|error| panic!("{locale} pack loads: {error:?}"));
-        let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+        let session = Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_resolved_locale_pack(pack.clone()),
+        );
         let emit = |input: &str| {
             let result = reemit_faber(&session, &pack, "empty_dense.fab", input);
             assert!(
@@ -673,7 +707,11 @@ fn axis_sugar_reemits_as_authored() {
     // a fixed point.
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .unwrap_or_else(|error| panic!("en pack loads: {error:?}"));
-    let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack.clone()),
+    );
     let emit = |input: &str| {
         let result = reemit_faber(&session, &pack, "axis_sugar.fab", input);
         assert!(
@@ -746,6 +784,58 @@ fn scalar_math_and_vector_lift_survive_reemission() {
 }
 
 #[test]
+fn radical_glyphs_survive_reemission_on_scalar_and_tensor() {
+    // `√`, `∛` and `∜` are prefix sugar for the sqrt/cbrt method twins and the
+    // nested sqrt pair; re-emission keeps each authored glyph (the fourth root
+    // never prints as `radix().radix()`), and a nested authored `√ √ x` stays
+    // two square roots.
+    let code = assert_idempotent(
+        "functio s(f32 x) → f32 {\n    redde √ x + ∛ x + ∜ x\n}\nfunctio t(tensor<f32, [3]> v) → tensor<f32, [3]> {\n    redde √ v + ∛ v + ∜ v\n}\nfunctio u(f32 x) → f32 {\n    redde √ √ x\n}\nfunctio w(f32 x) → f32 {\n    redde ∜ (x + 1.0)\n}\n",
+    );
+    for expected in [
+        "redde √ x + ∛ x + ∜ x",
+        "redde √ v + ∛ v + ∜ v",
+        "redde √ √ x",
+        "redde ∜ (x + 1.0)",
+    ] {
+        assert!(code.contains(expected), "`{expected}` must survive:\n{code}");
+    }
+    assert!(!code.contains("radix().radix()"), "∜ must not respell as nested roots:\n{code}");
+}
+
+#[test]
+fn template_hole_labels_survive_reemission() {
+    // `§{label}` holes lower to the positional `§` form; re-emission restores
+    // the authored template text and, for labeled actuals, the labels in
+    // authored order. Repeated labels, numbered, plain and mixed holes all
+    // keep their text.
+    let source = concat!(
+        "functio f() → textus {\n",
+        "    sit textus labeled ← \"§{greet} §{who}\"(who: \"mundus\", greet: \"salve\")\n",
+        "    sit textus repeated ← \"§{n} et §{n}\"(n: \"x\")\n",
+        "    sit textus erased ← \"§{greet} mundus\"(\"salve\")\n",
+        "    sit textus mixed ← \"§{greet} §\"(\"salve\", \"mundus\")\n",
+        "    sit textus numbered ← \"§1 et §0 et §0\"(\"a\", \"b\")\n",
+        "    sit textus plain ← \"§ et §\"(\"a\", \"b\")\n",
+        "    sit _ captured ← `ubi id = §{id}`(id: \"42\")\n",
+        "    redde labeled\n",
+        "}\n",
+    );
+    let code = assert_idempotent(source);
+    for expected in [
+        "\"§{greet} §{who}\"(who: \"mundus\", greet: \"salve\")",
+        "\"§{n} et §{n}\"(n: \"x\")",
+        "\"§{greet} mundus\"(\"salve\")",
+        "\"§{greet} §\"(\"salve\", \"mundus\")",
+        "\"§1 et §0 et §0\"(\"a\", \"b\")",
+        "\"§ et §\"(\"a\", \"b\")",
+        "`ubi id = §{id}`(id: \"42\")",
+    ] {
+        assert!(code.contains(expected), "`{expected}` must survive:\n{code}");
+    }
+}
+
+#[test]
 fn reduction_sum_reemits_source_shape() {
     let code = assert_idempotent(
         "functio total(tensor<f32, [8]> a) → f32 {\n    redde reducta via summa ex a apud [i] sit s { redde s }\n}\n",
@@ -813,7 +903,7 @@ fn union_hole_locals_stay_union_holes() {
     // union would freeze it.
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
-    let session = Session::new(Config::default().with_locale_pack(pack));
+    let session = Session::new(Config::default().with_latin_locale().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
         session
@@ -842,7 +932,7 @@ fn nondum_availability_projects_through_en_pack() {
     // The availability family is a contextual keyword: `unstable` under en.
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
-    let session = Session::new(Config::default().with_locale_pack(pack));
+    let session = Session::new(Config::default().with_latin_locale().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
         session
@@ -889,7 +979,7 @@ fn commune_annotation_round_trips_each_locale_spelling() {
     // illegal surface (sealed locales).
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
-    let session = Session::new(Config::default().with_locale_pack(pack));
+    let session = Session::new(Config::default().with_latin_locale().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
         session
@@ -981,7 +1071,7 @@ fn authored_elige_vocabulary_round_trips() {
     // en pack and round-trip as authored.
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
-    let session = Session::new(Config::default().with_locale_pack(pack));
+    let session = Session::new(Config::default().with_latin_locale().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
         session
@@ -1030,7 +1120,7 @@ fn discard_binding_round_trips() {
     // en fixture: `let T _ ← expr` keeps the authored declaration form.
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
-    let session = Session::new(Config::default().with_locale_pack(pack));
+    let session = Session::new(Config::default().with_latin_locale().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
         session
@@ -1077,7 +1167,7 @@ fn ordo_enum_round_trips_discriminants() {
     // en fixture: `enum` surface spelling with discriminants round-trips.
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
-    let session = Session::new(Config::default().with_locale_pack(pack));
+    let session = Session::new(Config::default().with_latin_locale().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
         session
@@ -1140,7 +1230,11 @@ fn ordo_members_keep_their_authored_qualification() {
 fn canonical_revalidation_refuses_an_emitter_that_changes_meaning() {
     let source = "functio duplex(numerus x) → numerus {\n    redde x + x\n}\n";
     let latin = crate::locale::latin_locale_pack();
-    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_locale_pack(latin.clone()),
+    );
     let prepared = prepare_program_module_for_name("meaning.fab", source, &session).expect("prepare meaning source");
     let analysis = analyze_source(
         &prepared.session,
@@ -1189,7 +1283,11 @@ fn canonical_revalidation_refuses_an_emitter_that_changes_meaning() {
 fn canonical_revalidation_accepts_layout_only_changes() {
     let source = "functio duplex(numerus x) → numerus {\n    redde x + x\n}\n";
     let latin = crate::locale::latin_locale_pack();
-    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_locale_pack(latin.clone()),
+    );
     let prepared = prepare_program_module_for_name("layout.fab", source, &session).expect("prepare layout source");
     let analysis = analyze_source(
         &prepared.session,
@@ -1207,7 +1305,11 @@ fn canonical_revalidation_accepts_layout_only_changes() {
 fn emit_closure_body_twice(source: &str, locale: &str) -> String {
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(locale))
         .expect("reader pack loads");
-    let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack.clone()),
+    );
     let emit = |source: &str| {
         let result = reemit_faber(&session, &pack, "closure.fab", source);
         assert!(result.success(), "{source}\n{:?}", result.diagnostics);
@@ -1258,7 +1360,11 @@ fn closure_body_breakability_explicit_fac_blocks_remain_compact() {
 fn closure_body_breakability_revalidation_rejects_added_fac_scope() {
     let source = "functio f() { clausura → numerus { redde 1 } }\n";
     let latin = crate::locale::latin_locale_pack();
-    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_locale_pack(latin.clone()),
+    );
     let prepared = prepare_program_module_for_name("closure.fab", source, &session).expect("prepare closure");
     let analysis = analyze_source(
         &prepared.session,
@@ -1366,7 +1472,11 @@ fn integer_literal_in_float_slot_converts_to_every_locale() {
 #[test]
 fn float_literal_normalization_still_refuses_a_different_value() {
     let latin = crate::locale::latin_locale_pack();
-    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_locale_pack(latin.clone()),
+    );
     let prepared = prepare_program_module_for_name("float.fab", FLOAT_SLOT_INTEGER_SOURCE, &session)
         .expect("prepare float source");
     let analysis = analyze_source(
@@ -1458,7 +1568,11 @@ fn typed_sermo_annotation_keeps_its_arguments() {
 fn emit_en_idempotent(source: &str) -> String {
     let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .unwrap_or_else(|error| panic!("en pack loads: {error:?}"));
-    let session = Session::new(Config::default().with_resolved_locale_pack(pack.clone()));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack.clone()),
+    );
     let emit = |input: &str| {
         let result = reemit_faber(&session, &pack, "inferred_constructor.fab", input);
         assert!(
@@ -1547,11 +1661,4 @@ fn first_match_over_array_literal_reemits_with_meaning_intact() {
         emitted.contains("primus_quem([1.0, -2.0, 3.0]"),
         "first-match head kept: {emitted}"
     );
-}
-
-#[test]
-fn retired_octeti_word_revalidates_as_list_b8() {
-    let code = assert_idempotent("functio f(octeti b) → octeti { redde b }\n");
-    assert!(code.contains("lista<b8>"), "retired octeti must re-emit as list<b8>:\n{code}");
-    assert!(!code.contains("octeti"), "retired octeti must not survive re-emission:\n{code}");
 }

@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "Octeti literals take hex digits only: |zz| rejects with SEM011:octeti_literal_invalid_character naming the offending character."
+summary = "Byte-list literals take hex digits only: |zz| rejects with SEM011:octeti_literal_invalid_character naming the offending character."
 syntax = "|zz|"
 related = ["octeti", "b8"]
 locale = "en"
@@ -12,7 +12,7 @@ no_expected = "rejects"
 diagnostic = "SEM011:octeti_literal_invalid_character"
 +++
 # =============================================================================
-# octeti — Octeti literals take hex digits only.
+# list<b8> — Byte-list literals take hex digits only.
 # =============================================================================
 #
 # What this teaches:
@@ -22,10 +22,10 @@ diagnostic = "SEM011:octeti_literal_invalid_character"
 # Common mistakes:
 #   • Writing a non-hex character inside `|…|` — digits 0-9 and a-f only
 #
-# See also: octeti, b8
+# See also: list<b8>, b8
 # =============================================================================
 
-# octeti reject case — expected compile failure
+# list<b8> reject case — expected compile failure
 #
 # This exemplum intentionally fails to compile.
 

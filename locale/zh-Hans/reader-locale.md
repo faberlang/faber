@@ -295,8 +295,6 @@ included, so the pack's `apud` at line 3595 is deliberately unjudged here.
 - row: vacuum - section: types - current: 无值 - proposed: 无值 - confidence: high - equals-latin-key: no - reason: void type; 无值 says no value and matches void
 - row: numquam - section: types - current: 永不 - proposed: 永不 - confidence: high - equals-latin-key: no - reason: never type; 永不 is the never word and matches never
 - row: ignotum - section: types - current: 未知 - proposed: 未知 - confidence: high - equals-latin-key: no - reason: unknown type; 未知 is the unknown word and matches unknown
-- row: octeti - section: types - current: 字节 - proposed: 字节 - confidence: high - equals-latin-key: no - reason: bytes type; 字节 is the byte noun and matches bytes
-- row: octetus - section: types - current: 单字节 - proposed: 单字节 - confidence: high - equals-latin-key: no - reason: byte type; 单字节 says one byte and stays distinct from octeti (字节)
 - row: clampa - section: types - current: 钳制 - proposed: 钳制 - confidence: high - equals-latin-key: no - reason: clamp edge policy; 钳制 is the clamp verb and matches clamp
 - row: reflexa - section: types - current: 反射 - proposed: 反射 - confidence: high - equals-latin-key: no - reason: reflect edge policy; 反射 is the reflect word and matches reflect
 - row: involuta - section: types - current: 环绕 - proposed: 环绕 - confidence: high - equals-latin-key: no - reason: wrap edge policy; 环绕 is the wrap word and matches wrap

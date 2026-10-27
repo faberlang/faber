@@ -1,11 +1,5 @@
 {
   "targets": {
-    "rust": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "cannot add `elem` to `elem`",
-      "reason": "Rust emit lowers the norma:vector generic leaves to <elem> functions with no arithmetic trait bounds, so cargo rejects the generated crate with E0369 (cannot add `elem` to `elem`). The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
-    },
     "c": {
       "outcome": "known-fail",
       "phase": "emit",

@@ -1,0 +1,37 @@
+{
+  "targets": {
+    "runner": {
+      "outcome": "pass",
+      "expect": {
+        "exit": 3
+      }
+    },
+    "rust": {
+      "outcome": "pass",
+      "expect": {
+        "exit": 3
+      }
+    },
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
+    },
+    "clif": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "failure_kind": "nonzero-exit",
+      "reason": "The clif-linked executable builds and runs but the `processus` exit route returns to the caller instead of ending the process, so the program aborts with `process exit returned unexpectedly` and exits 1 rather than the requested 3. This is the exit-status contract measured on the clif lane; re-measure this row when the clif lane carries the exit route.",
+      "expect": {
+        "exit_nonzero": true
+      }
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "undefined: process",
+      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:process` module this proof imports, so the generated `main.go` calls `process.*` with no such package-level identifier and `go build` stops with `undefined: process`. Re-measure this row when the Go package emitter lowers that module binding."
+    }
+  }
+}

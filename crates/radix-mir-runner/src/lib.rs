@@ -258,6 +258,23 @@ impl RunnerError {
             .map(|(_, value)| value.as_str())
     }
 
+    /// Process exit status of a run this error ends: the sysexits class of the
+    /// failure (`radix_runtime_contract::trap`). A leaf failure takes the class
+    /// of its `IoFault` variant (`fault_kind`; a leaf failure also carries the
+    /// conversion code, so the variant is read first), any other conversion
+    /// failure 65, and every other failure the program-logic class 70. The
+    /// class never comes from the message wording.
+    #[must_use]
+    pub fn exit_status(&self) -> i32 {
+        use radix_runtime_contract::trap::{TrapKind, exit_status, io_fault_kind};
+        let kind = match self.arg("fault_kind") {
+            Some(variant) => io_fault_kind(variant).unwrap_or(TrapKind::ProgramLogic),
+            None if self.is_conversion_failure() => TrapKind::Conversion,
+            None => TrapKind::ProgramLogic,
+        };
+        exit_status(kind)
+    }
+
     fn is_conversion_failure(&self) -> bool {
         // WHY: parse failures ("... conversion failed") and width-overflow
         // failures ("... conversion out of range", SA-002) are both recoverable
@@ -4302,6 +4319,10 @@ mod lib_test;
 #[cfg(test)]
 #[path = "copy_into_test.rs"]
 mod copy_into_test;
+
+#[cfg(test)]
+#[path = "exit_status_test.rs"]
+mod exit_status_test;
 
 #[cfg(test)]
 #[path = "tensor_fill_test.rs"]

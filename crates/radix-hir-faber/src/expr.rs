@@ -330,6 +330,21 @@ impl super::FaberCodegen<'_> {
                     writer.write(close);
                 }
             }
+            HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
+                if type_args.is_empty()
+                    && args.is_empty()
+                    && self.radical_quarta_ids.contains(&expr.id)
+                    && Self::radical_quarta_operand(receiver).is_some() =>
+            {
+                // Authored `∜ x`: lowering nested two `radix` calls and
+                // recorded only the outer id. The operand sits under the
+                // inner call, and the glyph is the authored surface. A
+                // radical binds like unary `-`.
+                if let Some(operand) = Self::radical_quarta_operand(receiver) {
+                    writer.write("∜ ");
+                    self.write_expr_prec(operand, 12, names, surface, writer);
+                }
+            }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
                 if type_args.is_empty()
                     && args.is_empty()
@@ -997,6 +1012,10 @@ impl super::FaberCodegen<'_> {
                 }
             }
             HirExpressionKind::Scriptum(template, args) => {
+                // Named holes: the authored text (with its `§{label}` holes)
+                // and the authored actual labels replace the erased form.
+                let authored = self.template_holes.get(&expr.id);
+                let template = authored.map_or(*template, |holes| holes.template);
                 if surface.preserve_template_application_sugar() {
                     // Reader-locale emit keeps the author postfix glyph
                     // `"template"(arg, …)`: keyword spellings localize but the
@@ -1004,19 +1023,13 @@ impl super::FaberCodegen<'_> {
                     // program re-renders with only its spellings changed.
                     // The template keeps `«…»` when its text holds `"` or a
                     // newline, exactly like a plain `textus` literal.
-                    self.write_textus_literal(*template, writer);
-                    writer.write("(");
-                    for (idx, arg) in args.iter().enumerate() {
-                        if idx > 0 {
-                            writer.write(", ");
-                        }
-                        self.write_expr(arg, names, surface, writer);
-                    }
-                    writer.write(")");
+                    self.write_textus_literal(template, writer);
+                    let refs: Vec<&HirExpression> = args.iter().collect();
+                    self.write_template_actuals(&refs, authored, names, surface, writer);
                 } else {
                     writer.write(surface.contextual_keyword("scriptum"));
                     writer.write("(");
-                    self.write_textus_literal(*template, writer);
+                    self.write_textus_literal(template, writer);
                     for arg in args {
                         writer.write(", ");
                         self.write_expr(arg, names, surface, writer);
@@ -1562,7 +1575,7 @@ impl super::FaberCodegen<'_> {
             .type_to_faber_at(&site, target, names, surface)
             .unwrap_or_else(|error| self.record_type_emission_error(error));
         if let Some(entries) = entries {
-            if self.write_forma_capture(entries, target, names, surface, writer) {
+            if self.write_forma_capture(owner, entries, target, names, surface, writer) {
                 return;
             }
 
@@ -1675,6 +1688,7 @@ impl super::FaberCodegen<'_> {
     /// Re-emit builtin `forma` template capture as backtick syntax when possible.
     fn write_forma_capture(
         &self,
+        owner: radix_hir::HirId,
         entries: &[HirObjectField],
         target: TypeId,
         names: &FxHashMap<DefId, Symbol>,
@@ -1726,6 +1740,8 @@ impl super::FaberCodegen<'_> {
             None => None,
         };
 
+        let authored = self.template_holes.get(&owner);
+        let sym = authored.map_or(sym, |holes| &holes.template);
         writer.write("`");
         // Raw payload: `writer.write` would re-indent every content line by the
         // enclosing block level, and the re-indented text is part of the raw
@@ -1735,16 +1751,45 @@ impl super::FaberCodegen<'_> {
         if let Some(param_exprs) = param_exprs
             && !param_exprs.is_empty()
         {
-            writer.write("(");
-            for (idx, expr) in param_exprs.iter().enumerate() {
-                if idx > 0 {
-                    writer.write(", ");
-                }
-                self.write_expr(expr, names, surface, writer);
-            }
-            writer.write(")");
+            self.write_template_actuals(&param_exprs, authored, names, surface, writer);
         }
         true
+    }
+
+    /// The actual list of a template application: `(a, b)` positional, or
+    /// `(label: a, …)` in authored order when the application recorded labels.
+    fn write_template_actuals(
+        &self,
+        args: &[&HirExpression],
+        authored: Option<&radix_hir::HirTemplateHoles>,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        writer.write("(");
+        match authored {
+            Some(holes) if !holes.labeled_actuals.is_empty() => {
+                for (idx, (label, position)) in holes.labeled_actuals.iter().enumerate() {
+                    if idx > 0 {
+                        writer.write(", ");
+                    }
+                    writer.write(&self.symbol_to_string(*label));
+                    writer.write(": ");
+                    if let Some(arg) = args.get(*position as usize).copied() {
+                        self.write_expr(arg, names, surface, writer);
+                    }
+                }
+            }
+            _ => {
+                for (idx, arg) in args.iter().enumerate() {
+                    if idx > 0 {
+                        writer.write(", ");
+                    }
+                    self.write_expr(arg, names, surface, writer);
+                }
+            }
+        }
+        writer.write(")");
     }
 
     fn write_handled_expr(
@@ -2291,6 +2336,20 @@ impl super::FaberCodegen<'_> {
             (spelling == canonical || localized.as_deref() == Some(spelling.as_str()))
                 .then_some((open, close))
         })
+    }
+
+    /// The operand of an authored `∜`: the receiver of the inner `radix` call
+    /// under the recorded outer call, or `None` when the shape no longer
+    /// matches (the id then falls back to the nested method-call spelling).
+    fn radical_quarta_operand(inner: &HirExpression) -> Option<&HirExpression> {
+        match &inner.kind {
+            HirExpressionKind::MethodCall(operand, _, type_args, args, _)
+                if type_args.is_empty() && args.is_empty() =>
+            {
+                Some(operand)
+            }
+            _ => None,
+        }
     }
 
     /// The glyph prefix of a radical twin (`radix` square root, `radix_cubica`

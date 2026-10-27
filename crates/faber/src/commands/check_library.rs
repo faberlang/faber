@@ -248,6 +248,6 @@ pub(super) fn cmd_check_library(args: CheckLibraryArgs) {
     if fatal == 0 {
         eprintln!("ok: {}", checkout.name);
     } else {
-        std::process::exit(1);
+        faber_cli::exit_status::exit_data_error();
     }
 }

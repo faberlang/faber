@@ -96,8 +96,11 @@ fn textus_embed_rejects_invalid_utf8() {
 #[test]
 fn octeti_embed_folds_to_raw_bytes() {
     let config = config_with("logo.bin", InsereSource::Bytes(vec![0x00, 0xff, 0x10]));
-    let (value, interner) =
-        static_value("fixum octeti LOGO = insere \"logo.bin\"\n", config, "LOGO");
+    let (value, interner) = static_value(
+        "fixum lista<b8> LOGO = insere \"logo.bin\"\n",
+        config,
+        "LOGO",
+    );
     let HirExpressionKind::Literal(HirLiteral::Octeti(sym)) = value.kind else {
         panic!("expected octeti literal, got {:?}", value.kind);
     };
@@ -107,7 +110,7 @@ fn octeti_embed_folds_to_raw_bytes() {
 #[test]
 fn octeti_embed_accepts_invalid_utf8() {
     let config = config_with("raw.bin", InsereSource::Bytes(vec![0xff, 0xfe]));
-    let _ = static_value("fixum octeti RAW = insere \"raw.bin\"\n", config, "RAW");
+    let _ = static_value("fixum lista<b8> RAW = insere \"raw.bin\"\n", config, "RAW");
 }
 
 #[test]

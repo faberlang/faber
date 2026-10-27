@@ -204,8 +204,8 @@ fn manifest_check_unknown_key_fails_closed() {
     );
     assert_eq!(
         code,
-        Some(1),
-        "fatal manifest diagnostic exits 1:\n{stderr}"
+        Some(78),
+        "fatal manifest diagnostic exits 78:\n{stderr}"
     );
     assert!(
         stderr.contains("bogus-budget"),

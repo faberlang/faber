@@ -72,6 +72,7 @@ fn mir_function_names(program: &crate::mir::MirProgram, interner: &crate::lexer:
 fn gt19_session() -> Session {
     Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::MirFmirBinary)
             .with_dev_locale_root(),
     )

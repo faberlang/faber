@@ -149,10 +149,6 @@ pub enum FaberCliTarget {
     /// Source-independent package MIR binary image.
     #[value(name = "fmir")]
     MirFmirBinary,
-
-    /// Direct runnable binary wrapper with embedded package MIR image bytes.
-    #[value(name = "fmir-bin")]
-    MirFmirBundle,
 }
 
 impl FaberCliTarget {
@@ -188,7 +184,6 @@ impl FaberCliTarget {
             FaberCliTarget::MirScena => Target::MirScena,
             FaberCliTarget::MirFmir => Target::MirFmir,
             FaberCliTarget::MirFmirBinary => Target::MirFmirBinary,
-            FaberCliTarget::MirFmirBundle => Target::MirFmirBundle,
         }
     }
 }

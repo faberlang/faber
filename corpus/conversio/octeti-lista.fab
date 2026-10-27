@@ -4,29 +4,29 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Boundary bridge from octeti to lista<u8>."
-syntax = "<octeti> ↦ list<u8>"
+summary = "Boundary bridge from list<b8> to lista<u8>."
+syntax = "list<b8> ↦ list<u8>"
 related = ["↦", "octeti", "lista", "numerus"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — Boundary bridge from octeti to lista<u8>.
+# ↦ — Boundary bridge from list<b8> to lista<u8>.
 # =============================================================================
 #
 # What this teaches:
-#   • Representation change — `bytes ↦ list<u8>` copies the buffer once.
-#   • Symmetric reverse — `list<u8> ↦ bytes` is the live lista → octeti direction.
-#   • One endian host — endian windows stay on octeti; lists are for element work.
+#   • Representation change — `list<b8> ↦ list<u8>` copies the buffer once.
+#   • Symmetric reverse — `list<u8> ↦ list<b8>` is the live lista → list<b8> direction.
+#   • One endian host — endian windows stay on list<b8>; lists are for element work.
 #
 # Common mistakes:
-#   • Detouring through valor (`bytes ↦ value ↦ list<int>`) instead of the bulk bridge.
-#   • Treating `bytes ↦ list<int>` (unsized) as the same convert — only u8 elements.
+#   • Detouring through valor (`list<b8> ↦ value ↦ list<int>`) instead of the bulk bridge.
+#   • Treating `list<b8> ↦ list<int>` (unsized) as the same convert — only u8 elements.
 #
-# See also: ↦, octeti, lista, numerus
+# See also: ↦, list<b8>, lista, numerus
 # =============================================================================
 
 
-# conversio — octeti ↦ lista<u8>
+# conversio — list<b8> ↦ lista<u8>
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' 'list' '<' 'int' '<' 'u8' '>' '>'

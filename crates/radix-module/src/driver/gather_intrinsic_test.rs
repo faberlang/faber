@@ -26,7 +26,7 @@ use crate::mir::{
     BufferHost, MirCollectionOp, MirIntrinsic, MirRuntimeCall, MirStatementKind, RunSourceError, run_source,
 };
 use crate::semantic::{self, PassConfig};
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 use radix_mir::device_program_plans::transformer_shape_signature;
 use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_types::Type;
@@ -48,6 +48,7 @@ fn air_lower_errors(source: &str) -> Vec<crate::air::AirLowerError> {
 fn runner_session() -> Session {
     Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_dev_locale_root(),
     )
@@ -364,7 +365,7 @@ incipit {
 
     // Driver compile to a MIR-backed target stays green.
     let result = compile(
-        &test_session(Target::MirLlvm),
+        &test_session_la(Target::MirLlvm),
         "tensor_get_slice.fab",
         source,
         ModuleCompileRequest::default(),

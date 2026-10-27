@@ -187,8 +187,6 @@ nihil = "कुछनहीं"
 vacuum = "रिक्त"
 numquam = "कभीनहीं"
 ignotum = "अज्ञात"
-octeti = "बाइट"
-octetus = "बाइट_मान"
 # Tensor edge-policy markers (`limes<P>()`): pin / wrap-around / mirror at the border.
 clampa = "किनारा_स्थिर"
 reflexa = "किनारा_परावर्तन"
@@ -201,7 +199,7 @@ instans = "क्षण"
 objectum = "वस्तु"
 quidlibet = "कुछभी"
 lista = "सूची"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
 tabula = "तालिका"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "बही"
@@ -260,7 +258,7 @@ message = "समाप्त न हुआ backtick template literal"
 help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
 
 [diagnostics.LEX001.issues.unterminated_octeti_literal]
-message = "समाप्त न हुआ octeti literal"
+message = "समाप्त न हुआ {lista}<b8> literal"
 help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
 
 [diagnostics.LEX001.issues.unterminated_regex_literal]
@@ -805,7 +803,7 @@ help = "संकेत को लक्ष्य के बाद via उपव
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "रूपांतरण संकेत लक्ष्य के बाद कोणीय कोष्ठकों में नहीं आता"
-help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `octeti<16> via Le`"
+help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `{lista}<b8, 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "अभिव्यक्ति अपेक्षित है"
@@ -1383,17 +1381,13 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "statement lowering से पहले object destructuring को expand किया जाना चाहिए"
 help = "lowering के लिए AST construct ठीक करें"
 
-[diagnostics.SEM008.issues.retired_byte_word]
-message = "शब्द byte retire हो गया है: raw bits के लिए b8 या संख्या के लिए u8 लिखें"
-help = "raw byte के लिए b8 (byte string के लिए lista<b8>) या संख्यात्मक byte के लिए u8 उपयोग करें"
-
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker ms या us जैसे bare spelling में होना चाहिए"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type parameters स्वीकार नहीं कर सकता"
-help = "textus<N>, ascii<N>, और octeti<N> shipped bounded forms हैं"
+help = "textus<N>, ascii<N>, और {lista}<b8, N> shipped bounded forms हैं"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type namespace द्वारा export नहीं किया गया है"
@@ -2376,16 +2370,16 @@ message = "यह लूप `{binding}` पर चलता है, इसलि
 help = "किसी तत्व को बदलने के लिए ब्रैकेट स्टोर लिखें, या कार्य-सूची के लिए {dum} के साथ {queue} का उपयोग करें"
 
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
-message = "octeti literal में अमान्य character '{character}' है"
-help = "octeti literals में केवल hexadecimal digits का उपयोग करें"
+message = "{lista}<b8> literal में अमान्य character '{character}' है"
+help = "{lista}<b8> literals में केवल hexadecimal digits का उपयोग करें"
 
 [diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
-message = "octeti literal में hexadecimal digits की संख्या विषम है"
-help = "octeti literals में पूर्ण byte pairs दें"
+message = "{lista}<b8> literal में hexadecimal digits की संख्या विषम है"
+help = "{lista}<b8> literals में पूर्ण byte pairs दें"
 
 [diagnostics.SEM011.issues.octeti_literal_template_application]
-message = "octeti literals template application समर्थित नहीं करते"
-help = "octeti literal calls के बजाय textus formatting का उपयोग करें"
+message = "{lista}<b8> literals template application समर्थित नहीं करते"
+help = "{lista}<b8> literal calls के बजाय textus formatting का उपयोग करें"
 
 [diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
 message = "{method} अधिकतम एक payload type argument स्वीकार करती है"
@@ -2481,7 +2475,7 @@ help = "textus को numerus या integer range से index करें"
 
 [diagnostics.SEM011.issues.window_requires_list]
 message = "window [lo‥hi] के लिए list आवश्यक है"
-help = "window [lo‥hi] केवल lista, textus या octeti value से लें"
+help = "window [lo‥hi] केवल lista, textus या {lista}<b8> value से लें"
 
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index numerus होना चाहिए"
@@ -2656,7 +2650,7 @@ message = "intervallum clamp के लिए समान bound प्रका
 help = "source और target bound element प्रकारों को समान करें"
 
 [diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
-message = "sermo materialization लक्ष्य समर्थित नहीं है; vacuum, valor, scalar (numerus, fractus, bivalens, textus, ascii, octeti, instans), या lista<T> अपेक्षित है"
+message = "sermo materialization लक्ष्य समर्थित नहीं है; vacuum, valor, scalar (numerus, fractus, bivalens, textus, ascii, {lista}<b8>, instans), या lista<T> अपेक्षित है"
 help = "समर्थित sermo materialization लक्ष्य चुनें"
 
 [diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
@@ -2704,7 +2698,7 @@ message = "cursor से valor रूपांतरण eager/lazy boundary प�
 help = "boundary पार करने से पहले cursor को lista के माध्यम से materialize करें"
 
 [diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
-message = "numerus, fractus, या bivalens से octeti में रूपांतरण निर्दिष्ट नहीं है (byte width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
+message = "numerus, fractus, या bivalens से {lista}<b8> में रूपांतरण निर्दिष्ट नहीं है (byte width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
@@ -2720,11 +2714,11 @@ message = "bit width बदलने वाले bits list conversion को vi
 help = "conversion के साथ byte order लिखें, जैसे lista<b8> ↦ lista<u16> via Le; same-width conversion कोई clause नहीं लेता"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
-message = "octeti से numerus में रूपांतरण निर्दिष्ट नहीं है (byte width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
+message = "{lista}<b8> से numerus में रूपांतरण निर्दिष्ट नहीं है (byte width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
 
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
-message = "octeti से fractus में रूपांतरण निर्दिष्ट नहीं है (IEEE width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
+message = "{lista}<b8> से fractus में रूपांतरण निर्दिष्ट नहीं है (IEEE width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
@@ -2737,7 +2731,7 @@ help = "via के बाद Hex, Bin, Oct, Be, Le, या Code में से
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "यह रूपांतरण लक्ष्य कोई रूपांतरण संकेत नहीं लेता"
-help = "via उपवाक्य हटाएं; केवल numeric, ascii, littera, vector, और octeti<N> लक्ष्य संकेत लेते हैं"
+help = "via उपवाक्य हटाएं; केवल numeric, ascii, littera, vector, और {lista}<b8, N> लक्ष्य संकेत लेते हैं"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "float या decimal rounding का नाम दिए बिना integer में convert नहीं होता"
@@ -2752,7 +2746,7 @@ message = "valor से या valor में बदली गई map कुं
 help = "map को textus कुंजियों के साथ लिखें; रूपांतरण कुंजियों को कभी parse नहीं करता, और class पर `@ json` wire mapping परिभाषित करता है"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
-message = "octeti से bivalens में रूपांतरण का कोई default अर्थ नहीं है; textus में decode करें या bytes की स्पष्ट तुलना करें"
+message = "{lista}<b8> से bivalens में रूपांतरण का कोई default अर्थ नहीं है; textus में decode करें या {lista}<b8> की स्पष्ट तुलना करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
 
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
@@ -2921,19 +2915,19 @@ help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`,
 
 [diagnostics.SEM018.issues.empty_radix_typus_domain]
 message = "@ radix typus domain में कम से कम एक अनुमत type आवश्यक है"
-help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus {lista}<b8>` या braced `{radix_typus_braced}` का उपयोग करें"
 
 [diagnostics.SEM018.issues.missing_type_param]
 message = "@ radix typus के लिए generic type parameter आवश्यक है"
-help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus {lista}<b8>` या braced `{radix_typus_braced}` का उपयोग करें"
 
 [diagnostics.SEM018.issues.non_identifier_type_param]
 message = "@ radix typus parameter identifier होना चाहिए"
-help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus {lista}<b8>` या braced `{radix_typus_braced}` का उपयोग करें"
 
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "@ radix typus allowed value type होना चाहिए"
-help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus {lista}<b8>` या braced `{radix_typus_braced}` का उपयोग करें"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "अज्ञात @ radix directive; `lane` अपेक्षित है"
@@ -3547,6 +3541,13 @@ help = "उद्धरण चिह्नों वाले पाठ के �
 message = "यह स्ट्रिंग `\\\"` को एस्केप करती है; इसे «…» में लिखें, किसी एस्केप की ज़रूरत नहीं"
 help = "उद्धरण चिह्नों वाले पाठ के लिए «...» का उपयोग करें"
 
+[diagnostics.WARN035]
+message = "इस टेम्पलेट में सादे और क्रमांकित प्लेसहोल्डर मिले हुए हैं; सादे प्लेसहोल्डर ये पढ़ते हैं: {reads}"
+help = "हर प्लेसहोल्डर को क्रमांक दें (`§0`, `§1`, …) ताकि हर एक वही आर्ग्युमेंट पढ़े जो आप चाहते हैं"
+
+[diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
+message = "इस टेम्पलेट में सादे और क्रमांकित प्लेसहोल्डर मिले हुए हैं; सादे प्लेसहोल्डर ये पढ़ते हैं: {reads}"
+help = "हर प्लेसहोल्डर को क्रमांक दें (`§0`, `§1`, …) ताकि हर एक वही आर्ग्युमेंट पढ़े जो आप चाहते हैं"
 
 [llm]
 system_prompt_snippet = "Emit Hindi reader-locale Faber using Hindi keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged. जब किसी स्ट्रिंग में उद्धरण चिह्न (\" या ') हो, तो उसे «…» से लिखें: गुइलेमे को किसी एस्केप की आवश्यकता नहीं होती।"

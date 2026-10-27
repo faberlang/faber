@@ -1268,7 +1268,7 @@ fn non_callable_callee_uses_structured_issue_arg() {
 #[test]
 fn invalid_conversion_uses_structured_issue_arg() {
     test_support::assert_rejects_with_issue(
-        "incipit { nota 1 ↦ octeti }",
+        "incipit { nota 1 ↦ lista<b8> }",
         "numeric_to_octeti_unspecified",
     );
 }

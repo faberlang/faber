@@ -125,13 +125,13 @@ pub(crate) struct CostSpanJson {
 pub(super) fn cmd_cost(args: CostArgs) {
     if args.input.is_empty() || args.input[0] == "-" {
         eprintln!("error: package cost requires a path input");
-        std::process::exit(1);
+        faber_cli::exit_status::exit_usage();
     }
     let min_class = match parse_min_class(&args.min_class) {
         Ok(class) => class,
         Err(message) => {
             eprintln!("error: {message}");
-            std::process::exit(1);
+            faber_cli::exit_status::exit_usage();
         }
     };
     let input = package::absolutize_path(Path::new(&args.input[0]));
@@ -156,7 +156,7 @@ pub(super) fn cmd_cost(args: CostArgs) {
         }
         Err(diagnostics) => {
             super::eprint_compile_diagnostics(&diagnostics);
-            std::process::exit(1);
+            faber_cli::exit_status::exit_for_diagnostics(&diagnostics);
         }
     }
 }

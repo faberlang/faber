@@ -5,8 +5,11 @@ use super::extract_file_interface_with_identity;
 use radix_module::driver::{AnalyzeRequest, Config, ModuleImportContract, Session, analyze_source};
 
 fn export_of(source: &str) -> String {
-    let session =
-        Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(radix_module::codegen::Target::HirRust),
+    );
     let analysis = analyze_source(
         &session,
         "consts.fab",

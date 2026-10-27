@@ -4,66 +4,66 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "inline_default", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Text and byte conversio between textus, ascii, and octeti."
-syntax = "<expression> ↦ octeti | <expression> ↦ textus | <expression> ↦ ascii"
+summary = "Text and byte conversio between textus, ascii, and list<b8>."
+syntax = "<expression> ↦ list<b8> | <expression> ↦ textus | <expression> ↦ ascii"
 related = ["↦", "octeti", "textus", "chorda"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — Text and byte conversio between textus, ascii, and octeti.
+# ↦ — Text and byte conversio between textus, ascii, and list<b8>.
 # =============================================================================
 #
 # What this teaches:
-#   • Text↔byte bridges — `textus ↦ octeti` (UTF-8 encode), `ascii ↦ octeti` (ASCII encode), `octeti ↦ textus` (UTF-8 decode), `octeti ↦ ascii` (ASCII narrow).
+#   • Text↔byte bridges — `textus ↦ list<b8>` (UTF-8 encode), `ascii ↦ list<b8>` (ASCII encode), `list<b8> ↦ textus` (UTF-8 decode), `list<b8> ↦ ascii` (ASCII narrow).
 #   • Fallible decoding — byte-to-text conversions can fail on invalid bytes; recover with a `⊥` default.
 #   • Stdlib foundation — these language-level bridges are what stdlib's chorda mechanical trio (pange/solve/tempta) builds on.
 #
 # Common mistakes:
-#   • Assuming `octeti ↦ textus` always succeeds — invalid UTF-8 bytes require a `⊥` recovery value.
+#   • Assuming `list<b8> ↦ textus` always succeeds — invalid UTF-8 bytes require a `⊥` recovery value.
 #
-# See also: ↦, octeti, textus, chorda
+# See also: ↦, list<b8>, textus, chorda
 # =============================================================================
 
 
-# conversio — textus/ascii ↔ octeti (byte conversions)
+# conversio — textus/ascii ↔ list<b8> (byte conversions)
 #
-# WHY: `↦ octeti` and `↦ textus`/`↦ ascii` are the standard Faber conversion
+# WHY: `↦ list<b8>` and `↦ textus`/`↦ ascii` are the standard Faber conversion
 # paths between text and bytes. They are the language-level bridge that the
 # stdlib's chorda mechanical trio (pange/solve/tempta) builds on, not a
 # competitor to it. See DEFER-029 and docs/factory/octeti-unify-lista/.
 #
-# textus ↦ octeti: UTF-8 encode (lossless; String is already UTF-8 in Rust).
-# ascii  ↦ octeti: ASCII encode (lossless; ASCII is a strict subset of UTF-8).
-# octeti ↦ textus: UTF-8 decode (can fail on invalid bytes; use `⊥` for a default).
-# octeti ↦ ascii:  ASCII narrow (can fail on any byte ≥ 128; use `⊥`).
+# textus ↦ list<b8>: UTF-8 encode (lossless; String is already UTF-8 in Rust).
+# ascii  ↦ list<b8>: ASCII encode (lossless; ASCII is a strict subset of UTF-8).
+# list<b8> ↦ textus: UTF-8 decode (can fail on invalid bytes; use `⊥` for a default).
+# list<b8> ↦ ascii:  ASCII narrow (can fail on any byte ≥ 128; use `⊥`).
 
 main {
-    # textus → octeti (UTF-8 encode)
+    # textus → list<b8> (UTF-8 encode)
     let string hi ← "hi"
     let list<b8> enc ← hi ↦ list<b8>
     print enc.length()
 
-    # octeti → textus (UTF-8 decode, valid bytes)
+    # list<b8> → textus (UTF-8 decode, valid bytes)
     # "hi" in UTF-8
     let list<b8> raw ← |68 69|
     let string dec ← raw ↦ string
     print dec
 
-    # octeti → textus with recovery (invalid UTF-8 → recovery value)
+    # list<b8> → textus with recovery (invalid UTF-8 → recovery value)
     let list<b8> badUtf8 ← |ff ff|
     let string recovered ← badUtf8 ↦ string ⊥ "?"
     print recovered
 
-    # ascii → octeti
+    # ascii → list<b8>
     let ascii a ← 'hi'
     let list<b8> aenc ← a ↦ list<b8>
     print aenc.length()
 
-    # octeti → ascii (valid ASCII bytes)
+    # list<b8> → ascii (valid ASCII bytes)
     let ascii adec ← raw ↦ ascii
     print adec
 
-    # octeti → ascii with recovery (non-ASCII byte → recovery value)
+    # list<b8> → ascii with recovery (non-ASCII byte → recovery value)
     # A one-scalar ascii literal is ascii<1>, which does not assign to bare
     # ascii. Recovery for ↦ ascii must be bare ascii (a multi-char literal).
     let list<b8> nonAscii ← |ff|

@@ -187,7 +187,7 @@ fn text_truthiness_conversio_accepts_recovery_slot() {
 
 #[test]
 fn textus_to_octeti_conversio_typechecks() {
-    test_support::assert_accepts_la(r#"incipit { sit _ b ← "hi" ↦ octeti }"#);
+    test_support::assert_accepts_la(r#"incipit { sit _ b ← "hi" ↦ lista<b8> }"#);
 }
 
 #[test]
@@ -250,14 +250,14 @@ fn bounded_textus_conversio_accepts_inline_recovery() {
 #[test]
 fn octeti_variable_to_textus_conversio_stays_legal() {
     test_support::assert_accepts_la(
-        "incipit {\n  sit octeti b ← |68 69|\n  sit _ s ← b ↦ textus\n}",
+        "incipit {\n  sit lista<b8> b ← |68 69|\n  sit _ s ← b ↦ textus\n}",
     );
 }
 
 #[test]
 fn ascii_octeti_conversio_roundtrip_typechecks() {
     test_support::assert_accepts_la(
-        "incipit {\n  sit _ b ← 'hi' ↦ octeti\n  sit _ a ← b ↦ ascii\n}",
+        "incipit {\n  sit _ b ← 'hi' ↦ lista<b8>\n  sit _ a ← b ↦ ascii\n}",
     );
 }
 
@@ -269,7 +269,7 @@ fn octeti_textus_recovery_typechecks() {
 #[test]
 fn fractus_to_octeti_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit _ b ← 1.5 ↦ octeti }",
+        "incipit { sit _ b ← 1.5 ↦ lista<b8> }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -277,7 +277,7 @@ fn fractus_to_octeti_conversio_rejects() {
 #[test]
 fn bivalens_to_octeti_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit _ b ← verum ↦ octeti }",
+        "incipit { sit _ b ← verum ↦ lista<b8> }",
         "numeric_to_octeti_unspecified",
     );
 }
@@ -375,7 +375,7 @@ fn primitive_conversio_matrix_cases() -> &'static [ConversioMatrixCase] {
         },
         ConversioMatrixCase {
             name: "numerus_to_octeti",
-            source: "incipit { sit _ b ← 42 ↦ octeti }",
+            source: "incipit { sit _ b ← 42 ↦ lista<b8> }",
             expect: MatrixExpect::RejectsIssue("numeric_to_octeti_unspecified"),
         },
         ConversioMatrixCase {
@@ -1262,7 +1262,7 @@ fn sermo_materialize_to_textus_typechecks() {
 #[test]
 fn sermo_materialize_to_octeti_typechecks() {
     test_support::assert_accepts_la(
-        r#"incipit { sit _ o ← ad 'runtime:echo' ("salve") ↦ octeti }"#,
+        r#"incipit { sit _ o ← ad 'runtime:echo' ("salve") ↦ lista<b8> }"#,
     );
 }
 
@@ -1328,7 +1328,7 @@ fn regex_literal_pattern_empty_accepts() {
 
 #[test]
 fn octeti_empty_literal_typechecks() {
-    test_support::assert_accepts_la("incipit { sit _ b ← || ↦ octeti }");
+    test_support::assert_accepts_la("incipit { sit _ b ← || ↦ lista<b8> }");
 }
 
 #[test]
@@ -2523,7 +2523,7 @@ fn policy_word_conversio_accepts_a_rounded_float_source() {
 fn via_lowercase_policy_words_accepted() {
     for source in [
         r#"incipit { sit _ n ← "ff" ↦ u32 via hex }"#,
-        "functio f(octeti corpus) → f32 { redde corpus[0‥4] ↦ f32 via le }",
+        "functio f(lista<b8> corpus) → f32 { redde corpus[0‥4] ↦ f32 via le }",
     ] {
         test_support::assert_accepts_la(source);
     }

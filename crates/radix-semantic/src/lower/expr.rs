@@ -29,7 +29,7 @@
 use super::{Lowerer, issue_args};
 use crate::builtins::forma::{self as builtin_forma};
 use crate::template_holes::{TemplateHoleAnalysis, analyze_template};
-use crate::{Primitive, SemanticErrorKind, TypeId};
+use crate::{Primitive, SemanticErrorKind, TypeId, WarningKind};
 use handroll::FxHashSet;
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
@@ -39,6 +39,10 @@ use radix_hir::{
 use radix_syntax::{
     BinaryExpr, Expr, ExprKind, GenericArgExpr, Literal, TypeExpr, TypeExprKind, UnaryExpr,
 };
+
+/// The authored form of a template application with named holes: the authored
+/// template text and the labeled actuals as `(label, positional slot)`.
+type TemplateAuthored = Option<(radix_lexer::Symbol, Vec<(radix_lexer::Symbol, u32)>)>;
 
 /// The parser's private method name for the source-only `ᵀ` suffix (the same
 /// spelling typecheck rewrites to the transpose intrinsic).
@@ -725,7 +729,10 @@ impl Lowerer<'_> {
                     return HirExpressionKind::Error;
                 }
                 match self.lower_template_application(*template, &call.args) {
-                    Some((erased, args)) => HirExpressionKind::Scriptum(erased, args),
+                    Some((erased, args, authored)) => {
+                        self.record_template_holes(id, authored);
+                        HirExpressionKind::Scriptum(erased, args)
+                    }
                     None => HirExpressionKind::Error,
                 }
             }
@@ -734,7 +741,10 @@ impl Lowerer<'_> {
                     return HirExpressionKind::Error;
                 }
                 match self.lower_template_application(*template, &call.args) {
-                    Some((erased, args)) => self.lower_forma_capture(erased, args),
+                    Some((erased, args, authored)) => {
+                        self.record_template_holes(id, authored);
+                        self.lower_forma_capture(erased, args)
+                    }
                     None => HirExpressionKind::Error,
                 }
             }
@@ -1086,7 +1096,7 @@ impl Lowerer<'_> {
         &mut self,
         template: radix_lexer::Symbol,
         args: &[radix_syntax::Argument],
-    ) -> Option<(radix_lexer::Symbol, Vec<HirExpression>)> {
+    ) -> Option<(radix_lexer::Symbol, Vec<HirExpression>, TemplateAuthored)> {
         let call_span = self.current_span;
         let text = self.interner.resolve(template).to_owned();
         let analysis = analyze_template(&text);
@@ -1094,6 +1104,17 @@ impl Lowerer<'_> {
             .iter()
             .map(|arg| (arg.label, lower_expr(self, &arg.value)))
             .collect();
+
+        if let Some(reads) = analysis.plain_numbered_mix() {
+            self.push_error(
+                SemanticErrorKind::Warning(WarningKind::MixedTemplateHoles),
+                vec![
+                    DiagnosticArg::new("issue", "mixed_plain_numbered_template_holes"),
+                    DiagnosticArg::new("reads", reads),
+                ],
+                call_span,
+            );
+        }
 
         let mut ok = true;
         let has_labeled = lowered.iter().any(|(label, _)| label.is_some());
@@ -1181,12 +1202,38 @@ impl Lowerer<'_> {
 
         // Template text is a string payload: keep source bytes (no NFKC).
         let erased = self.interner.intern_raw(&analysis.erased);
+        // Authored form for re-emission: only a template with named holes
+        // differs from its erased text, and labeled actuals are listed in
+        // authored order with the positional slot each one fills.
+        let labeled_actuals: Vec<(radix_lexer::Symbol, u32)> = lowered
+            .iter()
+            .filter_map(|(label, _)| {
+                let label = (*label)?;
+                let position = analysis.label_position(self.interner.resolve(label))?;
+                Some((label, u32::try_from(position).ok()?))
+            })
+            .collect();
+        let authored = (analysis.erased != text).then_some((template, labeled_actuals));
         let positional = if has_labeled {
             self.reorder_labeled_actuals(&analysis, lowered)?
         } else {
             lowered.into_iter().map(|(_, expr)| expr).collect()
         };
-        Some((erased, positional))
+        Some((erased, positional, authored))
+    }
+
+    /// Record the authored template text and actual labels of the application
+    /// `id` when its holes were named, so Faber re-emission restores them.
+    fn record_template_holes(&mut self, id: radix_hir::HirId, authored: TemplateAuthored) {
+        if let Some((template, labeled_actuals)) = authored {
+            self.presentation
+                .template_holes
+                .push(radix_hir::HirTemplateHoles {
+                    expr: id,
+                    template,
+                    labeled_actuals,
+                });
+        }
     }
 
     /// Place labeled actuals into the positional vector the backends already consume.

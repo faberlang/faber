@@ -1,0 +1,53 @@
+3
+abc
+0
+
+
+abc
+5
+event: tick
+id: 7
+data: one
+data: two
+
+
+1
+tick
+one
+two
+7
+0
+true
+true
+false
+2
+text/html
+["text/html", "application/json"]
+GET
+/search
+q=a%20b&n=2
+a b
+2
+true
+text/html
+true
+true
+false
+false
+false
+false
+test
+true
+true
+true
+true
+example.com
+8080
+true
+false
+example.com:8080
+example.com
+/a/b?x=1
+/p
+0
+1

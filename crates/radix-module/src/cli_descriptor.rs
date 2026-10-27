@@ -11,7 +11,7 @@
 //! (Checkpoint B).
 //!
 //! The descriptor is a compact, deterministic byte encoding. Radix owns only
-//! the encoder; the Faber LLVM host (`hosts/llvm/src/cli.rs`) owns the decoder
+//! the encoder; the Faber LLVM host runtime (its `cli` module) owns the decoder
 //! and is the decode authority for this format. The wire format is pinned here
 //! by the byte layout below and the golden byte fixtures in the companion
 //! tests, so an encoder change that would break the host fails loudly.

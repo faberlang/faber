@@ -17,7 +17,12 @@ const FLOAT_LITERAL_POW: &str = r"incipit {
 }";
 
 fn compile(target: Target, source: &str) -> crate::Output {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
     assert!(result.success(), "compilation failed: {:?}", result.diagnostics);
     result.output.expect("output")

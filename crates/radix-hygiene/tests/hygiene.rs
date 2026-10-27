@@ -520,7 +520,7 @@ fn is_rust_test_file(path: &Path) -> bool {
             .expect("radix-hygiene lives under crates/"),
         path,
     )
-    .starts_with("crates/exempla/src/exempla_e2e/")
+    .starts_with("crates/corpus-matrix/src/exempla_e2e/")
     {
         return true;
     }
@@ -572,7 +572,7 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // message for the category slug. Missing field: the capability
         // category as a diagnostic arg on the llvm_emission_failed diagnostic
         // (radix-program/src/llvm.rs).
-        || rel == "crates/exempla/src/exempla_e2e/llvm.rs"
+        || rel == "crates/corpus-matrix/src/exempla_e2e/llvm.rs"
         // radix-air reverse-AD call graph: `CallGraphCycleError` carries
         // `functions` and `message` only. Missing field: a kind/issue
         // distinguishing cross-package call, mutual-recursion cycle and

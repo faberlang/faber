@@ -817,7 +817,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 Value::Octeti(_) | Value::Array(_) => self.convert_to_octeti(value, span),
                 _ => Err(RunnerError::conversion(
                     span,
-                    "valor to octeti conversion failed",
+                    "valor to list<b8> conversion failed",
                 )),
             },
             Type::Primitive(Primitive::Ascii) => match value {

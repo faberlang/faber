@@ -1,0 +1,60 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for the strict reads of norma:value (find_part,
+# require_strings) and for the crossing-record conversion norma:fault
+# (io_fault_from). Output must match under `faber run` and a `faber build`
+# Rust binary.
+
+import from "norma:fault" fault
+import from "norma:toml" toml
+import from "norma:value" value
+
+fn kind_word(fault.IoFault f) → string {
+    match f {
+        case NotFound let path { return "NotFound:§"(path) }
+        case ConnectionRefused let path { return "ConnectionRefused:§"(path) }
+        default { return "other" }
+    }
+}
+
+main {
+    let value doc ← toml.parse("name = \"faber\"\nlang = \"fab\"\nn = 3\narr = [10, 20, 30]\n[server]\nport = 8080\n")
+
+    # find_part walks one map key, then a numeric segment of a list.
+    print value.find_part(doc, "name") ↦ string ⊥ "?"
+    print value.is_null(value.find_part(doc, "absent"))
+    print value.find_part(value.get(doc, "arr"), "1") ↦ int ⊥ -1
+    print value.is_null(value.find_part(value.get(doc, "arr"), "x"))
+    print value.is_null(value.find_part(value.get(doc, "n"), "x"))
+
+    # require_strings succeeds when every key is present and a string.
+    value.require_strings(doc, ["name", "lang"])
+    print "require_strings-ok"
+    mut string failure ← ""
+    do {
+        value.require_strings(doc, ["name", "n"])
+    }
+    catch err {
+        failure ← err
+    }
+    print failure
+    mut string missing ← ""
+    do {
+        value.require_strings(doc, ["name", "gone"])
+    }
+    catch err {
+        missing ← err
+    }
+    print missing
+
+    # io_fault_from selects the variant by the record's kind word and falls
+    # back to Io for an unknown one.
+    let value refused ← toml.parse("kind = \"ConnectionRefused\"\npath = \"127.0.0.1:1\"\n")
+    print kind_word(fault.io_fault_from(refused))
+    let value absent ← toml.parse("kind = \"NotFound\"\npath = \"/nope\"\n")
+    print kind_word(fault.io_fault_from(absent))
+    let value strange ← toml.parse("kind = \"Strange\"\npath = \"x\"\n")
+    print kind_word(fault.io_fault_from(strange))
+}

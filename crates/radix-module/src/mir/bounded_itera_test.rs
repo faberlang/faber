@@ -9,7 +9,7 @@ use crate::mir::MirLoweringOptions;
 use crate::mir::{dump_program, lower_analyzed_unit, validate_program};
 
 fn session() -> Session {
-    Session::new(Config::default())
+    Session::new(Config::default().with_latin_locale())
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
     );
 }
 
-// --- AEU-7: scalar bounded buffer forms (`octeti<N>` / `ascii<N>` / `textus<N>`)
+// --- AEU-7: scalar bounded buffer forms (`lista<b8, N>` / `ascii<N>` / `textus<N>`)
 
 /// Route B proof: the scalar buffers lower to the same live-prefix static
 /// split as `lista<T, N>` — a switch on the carrier `len` with N+1 arms, arm
@@ -175,8 +175,8 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
 fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
     let cases: [(&str, &str); 3] = [
         (
-            "octeti<8>",
-            r"functio visit(octeti<8> xs) → vacuum {
+            "lista<b8, 8>",
+            r"functio visit(lista<b8, 8> xs) → vacuum {
   itera ex xs sit b {
     nota b
   }

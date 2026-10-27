@@ -85,7 +85,7 @@ fn targets_reports_faber_package_capability_for_fmir_targets() {
     let (stdout, stderr, ok) = run_faber(&["targets"]);
     assert!(ok, "faber targets failed:\n{stderr}");
 
-    for target in ["fmir-text", "fmir", "fmir-bin"] {
+    for target in ["fmir-text", "fmir"] {
         let prefix = format!("{target} ");
         let row = stdout
             .lines()
@@ -389,6 +389,47 @@ target = "fmir-text"
     assert_no_generated_rust(&package);
 }
 
+/// `faber run` takes source, never a built image: a `.fmir` / `.fmir.txt`
+/// file is refused by name (never read as Faber source), and the package it
+/// was built from still runs.
+#[test]
+fn run_refuses_built_fmir_images_by_name() {
+    let package = write_basic_package("run-fmir-image", "main { print \"hi\" }");
+    let package_arg = package.to_str().expect("utf8 package path");
+
+    for (target, image, runner_hint) in [
+        ("fmir", "target/faber-mir/image.fmir", true),
+        ("fmir-text", "target/faber-mir/image.fmir.txt", false),
+    ] {
+        let (_, stderr, ok) = run_faber(&["build", "--target", target, package_arg]);
+        assert!(ok, "{target} build failed:\n{stderr}");
+        let image_path = package.join(image);
+        assert!(image_path.is_file(), "missing built image {image_path:?}");
+
+        let (stdout, stderr, status) =
+            run_faber_status(&["run", image_path.to_str().expect("utf8 image path")]);
+        assert!(!status.success(), "{target} image must be refused");
+        assert!(stdout.is_empty(), "refused run printed:\n{stdout}");
+        assert!(
+            stderr.contains("not a runnable input for `faber run`"),
+            "expected the refusal message, got:\n{stderr}"
+        );
+        assert_eq!(
+            stderr.contains("faber __fmir-run"),
+            runner_hint,
+            "image-runner hint mismatch for {target}:\n{stderr}"
+        );
+        assert!(
+            !stderr.contains("UTF-8"),
+            "must never report a decode error:\n{stderr}"
+        );
+    }
+
+    let (stdout, stderr, ok) = run_faber(&["run", package_arg]);
+    assert!(ok, "package run failed:\n{stderr}");
+    assert_eq!(stdout.trim(), "hi");
+}
+
 #[cfg(feature = "hir-rust")]
 #[test]
 fn build_reader_locale_accepts_direct_entry_file_input() {
@@ -541,7 +582,7 @@ fn run_reader_locale_accepts_direct_entry_file_input() {
 
 #[test]
 fn run_unhandled_failable_call_in_main_panics_with_the_error_message() {
-    // D17.8 (fi6c): a failure directly in `main` is a panic: exit code 1, the
+    // D17.8 (fi6c): a failure directly in `main` is a panic: exit code 70, the
     // output before it kept, and the error value reported on stderr.
     let source = write_single_file(
         "run-unhandled-failable-call-panics",
@@ -566,8 +607,8 @@ main {
 
     assert_eq!(
         status.code(),
-        Some(1),
-        "a panic exits with code 1:\n{stderr}"
+        Some(70),
+        "a panic exits with code 70:\n{stderr}"
     );
     assert_eq!(stdout, "2\n", "output before the panic is kept");
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: the runtime abort message is the CLI stderr contract.
@@ -1022,153 +1063,6 @@ fn build_reader_locale_forced_package_rejects_existing_non_package_file() {
         stderr.contains("--locale th-TH requires a package path or .fab entry file"),
         "expected reader-locale shape rejection, got:\n{stderr}"
     );
-}
-
-#[test]
-#[ignore = "builds a generated fmir-bin Rust runner with Cargo; run in periodic end-to-end coverage"]
-fn fmir_bin_package_forwards_runtime_arg_after_source_is_removed() {
-    let package = write_basic_package(
-        "fmir-bin-cli",
-        r#"
-@ cli "tool"
-@ operand string name
-incipit argumenta args {
-  nota "fmir-bin §!"(args.name)
-}
-"#,
-    );
-
-    let (build_stdout, build_stderr, build_ok) = run_faber(&[
-        "build",
-        "--target",
-        "fmir-bin",
-        package.to_str().expect("utf8 package path"),
-    ]);
-    assert!(build_ok, "fmir-bin build failed:\n{build_stderr}");
-    let entrypoint = PathBuf::from(build_stdout.trim());
-    assert_eq!(entrypoint, package.join("target/faber-mir/exe/run"));
-    assert!(
-        package.join("target/faber-mir/exe/image.fmir").exists(),
-        "expected colocated FMIR image"
-    );
-    let runner_manifest =
-        fs::read_to_string(package.join("target/faber-mir/exe/runner/Cargo.toml"))
-            .expect("read generated runner manifest");
-    assert!(
-        runner_manifest.contains(&format!(
-            r#"faber = {{ path = "{}", version = "={}" }}"#,
-            env!("CARGO_MANIFEST_DIR"),
-            env!("CARGO_PKG_VERSION")
-        )),
-        "runner manifest must pin the faber path dependency version:\n{runner_manifest}"
-    );
-
-    // `faber run` is interpreted execution and no longer executes built
-    // targets; the fmir-bin bundle is a self-contained artifact executed
-    // directly (compiled artifacts are built, never executed, by faber).
-    let (run_stdout, run_stderr, run_ok) = run_executable(&entrypoint, &["runtime"]);
-    assert!(run_ok, "fmir-bin entrypoint failed:\n{run_stderr}");
-    assert_eq!(run_stdout, "fmir-bin runtime!\n");
-
-    fs::remove_file(package.join("src/main.fab")).expect("remove source");
-    fs::remove_file(package.join("target/faber-mir/exe/image.fmir")).expect("remove sidecar image");
-    let _relocated_root = temp_dir("fmir-bin-relocated");
-    let relocated = _relocated_root.join("run");
-    fs::copy(&entrypoint, &relocated).expect("relocate entrypoint");
-    let (direct_stdout, direct_stderr, direct_ok) = run_executable(&relocated, &["runtime"]);
-    assert!(
-        direct_ok,
-        "relocated fmir-bin entrypoint failed after source and sidecar removal:\n{direct_stderr}"
-    );
-    assert_eq!(direct_stdout, run_stdout);
-    assert_no_generated_rust(&package);
-}
-
-#[test]
-#[ignore = "builds a generated fmir-bin Rust runner with Cargo; run in periodic end-to-end coverage"]
-fn fmir_bin_multifile_package_runs_after_source_mutation() {
-    let package = write_basic_package(
-        "fmir-bin-multifile",
-        r#"
-importa ex "./message" message
-
-@ cli "tool"
-@ operandus textus name
-incipit argumenta args {
-  nota message.text(args.name)
-}
-"#,
-    );
-    fs::write(
-        package.join("src/message.fab"),
-        r#"
-functio text(textus name) → textus {
-  redde "multi §!"(name)
-}
-"#,
-    )
-    .expect("write module");
-
-    let (build_stdout, build_stderr, build_ok) = run_faber(&[
-        "build",
-        "--target",
-        "fmir-bin",
-        package.to_str().expect("utf8 package path"),
-    ]);
-    assert!(build_ok, "fmir-bin build failed:\n{build_stderr}");
-    let entrypoint = PathBuf::from(build_stdout.trim());
-    fs::write(package.join("src/main.fab"), "incipit { nota \"mutated\" }").expect("mutate entry");
-    fs::write(
-        package.join("src/message.fab"),
-        "functio text(textus name) → textus { redde \"mutated\" }",
-    )
-    .expect("mutate module");
-
-    let (stdout, stderr, ok) = run_executable(&entrypoint, &["runtime"]);
-    assert!(ok, "direct fmir-bin entrypoint failed:\n{stderr}");
-    assert_eq!(stdout, "multi runtime!\n");
-    assert_no_generated_rust(&package);
-}
-
-#[test]
-#[ignore = "builds a generated fmir-bin Rust runner with Cargo; run in periodic end-to-end coverage"]
-fn fmir_bin_norma_fs_package_reads_file_after_source_is_removed() {
-    let package = write_basic_package(
-        "fmir-bin-solum",
-        r#"import from "norma:fs" fileio
-
-incipit {
-  nota fileio.lege<textus>("__PAYLOAD__")
-}
-"#,
-    );
-    let payload = package.join("payload.txt");
-    fs::write(&payload, "solum-ok").expect("write payload");
-    let source = fs::read_to_string(package.join("src/main.fab"))
-        .expect("read source")
-        .replace("__PAYLOAD__", &payload.to_string_lossy());
-    fs::write(package.join("src/main.fab"), source).expect("write source");
-
-    let library_home = norma_library_home();
-    let (build_stdout, build_stderr, build_ok) = run_faber_with_env(
-        &[
-            "build",
-            "--library-home",
-            library_home.to_str().expect("utf8"),
-            "--target",
-            "fmir-bin",
-            package.to_str().expect("utf8 package path"),
-        ],
-        &[],
-    );
-    assert!(build_ok, "fmir-bin build failed:\n{build_stderr}");
-    let entrypoint = PathBuf::from(build_stdout.trim());
-    fs::remove_file(package.join("src/main.fab")).expect("remove source");
-
-    let (stdout, stderr, ok) = run_executable(&entrypoint, &[]);
-    assert!(ok, "direct fmir-bin norma:fs entrypoint failed:\n{stderr}");
-    assert_eq!(stdout, "solum-ok\n");
-    assert_no_generated_rust(&package);
 }
 
 fn write_zip_archive(label: &str, entries: &[(&str, &str)]) -> TempPath {
@@ -2589,7 +2483,7 @@ import from "norma:fault" fault
 
 main {
   let _ partial ← (string msg) → void ⇥ fault.IoFault ∴ write_partial(msg)
-  let _ out_bytes ← (bytes data) → void ⇥ fault.IoFault ∴ write_bytes(data)
+  let _ out_bytes ← (list<b8> data) → void ⇥ fault.IoFault ∴ write_bytes(data)
   partial("P")
   out_bytes(|41|)
   partial(read_line() coalesce "")
@@ -2699,7 +2593,7 @@ main {
     mut int reads ← 0
     mut bool done ← false
     while (not done) and reads ≺ 10 {
-        let bytes ∪ none chunk ← read_bytes(4)
+        let list<b8> ∪ none chunk ← read_bytes(4)
         if chunk is none {
             done ← true
         }
@@ -2708,7 +2602,7 @@ main {
         }
     }
     print reads
-    let bytes ∪ none zero ← read_bytes(0)
+    let list<b8> ∪ none zero ← read_bytes(0)
     mut bool absent ← false
     if zero is none {
         absent ← true
@@ -2751,9 +2645,10 @@ fn run_accepts_a_fitting_constant_argument_for_a_narrow_parameter() {
 }
 
 #[test]
-fn run_panic_prints_abort_reason_to_stderr_and_exits_one() {
+fn run_panic_prints_abort_reason_to_stderr_and_exits_seventy() {
     // `faber run` surfaces a runner abort the way the runner's own
-    // `StdioHost::abort` does: `abort: <message>` on stderr, exit 1, with
+    // `StdioHost::abort` does: `abort: <message>` on stderr, exit 70 (the
+    // program-logic class of the trap contract), with
     // stdout written before the trap still flushed.
     let file = write_single_file(
         "run-panic-abort",
@@ -2763,7 +2658,7 @@ fn run_panic_prints_abort_reason_to_stderr_and_exits_one() {
     let (stdout, stderr, status) =
         run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
 
-    assert_eq!(status.code(), Some(1), "panic must exit 1:\n{stderr}");
+    assert_eq!(status.code(), Some(70), "panic must exit 70:\n{stderr}");
     assert_eq!(stdout, "before\n");
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: runtime abort reason is the stderr contract.
     assert!(
@@ -2782,13 +2677,63 @@ fn run_negative_integer_exponent_trap_prints_reason_to_stderr() {
     let (stdout, stderr, status) =
         run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
 
-    assert_eq!(status.code(), Some(1), "trap must exit 1:\n{stderr}");
+    assert_eq!(status.code(), Some(70), "trap must exit 70:\n{stderr}");
     assert_eq!(stdout, "before\n");
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: runtime abort reason is the stderr contract.
     assert!(
         stderr.contains("abort: numerus potentia failed: negative exponent"),
         "expected trap reason on stderr:\n{stderr}"
     );
+}
+
+/// Run a single-file program that traps and return its exit status and the
+/// first stderr line. The statuses are the sysexits classes of the trap
+/// contract (`radix::module::runtime_contract::trap`), not 1.
+fn trap_exit(label: &str, source: &str) -> (Option<i32>, String) {
+    let file = write_single_file(label, source);
+    let (_stdout, stderr, status) =
+        run_faber_status(&["run", file.to_str().expect("utf8 source path")]);
+    let line = stderr.lines().next().unwrap_or_default().to_owned();
+    (status.code(), line)
+}
+
+#[test]
+fn run_conversion_failure_exits_sixty_five_with_one_error_line() {
+    let (code, line) = trap_exit(
+        "run-trap-conversion",
+        "main {\n    print \"salve\" ↦ bool\n}\n",
+    );
+    assert_eq!(code, Some(65), "{line}");
+    assert_eq!(line, "error: text to bivalens conversion failed");
+}
+
+#[test]
+fn run_index_trap_exits_seventy_with_one_error_line() {
+    let (code, line) = trap_exit(
+        "run-trap-index",
+        "main {\n    let string s ← \"ab\"\n    let int i ← 5\n    print s[i]\n}\n",
+    );
+    assert_eq!(code, Some(70), "{line}");
+    assert_eq!(line, "error: text index out of bounds");
+}
+
+#[test]
+fn run_unhandled_missing_file_exits_sixty_six() {
+    let (code, line) = trap_exit(
+        "run-trap-not-found",
+        "import from \"norma:fs\" fs\nimport from \"norma:fault\" fault\nfn read_text(string path) → string ⇥ fault.IoFault {\n    return fs.read_file<string>(path)\n}\nmain {\n    print read_text(\"/nonexistent/faber-trap-contract\")\n}\n",
+    );
+    assert_eq!(code, Some(66), "{line}");
+    assert!(line.starts_with("abort: ERR001 "), "{line}");
+}
+
+#[test]
+fn run_explicit_process_exit_keeps_its_own_status() {
+    let (code, _line) = trap_exit(
+        "run-trap-exit-process",
+        "import from \"norma:process\" process\nmain {\n    process.exit_process(3)\n}\n",
+    );
+    assert_eq!(code, Some(3));
 }
 
 const KERNEL_SOURCE: &str = r#"

@@ -33,7 +33,7 @@ locale = "la"
 #   • cross-width pairing — `n ↦ b16 ↦ f32` from u16 rejects
 #     (bits_conversion_width_mismatch)
 #
-# See also: ↦, fractus, octeti
+# See also: ↦, fractus, lista<b8>
 # =============================================================================
 
 functio in_f16(u16 n) → f16 {

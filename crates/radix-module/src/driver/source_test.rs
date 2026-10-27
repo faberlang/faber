@@ -89,7 +89,7 @@ fn line_content_returns_trimmed_lines_and_none_out_of_range() {
 
 #[test]
 fn eot_driver_acceptance_red_driver_for_selective_import_and_transfer() {
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let result = crate::driver::analyze_source(
         &session,
         "eot-1.fab",

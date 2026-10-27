@@ -187,8 +187,6 @@ nihil = "无"
 vacuum = "无值"
 numquam = "永不"
 ignotum = "未知"
-octeti = "字节"
-octetus = "单字节"
 # Tensor edge-policy markers (`limes<P>()`): pin / wrap-around / mirror at the border.
 clampa = "钳制"
 reflexa = "反射"
@@ -201,7 +199,7 @@ instans = "时刻"
 objectum = "对象"
 quidlibet = "任意"
 lista = "列表"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
 tabula = "映射"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "账本"
@@ -260,7 +258,7 @@ message = "未闭合 backtick template 字面量"
 help = "在行尾或文件结束前闭合字符串字面量"
 
 [diagnostics.LEX001.issues.unterminated_octeti_literal]
-message = "未闭合 octeti 字面量"
+message = "未闭合 {lista}<b8> 字面量"
 help = "在行尾或文件结束前闭合字符串字面量"
 
 [diagnostics.LEX001.issues.unterminated_string_literal]
@@ -849,7 +847,7 @@ help = "把提示写成目标之后的 via 子句：`u32 via Le`、`ascii<8> via
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "转换提示不写在目标之后的尖括号中"
-help = "把提示写成目标之后的 via 子句：`octeti<16> via Le`"
+help = "把提示写成目标之后的 via 子句：`{lista}<b8, 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要表达式"
@@ -1415,17 +1413,13 @@ help = "修正用于 lowering 的 AST construct"
 message = "object destructuring 应在 statement lowering 之前展开"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.retired_byte_word]
-message = "byte 一词已停用：原始位请写 b8，数值请写 u8"
-help = "原始字节使用 b8（字节串用 lista<b8>），数值字节使用 u8"
-
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker 必须是裸写法，例如 ms 或 us"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type 不能接受 parameters"
-help = "textus<N>、ascii<N> 和 octeti<N> 是已交付的有界形式"
+help = "textus<N>、ascii<N> 和 {lista}<b8, N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace 未导出 qualified type"
@@ -2408,16 +2402,16 @@ message = "此循环正在遍历 `{binding}`，因此 `{method}` 不能改变它
 help = "用方括号赋值来更新元素，或对工作列表使用 {queue} 加 {dum}"
 
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
-message = "octeti literal 包含无效字符 '{character}'"
-help = "在 octeti literals 中只使用十六进制数字"
+message = "{lista}<b8> literal 包含无效字符 '{character}'"
+help = "在 {lista}<b8> literals 中只使用十六进制数字"
 
 [diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
-message = "octeti literal 的十六进制数字个数为奇数"
-help = "在 octeti literals 中提供完整的 byte pairs"
+message = "{lista}<b8> literal 的十六进制数字个数为奇数"
+help = "在 {lista}<b8> literals 中提供完整的 byte pairs"
 
 [diagnostics.SEM011.issues.octeti_literal_template_application]
-message = "octeti literals 不支持 template application"
-help = "用 textus formatting 代替 octeti literal calls"
+message = "{lista}<b8> literals 不支持 template application"
+help = "用 textus formatting 代替 {lista}<b8> literal calls"
 
 [diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
 message = "{method} 最多接受一个 payload type argument"
@@ -2513,7 +2507,7 @@ help = "用 numerus 或整数 range 索引 textus"
 
 [diagnostics.SEM011.issues.window_requires_list]
 message = "窗口 [lo‥hi] 需要列表"
-help = "只能对 lista、textus 或 octeti 取窗口 [lo‥hi]"
+help = "只能对 lista、textus 或 {lista}<b8> 取窗口 [lo‥hi]"
 
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index 必须是 numerus"
@@ -2736,7 +2730,7 @@ message = "cursor 到 valor conversion 跨越 eager/lazy boundary"
 help = "跨越 boundary 前先通过 lista materialize cursor"
 
 [diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
-message = "从 numerus、fractus 或 bivalens 到 octeti 的 conversion 未指定"
+message = "从 numerus、fractus 或 bivalens 到 {lista}<b8> 的 conversion 未指定"
 help = "使用 chorda 或显式 byte conversion helpers"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
@@ -2752,11 +2746,11 @@ message = "改变位宽的 bits 列表转换需要 via Le 或 via Be 子句"
 help = "在转换中写出字节序，例如 lista<b8> ↦ lista<u16> via Le；相同宽度的转换不接受子句"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
-message = "从 octeti 到 numerus 的 conversion 未指定"
+message = "从 {lista}<b8> 到 numerus 的 conversion 未指定"
 help = "使用 chorda 或显式 byte conversion helpers"
 
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
-message = "从 octeti 到 fractus 的 conversion 未指定"
+message = "从 {lista}<b8> 到 fractus 的 conversion 未指定"
 help = "使用 chorda 或显式 byte conversion helpers"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
@@ -2769,7 +2763,7 @@ help = "在 via 之后使用 Hex、Bin、Oct、Be、Le 或 Code 之一；Floor�
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "此转换目标不接受转换提示"
-help = "去掉 via 子句；只有 numeric、ascii、littera、vector 和 octeti<N> 目标接受提示"
+help = "去掉 via 子句；只有 numeric、ascii、littera、vector 和 {lista}<b8, N> 目标接受提示"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "float 或 decimal 不指名 rounding 就不能转换为 integer"
@@ -2784,7 +2778,7 @@ message = "与 valor 互相转换的 map 键必须是 textus"
 help = "用 textus 键写 map；转换从不解析键，类上的 `@ json` 定义 wire 映射"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
-message = "从 octeti 到 bivalens 的 conversion 没有 default meaning"
+message = "从 {lista}<b8> 到 bivalens 的 conversion 没有 default meaning"
 help = "使用 chorda 或显式 byte conversion helpers"
 
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
@@ -2793,7 +2787,7 @@ help = "先转换为 lista<b8>、lista<b16> 或 lista<b32>，再 ↦ textus（UT
 
 [diagnostics.SEM016.issues.textus_to_lista_unsupported]
 message = "textus 不能转换为 lista；element type 没有指明是哪一种文字编码"
-help = "用 ↦ lista<b8>（或 lista<b16>/lista<b32>）编码，再从 octeti 着手，或显式构造字符的 lista"
+help = "用 ↦ lista<b8>（或 lista<b16>/lista<b32>）编码，再从 {lista}<b8> 着手，或显式构造字符的 lista"
 
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "conversion 到 promissum 跨越 async/sync boundary"
@@ -2953,19 +2947,19 @@ help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \
 
 [diagnostics.SEM018.issues.empty_radix_typus_domain]
 message = "@ radix typus domain 至少需要一个 allowed type"
-help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.missing_type_param]
 message = "@ radix typus 需要 generic type parameter"
-help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.non_identifier_type_param]
 message = "@ radix typus parameter 必须是 identifier"
-help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "@ radix typus allowed value 必须是 type"
-help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "未知 @ radix directive；应为 `lane`"
@@ -3579,6 +3573,13 @@ help = "文本含引号时请使用 «...»"
 message = "该字符串转义了 `\\\"`；请用 «…» 改写，无需任何转义"
 help = "文本含引号时请使用 «...»"
 
+[diagnostics.WARN035]
+message = "此模板混用了普通占位符和带编号占位符；普通占位符读取 {reads}"
+help = "请为每个占位符编号（`§0`、`§1`……），让它们各自读取你想要的参数"
+
+[diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
+message = "此模板混用了普通占位符和带编号占位符；普通占位符读取 {reads}"
+help = "请为每个占位符编号（`§0`、`§1`……），让它们各自读取你想要的参数"
 
 [llm]
 system_prompt_snippet = "Emit Simplified Chinese reader-locale Faber using Chinese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged. 当字符串包含引号字符（\" 或 '）时，请用 «…» 书写：法式引号无需任何转义。"

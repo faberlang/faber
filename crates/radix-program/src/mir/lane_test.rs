@@ -20,7 +20,7 @@ use radix_module::lexer::Span;
 use radix_module::semantic::Resolver;
 use std::path::PathBuf;
 
-const METHOD_LIB: &str = "@ publica\ngenus Punctum {\n    varia numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
+const METHOD_LIB: &str = "+++\nlocale = \"la\"\n+++\n@ publica\ngenus Punctum {\n    varia numerus x\n\n    functio dupla() → numerus {\n        redde ego.x * 2\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Punctum {\n    redde Punctum { x = x }\n}\n";
 const METHOD_MAIN: &str = "import from \"methlib:lib\" lib\n\nmain {\n    let lib.Punctum p ← lib.structa(21)\n    print p.dupla()\n}\n";
 const LOCAL_METHOD_LIB: &str = "@ public {}\nclass Punctum {\n    mut int x\n\n    fn dupla() → int {\n        return self.x * 2\n    }\n}\n\n@ public {}\nfn structa(int x) → Punctum {\n    return Punctum { x = x }\n}\n";
 const LOCAL_METHOD_MAIN: &str = "import from \"./math\" math\n\nmain {\n    let math.Punctum p ← math.structa(21)\n    print p.dupla()\n}\n";
@@ -34,7 +34,8 @@ const CALLBACK_MAIN: &str = "importa ex \"callbacklib:lib\" lib\n\nincipit {\n  
 // unit imports a module that exports `gelu`. Pre-guard, the method-name sweep
 // rewrote ANY HIR-generated receiver def (>= 1_000_000), so `h1b.gelu()` was
 // rewritten to `nn.gelu(h1b)` — an arity-corrupting synthetic-path call.
-const GELU_LIB: &str = "@ publica\nfunctio gelu() → numerus {\n    redde 7\n}\n";
+const GELU_LIB: &str =
+    "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio gelu() → numerus {\n    redde 7\n}\n";
 const GELU_MAIN: &str = "import from \"gelulib:lib\" nn\n\nclass H1B {\n    mut int x\n\n    fn gelu() → int {\n        return self.x * 2\n    }\n}\n\nfn structa(int x) → H1B {\n    return H1B { x = x }\n}\n\nmain {\n    let int nn_value ← nn.gelu()\n    let H1B h1b ← structa(21)\n    print h1b.gelu()\n    print nn_value\n}\n";
 
 #[test]
@@ -507,7 +508,7 @@ fn package_mir_passes_captured_entry_closure_to_linked_library_function() {
 // MIR lowerer lowered it as a plain call and the cape handler's blocks
 // orphaned ("block bbN is not reachable from entry", PKG001). The success
 // path (`4`) and the error path (`caught`) both prove handler reachability.
-const FAILABLE_METHOD_LIB: &str = "@ publica\ngenus Divisor {\n    varia numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
+const FAILABLE_METHOD_LIB: &str = "+++\nlocale = \"la\"\n+++\n@ publica\ngenus Divisor {\n    varia numerus x\n\n    functio reciproca() → numerus ⇥ textus {\n        si ego.x ≡ 0 {\n            iace \"division by zero\"\n        }\n        redde 100 / ego.x\n    }\n}\n\n@ publica\nfunctio structa(numerus x) → Divisor {\n    redde Divisor { x = x }\n}\n";
 const FAILABLE_METHOD_MAIN: &str = "import from \"failib:lib\" lib\n\nmain {\n    let lib.Divisor ok ← lib.structa(25)\n    do {\n        let int r ← ok.reciproca()\n        print r\n    }\n    catch err {\n        print \"caught\"\n    }\n    let lib.Divisor bad ← lib.structa(0)\n    do {\n        let int r2 ← bad.reciproca()\n        print r2\n    }\n    catch err {\n        print \"caught\"\n    }\n}\n";
 
 #[test]
@@ -723,8 +724,8 @@ fn package_mir_const_data_member_path_initializer_module_private_target_transpla
 // never a name sweep across the unit's imports (which bails when more than
 // one import exports the method: BOTH `forma` and `typo` export `causa` here,
 // mirroring gradus shape.fab + dtype.fab).
-const FORMA_LIB: &str = "@ publica\nfunctio quantitas(lista<numerus> forma) → numerus {\n    redde forma.longitudo()\n}\n\n@ publica\nfunctio causa(numerus n) → numerus {\n    redde n + 1\n}\n";
-const TYPO_LIB: &str = "@ publica\nfunctio causa(numerus n) → numerus {\n    redde n + 2\n}\n";
+const FORMA_LIB: &str = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio quantitas(lista<numerus> forma) → numerus {\n    redde forma.longitudo()\n}\n\n@ publica\nfunctio causa(numerus n) → numerus {\n    redde n + 1\n}\n";
+const TYPO_LIB: &str = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio causa(numerus n) → numerus {\n    redde n + 2\n}\n";
 const FORMA_MAIN: &str = "import from \"forma:lib\" forma\nimport from \"typo:lib\" typo\n\n# The local param `forma` shadows the import binding `forma` — the shadowed\n# namespace-reference shape of gradus tensor.fab `_quantitas_forma`.\nfn dubbia(list<int> forma) → int {\n    let int n ← forma.quantitas(forma)\n    return forma.causa(n)\n}\n\nmain {\n    print dubbia([2, 3, 4])\n    print typo.causa(7)\n}\n";
 
 /// The shadowed-alias rewrite fires for synthetic HIR receiver defs: a local

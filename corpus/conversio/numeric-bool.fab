@@ -17,7 +17,7 @@ locale = "en"
 #   • Fractional to integer — `fractus ↦ numerus` is legal only with a rounding choice (`via Floor|Ceil|HalfEven|Trunc`); the bare conversion is a compile error (SEM016). A NaN, an infinity, or a value outside the target range fails (`⊥ default` recovers).
 #   • Truthiness from numbers — `fractus ↦ bivalens` and `numerus ↦ bivalens` use non-zero truthiness.
 #   • Bool-to-number — `bivalens ↦ numerus` yields 0/1; `bivalens ↦ fractus` yields 0.0/1.0.
-#   • Byte reinterpretation boundary — numerus/fractus/bivalens ↔ octeti is rejected at typecheck (use chorda instead).
+#   • Byte reinterpretation boundary — numerus/fractus/bivalens ↔ list<b8> is rejected at typecheck (use chorda instead).
 #
 # Common mistakes:
 #   • Writing a bare `fractus ↦ numerus` — a fractional number converts to an integer only with a rounding choice (`via Floor|Ceil|HalfEven|Trunc`), and it fails when out of range rather than saturating.
@@ -34,7 +34,7 @@ locale = "en"
 # numerus` yields 0/1. `bivalens ↦ fractus` uses 1.0/0.0 because `bool as f64`
 # is invalid in Rust. `ascii ↦ bivalens` parallels `textus ↦ bivalens`: it parses the code locale's
 # `true`/`false` words and fails on anything else.
-# Byte reinterpretation (`numerus`/`fractus`/`bivalens` ↔ `octeti`) is rejected
+# Byte reinterpretation (`numerus`/`fractus`/`bivalens` ↔ `list<b8>`) is rejected
 # at typecheck — use `chorda` instead. See docs/factory/conversio-numeric-bool-coverage/.
 
 main {

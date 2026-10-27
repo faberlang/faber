@@ -6,6 +6,7 @@
 
 use crate::artifact::{HirArtifact, SCHEMA_VERSION};
 use crate::error::HirArtifactError;
+use crate::shape::wire_shape_hash;
 use crate::validate::validate_referential_integrity;
 
 /// Serialize a [`HirArtifact`] to deterministic `postcard` bytes.
@@ -25,7 +26,9 @@ pub fn encode(artifact: &HirArtifact) -> Result<Vec<u8>, postcard::Error> {
 /// `schema_version` is the first wire field, so the version prefix is read
 /// before the payload is interpreted and any mismatch — forward or backward —
 /// is rejected with [`HirArtifactError::UnsupportedSchemaVersion`]. There is
-/// no compatibility decoder for earlier schemas.
+/// no compatibility decoder for earlier schemas. The derived wire-shape hash
+/// follows the version; a mismatch is rejected with
+/// [`HirArtifactError::UnsupportedWireShape`].
 ///
 /// # Fail-closed (F7)
 ///
@@ -37,23 +40,37 @@ pub fn encode(artifact: &HirArtifact) -> Result<Vec<u8>, postcard::Error> {
 /// Returns [`HirArtifactError::TruncatedArtifact`] on truncated input,
 /// [`HirArtifactError::Malformed`] on postcard decoding failures,
 /// [`HirArtifactError::UnsupportedSchemaVersion`] on a version mismatch,
+/// [`HirArtifactError::UnsupportedWireShape`] on a shape-hash mismatch,
 /// and the validation errors from the referential-integrity gate (U2.3).
 pub fn decode(bytes: &[u8]) -> Result<HirArtifact, HirArtifactError> {
     // F3: read the schema-version prefix (first wire field) and reject any
     // mismatch before interpreting the payload. A schema-v1 artifact is
     // rejected here with UnsupportedSchemaVersion — never a confusing
     // field-layout error.
-    let (schema_version, _rest) = postcard::take_from_bytes::<u32>(bytes).map_err(|e| {
+    let to_error = |e| {
         if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
             HirArtifactError::TruncatedArtifact
         } else {
             HirArtifactError::Malformed(e)
         }
-    })?;
+    };
+    let (schema_version, rest) = postcard::take_from_bytes::<u32>(bytes).map_err(to_error)?;
     if schema_version != SCHEMA_VERSION {
         return Err(HirArtifactError::UnsupportedSchemaVersion {
             found: schema_version,
             expected: SCHEMA_VERSION,
+        });
+    }
+
+    // The wire-shape hash is the second header field. It is derived from the
+    // live type definitions, so a serialized-type change that forgot the
+    // version bump is rejected here, before the positional payload is read.
+    let (shape_hash, _rest) = postcard::take_from_bytes::<u64>(rest).map_err(to_error)?;
+    let expected = wire_shape_hash();
+    if shape_hash != expected {
+        return Err(HirArtifactError::UnsupportedWireShape {
+            found: shape_hash,
+            expected,
         });
     }
 

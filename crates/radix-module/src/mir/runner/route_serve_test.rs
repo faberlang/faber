@@ -79,7 +79,7 @@ fn partem_reads_the_requested_range() {
         "route-partem.fab",
         &program(&format!(
             "    sit lista<valor> args ← [\"{path}\", 2, 3]\n    \
-             sit octeti bytes ← ad 'solum:partem' (args) ↦ octeti\n    \
+             sit lista<b8> bytes ← ad 'solum:partem' (args) ↦ lista<b8>\n    \
              nota bytes[0] ↦ u8\n    nota bytes[2] ↦ u8"
         )),
     );
@@ -95,7 +95,7 @@ fn partem_honours_the_range_cap() {
         "route-partem-cap.fab",
         &program(&format!(
             "    sit lista<valor> args ← [\"{path}\", 0, {over}]\n    \
-             nota ad 'solum:partem' (args) ↦ octeti"
+             nota ad 'solum:partem' (args) ↦ lista<b8>"
         )),
         &mut host,
     )
@@ -110,10 +110,10 @@ fn hauri_returns_the_bytes_and_honours_the_ceiling() {
     let host = run_ok(
         "route-hauri.fab",
         &program(&format!(
-            "    sit octeti all ← ad 'solum:hauri' (\"{path}\") ↦ octeti\n    \
+            "    sit lista<b8> all ← ad 'solum:hauri' (\"{path}\") ↦ lista<b8>\n    \
              nota all[0] ↦ u8\n    nota all[2] ↦ u8\n    \
              sit lista<valor> args ← [\"{path}\", 3]\n    \
-             sit octeti capped ← ad 'solum:hauri' (args) ↦ octeti\n    \
+             sit lista<b8> capped ← ad 'solum:hauri' (args) ↦ lista<b8>\n    \
              nota capped[1] ↦ u8"
         )),
     );
@@ -124,7 +124,7 @@ fn hauri_returns_the_bytes_and_honours_the_ceiling() {
         "route-hauri-ceiling.fab",
         &program(&format!(
             "    sit lista<valor> args ← [\"{path}\", 2]\n    \
-             nota ad 'solum:hauri' (args) ↦ octeti"
+             nota ad 'solum:hauri' (args) ↦ lista<b8>"
         )),
         &mut host,
     )

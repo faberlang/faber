@@ -328,7 +328,7 @@ incipit {
 #[test]
 fn constrained_generic_call_hole_solves_then_checks_domain() {
     accepts(
-        r#"@ radix typus T in textus lista<textus> octeti
+        r#"@ radix typus T in textus lista<textus> lista<b8>
 functio load<T>(T value) → T {
     redde value
 }
@@ -343,7 +343,7 @@ incipit {
 #[test]
 fn constrained_generic_call_hole_rejects_after_solve() {
     rejects_with_args(
-        r"@ radix typus T in textus lista<textus> octeti
+        r"@ radix typus T in textus lista<textus> lista<b8>
 functio load<T>(T value) → T {
     redde value
 }
@@ -530,7 +530,7 @@ incipit {
 #[test]
 fn constrained_generic_call_accepts_allowed_explicit_type_arg() {
     accepts(
-        r#"@ radix typus T in textus lista<textus> octeti
+        r#"@ radix typus T in textus lista<textus> lista<b8>
 functio load<T>(T value) → T {
     redde value
 }
@@ -538,7 +538,7 @@ functio load<T>(T value) → T {
 incipit {
     sit textus body ← load<textus>("body")
     sit lista<textus> lines ← load<lista<textus>>(["a", "b"])
-    sit octeti bytes ← load<octeti>(|ca fe|)
+    sit lista<b8> bytes ← load<lista<b8>>(|ca fe|)
     nota body
     nota lines
     nota bytes
@@ -549,7 +549,7 @@ incipit {
 #[test]
 fn constrained_generic_call_rejects_unsupported_explicit_type_arg() {
     rejects_with_args(
-        r"@ radix typus T in textus lista<textus> octeti
+        r"@ radix typus T in textus lista<textus> lista<b8>
 functio load<T>(T value) → T {
     redde value
 }
@@ -570,7 +570,7 @@ incipit {
 #[test]
 fn constrained_generic_call_rejects_unsupported_inferred_type_arg() {
     rejects_with_args(
-        r"@ radix typus T in textus lista<textus> octeti
+        r"@ radix typus T in textus lista<textus> lista<b8>
 functio load<T>(T value) → T {
     redde value
 }
@@ -791,7 +791,7 @@ fn sermo_meus_typed_view_typechecks() {
     accepts(
         r#"incipit {
     sit sermo s ← ad 'runtime:echo' ("salve")
-    sit _ sink ← s.meus<octeti>()
+    sit _ sink ← s.meus<lista<b8>>()
 }"#,
     );
 }

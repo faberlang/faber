@@ -14,7 +14,7 @@ use crate::hir::{HirArrayElement, HirExpression, HirExpressionKind, HirItemKind,
 use radix_diagnostics::Diagnostic;
 
 fn analyze(source: &str) -> Result<AnalyzedModule, Vec<Diagnostic>> {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     analyze_source(&session, "praefixum.fab", source, AnalyzeRequest::default())
 }
 
@@ -146,6 +146,7 @@ fn endless_loop_hits_the_step_limit() {
 fn faber_reemission_keeps_the_authored_body() {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_dev_locale_root()
             .with_target(Target::HirFaber),
     );
@@ -211,7 +212,7 @@ pub(super) mod imported {
         source: &str,
         defer: bool,
     ) -> Result<AnalyzedModule, Vec<Diagnostic>> {
-        let mut config = Config::default().with_dev_locale_root();
+        let mut config = Config::default().with_latin_locale().with_dev_locale_root();
         if defer {
             config = config.with_defer_imported_praefixum();
         }

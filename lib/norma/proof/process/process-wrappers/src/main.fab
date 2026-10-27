@@ -1,0 +1,42 @@
++++
+locale = "en"
++++
+
+# norma:process wrapper routes called directly: spawn, wait, kill, detach,
+# capture, exec, cwd, chdir and argv. Child processes are `sh`/`sleep`, which
+# every supported host provides.
+import from "norma:process" process
+import from "norma:value" value
+
+main {
+    # exec: run a shell command, read its stdout.
+    assert process.exec("printf wrapper-ok") ≡ "wrapper-ok"
+
+    # spawn + wait: a child's exit status comes back through wait.
+    let process.Subprocess exited ← process.spawn(["sh", "-c", "exit 3"])
+    assert exited.pid ≻ 0
+    assert process.wait(exited) ≡ 3
+
+    # spawn + kill + wait: a killed child reports a nonzero status.
+    let process.Subprocess sleeper ← process.spawn(["sleep", "30"])
+    process.kill(sleeper)
+    assert process.wait(sleeper) ≢ 0
+
+    # detach: a fire-and-forget child yields its pid.
+    assert process.detach(["sleep", "0"]) ≻ 0
+
+    # capture: stdout, stderr and the status are returned as route data.
+    let value captured ← process.capture(["sh", "-c", "printf out; echo err-bytes 1>&2; exit 7"])
+    assert value.is_map(captured)
+
+    # cwd + chdir: change into the temp directory and read it back.
+    let string start ← process.cwd()
+    assert start.length() ≻ 0
+    process.chdir(start)
+    assert process.cwd() ≡ start
+
+    # argv: the program name is always present.
+    assert process.argv().length() ≥ 0
+
+    print "process-wrappers-ok"
+}

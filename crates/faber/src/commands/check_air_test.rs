@@ -5,9 +5,12 @@
 
 use std::process::Command;
 
-// File mode (`cmd_check_file`, single-file pipeline) uses the canonical Latin
-// surface by default, so the fixtures use `functio`/`fixum`/`varia`/`itera ab`.
-const MIXED_SOURCE: &str = r#"functio computus_gyrum() → fractus {
+// The fixtures are tagged with the Latin reader locale (`+++ locale = "la" +++`),
+// so they use `functio`/`fixum`/`varia`/`itera ab`.
+const MIXED_SOURCE: &str = r#"+++
+locale = "la"
++++
+functio computus_gyrum() → fractus {
     sit fractus total ← 0.0
     itera ab 0‥10 per 2 sit i {
         total ← total + 1.0
@@ -26,7 +29,10 @@ functio salve(textus nomen) → textus {
 }
 "#;
 
-const ANNOTATED_IMPURE: &str = r#"@ radix lane "air"
+const ANNOTATED_IMPURE: &str = r#"+++
+locale = "la"
++++
+@ radix lane "air"
 functio gradus_passus(numerus x) → numerus {
     varia numerus total ← x
     total ← total + 1
@@ -36,13 +42,19 @@ functio gradus_passus(numerus x) → numerus {
 
 // Ruling 25 (air1): an AIR store must be proven to fit, so the pure fixture
 // takes a `numerus<i32>` operand whose `+ 1` provably fits the `numerus` result.
-const ANNOTATED_PURE: &str = r#"@ radix lane "air"
+const ANNOTATED_PURE: &str = r#"+++
+locale = "la"
++++
+@ radix lane "air"
 functio computus_purus(i32 x) → numerus {
     redde x + 1
 }
 "#;
 
-const CALLEE_BLOCKED: &str = r#"functio impura(numerus x) → numerus {
+const CALLEE_BLOCKED: &str = r#"+++
+locale = "la"
++++
+functio impura(numerus x) → numerus {
     varia numerus total ← x
     redde total
 }
@@ -52,7 +64,10 @@ functio caller(numerus x) → numerus {
 }
 "#;
 
-const OWN_AND_CALLEE_BLOCKED: &str = r#"functio impura(numerus x) → numerus {
+const OWN_AND_CALLEE_BLOCKED: &str = r#"+++
+locale = "la"
++++
+functio impura(numerus x) → numerus {
     varia numerus total ← x
     redde total
 }
@@ -354,7 +369,10 @@ fn air_report_unknown_reason_trails_known_buckets() {
 /// unavailable callee body.
 #[test]
 fn air_report_does_not_invent_cross_unit_callee_blocker() {
-    let source = r#"importa ex "norma:text" retorta
+    let source = r#"+++
+locale = "la"
++++
+importa ex "norma:text" retorta
 
 functio caller(numerus x) → numerus {
     redde retorta(x)
@@ -416,5 +434,5 @@ entry = "main.fab"
         stderr.contains("`faber check --air` package mode is not supported"),
         "package input with --air must print the unsupported message:\n{stderr}"
     );
-    assert_eq!(Some(1), output.status.code());
+    assert_eq!(Some(64), output.status.code());
 }

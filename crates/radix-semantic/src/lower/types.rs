@@ -924,10 +924,6 @@ impl Lowerer<'_> {
             return Some(self.lower_trapping_word_type(params));
         }
 
-        if name_str == "octetus" {
-            return Some(self.lower_retired_byte_word_type());
-        }
-
         if crate::numeric_width::is_standalone_width_name(name_str) {
             let Some(type_params) = generic_type_exprs(params) else {
                 self.error("generic_size_argument_in_type_position");
@@ -1172,7 +1168,6 @@ impl Lowerer<'_> {
             crate::locale::TypeBindingKind::TrappingWord => {
                 Some(self.lower_trapping_word_type(params))
             }
-            crate::locale::TypeBindingKind::ByteWord => Some(self.lower_retired_byte_word_type()),
             crate::locale::TypeBindingKind::TensorEdgePolicy(policy) => {
                 Some(self.lower_tensor_edge_policy_type(policy, params))
             }
@@ -1199,13 +1194,6 @@ impl Lowerer<'_> {
         }
     }
 
-    /// Need (ruling B8): `octetus` (en `byte`) is retired with
-    /// `octeti`; the diagnostic names both replacements (`b8`, `u8`).
-    fn lower_retired_byte_word_type(&mut self) -> TypeId {
-        self.error("retired_byte_word");
-        self.types.intern(Type::Error)
-    }
-
     fn lower_tensor_edge_policy_type(
         &mut self,
         policy: crate::BuiltinTensorEdgePolicy,
@@ -1222,10 +1210,7 @@ impl Lowerer<'_> {
         // Bounded textus/ascii/octeti capacities are index arguments, not type
         // arguments. Lower this family before the width/type-only helper so a
         // literal capacity reaches the shared IndexExpr arena.
-        if matches!(
-            prim,
-            Primitive::Ascii | Primitive::Textus | Primitive::Octeti
-        ) {
+        if matches!(prim, Primitive::Ascii | Primitive::Textus) {
             return self.lower_bounded_primitive(prim, params);
         }
         let Some(type_params) = generic_type_exprs(params) else {
@@ -1256,7 +1241,6 @@ impl Lowerer<'_> {
 
     fn lower_bounded_primitive(&mut self, prim: Primitive, params: &[GenericArgExpr]) -> TypeId {
         match params {
-            [] if prim == Primitive::Octeti => self.types.octeti_list(),
             [] => self.types.primitive(prim),
             [capacity]
                 if prim == Primitive::Ascii
@@ -1272,7 +1256,6 @@ impl Lowerer<'_> {
                 match prim {
                     Primitive::Ascii => self.types.bounded_ascii(capacity),
                     Primitive::Textus => self.types.bounded_textus(capacity),
-                    Primitive::Octeti => self.types.bounded_octeti(capacity),
                     _ => {
                         self.error("primitive_params");
                         self.types.intern(Type::Error)

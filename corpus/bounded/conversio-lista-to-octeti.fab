@@ -3,21 +3,21 @@ term = "↦"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
-summary = "Compile-admitted bounded lista<u8,N> to bounded octeti<M> route."
-syntax = "lista<u8, N> ↦ octeti<M>"
+summary = "Compile-admitted bounded list<u8, N> to bounded list<b8, M> route."
+syntax = "list<u8, N> ↦ list<b8, M>"
 related = ["↦", "lista", "octeti", "u8"]
 locale = "en"
 no_expected = "awaiting-ruling"
 ruling = "6a13d711"
 +++
 # =============================================================================
-# bounded lista to octeti — compile-admitted byte carrier route
+# bounded list<u8, N> to list<b8, M> — compile-admitted byte carrier route
 # =============================================================================
 #
 # What this teaches:
 #   • The bounded u8 list names a bounded byte target explicitly.
 #   • The route is currently a check-level contract; the runner has no
-#     bounded octeti carrier.
+#     bounded list<b8, N> carrier.
 #
 # Common mistakes:
 #   • using a general integer list for a byte carrier — the element width is

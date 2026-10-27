@@ -104,7 +104,7 @@ fn corpus_runs_pilot_suite_across_source_package_and_rejection_cases() {
         .find(|row| row["case"] == "diagnostics/unknown-type")
         .expect("intentional rejection case");
     assert_eq!(rejection["status"], "pass");
-    assert_eq!(rejection["exit"], 1);
+    assert_eq!(rejection["exit"], 65);
     assert!(
         rows.iter()
             .any(|row| row["case"] == "packages/proba-canary" && row["status"] == "pass")
@@ -444,7 +444,7 @@ fn corpus_rust_pilot_builds_once_and_checks_generated_binaries() {
         .expect("intentional Rust emit rejection");
     assert_eq!(rejection["status"], "pass");
     assert_eq!(rejection["phase"], "emit");
-    assert_eq!(rejection["exit"], 1);
+    assert_eq!(rejection["exit"], 65);
     assert!(rows[0]["emit_command"]["argv"].is_array());
     assert_eq!(
         rows.iter()

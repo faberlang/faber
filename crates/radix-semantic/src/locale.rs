@@ -897,7 +897,6 @@ fn build_type_fallbacks(type_surfaces: &HashMap<TypeBindingKind, String>) -> Vec
             TypeBindingKind::ModularWord,
             TypeBindingKind::SaturatingWord,
             TypeBindingKind::TrappingWord,
-            TypeBindingKind::ByteWord,
         ])
         .chain(
             BuiltinTensorEdgePolicy::ALL
@@ -931,7 +930,6 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
         TypeBindingKind::ModularWord => "modulus",
         TypeBindingKind::SaturatingWord => "saturatus",
         TypeBindingKind::TrappingWord => "exactus",
-        TypeBindingKind::ByteWord => "octetus",
         TypeBindingKind::TensorEdgePolicy(policy) => policy.latin(),
         // Relational type names keep the canonical Latin spelling as the
         // Latin fallback (identity surface; all 8 packs own rows today).
@@ -1097,9 +1095,6 @@ pub enum TypeBindingKind {
     /// names the default overflow policy outright, so `exactus<u8>` is the
     /// very type the bare marker `u8` denotes.
     TrappingWord,
-    /// `octetus` (en `byte`): the byte scalar, an exact alias of
-    /// `numerus<u8>` (D10.4) and the element of `octeti`.
-    ByteWord,
     /// Compiler-owned, type-only selectors for `limes<Policy>()`.
     TensorEdgePolicy(BuiltinTensorEdgePolicy),
     /// Census relational type names (`relational-views.md` §7): the inert
@@ -1490,7 +1485,6 @@ fn insert_latin_extra_types(types: &mut BTreeMap<String, TypeBinding>) {
         ("modulus", "modulus_t", TypeBindingKind::ModularWord),
         ("saturatus", "saturatus", TypeBindingKind::SaturatingWord),
         ("exactus", "exactus", TypeBindingKind::TrappingWord),
-        ("octetus", "octetus", TypeBindingKind::ByteWord),
     ] {
         types.insert(
             key.to_owned(),
@@ -2646,9 +2640,6 @@ fn type_binding_kind_for_key(key: &str) -> Option<TypeBindingKind> {
     }
     if key == "exactus" {
         return Some(TypeBindingKind::TrappingWord);
-    }
-    if key == "octetus" {
-        return Some(TypeBindingKind::ByteWord);
     }
     if let Some(policy) = BuiltinTensorEdgePolicy::from_latin(key) {
         return Some(TypeBindingKind::TensorEdgePolicy(policy));

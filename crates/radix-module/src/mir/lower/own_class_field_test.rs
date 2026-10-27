@@ -11,6 +11,7 @@ use crate::mir::{BufferHost, RunSourceError, run_source};
 fn own_bind_of_class_value_reads_field_on_runner() {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_dev_locale_root(),
     );

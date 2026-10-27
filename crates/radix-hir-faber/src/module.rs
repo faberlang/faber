@@ -126,6 +126,8 @@ pub struct FaberCodegen<'a> {
     /// Authored build-time embed paths (`insere "path"`, D8.10), keyed by the
     /// folded literal's `HirId`: those literals re-emit as the embed.
     pub(crate) insere_exprs: FxHashMap<radix_hir::HirId, Symbol>,
+    /// Authored template text and actual labels, keyed by application id.
+    pub(crate) template_holes: FxHashMap<radix_hir::HirId, radix_hir::HirTemplateHoles>,
     /// Function modifier bindings (`errors e`, `options o`, `exit code`) by the
     /// runtime-provided local each introduced: those locals re-emit as the
     /// signature modifier, not as body statements.
@@ -189,6 +191,7 @@ impl<'a> FaberCodegen<'a> {
             authored_type_forms: FxHashMap::default(),
             tuple_label_accesses: FxHashMap::default(),
             insere_exprs: FxHashMap::default(),
+            template_holes: FxHashMap::default(),
             function_modifier_bindings: FxHashMap::default(),
             type_emission_error: RefCell::new(None),
         }
@@ -258,6 +261,7 @@ pub fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        template_holes: Vec::new(),
         insere_exprs: Vec::new(),
         function_modifier_bindings: Vec::new(),
         region: None,
@@ -422,6 +426,11 @@ impl FaberCodegen<'_> {
             .insere_exprs
             .iter()
             .map(|insere| (insere.expr, insere.path))
+            .collect();
+        self.template_holes = presentation
+            .template_holes
+            .iter()
+            .map(|holes| (holes.expr, holes.clone()))
             .collect();
         self.function_modifier_bindings = presentation
             .function_modifier_bindings

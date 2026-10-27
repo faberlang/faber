@@ -294,7 +294,7 @@ targets = ["rust"]
 
     let _guard = LibraryHomeGuard::set(&home);
     let resolved = resolve_namespace_import(
-        &crate::driver::Session::new(crate::driver::Config::default()),
+        &crate::driver::Session::new(crate::driver::Config::default().with_latin_locale()),
         PathBuf::from("/tmp/app.fab").as_path(),
         "triga:triga",
         None,
@@ -319,12 +319,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/triga.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Vector3 {
     varia f32 x
@@ -343,14 +347,16 @@ functio vector3(f32 x, f32 y, f32 z) → Vector3 {
 functio matrix4_inversa_affinis(de Matrix4 matrix) → Matrix4 ∪ nihil {
     redde nulla
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "triga:triga" triga
 incipit {
   sit triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
@@ -396,24 +402,28 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio aperta() → vacuum {
 }
 @ interna
 functio clausa() → vacuum {
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
-    fs::write(&app, "importa ex \"probe:probe\" probe\n").expect("app");
+    fs::write(&app, "+++\nlocale = \"la\"\n+++\nimporta ex \"probe:probe\" probe\n").expect("app");
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
@@ -447,23 +457,29 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ interna
 functio clausa() → vacuum {
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipit {
   probe.clausa()
@@ -508,23 +524,29 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio aperta() → vacuum {
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipit {
   probe.aperta()
@@ -621,22 +643,28 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 typus Nomen = textus
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 functio e(probe.Nomen nomen) → probe.Nomen {
     redde nomen
@@ -687,22 +715,28 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ interna
 typus Nomen = textus
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 functio e() → probe.Nomen {
     redde "x"
@@ -751,21 +785,27 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 typus Nomen = textus
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 functio e() → probe.Nomen {
     redde "x"
@@ -862,12 +902,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio later() fiet → numerus {
     redde 1
@@ -889,14 +933,16 @@ functio annotated_later() → numerus {
 functio annotated_stream() → numerus {
     cede 2
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipit {
   nota 1
@@ -964,24 +1010,30 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ futura
 @ publica
 functio sleep() → vacuum {
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipiet {
   tacebit probe.sleep()
@@ -1020,12 +1072,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ futura
 @ publica
 functio sleep() → vacuum ⇥ textus {
@@ -1038,7 +1094,9 @@ functio sleep() → vacuum ⇥ textus {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 functio caller() fiet → vacuum ⇥ textus {
   tacebit probe.sleep()
@@ -1077,12 +1135,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/triga.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Vector3 {
     varia f32 x
@@ -1097,14 +1159,16 @@ functio vector3(f32 x, f32 y, f32 z) → Vector3 {
 functio vector3_normalizata(de Vector3 v) → Vector3 {
     redde v
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "triga:triga" triga
 incipit {
   sit triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
@@ -1154,12 +1218,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/triga.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Vector3 {
     varia f32 x
@@ -1174,14 +1242,16 @@ functio vector3(f32 x, f32 y, f32 z) → Vector3 {
 functio vector3_normalizata(de Vector3 v) → Vector3 {
     redde v
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "triga:triga" triga
 incipit {
   sit triga.Vector3 zero ← triga.vector3(0.0, 0.0, 0.0)
@@ -1247,14 +1317,18 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     // Generic lege + plain carpe — historically fail-all SEM002 on file interface install.
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
-@ radix typus T in textus lista<textus> octeti
+        r#"+++
+locale = "la"
++++
+@ radix typus T in textus lista<textus> lista<b8>
 @ publica
 functio lege<T>(textus via) → T {
     mori "lege deferred in probe"
@@ -1274,7 +1348,9 @@ functio exstat(textus via) → bivalens {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipit {
   sit bivalens ok ← probe.exstat("x")
@@ -1343,13 +1419,17 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     // Unknown applied type (not a formal primitive) still poisons one export only.
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio pange(ignotum_genus x) → textus {
     redde ""
@@ -1365,7 +1445,9 @@ functio salve() → textus {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipit {
   sit textus s ← probe.salve()
@@ -1441,6 +1523,8 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
@@ -1449,7 +1533,9 @@ targets = ["rust"]
     // callables reference it, so the interface must still install them.
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 discretio ProbeError {
     Perperam { textus causa }
 }
@@ -1470,7 +1556,9 @@ functio causa(ProbeError e) → textus {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipit {
   sit textus s ← probe.causa(probe.perperam("x"))
@@ -1524,22 +1612,28 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/math.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Matrix4 {
     varia f32 m00
 }
-",
+"#,
     )
     .expect("math");
     fs::write(
         provider.join("src/scene.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:math" math
 
 @ publica
@@ -1570,7 +1664,9 @@ functio scene_group(textus name) → SceneNode {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:math" math
 importa ex "probe:scene" scene
 
@@ -1631,13 +1727,17 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     // Sibling module: the imported view types (browser.fab's tela:visus shape).
     fs::write(
         provider.join("src/visus.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 discretio Visus {
     Textus { textus valor }
@@ -1659,7 +1759,9 @@ functio textus_visus(textus valor) → Visus {
     // signature references the imported types (browser.fab's mount shape).
     fs::write(
         provider.join("src/browser.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:visus" visus
 
 @ publica
@@ -1685,7 +1787,9 @@ functio mount(Scope scopus, visus.Visus visus, visus.Thema thema) → Mounted �
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r##"
+        r##"+++
+locale = "la"
++++
 importa ex "probe:browser" browser
 importa ex "probe:visus" visus
 
@@ -2077,13 +2181,17 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     // Kernel module: exports Scopulum + a class-returning function.
     fs::write(
         provider.join("src/tela.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Scopulum {
     varia textus nomen
@@ -2101,7 +2209,9 @@ functio scopulum(textus nomen, textus valor) → Scopulum {
     // name that collided with the kernel's type in the shared snapshot).
     fs::write(
         provider.join("src/extension.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Scopulum {
     varia textus nomen
@@ -2119,7 +2229,9 @@ functio chart_axis_muted() → Scopulum {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:tela" tela
 importa ex "probe:extension" ext
 
@@ -2170,7 +2282,9 @@ fn norma_json_tool_path_installs_facade_exports() {
     let app = dir_nj.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:json" json
 incipit {
   sit json ∪ nihil maybe ← json.try_parse("{}")
@@ -2292,7 +2406,7 @@ incipit {}
     let source_a = fs::read_to_string(&app_a).expect("read app a");
     let source_b = fs::read_to_string(&app_b).expect("read app b");
 
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let prepared_a =
         crate::program::compile::prepare_program_module(&app_a, &source_a, &session).expect("prepare first module");
     // The second module enters through a re-wrap of the same run — the shape
@@ -2342,12 +2456,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio nunc() → instans<ns> {
     redde ad 'probe:nunc' ↦ instans<ns>
@@ -2360,14 +2478,16 @@ functio solve(textus wire) → instans {
 functio wire(instans<ns> t) → textus {
     redde t ↦ textus
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 incipit {
   sit instans<ns> nanos ← probe.nunc()
@@ -2493,7 +2613,7 @@ fn resolve_provider_segment_via_manifest_provider_name() {
 
     let _guard = LibraryHomeGuard::set(&home);
     let resolved = resolve_namespace_import(
-        &crate::driver::Session::new(crate::driver::Config::default()),
+        &crate::driver::Session::new(crate::driver::Config::default().with_latin_locale()),
         PathBuf::from("/tmp/app.fab").as_path(),
         "web:dom",
         None,
@@ -2632,7 +2752,9 @@ fn valida_nomen_tag(string nomen) → bool {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "tela:valida" valida
 incipit {
   sit bivalens ok ← valida.valida_nomen_tag("a")
@@ -2695,7 +2817,9 @@ fn valida_nomen_tag(string nomen) → bool {
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "tela:valida" valida
 incipit {
   sit bivalens ok ← valida.valida_nomen_tag("a")
@@ -2931,7 +3055,7 @@ incipit {
     )
     .expect("write entry");
 
-    let config = crate::driver::Config::default();
+    let config = crate::driver::Config::default().with_latin_locale();
     let identities = crate::program::package_identity_facts_for_path(&entry, &config)
         .expect("Latin local imports must register identity facts under the la pack");
     assert_eq!(identities.product, "adiutorium", "product derives from the package root");
@@ -3021,7 +3145,7 @@ functio via() → leaf.Point {
     )
     .expect("mid");
     let source = fs::read_to_string(&mid).expect("read mid");
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let empty = crate::driver::analyze_source(&session, &mid.display().to_string(), &source, AnalyzeRequest::default());
     assert!(
         empty.is_err(),
@@ -3238,7 +3362,9 @@ fn interface_snapshot_projects_union_and_enum_variants() {
     // (SEM001.unknown_variant / SEM008 on imported union refs).
     let (program, interner) = super::parse_program_for_namespace_exports(
         "producer.fab",
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 discretio Eventum {
     Ictus { numerus vis },
@@ -3250,8 +3376,8 @@ ordo Gradus {
     Parvus,
     Magnus
 }
-",
-        None,
+"#,
+        Some(&la_locale_pack()),
     )
     .expect("parse producer source");
 
@@ -3306,7 +3432,9 @@ fn interface_snapshot_snaps_consts_and_tuple_returns() {
     // conversion with SEM010 at the call sites.
     let (program, interner) = super::parse_program_for_namespace_exports(
         "producer.fab",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 sit textus schema_versio ← "2.0.0"
 
@@ -3315,7 +3443,7 @@ functio limes() → iuncta<numerus, numerus> {
     redde iuncta<numerus, numerus> [1, 2]
 }
 "#,
-        None,
+        Some(&la_locale_pack()),
     )
     .expect("parse producer source");
 
@@ -3366,24 +3494,30 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/eventum.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 discretio Eventum {
     Ictus { numerus vis },
     Sonitus
 }
-",
+"#,
     )
     .expect("eventum");
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:eventum" eventum
 
 functio describe(eventum.Eventum e) → textus {
@@ -3524,12 +3658,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ nucleum
 @ publica
 functio scala(f32 x) → f32 {
@@ -3540,14 +3678,16 @@ functio scala(f32 x) → f32 {
 functio adiuvans(f32 x) → f32 {
     redde x + 2.0
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 "#,
     )
@@ -3610,12 +3750,16 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio plana(f32 x) → f32 {
     redde x
@@ -3626,14 +3770,16 @@ functio plana(f32 x) → f32 {
 functio fragmentum(f32 x) → f32 {
     redde x
 }
-",
+"#,
     )
     .expect("lib");
 
     let app = home.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "probe:probe" probe
 "#,
     )
@@ -3749,6 +3895,8 @@ source = "src"
 [build]
 kind = "lib"
 targets = ["rust"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("manifest");
@@ -3756,12 +3904,12 @@ targets = ["rust"]
     // body never closes.
     fs::write(
         provider.join("src/probe.fab"),
-        "functio scala(f32 x) → f32 {\n    redde x + 1.0\n",
+        "+++\nlocale = \"la\"\n+++\nfunctio scala(f32 x) → f32 {\n    redde x + 1.0\n",
     )
     .expect("broken lib");
 
     let app = home.join("app.fab");
-    fs::write(&app, "importa ex \"probe:probe\" probe\n").expect("app");
+    fs::write(&app, "+++\nlocale = \"la\"\n+++\nimporta ex \"probe:probe\" probe\n").expect("app");
     let source = fs::read_to_string(&app).expect("read app");
 
     let _guard = LibraryHomeGuard::set(&home);
@@ -3825,7 +3973,7 @@ fn prepare_program_module_fails_closed_on_unparsable_library() {
     fs::write(&app, "importa ex \"./math\" math\n").expect("app");
     let source = fs::read_to_string(&app).expect("read app");
 
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
     let diagnostic = match crate::program::compile::prepare_program_module(&app, &source, &session) {
         Ok(prepared) => panic!(
             "parse-failed library must fail the program compile closed, got contract bindings {:?}",
@@ -3855,19 +4003,23 @@ fn import_contract_carries_static_field_default_from_sibling() {
     let lectio = dir.join("lectio.fab");
     fs::write(
         &lectio,
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Tab {
     fixum numerus LIMES = 7
     varia numerus w = 1
 }
-",
+"#,
     )
     .expect("lectio");
     let app = dir.join("app.fab");
     fs::write(
         &app,
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "./lectio" lectio
 incipit {
     print lectio.Tab.LIMES
@@ -3905,7 +4057,9 @@ fn interface_snapshot_carries_nondum_gates_in_every_spelling() {
     // interface, so the importer refuses every use (SEM017).
     let (program, interner) = super::parse_program_for_namespace_exports(
         "producer.fab",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 @ nondum "pending host dispatch"
 functio later(textus s) → textus
@@ -3923,7 +4077,7 @@ functio nunc(textus s) → textus {
     redde s
 }
 "#,
-        None,
+        Some(&la_locale_pack()),
     )
     .expect("parse producer source");
 
@@ -3959,7 +4113,9 @@ fn interface_snapshot_carries_nondum_method_gates() {
     // method record, so the importer refuses every call (SEM017).
     let (program, interner) = super::parse_program_for_namespace_exports(
         "producer.fab",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Nexus {
     varia numerus id
@@ -3977,7 +4133,7 @@ genus Nexus {
     }
 }
 "#,
-        None,
+        Some(&la_locale_pack()),
     )
     .expect("parse producer source");
 
@@ -4062,7 +4218,11 @@ fn unresolved_norma_import_is_unknown_library_module_before_emit() {
 fn resolvable_norma_import_is_not_unknown_library_module() {
     let (_td, home) = temp_dir("known-norma-module");
     let app = home.join("main.fab");
-    fs::write(&app, "importa ex \"norma:text\" text\n\nincipit {\n    nota \"ok\"\n}\n").expect("write app");
+    fs::write(
+        &app,
+        "+++\nlocale = \"la\"\n+++\nimporta ex \"norma:text\" text\n\nincipit {\n    nota \"ok\"\n}\n",
+    )
+    .expect("write app");
 
     let result = crate::program::compile_cli_path(&app, false, crate::codegen::Target::HirGo);
     assert!(

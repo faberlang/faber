@@ -1,0 +1,22 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for sorted_map.from_map: the map is sorted once at
+# construction, so keys and values read back in key order. Output must match
+# under `faber run` and a `faber build` Rust binary.
+
+import from "norma:sorted_map" sorted_map
+
+main {
+    mut map<string, int> source ← {}
+    source.put("pear", 3)
+    source.put("apple", 1)
+    source.put("fig", 2)
+    let sorted_map.SortedMap<string, int> m ← sorted_map.from_map<string, int>(source)
+    print m.length()
+    print m.keys()
+    print m.values()
+    print m.get("fig")
+    print m.has("kiwi")
+}

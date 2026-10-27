@@ -133,7 +133,7 @@ fn itera_ex_textus_element_is_not_numerus() {
 #[test]
 fn itera_ex_octeti_binds_index_element_type() {
     test_support::assert_accepts(
-        "functio f(octeti b) → vacuum {
+        "functio f(lista<b8> b) → vacuum {
     itera ex b sit x {
         sit b8 y ← x
         nota y

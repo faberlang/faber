@@ -3,7 +3,7 @@
     "runner": {
       "outcome": "pass",
       "expect": {
-        "exit_nonzero": true,
+        "exit": 70,
         "stderr_contains": "numerus overflow"
       }
     },
@@ -14,12 +14,10 @@
       "reason": "The runner reports the shift-count trap as a clean nonzero exit with `error: numerus overflow`; the generated Rust executable raises the same trap by panicking (thread 'main' panicked at ...: numerus overflow, exit 101) instead of printing the trap diagnostic, so the rust lane's stderr is not the product error surface. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
     },
     "clif": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "failure_kind": "nonzero-exit",
-      "reason": "math-shift-overflow uses no leaf route, so it clears the clif capability classifier, links and runs, but it is expected to trap: the generated executable exits nonzero with `error: numerus overflow` on the shift-count overflow instead of printing a value, the same trap oracle the runner row pins. This row is not a clif backend gap; it is the trap contract measured on the clif lane.",
+      "outcome": "pass",
       "expect": {
-        "exit_nonzero": true
+        "exit": 70,
+        "stderr_contains": "numerus overflow"
       }
     },
     "c": {

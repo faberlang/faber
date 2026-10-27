@@ -13,7 +13,7 @@ check_only = false
 outcome = "pass"
 
 [targets.runner.expect]
-exit_nonzero = true
+exit = 70
 stdout_contains = "before\n"
 stderr_contains = "abort: boom"
 check_only = false

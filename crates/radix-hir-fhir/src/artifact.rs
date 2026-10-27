@@ -634,7 +634,16 @@ pub struct FunctionProvenanceTableWire {
 /// schema-v45 artifacts fail closed. Version 47 adds the source-shaped
 /// `HirExpressionKind::Scan` node and its proven grouped-key domain; schema-v46
 /// artifacts fail closed because the serialized HIR enum changed.
-pub const SCHEMA_VERSION: u32 = 47;
+/// Version 48 adds `HirPresentation::template_holes` (the authored template
+/// hole spans of interpolated strings) and the derived wire-shape hash
+/// (`HirArtifact::shape_hash`, see [`crate::wire_shape_hash`]) beside the
+/// version. `HirPresentation::radical_quarta_ids` (2026-10-19) was added
+/// without its own bump, so earlier v47 artifacts carry a different
+/// positional layout than this reader; schema-v47 artifacts fail closed. From
+/// version 48 on, a serialized-shape change is also caught mechanically: the
+/// header hash is derived from the live type definitions, so a layout change
+/// that forgot this bump still fails closed on decode.
+pub const SCHEMA_VERSION: u32 = 48;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1003,6 +1012,14 @@ pub struct DisplayTokensWire {
 pub struct HirArtifact {
     /// Schema version — starts at 1, ratchets on breaking changes (F3).
     pub schema_version: u32,
+
+    /// Hash of the serialized wire shape (types, field order, enum variants)
+    /// derived from the live type definitions, not hand-maintained: always
+    /// [`crate::wire_shape_hash`] when written. Second wire field, read right
+    /// after the version; decode rejects any artifact whose hash differs from
+    /// the reader's, so a layout change that forgot the `SCHEMA_VERSION` bump
+    /// still fails closed instead of decoding misaligned.
+    pub shape_hash: u64,
 
     /// Content-hash + relative-path identity (no absolute build-host paths).
     pub source_identity: SourceIdentity,

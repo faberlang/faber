@@ -13,6 +13,6 @@ check_only = false
 outcome = "pass"
 
 [targets.runner.expect]
-exit_nonzero = true
+exit = 70
 stderr_contains = "does not fit in `d64`"
 check_only = false

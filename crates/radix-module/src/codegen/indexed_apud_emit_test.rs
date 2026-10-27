@@ -29,7 +29,7 @@ incipit {
 }"#;
 
 fn emit(target: Target, source: &str) -> String {
-    let session = Session::new(Config::default().with_target(target));
+    let session = Session::new(Config::default().with_latin_locale().with_target(target));
     let result = compile(&session, "apud.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "{:?}", result.diagnostics);
     match result.output {
@@ -84,7 +84,7 @@ fn ts_builds_value_keyed_tuple_map() {
 
 #[test]
 fn faber_reemit_keeps_the_bracket_list_key() {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     let pack = crate::locale::latin_locale_pack();
     let result = reemit_faber(&session, &pack, "apud.fab", COMPOSITE);
     assert!(result.success(), "{:?}", result.diagnostics);

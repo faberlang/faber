@@ -318,11 +318,10 @@ fn manifest_declared_targets_keep_their_analysis_identity() {
     fs::create_dir_all(dir.join("src")).expect("src");
     fs::write(dir.join("src/main.fab"), "main {}\n").expect("source");
     let manifest_path = dir.join("faber.toml");
-    let spellings = Target::ALL.iter().map(ToString::to_string).chain([
-        "typescript".to_owned(),
-        "wasm".to_owned(),
-        "fmir-bin".to_owned(),
-    ]);
+    let spellings = Target::ALL
+        .iter()
+        .map(ToString::to_string)
+        .chain(["typescript".to_owned(), "wasm".to_owned()]);
     for spelling in spellings {
         let expected =
             radix::program::manifest::manifest_build_target(Some(&spelling), &manifest_path);
@@ -422,18 +421,18 @@ fn package_check_refuses_the_manifest_target_build_refuses() {
     )
     .expect("manifest");
     let mut errors = Vec::new();
-    for operation in ["check", "build", "build-explicit"] {
+    for op in ["check", "build", "build-explicit"] {
         let output = Command::new(std::env::current_exe().expect("test executable"))
             .args([
                 "--exact",
                 "package::tests::manifest_target_command_probe",
                 "--nocapture",
             ])
-            .env("FABER_MANIFEST_TARGET_PROBE", operation)
+            .env("FABER_MANIFEST_TARGET_PROBE", op)
             .env("FABER_MANIFEST_TARGET_PROBE_INPUT", dir.path())
             .output()
             .expect("run package command probe");
-        assert_eq!(output.status.code(), Some(1), "{operation}: {output:?}");
+        assert_eq!(output.status.code(), Some(78), "{op}: {output:?}");
         let stderr = String::from_utf8(output.stderr).expect("diagnostic UTF-8");
         assert!(
             stderr.contains("build.target 'ada' is not a build target"),
@@ -997,7 +996,9 @@ rustc = ""
     .expect("write lock");
     fs::write(
         locked_interfaces.join("fs/path.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio locked_label() → textus {
   redde "locked"
@@ -1007,7 +1008,9 @@ functio locked_label() → textus {
     .expect("write locked norma interface");
     fs::write(
         library_home.join("norma/src/fs/path.fab"),
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio fallback_label() → textus {
   redde "fallback"
@@ -2965,7 +2968,7 @@ main args args {
   let string source ← fs.join(partes)
   partes ← [nested, "source-link"]
   let string link ← fs.join(partes)
-  let bytes payload ← |41 42|
+  let list<b8> payload ← |41 42|
   fs.write_bytes(source, payload)
   fs.create_link(source, link)
   print fs.is_symlink(link)
@@ -3017,7 +3020,7 @@ main args args {
   fs.create_dir(dir)
   partes ← [dir, "data.bin"]
   let string target ← fs.join(partes)
-  let bytes payload ← |41 42 43|
+  let list<b8> payload ← |41 42 43|
   fs.write_bytes(target, payload)
   print fs.byte_length(target)
   fs.delete(target)
@@ -3224,9 +3227,9 @@ fn package_mir_cli_root_octeti_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operand bytes raw
+@ operand list<b8> raw
 main args args {
-  let bytes raw ← args.raw
+  let list<b8> raw ← args.raw
   print raw.length()
 }
 "#,
@@ -5409,12 +5412,14 @@ fn compile_package_preserves_file_stem_named_type_under_import_alias() {
     write_temp_library_fixture(
         library_home.path(),
         "Thing",
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 genus Thing {
     varia textus name
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("alias-stem-type-entry");
@@ -5633,7 +5638,7 @@ fn compile_package_emits_norma_text_encode() {
 import from "norma:text" text
 
 main {
-  let bytes raw ← text.encode("Salve")
+  let list<b8> raw ← text.encode("Salve")
   print text.decode(raw)
 }
 "#,
@@ -6032,7 +6037,7 @@ import from "norma:console" const read_line as line_reader, read_bytes as bytes_
 
 main {
   let string line ← line_reader() coalesce ""
-  let bytes chunk ← bytes_reader(4) coalesce |00|
+  let list<b8> chunk ← bytes_reader(4) coalesce |00|
 }
 "#,
     )
@@ -8367,12 +8372,17 @@ source = "src"
 kind = "lib"
 target = "ts"
 targets = ["ts"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("lalib/src/math.fab"),
-        r#"# Public import: importa ex "lalib:math" math
+        r#"+++
+locale = "la"
++++
+# Public import: importa ex "lalib:math" math
 
 @ publica
 genus Vector3 {
@@ -8717,7 +8727,7 @@ provider = "lib-target"
 
 #[test]
 fn discover_package_accepts_manifest_package_mir_targets() {
-    for target in ["rust", "scena", "fmir-text", "fmir", "fmir-bin"] {
+    for target in ["rust", "scena", "fmir-text", "fmir"] {
         let dir = test_temp_dir(&format!("manifest-target-{}", target.replace('-', "_")));
         let src = dir.join("src");
         fs::create_dir_all(&src).expect("create src");
@@ -9100,12 +9110,14 @@ fn check_package_types_top_level_json_solve_namespace_call() {
     write_temp_library_fixture(
         library_home.path(),
         "json/solve",
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio solve(textus json) → valor {
     redde json ↦ valor
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("top-level-json-solve-entry");
@@ -9453,14 +9465,16 @@ fn compile_package_rejects_private_library_type_through_file_namespace_alias() {
     write_temp_library_fixture(
         library_home.path(),
         "types",
-        r"
+        r#"+++
+locale = "la"
++++
 @ privata
 genus Secretum {
 }
 
 genus Publicum {
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("private-library-type-entry");
@@ -9493,7 +9507,9 @@ fn compile_package_rejects_private_library_function_through_file_namespace_alias
     write_temp_library_fixture(
         library_home.path(),
         "helpers",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ privata
 functio secretum() → textus {
     redde "hidden"
@@ -10438,12 +10454,14 @@ fn transitive_nested_lista_lista_textus_typechecks() {
     write_temp_library_fixture(
         library_home.path(),
         "nested_lista_probe",
-        r"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio vacua_tabula() → lista<lista<textus>> {
     redde vacua
 }
-",
+"#,
     );
 
     let dir = test_temp_dir("transitive-nested-lista-entry");
@@ -10477,7 +10495,9 @@ fn transitive_import_text_via_fixture_library_compiles() {
     write_temp_library_fixture(
         library_home.path(),
         "transitive_fixture",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:text" chorda
 
 @ publica
@@ -10524,7 +10544,9 @@ fn transitive_library_import_cycle_is_rejected() {
     write_temp_library_fixture(
         library_home.path(),
         "cycle_a",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:cycle_b" cycle_b
 
 functio label() → textus {
@@ -10535,7 +10557,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "cycle_b",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:cycle_a" cycle_a
 
 functio label() → textus {
@@ -10612,7 +10636,9 @@ fn transitive_library_diamond_dedupes_shared_dependency() {
     write_temp_library_fixture(
         library_home.path(),
         "shared_d",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio tag() → textus {
     redde "d"
@@ -10622,7 +10648,9 @@ functio tag() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "dep_b",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:shared_d" shared_d
 
 @ publica
@@ -10634,7 +10662,9 @@ functio via_b() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "dep_c",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:shared_d" shared_d
 
 @ publica
@@ -10646,7 +10676,9 @@ functio via_c() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "leaf_a",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:dep_b" dep_b
 importa ex "norma:dep_c" dep_c
 
@@ -10706,7 +10738,9 @@ fn transitive_library_import_closure_preserves_publica_visibility() {
     write_temp_library_fixture(
         library_home.path(),
         "child",
-        r#"
+        r#"+++
+locale = "la"
++++
 functio label() → textus {
     redde "child"
 }
@@ -10715,7 +10749,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "parent",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:child" publica child
 
 functio parent_label() → textus {
@@ -10772,7 +10808,9 @@ fn publica_library_import_surfaces_as_nested_namespace_binding() {
     write_temp_library_fixture(
         library_home.path(),
         "child",
-        r#"
+        r#"+++
+locale = "la"
++++
 @ publica
 functio label() → textus {
     redde "child"
@@ -10782,7 +10820,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "parent",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:child" publica child
 
 functio parent_label() → textus {
@@ -10825,7 +10865,9 @@ fn privata_transitive_library_import_does_not_surface_as_nested_namespace_bindin
     write_temp_library_fixture(
         library_home.path(),
         "child",
-        r#"
+        r#"+++
+locale = "la"
++++
 functio label() → textus {
     redde "child"
 }
@@ -10834,7 +10876,9 @@ functio label() → textus {
     write_temp_library_fixture(
         library_home.path(),
         "parent",
-        r#"
+        r#"+++
+locale = "la"
++++
 importa ex "norma:child" child
 
 functio parent_label() → textus {
@@ -10982,7 +11026,6 @@ fn use_package_compiler_keeps_rust_and_metal_fab_on_package_path() {
     assert!(use_package_compiler(Target::MirScena, fab, false));
     assert!(use_package_compiler(Target::MirFmir, fab, false));
     assert!(use_package_compiler(Target::MirFmirBinary, fab, false));
-    assert!(use_package_compiler(Target::MirFmirBundle, fab, false));
     assert!(use_package_compiler(Target::HirFhir, fab, false));
     assert!(use_package_compiler(Target::MirMetal, fab, false));
     assert!(!use_package_compiler(Target::MirWgsl, fab, false));
@@ -11763,9 +11806,9 @@ main args args exit 0 {
   console.write_line_async(":")
   console.write_partial_async(console.read_line_async() coalesce "")
   console.write_line("")
-  let bytes sync_bytes ← console.read_bytes(4) coalesce |00|
+  let list<b8> sync_bytes ← console.read_bytes(4) coalesce |00|
   console.write_bytes_async(sync_bytes)
-  let bytes async_bytes ← console.read_bytes_async(4) coalesce |00|
+  let list<b8> async_bytes ← console.read_bytes_async(4) coalesce |00|
   console.write_bytes(async_bytes)
   console.warn_line_async("warn")
   console.debug_line_async("debug")
@@ -13937,12 +13980,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"@ publica
+        r#"+++
+locale = "la"
++++
+@ publica
 functio nil() → vacuum {
     tacet
 }
@@ -14033,12 +14081,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"@ publica
+        r#"+++
+locale = "la"
++++
+@ publica
 functio nil() → vacuum {
     tacet
 }
@@ -14111,21 +14164,29 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testlib/src/inner.fab"),
-        r"@ interna
+        r#"+++
+locale = "la"
++++
+@ interna
 functio dupla(numerus value) → numerus {
     redde value * 2
 }
-",
+"#,
     )
     .expect("write nested library module");
     fs::write(
         lib_root.join("testlib/src/outer.fab"),
-        r#"importa ex "testlib:inner" inner
+        r#"+++
+locale = "la"
++++
+importa ex "testlib:inner" inner
 
 @ publica
 functio computa(numerus value) → numerus {
@@ -14194,12 +14255,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"@ radix lane "air"
+        r#"+++
+locale = "la"
++++
+@ radix lane "air"
 functio inner(tensor<f32, [2,2]> a, tensor<f32, [2,2]> b) → tensor<f32, [2,2]> {
     redde a + b
 }
@@ -14416,12 +14482,17 @@ source = "src"
 kind = "lib"
 target = "fmir"
 targets = ["fmir"]
+[reader]
+locale = "la"
 "#,
     )
     .expect("write library manifest");
     fs::write(
         lib_root.join("testgrad/src/gradient.fab"),
-        r#"importa ex "testgrad:tensor" tensor
+        r#"+++
+locale = "la"
++++
+importa ex "testgrad:tensor" tensor
 
 @ publica
 functio nil() → vacuum {
@@ -14443,15 +14514,18 @@ functio simple_loss(
     .expect("write gradient module");
     fs::write(
         lib_root.join("testgrad/src/tensor.fab"),
-        r"functio fill(f32 v) → f32 {
+        r#"+++
+locale = "la"
++++
+functio fill(f32 v) → f32 {
     redde v
 }
-",
+"#,
     )
     .expect("write tensor module");
     fs::write(
         lib_root.join("testgrad/src/math.fab"),
-        "fixum f32 epsilon = 0.00001\n",
+        "+++\nlocale = \"la\"\n+++\nfixum f32 epsilon = 0.00001\n",
     )
     .expect("write math module");
 

@@ -534,7 +534,7 @@ impl Host for StdioHost {
 
     fn abort(&mut self, reason: &str) -> ! {
         let _ = writeln!(io::stderr(), "abort: {reason}");
-        std::process::exit(1);
+        std::process::exit(radix_runtime_contract::trap::abort_exit_status(reason));
     }
 
     fn provider(&mut self, _provider: &MirProvider) -> Result<Value, RunnerError> {

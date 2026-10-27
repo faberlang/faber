@@ -1,0 +1,59 @@
++++
+locale = "en"
++++
+
+# Pure-module proof for norma:json and its lexer, parser and serializer leaves.
+# Every public route is called by this case: the facade (parse, try_parse,
+# stringify), the solve and serialize modules it delegates to, and each lexer
+# classifier. Output must match under `faber run` and a `faber build` Rust binary.
+
+import from "norma:json" json_codec
+import from "norma:json/lexer" lexer
+import from "norma:json/serialize" encoder
+import from "norma:json/solve" parser
+import from "norma:value" value
+
+main {
+    # Lexer classifiers.
+    print lexer.is_whitespace(" ")
+    print lexer.is_whitespace("x")
+    print lexer.skip_whitespace("  \t\nab", 0)
+    print lexer.skip_whitespace("ab", 1)
+    print lexer.is_digit("7")
+    print lexer.is_digit("a")
+    print lexer.is_terminator(",")
+    print lexer.is_terminator("}")
+    print lexer.is_terminator("x")
+    print lexer.is_control("\n")
+    print lexer.is_control("a")
+    print lexer.needs_escape(«"»)
+    print lexer.needs_escape("\n")
+    print lexer.needs_escape("a")
+    print lexer.escape_char("\n") coalesce "none"
+    print lexer.escape_char("a") is none
+    print lexer.control_escape("\n")
+    let string unescaped ← lexer.unescape_char("n") coalesce "none"
+    print unescaped ≡ "\n"
+    print lexer.unescape_char("z") is none
+    print lexer.hex_value("f") coalesce -1
+    print lexer.hex_value("A") coalesce -1
+    print lexer.hex_value("g") is none
+
+    # Parsing through the facade and through the solve module. Each parse
+    # result is used once: a `json` converted to `value` is consumed.
+    let string wire ← «{"name":"faber","n":42,"xs":[1,2,3],"ok":true,"none":null}»
+    let value tree ← json_codec.parse(wire) ↦ value
+    print value.is_map(tree)
+    print value.get(tree, "name") ↦ string ⊥ "?"
+    print value.get(tree, "n") ↦ int ⊥ -1
+    print value.get_index(value.get(tree, "xs"), 2) ↦ int ⊥ -1
+    print json_codec.try_parse(«{"a":1») is none
+    print json_codec.try_parse(«{"a":[1,2]}») is none
+    print parser.try_parse("{") is none
+    print value.is_map(parser.parse(«{"a":[true,false]}») ↦ value)
+
+    # Serialization through the facade and through the serialize module.
+    print json_codec.stringify(json_codec.parse(wire))
+    print encoder.stringify(parser.parse(«{"a":[true,false]}»))
+    print json_codec.stringify(json_codec.parse("{\"s\":\"a\\nb\\u0001\"}"))
+}

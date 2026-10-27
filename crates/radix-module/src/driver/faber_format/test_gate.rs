@@ -32,8 +32,8 @@ pub fn lex_parse_with_pack(code: &str, pack: Option<&LocalePack>) -> Result<(), 
     let lex = match pack {
         Some(pack) => lexer::lex_with_locale_pack(code, pack),
         None => match crate::driver::default_code_pack(&crate::driver::Config::default()) {
-            Some(pack) => lexer::lex_with_locale_pack(code, &pack),
-            None => lexer::lex(code),
+            Ok(pack) => lexer::lex_with_locale_pack(code, &pack),
+            Err(diagnostic) => return Err(format!("default reader locale failed to load: {}", diagnostic.message)),
         },
     };
     if !lex.success() {

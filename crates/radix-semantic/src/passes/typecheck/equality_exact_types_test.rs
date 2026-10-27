@@ -121,7 +121,7 @@ incipit {
             name: "octeti_lista_eq_accepts",
             source: r#"
 incipit {
-    sit octeti raw ← |41|
+    sit lista<b8> raw ← |41|
     sit lista<b8> bytes ← |41|
     si raw ≡ bytes { nota "same" }
 }
@@ -134,7 +134,7 @@ incipit {
             name: "octeti_lista_u8_eq_rejects",
             source: r#"
 incipit {
-    sit octeti raw ← |41|
+    sit lista<b8> raw ← |41|
     sit lista<u8> bytes ← [0x41 ∷ u8]
     si raw ≡ bytes { nota "bad" }
 }

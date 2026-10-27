@@ -7,11 +7,11 @@
 //! leaked [`MatchValue`]; like text, nothing is reclaimed.
 
 use super::{
-    List, Present, TAG_MATCH, TAG_TEXT, flush, list_new_from, list_ref, text_bytes, text_new,
+    List, Present, TAG_MATCH, TAG_TEXT, exit_trap, list_new_from, list_ref, text_bytes, text_new,
     text_str,
 };
 use crate::regex_program::{self, MatchValue, RegexProgram};
-use std::io::Write;
+use radix_runtime_contract::trap::TrapKind;
 use std::sync::Mutex;
 
 /// The rejection payload of the latest failed compile.
@@ -92,10 +92,10 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_literal(pattern: *const u8) -> *c
     match RegexProgram::compile(&unsafe { text_of(pattern) }) {
         Ok(compiled) => leak(compiled),
         Err(payload) => {
-            flush();
-            let mut stderr = std::io::stderr();
-            let _ = writeln!(stderr, "error: constant regex is invalid: {payload}");
-            std::process::exit(1);
+            exit_trap(
+                &format!("constant regex is invalid: {payload}"),
+                TrapKind::Conversion,
+            );
         }
     }
 }
@@ -203,10 +203,7 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_replace_each(
         .collect();
     let Some(replaced) = unsafe { program(regex) }.replace_each(&unsafe { text_of(text) }, &pieces)
     else {
-        flush();
-        let mut stderr = std::io::stderr();
-        let _ = writeln!(stderr, "error: replace-each count mismatch");
-        std::process::exit(1);
+        exit_trap("replace-each count mismatch", TrapKind::ProgramLogic);
     };
     text_new(replaced.as_bytes())
 }

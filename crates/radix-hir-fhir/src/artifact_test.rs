@@ -152,64 +152,6 @@ fn selective_import_decode_passes_referential_integrity() {
     assert!(import.selective);
 }
 
-#[test]
-fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
-    // Schema-version receipt (fail-closed policy): `HirImport.selective` is an
-    // additive `#[serde(default)]` field, so the version stayed 4 at EOT-2W —
-    // no wire break, no compatibility decoder. Consumers of the bool today:
-    // radix-hir-faber decl emission (locale-preserving `fixum` list),
-    // radix-hir-rust namespace/use analysis (locals, not namespaces),
-    // radix-hir-ts decl emission (value-import form), radix-hir-go
-    // fail-closed, and this crate's round-trip/validate proof.
-    // EOT-3W ratchets to 5 (Transfer variant shifts serde ordinals), E3
-    // ratchets to 6 for resolver conversion-arm rows, and CTR-05 ratchets to
-    // 7 (registry rows replace destination-owned arm rows; the enum's
-    // retired conversion-arm payload leaves the serde'd HIR payload), and
-    // SCR-04 ratchets to 8 (capability-provenance summaries join the wire),
-    // and ATF-5 ratchets to 9 because authored type forms join presentation,
-    // and GPD-5 ratchets to 10 because resolved generic binding vectors join
-    // the wire. Schema 14 (provider-import-parity repair) carries analyzed
-    // provider carriage per unit — a serialized addition, so the wire breaks
-    // and there is no compatibility decoder for schema-v13 artifacts.
-    // Schema 15 adds the authored `iuncta` element label on
-    // `HirTypeForm` and `HirPresentation::tuple_label_accesses` so authored
-    // named-tuple labels and by-label reads survive re-emission — both are
-    // serialized presentation additions, so schema-v14 artifacts fail closed.
-    // Schema 16 (D4.1) removes the dead `HirCasuArm::guard` field — a
-    // serialized HIR removal, so schema-v15 artifacts fail closed.
-    // Schema 17 (D8.1) drops `HirStruct.extends` and `HirStruct.is_abstract`.
-    // Schema 18 (D2.1) adds `HirExpressionKind::Format`.
-    // Schema 20 (D16.1) replaces `HirField.is_static` with the field modifier.
-    // Schema 21 (D7.7) adds `HirPresentation::region` and the `Region` trivia
-    // owner kind.
-    // Schema 22 (D8.10) adds `HirPresentation::insere_exprs`.
-    // Schema 23 (D5.3) carries member visibility on `StructFieldSnapshot`.
-    // Schema 24 adds `HirPresentation::function_modifier_bindings`.
-    // Schema 25 adds `HirExpressionKind::Insere` (st1 U4).
-    // Schema 26 adds `HirExpressionKind::Widen` (inf-wn).
-    // Schema 29 (N7E-1) adds `Type::PolicyFloat`, shifting the serde ordinal of
-    // the `Type` variants after `SaturatingWord`.
-    // Schema 30 (IB-1) converts `HirExpressionKind::Itera` to named fields and
-    // adds the loop-binder `mutable` flag to the four loop nodes. Schema 31
-    // carries runtime shape-boundary obligations; schema 32 carries inferred
-    // per-target kernel requirements; schema 33 carries tensor edge policies;
-    // schema 34 carries runtime shape guards in provider units; schema 36
-    // reshapes `HirExpressionKind::Transfer` into `CopyInto`; schema 37 removes
-    // the legacy `Summa` and `Extremum` variants in favor of `Reduction`; schema 38
-    // adds `HirTypeSlot::TypedZero`; schema 39 adds
-    // `HirPresentation::empty_dense_ids`; schema 43 carries
-    // `ResolvedUseWire::local` (the unit-local def of each resolved use);
-    // schema 44 carries the unit's program display tokens (`true`, `false`,
-    // `none`, `tuple`) so a loaded unit prints the author's code-locale words;
-    // schema 45 adds `HirPresentation::axis_sugar` (the authored
-    // `t.sum(axis n)` / `t.mean(axis n)` calls typecheck expanded);
-    // schema 46 carries `HirArtifact::conversation_constructor` (the
-    // compiler-owned `sermo` definition the authored-form validator pairs a
-    // bare carrier with); schema 47 adds source-shaped scans and their key
-    // domain evidence.
-    assert_eq!(SCHEMA_VERSION, 47);
-}
-
 // ── EOT-3W transfer wire contract ────────────────────────────────────────
 
 #[test]

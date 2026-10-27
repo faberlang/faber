@@ -28,3 +28,4 @@ pub mod frame;
 pub mod instans;
 pub mod sparsa;
 pub mod tensor;
+pub mod trap;

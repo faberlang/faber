@@ -897,7 +897,6 @@ impl CliBuilder<'_> {
             "numerus" => CliType::Numerus,
             "fractus" => CliType::Fractus,
             "bivalens" => CliType::Bivalens,
-            "octeti" => CliType::Octeti,
             "ignotum" => CliType::Ignotum,
             other => {
                 self.error_with(span, ISSUE_UNSUPPORTED_TYPE, [("type", other.to_owned())]);
@@ -912,6 +911,9 @@ impl CliBuilder<'_> {
                 match self.interner.resolve(inner.name) {
                     "textus" => CliType::ListaTextus,
                     "numerus" => CliType::ListaNumerus,
+                    // `lista<b8>` is the raw byte operand (the retired
+                    // `octeti`/`bytes` word named the same type).
+                    "b8" => CliType::Octeti,
                     other => {
                         self.error_with(
                             span,

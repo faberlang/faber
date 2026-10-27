@@ -187,8 +187,6 @@ nihil = "ไม่มี"
 vacuum = "เปล่า"
 numquam = "ไม่เคย"
 ignotum = "ไม่รู้"
-octeti = "ไบต์"
-octetus = "ไบต์เดี่ยว"
 # Tensor edge-policy markers (`limes<P>()`): pin / wrap-around / mirror at the border.
 clampa = "ตรึงขอบ"
 reflexa = "สะท้อนขอบ"
@@ -201,7 +199,7 @@ instans = "อินสแตนซ์"
 objectum = "ออบเจ็กต์"
 quidlibet = "อะไรก็ได้"
 lista = "รายการ"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
 tabula = "ตาราง"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "สมุดบัญชี"
@@ -260,7 +258,7 @@ message = "ลิเทอรัลเทมเพลต backtick ไม่ป�
 help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
 
 [diagnostics.LEX001.issues.unterminated_octeti_literal]
-message = "ลิเทอรัล octeti ไม่ปิดท้าย"
+message = "ลิเทอรัล {lista}<b8> ไม่ปิดท้าย"
 help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
 
 [diagnostics.LEX001.issues.unterminated_regex_literal]
@@ -805,7 +803,7 @@ help = "เขียน hint เป็นอนุประโยค via หล�
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "convert hint ไม่ได้ตามหลังเป้าหมายในวงเล็บแหลม"
-help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `octeti<16> via Le`"
+help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `{lista}<b8, 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "ต้องมีนิพจน์"
@@ -1383,17 +1381,13 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "ต้องขยายการแยกโครงสร้าง object ก่อนลดระดับคำสั่ง"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
-[diagnostics.SEM008.issues.retired_byte_word]
-message = "คำว่า byte ถูกยกเลิกแล้ว: ใช้ b8 สำหรับบิตดิบ หรือ u8 สำหรับตัวเลข"
-help = "ใช้ b8 สำหรับไบต์ดิบ (lista<b8> สำหรับสายไบต์) หรือ u8 สำหรับไบต์ที่เป็นตัวเลข"
-
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "ตัวระบุความละเอียดต้องเป็นการสะกดเปล่า เช่น ms หรือ us"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "ชนิด primitive รับพารามิเตอร์ไม่ได้"
-help = "textus<N>, ascii<N> และ octeti<N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+help = "textus<N>, ascii<N> และ {lista}<b8, N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace ไม่ได้ส่งออก qualified type"
@@ -2376,16 +2370,16 @@ message = "ลูปนี้วนอยู่บน `{binding}` ดังน�
 help = "ใช้การเก็บค่าด้วยวงเล็บเหลี่ยมเพื่อแก้องค์ประกอบ หรือใช้ {queue} กับ {dum} สำหรับรายการงาน"
 
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
-message = "ลิเทอรัล octeti มีอักขระไม่ถูกต้อง '{character}'"
-help = "ใช้เฉพาะเลขฐานสิบหกในลิเทอรัล octeti"
+message = "ลิเทอรัล {lista}<b8> มีอักขระไม่ถูกต้อง '{character}'"
+help = "ใช้เฉพาะเลขฐานสิบหกในลิเทอรัล {lista}<b8>"
 
 [diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
-message = "ลิเทอรัล octeti มีจำนวนเลขฐานสิบหกเป็นคี่"
-help = "ระบุคู่ไบต์ให้ครบในลิเทอรัล octeti"
+message = "ลิเทอรัล {lista}<b8> มีจำนวนเลขฐานสิบหกเป็นคี่"
+help = "ระบุคู่ไบต์ให้ครบในลิเทอรัล {lista}<b8>"
 
 [diagnostics.SEM011.issues.octeti_literal_template_application]
-message = "ลิเทอรัล octeti ไม่รองรับการใช้ template"
-help = "ใช้การจัดรูปแบบ textus แทนการเรียกลิเทอรัล octeti"
+message = "ลิเทอรัล {lista}<b8> ไม่รองรับการใช้ template"
+help = "ใช้การจัดรูปแบบ textus แทนการเรียกลิเทอรัล {lista}<b8>"
 
 [diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
 message = "{method} รับอาร์กิวเมนต์ชนิด payload ได้ไม่เกินหนึ่งรายการ"
@@ -2481,7 +2475,7 @@ help = "ใช้ numerus หรือช่วง integer เพื่อทำ
 
 [diagnostics.SEM011.issues.window_requires_list]
 message = "window [lo‥hi] ต้องใช้ list"
-help = "ใช้ window [lo‥hi] กับค่า lista, textus หรือ octeti เท่านั้น"
+help = "ใช้ window [lo‥hi] กับค่า lista, textus หรือ {lista}<b8> เท่านั้น"
 
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "ดัชนี array ต้องเป็น numerus"
@@ -2656,7 +2650,7 @@ message = "intervallum clamp ต้องการชนิด bound ที่�
 help = "ทำให้ชนิดองค์ประกอบ bound ของต้นทางและเป้าหมายตรงกัน"
 
 [diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
-message = "ไม่รองรับเป้าหมายการ materialize ของ sermo; ต้องเป็น vacuum, valor, scalar (numerus, fractus, bivalens, textus, ascii, octeti, instans) หรือ lista<T>"
+message = "ไม่รองรับเป้าหมายการ materialize ของ sermo; ต้องเป็น vacuum, valor, scalar (numerus, fractus, bivalens, textus, ascii, {lista}<b8>, instans) หรือ lista<T>"
 help = "เลือกเป้าหมายการ materialize ของ sermo ที่รองรับ"
 
 [diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
@@ -2704,7 +2698,7 @@ message = "การแปลง cursor เป็น valor ข้ามขอบ
 help = "materialize cursor ผ่าน lista ก่อนข้ามขอบเขต"
 
 [diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
-message = "การแปลงจาก numerus, fractus หรือ bivalens เป็น octeti ไม่ได้ระบุไว้ (ความกว้างไบต์และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
+message = "การแปลงจาก numerus, fractus หรือ bivalens เป็น {lista}<b8> ไม่ได้ระบุไว้ (ความกว้างไบต์และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
@@ -2720,11 +2714,11 @@ message = "การแปลงลิสต์ bits ที่เปลี่ย
 help = "เขียนลำดับไบต์พร้อมการแปลง เช่น lista<b8> ↦ lista<u16> via Le; การแปลงความกว้างเดียวกันไม่รับอนุประโยค"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
-message = "การแปลงจาก octeti เป็น numerus ไม่ได้ระบุไว้ (ความกว้างไบต์และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
+message = "การแปลงจาก {lista}<b8> เป็น numerus ไม่ได้ระบุไว้ (ความกว้างไบต์และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
 
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
-message = "การแปลงจาก octeti เป็น fractus ไม่ได้ระบุไว้ (ความกว้าง IEEE และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
+message = "การแปลงจาก {lista}<b8> เป็น fractus ไม่ได้ระบุไว้ (ความกว้าง IEEE และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
@@ -2737,7 +2731,7 @@ help = "ใช้หนึ่งใน Hex, Bin, Oct, Be, Le หรือ Code �
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "เป้าหมายการแปลงนี้ไม่รับ convert hint"
-help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "float หรือทศนิยมไม่แปลงเป็นจำนวนเต็มหากไม่ระบุการปัดเศษ"
@@ -2752,7 +2746,7 @@ message = "คีย์ map ที่แปลงจากหรือเป็�
 help = "เขียน map ด้วยคีย์ textus; การแปลงไม่ parse คีย์ และ `@ json` บน class กำหนด wire mapping"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
-message = "การแปลงจาก octeti เป็น bivalens ไม่มีความหมายเริ่มต้น; ถอดรหัสเป็น textus หรือเปรียบเทียบไบต์อย่างชัดเจน"
+message = "การแปลงจาก {lista}<b8> เป็น bivalens ไม่มีความหมายเริ่มต้น; ถอดรหัสเป็น textus หรือเปรียบเทียบไบต์อย่างชัดเจน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
 
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
@@ -2921,19 +2915,19 @@ help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@
 
 [diagnostics.SEM018.issues.empty_radix_typus_domain]
 message = "โดเมน typus ของ @ radix ต้องมีชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
-help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+help = "ใช้ `@ radix typus T in textus {lista}<b8>` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
 
 [diagnostics.SEM018.issues.missing_type_param]
 message = "@ radix typus ต้องมีพารามิเตอร์ชนิด generic"
-help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+help = "ใช้ `@ radix typus T in textus {lista}<b8>` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
 
 [diagnostics.SEM018.issues.non_identifier_type_param]
 message = "พารามิเตอร์ typus ของ @ radix ต้องเป็น identifier"
-help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+help = "ใช้ `@ radix typus T in textus {lista}<b8>` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
 
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "ค่าที่อนุญาตของ @ radix typus ต้องเป็นชนิด"
-help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+help = "ใช้ `@ radix typus T in textus {lista}<b8>` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "ไม่รู้จัก directive ของ @ radix; ต้องเป็น `lane`"
@@ -3547,6 +3541,13 @@ help = "ใช้ «...» กับข้อความที่มีเคร
 message = "สตริงนี้หลบอักขระ `\\\"`; เขียนด้วย «…» ซึ่งไม่ต้องหลบอักขระใด ๆ"
 help = "ใช้ «...» กับข้อความที่มีเครื่องหมายคำพูด"
 
+[diagnostics.WARN035]
+message = "เทมเพลตนี้ผสมช่องแทนค่าแบบธรรมดากับแบบมีเลขกำกับ; ช่องแบบธรรมดาอ่านค่า {reads}"
+help = "ใส่เลขกำกับให้ทุกช่อง (`§0`, `§1`, …) เพื่อให้แต่ละช่องอ่านอาร์กิวเมนต์ที่ตั้งใจ"
+
+[diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
+message = "เทมเพลตนี้ผสมช่องแทนค่าแบบธรรมดากับแบบมีเลขกำกับ; ช่องแบบธรรมดาอ่านค่า {reads}"
+help = "ใส่เลขกำกับให้ทุกช่อง (`§0`, `§1`, …) เพื่อให้แต่ละช่องอ่านอาร์กิวเมนต์ที่ตั้งใจ"
 
 [llm]
 system_prompt_snippet = "Emit Thai reader-locale Faber using Thai keywords for declarations, control flow, loops, returns, booleans, common primitive types, and lista/tabula collections. Keep Faber glyph syntax unchanged. เมื่อสตริงมีอักขระเครื่องหมายคำพูด (\" หรือ ') ให้เขียนด้วย «…»: กิลเลอเมต์ไม่ต้องใช้การหลีกอักขระใด ๆ"

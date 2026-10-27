@@ -646,3 +646,68 @@ incipit {
 "#,
     );
 }
+
+fn mixed_hole_warnings(source: &str) -> Vec<String> {
+    test_support::analyze_source_la(source)
+        .diagnostics
+        .iter()
+        .filter(|err| {
+            !err.is_error()
+                && test_support::issue(err) == Some("mixed_plain_numbered_template_holes")
+        })
+        .map(|err| {
+            assert_eq!(crate::semantic_spec(err.kind).code, "WARN035");
+            err.args
+                .iter()
+                .find(|arg| arg.name == "reads")
+                .map(|arg| arg.value.to_string())
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
+#[test]
+fn mixed_plain_and_numbered_holes_warn_and_name_what_plain_holes_read() {
+    let source = r#"
+incipit {
+    sit textus a ← "§0 and §"("a")
+    sit textus b ← "§ § §0"("a", "b")
+    nota a
+    nota b
+}
+"#;
+    assert_eq!(
+        mixed_hole_warnings(source),
+        vec!["§=§0".to_owned(), "§=§0, §=§1".to_owned()]
+    );
+    // The numbering is unchanged: the mixed literal still erases as built.
+    let (template, args) = scriptum_application(source);
+    assert_eq!(template, "§0 and §");
+    assert_eq!(args, vec!["str:a".to_owned()]);
+}
+
+#[test]
+fn mixed_labeled_and_numbered_holes_warn() {
+    let source = r#"
+incipit {
+    sit textus out ← "§{a} §0"("x")
+    nota out
+}
+"#;
+    assert_eq!(mixed_hole_warnings(source), vec!["§{a}=§0".to_owned()]);
+}
+
+#[test]
+fn uniform_hole_literals_do_not_warn_about_mixing() {
+    let source = r#"
+incipit {
+    sit textus a ← "§ §"("x", "y")
+    sit textus b ← "§1 §0"("x", "y")
+    sit textus c ← "§{p} §{q}"(p: "x", q: "y")
+    nota a
+    nota b
+    nota c
+}
+"#;
+    assert!(mixed_hole_warnings(source).is_empty());
+}

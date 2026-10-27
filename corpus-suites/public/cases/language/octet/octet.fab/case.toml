@@ -7,18 +7,3 @@ input = "octet/octet.fab"
 
 [expect]
 check_only = true
-
-[targets.mir]
-outcome = "rejects"
-phase = "emit"
-diagnostic_contains = "retired_byte_word"
-
-[targets.roundtrip]
-outcome = "rejects"
-phase = "emit"
-diagnostic_contains = "retired_byte_word"
-
-[targets.runner]
-outcome = "rejects"
-phase = "run"
-diagnostic_contains = "retired_byte_word"

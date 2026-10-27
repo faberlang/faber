@@ -167,3 +167,29 @@ fn explicit_indexes_do_not_consume_automatic_positions() {
     );
     assert_eq!(analysis.erased, "§2 § §");
 }
+
+#[test]
+fn plain_numbered_mix_names_what_each_plain_hole_reads() {
+    assert_eq!(
+        analyze_template("§0 and §").plain_numbered_mix().as_deref(),
+        Some("§=§0")
+    );
+    assert_eq!(
+        analyze_template("§ § §0").plain_numbered_mix().as_deref(),
+        Some("§=§0, §=§1")
+    );
+    assert_eq!(
+        analyze_template("§{a} §1 §{a}")
+            .plain_numbered_mix()
+            .as_deref(),
+        Some("§{a}=§0")
+    );
+}
+
+#[test]
+fn plain_numbered_mix_is_none_without_both_kinds() {
+    assert_eq!(analyze_template("§ §").plain_numbered_mix(), None);
+    assert_eq!(analyze_template("§{a} §{b}").plain_numbered_mix(), None);
+    assert_eq!(analyze_template("§0 §1 §0").plain_numbered_mix(), None);
+    assert_eq!(analyze_template("no holes").plain_numbered_mix(), None);
+}

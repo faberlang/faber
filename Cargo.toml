@@ -79,6 +79,30 @@ codegen-units = 256
 debug = 1
 codegen-units = 256
 
+# The compile pipeline and the MIR runner are CPU-bound interpreters of large
+# programs: at opt-level 0 the `session_dispatch` hardware tests spend their
+# time building device images (`radix-mir` lane-index proofs) and running the
+# sequential oracle (`radix-mir-runner`, instantiated in `radix-module`,
+# `radix-program` and `faber`), 2.5-3x slower than at opt-level 1. Measured
+# 2026-10-27: those 82 tests cost 186 CPU-s at opt-level 0 and 68 CPU-s at
+# opt-level 1; the whole `faber_cli` executable 450 -> 255 CPU-s. Under a
+# loaded machine that CPU cost is what pushed the executable past the
+# stage-4b 600 s timeout. Debug assertions and overflow checks stay on.
+[profile.dev.package.radix-mir]
+opt-level = 1
+
+[profile.dev.package.radix-mir-runner]
+opt-level = 1
+
+[profile.dev.package.radix-module]
+opt-level = 1
+
+[profile.dev.package.radix-program]
+opt-level = 1
+
+[profile.dev.package.faber]
+opt-level = 1
+
 # Public export: the private code generators' feature names stay
 # declared so the `cfg(feature = ...)` gates they leave behind are known.
 [workspace.lints.rust]

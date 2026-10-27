@@ -19,6 +19,7 @@ mod decode;
 mod error;
 mod msgpack;
 pub mod package;
+mod shape;
 
 #[cfg(test)]
 mod commune_emit_test;
@@ -33,6 +34,7 @@ pub use artifact::DisplayTokensWire;
 pub use artifact::*;
 pub use decode::{decode, encode};
 pub use error::HirArtifactError;
+pub use shape::wire_shape_hash;
 // FPF-5: the MessagePack package codecs are the live `.fhirpkg` wire
 // (package schema v2); the postcard package codec is the legacy v1 path.
 pub use msgpack::{MsgpackError, decode_package_msgpack, encode_package_msgpack};

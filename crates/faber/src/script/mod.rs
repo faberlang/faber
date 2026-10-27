@@ -169,20 +169,16 @@ pub(crate) fn source_declares_non_kernel_import(name: &str, source: &str) -> boo
     let Ok(peeled) = radix::module::driver::peel_raw_source(name, source) else {
         return false;
     };
-    // TEMPORARY STAGING: the pack-less fallback reads the
-    // no-locale default while `RADIX_DEFAULT_CODE_LOCALE=en`; unset keeps the
-    // historical pack-less (Latin) reading.
-    let code_pack =
+    // The no-locale default is `en`; a default pack that fails to load is a
+    // failed read, not a Latin fallback.
+    let Some(code_pack) =
         faber_cli::package::default_config_with_locale(radix::module::Target::HirTypeScript)
             .ok()
             .and_then(|config| config.locale_pack)
-            .or_else(|| {
-                radix::module::driver::default_code_pack(&radix::module::driver::Config::default())
-            });
-    let lex = match code_pack.as_ref() {
-        Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
-        None => radix::module::lexer::lex(peeled.body),
+    else {
+        return false;
     };
+    let lex = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
     let parse = radix::module::parser::parse(lex);
     let Some(program) = parse.program else {
         return false;
@@ -212,20 +208,16 @@ pub(crate) fn source_declares_cli_entry(name: &str, source: &str) -> bool {
     let Ok(peeled) = radix::module::driver::peel_raw_source(name, source) else {
         return false;
     };
-    // TEMPORARY STAGING: the pack-less fallback reads the
-    // no-locale default while `RADIX_DEFAULT_CODE_LOCALE=en`; unset keeps the
-    // historical pack-less (Latin) reading.
-    let code_pack =
+    // The no-locale default is `en`; a default pack that fails to load is a
+    // failed read, not a Latin fallback.
+    let Some(code_pack) =
         faber_cli::package::default_config_with_locale(radix::module::Target::HirTypeScript)
             .ok()
             .and_then(|config| config.locale_pack)
-            .or_else(|| {
-                radix::module::driver::default_code_pack(&radix::module::driver::Config::default())
-            });
-    let lex = match code_pack.as_ref() {
-        Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
-        None => radix::module::lexer::lex(peeled.body),
+    else {
+        return false;
     };
+    let lex = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
     let parse = radix::module::parser::parse(lex);
     let Some(program) = parse.program else {
         return false;
@@ -282,6 +274,26 @@ pub fn interpret_source<H: Host>(
     run_named(name, source, host).map(|_| ())
 }
 
+/// The tool's exit status for a run that failed before or while running.
+///
+/// Front-end error diagnostics are the source's fault ([`exit_status::DATA_ERROR`]
+/// or the class they carry). A MIR or runner failure keeps
+/// [`exit_status::FAILURE`]: it may be the program's own trap, whose status is
+/// the program's, not the tool's.
+#[cfg(feature = "runner")]
+pub fn status_for_run_source_error(error: &RunSourceError) -> i32 {
+    match error {
+        RunSourceError::Frontend(diagnostics) => {
+            faber_cli::exit_status::status_for_diagnostics(diagnostics)
+        }
+        // A runner trap carries its class from the shared trap table.
+        RunSourceError::Stepper(errors) => errors
+            .first()
+            .map_or(faber_cli::exit_status::FAILURE, |error| error.exit_status()),
+        RunSourceError::Mir(_) => faber_cli::exit_status::FAILURE,
+    }
+}
+
 /// Run source via the runner, printing errors and exiting the process on failure.
 #[cfg(feature = "runner")]
 pub fn interpret_source_or_exit(name: &str, source: &str, host: &mut StdioHost) {
@@ -293,7 +305,7 @@ pub fn interpret_source_or_exit(name: &str, source: &str, host: &mut StdioHost) 
         }
         Err(error) => {
             print_run_source_error(&error);
-            std::process::exit(1);
+            std::process::exit(status_for_run_source_error(&error));
         }
     }
 }

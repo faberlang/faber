@@ -20,6 +20,11 @@ fn temp_fab(label: &str, content: &str) -> (tempfile::TempDir, String) {
     (dir, path.to_string_lossy().to_string())
 }
 
+/// Tag a Latin test source with its `la` reader locale.
+fn la(source: &str) -> String {
+    format!("+++\nlocale = \"la\"\n+++\n{source}")
+}
+
 fn temp_dir(label: &str) -> tempfile::TempDir {
     crate::test_support::test_temp_dir(&format!("main-dir-{label}"))
 }
@@ -143,20 +148,6 @@ fn cmd_targets_fmir_delegated_capabilities() {
     );
     assert_eq!(target_name(crate::codegen::Target::MirFmirBinary), "fmir");
     assert_eq!(target_extension(crate::codegen::Target::MirFmirBinary), "fmir");
-
-    let fmir_bin = target_capabilities(crate::codegen::Target::MirFmirBundle);
-    assert!(!fmir_bin.package);
-    assert!(!fmir_bin.build);
-    assert!(!fmir_bin.run);
-    assert!(
-        fmir_bin
-            .note
-            .contains("delegated to `faber build --target fmir-bin`"),
-        "unexpected fmir-bin note: {}",
-        fmir_bin.note
-    );
-    assert_eq!(target_name(crate::codegen::Target::MirFmirBundle), "fmir-bin");
-    assert_eq!(target_extension(crate::codegen::Target::MirFmirBundle), "run");
 }
 
 #[test]
@@ -311,10 +302,6 @@ fn cmd_targets_keeps_faber_package_capabilities_off_radix_surface() {
             crate::codegen::Target::MirFmirBinary,
             "delegated to `faber build --target fmir`",
         ),
-        (
-            crate::codegen::Target::MirFmirBundle,
-            "delegated to `faber build --target fmir-bin`",
-        ),
     ] {
         let radix = target_capabilities_for_surface(TargetCommandSurface::Radix, target);
         let faber = target_capabilities_for_surface(TargetCommandSurface::Faber, target);
@@ -345,7 +332,6 @@ fn cmd_targets_discovery_hides_legacy_scena() {
 
     assert!(names.contains(&"fmir-text"));
     assert!(names.contains(&"fmir"));
-    assert!(names.contains(&"fmir-bin"));
     assert!(!names.contains(&"scena"), "scena must stay hidden from target discovery");
 }
 
@@ -412,7 +398,6 @@ fn rust_and_runner_declare_the_n2_leaves() {
         crate::codegen::Target::HirRust,
         crate::codegen::Target::MirFmir,
         crate::codegen::Target::MirFmirBinary,
-        crate::codegen::Target::MirFmirBundle,
     ] {
         assert_eq!(target_leaves(target), Leaf::ALL, "{target} must declare N2 leaves");
     }
@@ -533,7 +518,7 @@ fn hir_aspect_verify_reports_checker_unavailable_without_success() {
 
 #[test]
 fn diagnostics_check_reports_parse_record() {
-    let result = check_diagnostics_for_source("main.fab", "si verum tacet", false);
+    let result = check_diagnostics_for_source("main.fab", &la("si verum tacet"), false);
 
     assert!(!result.success);
     assert_eq!(result.diagnostics.len(), 1);
@@ -658,13 +643,15 @@ fn diagnostics_check_rejects_undeclared_latin_keyword_in_grammar_position() {
 
 /// Shared fixture: compiles the `add_one` nucleum and returns parsed reflection JSON.
 fn gpu_reflection_fixture() -> (String, serde_json::Value) {
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ nucleum
 @ publica
 functio add_one(f32 x) → f32 {
     redde x + 1.0
 }
-";
+"#;
     let result = compile_cli_source("main.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(result.success(), "{:?}", result.diagnostics);
@@ -1247,13 +1234,15 @@ fn emit_reflection_json_webgpu_dispatch_and_builtins() {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn gpu_builtin_emit_reflection_json_serializes_source_names_for_builtin_inputs() {
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ nucleum
 @ publica
 functio copy(tf32[4] input, varia tf32[4] output, u32 id) → vacuum {
     output[id] ← input[id]
 }
-";
+"#;
     let result = compile_cli_source("main.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(result.success(), "{:?}", result.diagnostics);
@@ -1285,13 +1274,15 @@ fn gpu_builtin_named_parameters_are_rejected_as_raw_lane_ids() {
     // A trailing parameter named after a thread-id builtin is a raw lane id
     // under another spelling (gpu-reset rule 12.5). The compiler still binds
     // its own builtin inputs, but only for legal parameter names.
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ nucleum
 @ publica
 functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 global_invocation_x, u32 workgroup_id_y) → vacuum {
     output[global_invocation_x] ← input[global_invocation_x]
 }
-";
+"#;
     let result = compile_cli_source("main.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(!result.success(), "{:?}", result.diagnostics);
@@ -1604,11 +1595,13 @@ fn wgsl_text_source_vertex_entry_accepts_non_empty_body() {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_vertex_entry_rejects_missing_layout_facts() {
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ vertex
 functio lonely_vertex() → vacuum {
 }
-";
+"#;
     let result = compile_cli_source("missing-layout.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(!result.success(), "source vertex without layout facts must fail closed");
@@ -1904,7 +1897,7 @@ fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn emit_reflection_json_rejects_non_gpu_output() {
-    let result = compile_cli_source("main.fab", "incipit {}", crate::codegen::Target::HirRust);
+    let result = compile_cli_source("main.fab", &la("incipit {}"), crate::codegen::Target::HirRust);
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("rust output");
@@ -1936,7 +1929,11 @@ fn diagnostics_emit_can_render_semantic_record() {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn emit_faber_target_returns_canonical_faber_output() {
-    let result = compile_cli_source("main.fab", "incipit {\n  nota \"ok\"\n}\n", crate::codegen::Target::HirFaber);
+    let result = compile_cli_source(
+        "main.fab",
+        &la("incipit {\n  nota \"ok\"\n}\n"),
+        crate::codegen::Target::HirFaber,
+    );
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let Some(crate::Output::Faber(output)) = result.output else {
@@ -2011,10 +2008,10 @@ fn emit_faber_file_preserves_namespace_qualified_type_references() {
     let dir = dir_td.path();
     let types = dir.join("types.fab");
     let main = dir.join("main.fab");
-    std::fs::write(&types, "@ publica\ngenus Box {\n    varia textus value\n}\n").expect("write types");
+    std::fs::write(&types, la("@ publica\ngenus Box {\n    varia textus value\n}\n")).expect("write types");
     std::fs::write(
         &main,
-        "importa ex \"./types\" T\n\nincipit {\n    sit T.Box box ← T.Box { value = \"ok\" }\n    nota box.value\n}\n",
+        la("importa ex \"./types\" T\n\nincipit {\n    sit T.Box box ← T.Box { value = \"ok\" }\n    nota box.value\n}\n"),
     )
     .expect("write main");
 
@@ -2031,7 +2028,7 @@ fn emit_faber_file_preserves_namespace_qualified_type_references() {
 
 #[test]
 fn emit_fmir_target_rejection_preserves_delegation_message() {
-    let result = compile_cli_source("main.fab", "functio salve() {}", crate::codegen::Target::MirFmir);
+    let result = compile_cli_source("main.fab", &la("functio salve() {}"), crate::codegen::Target::MirFmir);
 
     assert!(!result.success());
     let diagnostic = result
@@ -2052,7 +2049,7 @@ fn emit_fmir_target_rejection_preserves_delegation_message() {
 
 #[test]
 fn mir_output_for_source_returns_deterministic_text() {
-    let output = mir_output_for_source("main.fab", "functio saluta() {}").expect("MIR output");
+    let output = mir_output_for_source("main.fab", &la("functio saluta() {}")).expect("MIR output");
 
     assert_eq!(
         output,
@@ -2077,7 +2074,7 @@ fn mir_output_for_source_returns_error_for_invalid_syntax() {
 fn mir_output_reports_unknown_library_module_for_unresolved_norma_import() {
     let (_td, path) = temp_fab(
         "mir-unknown-norma-module",
-        "importa ex \"norma:nonexistent\" nonexistent\n\nincipit {\n    nota \"unreachable\"\n}\n",
+        &la("importa ex \"norma:nonexistent\" nonexistent\n\nincipit {\n    nota \"unreachable\"\n}\n"),
     );
     let source = std::fs::read_to_string(&path).expect("read temp fab");
 
@@ -2094,7 +2091,7 @@ fn mir_output_reports_unknown_library_module_for_unresolved_norma_import() {
 fn mir_output_for_control_flow_source_returns_deterministic_text() {
     let output = mir_output_for_source(
         "main.fab",
-        "functio signum(numerus n) → numerus { si n ≻ 0 ergo redde n redde 0 }",
+        &la("functio signum(numerus n) → numerus { si n ≻ 0 ergo redde n redde 0 }"),
     )
     .expect("MIR output");
 
@@ -2125,7 +2122,9 @@ function f0 -> ty#1 {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_annotation_payload() {
-    let source = r#"
+    let source = r#"+++
+locale = "la"
++++
 @ fragment { mode = "x" }
 functio bad_fragment() → vacuum {
 }
@@ -2146,11 +2145,13 @@ functio bad_fragment() → vacuum {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_parameters() {
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ fragment
 functio bad_fragment(numerus x) → vacuum {
 }
-";
+"#;
     let result = compile_cli_source("fragment-params.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(!result.success(), "fragment entry with parameters must fail closed");
@@ -2167,12 +2168,14 @@ functio bad_fragment(numerus x) → vacuum {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_non_vacuum_return() {
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ fragment
 functio bad_fragment() → numerus {
     redde 1
 }
-";
+"#;
     let result = compile_cli_source("fragment-return.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(!result.success(), "fragment entry with non-vacuum return must fail closed");
@@ -2189,11 +2192,13 @@ functio bad_fragment() → numerus {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_error_type() {
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ fragment
 functio bad_fragment() → vacuum ⇥ textus {
 }
-";
+"#;
     let result = compile_cli_source("fragment-error.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(!result.success(), "fragment entry with error type must fail closed");
@@ -2275,7 +2280,9 @@ fn wgsl_text_vertex_body_reads_uv() {
 #[cfg(feature = "mir-wgsl")]
 #[test]
 fn wgsl_text_source_fragment_entry_rejects_multiple_entries() {
-    let source = r"
+    let source = r#"+++
+locale = "la"
++++
 @ fragment
 functio first_fragment() → vacuum {
 }
@@ -2283,7 +2290,7 @@ functio first_fragment() → vacuum {
 @ fragment
 functio second_fragment() → vacuum {
 }
-";
+"#;
     let result = compile_cli_source("fragment-count.fab", source, crate::codegen::Target::MirWgsl);
 
     assert!(!result.success(), "multiple fragment entries must fail closed");
@@ -2308,6 +2315,7 @@ fn emit_fhir_serializes_valid_faber_to_fhir_bytes() {
     let source = "incipit {\n  nota \"hello from fhir\"\n}\n";
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
+            .with_latin_locale()
             .with_target(crate::codegen::Target::HirFhir)
             .with_dev_locale_root(),
     );
@@ -2337,6 +2345,7 @@ fn emit_fhir_round_trip_hello_world() {
 
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
+            .with_latin_locale()
             .with_target(crate::codegen::Target::HirFhir)
             .with_dev_locale_root(),
     );
@@ -2442,7 +2451,7 @@ fn wrong_locale_diagnostic(result: &CheckDiagnosticsResult) -> Option<usize> {
     result.diagnostics.iter().position(|diagnostic| {
         diagnostic.code == Some("LOCALE002")
             && radix_semantic::arg_value(&diagnostic.args, "issue") == Some("source_reads_as_other_locale")
-            && radix_semantic::arg_value(&diagnostic.args, "detected") == Some("en")
+            && radix_semantic::arg_value(&diagnostic.args, "detected") == Some("la")
     })
 }
 
@@ -2461,26 +2470,26 @@ fn assert_wrong_locale_reported_first(name: &str, source: &str) {
 
 #[test]
 fn check_wrong_locale_source_reports_detected_locale_on_stdin_route() {
-    assert_wrong_locale_reported_first("<stdin>", "main { print 1 }");
+    assert_wrong_locale_reported_first("<stdin>", "incipit { nota 1 }");
 }
 
 #[test]
 fn check_wrong_locale_source_reports_detected_locale_on_file_route() {
-    let (_dir, path) = temp_fab("wrong-locale", "main { print 1 }");
+    let (_dir, path) = temp_fab("wrong-locale", "incipit { nota 1 }");
     let source = std::fs::read_to_string(&path).expect("read temp fab");
     assert_wrong_locale_reported_first(&path, &source);
 }
 
 #[test]
 fn check_wrong_locale_source_reports_detected_locale_on_command_route() {
-    assert_wrong_locale_reported_first("command-line", "main { print 1 }");
+    assert_wrong_locale_reported_first("command-line", "incipit { nota 1 }");
 }
 
 #[test]
 fn check_wrong_locale_source_reports_locales002_once_and_first() {
     // The reading note must not be doubled by a keyword-level LOCALE002 for
     // the same file, and it must precede the errors it explains.
-    let result = check_diagnostics_for_source("once.fab", "main { print 1 }", false);
+    let result = check_diagnostics_for_source("once.fab", "incipit { nota 1 }", false);
     assert!(!result.success, "diagnostics: {:?}", result.diagnostics);
     let notes: Vec<usize> = result
         .diagnostics

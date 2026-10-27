@@ -178,8 +178,6 @@ Avoid collisions among related rows. A shared Latin key is evaluated in its keyw
 - row: vacuum - section: types - current: trống - proposed: vô_giá_trị - confidence: high - equals-latin-key: no - reason: trống means empty rather than the no-value void type
 - row: numquam - section: types - current: không_bao_giờ - proposed: không_bao_giờ - confidence: high - equals-latin-key: no - reason: không_bao_giờ names the never concept in this row
 - row: ignotum - section: types - current: chưa_biết - proposed: chưa_biết - confidence: high - equals-latin-key: no - reason: chưa_biết names the unknown concept in this row
-- row: octeti - section: types - current: byte - proposed: dãy_byte - confidence: high - equals-latin-key: no - reason: byte is singular while octeti denotes a byte sequence
-- row: octetus - section: types - current: byte_đơn - proposed: byte_đơn - confidence: high - equals-latin-key: no - reason: byte_đơn names the byte concept in this row
 - row: clampa - section: types - current: kẹp_biên - proposed: kẹp_biên - confidence: high - equals-latin-key: no - reason: kẹp_biên names the clamp concept in this row
 - row: reflexa - section: types - current: phản_xạ_biên - proposed: phản_xạ_biên - confidence: high - equals-latin-key: no - reason: phản_xạ_biên names the reflect concept in this row
 - row: involuta - section: types - current: vòng_biên - proposed: vòng_biên - confidence: high - equals-latin-key: no - reason: vòng_biên names the wrap concept in this row

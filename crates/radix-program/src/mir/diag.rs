@@ -93,6 +93,11 @@ pub(super) fn mir_issue_diag(
 pub(super) fn runner_diagnostics(path: &Path, errors: Vec<RunnerError>) -> Vec<Diagnostic> {
     errors
         .into_iter()
-        .map(|error| mir_diag(path, error.message))
+        .map(|error| {
+            // The run's exit status travels with the diagnostic so the caller
+            // that exits the process applies the failure's sysexits class.
+            let status = error.exit_status().to_string();
+            mir_diag(path, error.message).with_arg("exit_status", status)
+        })
         .collect()
 }

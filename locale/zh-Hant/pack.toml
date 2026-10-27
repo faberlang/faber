@@ -187,8 +187,6 @@ nihil = "無"
 vacuum = "空值"
 numquam = "永不"
 ignotum = "未知"
-octeti = "位元組"
-octetus = "單位元組"
 # Tensor edge-policy markers (`limes<P>()`): pin / wrap-around / mirror at the border.
 clampa = "鉗制"
 reflexa = "反射"
@@ -201,7 +199,7 @@ instans = "執行個體"
 objectum = "物件"
 quidlibet = "任意值"
 lista = "列表"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
 tabula = "表格"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "帳本"
@@ -260,7 +258,7 @@ message = "未結束的反引號範本字面值"
 help = "在行尾或檔案結束前結束字串字面值"
 
 [diagnostics.LEX001.issues.unterminated_octeti_literal]
-message = "未結束的 octeti 字面值"
+message = "未結束的 {lista}<b8> 字面值"
 help = "在行尾或檔案結束前結束字串字面值"
 
 [diagnostics.LEX001.issues.unterminated_regex_literal]
@@ -849,7 +847,7 @@ help = "將提示寫成目標之後的 via 子句：`u32 via Le`、`ascii<8> via
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "轉換提示不跟在角括號裡的目標之後"
-help = "將提示寫成目標之後的 via 子句：`octeti<16> via Le`"
+help = "將提示寫成目標之後的 via 子句：`{lista}<b8, 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要運算式"
@@ -1415,17 +1413,13 @@ help = "修正用於降階的 AST 結構"
 message = "物件解構應在陳述式降階前展開"
 help = "修正用於降階的 AST 結構"
 
-[diagnostics.SEM008.issues.retired_byte_word]
-message = "byte 一詞已停用：原始位元請寫 b8，數值請寫 u8"
-help = "原始位元組使用 b8（位元組串用 lista<b8>），數值位元組使用 u8"
-
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "精度標記必須是裸拼寫，例如 ms 或 us"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "基本型別不能接受參數"
-help = "textus<N>、ascii<N> 和 octeti<N> 是已交付的有界形式"
+help = "textus<N>、ascii<N> 和 {lista}<b8, N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "命名空間未匯出限定型別"
@@ -2404,16 +2398,16 @@ message = "此迴圈正在走訪 `{binding}`，因此 `{method}` 不能改變它
 help = "用方括號賦值來更新元素，或對工作清單使用 {queue} 加 {dum}"
 
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
-message = "octeti 字面值包含無效字元 '{character}'"
-help = "octeti 字面值只能使用十六進位數字"
+message = "{lista}<b8> 字面值包含無效字元 '{character}'"
+help = "{lista}<b8> 字面值只能使用十六進位數字"
 
 [diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
-message = "octeti 字面值的十六進位數字數量為奇數"
-help = "octeti 字面值請提供完整的位元組配對"
+message = "{lista}<b8> 字面值的十六進位數字數量為奇數"
+help = "{lista}<b8> 字面值請提供完整的位元組配對"
 
 [diagnostics.SEM011.issues.octeti_literal_template_application]
-message = "octeti 字面值不支援範本套用"
-help = "請使用 textus 格式，而非 octeti 字面值呼叫"
+message = "{lista}<b8> 字面值不支援範本套用"
+help = "請使用 textus 格式，而非 {lista}<b8> 字面值呼叫"
 
 [diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
 message = "{method} 最多接受一個承載內容型別引數"
@@ -2509,7 +2503,7 @@ help = "使用 numerus 或整數範圍索引 textus"
 
 [diagnostics.SEM011.issues.window_requires_list]
 message = "視窗 [lo‥hi] 需要列表"
-help = "只能對 lista、textus 或 octeti 取視窗 [lo‥hi]"
+help = "只能對 lista、textus 或 {lista}<b8> 取視窗 [lo‥hi]"
 
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "陣列索引必須是 numerus"
@@ -2684,7 +2678,7 @@ message = "intervallum clamp 需要相符的界限型別"
 help = "使來源與目標的界限元素型別相符"
 
 [diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
-message = "不支援 sermo 具現化目標；預期為 vacuum、valor、scalar（numerus、fractus、bivalens、textus、ascii、octeti、instans）或 lista<T>"
+message = "不支援 sermo 具現化目標；預期為 vacuum、valor、scalar（numerus、fractus、bivalens、textus、ascii、{lista}<b8>、instans）或 lista<T>"
 help = "選擇受支援的 sermo 具現化目標"
 
 [diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
@@ -2732,7 +2726,7 @@ message = "cursor 至 valor 轉換跨越 eager/lazy 邊界；透過 `cursor ↦ 
 help = "在跨越邊界前，透過 lista 具現化 cursor"
 
 [diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
-message = "從 numerus、fractus 或 bivalens 轉換為 octeti 未指定（位元組寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
+message = "從 numerus、fractus 或 bivalens 轉換為 {lista}<b8> 未指定（位元組寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
 help = "使用 chorda 或明確的位元組轉換輔助工具"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
@@ -2748,11 +2742,11 @@ message = "會改變位元寬度的 bits 列表轉換需要 via Le 或 via Be �
 help = "在轉換時寫出位元組序，例如 lista<b8> ↦ lista<u16> via Le；同寬轉換不接受子句"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
-message = "從 octeti 轉換為 numerus 未指定（位元組寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
+message = "從 {lista}<b8> 轉換為 numerus 未指定（位元組寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
 help = "使用 chorda 或明確的位元組轉換輔助工具"
 
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
-message = "從 octeti 轉換為 fractus 未指定（IEEE 寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
+message = "從 {lista}<b8> 轉換為 fractus 未指定（IEEE 寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
 help = "使用 chorda 或明確的位元組轉換輔助工具"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
@@ -2765,7 +2759,7 @@ help = "via 之後使用 Hex、Bin、Oct、Be、Le 或 Code 其中之一；Floor
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "此轉換目標不接受轉換提示"
-help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "浮點或十進位未指明捨入方式時不會轉換為整數"
@@ -2780,7 +2774,7 @@ message = "與 valor 互相轉換的 map 索引鍵必須是 textus"
 help = "以 textus 索引鍵撰寫 map；轉換從不解析索引鍵，類別上的 `@ json` 定義 wire 對應"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
-message = "從 octeti 轉換為 bivalens 沒有預設意義；請解碼為 textus，或明確比較位元組"
+message = "從 {lista}<b8> 轉換為 bivalens 沒有預設意義；請解碼為 textus，或明確比較位元組"
 help = "使用 chorda 或明確的位元組轉換輔助工具"
 
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
@@ -2789,7 +2783,7 @@ help = "先轉換為 lista<b8>、lista<b16> 或 lista<b32>，再 ↦ textus（UT
 
 [diagnostics.SEM016.issues.textus_to_lista_unsupported]
 message = "textus 不能轉換為 lista；元素型別沒有指明是哪一種文字編碼"
-help = "用 ↦ lista<b8>（或 lista<b16>/lista<b32>）編碼，再從 octeti 著手；或明確建構字元的 lista"
+help = "用 ↦ lista<b8>（或 lista<b16>/lista<b32>）編碼，再從 {lista}<b8> 著手；或明確建構字元的 lista"
 
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "轉換為 promissum 會跨越 async/sync 邊界；使用 `@ futura` 或 `.tum()` 進行非同步包裝"
@@ -2949,19 +2943,19 @@ help = "在頂層 functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir
 
 [diagnostics.SEM018.issues.empty_radix_typus_domain]
 message = "@ radix typus 領域至少需要一個允許的型別"
-help = "使用 `@ radix typus T in textus octeti`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.missing_type_param]
 message = "@ radix typus 需要泛型型別參數"
-help = "使用 `@ radix typus T in textus octeti`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.non_identifier_type_param]
 message = "@ radix typus 參數必須是識別碼"
-help = "使用 `@ radix typus T in textus octeti`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "@ radix typus 允許值必須是型別"
-help = "使用 `@ radix typus T in textus octeti`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
+help = "使用 `@ radix typus T in textus {lista}<b8>`，或使用至少包含一個允許型別的加括號 `{radix_typus_braced}`"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "未知的 @ radix directive；預期為 `lane`"
@@ -3575,6 +3569,13 @@ help = "文字含引號時請使用 «...»"
 message = "該字串轉義了 `\\\"`；請改用 «…»，無需任何轉義"
 help = "文字含引號時請使用 «...»"
 
+[diagnostics.WARN035]
+message = "此範本混用了一般佔位符與帶編號佔位符；一般佔位符讀取 {reads}"
+help = "請為每個佔位符編號（`§0`、`§1`……），讓它們各自讀取你想要的引數"
+
+[diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
+message = "此範本混用了一般佔位符與帶編號佔位符；一般佔位符讀取 {reads}"
+help = "請為每個佔位符編號（`§0`、`§1`……），讓它們各自讀取你想要的引數"
 
 [llm]
 system_prompt_snippet = "Emit Traditional Chinese reader-locale Faber using Traditional Chinese keywords where the pack overrides Simplified Chinese rows, while preserving universal Faber glyph syntax. 當字串包含引號字元（\" 或 '）時，請用 «…» 書寫：法式引號無需任何轉義。"

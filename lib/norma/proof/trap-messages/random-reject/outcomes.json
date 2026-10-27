@@ -3,7 +3,7 @@
     "runner": {
       "outcome": "pass",
       "expect": {
-        "exit_nonzero": true,
+        "exit": 70,
         "stderr_contains": "InvalidArgument"
       }
     },

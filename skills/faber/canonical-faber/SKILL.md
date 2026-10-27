@@ -450,13 +450,13 @@ flag under the element walk: `if i ≻ 0 { out ← out + "," }` inside `for rang
 `for from f let dim`. This is the flat-carrier sibling of the rank-2
 container-walk rule above.
 
-### 5. Keep-class: `for range` stays when the index is the value, on zips, and on bytes
+### 5. Keep-class: `for range` stays when the index is the value, on zips, and on byte lists
 
 The leftover class is correct, not missed:
 
 - **Index is identity** — the index feeds a lookup that is not `xs.get(i)` on the same list (e.g. `tokenizer.is_eog(i)` vocab ids, best-index returns).
 - **Write-back** — the index writes into a collection, or feeds arithmetic on a different carrier.
-- **Bytes walks** — `for from o` over `bytes` now checks and binds `u8`, but the MIR runner rejects it (`unsupported MIR lowering: itera collection before iterator MIR lowering`); a byte-list helper keeps `for range` + `get(i) coalesce 0 ∷ u8`.
+- **Byte-list walks** — `for from o` over `list<b8>` now checks and binds `u8`, but the MIR runner rejects it (`unsupported MIR lowering: itera collection before iterator MIR lowering`); a byte-list helper keeps `for range` + `get(i) coalesce 0 ∷ u8`.
 
 Aligned collections are no longer keep-class: the lockstep walk
 `for from a, b let x, y` (`corpus/itera/lockstep-n2.fab`,

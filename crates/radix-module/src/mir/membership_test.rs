@@ -10,7 +10,11 @@ use crate::driver::{AnalyzeRequest, AnalyzedModule, Config, Session};
 use crate::mir::{BufferHost, dump_analyzed_unit, run_source};
 
 fn analyze(source: &str) -> AnalyzedModule {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }
 
@@ -36,7 +40,11 @@ fn program(condition: &str) -> String {
 }
 
 fn run(condition: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let mut host = BufferHost::default();
     run_source(&session, "membership.fab", &program(condition), &mut host).expect("runs");
     host.stdout_lines
@@ -81,7 +89,11 @@ fn runner_takes_the_right_branch_for_both_polarities() {
 
 /// Run a Latin-locale body that prints `yes` / `no` for each condition.
 fn run_body(body: &str) -> Vec<String> {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let mut host = BufferHost::default();
     let source = format!("incipit {{\n{body}\n}}\n");
     run_source(&session, "range-membership.fab", &source, &mut host).expect("runs");
@@ -175,7 +187,11 @@ fn stored_interval_membership_is_one_interval_contains_call() {
 
 #[test]
 fn range_operands_evaluate_left_to_right_and_once() {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let mut host = BufferHost::default();
     let source = "functio tick(numerus v) → numerus {\n    nota v\n    redde v\n}\n\
         incipit {\n    si tick(5) ∈ tick(0)‥tick(10) { nota \"hit\" }\n}\n";
@@ -220,6 +236,7 @@ main {
 fn range_membership_runs_inside_a_lane_loop_kernel_on_the_cpu_route() {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirTypeScript)
             .with_host_kernels(),
     );
@@ -234,7 +251,11 @@ fn range_membership_runs_inside_a_lane_loop_kernel_on_the_cpu_route() {
 #[test]
 fn range_membership_lowers_in_device_kernel_form_without_interval_ops() {
     let unit = crate::program::analyze_prepared_program_name(
-        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        &Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_target(Target::HirTypeScript),
+        ),
         "range-kernel-device.fab",
         &format!("+++\nlocale = \"en\"\n+++\n{KERNEL}"),
     )

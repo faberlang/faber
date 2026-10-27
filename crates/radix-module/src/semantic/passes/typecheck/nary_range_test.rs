@@ -6,11 +6,11 @@
 //! checked exactly as user packages meet it — parse, lower, typecheck — and,
 //! since NR-4 (e55457166), the Rust target emits the product.
 
-use super::test_support::{assert_accepts, assert_analysis_accepts, assert_analysis_rejects_with_issue};
+use super::test_support::{assert_accepts_la, assert_analysis_accepts_la, assert_analysis_rejects_with_issue_la};
 
 #[test]
 fn n2_range_product_typechecks_through_the_driver() {
-    assert_analysis_accepts(
+    assert_analysis_accepts_la(
         r"
 functio grid(numerus m, numerus n) → vacuum {
     itera ab 0‥m, 0‥n sit i, j {
@@ -23,7 +23,7 @@ functio grid(numerus m, numerus n) → vacuum {
 
 #[test]
 fn n3_range_product_typechecks_through_the_driver() {
-    assert_analysis_accepts(
+    assert_analysis_accepts_la(
         r"
 functio cube(numerus m, numerus n, numerus k) → vacuum {
     itera ab 0‥m, 0‥n, 0‥k sit i, j, p {
@@ -36,7 +36,7 @@ functio cube(numerus m, numerus n, numerus k) → vacuum {
 
 #[test]
 fn n1_range_keeps_the_shared_itera_path_through_the_driver() {
-    assert_analysis_accepts(
+    assert_analysis_accepts_la(
         r"
 functio line(numerus m) → vacuum {
     itera ab 0‥m sit i {
@@ -49,7 +49,7 @@ functio line(numerus m) → vacuum {
 
 #[test]
 fn driver_rejects_range_product_count_mismatch() {
-    assert_analysis_rejects_with_issue(
+    assert_analysis_rejects_with_issue_la(
         r"
 functio short(numerus m, numerus n) → vacuum {
     itera ab 0‥m, 0‥n sit i {
@@ -63,7 +63,7 @@ functio short(numerus m, numerus n) → vacuum {
 
 #[test]
 fn driver_rejects_range_product_extent_binder_shadowing() {
-    assert_analysis_rejects_with_issue(
+    assert_analysis_rejects_with_issue_la(
         r"
 functio shadow(numerus m, numerus k) → vacuum {
     itera ab 0‥m, 0‥k sit i, k {
@@ -77,7 +77,7 @@ functio shadow(numerus m, numerus k) → vacuum {
 
 #[test]
 fn driver_rejects_range_product_mixed_member() {
-    assert_analysis_rejects_with_issue(
+    assert_analysis_rejects_with_issue_la(
         r"
 functio mixed(numerus m, numerus n) → vacuum {
     itera ab 0‥m, n sit i, j {
@@ -91,7 +91,7 @@ functio mixed(numerus m, numerus n) → vacuum {
 
 #[test]
 fn driver_rejects_range_product_apud_clause() {
-    assert_analysis_rejects_with_issue(
+    assert_analysis_rejects_with_issue_la(
         r"
 functio coord(numerus m, numerus n) → vacuum {
     itera ab 0‥m, 0‥n apud [c] sit i, j {
@@ -107,7 +107,7 @@ functio coord(numerus m, numerus n) → vacuum {
 fn driver_keeps_lockstep_laws_off_the_range_product_route() {
     // The zip form (`ex`) keeps its own identity on the same mismatch shape:
     // the product never reaches the for-from lockstep checker.
-    assert_analysis_rejects_with_issue(
+    assert_analysis_rejects_with_issue_la(
         r"
 functio zip(lista<numerus> xs, lista<numerus> ys) → vacuum {
     itera ex xs, ys sit x {
@@ -127,7 +127,7 @@ fn rust_target_emits_the_range_product_through_the_driver() {
     // `radix-hir-rust` leaf). Through the driver that is a clean compile —
     // codegen output present, no error diagnostics. The malformed-product
     // laws above keep failing closed at typecheck.
-    assert_accepts(
+    assert_accepts_la(
         r"
 functio grid(numerus m, numerus n) → vacuum {
     itera ab 0‥m, 0‥n sit i, j {

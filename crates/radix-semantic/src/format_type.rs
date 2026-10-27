@@ -59,7 +59,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format!("ascii<{}>", format_figura(*capacity, types, interner))
         }
         Type::BoundedOcteti { capacity } => {
-            format!("octeti<{}>", format_figura(*capacity, types, interner))
+            format!("lista<b8, {}>", format_figura(*capacity, types, interner))
         }
 
         Type::Map(key, value) => format!(
@@ -289,7 +289,7 @@ fn primitive_to_faber(prim: Primitive) -> String {
         Primitive::Ignotum => "ignotum",
         Primitive::Json => "json",
         Primitive::Valor => "valor",
-        Primitive::Octeti => "octeti",
+        Primitive::Octeti => "lista<b8>",
         Primitive::Regex => "regex",
         // RD-3: internal display name only; there is no source spelling.
         Primitive::Match => "match",

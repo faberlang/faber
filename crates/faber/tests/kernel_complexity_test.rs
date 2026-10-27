@@ -256,7 +256,7 @@ fn kernel_complexity_deny_warn027_promotes_both_budgets_together() {
         Some(0),
         "promoted warnings must fail the check:\n{stderr}"
     );
-    assert_eq!(code, Some(1), "fatal promoted warnings exit 1:\n{stderr}");
+    assert_eq!(code, Some(65), "fatal promoted warnings exit 65:\n{stderr}");
     assert!(
         warn_count(&stderr) >= 2,
         "both budget tiers' findings present:\n{stderr}"

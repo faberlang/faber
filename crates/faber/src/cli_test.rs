@@ -385,17 +385,6 @@ fn cli_parses_fmir_target_for_build() {
 }
 
 #[test]
-fn cli_parses_fmir_bin_target_for_build() {
-    let build = Cli::try_parse_from(["faber", "build", "--target", "fmir-bin", "pkg"])
-        .expect("parse build fmir-bin target");
-    let Some(crate::cli::Command::Build(args)) = build.command else {
-        panic!("expected build subcommand");
-    };
-    assert_eq!(args.target, Some(FaberCliTarget::MirFmirBundle));
-    assert_eq!(args.input, "pkg");
-}
-
-#[test]
 fn cli_parses_complexity_budget_on_check() {
     let check = Cli::try_parse_from(["faber", "check", "--complexity-budget", "7", "main.fab"])
         .expect("parse check complexity budget");
@@ -1298,7 +1287,10 @@ fn check_library_long_help_states_v1_library_home_rule() {
 /// via callee closure, NOT-A-TARGET. Latin surface: file mode uses the
 /// canonical Latin reader. The kernel entry takes a `numerus<i32>` operand so
 /// its `+ 1` store is proven to fit (ruling 25, air1).
-const ALL_FOUR_VERDICTS: &str = r#"@ radix lane "air"
+const ALL_FOUR_VERDICTS: &str = r#"+++
+locale = "la"
++++
+@ radix lane "air"
 functio computus_purus(i32 x) → numerus {
     redde x + 1
 }

@@ -20,7 +20,8 @@ fn analyze_with(config: Config, source: &str) -> Result<AnalyzedModule, Vec<Diag
 }
 
 fn analyze_ok(source: &str) -> AnalyzedModule {
-    analyze_with(Config::default(), source).unwrap_or_else(|diagnostics| panic!("analysis failed: {diagnostics:?}"))
+    analyze_with(Config::default().with_latin_locale(), source)
+        .unwrap_or_else(|diagnostics| panic!("analysis failed: {diagnostics:?}"))
 }
 
 /// Every block-level local with an initializer, by name.
@@ -56,7 +57,7 @@ fn local_int(unit: &AnalyzedModule, name: &str) -> u64 {
 }
 
 fn rejection(source: &str, issue: &str) -> Diagnostic {
-    let diagnostics = match analyze_with(Config::default(), source) {
+    let diagnostics = match analyze_with(Config::default().with_latin_locale(), source) {
         Ok(unit) => panic!("expected {issue}, analysis succeeded: {:?}", unit.diagnostics),
         Err(diagnostics) => diagnostics,
     };
@@ -160,7 +161,9 @@ fn mori_in_a_local_body_is_a_build_error_naming_the_local() {
 #[test]
 fn faber_reemission_keeps_the_authored_local_body() {
     let unit = analyze_with(
-        Config::default().with_target(Target::HirFaber),
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirFaber),
         "incipit {\n    fixum numerus n = praefixum {\n        redde 2 + 2\n    }\n    nota n\n}\n",
     )
     .expect("analysis");
@@ -174,7 +177,7 @@ fn reemit_keeps_the_local_body_even_under_a_default_target_session() {
     // The roundtrip lane (and any other caller) hands `reemit_faber` a default
     // session; the evaluating targets would print the literal in the body's
     // place, because a block-level constant keeps no authored copy.
-    let session = Session::new(Config::default().with_dev_locale_root());
+    let session = Session::new(Config::default().with_latin_locale().with_dev_locale_root());
     let result = crate::driver::reemit_faber(
         &session,
         &crate::locale::latin_locale_pack(),

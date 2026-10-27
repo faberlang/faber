@@ -928,7 +928,7 @@ productions. It is not a second keyword authority.
 | Params | `argumenta` | CLI arguments modifier |
 | Expression | `ascendens` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `aut` | or |
-| Grammar | `axis` | keyword literal derived from the production |
+| Params | `axis` | axis marker word: a parameter declares it (`axis int a`), a call echoes it (`t.mean(axis 1)`); shared source spelling; contextual |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `cape` | local handler |
 | Error | `capta` | capture boundary (error channel reified as a value) |
@@ -995,7 +995,7 @@ productions. It is not a second keyword authority.
 | Error | `mori` | panic |
 | Declarations | `nomen` | import binding name |
 | Boolean | `non` | not |
-| Grammar | `nondum` | keyword literal derived from the production |
+| Annotation | `nondum` | availability marker `@ nondum` (en `@ unstable`) |
 | Literals | `nonnumerus` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `nota` | note |
 | Annotation | `nucleum` | kernel annotation |
@@ -1290,7 +1290,7 @@ parser claims it in expression position when directly followed by a string
 literal; any other use of the spelling is an ordinary identifier). Lowering
 admits it only as the whole initializer of such a constant or field default;
 anywhere else (`x ← insere "p"`, a call argument, a `redde` value) it is `SEM061`
-`insere_outside_constant`. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `octeti` reads the raw bytes unconditionally. The result type follows the slot: a `_` slot, or no slot, is `SEM061` `insere_type_required`, and any other concrete slot type is `insere_type_invalid`.
+`insere_outside_constant`. The path is package-relative, resolved against the nearest ancestor `faber.toml` (or the source file's own directory when none exists); an absolute path or a `..` escape is rejected, and a missing file is a compile error. The file is read once, at build time — it is a build input, like the source itself. The declared type decides how the bytes land: `textus` requires valid UTF-8 and fails to build otherwise; `lista<b8>` reads the raw bytes unconditionally. The result type follows the slot: a `_` slot, or no slot, is `SEM061` `insere_type_required`, and any other concrete slot type is `insere_type_invalid`.
 
 ### Functions
 
@@ -1622,8 +1622,8 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - A call-site argument list (`callTypeArgs`) admits the same size forms: a natural (`take<2, 2>(a)`), a bracketed shape, a spelled lift (`size n`) or a dimension term (`n + 1`, `d / 2`). A bare name or `_` is a type there; the callee decides whether it binds a type or a `magnitudo` parameter.
-- Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
-- **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `via` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`octeti<16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
+- Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
+- **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `via` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
 - `labeledTypeArgument` is the optional label prefix on `iuncta` type arguments only (`iuncta<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`iuncta` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`iuncta<fixum: A>`).
@@ -1682,15 +1682,12 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `vacuum`   | void |
 | `numquam`  | never |
 | `ignotum`  | unknown |
-| `octeti`   | en `bytes`; the byte string, exactly `lista<b8>` |
-| `octeti<N>` | shipped; bounded byte buffer; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `octeti<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
-| `octetus`  | retired: `SEM008 retired_byte_word`; write `b8` for a raw byte or `u8` for a numeric byte. |
 
-Bare `textus` / `ascii` / `octeti` remain the unbounded productions. The
-shipped forms `textus<N>`, `ascii<N>`, and `octeti<N>` take
+Bare `textus` / `ascii` remain the unbounded productions. The
+shipped forms `textus<N>` and `ascii<N>` take
 one `magnitudo` / `NATURAL` applied argument. That `N` is capacity, not a
 width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
-`textus<_>`, `octeti<_>`, `lista<T, _>`) is a capacity hole: the form stays
+`textus<_>`, `lista<T, _>`) is a capacity hole: the form stays
 bounded, and `N` is inferred from a same-family bounded witness. Bare
 `ascii` is not a hole.
 
@@ -1702,7 +1699,7 @@ the call boundary as a recoverable error, never a silent reshape. Type parameter
 layout, `vector` and `matrix` register shapes, and `atomic<T>` stay compile-time; a whole-shape `_` must still resolve its rank at
 compile time.
 
-**`octeti` is `lista<b8>`**: the word names the list of raw
+**A byte string is `lista<b8>`**: the list of raw
 bytes; it is not a list of numbers, so `lista<b8>` converts to `lista<u8>`
 only with an explicit `↦` and never widens to `lista<int>` or `lista<b16>`.
 `ascii<1>` is an ordinary ASCII string of
@@ -2025,7 +2022,7 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   failable. `textus`/`ascii ↦ inf` accepts an
   optional sign and digits of any length (failable on malformed input; `via
   Hex|Bin|Oct` as for other integers); `inf ↦ textus` writes the decimal digits.
-  `inf ↔ octeti via Be|Le` is the minimal two's-complement encoding and its
+  `inf ↔ lista<b8> via Be|Le` is the minimal two's-complement encoding and its
   exact inverse. `inf ↦ bN` is rejected (no fixed width), and
   `inf ↦ littera via Code` is not a row (write `x ↦ u32 ↦ littera via Code`).
   `inf ↔ valor`/`json` carries the integer exactly.
@@ -2052,10 +2049,10 @@ semantics are carried per target, on an unbounded integer of the target's own:
 - **Supported.** The MIR runner (the oracle), Rust, TypeScript, Go and Python
   run the arithmetic, comparison, conversion and display rules above; the
   runner also runs the `itera` binder over `inf` bounds. The runner, Rust and TypeScript also carry
-  the `octeti via Be|Le` and `valor`/`json` rows with every digit; Go carries
-  `valor ↦ inf` and `octeti via Be|Le`. The Racket (`sexp`) target carries the
+  the `lista<b8> via Be|Le` and `valor`/`json` rows with every digit; Go carries
+  `valor ↦ inf` and `lista<b8> via Be|Le`. The Racket (`sexp`) target carries the
   arithmetic and comparison rows.
-- **Named gaps.** Python has no `↦ valor` and no `octeti` route; the Racket
+- **Named gaps.** Python has no `↦ valor` and no `lista<b8>` route; the Racket
   target lacks formatted display, genus printing and `↦ valor` (as it does for
   every type); Go fails closed on a few container and intrinsic constructs
   holding an `inf`; TypeScript keeps bounded `int` and `u64` as numbers, so a
@@ -2318,8 +2315,7 @@ A negative number pattern is written with a leading minus (`casu -1`,
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
 patterns (`casu u32` over a `numerus`) and length-shaped patterns (`casu
-lista<numerus, 4>` over a `lista<numerus>`; bounded `textus`, `ascii` and
-`octeti`; tensor figures). Ask an integer's width or range with an `est` test,
+lista<numerus, 4>` over a `lista<numerus>`; bounded `textus` and `ascii`; tensor figures). Ask an integer's width or range with an `est` test,
 and ask a length with `.longitudo()` in a `si`.
 
 There are no range patterns (`casu 1‥5`). Test the range with `si` inside the
@@ -2527,30 +2523,30 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 - `n ↦ ascii<N> via Hex|Bin|Oct` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
 - `n ↦ ascii<_> via Hex|Bin|Oct` — shipped for const-foldable numerus sources; the hole is solved to the source digit count. Runtime sources leave the hole unsolved and require explicit `N`.
 
-**The `via` clause (D11.9).** A convert hint is a clause on the conversion, not a type argument: `"ff" ↦ i32 via Hex`, `65 ↦ littera via Code`, `octeti[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32`. The grammar is `conversio_expr := '↦' type_annotation via_clause? inline_default?` and `via_clause := 'via' IDENTIFIER`.
+**The `via` clause (D11.9).** A convert hint is a clause on the conversion, not a type argument: `"ff" ↦ i32 via Hex`, `65 ↦ littera via Code`, `lista<b8>[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32`. The grammar is `conversio_expr := '↦' type_annotation via_clause? inline_default?` and `via_clause := 'via' IDENTIFIER`.
 
 - `via` is contextual: it is claimed only on the conversion's own line, immediately after the target type. Everywhere else it is an ordinary identifier (radix corpora contain 186 real uses of `via` as an identifier: gradus 129, examples 29, inferentia 26, norma 2).
 - The hint (`Hex`, `Bin`, `Oct`, `Be`, `Le`, `Code`) is a compile-time identifier that selects the conversion row. It is not part of the target type and it is not a keyword. The set is exactly those six (there is no `Radix` hint; `Bits` retired, see below). Hint spellings are the same short English identifiers in every locale; the word `via` itself is per-locale (`via` in en and la).
 - The clause binds tighter than the `⊥` default: `x ↦ u32 via Hex ⊥ 0` is `(x ↦ u32 via Hex) ⊥ 0`. Conversions chain, each hop with its own clause.
 - Whether a hint is known, and whether the target takes one, is semantic (lowering), not grammar.
 
-**Retired spellings.** Before D11.9 a hint was written as the second type argument of the `↦` target (`ascii<N, Hex>`, `littera<Code>`) or as a bracketed tail (`octeti<16><Le>`). Both are rejected at parse time (`conversio_hint_type_argument`, `conversio_hint_tail_argument`); the `via` clause is the only spelling.
+**Retired spellings.** Before D11.9 a hint was written as the second type argument of the `↦` target (`ascii<N, Hex>`, `littera<Code>`) or as a bracketed tail (`lista<b8, 16><Le>`). Both are rejected at parse time (`conversio_hint_type_argument`, `conversio_hint_tail_argument`); the `via` clause is the only spelling.
 
 The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code` are convert hints in the `via` clause, not keywords and not new `baseType` productions. For ascii output, `Hex` / `Bin` / `Oct` select the lowercase fixed-width digit pack; the hint is not part of type identity. Target support is not a grammar production (see Target Support).
 
 - `"ff" ↦ i32 via Hex` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
-- `octeti[lo‥hi] ↦ W via Be` / `… ↦ W via Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). `octeti` itself has no endian; `bytes ↦ u32` without `via Be` / `via Le` stays rejected. A short window fails (no pad).
-- `octeti[lo‥hi] ↦ f32 via Be|Le` / `… ↦ f64 via Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `via Be` / `via Le` mandatory).
-- `octeti ↦ tensor<E, [d1, …, dk]> via Le` / `… via Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` (`bytes`) or the bounded `octeti<N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `magnitudo n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `via Le` / `via Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`cape`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (an `octeti` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse `tensor ↦ octeti via Be|Le` is not available. `lista<f32> via Le` stays rejected (`SEM016` `unsupported_conversio`); the tensor row is the only bulk endian decode. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> via Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> via Be` prints `[258, 772]` where `via Le` prints `[513, 1027]`.
+- `lista<b8>[lo‥hi] ↦ W via Be` / `… ↦ W via Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). A `lista<b8>` itself has no endian; `lista<b8> ↦ u32` without `via Be` / `via Le` stays rejected. A short window fails (no pad).
+- `lista<b8>[lo‥hi] ↦ f32 via Be|Le` / `… ↦ f64 via Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `via Be` / `via Le` mandatory).
+- `lista<b8> ↦ tensor<E, [d1, …, dk]> via Le` / `… via Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `magnitudo n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `via Le` / `via Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`cape`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse `tensor ↦ lista<b8> via Be|Le` is not available. `lista<f32> via Le` stays rejected (`SEM016` `unsupported_conversio`); the tensor row is the only bulk endian decode. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> via Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> via Be` prints `[258, 772]` where `via Le` prints `[513, 1027]`.
 - `lista<bN> ↦ lista<E>` / `lista<E> ↦ lista<bN>` — bulk conversion between a raw-bits list and a numeric list (a `via Le` / `via Be` clause exactly when the bit width changes, and never when it stays the same). A same-width conversion (`lista<b8> ↦ lista<u8>`, `lista<b16> ↦ lista<u16>`, the signed twins, and back) takes no clause at any width, and a clause written on one is `SEM016` `bits_via_clause_not_allowed`. A width change (`lista<b8> ↦ lista<u16>`, `lista<u16> ↦ lista<b8>`, `lista<b8> ↦ lista<b16>`, `lista<b8> ↦ lista<f32>`) requires the clause (`SEM016` `bits_via_clause_required`): each source element is written as width/8 bytes in the byte order of the clause and the byte stream is regrouped at the target width, so `lista<b8> ↦ lista<u16> via Le` of `[1, 2, 3, 4]` is `[513, 1027]` and `via Be` is `[258, 772]`. A byte total that is not a whole number of target elements is a recoverable run-time error (`bits list length mismatch`). Shipped on the checker and the MIR runner; every emitter refuses the width-changing form by name. The `lista<b8> ↦ tensor<E, [shape]>` row above follows the same rule (no clause on an 8-bit element).
 - `via Bits` — **retired**. A bit pattern is a `bN` value (`b8`, `b16`, `b32`, `b64`), and the one rule is: from a number, `↦` converts the value; from bits, `↦` to a same-width type reads those bits as that type. A float to its pattern is `x ↦ b32` (b16 for f16 and bf16, b64 for f64); a pattern to a float is `p ↦ f32`; a number that holds a pattern says so in one step, `u16 ↦ b16 ↦ f16`. `n ↦ f32` on a `u32` stays the value conversion. Every `via Bits` spelling is `SEM016` (`conversio_via_bits_retired`), whose help names the `↦ bN` replacement.
-- `W ↦ bytes<N> via Be` / `… ↦ bytes<N> via Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `bytes<N>` whose `N` equals the source element's byte width. The `via Le` / `via Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source and an unsized `bytes` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded octeti. Register targets take the clause today: `v ↦ octeti<16> via Le`, `corpus[0‥16] ↦ vector<u32, 4> via Be`.
+- `W ↦ lista<b8, N> via Be` / `… ↦ lista<b8, N> via Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, N>` whose `N` equals the source element's byte width. The `via Le` / `via Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, N>`. Register targets take the clause today: `v ↦ lista<b8, 16> via Le`, `corpus[0‥16] ↦ vector<u32, 4> via Be`.
 - `'A' ↦ u32 via Code` — shipped; the code point as a `u32` (`u32` holds every code point, as Rust's `char as u32`); the source must be `littera`. `65 ↦ littera via Code` — shipped; builds the character for that code point, failing above U+10FFFF and on a surrogate. `Code` is a `via` hint like `Hex`/`Le`; any other hint on these targets, or a source/target type other than `littera`/`u32`, is `SEM016` (`code_hint_pair_mismatch`).
 - `n ↦ textus` / `n ↦ ascii` / `n ↦ littera` — a number's digits (D10.6): `7 ↦ textus` = `"7"`, `7 ↦ ascii` = `"7"`, `7 ↦ littera` = `'7'`; `littera` fails outside 0–9 (`42 ↦ littera` fails, two letters).
 - `littera ↦ numerus` — parses the digit, failing otherwise (as `"22" ↦ numerus` parses).
 - `littera ↦ textus` — the one-letter string; never fails.
 - `textus ↦ littera` — the only letter; fails unless the text is exactly one letter.
-- `octeti ↦ textus` — UTF-8 decode; can fail. `octeti ↦ ascii` — checks every byte is below 128, same bytes; can fail. `octeti[i‥i+1] ↦ ascii` — one byte through a window (mirrors `octeti[lo‥hi] ↦ W via Be`).
+- `lista<b8> ↦ textus` — UTF-8 decode; can fail. `lista<b8> ↦ ascii` — checks every byte is below 128, same bytes; can fail. `lista<b8>[i‥i+1] ↦ ascii` — one byte through a window (mirrors `lista<b8>[lo‥hi] ↦ W via Be`).
 
 Explicit integer narrowing is magnitude-checked on every backend:
 `n ↦ u8` converts a value that fits unchanged, and a value out of the
@@ -2614,22 +2610,42 @@ They are not interchangeable synonyms.
 | `«...»` | `textus` | block/multiline Unicode; `(...)` renders |
 | `` `...` `` | `forma` | captured templates; `(...)` captures |
 | `{ ... }` | `json` | compile-time object-rooted JSON document (`:` inside) |
-| `\|...\|` | `octeti` | compile-time hex bytes |
+| `\|...\|` | `lista<b8>` | compile-time hex bytes |
 | `"..." ↦ regex` | `regex` | compiled pattern from dynamic text (conversion) |
 | `regex /.../` | `regex` | inline raw pattern literal (locale regex type word) |
 | `_ /.../` | `regex` | inferred inline raw pattern literal |
 | `[ ... ]` | `lista<T>` | Faber list (not JSON array, not bytes) |
 
 `§` (U+00A7) is a template hole in Unicode forms (`"`, `«`, `` ` ``).
-§{label} names a hole with an identifier label; the label is unique within
-its template and may use a keyword spelling under the contextual law. Named
-holes are not available in `ascii` literals, where `§` remains forbidden.
+§{label} names a hole with an identifier label; the label may repeat within
+its template (see the hole rules below) and may use a keyword spelling under
+the contextual law. Named holes are not available in `ascii` literals, where
+`§` remains forbidden.
 
-A numbered hole `§N` means argument N; the same number may appear any number
-of times and one value serves all of them. A template needs max(N)+1 values,
-and every number below the highest must be read by some hole (an unread value
-is `template_application_arity_mismatch`). Plain `§` holes stay positional,
-one value each.
+Hole rules (P1-P5):
+
+- **P1, numbered holes select.** A numbered hole `§N` means argument N; the
+  same number may appear any number of times and one value serves all of
+  them. A template needs max(N)+1 values, so the count of holes does not
+  matter, and a value past the highest number is
+  `template_application_arity_mismatch`.
+- **P2, no gaps.** Every number below the highest must be read by some hole.
+  `"§0 and §2"` leaves argument 1 unread and is `template_hole_index_gap`,
+  whether or not the value count happens to match.
+- **P3, forma follows.** A backtick `forma` template obeys the same rules; its
+  parameter list holds one entry per distinct position.
+- **P4, a label is one position.** A repeated label reads the position its
+  first occurrence was assigned, takes one value, and consumes no extra
+  position (see Format-Template Application). The argument is evaluated once, however many
+  holes read it.
+- **P5, mixing warns.** Plain holes (an unnumbered `§`, named or not) count
+  from 0 in their own order and ignore numbered holes, so `"§0 and §"("a")` is `a and a` and
+  `"§ § §0"("a", "b")` is `a b a`. A literal that holds both kinds is the
+  warning `WARN035` (`mixed_plain_numbered_template_holes`); it names the
+  argument each plain hole reads and suggests numbering every hole. The
+  numbering itself does not change.
+
+Plain `§` holes stay positional, one value each.
 
 **Rendered templates** (`textus`): `"..."(...)` and `«...»(...)` lower to
 `scriptum("...", args...)`.
@@ -2663,7 +2679,7 @@ writes NUL). A regex pattern in `"..."` doubles its backslashes
 
 Implementation status (2026-10-11):
 
-- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `octeti`, `{ ... }` → `json`, text/ascii `↦ regex`, and the inline regex literals `regex /.../` and `_ /.../`.
+- Shipped: `"..."`, `«...»` block `textus`, `'...'` → `ascii`, `` `...` `` → `forma`, `|...|` → `lista<b8>`, `{ ... }` → `json`, text/ascii `↦ regex`, and the inline regex literals `regex /.../` and `_ /.../`.
 
 Inline block example:
 
@@ -2711,11 +2727,18 @@ erased at lowering, so "§{greet} world"(greet: "salve") lowers identically
 to the positional form `"§ world"("salve")` and its canonical
 `scriptum("§ world", "salve")` form.
 
-A numbered hole `§N` means argument N; the same number may appear any number
-of times and one value serves all of them. A template needs max(N)+1 values,
-and every number below the highest must be read by some hole (an unread value
-is `template_application_arity_mismatch`). Plain `§` holes stay positional,
-one value each.
+The hole rules P1-P5 (stated with the template literal forms above) in use:
+
+```fab
+# P1: one value serves every occurrence of a number; renders "her, her, her, and me".
+"§0, §0, §0, and §1"("her", "me")
+# P2: rejected, template_hole_index_gap (argument 1 is never read).
+"§0 and §2"("a", "b", "c")
+# P4: a repeated label is one position and one value; renders "x and x".
+"§{n} and §{n}"(n: "x")
+# P5: accepted with WARN035; the plain hole reads argument 0, so this renders "a and a".
+"§0 and §"("a")
+```
 
 This lowers to the compiler's `scriptum("...", args...)` form. Use the string-template form in ordinary source; reserve `scriptum(...)` for explicit desugaring examples and compiler-facing documentation.
 
@@ -2783,27 +2806,27 @@ Rank-N tensors use a list-shaped index expression such as `[[r, c]]` or a
 bound `lista<integer>` value. `grid[r, c]` is not syntax; `memberSuffix` still
 contains exactly one `expression` between brackets.
 
-For `octeti`, bracket indexing is a byte or an exclusive window:
+For a `lista<b8>` byte string, bracket indexing is a byte or an exclusive window:
 
 ```fab
 # One byte → u8. O(1). Traps on out-of-bounds.
 buf[i]
-# Exclusive window → octeti. Fully in bounds or fail (no short slice, no pad).
+# Exclusive window → lista<b8>. Fully in bounds or fail (no short slice, no pad).
 buf[lo‥hi]
 ```
 
 The index must be an integer or a range. A compile-time-provable out-of-range
-index on an octeti literal (`|de ad be ef|[0‥5]`) is a structured reject.
+index on a `|...|` literal (`|de ad be ef|[0‥5]`) is a structured reject.
 Runtime out-of-bounds traps — the same trapping model as
 lista bracket access, not textus short-slice. A lista `[lo‥hi]` is a live window
 (a new list of the same elements), fully in bounds or the run dies.
 
-`octeti` is the endian host. Parse byte windows on the buffer
-(`buf[lo‥hi] ↦ W via Be|Le`). Cross to a list once, for element work,
-via `octeti ↦ lista<u8>` (representation change only; other element
-types fail closed). The reverse `lista<u8> ↦ octeti` is live. Do not
+A `lista<b8>` is the endian host. Parse byte windows on the buffer
+(`buf[lo‥hi] ↦ W via Be|Le`). Cross to a numeric list once, for element work,
+via `lista<b8> ↦ lista<u8>` (representation change only; other element
+types fail closed). The reverse `lista<u8> ↦ lista<b8>` is live. Do not
 detour through `valor`. Lists stay for element work, not endian windows.
-Decode a whole buffer at once with `octeti ↦ tensor<E, [shape]> via Le|Be`
+Decode a whole buffer at once with `lista<b8> ↦ tensor<E, [shape]> via Le|Be`
 (see Runtime conversion), not element by element through a list.
 
 ### Primary Expressions

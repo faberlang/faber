@@ -7,8 +7,8 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Rejected route: a bare number has no byte layout without a width and an endianness."
-syntax = "<number> ↦ bytes — rejected; write a sized n ↦ bytes<N> via Be|Le"
-related = ["↦", "via", "bytes", "Be", "Le"]
+syntax = "<number> ↦ list<b8> — rejected; write a sized n ↦ list<b8, N> via Be|Le"
+related = ["↦", "via", "list", "Be", "Le"]
 locale = "en"
 +++
 # =============================================================================
@@ -20,26 +20,26 @@ locale = "en"
 #     number-to-bytes conversion leaves both the width and the endianness
 #     unstated, so the checker refuses it (SEM016 numeric_to_octeti_unspecified).
 #   • Choose the width and byte order first: a sized numeric scalar writes
-#     into a fixed-width carrier with `n ↦ bytes<N> via Be` (or `via Le`),
+#     into a fixed-width carrier with `n ↦ list<b8, N> via Be` (or `via Le`),
 #     where N is the source's exact byte width.
 #   • The bit pattern works too, once the source is a sized slot:
-#     `n ↦ b64` gives the bits and `bits ↦ bytes` gives their octets.
+#     `n ↦ b64` gives the bits and `bits ↦ list<b8>` gives their octets.
 #
 # How to make it legal:
 #   • let i64 n ← 300
-#     let bytes<8> raw ← n ↦ bytes<8> via Be      (big endian)
-#   • let bytes<8> raw ← n ↦ bytes<8> via Le      (little endian)
+#     let list<b8, 8> raw ← n ↦ list<b8, 8> via Be      (big endian)
+#   • let list<b8, 8> raw ← n ↦ list<b8, 8> via Le      (little endian)
 #
 # Common mistakes:
 #   • assuming a default width — a number has no implicit byte layout.
 #   • omitting `via Be` / `via Le` — the endianness is part of the request.
 #
-# See also: ↦, via, bytes — and the working forms in
+# See also: ↦, via, list — and the working forms in
 # corpus/conversio/octeti-scalar-write.fab (pack) and
 # corpus/conversio/octeti-endian.fab (unpack).
 # =============================================================================
 
 main {
-    let _ raw ← 1.5 ↦ bytes
+    let _ raw ← 1.5 ↦ list<b8>
     print raw
 }

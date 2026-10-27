@@ -41,7 +41,7 @@ main {
     assert json.stringify(doc).length() ≻ 0
     let value tree ← toml.parse("name = \"faber\"\n")
     assert value.is_map(tree)
-    let bytes mac ← crypto.hmac("hmac-sha256", text.encode("key"), text.encode("data"))
+    let list<b8> mac ← crypto.hmac("hmac-sha256", text.encode("key"), text.encode("data"))
     assert encoding.hex(mac) ≡ "5031fe3d989c6d1537a013fa6e739da23463fdaec3b70137d828e36ace221bd0"
 
     let string dir ← fs.temp_dir()
@@ -57,8 +57,8 @@ main {
     assert random.random_int(1, 9) ≻ 0
     console.write_partial("")
 
-    let bytes framed ← chunked.encode(|68|)
-    mut bytes body ← |00|
+    let list<b8> framed ← chunked.encode(|68|)
+    mut list<b8> body ← |00|
     do {
         body ← chunked.decode(framed)
     }

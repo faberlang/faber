@@ -1,6 +1,6 @@
 //! Companion tests for `cli_descriptor` (encoder-side golden byte fixtures).
 //!
-//! Radix owns only the encoder; the LLVM host (`hosts/llvm/src/cli.rs`) owns
+//! Radix owns only the encoder; the LLVM host runtime (its `cli` module) owns
 //! the decoder and is the decode authority. These fixtures pin the v1 wire
 //! format byte-for-byte, hand-derived from the byte layout documented in
 //! `cli_descriptor.rs`, so a change to the encoder that would break the host

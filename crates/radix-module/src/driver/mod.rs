@@ -855,14 +855,6 @@ fn generate_output(
             ],
         }
         .into()),
-        Target::MirFmirBundle => Err(codegen::CodegenError {
-            message: "fmir-bin bundles must be built through `faber build --target fmir-bin`".to_owned(),
-            args: vec![
-                DiagnosticArg::new("issue", "package_artifact_route_required"),
-                DiagnosticArg::new("target", "fmir-bin"),
-            ],
-        }
-        .into()),
         Target::HirFhir => Err(codegen::CodegenError {
             message: "Target::HirFhir is a serialization dispatch, not a codegen backend. Use the emit workflow."
                 .to_owned(),
@@ -3886,11 +3878,13 @@ fn declared_surface_hits(lex_result: &lexer::LexResult) -> usize {
 /// the pack the source was read with. A missing baseline falls back to the
 /// configured no-locale default ([`default_code_pack`]).
 fn detect_other_locale(config: &Config, source: &str, baseline: Option<&LocalePack>) -> Option<&'static str> {
-    let baseline_pack = baseline.cloned().or_else(|| default_code_pack(config));
-    let baseline_hits = declared_surface_hits(&match baseline_pack.as_ref() {
-        Some(pack) => lexer::lex_with_locale_pack(source, pack),
-        None => lexer::lex(source),
-    });
+    // Advisory only: when the default pack cannot load, the load error itself
+    // is reported by the read path, so no second-locale hint is offered.
+    let baseline_pack = match baseline {
+        Some(pack) => pack.clone(),
+        None => default_code_pack(config).ok()?,
+    };
+    let baseline_hits = declared_surface_hits(&lexer::lex_with_locale_pack(source, &baseline_pack));
     DETECTABLE_LOCALE_IDS
         .iter()
         .filter_map(|id| {
@@ -4192,20 +4186,17 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
     })
 }
 
-/// The reader pack a source with no declared locale is read with.
+/// The reader pack a source with no declared locale is read with: `en`.
 ///
-/// TEMPORARY STAGING: resolves the `en` pack only while
-/// `RADIX_DEFAULT_CODE_LOCALE` equals `en`; it returns `None` in every other
-/// state, so an unset variable keeps the historical pack-less (Latin) lexing
-/// byte for byte. This is the single place the no-locale default is decided;
-/// the final unit of need deletes the switch and makes `en`
-/// unconditional here.
-#[must_use]
-pub fn default_code_pack(config: &Config) -> Option<LocalePack> {
-    if !std::env::var("RADIX_DEFAULT_CODE_LOCALE").is_ok_and(|value| value == DEFAULT_CODE_LOCALE_ID) {
-        return None;
-    }
-    resolve_frontmatter_locale_pack(config, DEFAULT_CODE_LOCALE_ID).ok()
+/// This is the single place the no-locale default is decided. The pack comes
+/// from the configured language-pack root like any source-declared locale.
+///
+/// # Errors
+///
+/// Returns a `Diagnostic` when the `en` pack cannot be loaded. A pack that
+/// fails to load is an error, never a silent fall back to the Latin surface.
+pub fn default_code_pack(config: &Config) -> Result<LocalePack, Box<Diagnostic>> {
+    resolve_frontmatter_locale_pack(config, DEFAULT_CODE_LOCALE_ID)
 }
 
 struct ParsedSourceBody<'a> {
@@ -4223,8 +4214,7 @@ struct ParsedSourceBody<'a> {
 /// Shared by the analysis front end and the forma author path so both honor a
 /// source's `+++ locale = "…" +++` declaration (e.g. the English exempla
 /// corpus). Pushes diagnostics and returns `Err(())` when the frontmatter
-/// locale key is malformed or the declared pack cannot be loaded; `Ok(None)`
-/// means no pack (pack-less lexing).
+/// locale key is malformed or the declared or default pack cannot be loaded.
 pub(crate) fn resolve_peeled_lex_pack(
     session: &Session,
     peeled: &PeeledSource,
@@ -4256,11 +4246,16 @@ pub(crate) fn resolve_peeled_lex_pack(
                 Err(())
             }
         },
-        None => Ok(session
-            .config
-            .locale_pack
-            .clone()
-            .or_else(|| default_code_pack(&session.config))),
+        None => match session.config.locale_pack.clone() {
+            Some(pack) => Ok(Some(pack)),
+            None => match default_code_pack(&session.config) {
+                Ok(pack) => Ok(Some(pack)),
+                Err(diagnostic) => {
+                    diagnostics.push(*diagnostic);
+                    Err(())
+                }
+            },
+        },
     }
 }
 
@@ -4395,7 +4390,6 @@ fn collect_target_policy_diagnostics(
         | Target::HirFhir
         | Target::MirStepper
         | Target::MirFmirBinary
-        | Target::MirFmirBundle
         | Target::MirFmir
         | Target::MirLlvm
         | Target::MirLlvmHost
@@ -4878,6 +4872,7 @@ fn empty_presentation() -> HirPresentation {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        template_holes: Vec::new(),
         insere_exprs: Vec::new(),
         function_modifier_bindings: Vec::new(),
         region: None,

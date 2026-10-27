@@ -82,7 +82,7 @@ and a run-time `const T x ← e` (la `fixum T x ← e`) is `PARSE010 runtime_con
 retired module-level `static` (la `generis`) declaration is a parse error: `PARSE010 static_decl_retired`
 (`keyword` names the spelling used) — write `const` instead; `static` is also retired
 as a `class` member (see the field modifiers below). `embed "path"` (la `insere "path"`) is a build-time file embed, read once at
-build time, package-relative path, no `..` escape; `string` requires valid UTF-8, `bytes` reads raw
+build time, package-relative path, no `..` escape; `string` requires valid UTF-8, `list<b8>` reads raw
 bytes. `embed` is contextual: claimed in expression position only when directly followed by a
 string literal. It is admitted only as the whole initializer of any `=` constant (module level or
 block level) or `class` field default under any modifier; elsewhere `SEM061 insere_outside_constant`.
@@ -198,8 +198,8 @@ Teaching exemplar: `corpus/operatores/numerus-widening.fab`.
 ## Bit Reinterpretation and Float Field Reads
 
 - Bit patterns go through the raw-bits markers `b8 b16 b32 b64` (bits are not numbers): `x ↦ b32` reads the pattern of an `f32` (`↦ b64` for `f64`), `u32 ↦ b32 ↦ f32` and `u16 ↦ b16 ↦ f16` reinterpret a pattern as a float; reinterpretation, never value conversion. `via Bits` is retired (`SEM016 conversio_via_bits_retired`, names the `bN` route).
-- **The `via` clause.** A convert hint follows the target: `x ↦ u16 via Le`, `"ff" ↦ i32 via Hex`, `65 ↦ char via Code`; register targets take it too (`v ↦ bytes<16> via Le`). The text/byte hint set is `Hex`, `Bin`, `Oct`, `Be`, `Le`, `Code`, and a float or `d64` to integer takes the rounding hints `Floor`, `Ceil`, `HalfEven`, `Trunc`; it binds tighter than `⊥` and applies per hop (`bytes[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32`). On bits lists a `via Le|Be` clause is written exactly when the bit width changes (`list<b8> ↦ list<u16> via Le`; `list<b8> ↦ list<u8>` takes none). `via` is a contextual keyword (an ordinary identifier elsewhere). The retired spellings — a hint as a type argument (`int<u32, Hex>`) or a register tail (`bytes<16><Le>`) — are parse errors (`PARSE030 conversio_hint_type_argument` / `conversio_hint_tail_argument`). `@ kernel lane "x"` is removed (`nucleum_lane_removed`).
-- **Bulk bytes to tensor.** `bytes ↦ tensor<E, [d1, …]> via Le` / `via Be` is a faithful reinterpretation of a byte string as a typed tensor: source `bytes` or `bytes<N>`; literal extents only; `E` is one of `u8 i8 i16 u16 i32 u32 i64 u64 f32 f64`; the hint is REQUIRED for every width (no hint, or `Bits`/`Hex`, is `SEM016 octeti_to_tensor_unspecified`; another element type is `octeti_to_tensor_element_unsupported`); row-major, element `i` at bytes `[i·w, (i+1)·w)`; pure bit copy (NaN payloads, `-0.0`, subnormals survive); the byte length must be exactly `product(shape)·w` (a compile error `octeti_to_tensor_length_mismatch` when statically known, otherwise a recoverable runtime error: handle it with `do { } catch`/`⊥`/`⇥`, and a bare `↦` outside `main` needs a handler). Example: `let tf32[2, 2] m ← raw ↦ tf32[2, 2] via Le`. Decode a whole buffer or weight file at once this way, never element by element through a list. NOT available: the reverse `tensor ↦ bytes via Le|Be` (held back), `list<f32> via Le` (still `SEM016 unsupported_conversio`), runtime (non-literal) extents.
+- **The `via` clause.** A convert hint follows the target: `x ↦ u16 via Le`, `"ff" ↦ i32 via Hex`, `65 ↦ char via Code`; register targets take it too (`v ↦ list<b8, 16> via Le`). The text/byte hint set is `Hex`, `Bin`, `Oct`, `Be`, `Le`, `Code`, and a float or `d64` to integer takes the rounding hints `Floor`, `Ceil`, `HalfEven`, `Trunc`; it binds tighter than `⊥` and applies per hop (`list<b8>[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32`). On bits lists a `via Le|Be` clause is written exactly when the bit width changes (`list<b8> ↦ list<u16> via Le`; `list<b8> ↦ list<u8>` takes none). `via` is a contextual keyword (an ordinary identifier elsewhere). The retired spellings — a hint as a type argument (`int<u32, Hex>`) or a register tail (`list<b8, 16><Le>`) — are parse errors (`PARSE030 conversio_hint_type_argument` / `conversio_hint_tail_argument`). `@ kernel lane "x"` is removed (`nucleum_lane_removed`).
+- **Bulk bytes to tensor.** `list<b8> ↦ tensor<E, [d1, …]> via Le` / `via Be` is a faithful reinterpretation of a byte string as a typed tensor: source `list<b8>` or `list<b8, N>`; literal extents only; `E` is one of `u8 i8 i16 u16 i32 u32 i64 u64 f32 f64`; the hint is REQUIRED for every width (no hint, or `Bits`/`Hex`, is `SEM016 octeti_to_tensor_unspecified`; another element type is `octeti_to_tensor_element_unsupported`); row-major, element `i` at bytes `[i·w, (i+1)·w)`; pure bit copy (NaN payloads, `-0.0`, subnormals survive); the byte length must be exactly `product(shape)·w` (a compile error `octeti_to_tensor_length_mismatch` when statically known, otherwise a recoverable runtime error: handle it with `do { } catch`/`⊥`/`⇥`, and a bare `↦` outside `main` needs a handler). Example: `let tf32[2, 2] m ← raw ↦ tf32[2, 2] via Le`. Decode a whole buffer or weight file at once this way, never element by element through a list. NOT available: the reverse `tensor ↦ list<b8> via Le|Be` (held back), `list<f32> via Le` (still `SEM016 unsupported_conversio`), runtime (non-literal) extents.
 - finite/NaN detection reads the bit fields through `x ↦ b32 ↦ u32` (exponent all-ones, fraction nonzero separates NaN from ±Inf) — never `x ≢ x`, which is lane-dependent (the MIR runner's float `≢` is NaN-total). Exemplar: `corpus/scalar/finite-nan.fab`.
 
 ## Copy-Into (`⇇`)
@@ -330,9 +330,9 @@ Primitives:
 - `trapping<W>` (la `exactus<W>`) — the trapping policy spelled out: the same type as the bare marker `W`, and a store traps when the value does not fit (integer widths and `d64`; `trapping<f32>` is `trapping_float_not_implemented`)
 - `wrapping<W>` (la `modulus<W>`) — modular word, signed or unsigned; the value reduces mod 2^W at the store, and `↦` into it reduces and cannot fail
 - `saturating<W>` (la `saturatus<W>`) — saturating integer, signed or unsigned; arithmetic is exact and the value clamps to `W` **once, at the store** (never per operation); `↦` into it clamps and cannot fail
-- `none`, `void`, `never`, `unknown`, `bytes`, `instant`
+- `none`, `void`, `never`, `unknown`, `instant`
 - `char` (la `littera`) — one Unicode scalar value (4 bytes, never allocates); element of `string`/`ascii` iteration and `string[i]`/`ascii[i]` indexing
-- `byte` (la `octetus`) — an exact alias of `u8` (fixed-width, rejects applied parameters); `bytes ≡ list<byte>` is a type-identity fact, not mutual convertibility
+- There is no `bytes` or `byte` type. A byte string is `list<b8>` (la `lista<b8>`, bounded `list<b8, N>`); a raw byte is `b8`; a numeric byte is `u8`. `list<b8>` is not a list of numbers: it converts to `list<u8>` only with an explicit `↦`
 
 Sized numerics are **bare markers**: `i8`…`i64`, `u8`…`u64`, `f16`, `bf16`, `f32`, `f64`, `d64` (the decimal), `inf` (unbounded integer). Bare `int` / `float` are `i64` / `f64`. The wrapped forms `int<W>` / `float<W>` (each locale's own word for int and float; la `numerus<W>` / `fractus<W>`), the holes `int<_>` / `float<_>` and wrong-family forms (`int<f32>`) are `PARSE040 numeric_wrapper_retired`. `d32` is removed (`SEM008 removed_decimal_width_d32`). The policy words keep their argument: `trapping<W>` / `wrapping<W>` / `saturating<W>`, e.g. `wrapping<u32>`, `saturating<i16>`. Check EBNF for the live marker sets.
 
@@ -340,7 +340,7 @@ Collections and buffers:
 
 - `list<T>`, `map<K,V>`, `set<T>`, `queue<T>`, `stack<T>` (la `lista`, `tabula`, `copia`)
 - bounded capacity forms take a `NATURAL` (or `_` to infer): `list<T, N>`, `queue<T, N>`, `stack<T, N>`,
-  `string<N>`, `ascii<N>`, `bytes<N>`; capacities are compile-time values today (run-time capacities and
+  `string<N>`, `ascii<N>`; capacities are compile-time values today (run-time capacities and
   extents are admitted, not shipped)
 - `promise<T>`, `iterator<T>` (la `promissum`, `cursor`)
 - `tensor<T, Figura>`, `sparsa<T, Figura>` — shaped buffers
@@ -488,7 +488,7 @@ Prefer posture keywords over the old annotations:
 
 - `"..."` / `«...»` — `string`
 - `'...'` — `ascii`
-- `|de ad be ef|` — `bytes` (compile-time hex bytes)
+- `|de ad be ef|` — `list<b8>` (compile-time hex bytes)
 - `` `...` `` — backtick string token: `capture-pending` in the grammar (reserved; it does not parse as an expression today)
 - `[ ... ]` — list
 - `{ "key": constant }` — JSON document (`json`); values are JSON constants only

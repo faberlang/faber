@@ -187,8 +187,6 @@ nihil = "لاشيء"
 vacuum = "فراغ"
 numquam = "أبدا"
 ignotum = "مجهول"
-octeti = "بايتات"
-octetus = "بايت"
 # Tensor edge-policy markers (`limes<P>()`): pin / wrap-around / mirror at the border.
 clampa = "تثبيت_الحافة"
 reflexa = "انعكاس_الحافة"
@@ -201,7 +199,7 @@ instans = "لحظة"
 objectum = "كائن"
 quidlibet = "مهما"
 lista = "قائمة"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
 tabula = "جدول"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "دفتر"
@@ -260,7 +258,7 @@ message = "حرفية قالب backtick غير مغلقة"
 help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
 
 [diagnostics.LEX001.issues.unterminated_octeti_literal]
-message = "حرفية octeti غير مغلقة"
+message = "حرفية {lista}<b8> غير مغلقة"
 help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
 
 [diagnostics.LEX001.issues.unterminated_regex_literal]
@@ -805,7 +803,7 @@ help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`،
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "تلميح التحويل لا يتبع الهدف بين قوسين زاويين"
-help = "اكتب التلميح كجملة via بعد الهدف: `octeti<16> via Le`"
+help = "اكتب التلميح كجملة via بعد الهدف: `{lista}<b8, 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "تعبير مطلوب"
@@ -1371,17 +1369,13 @@ help = "أصلح تركيب AST للتخفيض"
 message = "object destructuring يجب توسيعه قبل statement lowering"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.retired_byte_word]
-message = "كلمة byte أُلغيت: اكتب b8 للبتات الخام أو u8 للعدد"
-help = "استخدم b8 للبايت الخام (lista<b8> لسلسلة بايتات) أو u8 للبايت العددي"
-
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker يجب أن يكون كتابة عارية مثل ms أو us"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type لا يقبل parameters"
-help = "textus<N> و ascii<N> و octeti<N> أشكال محدودة مشحونة"
+help = "textus<N> و ascii<N> و {lista}<b8, N> أشكال محدودة مشحونة"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace لا يصدر qualified type"
@@ -2364,16 +2358,16 @@ message = "هذه الحلقة تمر على `{binding}` فلا يمكن لـ `{
 help = "حدّث عنصرا بالقوس المربع، أو استخدم {queue} مع {dum} لقائمة عمل"
 
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
-message = "{octeti} literal يحتوي محرفا غير صالح '{character}'"
-help = "استخدم فقط hexadecimal digits في {octeti} literals"
+message = "{lista}<b8> literal يحتوي محرفا غير صالح '{character}'"
+help = "استخدم فقط hexadecimal digits في {lista}<b8> literals"
 
 [diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
-message = "{octeti} literal له عدد فردي من hex digits"
-help = "قدم complete byte pairs في {octeti} literals"
+message = "{lista}<b8> literal له عدد فردي من hex digits"
+help = "قدم complete byte pairs في {lista}<b8> literals"
 
 [diagnostics.SEM011.issues.octeti_literal_template_application]
-message = "{octeti} literals لا تدعم template application"
-help = "استخدم {textus} formatting بدلا من {octeti} literal calls"
+message = "{lista}<b8> literals لا تدعم template application"
+help = "استخدم {textus} formatting بدلا من {lista}<b8> literal calls"
 
 [diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
 message = "{method} يقبل payload type argument واحدا على الأكثر"
@@ -2469,7 +2463,7 @@ help = "فهرس {textus} بـ {numerus} أو integer range"
 
 [diagnostics.SEM011.issues.window_requires_list]
 message = "النافذة [lo‥hi] تتطلب قائمة"
-help = "خذ نافذة [lo‥hi] فقط من قيمة {lista} أو {textus} أو octeti"
+help = "خذ نافذة [lo‥hi] فقط من قيمة {lista} أو {textus} أو {lista}<b8>"
 
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index يجب أن يكون {numerus}"
@@ -2644,7 +2638,7 @@ message = "intervallum clamp يتطلب bound types متطابقة"
 help = "طابق source و target bound element types"
 
 [diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
-message = "sermo materialization target غير مدعوم؛ متوقع {vacuum} أو {valor} أو scalar ({numerus}، {fractus}، {bivalens}، {textus}، {ascii}، {octeti}، {instans}) أو {lista}<T>"
+message = "sermo materialization target غير مدعوم؛ متوقع {vacuum} أو {valor} أو scalar ({numerus}، {fractus}، {bivalens}، {textus}، {ascii}، {lista}<b8>، {instans}) أو {lista}<T>"
 help = "اختر sermo materialization target مدعوما"
 
 [diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
@@ -2692,7 +2686,7 @@ message = "{cursor} إلى {valor} conversion يعبر eager/lazy boundary؛ mat
 help = "materialize {cursor} عبر {lista} قبل عبور boundary"
 
 [diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
-message = "conversion من {numerus} أو {fractus} أو {bivalens} إلى {octeti} غير محدد (byte width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
+message = "conversion من {numerus} أو {fractus} أو {bivalens} إلى {lista}<b8> غير محدد (byte width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
 help = "استخدم chorda أو explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
@@ -2708,11 +2702,11 @@ message = "تحويل قائمة بتات يغيّر عرض البتات يحت�
 help = "اكتب ترتيب البايتات مع التحويل، مثل lista<b8> ↦ lista<u16> via Le؛ والتحويل بالعرض نفسه لا يقبل جملة"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
-message = "conversion من {octeti} إلى {numerus} غير محدد (byte width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
+message = "conversion من {lista}<b8> إلى {numerus} غير محدد (byte width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
 help = "استخدم chorda أو explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
-message = "conversion من {octeti} إلى {fractus} غير محدد (IEEE width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
+message = "conversion من {lista}<b8> إلى {fractus} غير محدد (IEEE width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
 help = "استخدم chorda أو explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
@@ -2725,7 +2719,7 @@ help = "استخدم واحدا من Hex أو Bin أو Oct أو Be أو Le أو 
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "هدف التحويل هذا لا يقبل تلميح تحويل"
-help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "العائم أو العشري لا يتحول إلى صحيح دون تسمية التقريب"
@@ -2740,7 +2734,7 @@ message = "مفتاح map عند التحويل من valor أو إليه يجب 
 help = "اكتب map بمفاتيح textus؛ التحويل لا يحلل المفاتيح أبدا، و`@ json` على genus يحدد تخطيط wire"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
-message = "conversion من {octeti} إلى {bivalens} بلا default meaning؛ فك إلى {textus} أو قارن bytes صراحة"
+message = "conversion من {lista}<b8> إلى {bivalens} بلا default meaning؛ فك إلى {textus} أو قارن {lista}<b8> صراحة"
 help = "استخدم chorda أو explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
@@ -2909,19 +2903,19 @@ help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ 
 
 [diagnostics.SEM018.issues.empty_radix_typus_domain]
 message = "@ radix typus domain يتطلب type مسموحا واحدا على الأقل"
-help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+help = "استخدم `@ radix typus T in {textus} {lista}<b8>` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
 
 [diagnostics.SEM018.issues.missing_type_param]
 message = "@ radix typus يتطلب generic type parameter"
-help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+help = "استخدم `@ radix typus T in {textus} {lista}<b8>` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
 
 [diagnostics.SEM018.issues.non_identifier_type_param]
 message = "@ radix typus parameter يجب أن يكون identifier"
-help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+help = "استخدم `@ radix typus T in {textus} {lista}<b8>` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
 
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "@ radix typus allowed value يجب أن يكون type"
-help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+help = "استخدم `@ radix typus T in {textus} {lista}<b8>` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "@ radix directive غير معروف؛ متوقع `lane`"
@@ -3534,6 +3528,15 @@ help = "استخدم «...» للنص الذي يحتوي على علامات ا
 [diagnostics.WARN034.issues.prefer_guillemet_for_quote]
 message = "هذه السلسلة تُهرّب `\\\"`؛ اكتبها بـ «…»، فلا حاجة إلى أي تهريب"
 help = "استخدم «...» للنص الذي يحتوي على علامات اقتباس"
+
+[diagnostics.WARN035]
+message = "يخلط هذا القالب بين المواضع العادية والمرقّمة؛ والمواضع العادية تقرأ {reads}"
+help = "رقّم كل موضع (`§0` و`§1` …) ليقرأ كلٌّ منها الوسيط الذي تقصده"
+
+[diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
+message = "يخلط هذا القالب بين المواضع العادية والمرقّمة؛ والمواضع العادية تقرأ {reads}"
+help = "رقّم كل موضع (`§0` و`§1` …) ليقرأ كلٌّ منها الوسيط الذي تقصده"
+
 [diagnostics.LOCALE003]
 message = "reader locale `{locale_id}` في frontmatter غير معروف أو غير صالح"
 help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
@@ -3600,7 +3603,7 @@ help = "اعتمد على constants أخرى فقط"
 
 [diagnostics.SEM061]
 message = "build-time embed غير صالح"
-help = "ضمّن ملفا نسبيا إلى package وموجودا، كـ `textus` (UTF-8) أو `octeti`"
+help = "ضمّن ملفا نسبيا إلى package وموجودا، كـ `textus` (UTF-8) أو `{lista}<b8>`"
 
 [diagnostics.SEM061.issues.insere_file_missing]
 message = "embedded file `{path}` غير موجود"
@@ -3624,15 +3627,15 @@ help = "`{insere}` يحتاج source file على disk؛ لا يمكن استخد
 
 [diagnostics.SEM061.issues.insere_invalid_utf8]
 message = "embedded file `{path}` ليس UTF-8 صالحا"
-help = "صرّح عن constant كـ `octeti` لتضمين bytes خام"
+help = "صرّح عن constant كـ `{lista}<b8>` لتضمين bytes خام"
 
 [diagnostics.SEM061.issues.insere_type_invalid]
-message = "initializer `{insere}` يجب أن يعلن `textus` أو `octeti`"
-help = "صرّح بـ `textus` لنص UTF-8 أو `octeti` لـ bytes خام"
+message = "initializer `{insere}` يجب أن يعلن `textus` أو `{lista}<b8>`"
+help = "صرّح بـ `textus` لنص UTF-8 أو `{lista}<b8>` لـ bytes خام"
 
 [diagnostics.SEM061.issues.insere_type_required]
-message = "initializer `{insere}` ليس فيه slot `textus` أو `octeti` يأخذ type منه"
-help = "اربطه بـ constant ذي type: `{fixum} textus NAME = {insere} \"path\"` لنص UTF-8 أو `{fixum} octeti NAME = {insere} \"path\"` لـ bytes خام"
+message = "initializer `{insere}` ليس فيه slot `textus` أو `{lista}<b8>` يأخذ type منه"
+help = "اربطه بـ constant ذي type: `{fixum} textus NAME = {insere} \"path\"` لنص UTF-8 أو `{fixum} {lista}<b8> NAME = {insere} \"path\"` لـ bytes خام"
 
 [diagnostics.SEM061.issues.insere_outside_constant]
 message = "`{insere}` مسموح فقط في initializer الخاص بـ constant `=` أو field default"
@@ -3677,7 +3680,6 @@ help = "استدع method عامة من `{owner}` بدلا منه"
 [diagnostics.SEM063.issues.union_member_visibility_differs]
 message = "`{member}` يُكتب عبر union تعلن members فيه visibility مختلفة: {detail}"
 help = "علن `{member}` بـ visibility نفسها على كل member في union"
-
 
 [llm]
 system_prompt_snippet = "Emit Arabic reader-locale Faber using Arabic keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and keep source in logical order. عندما يحتوي النص على علامة اقتباس (\" أو ')، اكتبه باستخدام «…»: لا تحتاج علامات الاقتباس المعقوفة إلى أي تهريب."

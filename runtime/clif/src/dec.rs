@@ -9,9 +9,9 @@
 //! `i64` carrier). An exact result that is a scale-8 `i64` carrier is returned
 //! as one, so a handle is the same value whatever computed it.
 
-use super::{exact_trap, flush, text_new};
+use super::{exact_trap, exit_trap, flush, text_new};
+use radix_runtime_contract::trap::TrapKind;
 use std::cmp::Ordering;
-use std::io::Write;
 
 /// Fraction digits of a stored `d64`.
 const STORED_SCALE: u32 = 8;
@@ -318,9 +318,7 @@ pub unsafe extern "C" fn __faber_clif_v1_dec_trap_store(
         unsafe { text(value) },
         String::from_utf8_lossy(bytes)
     );
-    let mut stderr = std::io::stderr();
-    let _ = writeln!(stderr, "error: {message}");
-    std::process::exit(1);
+    exit_trap(&message, TrapKind::ProgramLogic)
 }
 
 /// Exact order of an integer and a float: -1, 0, 1, or 2 when unordered.

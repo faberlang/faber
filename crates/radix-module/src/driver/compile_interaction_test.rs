@@ -4,7 +4,7 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
-use crate::test_support::test_session;
+use crate::test_support::test_session_la;
 
 // ── reader-pack integration ──
 
@@ -12,6 +12,7 @@ use crate::test_support::test_session;
 #[test]
 fn compile_uses_locale_pack_for_keyword_lexing() {
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(super::zh_locale_pack());
     let session = Session::new(config);
@@ -27,6 +28,7 @@ fn compile_accepts_en_require_surface_with_alternate_exit() {
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -41,6 +43,7 @@ fn compile_rejects_en_require_in_arrowless_function() {
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -71,6 +74,7 @@ fn compile_en_empty_marker_and_is_empty_intrinsic() {
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -90,6 +94,7 @@ fn compile_en_vacua_marker_rejected() {
     let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -115,6 +120,7 @@ fn compile_en_vacua_marker_rejected() {
 fn compile_la_vacua_marker_untouched() {
     let pack = crate::locale::latin_locale_pack();
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -132,6 +138,7 @@ fn compile_rejects_undeclared_latin_keyword_in_grammar_position() {
     // spelling `函数` is proven to succeed in
     // `compile_uses_locale_pack_for_keyword_lexing`.
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(super::zh_locale_pack());
     let session = Session::new(config);
@@ -168,6 +175,7 @@ fn compile_rejects_undeclared_latin_keyword_in_grammar_position() {
 #[test]
 fn compile_uses_locale_pack_for_primitive_type_surface() {
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(super::th_locale_pack());
     let session = Session::new(config);
@@ -186,6 +194,7 @@ fn compile_rejects_undeclared_tokenless_latin_keyword_in_grammar_slot() {
     // grammar slots. The source fails normally with no fallback event and no
     // LOCALE diagnostic.
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(super::zh_locale_pack());
     let session = Session::new(config);
@@ -217,6 +226,7 @@ fn deny_warnings_does_not_escalate_undeclared_latin_keyword_failure() {
     // on the source's own ordinary parse/semantic errors, never on a locale
     // fallback diagnostic.
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(super::zh_locale_pack())
         .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] });
@@ -262,6 +272,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -308,6 +319,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -335,6 +347,7 @@ fn compile_latin_keywords_under_la_and_no_pack() {
     // S2-U2 proof (d): `la` and no-pack stay registry-direct — the canonical
     // Latin spelling claims its grammar slot without a pack row.
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(crate::locale::latin_locale_pack());
     let session = Session::new(config);
@@ -346,7 +359,7 @@ fn compile_latin_keywords_under_la_and_no_pack() {
         result.diagnostics
     );
 
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(
         result.success(),
@@ -385,6 +398,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -433,6 +447,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -483,6 +498,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -528,6 +544,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -576,6 +593,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -623,6 +641,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -665,6 +684,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     let source = "入口 { 显示 空 }";
 
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack.clone());
     let session = Session::new(config);
@@ -682,6 +702,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     // The same source must also pass with all warnings denied.
     use crate::driver::WarnPolicy;
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack)
         .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] });
@@ -702,6 +723,7 @@ fn compile_one_letter_parameter_names_do_not_suggest_reader002() {
 
     use crate::driver::WarnPolicy;
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack)
         .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] });
@@ -759,6 +781,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
     )
     .expect("pack should validate");
     let config = Config::default()
+        .with_latin_locale()
         .with_target(Target::HirRust)
         .with_locale_pack(pack);
     let session = Session::new(config);
@@ -779,7 +802,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_exempla_metadata_in_frontmatter() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "+++\n[exempla]\n\"test\" = \"./exempla/test.fab\"\n+++\n\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -788,7 +811,7 @@ fn compile_accepts_exempla_metadata_in_frontmatter() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_strips_frontmatter_before_analysis() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "+++\ntitle = \"salve\"\n+++\n\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
@@ -796,7 +819,7 @@ fn compile_strips_frontmatter_before_analysis() {
 
 #[test]
 fn compile_rejects_invalid_frontmatter_toml() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "+++\nbad toml [[\n+++\n\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
@@ -810,7 +833,7 @@ fn compile_rejects_invalid_frontmatter_toml() {
 
 #[test]
 fn compile_rejects_line_start_section_directive() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "§ 1.0\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
@@ -824,7 +847,7 @@ fn compile_rejects_line_start_section_directive() {
 
 #[test]
 fn compile_rejects_c_style_line_comment() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "// This should fail\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
@@ -839,7 +862,7 @@ fn compile_rejects_c_style_line_comment() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_frontmatter_only_file() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "+++\nkey = \"value\"\n+++";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "frontmatter-only file must succeed as empty program");
@@ -849,7 +872,7 @@ fn compile_accepts_frontmatter_only_file() {
 
 #[test]
 fn compile_reports_lex_errors() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  sit s ← \"hello\n}"; // unterminated string → LEX001
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -860,7 +883,7 @@ fn compile_reports_lex_errors() {
 
 #[test]
 fn compile_reports_parse_errors() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  sit _ ← 1 + \n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -876,7 +899,7 @@ fn compile_reports_parse_errors() {
 
 #[test]
 fn compile_rejects_itera_pro_mode() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  sit _ xs ← [1, 2, 3]\n  itera pro fixum x de xs {\n    nota x\n  }\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -892,7 +915,7 @@ fn compile_rejects_itera_pro_mode() {
 
 #[test]
 fn compile_reports_semantic_errors() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit numerus n ← 1
   sit textus t ← n
@@ -906,7 +929,7 @@ fn compile_reports_semantic_errors() {
 
 #[test]
 fn compile_rejects_itera_ab_over_collection() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  sit _ xs ← [1, 2, 3]\n  itera ab xs sit i {\n    nota i\n  }\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -923,7 +946,7 @@ fn compile_rejects_itera_ab_over_collection() {
 
 #[test]
 fn compile_rejects_redde_without_explicit_return_type() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "functio bad() {\n  redde 1\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -939,7 +962,7 @@ fn compile_rejects_redde_without_explicit_return_type() {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn compile_accepts_effect_only_failable_function_without_return_arrow() {
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r"functio write(textus path, textus data) ⇥ textus {
   nota path
   nota data
@@ -953,7 +976,7 @@ fn compile_accepts_effect_only_failable_function_without_return_arrow() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_rejects_nondum_interface_method_for_target() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"implendum Drawable {
   @ nondum
   functio draw() → vacuum
@@ -981,7 +1004,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_rejects_target_only_nondum_interface_method_for_target() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"implendum Drawable {
   @ nondum "swift"
   functio draw() → vacuum
@@ -1014,7 +1037,7 @@ incipit {
 
 #[test]
 fn compile_rejects_iace_without_function_error_channel() {
-    let session = test_session(Target::HirTypeScript);
+    let session = test_session_la(Target::HirTypeScript);
     let source = r#"functio fails() {
   iace "bad"
 }"#;
@@ -1045,7 +1068,7 @@ fn incipit_argumenta_compiles_for_faber_target() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn custodi_multi_guard_emits_guards_in_source_order() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit numerus x ← 5
   custodi {
@@ -1100,7 +1123,7 @@ fn ergo_iace_mori_and_tacet_compile_for_faber_target() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_fac_cape_and_iace() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio probe(bivalens ok) → vacuum {
   fac {
     si ok {
@@ -1123,7 +1146,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_si_cape_attachments() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio probe(bivalens ok) → vacuum {
   si ok {
     nota "ok"
@@ -1152,7 +1175,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_elige_cape_attachments() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio probe(numerus x) → vacuum {
   elige x {
     casu 1 {
@@ -1175,7 +1198,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_target_accepts_lege_expression() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ x ← lege
   nota x
@@ -1210,7 +1233,7 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
 
 #[test]
 fn sed_expression_fails_with_generic_unknown_identifier() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit { sit _ r ← sed "\\d+" g }"#;
     let result = compile(&session, "sed-retired.fab", source, ModuleCompileRequest::default());
     // `sed` is a plain identifier; the source fails with generic
@@ -1227,7 +1250,7 @@ fn sed_expression_fails_with_generic_unknown_identifier() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn warning_only_semantic_diagnostics_still_emit_output() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ unused ← 1
 }";
@@ -1243,7 +1266,7 @@ fn warning_only_semantic_diagnostics_still_emit_output() {
 #[ignore = "slow: spawns external toolchain smoke (cargo/go/tsc); run with --ignored"]
 #[test]
 fn compile_accepts_textus_concatenation_and_explicit_append() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   varia textus s ← "salve"
   s ← s + "!"
@@ -1259,7 +1282,7 @@ fn compile_accepts_textus_concatenation_and_explicit_append() {
 #[ignore = "slow: spawns external toolchain smoke (cargo/go/tsc); run with --ignored"]
 #[test]
 fn compile_accepts_textus_explicit_append_with_ascii_operand() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   varia textus buf ← "x-"
   sit _ tag ← 'suffix'
@@ -1280,7 +1303,7 @@ fn compile_accepts_textus_explicit_append_with_ascii_operand() {
 
 #[test]
 fn go_target_rejects_ad_with_explicit_policy_diagnostic() {
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let source = r#"incipit {
   ad "fasciculus:lege" ("hello.txt") → textus response ⇥ textus {
     nota response
@@ -1300,7 +1323,7 @@ fn go_target_rejects_ad_with_explicit_policy_diagnostic() {
 
 #[test]
 fn go_target_rejects_externa_ignotum_binding_before_target_policy() {
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let source = r"@ externa
 fixum ignotum process = 0
 
@@ -1323,7 +1346,7 @@ incipit {
 
 #[test]
 fn go_target_rejects_bodyless_externa_at_parse_boundary() {
-    let session = test_session(Target::HirGo);
+    let session = test_session_la(Target::HirGo);
     let source = r"@ externa
 functio argv() → ignotum
 
@@ -1347,7 +1370,7 @@ incipit {
 
 #[test]
 fn ab_pipeline_is_not_active_rust_syntax() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ users ← [{ activus = verum }]
   sit _ active ← ab users activus
@@ -1361,7 +1384,7 @@ fn ab_pipeline_is_not_active_rust_syntax() {
 
 #[test]
 fn triple_quote_is_not_a_block_string_surface() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     // A bare `"""` fails as an ordinary unterminated string.
     let source = "incipit {\n  sit _ value ← \"\"\"\n  nota value\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1372,7 +1395,7 @@ fn triple_quote_is_not_a_block_string_surface() {
 
 #[test]
 fn slash_line_comment_is_not_faber_syntax() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  // old comment\n  nota \"ok\"\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1382,7 +1405,7 @@ fn slash_line_comment_is_not_faber_syntax() {
 
 #[test]
 fn slash_block_comment_is_not_faber_syntax() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = "incipit {\n  /* old block */\n  nota \"ok\"\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
@@ -1400,7 +1423,7 @@ fn slash_block_comment_is_not_faber_syntax() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_finge_variant_construction() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"discretio Event {
   Click { numerus x numerus y },
   Quit
@@ -1420,7 +1443,7 @@ incipit {
 
 #[test]
 fn rejects_statement_level_legacy_ad_string_route() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   ad "notificatio:mitte" ("User logged in", userId)
 }"#;
@@ -1438,7 +1461,7 @@ fn rejects_statement_level_legacy_ad_string_route() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_array_and_ex_destructuring_bindings() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"genus Persona { varia textus name }
 incipit {
   sit _ xs ← [1, 2]
@@ -1459,7 +1482,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn enum_member_access_no_longer_reports_unknown_identifier() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"ordo Color { rubrum, viridis }
 
 incipit {
@@ -1482,7 +1505,7 @@ incipit {
 
 #[test]
 fn enum_variant_path_resolves_but_bare_enum_name_reports_name_not_value() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     // `Color.rubrum` must resolve clean; bare `Color` in expr position
     // must still report name_not_value under F-069.
     let source = r"ordo Color { rubrum, viridis }
@@ -1521,7 +1544,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_accepts_param_alias_binding() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio greet(textus name, bivalens formal sponte ut f) → vacuum {
   si f {
     nota name
@@ -1541,7 +1564,7 @@ incipit {
 fn est_verum_and_falsum_are_rejected_as_value_targets() {
     // `est` tests a type (DECISIONS D23.1); the boolean literals are values,
     // so both spellings are rejected by name rather than compared.
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"functio check(ignotum x) → vacuum {
   si x est verum { nota "t" }
   si x est falsum { nota "f" }
@@ -1565,7 +1588,7 @@ fn est_value_literals_name_equality() {
     // `est` tests types (DECISIONS D23.1); a null, number or string literal on
     // the right is a value, so each gets the one named diagnostic whose help
     // names the equality family.
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     for rhs in ["nulla", "1", "\"a\""] {
         let source = format!(
             "functio check(ignotum x) → vacuum {{\n  si x est {rhs} {{ nota \"t\" }}\n}}\n\nincipit {{\n  check(verum)\n}}"
@@ -1588,7 +1611,7 @@ fn est_value_literals_name_equality() {
 
 #[test]
 fn externa_top_level_var_without_initializer_is_rejected() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"@ externa
 fixum ignotum Bun = 0
 
@@ -1610,7 +1633,7 @@ incipit {
 
 #[test]
 fn spread_array_argument_can_satisfy_multi_parameter_function() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"functio add(numerus a, numerus b) → numerus {
   redde a + b
 }
@@ -1638,7 +1661,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn import_alias_usage_no_longer_reports_unknown_identifier() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"importa ex "./norma/consolum" consolum
 
     incipit {
@@ -1659,7 +1682,7 @@ fn import_alias_usage_no_longer_reports_unknown_identifier() {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn duplicate_import_module_bindings_no_longer_report_duplicate_definition() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r#"importa ex "./helpers" item
 importa ex "./helpers" item
 
@@ -1679,7 +1702,7 @@ incipit {
 
 #[test]
 fn externa_ignotum_receiver_no_longer_reaches_type_inference() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"@ externa
 fixum ignotum process = 0
 
@@ -1705,7 +1728,7 @@ incipit {
 #[cfg(feature = "hir-rust")]
 #[test]
 fn ex_object_varia_bindings_accept_same_type_reassignment() {
-    let session = test_session(Target::HirRust);
+    let session = test_session_la(Target::HirRust);
     let source = r"genus Datum { varia numerus count  varia bivalens active }
 incipit {
   sit _ data ← Datum { count = 100, active = verum }
@@ -1751,6 +1774,7 @@ fn compile_with_installed_pack(locale: &str, source: &str) -> crate::CompileResu
     let pack = crate::locale::LocalePack::from_toml_path(pack_path).expect("installed pack should load");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirRust)
             .with_locale_pack(pack),
     );
@@ -1820,6 +1844,7 @@ fn session_with_installed_pack(locale: &str) -> Session {
     let pack = crate::locale::LocalePack::from_toml_path(pack_path).expect("installed pack should load");
     Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirRust)
             .with_locale_pack(pack),
     )

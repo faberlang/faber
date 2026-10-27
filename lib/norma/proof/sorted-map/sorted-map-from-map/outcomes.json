@@ -1,0 +1,28 @@
+{
+  "targets": {
+    "rust": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the method `get` exists for struct `HashMap<K, V>`, but its trait bounds were not satisfied",
+      "reason": "Rust emit lowers the norma:sorted_map genus and its file-scope helpers to unbounded <K, V> generics, so cargo rejects the generated crate with E0599: HashMap::get, contains_key and remove need K: Eq + Hash, Vec::clone and sort need K: Clone and K: Ord, and the emitted call sites pass faber::Valor instead of K. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
+    },
+    "c": {
+      "outcome": "known-fail",
+      "phase": "emit",
+      "diagnostic_contains": "package_target_unsupported",
+      "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced and the `norma:sorted_map` genus is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
+    },
+    "clif": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "clif-subset",
+      "reason": "The clif package builder declines this case before any code is generated: the MIR capability classifier reports the `clif-subset` issue, so the `norma:sorted_map` genus is never lowered. The clif lane carries no map port for this family yet; re-measure this row when that port lands."
+    },
+    "go": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "undefined: sorted_map",
+      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:sorted_map` module this proof imports, so the generated `main.go` calls `sorted_map.*` with no such package-level identifier and `go build` stops with `undefined: sorted_map`. Re-measure this row when the Go package emitter lowers that module binding."
+    }
+  }
+}

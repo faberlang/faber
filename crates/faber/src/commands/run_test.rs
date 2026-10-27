@@ -306,7 +306,7 @@ fn run_rejects_the_retired_backend_flag() {
     let dir = temp_dir("device-retired-backend-flag");
     std::fs::write(dir.join("main.fab"), "main { print 1 }\n").expect("write entry");
     let output = run_faber_binary(&dir, &["--backend", "metal"]);
-    assert_eq!(output.status.code(), Some(2), "clap usage error");
+    assert_eq!(output.status.code(), Some(64), "clap usage error");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("unexpected argument '--backend'"),
@@ -693,7 +693,15 @@ fn single_file_run_process_code_success_is_zero() {
 }
 
 #[test]
-fn single_file_run_process_code_frontend_error_is_one() {
+fn single_file_run_process_code_frontend_error_is_data_error() {
+    let diagnostic = Diagnostic::error("unknown name")
+        .with_phase(radix::module::diagnostics::DiagnosticPhase::Resolve);
+    let error = RunSourceError::Frontend(vec![diagnostic]);
+    assert_eq!(single_file_run_process_code(Err(error)), 65);
+}
+
+#[test]
+fn single_file_run_process_code_unclassed_failure_is_one() {
     let error = RunSourceError::Frontend(Vec::new());
     assert_eq!(single_file_run_process_code(Err(error)), 1);
 }
@@ -853,4 +861,23 @@ main {
     let (result, stdout) = run_single_file_under(&entry, DeviceSelection::Reference, Vec::new());
     assert!(result.is_ok(), "reference run failed: {result:?}");
     assert_eq!(stdout, vec!["4.5".to_owned(), "7.5".to_owned()]);
+}
+
+#[test]
+fn fmir_image_input_error_names_the_image_runner_for_binary_images() {
+    let dir = temp_dir("fmir-image-input");
+    let binary = dir.join("image.fmir");
+    let text = dir.join("image.fmir.txt");
+    let source = dir.join("main.fab");
+    for path in [&binary, &text, &source] {
+        std::fs::write(path, b"x").expect("write file");
+    }
+    let message = fmir_image_input_error(&binary).expect("binary image refused");
+    assert!(message.contains("not a runnable input for `faber run`"));
+    assert!(message.contains("faber __fmir-run"));
+    let message = fmir_image_input_error(&text).expect("text image refused");
+    assert!(message.contains("not a runnable input for `faber run`"));
+    assert!(!message.contains("__fmir-run"));
+    assert!(fmir_image_input_error(&source).is_none());
+    assert!(fmir_image_input_error(&dir.join("missing.fmir")).is_none());
 }

@@ -92,9 +92,9 @@ Common flows:
     land in target/faber-llvm/{debug|release}/ (modules/, link-manifest.toml,
     runtime/identity.toml, binary). Compiled artifacts are executed by the
     target ecosystem, not by faber. Requires a coherent LLVM toolchain
-    (llvm-as + clang, plus opt for release) and a buildable hosts/llvm
-    staticlib; unsupported host triples fail with a structured
-    diagnostic. `-t llvm-text` stays emit-only (radix emit).
+    (llvm-as + clang, plus opt for release) and a buildable runtime/llvm
+    staticlib (the in-tree faber-host-llvm crate); unsupported host triples
+    fail with a structured diagnostic. `-t llvm-text` stays emit-only (radix emit).
 
   Test selection (proba cases run on the runner, not a Cargo harness):
     faber test .
@@ -114,7 +114,7 @@ Common flows:
 
   Interpret source (runner, no Cargo) — `faber run` is interpreted execution,
   always; `faber script` retired and folded into it:
-    faber run crates/exempla/corpus/incipit/salve-munde.fab
+    faber run corpus/incipit/salve-munde.fab
     faber run path/to/pkg           # package directory or faber.toml
     faber run app.zip               # source archive
     faber run script.fab -- alpha beta
@@ -127,7 +127,7 @@ Common flows:
     this release; the rest return with the native host (core-norma N2).
 
   Single-file check (non-package):
-    faber check crates/exempla/corpus/salve-munde.fab
+    faber check corpus/incipit/salve-munde.fab
 
   Format and convert complete Faber source units:
     faber format path/to/file.fab           (report drift, writes nothing; exit 1)
@@ -154,23 +154,20 @@ Common flows:
     faber emit -t rust path/to/pkg
     faber build --target fmir-text path/to/pkg
     faber build --target fmir path/to/pkg
-    faber build --target fmir-bin path/to/pkg
-    path/to/pkg/target/faber-mir/exe/run alpha beta
 
   Inspect phases without a package (radix-compatible aliases):
-    faber lex crates/exempla/corpus/salve-munde.fab
-    faber parse crates/exempla/corpus/salve-munde.fab
+    faber lex corpus/incipit/salve-munde.fab
+    faber parse corpus/incipit/salve-munde.fab
 
   MIR probe emit on single `.fab` files (systems lane; package MIR image targets use `build`):
-    faber emit -t llvm-text crates/exempla/corpus/incipit/salve-munde.fab
-    faber emit -t wgsl-text crates/exempla/corpus/vector/kernel.fab
-    faber emit --reflection -t wgsl-text crates/exempla/corpus/vector/kernel.fab
+    faber emit -t llvm-text corpus/incipit/salve-munde.fab
+    faber emit -t wgsl-text corpus/vector/kernel.fab
+    faber emit --reflection -t wgsl-text corpus/vector/kernel.fab
 
 Output contract:
   - `build`: path of written artifact on stdout; diagnostics on stderr
   - `build --target fmir-text`: path to the inspectable FMIR text image on stdout
   - `build --target fmir`: path to the compact FMIR binary image on stdout
-  - `build --target fmir-bin`: path to a self-contained FMIR runner on stdout
   - `check` / `emit` (package): compiler diagnostics on stderr; emit writes source
   - `run` / `test`: runner output on stdout; forwards the program's exit code
   - `run <path>`: interprets the input (single file, package, or archive) and

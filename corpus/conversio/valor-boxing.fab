@@ -15,18 +15,18 @@ locale = "en"
 #
 # What this teaches:
 #   • Boxing into valor — `T ↦ valor` boxes any typed value (scalar, byte, collection, genus, tensor) into the canonical dynamic carrier.
-#   • Byte preservation — `octeti ↦ valor` composes as numeric byte values; it must not lossy-decode bytes as text.
+#   • Byte preservation — `list<b8> ↦ valor` composes as numeric byte values; it must not lossy-decode bytes as text.
 #
 # Common mistakes:
 #   • Expecting to extract a specific type from valor without a matching variant — valor requires the correct runtime variant or `⇥` recovery.
 #
-# See also: ↦, valor, octeti, lista, tabula, genus, tensor
+# See also: ↦, valor, list<b8>, lista, tabula, genus, tensor
 # =============================================================================
 
 # conversio — typed values to valor boxing
 #
 # WHY: `T ↦ valor` boxes typed values into the canonical dynamic carrier.
-# `octeti` composes as a list of numeric byte values; it must not lossy-decode
+# `list<b8>` composes as a list of numeric byte values; it must not lossy-decode
 # bytes as text.
 #
 # A valor object has no defined key order (DECISIONS D2.9), so the genus case

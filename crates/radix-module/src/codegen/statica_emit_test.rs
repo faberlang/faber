@@ -14,7 +14,12 @@ fixum textus NOMEN = \"lim\" + \"es\"\n\
 incipit {\n    nota LIMES\n    nota DUPLEX\n    nota NOMEN\n}\n";
 
 fn emit(target: Target) -> String {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let result = crate::driver::compile(&session, "<test>", SOURCE, ModuleCompileRequest::default());
     assert!(result.success(), "{target:?} compilation failed: {:?}", result.diagnostics);
     match result.output.expect("output") {
@@ -68,10 +73,11 @@ fn swift_emits_folded_statics() {
 fn rust_emits_octeti_static_as_byte_slice() {
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::HirRust)
             .with_dev_locale_root(),
     );
-    let source = "fixum octeti SIGNUM = |de ad|\nincipit {\n    nota SIGNUM.longitudo()\n}\n";
+    let source = "fixum lista<b8> SIGNUM = |de ad|\nincipit {\n    nota SIGNUM.longitudo()\n}\n";
     let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
     assert!(result.success(), "compilation failed: {:?}", result.diagnostics);
     let crate::Output::Rust(out) = result.output.expect("output") else {

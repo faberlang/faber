@@ -5,15 +5,11 @@ locale = "en"
 # Same assertions as fs-roundtrip/src/main.proba, as a generated Rust binary.
 import from "norma:fs" fs
 
-fn write_then_read(string path, string payload) → string {
-    fs.write_file(path, payload)
-    return fs.read_file<string>(path)
-}
-
 main {
     let string dir ← fs.temp_dir()
     let string path ← fs.join([dir, "core-norma-fs-proba.txt"])
-    assert write_then_read(path, "proba-ok") ≡ "proba-ok"
+    fs.write_file(path, "proba-ok")
+    assert fs.read_file<string>(path) ≡ "proba-ok"
     assert fs.exists(path)
     fs.delete(path)
     print "proba-ok"

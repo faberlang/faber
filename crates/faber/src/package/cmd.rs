@@ -96,6 +96,13 @@ fn fail(message: &str) -> ! {
     std::process::exit(1);
 }
 
+/// Terminate after a compile that produced no output; the diagnostics were
+/// already printed.
+fn fail_compilation(diagnostics: &[radix::module::Diagnostic]) -> ! {
+    eprintln!("compilation failed");
+    crate::exit_status::exit_for_compile_failure(diagnostics);
+}
+
 /// Exit when a build target was requested but this `faber` binary lacks its feature.
 ///
 /// WHY: the gate takes the `Target`, not a spelling, so the name shown is
@@ -138,7 +145,7 @@ fn fail_with_diagnostic(diag: &radix::module::Diagnostic) -> ! {
     } else {
         eprintln!("error: {}", diag.message);
     }
-    std::process::exit(1);
+    crate::exit_status::exit_for_diagnostic(diag);
 }
 
 /// Print `diagnostics` in normal mode, then terminate with `message`.
@@ -149,7 +156,7 @@ fn report_diagnostics_and_exit(
 ) -> ! {
     crate::postprocess::print_diagnostics(diagnostics, DiagnosticMode::Normal, locale_pack);
     eprintln!("{message}");
-    std::process::exit(1);
+    crate::exit_status::exit_for_diagnostics(diagnostics);
 }
 
 /// Execute the user-facing `faber build` command.
@@ -165,7 +172,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         command.package,
     ) {
         eprintln!("error: {message}");
-        std::process::exit(1);
+        crate::exit_status::exit_usage();
     }
 
     let raw_input_path = PathBuf::from(&command.input);
@@ -270,30 +277,6 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 ),
             };
             println!("{}", image.image_path.display());
-            return;
-        }
-    }
-
-    if is_package && target == Target::MirFmirBundle {
-        #[cfg(not(feature = "runner"))]
-        exit_runner_feature_unavailable();
-        #[cfg(feature = "runner")]
-        {
-            let bundle = match radix::program::mir::build_package_fmir_binary_bundle(
-                &config,
-                &input_path,
-                &[],
-                command.release,
-                &super::mir::faber_mir_seams(),
-            ) {
-                Ok(bundle) => bundle,
-                Err(diagnostics) => report_diagnostics_and_exit(
-                    &diagnostics,
-                    locale_pack.as_ref(),
-                    "fmir-bin bundle build failed",
-                ),
-            };
-            println!("{}", bundle.entrypoint_path.display());
             return;
         }
     }
@@ -458,7 +441,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 locale_pack.as_ref(),
             );
             let Some(output) = go_result.compile_result.output else {
-                fail("compilation failed");
+                fail_compilation(&go_result.compile_result.diagnostics);
             };
             let layout = match discover_build_layout(&input_path, &command.out_dir) {
                 Ok(l) => l,
@@ -499,7 +482,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     );
 
     let Some(output) = result.output else {
-        fail("compilation failed");
+        fail_compilation(&result.diagnostics);
     };
 
     // Native `clif` builds: the compiler emits an object, Faber links it
@@ -780,7 +763,6 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
                 | Target::MirScena
                 | Target::MirFmir
                 | Target::MirFmirBinary
-                | Target::MirFmirBundle
                 | Target::HirFhir
                 | Target::MirLlvmHost
                 | Target::MirWasm
@@ -839,7 +821,7 @@ pub fn cmd_check_package(
 ) {
     if command.input.is_empty() || command.input[0] == "-" {
         eprintln!("error: package checking requires a path input");
-        std::process::exit(1);
+        crate::exit_status::exit_usage();
     }
     let advice_target = device.map(advice_target);
 
@@ -899,6 +881,7 @@ pub fn cmd_check_package(
     radix::module::apply_warn_policy(&mut diagnostics, &config.warn_policy);
 
     let mut fatal_errors = 0usize;
+    let mut fatal_diagnostics = Vec::new();
     let mut downgraded = 0usize;
     if command.diagnostic_mode == DiagnosticMode::Diagnostics && !diagnostics.is_empty() {
         match locale_pack.as_ref() {
@@ -938,6 +921,7 @@ pub fn cmd_check_package(
                 downgraded += 1;
             } else {
                 fatal_errors += 1;
+                fatal_diagnostics.push(diag.clone());
             }
         }
     }
@@ -978,7 +962,7 @@ pub fn cmd_check_package(
     if fatal_errors == 0 {
         eprintln!("ok: {}", input_path.display());
     } else {
-        std::process::exit(1);
+        crate::exit_status::exit_for_compile_failure(&fatal_diagnostics);
     }
 }
 
@@ -1046,7 +1030,7 @@ fn exit_does_not_lower(
         "error: {}: {CHECKS_BUT_DOES_NOT_LOWER}",
         input_path.display()
     );
-    std::process::exit(1);
+    crate::exit_status::exit_for_compile_failure(diagnostics);
 }
 
 /// What `faber check --device D [--partitions N]` asked for: advice on where
@@ -1070,12 +1054,12 @@ fn advice_target(request: DeviceAdviceRequest) -> (super::device::AdviceDevice, 
         DeviceChoice::Cuda => AdviceDevice::Cuda,
         DeviceChoice::Auto | DeviceChoice::Reference => {
             eprintln!("error: `check --device` names the device to advise for: cpu, metal or cuda");
-            std::process::exit(1);
+            crate::exit_status::exit_usage();
         }
     };
     if request.partitions.is_some() && device == AdviceDevice::Cuda {
         eprintln!("error: `--partitions` is valid only with `--device cpu` or `--device metal`");
-        std::process::exit(1);
+        crate::exit_status::exit_usage();
     }
     (device, request.partitions.unwrap_or(1))
 }
@@ -1218,7 +1202,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
             };
             if command.reflection {
                 eprintln!("error: target does not expose GPU reflection metadata");
-                std::process::exit(1);
+                crate::exit_status::exit_usage();
             }
             let code = crate::postprocess::postprocess_code(code, command.target, format, linter);
             if let Some(out) = command.output {
@@ -1244,7 +1228,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
     );
 
     let Some(output) = result.output else {
-        fail("compilation failed");
+        fail_compilation(&result.diagnostics);
     };
 
     if command.reflection {
@@ -1256,7 +1240,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
                 Ok(Some(json)) => json,
                 Ok(None) => {
                     eprintln!("error: target does not expose GPU reflection metadata");
-                    std::process::exit(1);
+                    crate::exit_status::exit_usage();
                 }
                 Err(err) => {
                     eprintln!("error: failed to serialize GPU reflection metadata: {err}");
@@ -1377,14 +1361,14 @@ fn compile_package_input(
 ) -> (CompileResult, Option<radix::module::locale::LocalePack>) {
     if input.is_empty() || input[0] == "-" {
         eprintln!("error: package compilation requires a path input");
-        std::process::exit(1);
+        crate::exit_status::exit_usage();
     }
 
     let path = super::absolutize_path(std::path::Path::new(&input[0]));
     let package = use_package_compiler_from_args(target, input, force_package);
     if !package {
         eprintln!("error: expected a package directory, manifest, or entry file");
-        std::process::exit(1);
+        crate::exit_status::exit_usage();
     }
 
     let (config, locale_pack) = match config_with_locale(target, &path, locale, diagnostics_locale)

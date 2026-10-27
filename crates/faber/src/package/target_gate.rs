@@ -37,7 +37,7 @@ const RUNNER_FEATURE: &str = "runner";
 pub fn target_compiled_in(target: Target) -> bool {
     match target {
         Target::MirStepper => true,
-        Target::MirScena | Target::MirFmir | Target::MirFmirBinary | Target::MirFmirBundle => {
+        Target::MirScena | Target::MirFmir | Target::MirFmirBinary => {
             cfg!(feature = "runner")
         }
         Target::HirRust

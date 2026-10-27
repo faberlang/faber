@@ -4,13 +4,13 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "spelled_lift", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "fac_block", "cape_clause", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "Bulk typed reinterpretation of octeti as a tensor whose extent is a run-time size read from a binding."
-syntax = "<octeti> ↦ tensor<E, [N, magnitudo n]> via Be|Le"
+summary = "Bulk typed reinterpretation of lista<b8> as a tensor whose extent is a run-time size read from a binding."
+syntax = "lista<b8> ↦ tensor<E, [N, magnitudo n]> via Be|Le"
 related = ["↦", "octeti", "tensor", "float"]
 locale = "la"
 +++
 # =============================================================================
-# ↦ — octeti as a tensor whose extent is a run-time size.
+# ↦ — lista<b8> as a tensor whose extent is a run-time size.
 # =============================================================================
 #
 # What this teaches:
@@ -29,11 +29,11 @@ locale = "la"
 #     an expression extent over an in-scope binding (`magnitudo (n - 1)`).
 #   • Omitting Be/Le — the byte order is never implied, for any element width.
 #
-# See also: ↦, octeti, tensor, magnitudo
+# See also: ↦, lista<b8>, tensor, magnitudo
 # =============================================================================
 
 
-# conversio — octeti ↦ tensor<E, [N, magnitudo n]> via Be|Le
+# conversio — lista<b8> ↦ tensor<E, [N, magnitudo n]> via Be|Le
 #
 # EXPECTED stdout: see octeti-tensor-runtime-extent-la.expected
 #

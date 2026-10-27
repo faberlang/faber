@@ -324,8 +324,6 @@ covers multi-word names only.
 - row: vacuum - section: types - current: เปล่า - proposed: เปล่า - confidence: high - equals-latin-key: no - reason: เปล่า is the empty of the void type
 - row: numquam - section: types - current: ไม่เคย - proposed: ไม่เคย - confidence: high - equals-latin-key: no - reason: ไม่เคย is the Thai never of the bottom type
 - row: ignotum - section: types - current: ไม่รู้ - proposed: ไม่รู้จัก - confidence: medium - equals-latin-key: no - reason: ไม่รู้ is a verb whose subject is a person, where the row is an attributive type name
-- row: octeti - section: types - current: ไบต์ - proposed: ไบต์ - confidence: high - equals-latin-key: no - reason: ไบต์ is the fixed Thai loan for bytes
-- row: octetus - section: types - current: ไบต์เดี่ยว - proposed: ไบต์เดี่ยว - confidence: high - equals-latin-key: no - reason: ไบต์เดี่ยว names the single byte beside the bytes type
 - row: clampa - section: types - current: ตรึงขอบ - proposed: ตรึงขอบ - confidence: high - equals-latin-key: no - reason: ตรึงขอบ is the pin at border policy the marker names
 - row: reflexa - section: types - current: สะท้อนขอบ - proposed: สะท้อนขอบ - confidence: high - equals-latin-key: no - reason: สะท้อนขอบ is the mirror at border policy
 - row: involuta - section: types - current: วนขอบ - proposed: วนขอบ - confidence: high - equals-latin-key: no - reason: วนขอบ is the wrap around border policy, distinct from the keyword โมดูลัส

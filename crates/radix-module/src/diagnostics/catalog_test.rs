@@ -251,6 +251,7 @@ fn warning_codes_are_stable() {
         (WarningKind::PreferStringTemplate, "WARN018"),
         (WarningKind::DiscouragedMutLocal, "WARN019"),
         (WarningKind::PreferGuillemetQuote, "WARN034"),
+        (WarningKind::MixedTemplateHoles, "WARN035"),
     ];
     for (kind, expected_code) in &cases {
         let spec = semantic_spec(SemanticErrorKind::Warning(*kind));

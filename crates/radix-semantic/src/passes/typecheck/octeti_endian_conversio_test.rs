@@ -149,7 +149,7 @@ fn bounded_octeti_endian_read_accepts_all_widths() {
     ] {
         for hint in ["Le", "Be"] {
             let source =
-                format!("functio r(octeti<{width}> b) → {ty} {{ redde b ↦ {ty} via {hint} }}");
+                format!("functio r(lista<b8, {width}> b) → {ty} {{ redde b ↦ {ty} via {hint} }}");
             test_support::assert_accepts_la(&source);
         }
     }
@@ -158,11 +158,11 @@ fn bounded_octeti_endian_read_accepts_all_widths() {
 #[test]
 fn bounded_octeti_endian_read_without_hint_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio r(octeti<2> b) → u16 { redde b ↦ u16 }",
+        "functio r(lista<b8, 2> b) → u16 { redde b ↦ u16 }",
         "octeti_to_numerus_unspecified",
     );
     test_support::assert_rejects_with_issue_la(
-        "functio r(octeti<4> b) → f32 { redde b ↦ f32 }",
+        "functio r(lista<b8, 4> b) → f32 { redde b ↦ f32 }",
         "octeti_to_fractus_unspecified",
     );
 }
@@ -170,24 +170,24 @@ fn bounded_octeti_endian_read_without_hint_rejects() {
 #[test]
 fn bounded_octeti_endian_read_too_small_capacity_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio r(octeti<2> b) → u32 { redde b ↦ u32 via Le }",
+        "functio r(lista<b8, 2> b) → u32 { redde b ↦ u32 via Le }",
         "octeti_endian_width_mismatch",
     );
     test_support::assert_rejects_with_issue_la(
-        "functio r(octeti<4> b) → f64 { redde b ↦ f64 via Le }",
+        "functio r(lista<b8, 4> b) → f64 { redde b ↦ f64 via Le }",
         "octeti_endian_width_mismatch",
     );
 }
 
 #[test]
 fn bounded_octeti_endian_read_larger_capacity_accepts() {
-    test_support::assert_accepts_la("functio r(octeti<8> b) → u16 { redde b ↦ u16 via Le }");
+    test_support::assert_accepts_la("functio r(lista<b8, 8> b) → u16 { redde b ↦ u16 via Le }");
 }
 
 #[test]
 fn bounded_octeti_endian_read_u8_target_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio r(octeti<1> b) → u8 { redde b ↦ u8 via Le }",
+        "functio r(lista<b8, 1> b) → u8 { redde b ↦ u8 via Le }",
         "octeti_to_numerus_unspecified",
     );
 }
@@ -195,7 +195,7 @@ fn bounded_octeti_endian_read_u8_target_rejects() {
 #[test]
 fn bounded_octeti_to_bivalens_stays_rejected() {
     test_support::assert_rejects_with_issue_la(
-        "functio r(octeti<2> b) → bivalens { redde b ↦ bivalens }",
+        "functio r(lista<b8, 2> b) → bivalens { redde b ↦ bivalens }",
         "unsupported_conversio",
     );
 }

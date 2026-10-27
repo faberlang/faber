@@ -1,35 +1,47 @@
 +++
 term = "octet"
-kind = "reject"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "conversio_expr", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "The word byte (octetus) is retired: write b8 for raw bits or u8 for a number."
-syntax = "byte — rejected"
-related = ["bits", "octeti", "numerus"]
+summary = "There is no byte type: eight raw bits are b8, an eight-bit number is u8, and a run of bytes is list<b8>."
+syntax = "b8 | u8 | list<b8>"
+related = ["bits", "lista", "numerus"]
 locale = "en"
-no_expected = "rejects"
-diagnostic = "SEM008:retired_byte_word"
 +++
 # =============================================================================
-# byte — The word byte (octetus) is retired: write b8 for raw bits or u8 for a number.
+# octet — b8 for raw bits, u8 for a number, list<b8> for a byte run
 # =============================================================================
 #
 # What this teaches:
-#   • `byte` (Latin `octetus`) no longer names a type; the diagnostic names both replacements
-#   • A raw byte is `b8`; a numeric byte is `u8`
+#   • Eight raw bits are `b8`; an eight-bit number is `u8`. They are different
+#     types: a `b8` has equality, ordering by bit pattern and the bit
+#     operations, but no arithmetic and no mixing with numbers.
+#   • Cross between them explicitly with `↦`: `n ↦ b8` reads a number as its
+#     bit pattern, `bits ↦ u8` reads a bit pattern as a number.
+#   • A run of bytes is a list of raw bits, `list<b8>`; a hex literal such as
+#     `|de ad be ef|` writes one.
 #
 # Common mistakes:
-#   • Writing `byte` for an element of `bytes` — the element is `b8`
+#   • Adding or comparing a `b8` with a number — convert with `↦ u8` first.
+#   • Expecting a separate byte word — there is none; pick `b8` or `u8`.
 #
-# See also: bits, octeti, numerus
+# See also: bits, lista, numerus
 # =============================================================================
 
-# byte reject case — expected compile failure
+# octet — the three byte-sized forms side by side
 #
-# This exemplum intentionally fails to compile.
+# EXPECTED stdout: see octet.expected
 
 main {
-    let byte b ← 0x80 ∷ u8
-    print b
+    let b8 raw ← 0x80
+    let u8 number ← raw ↦ u8
+    let b8 again ← number ↦ b8
+    let list<b8> buffer ← |de ad be ef|
+    let u8 first ← buffer[0] ↦ u8
+    print raw
+    print number
+    print again
+    print buffer.length()
+    print first
 }

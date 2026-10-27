@@ -4,17 +4,17 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "range_expr", "range_tail", "conversio_expr", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Bulk typed reinterpretation of octeti as a tensor via Be|Le."
-syntax = "<octeti> ↦ tensor<E, [shape]> via Be|Le"
+summary = "Bulk typed reinterpretation of list<b8> as a tensor via Be|Le."
+syntax = "list<b8> ↦ tensor<E, [shape]> via Be|Le"
 related = ["↦", "octeti", "tensor", "float"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — Bulk typed reinterpretation of octeti as a tensor via Be|Le.
+# ↦ — Bulk typed reinterpretation of list<b8> as a tensor via Be|Le.
 # =============================================================================
 #
 # What this teaches:
-#   • Faithful reinterpretation — `bytes ↦ tensor<f32, [2]> via Le` reads each element
+#   • Faithful reinterpretation — `list<b8> ↦ tensor<f32, [2]> via Le` reads each element
 #     from the next 4 bytes in the chosen byte order; nothing is converted numerically.
 #   • Shape is row-major — a `[2, 2]` target fills the last index fastest.
 #   • Exact length — the byte count must equal `product(shape) * element width`.
@@ -24,11 +24,11 @@ locale = "en"
 #   • Omitting Be/Le — the byte order is never implied, for any element width.
 #   • Passing a short or long source — no truncation, no padding.
 #
-# See also: ↦, octeti, tensor
+# See also: ↦, list<b8>, tensor
 # =============================================================================
 
 
-# conversio — octeti ↦ tensor<E, [shape]> via Be|Le
+# conversio — list<b8> ↦ tensor<E, [shape]> via Be|Le
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' tensorType 'via' endian

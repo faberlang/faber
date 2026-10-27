@@ -1,0 +1,53 @@
++++
+term = "√"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "unary_expr", "additive_expr", "expression", "literal", "array_literal", "call_expr", "member_suffix", "nota_stmt"]
+category = "arithmetic"
+summary = "Prefix radicals √ ∛ ∜ lifted over a float tensor: each element takes the root and the shape is kept."
+syntax = "√ <float tensor> | ∛ <float tensor> | ∜ <float tensor>"
+related = ["tensor", "radical-scalar", "radical-int-reject"]
+locale = "en"
++++
+
+# =============================================================================
+# √ ∛ ∜ — prefix radicals over a float tensor.
+# =============================================================================
+#
+# What this teaches:
+#   • The radicals are legal wherever `.sqrt()` and `.cbrt()` are legal, so
+#     they lift over `tensor<f32, [N]>` element by element and keep the shape
+#   • `∛` of a negative element is the real cube root (`∛ -8.0` is -2.0)
+#   • Precedence holds on tensors too: `√ v + 1.0` is `(√ v) + 1.0`, the
+#     radical binds tighter than the `+`
+#
+# Common mistakes:
+#   • applying a radical to a `vector<f32, N>`: it has no `.sqrt()`, so the
+#     glyph is refused there; use a `tensor` for elementwise math
+#
+# EXPECTED stdout:
+#   [1.0, 2.0, 3.0]
+#   [2.0, 3.0, 4.0]
+#   [-2.0, 1.0, 3.0]
+#   [2.0, 3.0, 4.0]
+#
+# See also: tensor, radical-scalar, radical-int-reject
+# =============================================================================
+
+main {
+    let list<f32> roots ← [1.0, 4.0, 9.0]
+    let tensor<f32, [3]> squares ← roots ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> root ← √ squares
+    print root.flatten()
+    let tensor<f32, [3]> lifted ← √ squares + 1.0
+    print lifted.flatten()
+
+    let list<f32> cubes ← [-8.0, 1.0, 27.0]
+    let tensor<f32, [3]> signed ← cubes ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> cuberoot ← ∛ signed
+    print cuberoot.flatten()
+
+    let list<f32> fourths ← [16.0, 81.0, 256.0]
+    let tensor<f32, [3]> powers ← fourths ↦ tensor<f32, [3]>
+    let tensor<f32, [3]> fourth ← ∜ powers
+    print fourth.flatten()
+}

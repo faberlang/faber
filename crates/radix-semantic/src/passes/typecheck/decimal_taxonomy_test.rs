@@ -110,7 +110,7 @@ fn ascii_format_pack_from_integer_source_still_accepts() {
 #[test]
 fn endian_unpack_into_decimal_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio win(octeti corpus) → d64 { redde corpus[0‥4] ↦ d64 via Be }",
+        "functio win(lista<b8> corpus) → d64 { redde corpus[0‥4] ↦ d64 via Be }",
         "decimal_endianness_hint_rejected",
     );
 }
@@ -118,7 +118,7 @@ fn endian_unpack_into_decimal_rejects() {
 #[test]
 fn endian_unpack_into_integer_still_accepts() {
     test_support::assert_accepts_la(
-        "functio win(octeti corpus) → u32 { redde corpus[0‥4] ↦ u32 via Be }",
+        "functio win(lista<b8> corpus) → u32 { redde corpus[0‥4] ↦ u32 via Be }",
     );
 }
 

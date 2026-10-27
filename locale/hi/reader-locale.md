@@ -5,12 +5,12 @@ the la heritage pack (`locale/la/pack.toml`), the per-key concepts and rationale
 `docs/design/llm-locale.md`, and the verb-form law in `docs/stdlib/morphologia.md`.
 The review records findings only; it edits no pack row.
 
-Scope: 206 rows — `[keywords]` from line 5 (159 rows) and `[types]` from line 170
-(47 rows). Diagnostics rows are out of scope.
+Scope: 204 rows — `[keywords]` from line 5 (159 rows) and `[types]` from line 170
+(45 rows). Diagnostics rows are out of scope.
 
 ## Conventions
 
-The rules below are the lens this review applies to every one of the 206 rows. Where a
+The rules below are the lens this review applies to every one of the 204 rows. Where a
 rule contradicts the current pack word, the finding proposes a replacement; where it
 does not, the finding restates the current word and says so.
 
@@ -79,11 +79,11 @@ The pack is written in **Devanagari**, including matras and virama clusters
   normalize to the same sequence, and a proposal is only safe if it does. Indic digits
   (०-९) normalize compatibly with ASCII digits under the same rule.
 - **Multi-word names join with an underscore**, never by fusing the words and never by
-  a space (a space would split the token). 14 of the 206 rows use the underscore join
+  a space (a space would split the token). 13 of the 204 rows use the underscore join
   today: `fient` (line 83, `async_जनक`), `figendum` (line 84), `variandum` (line 85,
   `रुको_चर`), `reddet` (line 86), `primus_quem` (line 90, where the key itself is the
   joined name), `erratur` (line 116), `verte` (line 146), `imperia` (line 156),
-  `ordinata` (line 166), and the type rows `modulus` (line 174), `octetus` (line 184),
+  `ordinata` (line 166), and the type rows `modulus` (line 174),
   `clampa` (line 186), `reflexa` (line 187), `involuta` (line 188).
   The rule cuts both ways: fused compounds such as `अन्यथायदि` (`sin`), `इधरफेंको`
   (`iace`), `मरोजाओ` (`mori`), `रूपमें` (`ut`), `पूर्वतैयार` (`praepara`),
@@ -328,8 +328,6 @@ but not to the Latin key (`nonnumerus` at line 64 as `nan`, `fiet` at 81 as `asy
 - row: vacuum - section: types - current: रिक्त - proposed: रिक्त - confidence: high - equals-latin-key: no - reason: no mismatch: रिक्त is the void type
 - row: numquam - section: types - current: कभीनहीं - proposed: कभीनहीं - confidence: high - equals-latin-key: no - reason: no mismatch: कभीनहीं is the never bottom type
 - row: ignotum - section: types - current: अज्ञात - proposed: अज्ञात - confidence: high - equals-latin-key: no - reason: no mismatch: अज्ञात is the unknown top type
-- row: octeti - section: types - current: बाइट - proposed: बाइट - confidence: high - equals-latin-key: no - reason: no mismatch: बाइट is the bytes type
-- row: octetus - section: types - current: बाइट_मान - proposed: बाइट_मान - confidence: high - equals-latin-key: no - reason: no mismatch: the compound names a byte value in the underscore join
 - row: clampa - section: types - current: किनारा_स्थिर - proposed: किनारा_स्थिर - confidence: high - equals-latin-key: no - reason: no mismatch: the compound names the clamp edge policy in the underscore join
 - row: reflexa - section: types - current: किनारा_परावर्तन - proposed: किनारा_परावर्तन - confidence: high - equals-latin-key: no - reason: no mismatch: the compound names the reflect edge policy in the underscore join
 - row: involuta - section: types - current: किनारा_लपेट - proposed: किनारा_लपेट - confidence: high - equals-latin-key: no - reason: no mismatch: the compound names the wrap edge policy in the underscore join

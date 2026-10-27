@@ -94,7 +94,7 @@ fn foreign_env_module_is_not_counted() {
 #[test]
 fn harness_paths_are_exempt() {
     for path in [
-        "crates/exempla/src/exempla_e2e/runner.rs",
+        "crates/corpus-matrix/src/exempla_e2e/runner.rs",
         "crates/faber/tests/corpus_cli.rs",
         "crates/radix-semantic/src/test_support.rs",
         "crates/radix-module/src/driver/mod_test.rs",

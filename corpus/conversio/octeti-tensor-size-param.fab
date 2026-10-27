@@ -4,13 +4,13 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "spelled_lift", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "fac_block", "cape_clause", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "Bulk typed reinterpretation of octeti as a tensor whose extent is a size parameter witnessed by a tensor argument axis."
-syntax = "<octeti> ↦ tensor<E, [N]> via Be|Le"
+summary = "Bulk typed reinterpretation of list<b8> as a tensor whose extent is a size parameter witnessed by a tensor argument axis."
+syntax = "list<b8> ↦ tensor<E, [N]> via Be|Le"
 related = ["↦", "octeti", "tensor", "size"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — octeti as a tensor whose extent is a size parameter witnessed by the
+# ↦ — list<b8> as a tensor whose extent is a size parameter witnessed by the
 # tensor argument.
 # =============================================================================
 #
@@ -30,11 +30,11 @@ locale = "en"
 #     expression extent over an in-scope binding (`size (n - 1)`).
 #   • Omitting Be/Le — the byte order is never implied, for any element width.
 #
-# See also: ↦, octeti, tensor, size
+# See also: ↦, list<b8>, tensor, size
 # =============================================================================
 
 
-# conversio — octeti ↦ tensor<E, [N]> via Be|Le
+# conversio — list<b8> ↦ tensor<E, [N]> via Be|Le
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' tensorType 'via' endian

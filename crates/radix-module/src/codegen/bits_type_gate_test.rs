@@ -11,7 +11,12 @@ use crate::driver::{Config, ModuleCompileRequest, Session};
 const SOURCE: &str = "functio f(b8 a) → b8 { redde a }\nincipit {\n}\n";
 
 fn diagnostics(target: Target) -> Vec<(String, String)> {
-    let session = Session::new(Config::default().with_target(target).with_dev_locale_root());
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(target)
+            .with_dev_locale_root(),
+    );
     let result = crate::driver::compile(&session, "<test>", SOURCE, ModuleCompileRequest::default());
     result
         .diagnostics
@@ -87,6 +92,7 @@ fn wasm_text(body: &str) -> String {
     let source = format!("incipit {{\n{body}\n}}\n");
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::MirWasm)
             .with_dev_locale_root(),
     );
@@ -194,6 +200,7 @@ fn wasm_refuses_display_of_a_nested_list_of_bits_by_name() {
     let source = "incipit {\nsit lista<b8> xs ← [0x00]\nsit lista<lista<b8>> ys ← [xs, xs]\nnota ys\n}\n";
     let session = Session::new(
         Config::default()
+            .with_latin_locale()
             .with_target(Target::MirWasm)
             .with_dev_locale_root(),
     );

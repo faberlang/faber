@@ -29,7 +29,7 @@ pub(crate) fn reset_package_analysis_entries() {
 pub fn cmd_emit_faber(command: EmitCommand, format: bool, linter: bool) {
     if command.package {
         eprintln!("error: package Faber emit is not supported; use single-file input");
-        std::process::exit(1);
+        faber_cli::exit_status::exit_usage();
     }
 
     cmd_emit_with_locale(command, format, linter);
@@ -41,7 +41,7 @@ fn report_locale_diagnostic(diagnostic: &radix::module::diagnostics::Diagnostic)
     } else {
         eprintln!("error: {}", diagnostic.message);
     }
-    std::process::exit(1);
+    faber_cli::exit_status::exit_for_diagnostic(diagnostic);
 }
 
 /// Merge each library root's `[target.<spelling>]` bindings (read by Faber,
@@ -162,7 +162,7 @@ fn compile_wgsl_with_library_bindings(
 pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     if command.package {
         eprintln!("error: package emit must use the package compiler route");
-        std::process::exit(1);
+        faber_cli::exit_status::exit_usage();
     }
 
     // Faber owns locale → pack resolution (install layout + package manifests
@@ -210,7 +210,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
 
     let Some(output) = result.output else {
         eprintln!("compilation failed");
-        std::process::exit(1);
+        faber_cli::exit_status::exit_data_error();
     };
 
     if command.reflection {
@@ -222,7 +222,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
                 Ok(Some(json)) => json,
                 Ok(None) => {
                     eprintln!("error: target does not expose GPU reflection metadata");
-                    std::process::exit(1);
+                    faber_cli::exit_status::exit_usage();
                 }
                 Err(err) => {
                     eprintln!("error: failed to serialize GPU reflection metadata: {err}");

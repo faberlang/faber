@@ -12,7 +12,11 @@ fn run(body: &str) -> (Vec<String>, Vec<(String, String)>) {
 
 /// `items` are top-level declarations; `body` is the `incipit` block.
 fn run_items(items: &str, body: &str) -> (Vec<String>, Vec<(String, String)>) {
-    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirTypeScript),
+    );
     let source = format!("{items}\nincipit {{\n{body}\n}}\n");
     let mut host = BufferHost::default();
     let errors = match run_source(&session, "inf.fab", &source, &mut host) {
@@ -339,13 +343,13 @@ fn octeti_via_endian_is_minimal_two_complement() {
     // ruling 40: Java `toByteArray` semantics, and the exact inverse on decode.
     assert_eq!(
         ok(
-            "sit inf z ← 0\nsit inf p ← 128\nsit inf n ← -129\nsit octeti a ← z ↦ octeti via Be\nsit octeti b ← p ↦ octeti via Be\nsit octeti c ← n ↦ octeti via Be\nnota a.longitudo()\nnota b.longitudo()\nnota c.longitudo()\nnota a[0] ↦ u8\nnota b[0] ↦ u8\nnota b[1] ↦ u8\nnota c[0] ↦ u8\nnota c[1] ↦ u8"
+            "sit inf z ← 0\nsit inf p ← 128\nsit inf n ← -129\nsit lista<b8> a ← z ↦ lista<b8> via Be\nsit lista<b8> b ← p ↦ lista<b8> via Be\nsit lista<b8> c ← n ↦ lista<b8> via Be\nnota a.longitudo()\nnota b.longitudo()\nnota c.longitudo()\nnota a[0] ↦ u8\nnota b[0] ↦ u8\nnota b[1] ↦ u8\nnota c[0] ↦ u8\nnota c[1] ↦ u8"
         ),
         ["1", "2", "2", "0", "0", "128", "255", "127"]
     );
     assert_eq!(
         ok(&format!(
-            "sit inf big ← {TWO_64}\nsit octeti le ← big ↦ octeti via Le\nnota le.longitudo()\nnota le[8] ↦ u8\nsit inf back ← le ↦ inf via Le ⊥ 0\nnota back\nsit octeti be ← big ↦ octeti via Be\nsit inf back2 ← be ↦ inf via Be ⊥ 0\nnota back2"
+            "sit inf big ← {TWO_64}\nsit lista<b8> le ← big ↦ lista<b8> via Le\nnota le.longitudo()\nnota le[8] ↦ u8\nsit inf back ← le ↦ inf via Le ⊥ 0\nnota back\nsit lista<b8> be ← big ↦ lista<b8> via Be\nsit inf back2 ← be ↦ inf via Be ⊥ 0\nnota back2"
         )),
         ["9", "1", "18446744073709551616", "18446744073709551616"]
     );

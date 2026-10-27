@@ -9,7 +9,7 @@ use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 fn lege_corpus_still_checks() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/lege/lege.fab");
     let source = std::fs::read_to_string(&path).expect("lege corpus fixture");
-    let config = Config::default();
+    let config = Config::default().with_latin_locale();
     let result = Compiler::new(config).compile_str("lege.fab", &source);
     assert!(result.success(), "lege.fab must still compile: {:?}", result.diagnostics);
 }
@@ -47,7 +47,11 @@ fn th_th_sample_still_checks_without_locale002_advisories() {
 
 #[test]
 fn driver_analyzed_unit_carries_contract_facts() {
-    let session = Session::new(Config::default().with_target(Target::HirRust));
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirRust),
+    );
     let unit = analyze_source(
         &session,
         "g1.fab",
@@ -85,8 +89,12 @@ fn top_level_const_vacua_rejects_as_top_level_binding() {
     // not part of the `generis` static fold evaluator's compile-time-constant
     // surface (D5.9), so there is no static equivalent to redirect this
     // fixture to; assert the SEM062 rejection instead.
-    let result = Compiler::new(Config::default().with_target(Target::HirRust))
-        .compile_str("vacua.fab", "sit lista<numerus> name ← vacua");
+    let result = Compiler::new(
+        Config::default()
+            .with_latin_locale()
+            .with_target(Target::HirRust),
+    )
+    .compile_str("vacua.fab", "sit lista<numerus> name ← vacua");
     assert!(
         !result.success(),
         "top-level fixum vacua must fail closed, got: {:?}",

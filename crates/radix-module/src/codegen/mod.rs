@@ -471,8 +471,7 @@ pub fn generate_from_analyzed_with_options(
         | Target::MirBasic
         | Target::MirScena
         | Target::MirFmir
-        | Target::MirFmirBinary
-        | Target::MirFmirBundle => Err(mir_backed_requires_driver()),
+        | Target::MirFmirBinary => Err(mir_backed_requires_driver()),
     }
 }
 

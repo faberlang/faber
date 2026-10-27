@@ -22,11 +22,10 @@
 /// this test until it joins this list or is named hidden — the list can no
 /// longer silently drop a backend. The order is the report's presentation
 /// order and is preserved verbatim for the printed row output.
-const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 24] = [
+const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 23] = [
     crate::codegen::Target::HirRust,
     crate::codegen::Target::MirFmir,
     crate::codegen::Target::MirFmirBinary,
-    crate::codegen::Target::MirFmirBundle,
     crate::codegen::Target::HirFaber,
     crate::codegen::Target::HirFhir,
     crate::codegen::Target::HirGo,
@@ -97,7 +96,7 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::HirC => "c",
         crate::codegen::Target::MirWasm => "wat",
         crate::codegen::Target::MirLlvm | crate::codegen::Target::MirAmd => "ll",
-        crate::codegen::Target::MirLlvmHost | crate::codegen::Target::MirFmirBundle => "run",
+        crate::codegen::Target::MirLlvmHost => "run",
         crate::codegen::Target::MirClif => "o",
         crate::codegen::Target::MirMetal => "metal",
         crate::codegen::Target::MirWgsl => "wgsl",
@@ -324,13 +323,6 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             package: false,
             note: "delegated to `faber build --target fmir`; radix emit rejects package MIR image targets",
         },
-        crate::codegen::Target::MirFmirBundle => TargetCapabilities {
-            check: true,
-            build: false,
-            run: false,
-            package: false,
-            note: "delegated to `faber build --target fmir-bin`; radix emit rejects package executable targets",
-        },
         crate::codegen::Target::HirFhir => TargetCapabilities {
             check: true,
             build: true,
@@ -349,7 +341,7 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             build: true,
             run: true,
             package: true,
-            note: "hidden legacy source-backed MIR package runtime; use `fmir-text`, `fmir`, or `fmir-bin` for package MIR artifacts",
+            note: "hidden legacy source-backed MIR package runtime; use `fmir-text` or `fmir` for package MIR artifacts",
         },
         crate::codegen::Target::MirFmir => TargetCapabilities {
             check: true,
@@ -364,13 +356,6 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             run: true,
             package: true,
             note: "compact package MIR binary image via `faber build --target fmir`; run through FMIR loader",
-        },
-        crate::codegen::Target::MirFmirBundle => TargetCapabilities {
-            check: true,
-            build: true,
-            run: true,
-            package: true,
-            note: "direct package executable runner via `faber build --target fmir-bin`; embeds FMIR image bytes",
         },
         crate::codegen::Target::HirFhir => TargetCapabilities {
             check: true,

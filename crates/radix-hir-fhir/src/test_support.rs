@@ -75,6 +75,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
         tuple_label_accesses: Vec::new(),
+        template_holes: Vec::new(),
         insere_exprs: Vec::new(),
         function_modifier_bindings: Vec::new(),
         region: None,
@@ -82,6 +83,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
     let types = TypeTable::new();
     HirArtifact {
         schema_version: SCHEMA_VERSION,
+        shape_hash: crate::wire_shape_hash(),
         source_identity: SourceIdentity {
             content_hash: "abc123".to_string(),
             relative_path: "test.faber".to_string(),

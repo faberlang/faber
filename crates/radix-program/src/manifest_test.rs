@@ -222,10 +222,6 @@ fn build_target_maps_supported_spellings() {
         Target::MirFmirBinary
     );
     assert_eq!(
-        manifest_build_target(Some("fmir-bin"), Path::new("faber.toml")).expect("fmir-bin"),
-        Target::MirFmirBundle
-    );
-    assert_eq!(
         manifest_build_target(Some("llvm-host"), Path::new("faber.toml")).expect("llvm-host"),
         Target::MirLlvmHost
     );
@@ -256,7 +252,7 @@ fn build_target_rejects_unsupported_spelling() {
     // spelling must tell the declarer what the manifest does accept.
     let accepted = accepted_arg(&err);
     assert!(accepted.split(", ").any(|spelling| spelling == "go"));
-    assert!(accepted.split(", ").any(|spelling| spelling == "fmir-bin"));
+    assert!(accepted.split(", ").any(|spelling| spelling == "fmir"));
 }
 
 fn accepted_arg(err: &radix_module::diagnostics::Diagnostic) -> &str {
