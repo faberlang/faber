@@ -78,7 +78,7 @@ fn parses_explicit_type_args_on_keyword_import_alias_method_call() {
 fn parses_explicit_type_args_on_receiver_method_call() {
     let result = parse_ok_la(
         r"incipit {
-    sit octeti frame ← receiver.method<octeti>()
+    sit lista<b8> frame ← receiver.method<lista<b8>>()
 }",
     );
     let call = first_call_expr(&result);

@@ -4,13 +4,13 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "range_expr", "range_tail", "conversio_expr", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Endian integer and float unpack from an octeti window."
-syntax = "<octeti>[lo‥hi] ↦ W via Be|Le"
+summary = "Endian integer and float unpack from a list<b8> window."
+syntax = "list<b8>[lo‥hi] ↦ W via Be|Le"
 related = ["↦", "octeti", "int", "float"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — Endian integer unpack from an octeti window.
+# ↦ — Endian integer unpack from a list<b8> window.
 # =============================================================================
 #
 # What this teaches:
@@ -20,14 +20,14 @@ locale = "en"
 #   • Exact width — the window length must match the integer or float width (2 / 4 / 8).
 #
 # Common mistakes:
-#   • Omitting Be/Le — `bytes ↦ u32` or `bytes ↦ f32` stays rejected (endian unspecified).
+#   • Omitting Be/Le — `list<b8> ↦ u32` or `list<b8> ↦ f32` stays rejected (endian unspecified).
 #   • Using a short window — a 3-byte source does not pad.
 #
-# See also: ↦, octeti, int
+# See also: ↦, list<b8>, int
 # =============================================================================
 
 
-# conversio — octeti window ↦ W via Be|Le
+# conversio — list<b8> window ↦ W via Be|Le
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' width 'via' endian

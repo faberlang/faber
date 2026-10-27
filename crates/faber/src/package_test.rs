@@ -2965,7 +2965,7 @@ main args args {
   let string source ← fs.join(partes)
   partes ← [nested, "source-link"]
   let string link ← fs.join(partes)
-  let bytes payload ← |41 42|
+  let list<b8> payload ← |41 42|
   fs.write_bytes(source, payload)
   fs.create_link(source, link)
   print fs.is_symlink(link)
@@ -3017,7 +3017,7 @@ main args args {
   fs.create_dir(dir)
   partes ← [dir, "data.bin"]
   let string target ← fs.join(partes)
-  let bytes payload ← |41 42 43|
+  let list<b8> payload ← |41 42 43|
   fs.write_bytes(target, payload)
   print fs.byte_length(target)
   fs.delete(target)
@@ -3224,9 +3224,9 @@ fn package_mir_cli_root_octeti_operand_executes_without_rust_emit() {
         &entry,
         r#"
 @ cli "tool"
-@ operand bytes raw
+@ operand list<b8> raw
 main args args {
-  let bytes raw ← args.raw
+  let list<b8> raw ← args.raw
   print raw.length()
 }
 "#,
@@ -5633,7 +5633,7 @@ fn compile_package_emits_norma_text_encode() {
 import from "norma:text" text
 
 main {
-  let bytes raw ← text.encode("Salve")
+  let list<b8> raw ← text.encode("Salve")
   print text.decode(raw)
 }
 "#,
@@ -6032,7 +6032,7 @@ import from "norma:console" const read_line as line_reader, read_bytes as bytes_
 
 main {
   let string line ← line_reader() coalesce ""
-  let bytes chunk ← bytes_reader(4) coalesce |00|
+  let list<b8> chunk ← bytes_reader(4) coalesce |00|
 }
 "#,
     )
@@ -11763,9 +11763,9 @@ main args args exit 0 {
   console.write_line_async(":")
   console.write_partial_async(console.read_line_async() coalesce "")
   console.write_line("")
-  let bytes sync_bytes ← console.read_bytes(4) coalesce |00|
+  let list<b8> sync_bytes ← console.read_bytes(4) coalesce |00|
   console.write_bytes_async(sync_bytes)
-  let bytes async_bytes ← console.read_bytes_async(4) coalesce |00|
+  let list<b8> async_bytes ← console.read_bytes_async(4) coalesce |00|
   console.write_bytes(async_bytes)
   console.warn_line_async("warn")
   console.debug_line_async("debug")

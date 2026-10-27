@@ -92,7 +92,7 @@ fn octeti_embed_reads_raw_bytes() {
     let main = dir.path().join("main.fab");
     write(
         &main,
-        b"fixum octeti LOGO = insere \"logo.bin\"\nincipit {\n    nota \"ok\"\n}\n",
+        b"fixum lista<b8> LOGO = insere \"logo.bin\"\nincipit {\n    nota \"ok\"\n}\n",
     );
     let unit = analyze_file(&main).unwrap_or_else(|d| panic!("analysis failed: {d:?}"));
     let HirLiteral::Octeti(sym) = static_literal(&unit, "LOGO") else {
@@ -169,7 +169,7 @@ fn faber_reemission_prints_the_embed_not_the_bytes() {
     write(&dir.path().join("x.txt"), b"salve");
     write(&dir.path().join("x.bin"), &[1, 2]);
     let main = dir.path().join("main.fab");
-    let source = "fixum textus S = insere \"x.txt\"\n\nfixum octeti B = insere \"x.bin\"\n\ngenus G {\n    fixum textus T = insere \"x.txt\"\n}\n\nincipit {\n    nota S\n}\n";
+    let source = "fixum textus S = insere \"x.txt\"\n\nfixum lista<b8> B = insere \"x.bin\"\n\ngenus G {\n    fixum textus T = insere \"x.txt\"\n}\n\nincipit {\n    nota S\n}\n";
     write(&main, source.as_bytes());
     let session = Session::new(
         Config::default()

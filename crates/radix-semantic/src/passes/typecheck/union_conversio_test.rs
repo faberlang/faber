@@ -136,7 +136,7 @@ fn duplicate_pair_carries_dual_spans() {
 #[test]
 fn user_row_cannot_shadow_a_seeded_builtin_row() {
     test_support::assert_rejects_with_issue_la(
-        "@ conversio\nfunctio f(textus s) → octeti { redde s ↦ octeti }",
+        "@ conversio\nfunctio f(textus s) → lista<b8> { redde s ↦ lista<b8> }",
         "conversio_registry_builtin_shadow",
     );
 }

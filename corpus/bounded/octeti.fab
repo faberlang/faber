@@ -4,26 +4,25 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "conversio_expr", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "Bounded octeti<N>: byte capacity N; longitudo is len; appende overflow is an alternate exit."
-syntax = "octeti<N>"
+summary = "Bounded list<b8, N>: byte capacity N; longitudo is len; appende overflow is an alternate exit."
+syntax = "list<b8, N>"
 related = ["longitudo", "appende", "accipe", "sectio", "vacua"]
 locale = "en"
 +++
 # =============================================================================
-# octeti<N> — bounded byte buffer (BB-8R)
+# list<b8, N> — bounded byte buffer (BB-8R)
 # =============================================================================
 #
-# Latin spelling: octeti<8>
-# English surface: bytes<8>
+# Surface: list<b8, 8> (la: lista<b8, 8>)
 #
 # What this teaches:
-#   • `octeti<N>` is a distinct type from unbounded `octeti`.
+#   • `list<b8, N>` is a distinct type from unbounded `list<b8>`.
 #   • `longitudo` / `vacua` observe runtime `len`, not capacity `N`.
 #   • Unbounded → bounded copies the prefix through `↦` and fails closed when `len > N`.
 #
 # Common mistakes:
 #   • Reading spare `len..N` slots — they are unreadable.
-#   • Implicit assignment from `octeti` to `octeti<N>` — conversion is explicit.
+#   • Implicit assignment from `list<b8>` to `list<b8, N>` — conversion is explicit.
 #
 # See also: lista<numerus, N>, textus<N>, ascii<N>
 # =============================================================================

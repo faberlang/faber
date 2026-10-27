@@ -4,7 +4,7 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "type_arguments", "type_argument", "shape_suffix", "figendum_decl", "redde_stmt", "si_stmt", "arm", "else_arm", "assignment", "place", "dum_stmt", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "bitwise_and_expr", "shift_expr", "optional_suffix", "cast_expr", "inline_default", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "GGUF/safetensors-style data edge: octeti fixture → LE dims + flat lista<f32> → ↦ tensor<f32, [2, 8]>."
+summary = "GGUF/safetensors-style data edge: list<b8> fixture → LE dims + flat lista<f32> → ↦ tensor<f32, [2, 8]>."
 syntax = "<lista<f32>> ↦ tensor<f32, [2, 8]> ⊥ <recovery-tensor>"
 related = ["↦", "⊥", "octeti", "lista", "tensor"]
 locale = "en"
@@ -14,25 +14,25 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Conversion-route boundary — octeti fixture bytes decode to runtime dims
+#   • Conversion-route boundary — list<b8> fixture bytes decode to runtime dims
 #     plus a flat `lista<f32>`; the static tensor is born only at
 #     `flat ↦ tensor<f32, [2, 8]>` (one runtime element-count check).
 #   • Fail-closed mismatch — a short lista recovers via a `⊥` default instead of
 #     producing a wrong-shaped tensor. The causa is
 #     `tensor structa element count does not match shape`.
 #   • No static-world shape reads — `figura()` / `magnitudines()` stay on the
-#     conversion source. Dims come from the octeti header, not from a tensor.
+#     conversion source. Dims come from the list<b8> header, not from a tensor.
 #
 # Common mistakes:
 #   • Reading `figura()` on the materialized tensor to "confirm" the shape —
 #     the type already is `[2, 8]`; runtime shape reads belong at the data edge.
 #   • Expecting a mismatched lista to truncate or pad — it fails closed.
 #
-# See also: ↦, ⊥, octeti, lista, tensor
+# See also: ↦, ⊥, list<b8>, lista, tensor
 # =============================================================================
 
 
-# conversio — octeti fixture → LE decode → lista ↦ tensor<f32, [2, 8]>
+# conversio — list<b8> fixture → LE decode → lista ↦ tensor<f32, [2, 8]>
 #
 # WHY: GGUF/safetensors (and the parked production readers) meet the static
 # world at this edge. The fixture is a tiny little-endian blob:

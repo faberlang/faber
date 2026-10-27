@@ -96,7 +96,7 @@ fn textus_to_octeti_conversio_emits_into_bytes() {
     let session = test_session_la(Target::HirRust);
     let source = r#"incipit {
   sit _ s ← "hi"
-  sit _ b ← s ↦ octeti
+  sit _ b ← s ↦ lista<b8>
   nota b
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -149,7 +149,7 @@ fn ascii_octeti_conversio_emits_correct_lowering() {
     let session = test_session_la(Target::HirRust);
     let source = r"incipit {
   sit _ a ← 'hi'
-  sit _ b ← a ↦ octeti
+  sit _ b ← a ↦ lista<b8>
   sit _ back ← b ↦ ascii
   nota back
 }";
@@ -333,7 +333,7 @@ fn lista_to_valor_conversio_emits_from() {
 fn octeti_to_valor_conversio_emits_byte_list_boxing() {
     let session = test_session_la(Target::HirRust);
     let source = r"incipit {
-  sit octeti bytes ← |de ad|
+  sit lista<b8> bytes ← |de ad|
   sit valor v ← bytes ↦ valor
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -389,7 +389,7 @@ incipit {
     # Ruling 2026-10-10 (222376cb-4): a bare empty `{}` at an infer slot is
     # the double hole, so the valor source carries a typed cell.
     sit valor body ← { "k": 1 } ↦ valor
-    sit octeti bytes ← body ↦ octeti
+    sit lista<b8> bytes ← body ↦ lista<b8>
     nota bytes.longitudo()
 }
 "#;

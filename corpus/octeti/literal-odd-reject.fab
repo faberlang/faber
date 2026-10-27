@@ -4,7 +4,7 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = false
-summary = "An octeti literal needs two hex digits per byte: |686| has three digits and rejects with SEM011:octeti_literal_odd_digit_count."
+summary = "A byte-list literal needs two hex digits per byte: |686| has three digits and rejects with SEM011:octeti_literal_odd_digit_count."
 syntax = "|686|"
 related = ["octeti", "b8"]
 locale = "en"
@@ -12,20 +12,20 @@ no_expected = "rejects"
 diagnostic = "SEM011:octeti_literal_odd_digit_count"
 +++
 # =============================================================================
-# octeti odd digit count — An octeti literal needs two hex digits per byte.
+# list<b8> odd digit count — A byte-list literal needs two hex digits per byte.
 # =============================================================================
 #
 # What this teaches:
-#   • Every byte in an octeti hex literal is exactly two hex digits (|de ad be ef|)
+#   • Every byte in a byte-list hex literal is exactly two hex digits (|de ad be ef|)
 #   • |686| has three digits, so no byte boundary exists — SEM011 rejects it by name
 #
 # Common mistakes:
 #   • Writing |686| and expecting the lone digit to pad — each byte needs exactly two digits
 #
-# See also: octeti, b8
+# See also: list<b8>, b8
 # =============================================================================
 
-# octeti odd-digit reject case — expected compile failure
+# list<b8> odd-digit reject case — expected compile failure
 #
 # This exemplum intentionally fails to compile.
 

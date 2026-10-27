@@ -5,35 +5,34 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = true
-summary = "Primitive byte-buffer type."
-syntax = "octeti"
-aliases = ["bytes"]
+summary = "A byte buffer is a list<b8>; hex literals like |de ad be ef| write one."
+syntax = "list<b8>"
 related = ["textus", "lista"]
 locale = "en"
 +++
 # =============================================================================
-# octeti — Primitive byte-buffer type.
+# list<b8> — byte buffer.
 # =============================================================================
 #
 # What this teaches:
-#   • Primitive buffer type — `octeti` is the built-in byte buffer, analogous to `Vec<u8>` in Rust.
-#   • Literal syntax — Byte buffers can be written with hex literals like `|de ad be ef|`.
+#   • Buffer type — a byte buffer is `list<b8>`, a list of raw 8-bit values (analogous to `Vec<u8>` in Rust).
+#   • Literal syntax — A `list<b8>` can be written with hex literals like `|de ad be ef|`.
 #
 # Common mistakes:
-#   • Writing octeti hex literals with an odd digit count — each byte requires two hex digits.
+#   • Writing byte-buffer hex literals with an odd digit count — each byte requires two hex digits.
 #
-# See also: textus, lista
+# See also: textus, lista, bits
 # =============================================================================
 
-# octeti — byte-buffer type alias
+# list<b8> — byte-buffer type alias
 #
-# typus Fascis = octeti
+# type Fascis = list<b8>
 #
 # GRAMMAR:
 #   typeAliasDecl :← 'typus' ident '=' typeExpr
 #
 # EXPECTED OUTPUT:
-#   octeti.expected — type-known diagnostic.
+#   octeti.expected — type-known line.
 
 type Fascis = list<b8>
 

@@ -3,14 +3,14 @@ term = "textus"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
 category = "conversion"
-summary = "Decline: bounded textus<N> cannot convert directly to octeti<M>."
-syntax = "textus<N> ↦ octeti<M>"
+summary = "Decline: bounded textus<N> cannot convert directly to list<b8, M>."
+syntax = "textus<N> ↦ list<b8, M>"
 related = ["↦", "textus", "octeti"]
 locale = "en"
 +++
 
 # =============================================================================
-# bounded textus to octeti — unsupported conversion decline
+# bounded textus to list<b8, M> — unsupported conversion decline
 # =============================================================================
 #
 # What this teaches:

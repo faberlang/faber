@@ -7,7 +7,7 @@ locale = "en"
 #
 # Public import: importa ex "norma:text" private text
 # Method ledger: docs/stdlib/chorda-methods.md
-# Mechanical v1: encode/decode/try_decode = UTF-8 textus ↔ octeti only (one functio per verb)
+# Mechanical v1: encode/decode/try_decode = UTF-8 textus ↔ list<b8> only (one functio per verb)
 #
 # Naming rule: text owns string-level transformations that sit above compiler
 # intrinsics such as textus.longitudo() and textus.sectio().

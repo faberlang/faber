@@ -43,7 +43,7 @@ fn runtime_extent(int value) → int {
 }
 
 main {
-    let bytes raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
+    let list<b8> raw ← |00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40|
     let int n ← runtime_extent(3)
     let tensor<f32, [2, size n]> v ← raw ↦ tensor<f32, [2, size n]> via Le
     print v[[0, 0]]

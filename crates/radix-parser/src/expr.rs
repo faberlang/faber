@@ -1563,7 +1563,7 @@ impl Parser {
     /// spellings are retired and get a specific diagnostic pointing at the
     /// clause: the hint as a further type argument of the scalar head
     /// (`ascii<N, Hex>`, `littera<Code>`) and the hint as a bracketed tail
-    /// after the target (`octeti<16><Le>`). The wrapped numeric spelling
+    /// after the target (`lista<b8, 16><Le>`). The wrapped numeric spelling
     /// (`int<u32, Bits>`) is rejected earlier, in type position, as a whole.
     ///
     /// WHY: only the scalar heads that ever took a hint are checked, so a
@@ -1745,8 +1745,6 @@ impl Parser {
                 | "vacuum"
                 | "numquam"
                 | "ignotum"
-                | "octeti"
-                | "octetus"
                 | "saturatus"
                 | "exactus"
                 | "littera"

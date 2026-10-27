@@ -697,14 +697,14 @@ fn serve_typed_round_trips() {
 
 #[test]
 fn octeti_zero_argument_type_form_survives_the_fhir_round_trip() {
-    // `octeti` is authored as a zero-argument primitive spelling, but its
+    // `lista<b8>` is authored as a list type form, but its
     // finalized semantic witness is the byte-list array type. The FHIR
     // validator must accept the authored/semantic pairing.
     use crate::codegen::Target;
     use crate::driver::{Config, Session, analyze_source};
     use crate::hir::serialize::from_analyzed;
 
-    let source = "fixum octeti b = |de ad|\n\nincipit {\n    nota b\n}\n";
+    let source = "fixum lista<b8> b = |de ad|\n\nincipit {\n    nota b\n}\n";
     let session = Session::new(
         Config::default()
             .with_dev_locale_root()

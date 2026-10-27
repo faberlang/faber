@@ -4,8 +4,8 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "itera_stmt", "range_expr", "range_tail", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "`inf` crosses the byte and dynamic-value boundaries exactly: `octeti via Be|Le` is minimal two's complement both ways, and `valor` carries an integer of any size."
-syntax = "<inf> ↦ octeti via Be|Le | <octeti> ↦ inf via Be|Le | <inf> ↦ valor | <valor> ↦ inf [⊥ <default>]"
+summary = "`inf` crosses the byte and dynamic-value boundaries exactly: `list<b8> via Be|Le` is minimal two's complement both ways, and `valor` carries an integer of any size."
+syntax = "<inf> ↦ list<b8> via Be|Le | list<b8> ↦ inf via Be|Le | <inf> ↦ valor | <valor> ↦ inf [⊥ <default>]"
 related = ["inf", "octeti", "valor", "↦", "⊥"]
 locale = "en"
 +++
@@ -14,9 +14,9 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `inf ↦ octeti via Be` (or `Le`) is the minimal two's-complement byte
+#   • `inf ↦ list<b8> via Be` (or `Le`) is the minimal two's-complement byte
 #     string, most (or least) significant byte first: 0 is one byte, 128 needs
-#     a leading zero byte, -1 is `ff`, -129 is `ff 7f`. `octeti ↦ inf via Be`
+#     a leading zero byte, -1 is `ff`, -129 is `ff 7f`. `list<b8> ↦ inf via Be`
 #     reads the same bytes back, so the round trip is exact at any size.
 #   • `inf ↦ valor` keeps every digit, and `valor ↦ inf` takes any integer
 #     back out of a `valor`. A value that is not an integer (a float, text)
@@ -28,7 +28,7 @@ locale = "en"
 #   • Expecting a fixed width — the byte string is as long as the value
 #     needs, so `0` and `-1` are one byte each.
 #
-# See also: inf, octeti, valor, ↦, ⊥
+# See also: inf, list<b8>, valor, ↦, ⊥
 # =============================================================================
 
 # operatores/inf-conversio — U8a/U8b conversion rows on every carrier

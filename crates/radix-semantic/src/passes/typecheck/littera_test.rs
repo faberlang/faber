@@ -1,9 +1,8 @@
-//! D10.1–D10.5: `littera` (one Unicode scalar) and the retired byte word.
+//! D10.1–D10.5: `littera` (one Unicode scalar) and raw byte buffers.
 //!
 //! `ascii[i]`, text iteration, and text cursors bind `littera`; `textus[i]`
 //! keeps its `ascii<1>` row while operator fork F5 is held. `ascii<1> →
-//! littera → textus` widen implicitly, the scalar `octetus` is retired
-//! (`retired_byte_word`), and `octeti` is exactly `lista<b8>`. Assertions are structured (issue identity),
+//! littera → textus` widen implicitly, and a raw byte buffer is `lista<b8>`. Assertions are structured (issue identity),
 //! never rendered prose.
 
 use crate::test_support;
@@ -192,48 +191,14 @@ fn littera_converts_to_textus() {
     );
 }
 
-/// Need (ruling B8): the byte scalar word is retired; the issue
-/// names both replacements (`b8` raw bits, `u8` number) in every pack.
-#[test]
-fn octetus_is_retired_with_named_issue() {
-    test_support::assert_rejects_with_issue_la(
-        "functio f(octetus b) → vacuum {
-    nota b
-}",
-        "retired_byte_word",
-    );
-}
-
-/// Need (ruling B9): the `octeti` word resolves to `lista<b8>`.
-#[test]
-fn octeti_resolves_to_lista_b8() {
-    test_support::assert_accepts_la(
-        "functio f(octeti b) → vacuum {
-    sit lista<b8> c ← b
-    nota c
-}",
-    );
-}
-
 #[test]
 fn octeti_elements_are_b8() {
     test_support::assert_accepts_la(
-        "functio f(octeti b) → vacuum {
+        "functio f(lista<b8> b) → vacuum {
     itera ex b sit x {
         sit b8 y ← x
         nota y
     }
-}",
-    );
-}
-
-/// Identity, not mutual assignability — exact equality accepts the pair
-/// because they are one type (`octeti` is exactly `lista<b8>`).
-#[test]
-fn octeti_is_exactly_lista_b8() {
-    test_support::assert_accepts_la(
-        "functio f(octeti a, lista<b8> b) → bivalens {
-    redde a ≡ b
 }",
     );
 }

@@ -71,7 +71,7 @@ fn rust_emits_octeti_static_as_byte_slice() {
             .with_target(Target::HirRust)
             .with_dev_locale_root(),
     );
-    let source = "fixum octeti SIGNUM = |de ad|\nincipit {\n    nota SIGNUM.longitudo()\n}\n";
+    let source = "fixum lista<b8> SIGNUM = |de ad|\nincipit {\n    nota SIGNUM.longitudo()\n}\n";
     let result = crate::driver::compile(&session, "<test>", source, ModuleCompileRequest::default());
     assert!(result.success(), "compilation failed: {:?}", result.diagnostics);
     let crate::Output::Rust(out) = result.output.expect("output") else {

@@ -99,7 +99,7 @@ union Fault {
 }
 
 @ public
-@ radix type T mut string list<string> bytes
+@ radix type T mut string list<string> list<b8>
 fn read<T>(string path) → T ⇥ Fault {
     return path ↦ T
 }

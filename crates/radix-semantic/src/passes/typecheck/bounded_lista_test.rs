@@ -103,7 +103,7 @@ fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
     nota bad
 }",
         r"incipit {
-    sit octeti<8> bytes ← |61| ↦ octeti<8>
+    sit lista<b8, 8> bytes ← |61| ↦ lista<b8, 8>
     sit _ bad ← bytes[8]
     nota bad
 }",

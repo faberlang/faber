@@ -4,8 +4,8 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expr_stmt", "ad_expr", "ad_opener", "conversio_expr", "call_expr", "call_suffix", "call_type_args", "member_suffix", "argument_list", "argument", "array_literal", "expression", "literal", "adfirma_stmt", "equality_tail", "nota_stmt"]
 category = "ad"
 canonical = true
-summary = "fs file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (octeti)."
-syntax = "charta.read_file<textus>(via) | call 'solum:carpe' (via) ↦ lista<textus> | call 'solum:hauri' (via) ↦ octeti"
+summary = "fs file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (list<b8>)."
+syntax = "charta.read_file<textus>(via) | call 'solum:carpe' (via) ↦ lista<textus> | call 'solum:hauri' (via) ↦ list<b8>"
 related = ["ad", "fs", "lege", "carpe", "hauri"]
 locale = "en"
 +++
@@ -21,7 +21,7 @@ locale = "en"
 #
 # Common mistakes:
 #   • assuming one generic `charta.read_file<T>` reads every shape — `lege` is
-#     text-only; use `carpe` for `lista<textus>` and `hauri` for `octeti`
+#     text-only; use `carpe` for `lista<textus>` and `hauri` for `list<b8>`
 #
 # See also: ad, solum, lege, carpe, hauri
 # =============================================================================
@@ -30,7 +30,7 @@ locale = "en"
 #
 # The provider contract (hosts/crates/solum manifest) keeps one result shape
 # per route: `solum:lege` → textus, `solum:carpe` → lista<textus>,
-# `solum:hauri` → octeti. The `norma:fs` wrappers `carpe`/`hauri` are
+# `solum:hauri` → list<b8>. The `norma:fs` wrappers `carpe`/`hauri` are
 # module-private this release, so this fixture reaches the line/byte routes
 # directly through the manifest-backed `ad` surface; the compiler's
 # `@ radix typus` metadata on `norma:charta.read_file<T>` still admits the broader

@@ -202,7 +202,7 @@ fn run() args args {
 
 // ── octeti/bytes CLI values ────────────────────────────────
 //
-// An `octeti` (`bytes` on the English surface) option or rest operand arrives
+// A `list<b8>` (`lista<b8>` in Latin) option or rest operand arrives
 // on the package-MIR runner as the argument's UTF-8 byte list, not as text:
 // the option field is `lista<b8>` and the rest field is a row list of those.
 // The Rust emitter side of the same need is pinned in
@@ -210,9 +210,9 @@ fn run() args args {
 
 const OCTETI_OPTION_MAIN: &str = r#"
 @ cli "tool"
-@ option payload long "payload" type bytes
+@ option payload long "payload" type list<b8>
 main args args {
-  let bytes payload ← args.payload coalesce |21|
+  let list<b8> payload ← args.payload coalesce |21|
   print payload.length()
 }
 "#;
@@ -248,7 +248,7 @@ fn package_mir_cli_octeti_option_value_is_the_arguments_utf8_bytes() {
 
 const OCTETI_REST_OPERAND_MAIN: &str = r#"
 @ cli "tool"
-@ operand rest bytes data
+@ operand rest list<b8> data
 main args args {
   print args.data.length()
   print args.data[0].length()

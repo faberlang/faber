@@ -2220,7 +2220,9 @@ pub enum Primitive {
     /// Unknown escape type for interop or intentionally unchecked values.
     Ignotum,
 
-    /// Raw byte buffer.
+    /// Raw byte buffer: the internal carrier of `lista<b8>`. It has no
+    /// source-level type spelling (the `octeti`/`bytes` word is retired), so it
+    /// has no `PrimitiveTypeSpec` row and no locale row.
     Octeti,
 
     Regex,
@@ -2319,11 +2321,6 @@ pub static PRIMITIVE_TYPE_SPECS: &[PrimitiveTypeSpec] = &[
     PrimitiveTypeSpec {
         text: "ignotum",
         primitive: Primitive::Ignotum,
-        canonical: true,
-    },
-    PrimitiveTypeSpec {
-        text: "octeti",
-        primitive: Primitive::Octeti,
         canonical: true,
     },
     PrimitiveTypeSpec {

@@ -275,8 +275,6 @@ than one it guessed.
 - row: vacuum - section: types - current: 空值 - proposed: 空值 - confidence: high - equals-latin-key: no - reason: 空值 is the void type and stays distinct from nihil 無
 - row: numquam - section: types - current: 永不 - proposed: 永不 - confidence: high - equals-latin-key: no - reason: no mismatch: 永不 is the settled Traditional name for the never type
 - row: ignotum - section: types - current: 未知 - proposed: 未知 - confidence: high - equals-latin-key: no - reason: no mismatch: 未知 is the settled Traditional name for the unknown type
-- row: octeti - section: types - current: 位元組 - proposed: 位元組 - confidence: high - equals-latin-key: no - reason: no mismatch: 位元組 is the settled Traditional name for the bytes type
-- row: octetus - section: types - current: 單位元組 - proposed: 單位元組 - confidence: high - equals-latin-key: no - reason: 單位元組 is the single-byte type and pairs with octeti 位元組
 - row: clampa - section: types - current: 鉗制 - proposed: 鉗制 - confidence: high - equals-latin-key: no - reason: no mismatch: 鉗制 is the settled Traditional name for the clamp type
 - row: reflexa - section: types - current: 反射 - proposed: 反射 - confidence: high - equals-latin-key: no - reason: no mismatch: 反射 is the settled Traditional name for the reflect type
 - row: involuta - section: types - current: 環繞 - proposed: 環繞 - confidence: high - equals-latin-key: no - reason: no mismatch: 環繞 is the settled Traditional name for the wrap type

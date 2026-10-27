@@ -20,7 +20,7 @@ locale = "en"
 #     field default under any modifier (`const`, `let`, `mut`), and the
 #     `return` of a `comptime { … }` body.
 #   • The slot types the embed — the declared type decides: `string` takes the
-#     file as UTF-8 text, `bytes` takes the raw bytes. Inside a `comptime`
+#     file as UTF-8 text, `list<b8>` takes the raw bytes. Inside a `comptime`
 #     body the constant's own type is the slot.
 #   • Compile time only — the program carries the finished literal, never a
 #     file read.
@@ -30,7 +30,7 @@ locale = "en"
 #     `print embed "p"` are SEM061 `insere_outside_constant`; bind a constant
 #     first.
 #   • Giving the embed no type to take — `const _ x = embed "p"` is SEM061
-#     `insere_type_required`; declare `string` or `bytes`.
+#     `insere_type_required`; declare `string` or `list<b8>`.
 #
 # See also: insere, praefixum, fixum
 # =============================================================================

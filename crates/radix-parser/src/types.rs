@@ -28,12 +28,12 @@ use std::collections::HashSet;
 
 /// Heads whose arguments are capacities spelled in the type surface itself.
 ///
-/// `lista`, `textus`, `ascii`, and `octeti` carry their bound in the type, so
+/// `lista`, `textus`, and `ascii` carry their bound in the type, so
 /// their applied arguments keep the explicit `Type` shape. Generic heads
 /// (`Box<T>`, user genera) use the kinded split instead: their parameter kinds
 /// are only known from declaration metadata.
 fn is_bounded_capacity_head(name: &str) -> bool {
-    matches!(name, "lista" | "textus" | "ascii" | "octeti")
+    matches!(name, "lista" | "textus" | "ascii")
 }
 
 // TYPE PARSING
@@ -472,7 +472,7 @@ impl Parser {
             } else if path.len() == 1 && name_str == "ratio" {
                 GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
             } else if path.len() == 1 && is_bounded_capacity_head(name_str) {
-                // lista/textus/ascii/octeti spell their capacity in
+                // lista/textus/ascii spell their capacity in
                 // the type surface itself, so their arguments keep
                 // the explicit `Type` shape (NATURAL interns as a
                 // named type) rather than the kinded split.

@@ -278,7 +278,8 @@ fn the_default_binds_after_the_via_clause() {
 
 #[test]
 fn chained_conversions_carry_one_hint_per_hop() {
-    let via = entry_conversions("incipit { sit octeti b ← |3c 00|\n sit _ x ← b[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32 }");
+    let via =
+        entry_conversions("incipit { sit lista<b8> b ← |3c 00|\n sit _ x ← b[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32 }");
     let hints: Vec<_> = via.iter().map(|(_, hints)| hints.clone()).collect();
     assert_eq!(
         hints,
@@ -330,8 +331,8 @@ fn via_on_a_target_that_takes_no_hint_is_a_structured_error() {
 fn a_register_target_takes_a_via_hint() {
     // The register windows carry `Be`/`Le` in the clause like any other target.
     for source in [
-        "functio w(octeti c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4> via Be }",
-        "functio o(vector<u32, 4> v) → octeti<16> { redde v ↦ octeti<16> via Le }",
+        "functio w(lista<b8> c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4> via Be }",
+        "functio o(vector<u32, 4> v) → lista<b8, 16> { redde v ↦ lista<b8, 16> via Le }",
     ] {
         let diagnostics = diagnostics_with(latin_config(), source);
         assert!(
@@ -344,8 +345,8 @@ fn a_register_target_takes_a_via_hint() {
 #[test]
 fn the_retired_register_tail_is_rejected_pointing_at_the_clause() {
     for source in [
-        "functio w(octeti c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4><Be> }",
-        "functio o(vector<u32, 4> v) → octeti<16> { redde v ↦ octeti<16><Le> }",
+        "functio w(lista<b8> c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4><Be> }",
+        "functio o(vector<u32, 4> v) → lista<b8, 16> { redde v ↦ lista<b8, 16><Le> }",
     ] {
         assert_issue(&diagnostics_with(latin_config(), source), "conversio_hint_tail_argument");
     }

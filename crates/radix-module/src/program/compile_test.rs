@@ -1254,7 +1254,7 @@ targets = ["rust"]
     fs::write(
         provider.join("src/probe.fab"),
         r#"
-@ radix typus T in textus lista<textus> octeti
+@ radix typus T in textus lista<textus> lista<b8>
 @ publica
 functio lege<T>(textus via) → T {
     mori "lege deferred in probe"

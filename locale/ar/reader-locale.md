@@ -278,8 +278,6 @@ are kept and marked medium.
 - row: vacuum - section: types - current: فراغ - proposed: فراغ - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `void` and the la row `vacuum`
 - row: numquam - section: types - current: أبدا - proposed: أبدا - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `never` and the la row `numquam`
 - row: ignotum - section: types - current: مجهول - proposed: مجهول - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `unknown` and the la row `ignotum`
-- row: octeti - section: types - current: بايتات - proposed: بايتات - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `bytes` and the la row `octeti`
-- row: octetus - section: types - current: بايت - proposed: بايت - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `byte` and the la row `octetus`
 - row: clampa - section: types - current: تثبيت_الحافة - proposed: تثبيت_الحافة - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `clamp` and the la row `clampa`
 - row: reflexa - section: types - current: انعكاس_الحافة - proposed: انعكاس_الحافة - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `reflect` and the la row `reflexa`
 - row: involuta - section: types - current: التفاف_الحافة - proposed: التفاف_الحافة - confidence: high - equals-latin-key: no - reason: form and sense match the en concept `wrap` and the la row `involuta`

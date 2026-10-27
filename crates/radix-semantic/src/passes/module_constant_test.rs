@@ -206,7 +206,7 @@ fn insere_initializer_is_admitted_on_a_fixum_constant() {
         text.value.kind
     );
     let bytes = constant_with(
-        "fixum octeti B = insere \"signum.bin\"\n",
+        "fixum lista<b8> B = insere \"signum.bin\"\n",
         "B",
         embed_config(),
     );

@@ -622,14 +622,14 @@ incipit {
 
 #[test]
 fn octeti_is_not_numeric_arithmetic() {
-    // `octeti` is `lista<b8>`: the list `+` is refused by the
+    // A byte list is `lista<b8>`: the list `+` is refused by the
     // numeric-list operator law, and an element is a raw-bits `b8` that takes
     // no arithmetic either (bits are not numbers).
     test_support::assert_rejects_with_issue_la(
         r"
 incipit {
-    sit octeti left ← |01|
-    sit octeti right ← |02|
+    sit lista<b8> left ← |01|
+    sit lista<b8> right ← |02|
     sit _ both ← left + right
 }
 ",

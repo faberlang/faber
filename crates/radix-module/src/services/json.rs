@@ -354,7 +354,7 @@ fn cli_type_name(ty: &crate::cli::CliType) -> &'static str {
         crate::cli::CliType::Numerus => "numerus",
         crate::cli::CliType::Fractus => "fractus",
         crate::cli::CliType::Bivalens => "bivalens",
-        crate::cli::CliType::Octeti => "octeti",
+        crate::cli::CliType::Octeti => "lista<b8>",
         crate::cli::CliType::Ignotum => "ignotum",
         crate::cli::CliType::ListaTextus => "lista<textus>",
         crate::cli::CliType::ListaNumerus => "lista<numerus>",

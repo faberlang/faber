@@ -113,9 +113,9 @@ fn sse_events_are_chunk_framed_through_open_chunk_finish() {
         "{}  let list<value> headers ← []\n  \
          let list<value> open ← [id ↦ value, 200 ↦ value, headers ↦ value]\n  \
          let int writer ← call 'http:respond_open' (open) ↦ int\n  \
-         let list<value> first ← [writer ↦ value, \"data: one\\n\\n\" ↦ bytes ↦ value]\n  \
+         let list<value> first ← [writer ↦ value, \"data: one\\n\\n\" ↦ list<b8> ↦ value]\n  \
          let void r3 ← call 'http:respond_chunk' (first) ↦ void\n  \
-         let list<value> second ← [writer ↦ value, \"data: two\\n\\n\" ↦ bytes ↦ value]\n  \
+         let list<value> second ← [writer ↦ value, \"data: two\\n\\n\" ↦ list<b8> ↦ value]\n  \
          let void r4 ← call 'http:respond_chunk' (second) ↦ void\n  \
          let list<value> done ← [writer ↦ value, false ↦ value]\n  \
          let void r5 ← call 'http:respond_finish' (done) ↦ void\n  \

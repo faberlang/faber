@@ -396,7 +396,6 @@ fn types_test_parses_proposed_bounded_type_forms() {
         ("typus X = lista<numerus, 8>", "lista", &["numerus", "8"]),
         ("typus X = textus<8>", "textus", &["8"]),
         ("typus X = ascii<8>", "ascii", &["8"]),
-        ("typus X = octeti<8>", "octeti", &["8"]),
     ];
     for (source, type_name, expected_params) in cases {
         let result = parse_ok_la(source);

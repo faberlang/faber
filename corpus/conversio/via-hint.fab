@@ -33,7 +33,7 @@ locale = "en"
 #   • an unknown hint, or a hint on a target that takes none —
 #     `n ↦ string via Hex` is rejected
 #
-# See also: ↦, ⊥, Bits, Code, octeti
+# See also: ↦, ⊥, Bits, Code, list<b8>
 # =============================================================================
 
 

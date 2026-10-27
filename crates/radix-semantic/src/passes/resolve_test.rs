@@ -579,7 +579,7 @@ fn resolve_test_proposed_bounded_cords_typecheck() {
     for source in [
         "typus X = textus<8>",
         "typus X = ascii<8>",
-        "typus X = octeti<8>",
+        "typus X = lista<b8, 8>",
     ] {
         let (_types, resolved) = resolve_bounded_source(source);
         resolved.unwrap_or_else(|errors| panic!("{source} must resolve, got {errors:?}"));

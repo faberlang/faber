@@ -199,8 +199,6 @@ nihil = "nihil"
 vacuum = "vacuum"
 numquam = "numquam"
 ignotum = "ignotum"
-octeti = "octeti"
-octetus = "octetus"
 clampa = "clampa"
 reflexa = "reflexa"
 involuta = "involuta"
@@ -212,7 +210,7 @@ instans = "instans"
 objectum = "objectum"
 quidlibet = "quidlibet"
 lista = "lista"
-# Proposed bounded forms (not shipped): lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+# Proposed bounded forms (not shipped): lista<T, N>, textus<N>, ascii<N>.
 tabula = "tabula"
 # tabulae (ledger, an insertion-ordered map) is one letter from tabula (map) on purpose:
 # "two shades of the same thing" (Roman account books were tabulae). Not a typo;
@@ -301,7 +299,7 @@ message = "unterminated backtick template literal"
 help = "close the string literal before the end of the line or file"
 
 [diagnostics.LEX001.issues.unterminated_octeti_literal]
-message = "unterminated octeti literal"
+message = "unterminated {lista}<b8> literal"
 help = "close the string literal before the end of the line or file"
 
 [diagnostics.LEX001.issues.unterminated_regex_literal]
@@ -483,7 +481,6 @@ help = "start the body item with '{proba}', '{probandum}', or '{setup}'"
 [diagnostics.PARSE001.issues.test_modifier_integer]
 message = "expected integer after '{modifier}'"
 help = "put an integer literal after '{modifier}'"
-
 
 [diagnostics.PARSE001.issues.tensor_figura_after_element]
 message = "tensor requires a Figura shape after element type"
@@ -987,7 +984,7 @@ help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8>
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "a convert hint does not follow the target in angle brackets"
-help = "write the hint as a via clause after the target: `octeti<16> via Le`"
+help = "write the hint as a via clause after the target: `{lista}<b8, 16> via Le`"
 
 [diagnostics.PARSE030.issues.conditional_nested]
 message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
@@ -1773,10 +1770,6 @@ help = "fix the AST construct for lowering"
 message = "object destructuring should be expanded before statement lowering"
 help = "fix the AST construct for lowering"
 
-[diagnostics.SEM008.issues.retired_byte_word]
-message = "verbum octetus abrogatum est: scribe b8 pro bitis crudis aut u8 pro numero"
-help = "utere b8 pro octeto crudo (lista<b8> pro serie octetorum) aut u8 pro octeto numerico"
-
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker must be a bare spelling such as ms or us"
 help = "fix the AST construct for lowering"
@@ -1787,7 +1780,7 @@ help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as 
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
-help = "textus<N>, ascii<N>, and octeti<N> are proposed bounded forms, not yet shipped"
+help = "textus<N>, ascii<N>, and {lista}<b8, N> are proposed bounded forms, not yet shipped"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -2694,8 +2687,8 @@ message = "tuple index {index} out of bounds for arity {arity}"
 help = "use an index between 0 and {max_index}"
 
 [diagnostics.SEM010.issues.octeti_index_out_of_bounds]
-message = "octeti index extra fines"
-help = "utere intervallo totum intra octeti"
+message = "{lista}<b8> index extra fines"
+help = "utere intervallo totum intra {lista}<b8>"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
 message = "postfix gradient selection (`call(...) ∇ [places]`) is not lowered until the tensor-glyphs 2B autograd surface lands; no operand, selector, or result rule is active in Phase 2A"
@@ -3114,16 +3107,16 @@ message = "clavis ordinis numerus aut {textus} esse debet"
 help = "redde numerum aut {textus} ex selectore clavis"
 
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
-message = "octeti literal contains invalid character '{character}'"
-help = "use only hexadecimal digits in octeti literals"
+message = "{lista}<b8> literal contains invalid character '{character}'"
+help = "use only hexadecimal digits in {lista}<b8> literals"
 
 [diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
-message = "octeti literal has odd hex digit count"
-help = "provide complete byte pairs in octeti literals"
+message = "{lista}<b8> literal has odd hex digit count"
+help = "provide complete byte pairs in {lista}<b8> literals"
 
 [diagnostics.SEM011.issues.octeti_literal_template_application]
-message = "octeti literals do not support template application"
-help = "use textus formatting instead of octeti literal calls"
+message = "{lista}<b8> literals do not support template application"
+help = "use textus formatting instead of {lista}<b8> literal calls"
 
 [diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
 message = "{method} accepts at most one payload type argument"
@@ -3242,12 +3235,12 @@ message = "'¶' does not format this type"
 help = "'¶' formats numbers, {textus}, and {instans}; write a function that returns {textus}"
 
 [diagnostics.SEM011.issues.octeti_index_must_be_numerus_or_range]
-message = "octeti index requirit numerus vel intervallum"
-help = "indica octeti per numerus vel intervallum integrum"
+message = "{lista}<b8> index requirit numerus vel intervallum"
+help = "indica {lista}<b8> per numerus vel intervallum integrum"
 
 [diagnostics.SEM011.issues.window_requires_list]
 message = "a window [lo‥hi] needs a list"
-help = "take a window [lo‥hi] only of a {lista}, {textus} or octeti value"
+help = "take a window [lo‥hi] only of a {lista}, {textus} or {lista}<b8> value"
 
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index must be numerus"
@@ -3494,7 +3487,7 @@ message = "intervallum clamp requires matching bound types"
 help = "make the source and target bound element types match"
 
 [diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
-message = "sermo materialization target is not supported; expected {vacuum}, {valor}, scalar (numerus, fractus, bivalens, textus, ascii, octeti, instans), or {lista}<T>"
+message = "sermo materialization target is not supported; expected {vacuum}, {valor}, scalar (numerus, fractus, bivalens, textus, ascii, {lista}<b8>, instans), or {lista}<T>"
 help = "choose a supported sermo materialization target"
 
 [diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
@@ -3542,7 +3535,7 @@ message = "cursor to {valor} conversion crosses the eager/lazy boundary; materia
 help = "materialize the cursor through {lista} before crossing the boundary"
 
 [diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
-message = "conversion to octeti from numerus, fractus, or bivalens is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
+message = "conversion to {lista}<b8> from numerus, fractus, or bivalens is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
 help = "use chorda or explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
@@ -3558,11 +3551,11 @@ message = "a bits list conversion that changes the bit width needs a via Le or v
 help = "write the byte order with the conversion, such as lista<b8> ↦ lista<u16> via Le; a same-width conversion takes no clause"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
-message = "conversion from octeti to numerus is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
+message = "conversion from {lista}<b8> to numerus is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
 help = "use chorda or explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.octeti_endian_width_mismatch]
-message = "octeti endian conversion requires a window whose length matches the target width (2, 4, or 8 bytes)"
+message = "{lista}<b8> endian conversion requires a window whose length matches the target width (2, 4, or 8 bytes)"
 help = "use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64"
 
 [diagnostics.SEM016.issues.ascii_format_hint_not_capacity]
@@ -3578,27 +3571,27 @@ message = "ascii format pack rejects negative sources; narrow to an unsigned wid
 help = "convert to an unsigned numerus width before packing"
 
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
-message = "conversion from octeti to fractus is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
+message = "conversion from {lista}<b8> to fractus is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
 help = "use chorda or explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.octeti_to_tensor_unspecified]
-message = "conversion from octeti to tensor needs the byte order of each element; write `via Le` or `via Be`"
-help = "write octeti ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width"
+message = "conversion from {lista}<b8> to tensor needs the byte order of each element; write `via Le` or `via Be`"
+help = "write {lista}<b8> ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width"
 
 [diagnostics.SEM016.issues.octeti_to_tensor_element_unsupported]
-message = "octeti convert only to a tensor of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 elements"
+message = "{lista}<b8> convert only to a tensor of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 elements"
 help = "use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type"
 
 [diagnostics.SEM016.issues.octeti_to_tensor_length_mismatch]
-message = "the octeti length must equal the element count times the element width: expected {expected} bytes, found {actual}"
-help = "size the octeti window to product(shape) times the element width, or change the tensor shape"
+message = "the {lista}<b8> length must equal the element count times the element width: expected {expected} bytes, found {actual}"
+help = "size the {lista}<b8> window to product(shape) times the element width, or change the tensor shape"
 
 [diagnostics.SEM016.issues.tensor_to_octeti_unspecified]
-message = "conversion from tensor to octeti needs the byte order of each element; write `via Le` or `via Be`"
-help = "write tensor ↦ octeti via Le (or via Be); no other hint applies, and the hint is required for every element width"
+message = "conversion from tensor to {lista}<b8> needs the byte order of each element; write `via Le` or `via Be`"
+help = "write tensor ↦ {lista}<b8> via Le (or via Be); no other hint applies, and the hint is required for every element width"
 
 [diagnostics.SEM016.issues.tensor_to_octeti_element_unsupported]
-message = "a tensor converts to octeti only when its elements are u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64"
+message = "a tensor converts to {lista}<b8> only when its elements are u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64"
 help = "use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
@@ -3611,7 +3604,7 @@ help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEv
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
-help = "drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "a float or decimal does not convert to an integer without naming the rounding"
@@ -3626,7 +3619,7 @@ message = "clavis tabulae ad valorem vel a valore conversa textus esse debet"
 help = "scribe tabulam cum clavibus textus; conversio claves numquam legit, et `@ json` in genere mappationem fili definit"
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
-message = "conversion from octeti to bivalens has no default meaning; decode to textus or compare bytes explicitly"
+message = "conversion from {lista}<b8> to bivalens has no default meaning; decode to textus or compare bytes explicitly"
 help = "use chorda or explicit byte conversion helpers"
 
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
@@ -3875,19 +3868,19 @@ help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"h
 
 [diagnostics.SEM018.issues.empty_radix_typus_domain]
 message = "@ radix typus domain requires at least one allowed type"
-help = "use `@ radix typus T in textus octeti` or braced `{radix_typus_braced}` with at least one allowed type"
+help = "use `@ radix typus T in textus {lista}<b8>` or braced `{radix_typus_braced}` with at least one allowed type"
 
 [diagnostics.SEM018.issues.missing_type_param]
 message = "@ radix typus requires a generic type parameter"
-help = "use `@ radix typus T in textus octeti` or braced `{radix_typus_braced}` with at least one allowed type"
+help = "use `@ radix typus T in textus {lista}<b8>` or braced `{radix_typus_braced}` with at least one allowed type"
 
 [diagnostics.SEM018.issues.non_identifier_type_param]
 message = "@ radix typus parameter must be an identifier"
-help = "use `@ radix typus T in textus octeti` or braced `{radix_typus_braced}` with at least one allowed type"
+help = "use `@ radix typus T in textus {lista}<b8>` or braced `{radix_typus_braced}` with at least one allowed type"
 
 [diagnostics.SEM018.issues.non_type_allowed]
 message = "@ radix typus allowed value must be a type"
-help = "use `@ radix typus T in textus octeti` or braced `{radix_typus_braced}` with at least one allowed type"
+help = "use `@ radix typus T in textus {lista}<b8>` or braced `{radix_typus_braced}` with at least one allowed type"
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "unknown @ radix directive; expected `lane`"
@@ -4595,7 +4588,7 @@ help = "fix the divisor"
 
 [diagnostics.SEM061]
 message = "invalid build-time embed"
-help = "embed a package-relative file that exists, as `textus` (UTF-8) or `octeti`"
+help = "embed a package-relative file that exists, as `textus` (UTF-8) or `{lista}<b8>`"
 
 [diagnostics.SEM061.issues.insere_file_missing]
 message = "embedded file `{path}` does not exist"
@@ -4619,15 +4612,15 @@ help = "`{insere}` needs a source file on disk; it cannot be used from stdin"
 
 [diagnostics.SEM061.issues.insere_invalid_utf8]
 message = "embedded file `{path}` is not valid UTF-8"
-help = "declare the constant as `octeti` to embed raw bytes"
+help = "declare the constant as `{lista}<b8>` to embed raw bytes"
 
 [diagnostics.SEM061.issues.insere_type_invalid]
-message = "an `{insere}` initializer must declare `textus` or `octeti`"
-help = "declare `textus` for UTF-8 text or `octeti` for raw bytes"
+message = "an `{insere}` initializer must declare `textus` or `{lista}<b8>`"
+help = "declare `textus` for UTF-8 text or `{lista}<b8>` for raw bytes"
 
 [diagnostics.SEM061.issues.insere_type_required]
-message = "an `{insere}` initializer has no `textus` or `octeti` slot to take its type from"
-help = "bind it to a typed constant: `{fixum} textus NAME = {insere} \"path\"` for UTF-8 text or `{fixum} octeti NAME = {insere} \"path\"` for raw bytes"
+message = "an `{insere}` initializer has no `textus` or `{lista}<b8>` slot to take its type from"
+help = "bind it to a typed constant: `{fixum} textus NAME = {insere} \"path\"` for UTF-8 text or `{fixum} {lista}<b8> NAME = {insere} \"path\"` for raw bytes"
 
 [diagnostics.SEM061.issues.insere_outside_constant]
 message = "`{insere}` is allowed only in the initializer of a `=` constant or field default"
@@ -4707,7 +4700,7 @@ help = "end every path of the body with `{redde}` and the value"
 
 [diagnostics.SEM064.issues.praefixum_result_not_literal]
 message = "the value of `{praefixum}` initializer `{name}` has no literal form"
-help = "return scalars, text, bytes, collections of those, tuples, or a non-generic genus; never closures or handles"
+help = "return scalars, text, collections of those, tuples, or a non-generic genus; never closures or handles"
 
 [diagnostics.SEM064.issues.praefixum_unsupported]
 message = "`{praefixum}` initializer of `{name}` cannot run at build time: {detail}"
@@ -4952,7 +4945,6 @@ help = "use «...» for text that contains quote characters"
 [diagnostics.WARN034.issues.prefer_guillemet_for_quote]
 message = "this string escapes `\\\"`; write it with «…», which needs no escapes"
 help = "use «...» for text that contains quote characters"
-
 
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax. Cum textus signum citationis (\" aut ') continet, eum «…» scribe: guillemetae nullis effugiis egent."

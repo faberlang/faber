@@ -247,7 +247,7 @@ fn valor_octeti_body_extraction_emits_octeti_match() {
         r"
 main {
     let value body ← |09| ↦ value
-    let bytes payload ← body ↦ bytes
+    let list<b8> payload ← body ↦ list<b8>
     print payload.length()
 }
 ",

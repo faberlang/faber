@@ -88,7 +88,7 @@ fn a_wrapped_numeric_target_with_a_hint_is_rejected_as_the_wrapper() {
 #[test]
 fn a_bracketed_hint_tail_after_the_target_is_rejected() {
     for source in [
-        "sit _ n ← s ↦ octeti<16><Le>",
+        "sit _ n ← s ↦ lista<b8, 16><Le>",
         "sit _ n ← s ↦ vector<u32, 4><Be>",
         "sit _ n ← s ↦ ascii<8><Le>",
     ] {
@@ -101,7 +101,7 @@ fn a_hole_and_a_via_clause_stay_accepted() {
     for source in [
         "sit _ n ← s ↦ ascii<_> via Hex",
         "sit _ n ← s ↦ ascii<8> via Hex",
-        "sit _ n ← s ↦ octeti<16> via Le",
+        "sit _ n ← s ↦ lista<b8, 16> via Le",
         "sit _ n ← s ↦ vector<u32, 4> via Be",
     ] {
         let _ = parse_ok(source);
@@ -129,7 +129,7 @@ fn via_binds_tighter_than_the_up_tack_default() {
 
 #[test]
 fn chained_conversions_each_carry_their_own_via() {
-    let result = parse_ok("sit _ x ← octeti[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32");
+    let result = parse_ok("sit _ x ← buf[0‥2] ↦ u16 via Le ↦ f16 via Bits ↦ f32");
     let outer = conversio(initializer(&result, 0));
     assert!(outer.via.is_none(), "the last hop has no clause");
     let middle = conversio(&outer.expr);

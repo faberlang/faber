@@ -104,7 +104,7 @@ fn block_level_constant_embed_folds() {
 fn block_level_octeti_embed_folds_to_raw_bytes() {
     let config = config_with("b.bin", InsereSource::Bytes(vec![0x01, 0xff]));
     let found = survivors(
-        "functio f() → octeti {\n    fixum octeti b = insere \"b.bin\"\n    redde b\n}\n",
+        "functio f() → lista<b8> {\n    fixum lista<b8> b = insere \"b.bin\"\n    redde b\n}\n",
         config,
     );
     assert!(found.octeti && !found.unfolded);

@@ -105,7 +105,7 @@ fn fault_from(value raw) → Fault {{
     }}
 }}
 
-@ radix type T mut string list<string> bytes
+@ radix type T mut string list<string> list<b8>
 fn read<T>(string p) → T ⇥ Fault {{
     return call 'solum:lege' (p) ↦ T
 }}
@@ -161,7 +161,7 @@ fn fault_from(value raw) → Fault {{
     }}
 }}
 
-@ radix type T mut string list<string> bytes
+@ radix type T mut string list<string> list<b8>
 fn read<T>(string p) → T ⇥ Fault {{
     return call 'solum:lege' (p) ↦ T
 }}

@@ -1112,7 +1112,7 @@ fn octeti_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio octeti_full() → vacuum {
-    sit octeti<8> xs ← |de ad be ef ba dc fe ca| ↦ octeti<8>
+    sit lista<b8, 8> xs ← |de ad be ef ba dc fe ca| ↦ lista<b8, 8>
     itera ex xs sit b { }
 }
 "#,
@@ -1200,7 +1200,7 @@ fn scalar_bounded_ex_runtime_len_param_declines_not_concrete() {
     for source in [
         r#"
 @ radix lane "air"
-functio runtime(octeti<8> xs) → vacuum {
+functio runtime(lista<b8, 8> xs) → vacuum {
     itera ex xs sit b { }
 }"#,
         r#"

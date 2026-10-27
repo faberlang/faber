@@ -23,13 +23,13 @@ fn en(body: &str) -> String {
 
 #[test]
 fn copy_list_returns_as_bytes() {
-    let source = en("fn mk(list<u8> table) → bytes {
+    let source = en("fn mk(list<u8> table) → list<b8> {
     mut list<u8> b ← copy table
     b.append(9)
-    return b ↦ bytes
+    return b ↦ list<b8>
 }
 main {
-    let bytes o ← mk([1, 2, 3])
+    let list<b8> o ← mk([1, 2, 3])
     print o.length()
 }
 ");
@@ -41,7 +41,7 @@ fn copy_list_converts_to_bytes_with_arrow_down() {
     let source = en("main {
     let list<u8> t ← [1, 2, 3]
     mut list<u8> b ← copy t
-    let bytes o ↤ b
+    let list<b8> o ↤ b
     print o.length()
 }
 ");
@@ -62,12 +62,12 @@ fn copy_list_converts_to_wider_list() {
 
 #[test]
 fn plain_list_converts_to_bytes() {
-    let source = en("fn mk(list<u8> table) → bytes {
+    let source = en("fn mk(list<u8> table) → list<b8> {
     let list<u8> b ← table
-    return b ↦ bytes
+    return b ↦ list<b8>
 }
 main {
-    let bytes o ← mk([1, 2, 3])
+    let list<b8> o ← mk([1, 2, 3])
     print o.length()
 }
 ");

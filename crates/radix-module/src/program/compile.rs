@@ -2390,13 +2390,12 @@ fn interface_type_from_type_expr(
                     "bivalens" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Bivalens)),
                     "nihil" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Nihil)),
                     "vacuum" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
-                    "octeti" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Octeti)),
                     // Formal language type (faber::Json); not a guessed genus shell.
                     "json" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Json)),
                     "valor" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Valor)),
                     "instans" => Some(InterfaceTypeSnapshot::Primitive(Primitive::Instans)),
                     // Raw-bits markers `bN` (ruling d477c76d): locale-neutral
-                    // like `u8`, so `lista<b8>` (the retired `octeti` word)
+                    // like `u8`, so `lista<b8>` (the byte list)
                     // snapshots its element as Bits, never a guessed genus.
                     "b8" => Some(InterfaceTypeSnapshot::Bits(BitsWidth::B8)),
                     "b16" => Some(InterfaceTypeSnapshot::Bits(BitsWidth::B16)),

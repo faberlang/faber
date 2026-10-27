@@ -121,7 +121,7 @@ fn resolve_interns_bounded_forms() {
         Type::BoundedTextus { capacity } if matches!(types.get_index(*capacity), IndexExpr::Literal(4))
     ));
 
-    let (types, ty) = resolve_alias("typus X = octeti<8>");
+    let (types, ty) = resolve_alias("typus X = lista<b8, 8>");
     assert!(matches!(
         types.get(ty),
         Type::BoundedOcteti { capacity } if matches!(types.get_index(*capacity), IndexExpr::Literal(8))

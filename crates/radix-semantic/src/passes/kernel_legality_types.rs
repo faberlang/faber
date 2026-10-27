@@ -139,7 +139,7 @@ fn primitive_family(primitive: Primitive) -> Option<&'static str> {
     match primitive {
         Primitive::Ascii => Some("ascii"),
         Primitive::Textus => Some("textus"),
-        Primitive::Octeti => Some("octeti"),
+        Primitive::Octeti => Some("lista<b8>"),
         Primitive::Regex => Some("regex"),
         Primitive::Match => Some("match"),
         Primitive::Json => Some("json"),

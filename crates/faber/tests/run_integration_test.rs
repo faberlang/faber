@@ -2589,7 +2589,7 @@ import from "norma:fault" fault
 
 main {
   let _ partial ← (string msg) → void ⇥ fault.IoFault ∴ write_partial(msg)
-  let _ out_bytes ← (bytes data) → void ⇥ fault.IoFault ∴ write_bytes(data)
+  let _ out_bytes ← (list<b8> data) → void ⇥ fault.IoFault ∴ write_bytes(data)
   partial("P")
   out_bytes(|41|)
   partial(read_line() coalesce "")
@@ -2699,7 +2699,7 @@ main {
     mut int reads ← 0
     mut bool done ← false
     while (not done) and reads ≺ 10 {
-        let bytes ∪ none chunk ← read_bytes(4)
+        let list<b8> ∪ none chunk ← read_bytes(4)
         if chunk is none {
             done ← true
         }
@@ -2708,7 +2708,7 @@ main {
         }
     }
     print reads
-    let bytes ∪ none zero ← read_bytes(0)
+    let list<b8> ∪ none zero ← read_bytes(0)
     mut bool absent ← false
     if zero is none {
         absent ← true

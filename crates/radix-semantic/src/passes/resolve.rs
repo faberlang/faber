@@ -84,7 +84,6 @@ const ISSUE_MISSING_TYPE_ALIAS_SYMBOL: &str = "missing_type_alias_symbol";
 const ISSUE_MISSING_TYPE_SYMBOL_INFO: &str = "missing_type_symbol_info";
 const ISSUE_NAME_NOT_VARIANT: &str = "name_not_variant";
 const ISSUE_NAME_NOT_TYPE: &str = "name_not_type";
-const ISSUE_RETIRED_BYTE_WORD: &str = "retired_byte_word";
 const ISSUE_PRECISION_MARKER_PARAMS: &str = "precision_marker_params";
 const ISSUE_PRECISION_MARKER_SHAPE: &str = "precision_marker_shape";
 const ISSUE_PRIMITIVE_PARAMS: &str = "primitive_params";
@@ -1963,10 +1962,7 @@ fn resolve_type_expr(
                     }
                     return;
                 }
-                if matches!(
-                    prim,
-                    Primitive::Ascii | Primitive::Textus | Primitive::Octeti
-                ) {
+                if matches!(prim, Primitive::Ascii | Primitive::Textus) {
                     match params.as_slice() {
                         [] => {}
                         [capacity]
@@ -2950,8 +2946,6 @@ fn is_builtin_type(name: &str) -> bool {
             | "vacuum"
             | "numquam"
             | "ignotum"
-            | "octeti"
-            | "octetus"
             | "littera"
             | "regex"
             | "objectum"
@@ -3824,7 +3818,6 @@ fn lower_bounded_primitive(
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     match params {
-        [] if prim == Primitive::Octeti => Ok(types.octeti_list()),
         [] => Ok(types.primitive(prim)),
         [capacity]
             if prim == Primitive::Ascii && named_type_is_ascii_format_hint(capacity, interner) =>
@@ -3836,7 +3829,6 @@ fn lower_bounded_primitive(
             match prim {
                 Primitive::Ascii => Ok(types.bounded_ascii(capacity)),
                 Primitive::Textus => Ok(types.bounded_textus(capacity)),
-                Primitive::Octeti => Ok(types.bounded_octeti(capacity)),
                 _ => Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS)),
             }
         }
@@ -4107,12 +4099,9 @@ fn lower_named_type(
     }
 
     if let Some(prim) = Primitive::from_name(name_str) {
-        // Bounded textus/ascii/octeti capacities are index arguments, so they
+        // Bounded textus/ascii capacities are index arguments, so they
         // must bypass the width/type-only generic argument path.
-        if matches!(
-            prim,
-            Primitive::Ascii | Primitive::Textus | Primitive::Octeti
-        ) {
+        if matches!(prim, Primitive::Ascii | Primitive::Textus) {
             return lower_bounded_primitive(prim, params, resolver, interner, types);
         }
         let Some(type_params) = generic_type_exprs(params) else {
@@ -4145,12 +4134,6 @@ fn lower_named_type(
             return Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS));
         }
         return Ok(types.primitive(prim));
-    }
-
-    // Need (ruling B8): `octetus` (en `byte`) is retired with
-    // `octeti`; the diagnostic names `b8` and `u8`.
-    if name_str == "octetus" {
-        return Err(TypeLowerError::Issue(ISSUE_RETIRED_BYTE_WORD));
     }
 
     if let Some(collection) = CollectionKind::from_name(name_str) {

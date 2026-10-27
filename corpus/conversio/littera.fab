@@ -21,7 +21,7 @@ locale = "en"
 #   • `c ↦ int` parses the digit and fails otherwise; `c ↦ string` is the
 #     one-letter string and never fails.
 #   • `s ↦ char` is the only letter of s and fails unless s has exactly one.
-#   • `bytes ↦ string` decodes UTF-8 and can fail; `bytes ↦ ascii` checks every
+#   • `list<b8> ↦ string` decodes UTF-8 and can fail; `list<b8> ↦ ascii` checks every
 #     byte is below 128; one byte converts through a window `b[i‥i+1] ↦ ascii`.
 #   • Code points use the `Code` hint: `'A' ↦ u32 via Code` is 65 and
 #     `65 ↦ char via Code` is 'A' (fails above U+10FFFF and on surrogates).
@@ -32,7 +32,7 @@ locale = "en"
 #   • Expecting `65 ↦ char` to be 'A' — without `Code` it is the digits rule
 #     and fails (two letters). A byte is a number, so `b ↦ char` is digits too.
 #
-# See also: ↦, char, string, ascii, bytes
+# See also: ↦, char, string, ascii, list<b8>
 # =============================================================================
 
 main {

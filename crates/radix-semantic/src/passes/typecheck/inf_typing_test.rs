@@ -468,21 +468,21 @@ fn inf_packs_into_ascii_digits_through_a_radix_hint() {
 
 #[test]
 fn inf_converts_to_and_from_octeti_through_an_endian_hint() {
-    test_support::assert_accepts_la(&conversion("octeti a", "inf", "a ↦ inf via Be"));
-    test_support::assert_accepts_la(&conversion("octeti a", "inf", "a ↦ inf via Le"));
-    test_support::assert_accepts_la(&conversion("inf a", "octeti", "a ↦ octeti via Be"));
+    test_support::assert_accepts_la(&conversion("lista<b8> a", "inf", "a ↦ inf via Be"));
+    test_support::assert_accepts_la(&conversion("lista<b8> a", "inf", "a ↦ inf via Le"));
+    test_support::assert_accepts_la(&conversion("inf a", "lista<b8>", "a ↦ lista<b8> via Be"));
     // Without an endian hint there is no meaning, exactly as for every width.
     assert_rejects(
-        &conversion("inf a", "octeti", "a ↦ octeti"),
+        &conversion("inf a", "lista<b8>", "a ↦ lista<b8>"),
         "numeric_to_octeti_unspecified",
     );
     assert_rejects(
-        &conversion("octeti a", "inf", "a ↦ inf"),
+        &conversion("lista<b8> a", "inf", "a ↦ inf"),
         "octeti_to_numerus_unspecified",
     );
     // A bounded width still has no byte encoding.
     assert_rejects(
-        &conversion("u32 a", "octeti", "a ↦ octeti via Be"),
+        &conversion("u32 a", "lista<b8>", "a ↦ lista<b8> via Be"),
         "numeric_to_octeti_unspecified",
     );
 }

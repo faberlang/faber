@@ -208,7 +208,7 @@ fn textus_to_ascii_conversio_emits_try_from_textus() {
 #[test]
 fn octeti_literal_compiles_to_vec_u8() {
     let session = test_session_la(Target::HirRust);
-    let source = "incipit {\n  sit octeti sig ← |de ad be ef|\n  sit octeti empty_octeti ← ||\n  nota sig\n}";
+    let source = "incipit {\n  sit lista<b8> sig ← |de ad be ef|\n  sit lista<b8> empty_octeti ← ||\n  nota sig\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
@@ -223,7 +223,7 @@ fn octeti_literal_rejects_odd_hex_digit_count() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  sit octeti bad ← |abc|\n  nota bad\n}",
+        "incipit {\n  sit lista<b8> bad ← |abc|\n  nota bad\n}",
         &[DiagnosticArg::new("issue", "octeti_literal_odd_digit_count")],
     );
 }
@@ -234,7 +234,7 @@ fn octeti_literal_rejects_invalid_hex_character() {
     assert_compile_fails_with_args(
         &session,
         "test.fab",
-        "incipit {\n  sit octeti bad ← |de ad g0|\n  nota bad\n}",
+        "incipit {\n  sit lista<b8> bad ← |de ad g0|\n  nota bad\n}",
         &[
             DiagnosticArg::new("issue", "octeti_literal_invalid_character"),
             DiagnosticArg::new("character", "g"),
@@ -269,22 +269,19 @@ fn octeti_literal_matches_in_elige_pattern() {
     assert!(result.success(), "expected octeti pattern match, got: {:?}", result.diagnostics);
 }
 
-// ── octetus builtin (retired: need, ruling B8) ──
+// ── byte list with a `u8` return ──
 //
-// `octetus` (en `byte`) was `numerus<u8>`. The word is retired with the old
-// `octeti` primitive: the element of `octeti` is the raw-bits `b8`, a number
-// is spelled `u8`, and the two convert explicitly (`↦ u8`). The test keeps its
-// id; it now proves the u8 lowering of the number and the retirement of the
-// word.
+// The element of `lista<b8>` is the raw-bits `b8`; a number is spelled `u8`,
+// and the two convert explicitly (`↦ u8`).
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
+fn byte_list_param_and_u8_return_lower_to_vec_u8() {
     let session = test_session_la(Target::HirRust);
     // `accipe` is the optional read (`b8 ∪ nihil`), and an optional into a plain
     // cell is SEM010 optional_into_plain_cell (sb300 1d034eee1e, need),
     // so each read is coalesced with a b8 default.
-    let source = "functio firstByte(octeti buf) → u8 {\n    sit b8 b ← buf.accipe(0) vel (0 ∷ b8)\n    redde b ↦ u8\n}\n\nincipit {\n    varia octeti sig ← |de ad be ef|\n    sit u8 a ← firstByte(sig)\n    sit b8 raw ← sig.accipe(1) vel (0 ∷ b8)\n    sig.appende(raw)\n    nota a\n}\n";
+    let source = "functio firstByte(lista<b8> buf) → u8 {\n    sit b8 b ← buf.accipe(0) vel (0 ∷ b8)\n    redde b ↦ u8\n}\n\nincipit {\n    varia lista<b8> sig ← |de ad be ef|\n    sit u8 a ← firstByte(sig)\n    sit b8 raw ← sig.accipe(1) vel (0 ∷ b8)\n    sig.appende(raw)\n    nota a\n}\n";
     let result = compile(&session, "octet_builtin.fab", source, ModuleCompileRequest::default());
     assert!(result.success(), "expected success, got: {:?}", result.diagnostics);
     let code = super::rust_output(result).code;
@@ -300,20 +297,6 @@ fn octetus_builtin_resolves_to_numerus_u8_and_lowers_to_u8() {
         code.contains("l_sig.push(l_raw)"),
         "expected appende to lower to push, got:\n{code}"
     );
-    assert_compile_fails_with_issue(
-        &session,
-        "octetus_retired.fab",
-        "functio firstByte(octeti buf) → octetus {\n    redde 0\n}\n",
-        "retired_byte_word",
-    );
-}
-
-#[test]
-fn octetus_builtin_rejects_width_parameters() {
-    let session = test_session_la(Target::HirRust);
-    let source = "incipit { sit octetus<i32> x ← 1 }";
-    let result = compile(&session, "octet_params.fab", source, ModuleCompileRequest::default());
-    assert!(!result.success(), "expected octetus<i32> to be rejected, got success");
 }
 
 // ── valor unification ──

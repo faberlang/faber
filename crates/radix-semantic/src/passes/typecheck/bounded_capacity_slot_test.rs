@@ -61,7 +61,7 @@ fn resolve_interns_capacity_holes() {
     let (types, ty) = resolve_alias("typus X = textus<_>");
     assert!(interned_capacity_is_infer(&types, ty), "textus<_>");
 
-    let (types, ty) = resolve_alias("typus X = octeti<_>");
+    let (types, ty) = resolve_alias("typus X = lista<b8, _>");
     assert!(interned_capacity_is_infer(&types, ty), "octeti<_>");
 
     let (types, ty) = resolve_alias("typus X = lista<numerus, _>");

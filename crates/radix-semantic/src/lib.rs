@@ -1158,7 +1158,6 @@ fn register_locale_pack_type_spellings(
                 | TypeBindingKind::ModularWord
                 | TypeBindingKind::SaturatingWord
                 | TypeBindingKind::TrappingWord
-                | TypeBindingKind::ByteWord
                 | TypeBindingKind::Relational(_)
                 | TypeBindingKind::Ratio
                 | TypeBindingKind::Erratum

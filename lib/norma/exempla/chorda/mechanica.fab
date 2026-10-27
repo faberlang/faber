@@ -11,9 +11,9 @@ locale = "en"
 
 # chorda/mechanica — UTF-8 mechanical trio contract tests
 #
-# encode: textus → octeti (UTF-8 encode)
-# decode: octeti → textus (UTF-8 decode, throws on invalid)
-# try_decode: octeti → textus ∪ nihil (tries decode, returns nihil on invalid)
+# encode: textus → list<b8> (UTF-8 encode)
+# decode: list<b8> → textus (UTF-8 decode, throws on invalid)
+# try_decode: list<b8> → textus ∪ nihil (tries decode, returns nihil on invalid)
 #
 # N4a: encode/decode/try_decode are ordinary Faber bodies.
 

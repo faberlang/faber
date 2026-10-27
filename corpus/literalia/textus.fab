@@ -20,7 +20,7 @@ locale = "en"
 #   • template application with `§` placeholders — `"Salve, §!"(nomen)`
 #
 # Common mistakes:
-#   • Applying template § to ascii or octeti literals — template application works only on textus ("...") string literals.
+#   • Applying template § to ascii or list<b8> literals — template application works only on textus ("...") string literals.
 #
 # See also: block-string, §, textus
 # =============================================================================
