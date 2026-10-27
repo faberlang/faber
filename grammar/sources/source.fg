@@ -783,6 +783,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Iteration | `per` | range step |
 # | Iteration | `usque` | range until inclusive |
 # | Params | `argumenta` | CLI arguments modifier |
+# | Params | `axis` | axis marker word: a parameter declares it (`axis int a`), a call echoes it (`t.mean(axis 1)`); shared source spelling; contextual |
 # | Params | `ceteri` | rest |
 # | Params | `errata` | error channel |
 # | Params | `exitus` | exit code |
@@ -804,6 +805,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Builtin | `lineam` | line |
 # | Builtin | `scriptum` | write |
 # | Annotation | `fragment` | nucleum fragment |
+# | Annotation | `nondum` | availability marker `@ nondum` (en `@ unstable`) |
 # | Annotation | `nucleum` | kernel annotation |
 # | Annotation | `radix` | compiler-reserved annotation family |
 # | Annotation | `lane` | `@ radix` compiler-lane directive |

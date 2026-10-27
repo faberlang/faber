@@ -928,7 +928,7 @@ productions. It is not a second keyword authority.
 | Params | `อาร์กิวเมนต์` | CLI arguments modifier |
 | Expression | `น้อยไปมาก` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `หรือ` | or |
-| Grammar | `แกน` | keyword literal derived from the production |
+| Params | `แกน` | axis marker word: a parameter declares it (`แกน int a`), a call echoes it (`t.mean(แกน 1)`); shared source spelling; contextual |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `จับ` | local handler |
 | Error | `ดัก` | capture boundary (error channel reified as a value) |
@@ -995,7 +995,7 @@ productions. It is not a second keyword authority.
 | Error | `ตาย` | panic |
 | Declarations | `ชื่อ` | import binding name |
 | Boolean | `ไม่` | not |
-| Grammar | `ไม่เสถียร` | keyword literal derived from the production |
+| Annotation | `ไม่เสถียร` | availability marker `@ ไม่เสถียร` (en `@ unstable`) |
 | Literals | `nan` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `บันทึก` | note |
 | Annotation | `เคอร์เนล` | kernel annotation |

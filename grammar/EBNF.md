@@ -928,7 +928,7 @@ productions. It is not a second keyword authority.
 | Params | `argumenta` | CLI arguments modifier |
 | Expression | `ascendens` | ascending sort direction (en `asc`; contextual) |
 | Boolean | `aut` | or |
-| Grammar | `axis` | keyword literal derived from the production |
+| Params | `axis` | axis marker word: a parameter declares it (`axis int a`), a call echoes it (`t.mean(axis 1)`); shared source spelling; contextual |
 | Annotation | `backward` | `@ radix` gradient-companion directive |
 | Error | `cape` | local handler |
 | Error | `capta` | capture boundary (error channel reified as a value) |
@@ -995,7 +995,7 @@ productions. It is not a second keyword authority.
 | Error | `mori` | panic |
 | Declarations | `nomen` | import binding name |
 | Boolean | `non` | not |
-| Grammar | `nondum` | keyword literal derived from the production |
+| Annotation | `nondum` | availability marker `@ nondum` (en `@ unstable`) |
 | Literals | `nonnumerus` | named NaN literal (`nan` outside the Latin pack) |
 | Diagnostics | `nota` | note |
 | Annotation | `nucleum` | kernel annotation |
