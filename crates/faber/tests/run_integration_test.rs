@@ -3545,15 +3545,15 @@ fn run_auto_device_kernel_fault_runs_the_program_once() {
     );
 }
 
-/// The corpus-product device tensor fragments must print on the reference route
-/// exactly what their hand-computed `main.ref.json` reference says.
-fn assert_reference_route_matches_reference_fixture(package: &str) {
+/// The corpus-product device tensor fragments must print exactly what their
+/// hand-computed `main.ref.json` reference says, on every route.
+///
+/// `printed` is the program's stdout (no device receipt line) and `route`
+/// names the route in a failure message.
+fn assert_prints_reference_fixture(package: &str, route: &str, printed: &str) {
     let dir = repo_root()
         .join("corpus-product/tensor-fragment")
         .join(package);
-    let path = dir.display().to_string();
-    let (stdout, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
-    assert!(ok, "{package}: reference run failed:\n{stderr}");
     let fixture_text =
         fs::read_to_string(dir.join("src").join("main.ref.json")).expect("read main.ref.json");
     let fixture: serde_json::Value =
@@ -3565,7 +3565,7 @@ fn assert_reference_route_matches_reference_fixture(package: &str) {
         .iter()
         .map(|value| value.as_f64().expect("reference number"))
         .collect();
-    let got: Vec<f64> = stdout
+    let got: Vec<f64> = printed
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
@@ -3577,14 +3577,58 @@ fn assert_reference_route_matches_reference_fixture(package: &str) {
     assert_eq!(
         got.len(),
         want.len(),
-        "{package}: printed {got:?}, reference {want:?}\n{stdout}"
+        "{package}: {route} printed {got:?}, reference {want:?}\n{printed}"
     );
     for (index, (got, want)) in got.iter().zip(&want).enumerate() {
         assert!(
             (got - want).abs() <= tolerance,
-            "{package}: element {index}: reference route {got} vs main.ref.json {want}"
+            "{package}: element {index}: {route} {got} vs main.ref.json {want} (tolerance {tolerance})"
         );
     }
+}
+
+fn assert_reference_route_matches_reference_fixture(package: &str) {
+    let path = repo_root()
+        .join("corpus-product/tensor-fragment")
+        .join(package)
+        .display()
+        .to_string();
+    let (stdout, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
+    assert!(ok, "{package}: reference run failed:\n{stderr}");
+    assert_prints_reference_fixture(package, "reference route", &stdout);
+}
+
+/// `FABER_REQUIRE_METAL` makes a missing Metal device a failure instead of a
+/// skip, as `FABER_REQUIRE_CUDA` does for the CUDA hardware tests.
+#[cfg(target_os = "macos")]
+fn metal_required() -> bool {
+    std::env::var_os("FABER_REQUIRE_METAL").is_some()
+}
+
+/// The Metal device route must print what the hand-computed `main.ref.json`
+/// says, within its tolerance: the same values the reference route prints.
+/// Skips without a Metal device; fails when `FABER_REQUIRE_METAL` is set.
+#[cfg(target_os = "macos")]
+fn assert_metal_route_matches_reference_fixture(package: &str) {
+    let path = repo_root()
+        .join("corpus-product/tensor-fragment")
+        .join(package)
+        .display()
+        .to_string();
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "metal", &path]);
+    let Some((_, program)) = stdout
+        .split_once('\n')
+        .filter(|(receipt, _)| receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX))
+    else {
+        assert!(
+            !metal_required(),
+            "FABER_REQUIRE_METAL is set but {package} did not run on a Metal device:\n{stdout}\n{stderr}"
+        );
+        eprintln!("no Metal device: skipped");
+        return;
+    };
+    assert!(status.success(), "{package}: metal run failed:\n{stderr}");
+    assert_prints_reference_fixture(package, "metal route", program);
 }
 
 #[test]
@@ -3595,4 +3639,19 @@ fn tiny_linear_device_reference_route_prints_the_reference_fixture() {
 #[test]
 fn tiny_linear_device_relu_reference_route_prints_the_reference_fixture() {
     assert_reference_route_matches_reference_fixture("tiny-linear-device-relu");
+}
+
+/// Metal runs the matmul and the fused bias add as one kernel that stores
+/// `x·W + b` into the output parameter `y`; the bias must reach the output.
+#[cfg(target_os = "macos")]
+#[test]
+fn tiny_linear_device_metal_route_prints_the_reference_fixture() {
+    assert_metal_route_matches_reference_fixture("tiny-linear-device");
+}
+
+/// Metal's fused tail ends in the relu: four of the eight outputs are zeroed.
+#[cfg(target_os = "macos")]
+#[test]
+fn tiny_linear_device_relu_metal_route_prints_the_reference_fixture() {
+    assert_metal_route_matches_reference_fixture("tiny-linear-device-relu");
 }
