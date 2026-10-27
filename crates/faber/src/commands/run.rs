@@ -34,6 +34,10 @@ pub(super) fn cmd_run(args: RunArgs) {
     // Package discovery and execution require absolute inputs; resolve the
     // caller-relative path before any route selection or package handoff.
     let input_path = package::absolutize_path(&args.path);
+    if let Some(message) = fmir_image_input_error(&input_path) {
+        eprintln!("error: {message}");
+        std::process::exit(1);
+    }
     if let Some(message) = locale_without_package_error(
         args.locale.as_deref(),
         &[args.path.display().to_string()],
@@ -82,6 +86,29 @@ pub(super) fn cmd_run(args: RunArgs) {
         args.stats,
         args.stats_file.as_ref(),
     );
+}
+
+/// Refusal message when `path` is a built FMIR image file. `faber run` takes
+/// Faber source (a `.fab` file, package directory, `faber.toml`, or archive);
+/// a built image is the output of `faber build --target fmir[-text]`, and the
+/// binary image has its own loader, the hidden `faber __fmir-run`.
+pub(super) fn fmir_image_input_error(path: &Path) -> Option<String> {
+    if !path.is_file() {
+        return None;
+    }
+    let name = path.file_name()?.to_str()?;
+    let shown = path.display();
+    if name.ends_with(".fmir") {
+        Some(format!(
+            "`{shown}` is a built FMIR image, not a runnable input for `faber run`; run the package source with `faber run <package>`, or execute the image with `faber __fmir-run {shown}`"
+        ))
+    } else if name.ends_with(".fmir.txt") {
+        Some(format!(
+            "`{shown}` is a built FMIR text image, not a runnable input for `faber run`; run the package source with `faber run <package>`"
+        ))
+    } else {
+        None
+    }
 }
 
 /// Dispatch an interpreted input path to the package-MIR runner, archive
