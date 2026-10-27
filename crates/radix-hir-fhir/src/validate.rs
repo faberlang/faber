@@ -3937,6 +3937,22 @@ pub(crate) fn validate_referential_integrity(
             }
         }
 
+        // Each template application records its authored holes at most once.
+        let mut template_hole_ids: FxHashSet<radix_hir::HirId> = FxHashSet::default();
+        for holes in &presentation.template_holes {
+            checks.check_symbol(holes.template)?;
+            checks.check_hir(holes.expr)?;
+            for (label, _) in &holes.labeled_actuals {
+                checks.check_symbol(*label)?;
+            }
+            if !template_hole_ids.insert(holes.expr) {
+                return Err(HirArtifactError::InvalidPresentation {
+                    issue: "duplicate_template_holes",
+                    anchor: holes.expr.0,
+                });
+            }
+        }
+
         Ok(())
     }
 

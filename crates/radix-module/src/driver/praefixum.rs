@@ -387,6 +387,9 @@ mod evaluation {
             .insere_exprs
             .retain(|record| !dead.hirs.contains(&record.expr));
         unit.presentation
+            .template_holes
+            .retain(|record| !dead.hirs.contains(&record.expr));
+        unit.presentation
             .destructure_bindings
             .retain(|record| !record.stmt_ids.iter().any(|id| dead.hirs.contains(id)));
         unit.presentation
