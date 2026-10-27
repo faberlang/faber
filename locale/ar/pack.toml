@@ -3528,6 +3528,15 @@ help = "استخدم «...» للنص الذي يحتوي على علامات ا
 [diagnostics.WARN034.issues.prefer_guillemet_for_quote]
 message = "هذه السلسلة تُهرّب `\\\"`؛ اكتبها بـ «…»، فلا حاجة إلى أي تهريب"
 help = "استخدم «...» للنص الذي يحتوي على علامات اقتباس"
+
+[diagnostics.WARN035]
+message = "يخلط هذا القالب بين المواضع العادية والمرقّمة؛ والمواضع العادية تقرأ {reads}"
+help = "رقّم كل موضع (`§0` و`§1` …) ليقرأ كلٌّ منها الوسيط الذي تقصده"
+
+[diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
+message = "يخلط هذا القالب بين المواضع العادية والمرقّمة؛ والمواضع العادية تقرأ {reads}"
+help = "رقّم كل موضع (`§0` و`§1` …) ليقرأ كلٌّ منها الوسيط الذي تقصده"
+
 [diagnostics.LOCALE003]
 message = "reader locale `{locale_id}` في frontmatter غير معروف أو غير صالح"
 help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"

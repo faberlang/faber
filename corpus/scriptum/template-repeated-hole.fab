@@ -1,0 +1,48 @@
++++
+term = "scriptum"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "template_argument", "expression", "literal", "nota_stmt", "functio_decl"]
+category = "format"
+canonical = false
+summary = "A repeated label or number is one position and one value; its argument is evaluated once."
+syntax = "\"§{n} and §{n}\"(n: <value>)"
+related = ["scriptum", "named-holes", "forma"]
+locale = "en"
++++
+# =============================================================================
+# scriptum — a repeated hole reads one value, evaluated once
+# =============================================================================
+#
+# What this teaches:
+#   • A repeated label (`§{n} … §{n}`) is one position: it takes one labeled
+#     value and consumes no extra position.
+#   • A repeated number (`§0 … §0`) selects the same argument each time.
+#   • The argument is evaluated once, however many holes read it. The impure
+#     function below prints "evaluated" once per template application, not
+#     once per hole.
+#
+# Common mistakes:
+#   • Passing one value per hole for a repeated label or number — the extra
+#     value is refused, not ignored.
+#
+# See also: scriptum, named-holes, template-hole-gap-reject
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   One "evaluated" line before each of "x and x", "x or x or x" and "x, y, x".
+
+fn pick() → string {
+    print "evaluated"
+    return "x"
+}
+
+main {
+    # Repeated label: one labeled value, read twice.
+    print "§{n} and §{n}"(n: pick())
+
+    # Repeated number: one positional value, read three times.
+    print "§0 or §0 or §0"(pick())
+
+    # A second position keeps its own value.
+    print "§{a}, §{b}, §{a}"(a: pick(), b: "y")
+}

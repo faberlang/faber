@@ -91,6 +91,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::PositionalLaneParam,
     WarningKind::UnprovenKernelIndex,
     WarningKind::PreferGuillemetQuote,
+    WarningKind::MixedTemplateHoles,
 ];
 
 // STABLE CODES
@@ -1464,6 +1465,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::PreferGuillemetQuote => DiagnosticSpec {
             code: "WARN034",
             help: Some("write the string with «…»; guillemets need no escape for `\\\"` or `'`"),
+        },
+        WarningKind::MixedTemplateHoles => DiagnosticSpec {
+            code: "WARN035",
+            help: Some("number every hole (`§0`, `§1`, …) so each reads the argument you mean"),
         },
     }
 }

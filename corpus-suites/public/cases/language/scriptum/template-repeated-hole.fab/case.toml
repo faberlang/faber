@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/scriptum/template-repeated-hole.fab"
+group = "language"
+input_root = "corpus"
+input = "scriptum/template-repeated-hole.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

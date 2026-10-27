@@ -1,0 +1,39 @@
++++
+term = "scriptum"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "scriptum_expr", "call_expr", "call_suffix", "argument_list", "argument", "template_argument", "expression", "literal", "nota_stmt"]
+category = "format"
+canonical = false
+summary = "Plain and numbered holes in one literal run as built but warn WARN035."
+syntax = "\"§0 and §\"(<value>) - WARN035 mixed_plain_numbered_template_holes"
+related = ["scriptum", "named-holes", "forma"]
+locale = "en"
++++
+# =============================================================================
+# scriptum — plain and numbered holes in one literal
+# =============================================================================
+#
+# What this teaches:
+#   • Plain holes (`§`, `§{name}`) count from 0 in their own order and ignore
+#     numbered holes (`§N`).
+#   • A literal that mixes the two still runs; the checker reports WARN035
+#     `mixed_plain_numbered_template_holes`, names the argument each plain
+#     hole reads (`§=§0`), and suggests numbering every hole.
+#   • The numbering does not change: `"§0 and §"("a")` is "a and a" and
+#     `"§ § §0"("a", "b")` is "a b a".
+#
+# Common mistakes:
+#   • Expecting the plain hole to continue after the highest number — it
+#     starts again at 0.
+#
+# See also: scriptum, named-holes, template-repeated-hole
+# =============================================================================
+
+# EXPECTED OUTPUT:
+#   a and a
+#   a b a
+
+main {
+    print "§0 and §"("a")
+    print "§ § §0"("a", "b")
+}

@@ -42,10 +42,16 @@ const EXPECTED_STRUCTURE_REFUSALS: &[(&str, &str)] = &[
 ];
 
 /// Witness losses (strings, comments, annotation heads) the meaning fingerprint cannot see.
-const KNOWN_STRING_LOSS: &[(&str, &str)] = &[(
-    "literalia/named-holes.fab",
-    "named template holes (`§{name}`) lower to positional holes; the names are not retained",
-)];
+const KNOWN_STRING_LOSS: &[(&str, &str)] = &[
+    (
+        "literalia/named-holes.fab",
+        "named template holes (`§{name}`) lower to positional holes; the names are not retained",
+    ),
+    (
+        "scriptum/template-repeated-hole.fab",
+        "named template holes (`§{name}`) lower to positional holes; the names are not retained",
+    ),
+];
 
 fn corpus_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus")

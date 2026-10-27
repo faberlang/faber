@@ -29,7 +29,7 @@
 use super::{Lowerer, issue_args};
 use crate::builtins::forma::{self as builtin_forma};
 use crate::template_holes::{TemplateHoleAnalysis, analyze_template};
-use crate::{Primitive, SemanticErrorKind, TypeId};
+use crate::{Primitive, SemanticErrorKind, TypeId, WarningKind};
 use handroll::FxHashSet;
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
@@ -1094,6 +1094,17 @@ impl Lowerer<'_> {
             .iter()
             .map(|arg| (arg.label, lower_expr(self, &arg.value)))
             .collect();
+
+        if let Some(reads) = analysis.plain_numbered_mix() {
+            self.push_error(
+                SemanticErrorKind::Warning(WarningKind::MixedTemplateHoles),
+                vec![
+                    DiagnosticArg::new("issue", "mixed_plain_numbered_template_holes"),
+                    DiagnosticArg::new("reads", reads),
+                ],
+                call_span,
+            );
+        }
 
         let mut ok = true;
         let has_labeled = lowered.iter().any(|(label, _)| label.is_some());
