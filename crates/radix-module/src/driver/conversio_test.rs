@@ -398,7 +398,7 @@ incipit {
     let code = super::rust_output(result).code;
     assert!(
         code.contains("faber::Valor::Octeti(__bytes)")
-            && code.contains("faber::Trap::Conversion(\"valor\", \"octeti\")"),
+            && code.contains("faber::Trap::Other(\"valor to list<b8> conversion failed\")"),
         "expected valor octeti extraction, got:\n{code}"
     );
 }

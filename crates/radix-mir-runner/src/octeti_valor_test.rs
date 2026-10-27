@@ -105,7 +105,7 @@ fn octeti_valor_rejects_non_bytes_and_bad_lists_atomically() {
         lista(vec![Value::Int(0), Value::Bool(true)]),
     ] {
         let err = extract(invalid, None).expect_err("not a byte carrier");
-        assert_eq!(err.issue, "runner_valor_to_octeti_conversion_failed");
+        assert_eq!(err.issue, "runner_valor_to_list_b8_conversion_failed");
     }
 }
 

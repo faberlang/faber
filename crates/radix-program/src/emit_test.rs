@@ -271,7 +271,7 @@ main {
         output.code.contains("faber::Valor::Octeti(__bytes)")
             && output
                 .code
-                .contains("faber::Trap::Conversion(\"valor\", \"octeti\")"),
+                .contains("faber::Trap::Other(\"valor to list<b8> conversion failed\")"),
         "expected valor octeti extraction, got:\n{}",
         output.code
     );

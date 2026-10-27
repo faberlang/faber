@@ -638,7 +638,7 @@ fn dynamic_conversion_error(target: &Type) -> String {
         }
         Type::Primitive(Primitive::Bivalens) => "bivalens",
         Type::Primitive(Primitive::Ascii) => "ascii",
-        Type::Primitive(Primitive::Octeti) => "octeti",
+        Type::Primitive(Primitive::Octeti) => "list<b8>",
         Type::Primitive(Primitive::Json) => "json",
         Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => "instans",
         Type::Array(_) => "lista",
