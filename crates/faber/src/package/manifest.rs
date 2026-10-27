@@ -117,8 +117,10 @@ impl DeviceChoice {
         }
     }
 
-    /// The emit target whose device route this choice launches under
-    /// `faber run`, or `None` when the choice runs on the interpreter alone.
+    /// The CLI spelling of the emit target whose device route this choice
+    /// launches under `faber run`, or `None` when the choice runs on the
+    /// interpreter alone. Keyed by spelling so the product crate names no
+    /// backend variant (open-core boundary).
     ///
     /// `faber run` takes no `--target` and executes no emitted artifact: it
     /// interprets source. A device choice is the only way a target's route
@@ -128,11 +130,11 @@ impl DeviceChoice {
     /// that `faber run` has no way to select; the match is exhaustive, so a
     /// new choice must decide here.
     #[must_use]
-    pub const fn run_target(self) -> Option<Target> {
+    pub const fn run_target_spelling(self) -> Option<&'static str> {
         match self {
             Self::Auto | Self::Reference | Self::Cpu => None,
-            Self::Metal => Some(Target::MirMetal),
-            Self::Cuda => Some(Target::MirLlvm),
+            Self::Metal => Some("metal-text"),
+            Self::Cuda => Some("llvm-text"),
         }
     }
 

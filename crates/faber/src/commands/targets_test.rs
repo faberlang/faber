@@ -306,14 +306,23 @@ fn run_column_matches_what_faber_run_dispatches() {
         }
         let reaching: Vec<_> = DeviceChoice::value_variants()
             .iter()
-            .filter(|choice| choice.run_target() == Some(spec.target))
+            .filter(|choice| choice.run_target_spelling() == Some(spec.name.as_str()))
             .collect();
-        assert!(!reaching.is_empty(), "{} claims run but no --device reaches it", r.name);
+        assert!(
+            !reaching.is_empty(),
+            "{} claims run but no --device reaches it",
+            r.name
+        );
         for choice in reaching {
             let cli = Cli::try_parse_from(["faber", "run", "--device", choice.spelling(), "."])
-                .unwrap_or_else(|e| panic!("faber run rejects --device {}: {e}", choice.spelling()));
+                .unwrap_or_else(|e| {
+                    panic!("faber run rejects --device {}: {e}", choice.spelling())
+                });
             let Some(Command::Run(args)) = cli.command else {
-                panic!("`faber run --device {}` did not parse as run", choice.spelling());
+                panic!(
+                    "`faber run --device {}` did not parse as run",
+                    choice.spelling()
+                );
             };
             assert_eq!(args.device, Some(*choice));
         }
@@ -326,7 +335,7 @@ fn run_column_matches_what_faber_run_dispatches() {
             assert!(
                 DeviceChoice::value_variants()
                     .iter()
-                    .all(|choice| choice.run_target() != Some(spec.target)),
+                    .all(|choice| choice.run_target_spelling() != Some(spec.name.as_str())),
                 "{} is reached by a --device choice but reports run=no",
                 r.name
             );
@@ -340,10 +349,10 @@ fn run_column_matches_what_faber_run_dispatches() {
 
     // Every device choice that names a target names an emit row.
     for choice in DeviceChoice::value_variants() {
-        if let Some(target) = choice.run_target() {
+        if let Some(name) = choice.run_target_spelling() {
             assert!(
-                specs.iter().any(|spec| spec.target == target),
-                "--device {} maps to {target}, which is not a faber targets row",
+                specs.iter().any(|spec| spec.name == name),
+                "--device {} maps to {name}, which is not a faber targets row",
                 choice.spelling()
             );
         }

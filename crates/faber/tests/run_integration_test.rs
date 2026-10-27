@@ -128,7 +128,9 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
         .filter_map(|line| line.split_whitespace().next())
         .collect();
     assert!(
-        runnable.iter().all(|name| ["metal-text", "llvm-text"].contains(name)),
+        runnable
+            .iter()
+            .all(|name| ["metal-text", "llvm-text"].contains(name)),
         "only the device routes may report run=yes, got {runnable:?}:\n{stdout}"
     );
 
@@ -138,7 +140,10 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
             .lines()
             .find(|line| line.starts_with(&prefix))
             .unwrap_or_else(|| panic!("missing {name} row:\n{stdout}"));
-        assert!(row.contains(" run=no "), "{name} is not run by `faber run`:\n{row}");
+        assert!(
+            row.contains(" run=no "),
+            "{name} is not run by `faber run`:\n{row}"
+        );
         assert!(
             !row.contains("build/run --target") && !row.contains("faber run --target"),
             "{name} note must not advertise a `faber run` target:\n{row}"
@@ -148,7 +153,10 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     // And the dispatch agrees: `faber run` takes no `--target` for any of them.
     for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
         let (_, stderr, status) = run_faber_status(&["run", "--target", name, "."]);
-        assert!(!status.success(), "`faber run --target {name}` must be refused");
+        assert!(
+            !status.success(),
+            "`faber run --target {name}` must be refused"
+        );
         assert!(
             stderr.contains("--target"),
             "refusal must name the unexpected `--target` flag:\n{stderr}"
