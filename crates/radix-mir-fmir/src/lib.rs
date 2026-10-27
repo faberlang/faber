@@ -7,7 +7,7 @@
 //!
 //! This is a format crate, not a package resolver, host, or runner:
 //! package analysis and package-to-image assembly, package paths and target
-//! layout, CLI planning, generated `fmir-bin` runner construction, and
+//! layout, CLI planning, and
 //! loading/launching policy stay in the sibling `faber` crate. Faber passes
 //! its own toolchain version into [`decode_text_image`] / [`decode_binary_image`]
 //! and maps [`FmirImageError`] to its diagnostics.

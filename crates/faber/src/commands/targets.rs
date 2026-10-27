@@ -71,13 +71,13 @@ fn faber_target_row_specs() -> Result<Vec<FaberTargetRowSpec>, String> {
 ///
 /// Delegates to [`Target::required_feature`] (the feature strings forward
 /// 1:1 into faber's own Cargo features), with one documented faber-specific
-/// override: the fmir package-image family (`fmir-text` / `fmir` /
-/// `fmir-bin`) is faber-build-gated on the shared `mir-fmir` feature, which
-/// radix's neutral mapping leaves ungated (`None`) because the runner
-/// consumes images whenever any emit surface is present.
+/// override: the fmir package-image family (`fmir-text` / `fmir`) is
+/// faber-build-gated on the shared `mir-fmir` feature, which radix's neutral
+/// mapping leaves ungated (`None`) because the runner consumes images
+/// whenever any emit surface is present.
 fn faber_row_feature(target: Target) -> Result<&'static str, String> {
     match target {
-        Target::MirFmir | Target::MirFmirBinary | Target::MirFmirBundle => Ok("mir-fmir"),
+        Target::MirFmir | Target::MirFmirBinary => Ok("mir-fmir"),
         other => other.required_feature().ok_or_else(|| {
             format!(
                 "CLI target {other} has no faber feature mapping: every \
@@ -204,13 +204,6 @@ fn faber_surface_capabilities(
             run: true,
             package: true,
             note: "faber package MIR image target: `faber build --target fmir`",
-        },
-        Target::MirFmirBundle => TargetCapabilities {
-            check: true,
-            build: true,
-            run: true,
-            package: true,
-            note: "faber package MIR image target: `faber build --target fmir-bin`",
         },
         _ => capabilities,
     }

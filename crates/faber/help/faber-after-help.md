@@ -154,8 +154,6 @@ Common flows:
     faber emit -t rust path/to/pkg
     faber build --target fmir-text path/to/pkg
     faber build --target fmir path/to/pkg
-    faber build --target fmir-bin path/to/pkg
-    path/to/pkg/target/faber-mir/exe/run alpha beta
 
   Inspect phases without a package (radix-compatible aliases):
     faber lex crates/exempla/corpus/salve-munde.fab
@@ -170,7 +168,6 @@ Output contract:
   - `build`: path of written artifact on stdout; diagnostics on stderr
   - `build --target fmir-text`: path to the inspectable FMIR text image on stdout
   - `build --target fmir`: path to the compact FMIR binary image on stdout
-  - `build --target fmir-bin`: path to a self-contained FMIR runner on stdout
   - `check` / `emit` (package): compiler diagnostics on stderr; emit writes source
   - `run` / `test`: runner output on stdout; forwards the program's exit code
   - `run <path>`: interprets the input (single file, package, or archive) and

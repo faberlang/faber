@@ -318,11 +318,10 @@ fn manifest_declared_targets_keep_their_analysis_identity() {
     fs::create_dir_all(dir.join("src")).expect("src");
     fs::write(dir.join("src/main.fab"), "main {}\n").expect("source");
     let manifest_path = dir.join("faber.toml");
-    let spellings = Target::ALL.iter().map(ToString::to_string).chain([
-        "typescript".to_owned(),
-        "wasm".to_owned(),
-        "fmir-bin".to_owned(),
-    ]);
+    let spellings = Target::ALL
+        .iter()
+        .map(ToString::to_string)
+        .chain(["typescript".to_owned(), "wasm".to_owned()]);
     for spelling in spellings {
         let expected =
             radix::program::manifest::manifest_build_target(Some(&spelling), &manifest_path);
@@ -8717,7 +8716,7 @@ provider = "lib-target"
 
 #[test]
 fn discover_package_accepts_manifest_package_mir_targets() {
-    for target in ["rust", "scena", "fmir-text", "fmir", "fmir-bin"] {
+    for target in ["rust", "scena", "fmir-text", "fmir"] {
         let dir = test_temp_dir(&format!("manifest-target-{}", target.replace('-', "_")));
         let src = dir.join("src");
         fs::create_dir_all(&src).expect("create src");
@@ -10982,7 +10981,6 @@ fn use_package_compiler_keeps_rust_and_metal_fab_on_package_path() {
     assert!(use_package_compiler(Target::MirScena, fab, false));
     assert!(use_package_compiler(Target::MirFmir, fab, false));
     assert!(use_package_compiler(Target::MirFmirBinary, fab, false));
-    assert!(use_package_compiler(Target::MirFmirBundle, fab, false));
     assert!(use_package_compiler(Target::HirFhir, fab, false));
     assert!(use_package_compiler(Target::MirMetal, fab, false));
     assert!(!use_package_compiler(Target::MirWgsl, fab, false));

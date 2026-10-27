@@ -32,7 +32,6 @@ fn fmir_text_target_name_is_configured() {
 #[test]
 fn fmir_artifact_dir_names_are_configured() {
     assert_eq!(PACKAGE_MIR_ARTIFACT_DIR, "faber-mir");
-    assert_eq!(FMIR_BIN_ARTIFACT_DIR, "exe");
 }
 
 #[test]
@@ -820,6 +819,6 @@ fn package_mir_artifact_version_is_8_for_carried_semantics_schema() {
 
 // The S6-U8 reverse-AD upstream-seed proof requires faber's device-section
 // builder (a `MirSeams::device_section_builder` seam body compiled under
-// `device-runtime`), so it stays faber-side with the other bin_runner/device
+// `device-runtime`), so it stays faber-side with the other device
 // tests (`crates/faber/src/package/mir/mir_test.rs`); RP5 moves only the
 // compiler-owned tests here.

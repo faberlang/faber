@@ -116,9 +116,6 @@ pub enum Target {
 
     /// Source-independent package `MIR` binary image consumed by the runner.
     MirFmirBinary,
-
-    /// Direct runnable binary wrapper with embedded FMIR image bytes.
-    MirFmirBundle,
 }
 
 /// Output mode controlling access modifiers and entry-point emission.
@@ -167,7 +164,6 @@ impl Target {
             Target::MirScena => "scena",
             Target::MirFmir => "fmir-text",
             Target::MirFmirBinary => "fmir",
-            Target::MirFmirBundle => "fmir-bin",
         }
     }
 
@@ -282,7 +278,6 @@ impl Target {
             Target::MirScena => &["scena"],
             Target::MirFmir => &["fmir-text"],
             Target::MirFmirBinary => &["fmir"],
-            Target::MirFmirBundle => &["fmir-bin"],
         }
     }
 
@@ -323,7 +318,6 @@ impl Target {
         Target::MirScena,
         Target::MirFmir,
         Target::MirFmirBinary,
-        Target::MirFmirBundle,
     ];
 
     /// The current device backends, in report order.
@@ -373,11 +367,7 @@ impl Target {
             Target::MirClif => Some("mir-clif"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `None`.
-            Target::MirStepper
-            | Target::MirScena
-            | Target::MirFmir
-            | Target::MirFmirBinary
-            | Target::MirFmirBundle => None,
+            Target::MirStepper | Target::MirScena | Target::MirFmir | Target::MirFmirBinary => None,
         }
     }
 
@@ -408,11 +398,7 @@ impl Target {
             Target::MirClif => cfg!(feature = "mir-clif"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `true`.
-            Target::MirStepper
-            | Target::MirScena
-            | Target::MirFmir
-            | Target::MirFmirBinary
-            | Target::MirFmirBundle => true,
+            Target::MirStepper | Target::MirScena | Target::MirFmir | Target::MirFmirBinary => true,
         }
     }
 
@@ -449,8 +435,7 @@ impl Target {
             | Target::MirBasic
             | Target::MirScena
             | Target::MirFmir
-            | Target::MirFmirBinary
-            | Target::MirFmirBundle => false,
+            | Target::MirFmirBinary => false,
         }
     }
 
@@ -470,7 +455,6 @@ impl Target {
             | Target::MirStepper
             | Target::MirFmir
             | Target::MirFmirBinary
-            | Target::MirFmirBundle
             | Target::HirFaber
             | Target::HirFhir => Leaf::ALL,
             Target::HirGo => &[Leaf::Stdio, Leaf::Process, Leaf::Clock, Leaf::Entropy],

@@ -855,14 +855,6 @@ fn generate_output(
             ],
         }
         .into()),
-        Target::MirFmirBundle => Err(codegen::CodegenError {
-            message: "fmir-bin bundles must be built through `faber build --target fmir-bin`".to_owned(),
-            args: vec![
-                DiagnosticArg::new("issue", "package_artifact_route_required"),
-                DiagnosticArg::new("target", "fmir-bin"),
-            ],
-        }
-        .into()),
         Target::HirFhir => Err(codegen::CodegenError {
             message: "Target::HirFhir is a serialization dispatch, not a codegen backend. Use the emit workflow."
                 .to_owned(),
@@ -4395,7 +4387,6 @@ fn collect_target_policy_diagnostics(
         | Target::HirFhir
         | Target::MirStepper
         | Target::MirFmirBinary
-        | Target::MirFmirBundle
         | Target::MirFmir
         | Target::MirLlvm
         | Target::MirLlvmHost

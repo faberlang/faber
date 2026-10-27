@@ -5,9 +5,6 @@
 //! manifest writer + test support). This module keeps the faber product
 //! surface:
 //!
-//! - [`bin_runner`] — the generated fmir-bin runner crate writer (writes the
-//!   runner crate and invokes `cargo build`; external tool invocation stays
-//!   faber-side, ownership-freeze §3).
 //! - [`faber_mir_seams`] — the faber-supplied seam bundle (executed-lane
 //!   target, library resolver/cache, `[device]` projection, device-section
 //!   builder, host-route policy, runner writer, toolchain version) that the
@@ -17,8 +14,6 @@
 //!   not compiler compatibility modules.
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
 
-#[cfg(feature = "runner")]
-pub(crate) mod bin_runner;
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub mod cpu_proba;
 #[cfg(feature = "runner")]
@@ -42,19 +37,12 @@ use radix::module::diagnostics::Diagnostic;
 #[cfg(feature = "runner")]
 use radix::module::driver::Config;
 #[cfg(feature = "runner")]
-use std::fs;
-#[cfg(feature = "runner")]
 use std::path::Path;
 
 #[cfg(feature = "device-runtime")]
 use radix::program::mir::DeviceSelection;
 #[cfg(feature = "runner")]
 use radix::program::mir::mir_diag;
-
-// Faber's fmir-bin runner writer is the seam body radix-program's binary
-// bundle builder receives (`MirSeams::bin_runner_writer`).
-#[cfg(feature = "runner")]
-use bin_runner::write_fmir_bin_runner;
 
 /// The faber-supplied package-MIR seams (RP5). Every faber product input the
 /// moved compiler subset needs enters as an explicit function — no ambient
@@ -67,7 +55,6 @@ pub fn faber_mir_seams() -> radix::program::mir::MirSeams {
         library_cache_for_config: super::library_cache_with_config,
         device_config_for_input: manifest::manifest_device_config,
         device_section_builder,
-        bin_runner_writer: write_fmir_bin_runner,
         toolchain_version: env!("CARGO_PKG_VERSION"),
     }
 }
@@ -301,31 +288,6 @@ pub fn with_linked_test_package_mir<R>(
         run,
     )
 }
-
-/// Generated fmir-bin runner crates consume this public API (the stdio
-/// entry). Forward to the moved route with the faber seams.
-///
-/// # Errors
-/// Diagnostics when the image bytes or the persisted artifact is invalid.
-#[cfg(feature = "runner")]
-pub fn run_fmir_image_bytes_with_stdio(
-    image_bytes: &[u8],
-    diagnostic_path: &Path,
-    argumenta: Vec<String>,
-) -> Result<(), Vec<Diagnostic>> {
-    radix::program::mir::run_fmir_image_bytes_with_stdio(
-        image_bytes,
-        diagnostic_path,
-        argumenta,
-        &faber_mir_seams(),
-    )
-}
-
-// Runner-crate constants stay faber-side (the toolchain version is the
-// product version recorded in the generated runner's Cargo manifest).
-pub(crate) const PACKAGE_MIR_TOOLCHAIN_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub(crate) const FMIR_BIN_RUNNER_CRATE_DIR: &str = "runner";
-pub(crate) const FMIR_BIN_RUNNER_PACKAGE_NAME: &str = "faber-fmir-bin-runner";
 
 /// Diagnostic constructors used by the faber seam bodies.
 #[cfg(feature = "runner")]

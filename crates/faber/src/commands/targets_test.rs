@@ -112,9 +112,9 @@ fn mirwasm_double_row_shares_target_and_feature() {
 #[test]
 fn fmir_family_rows_share_the_fmir_feature_override() {
     // The documented faber-specific override: radix's `required_feature()`
-    // leaves the fmir family ungated; faber gates all three package-image
+    // leaves the fmir family ungated; faber gates both package-image
     // targets on its `mir-fmir` feature.
-    for name in ["fmir-text", "fmir", "fmir-bin"] {
+    for name in ["fmir-text", "fmir"] {
         let specs = faber_target_row_specs().expect("every CLI target maps to a faber feature");
         let spec = row_spec(&specs, name);
         assert_eq!(
@@ -205,7 +205,7 @@ fn default_build_reports_full_surface() {
     }
 
     // FMIR rows are faber package build/run/package targets.
-    for name in ["fmir-text", "fmir", "fmir-bin"] {
+    for name in ["fmir-text", "fmir"] {
         let r = row(&rows, name);
         assert!(
             r.capabilities.check

@@ -1,6 +1,6 @@
 //! FMIR package targets are not a radix single-file emit path.
 //!
-//! Radix must reject `fmir-text` / `fmir` / `fmir-bin` with CODEGEN001 (delegate
+//! Radix must reject `fmir-text` / `fmir` with CODEGEN001 (delegate
 //! to `faber build`). Package-shaped FMIR proofs live under `faber/corpus` and
 //! are exercised by exempla (`tensor_package_*`), not here.
 
@@ -16,7 +16,7 @@ incipit {
 
 #[test]
 fn fmir_targets_rejected_with_codegen001_on_single_file() {
-    for target in [Target::MirFmir, Target::MirFmirBinary, Target::MirFmirBundle] {
+    for target in [Target::MirFmir, Target::MirFmirBinary] {
         let result = compile_cli_source_with_locale_pack(
             "smoke.fab",
             SMOKE,

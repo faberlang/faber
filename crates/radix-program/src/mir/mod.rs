@@ -5,7 +5,7 @@
 //! here — multi-unit lowering/linking/rewrites (`lower`, `link`, `sources`,
 //! `remap`), FMIR image construction (`image`), artifact builders
 //! (`build_package_mir_artifact`, `build_package_fmir_image`,
-//! `build_package_fmir_text_image`, `build_package_fmir_binary_bundle`),
+//! `build_package_fmir_text_image`),
 //! runtime-requirement collection (`requirements`), the package-MIR driver
 //! (`driver`, `with_lowered_package_mir`), CLI planning (`cli_bind`,
 //! `cli_plan`, `cli_values`), package-MIR diagnostics (`diag`), and the
@@ -19,7 +19,7 @@
 //! [`MirSeams`] (the RP4 `EmissionSeams` posture): executed-lane target
 //! resolution, library resolver/cache construction, the `[device]` manifest
 //! projection, the device-section builder, the host-construction route
-//! policy, and the fmir-bin runner writer. Nothing here reads the ambient
+//! policy. Nothing here reads the ambient
 //! environment, invokes external tools, or depends on faber's `device/`
 //! subtree.
 #![allow(dead_code)] // Binary and library targets exercise different package runner surfaces.
@@ -99,23 +99,11 @@ pub type DeviceSectionBuilder = fn(
     &Path,
 ) -> Result<Option<FmirDeviceSection>, Vec<Diagnostic>>;
 
-/// Generated fmir-bin runner crate writer (faber's `bin_runner.rs`): writes
-/// the runner crate and invokes `cargo build`. Toolchain invocation is faber
-/// product; the binary-bundle builder receives the writer.
-pub type BinRunnerWriter = fn(
-    artifact_root: &Path,
-    entrypoint_path: &Path,
-    diagnostic_path: &Path,
-    image: &[u8],
-    release: bool,
-) -> Result<(), Vec<Diagnostic>>;
-
 /// Faber-supplied package-MIR seams (RP5).
 ///
 /// Mirrors the RP3/RP4 `AnalysisSeams`/`EmissionSeams` posture: every faber
 /// product input (executed-lane target, library resolver/cache, `[device]`
-/// projection, device-section builder, fmir-bin runner
-/// writer, toolchain version) enters as an explicit function — no ambient env
+/// projection, device-section builder, toolchain version) enters as an explicit function — no ambient env
 /// reads, no faber product dependency inside `radix-program`
 /// (package-api.md §3/§5).
 #[derive(Clone, Copy)]
@@ -125,7 +113,6 @@ pub struct MirSeams {
     pub library_cache_for_config: LibraryCacheForConfig,
     pub device_config_for_input: DeviceConfigForInput,
     pub device_section_builder: DeviceSectionBuilder,
-    pub bin_runner_writer: BinRunnerWriter,
     /// The toolchain version recorded in FMIR images (`faber_cli_version`
     /// field) and validated at decode. Faber's `CARGO_PKG_VERSION` (the
     /// product version); supplied as a seam so image bytes keep the faber
@@ -201,11 +188,9 @@ type CliEntryRecords = HashMap<PathBuf, CliRecordFieldsByType>;
 pub use radix_types::PACKAGE_MIR_SYNTHETIC_DEF_BASE;
 pub const PACKAGE_MIR_TARGET_NAME: &str = "scena";
 pub const PACKAGE_MIR_ARTIFACT_DIR: &str = "faber-mir";
-pub const FMIR_BIN_ARTIFACT_DIR: &str = "exe";
 pub const PACKAGE_MIR_MANIFEST_FILE: &str = "image.toml";
 pub const FMIR_TEXT_IMAGE_FILE: &str = "image.fmir.txt";
 pub const FMIR_IMAGE_FILE: &str = "image.fmir";
-pub const FMIR_BIN_ENTRYPOINT_FILE: &str = "run";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageMirArtifact {
@@ -221,12 +206,6 @@ pub struct PackageFmirTextImage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageFmirImage {
-    pub image_path: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackageFmirBinaryBundle {
-    pub entrypoint_path: PathBuf,
     pub image_path: PathBuf,
 }
 
@@ -557,11 +536,8 @@ pub fn fnv1a64(bytes: &[u8]) -> u64 {
     hash
 }
 
-/// FNV-1a provenance hash idiom shared by image and runner artifacts: a
-/// fixed-width hex digest under an `fnv64:` prefix.
-///
-/// RP5: moved from faber's `bin_runner.rs` with the image construction that
-/// consumes it; faber's fmir-bin runner writer re-exports it.
+/// FNV-1a provenance hash idiom for image artifacts: a fixed-width hex
+/// digest under an `fnv64:` prefix.
 #[must_use]
 pub fn fnv64_hex(bytes: &[u8]) -> String {
     format!("fnv64:{:016x}", fnv1a64(bytes))
@@ -571,8 +547,6 @@ pub fn fnv64_hex(bytes: &[u8]) -> String {
 /// record (relative path + FNV hash). Source identities ride images that
 /// carry a device payload (the A10 identity's source half).
 ///
-/// RP5: moved from faber's `bin_runner.rs` with the image construction that
-/// consumes it.
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn source_identity(
@@ -700,9 +674,6 @@ pub fn imported_entry_facts(
 }
 
 pub use routes::FmirImageRouteDecision;
-/// Generated fmir-bin runner crates consume this public API through faber's
-/// re-export (`faber_cli::package::run_fmir_image_bytes_with_stdio`).
-pub use routes::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "hir-fhir")]
 pub use routes::run_package_mir_from_loaded;
 pub use routes::with_interpreted_bound_package_mir;
@@ -713,10 +684,10 @@ pub use routes::{
 };
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub use routes::{
-    build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
-    fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
-    run_package_fmir_built_image, run_package_fmir_image, run_package_fmir_image_with_selection,
-    run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
+    build_package_fmir_image, build_package_fmir_text_image, fmir_image_route_decision,
+    run_fmir_image_path, run_fmir_image_path_with_selection, run_package_fmir_built_image,
+    run_package_fmir_image, run_package_fmir_image_with_selection, run_package_fmir_text_image,
+    run_package_fmir_text_image_with_selection,
 };
 
 pub mod test_support;

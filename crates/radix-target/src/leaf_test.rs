@@ -112,7 +112,6 @@ fn supported_leaves_other_emit_targets_refuse_every_leaf() {
                 | Target::MirStepper
                 | Target::MirFmir
                 | Target::MirFmirBinary
-                | Target::MirFmirBundle
                 | Target::HirFaber
                 | Target::HirFhir
                 | Target::HirGo
