@@ -21,6 +21,9 @@ locale = "en"
 #     `ln`, `log10`, `sin`, `cos`, `tan`, `abs`) and for a store through
 #     assignment, a return, an argument or a field
 #   • A variable receiver, a literal receiver and a glyph receiver all agree
+#   • The store's float width reaches the literal receiver the way it reaches
+#     the operands of `2.0 * 3.0`: `let f32 y ← (8.0).cbrt()` is accepted and
+#     rounds once, at the store (the last six lines below)
 #
 # Common mistakes:
 #   • expecting the literal receiver to need its own `f64` annotation: the
@@ -40,6 +43,12 @@ locale = "en"
 #   3.0
 #   4.0
 #   2.0
+#   2.0
+#   9.0
+#   2.0
+#   2.0
+#   2.0
+#   1.4142135
 #
 # See also: radical-scalar, radical-tensor, radical-int-reject
 # =============================================================================
@@ -83,4 +92,17 @@ main {
     print probe.root
     print halve((64.0).sqrt())
     print cube_root_of_eight()
+    let f32 glyph32 ← ∛ 8.0
+    let f32 root32 ← √ 81.0
+    let f32 method32 ← (8.0).cbrt()
+    let f32 chain32 ← (64.0).sqrt().cbrt()
+    mut f32 later32 ← 0.0
+    later32 ← (4.0).sqrt()
+    let f32 rounded32 ← (2.0).sqrt()
+    print glyph32
+    print root32
+    print method32
+    print chain32
+    print later32
+    print rounded32
 }

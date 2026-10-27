@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/radical/radical-store-abs.fab"
+group = "language"
+input_root = "corpus"
+input = "radical/radical-store-abs.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
