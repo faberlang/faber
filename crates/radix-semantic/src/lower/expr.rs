@@ -1226,11 +1226,13 @@ impl Lowerer<'_> {
     /// `id` when its holes were named, so Faber re-emission restores them.
     fn record_template_holes(&mut self, id: radix_hir::HirId, authored: TemplateAuthored) {
         if let Some((template, labeled_actuals)) = authored {
-            self.presentation.template_holes.push(radix_hir::HirTemplateHoles {
-                expr: id,
-                template,
-                labeled_actuals,
-            });
+            self.presentation
+                .template_holes
+                .push(radix_hir::HirTemplateHoles {
+                    expr: id,
+                    template,
+                    labeled_actuals,
+                });
         }
     }
 
