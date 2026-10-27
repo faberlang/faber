@@ -123,6 +123,7 @@ fn minimal_test_artifact() -> HirArtifact {
 
     HirArtifact {
         schema_version: SCHEMA_VERSION,
+        shape_hash: radix_hir_fhir::wire_shape_hash(),
         source_identity: SourceIdentity { content_hash: "abc123".to_string(), relative_path: "test.faber".to_string() },
         hir,
         presentation: empty_presentation(),
@@ -1928,6 +1929,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
     use radix_hir_fhir::{SCHEMA_VERSION, SourceIdentity};
     HirArtifact {
         schema_version: SCHEMA_VERSION,
+        shape_hash: radix_hir_fhir::wire_shape_hash(),
         source_identity: SourceIdentity {
             content_hash: "test_hash".to_string(),
             relative_path: "test.faber".to_string(),

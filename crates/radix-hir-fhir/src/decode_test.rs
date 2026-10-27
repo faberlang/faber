@@ -84,6 +84,50 @@ fn decode_rejects_unsupported_schema_version() {
 }
 
 #[test]
+fn decode_rejects_schema_v47_after_template_holes_wire_break() {
+    let mut artifact = stub_artifact();
+    artifact.schema_version = 47;
+    let bytes = encode(&artifact).expect("encode schema-v47 artifact");
+    assert!(matches!(
+        decode(&bytes),
+        Err(HirArtifactError::UnsupportedSchemaVersion {
+            found: 47,
+            expected: SCHEMA_VERSION,
+        })
+    ));
+}
+
+#[test]
+fn decode_rejects_a_foreign_wire_shape_with_the_current_version() {
+    // A writer whose serialized types differ (a forgotten SCHEMA_VERSION bump)
+    // stamps a different derived shape hash; the version matches, so only the
+    // header hash can stop the misaligned positional decode.
+    let mut artifact = stub_artifact();
+    artifact.shape_hash = wire_shape_hash() ^ 1;
+    let bytes = encode(&artifact).expect("encode foreign-shape artifact");
+    match decode(&bytes) {
+        Err(error @ HirArtifactError::UnsupportedWireShape { found, expected }) => {
+            assert_eq!(found, wire_shape_hash() ^ 1);
+            assert_eq!(expected, wire_shape_hash());
+            assert!(
+                error.to_string().contains("without a schema version bump"),
+                "error must say what happened: {error}"
+            );
+        }
+        other => panic!("expected UnsupportedWireShape, got {other:?}"),
+    }
+}
+
+#[test]
+fn encoded_artifact_carries_the_derived_shape_hash_right_after_the_version() {
+    let bytes = encode(&stub_artifact()).expect("encode artifact");
+    let (version, rest) = postcard::take_from_bytes::<u32>(&bytes).expect("version");
+    let (hash, _rest) = postcard::take_from_bytes::<u64>(rest).expect("hash");
+    assert_eq!(version, SCHEMA_VERSION);
+    assert_eq!(hash, wire_shape_hash());
+}
+
+#[test]
 fn decode_rejects_schema_v8_after_authored_types_wire_break() {
     let mut artifact = stub_artifact();
     artifact.schema_version = 8;

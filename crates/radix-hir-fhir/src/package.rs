@@ -197,6 +197,14 @@ pub enum FhirPackageError {
         found: u32,
         expected: u32,
     },
+    /// An embedded unit was written with a serialized wire shape that differs
+    /// from this loader's derived shape hash (a type changed without a
+    /// `SCHEMA_VERSION` bump).
+    UnsupportedUnitWireShape {
+        module: String,
+        found: u64,
+        expected: u64,
+    },
     /// An embedded unit failed its own decode/validation gates.
     MalformedUnit { module: String, detail: String },
     /// The module table contains the same canonical path twice.
@@ -245,6 +253,15 @@ impl std::fmt::Display for FhirPackageError {
             } => write!(
                 f,
                 "unsupported unit schema version {found} in module `{module}` (expected {expected})"
+            ),
+            Self::UnsupportedUnitWireShape {
+                module,
+                found,
+                expected,
+            } => write!(
+                f,
+                "unit in module `{module}` has wire shape {found:#018x} but this build reads {expected:#018x} \
+                 (a serialized type changed without a schema version bump); rebuild the package"
             ),
             Self::MalformedUnit { module, detail } => {
                 write!(f, "malformed unit `{module}` in FHIR package: {detail}")
@@ -307,6 +324,11 @@ impl From<crate::msgpack::MsgpackError> for FhirPackageError {
             crate::msgpack::MsgpackError::UnsupportedSchemaVersion { found, expected } => {
                 Self::MalformedMsgpack(format!(
                     "unsupported msgpack unit schema version {found} (expected {expected})"
+                ))
+            }
+            crate::msgpack::MsgpackError::UnsupportedWireShape { found, expected } => {
+                Self::MalformedMsgpack(format!(
+                    "unsupported msgpack unit wire shape {found:#018x} (expected {expected:#018x})"
                 ))
             }
         }
