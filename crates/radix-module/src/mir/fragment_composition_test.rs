@@ -2049,3 +2049,200 @@ fn unmatched_type_args_do_not_fall_back_to_a_same_source_function() {
         "the unmatched call must stay in place, not be inlined from a same-source function"
     );
 }
+
+// --- Declared `filum` reduction inside a composed kernel helper ---
+
+/// A declared `filum` carries its binder locals and its captured term body in
+/// the id space of the function that wrote it. Composing that function into a
+/// caller renames them with the rest of the callee: a clone that left them
+/// behind would point the reduction at whatever the caller declares at those
+/// ids (here the caller's own total and the bound tensor copy).
+#[test]
+fn kernel_helper_filum_declaration_follows_the_alpha_rename() {
+    use radix_mir::{
+        MirFilumCoordinate, MirFilumForm, MirFilumReduceOp, MirIntrinsic, MirPlaceBase, MirReduceOp, MirRuntimeCall,
+        MirTemp,
+    };
+
+    let mut types = TypeTable::new();
+    let (tensor, element) = crate::mir::test_support::rank1_tf32_type(&mut types);
+    let index_ty = crate::mir::test_support::u32_type(&mut types);
+    let local =
+        |id: u32, ty: MirType| MirLocal { id: MirLocalId(id), name: None, ty, mutable: false, span: DEF_SPAN() };
+    let assign = |place: MirPlace, value_id: u32, operand: MirOperand| MirStatement {
+        kind: MirStatementKind::Assign {
+            place,
+            value: MirValue {
+                id: MirValueId(value_id),
+                kind: MirValueKind::Operand(operand),
+                ty: element,
+                span: DEF_SPAN(),
+            },
+        },
+        span: DEF_SPAN(),
+    };
+
+    // helper(a): total = filum sum over a, coordinate i (1), element binder v
+    // (2), term result (3), total (4); the term body routes v through temp 0.
+    let term_body = vec![
+        assign(
+            MirPlace::temp(radix_mir::MirTempId(0)),
+            0,
+            MirOperand::Place(MirPlace::local(MirLocalId(2))),
+        ),
+        assign(MirPlace::local(MirLocalId(3)), 1, MirOperand::Temp(radix_mir::MirTempId(0))),
+    ];
+    let filum = MirFilumReduceOp {
+        op: MirReduceOp::Sum,
+        form: MirFilumForm::Declared,
+        filum_binder: None,
+        term_binder: MirLocalId(2),
+        term_binder_name: None,
+        coordinates: vec![MirFilumCoordinate { local: MirLocalId(1), name: None }],
+        lane_width: 32,
+        term_body,
+        term_captures: None,
+        term_result: MirLocalId(3),
+        term_ty: element,
+        group: None,
+    };
+    let mut helper = function(
+        1,
+        KERNEL_HELPER,
+        vec![param(0, tensor)],
+        element,
+        vec![
+            local(1, index_ty),
+            local(2, element),
+            local(3, element),
+            local(4, element),
+        ],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(4))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::FilumReduce(filum),
+                        args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                        return_ty: element,
+                    },
+                },
+                span: DEF_SPAN(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(4))))),
+                span: DEF_SPAN(),
+            },
+            span: DEF_SPAN(),
+        }],
+        None,
+    );
+    helper
+        .temps
+        .push(MirTemp { id: radix_mir::MirTempId(0), ty: element, span: DEF_SPAN() });
+    // The caller declares a local at id 1 of its own: the callee's coordinate id.
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, tensor)],
+        element,
+        vec![local(1, element)],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_stmt(
+                Some(MirPlace::local(MirLocalId(1))),
+                MirFunctionId(1),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            )],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(1))))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        Some(MirKernelShaderStage::Compute),
+    );
+
+    let mut functions = vec![entry, helper];
+    assert!(compose_fns(&mut functions).is_empty(), "kernel helper must compose");
+    let composed = &functions[0];
+    let local_ty = |id: MirLocalId| {
+        composed
+            .params
+            .iter()
+            .find(|param| param.local == id)
+            .map(|param| param.ty)
+            .or_else(|| {
+                composed
+                    .locals
+                    .iter()
+                    .find(|local| local.id == id)
+                    .map(|local| local.ty)
+            })
+    };
+    let filum = composed
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find_map(|stmt| match &stmt.kind {
+            MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+                MirIntrinsic::FilumReduce(filum) => Some(filum),
+                _ => None,
+            },
+            _ => None,
+        })
+        .expect("the composed caller carries the filum declaration");
+
+    let [coordinate] = &filum.coordinates[..] else {
+        panic!("one coordinate binder: {filum:#?}");
+    };
+    assert_eq!(
+        local_ty(coordinate.local),
+        Some(index_ty),
+        "coordinate names the callee's index local: {composed:#?}"
+    );
+    assert_eq!(
+        local_ty(filum.term_binder),
+        Some(element),
+        "element binder names the callee's element local"
+    );
+    assert_eq!(
+        local_ty(filum.term_result),
+        Some(element),
+        "term result names the callee's result local"
+    );
+    assert_ne!(filum.term_binder, filum.term_result);
+    assert_ne!(coordinate.local, MirLocalId(1), "the caller's own local keeps its id");
+
+    let [read_binder, write_result] = &filum.term_body[..] else {
+        panic!("two term-body statements: {filum:#?}");
+    };
+    let MirStatementKind::Assign { place: temp_place, value: first } = &read_binder.kind else {
+        panic!("term body starts with the temp assign");
+    };
+    let MirStatementKind::Assign { place: result_place, value: second } = &write_result.kind else {
+        panic!("term body ends with the result assign");
+    };
+    let MirPlaceBase::Temp(temp) = temp_place.base else {
+        panic!("term body routes through a temp");
+    };
+    assert!(
+        composed.temps.iter().any(|candidate| candidate.id == temp),
+        "the term-body temp is declared: {composed:#?}"
+    );
+    assert!(
+        matches!(&first.kind, MirValueKind::Operand(MirOperand::Place(place)) if place.base == MirPlaceBase::Local(filum.term_binder)),
+        "the term body reads the element binder: {filum:#?}"
+    );
+    assert_eq!(
+        result_place.base,
+        MirPlaceBase::Local(filum.term_result),
+        "the term body writes the term result"
+    );
+    assert!(
+        matches!(&second.kind, MirValueKind::Operand(MirOperand::Temp(read)) if *read == temp),
+        "the term result reads the same temp: {filum:#?}"
+    );
+    assert_ne!(first.id, second.id, "value ids stay distinct");
+}

@@ -4935,6 +4935,53 @@ fn kernel_plan_for_function_derives_distributed_sum_plan() {
 }
 
 #[test]
+fn kernel_plan_for_function_reads_declared_filum_source_through_a_parameter_copy() {
+    // Composition binds a callee's tensor parameter by a whole copy of the
+    // caller's, so a declared filum inlined from a kernel helper reads the
+    // copy. The copy is the parameter's storage: the plan must resolve to the
+    // kernel's source buffer exactly as for the direct read.
+    let mut types = TypeTable::new();
+    let mut function = filum_function(&mut types);
+    let tensor = function.locals[0].ty;
+    function.locals.push(MirLocal {
+        id: MirLocalId(5),
+        name: None,
+        ty: tensor,
+        mutable: false,
+        span: test_span(),
+    });
+    function.blocks[0].statements.insert(
+        0,
+        MirStatement {
+            kind: MirStatementKind::Assign {
+                place: MirPlace::local(MirLocalId(5)),
+                value: MirValue {
+                    id: MirValueId(0),
+                    kind: MirValueKind::Operand(MirOperand::Place(MirPlace::local(MirLocalId(0)))),
+                    ty: tensor,
+                    span: test_span(),
+                },
+            },
+            span: test_span(),
+        },
+    );
+    let MirStatementKind::RuntimeCall { call, .. } = &mut function.blocks[0].statements[1].kind
+    else {
+        panic!("filum function statement is a runtime call");
+    };
+    call.args = vec![MirOperand::Place(MirPlace::local(MirLocalId(5)))];
+    let signature = reduction_signature(1024, 32, 32);
+    let validation = MirValidationContext::new(&types);
+    let derived = kernel_plan_for_function(&function, &signature, &validation)
+        .expect("a filum read through a parameter copy resolves its source buffer")
+        .expect("filum function carries the declared recipe plan");
+    let CollectionKernelPlan::DistributedSum(plan) = &derived else {
+        panic!("filum declaration must resolve to DistributedSum, got {derived:?}");
+    };
+    assert_eq!(plan.length, 1024);
+}
+
+#[test]
 fn nested_filum_form_is_never_a_declared_sum_plan() {
     // gpu-reset rule 14.5 vocabulary: the nested lane-body form validates
     // like Grid but must never be taken for a Declared plan.

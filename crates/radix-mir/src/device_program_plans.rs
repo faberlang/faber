@@ -448,6 +448,10 @@ fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumReduceO
             let MirPlaceBase::Local(source_local) = place.base else {
                 continue;
             };
+            // Composition binds a callee's tensor parameter by a whole copy of
+            // the caller's: the declaration reads the parameter's buffer
+            // through the copy.
+            let source_local = crate::abi::resolve_parameter_alias(function, source_local);
             declarations.push((filum.clone(), source_local));
         }
     }
