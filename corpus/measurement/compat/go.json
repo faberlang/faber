@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 466,
-    "analyzable": 517
+    "capable": 470,
+    "analyzable": 525
   },
   "terms": [
     {
@@ -772,6 +772,12 @@
       "analyzable": 4
     },
     {
+      "term": "saturating<W, lo‥hi>",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
       "term": "scribe",
       "rule": "keyword",
       "capable": 1,
@@ -889,19 +895,25 @@
       "term": "tensor",
       "rule": "type",
       "capable": 23,
-      "analyzable": 25
+      "analyzable": 26
     },
     {
       "term": "textus",
       "rule": "keyword",
-      "capable": 8,
-      "analyzable": 8
+      "capable": 9,
+      "analyzable": 9
     },
     {
       "term": "trapped",
       "rule": "type",
       "capable": 1,
       "analyzable": 1
+    },
+    {
+      "term": "trapping<W, lo‥hi>",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "typus",
@@ -982,6 +994,12 @@
       "analyzable": 1
     },
     {
+      "term": "wrapping<W, lo‥hi>",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
       "term": "§",
       "rule": "operator-group",
       "capable": 1,
@@ -1008,13 +1026,13 @@
     {
       "term": "‥",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 3
     },
     {
       "term": "…",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {

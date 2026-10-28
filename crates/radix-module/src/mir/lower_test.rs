@@ -620,22 +620,22 @@ fn lowers_vector_norma_to_sqrt_of_dot() {
     let dump = dump_source(
         r"
 functio length(vector<f32, 3> v) → f32 {
-    redde v.norma()
+    redde v.norm()
 }
 ",
     );
-    assert!(dump.contains("sqrt"), "norma must lower through sqrt\n{dump}");
+    assert!(dump.contains("sqrt"), "norm must lower through sqrt\n{dump}");
     assert!(
         dump.contains("_0.lane0 * _0.lane0"),
-        "norma must square lane0 for dot(v,v)\n{dump}"
+        "norm must square lane0 for dot(v,v)\n{dump}"
     );
     assert!(
         dump.contains("_0.lane1 * _0.lane1"),
-        "norma must square lane1 for vector<f32,3>\n{dump}"
+        "norm must square lane1 for vector<f32,3>\n{dump}"
     );
     assert!(
         dump.contains("_0.lane2 * _0.lane2"),
-        "norma must square lane2 for vector<f32,3>\n{dump}"
+        "norm must square lane2 for vector<f32,3>\n{dump}"
     );
 }
 

@@ -1249,7 +1249,7 @@ pub enum MirVectorOp {
     Select,
     Dot,
     Cross,
-    /// Euclidean norm `sqrt(dot(v, v))` (`norma`), in the element type.
+    /// Euclidean norm `sqrt(dot(v, v))` (`norm`), in the element type.
     Norm,
     /// Lane count (`longitudo`): the element count of the vector, an
     /// integer constant once the width is literal (operator ruling

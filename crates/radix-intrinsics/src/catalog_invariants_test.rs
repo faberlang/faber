@@ -842,8 +842,8 @@ fn synthetic_duplicates_return_none_and_first_match_keeps_catalog_position() {
 
 /// Operator ruling 2026-10-15, Q-X1: `longitudo` is the element count on every
 /// collection (including vector and matrix); the tensor rank and the
-/// Euclidean norm are the separate `gradus` and `norma` rows, and the vector
-/// norm moved off `longitudo` onto `norma`.
+/// Euclidean norm are the separate `rank` and `norm` rows, and the vector
+/// norm moved off `longitudo` onto `norm`.
 #[test]
 fn length_is_the_element_count_and_rank_and_norm_are_named_rows() {
     for receiver in [
@@ -860,15 +860,15 @@ fn length_is_the_element_count_and_rank_and_norm_are_named_rows() {
         Some(MirCollectionOp::Length)
     );
 
-    let rank = lookup_method(IntrinsicReceiver::Tensor, "gradus", 0).expect("rank row");
+    let rank = lookup_method(IntrinsicReceiver::Tensor, "rank", 0).expect("rank row");
     assert_eq!(mir_collection_op(rank), Some(MirCollectionOp::TensorRank));
     assert!(matches!(rank.return_kind, IntrinsicReturnKind::Numerus));
 
-    let norm = lookup_method(IntrinsicReceiver::Tensor, "norma", 0).expect("tensor norm row");
+    let norm = lookup_method(IntrinsicReceiver::Tensor, "norm", 0).expect("tensor norm row");
     assert_eq!(mir_collection_op(norm), Some(MirCollectionOp::TensorNorm));
     assert!(matches!(norm.return_kind, IntrinsicReturnKind::Inner));
 
-    let vector_norm = lookup_method(IntrinsicReceiver::Vector, "norma", 0).expect("vector norm");
+    let vector_norm = lookup_method(IntrinsicReceiver::Vector, "norm", 0).expect("vector norm");
     assert!(matches!(
         vector_norm.return_kind,
         IntrinsicReturnKind::Inner

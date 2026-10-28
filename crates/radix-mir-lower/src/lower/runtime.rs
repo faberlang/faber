@@ -1816,7 +1816,7 @@ impl FunctionBuilder<'_> {
         let (op, peer_args): (MirVectorOp, &[HirCallArg]) = match method {
             VectorMethodKind::Crea
             | VectorMethodKind::Longitudo
-            | VectorMethodKind::Norma
+            | VectorMethodKind::Norm
             | VectorMethodKind::Normalizata => {
                 if !args.is_empty() {
                     return None;
@@ -1824,7 +1824,7 @@ impl FunctionBuilder<'_> {
                 let op = match method {
                     VectorMethodKind::Crea => MirVectorOp::Crea,
                     VectorMethodKind::Longitudo => MirVectorOp::Count,
-                    VectorMethodKind::Norma => MirVectorOp::Norm,
+                    VectorMethodKind::Norm => MirVectorOp::Norm,
                     _ => MirVectorOp::Normalized,
                 };
                 (op, &[])
@@ -6453,7 +6453,7 @@ enum VectorMethodKind {
     Cross,
     Swizzle,
     Longitudo,
-    Norma,
+    Norm,
     Normalizata,
     Crea,
     Elementwise(MirLaneOp),
@@ -6465,7 +6465,7 @@ fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
         "transversum" => Some(VectorMethodKind::Cross),
         "swizzle" => Some(VectorMethodKind::Swizzle),
         "longitudo" => Some(VectorMethodKind::Longitudo),
-        "norma" => Some(VectorMethodKind::Norma),
+        "norm" => Some(VectorMethodKind::Norm),
         "normalizata" => Some(VectorMethodKind::Normalizata),
         "crea" => Some(VectorMethodKind::Crea),
         "addita" => Some(VectorMethodKind::Elementwise(MirLaneOp::Add)),

@@ -85,6 +85,9 @@ const KEPT_IDENTITY: &[&str] = &[
     "silu",
     "formata",
     "swizzle",
+    // Math built-ins keep the industry name (operator ruling 2026-10-27).
+    "rank",
+    "norm",
 ];
 
 /// Every installed non-la reader pack owns a row for every registry canonical,

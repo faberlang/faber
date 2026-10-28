@@ -835,10 +835,10 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // tensor
     // Q-X1 (operator ruling 2026-10-15): `longitudo` is the element count on
     // every collection; the number of extents and the Euclidean norm are the
-    // named methods `gradus` (rank) and `norma` (norm).
+    // named methods `rank` and `norm`.
     intrinsic!(Tensor, "longitudo", 0, &[], Numerus, collection Length),
-    intrinsic!(Tensor, "gradus", 0, &[], Numerus, collection TensorRank),
-    intrinsic!(Tensor, "norma", 0, &[], Inner, collection TensorNorm),
+    intrinsic!(Tensor, "rank", 0, &[], Numerus, collection TensorRank),
+    intrinsic!(Tensor, "norm", 0, &[], Inner, collection TensorNorm),
     intrinsic!(Tensor, "magnitudines", 0, &[], ArrayInner, collection TensorShape),
     intrinsic!(
         Tensor,
@@ -1374,9 +1374,9 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    // Q-X1: `longitudo` is the lane count; the Euclidean norm is `norma`.
+    // Q-X1: `longitudo` is the lane count; the Euclidean norm is `norm`.
     intrinsic!(Vector, "longitudo", 0, &[], Numerus, CodegenOnly),
-    intrinsic!(Vector, "norma", 0, &[], Inner, CodegenOnly),
+    intrinsic!(Vector, "norm", 0, &[], Inner, CodegenOnly),
     intrinsic!(Vector, "normalizata", 0, &[], SameAsReceiver, CodegenOnly),
     intrinsic!(
         Vector,

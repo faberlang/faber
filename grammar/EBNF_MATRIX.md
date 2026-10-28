@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 513 | 517 | 99% |
-| go | 466 | 517 | 90% |
-| ts | 517 | 517 | 100% |
-| faber | 517 | 517 | 100% |
+| rust | 521 | 525 | 99% |
+| go | 470 | 525 | 90% |
+| ts | 525 | 525 | 100% |
+| faber | 525 | 525 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 448 | 520 | 86% |
-| wasm-text | 382 | 520 | 73% |
-| wasm | 381 | 520 | 73% |
-| metal-text | 5 | 520 | 1% |
-| wgsl-text | 5 | 520 | 1% |
-| sexp-struct | 468 | 520 | 90% |
-| sexp | 465 | 520 | 89% |
-| runner | 459 | 520 | 88% |
+| llvm-text | 450 | 528 | 85% |
+| wasm-text | 384 | 528 | 73% |
+| wasm | 383 | 528 | 73% |
+| metal-text | 5 | 528 | 1% |
+| wgsl-text | 5 | 528 | 1% |
+| sexp-struct | 471 | 528 | 89% |
+| sexp | 468 | 528 | 89% |
+| runner | 466 | 528 | 88% |
 
 ## Keywords — application lane
 
@@ -195,13 +195,16 @@ pages of the documentation site.
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="modulus-u8"></a>`modulus<u8>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="non-est"></a>`non est` | ✓ | ✓ | ✓ | ✓ |
+| <a id="saturating-w-lo-hi"></a>`saturating<W, lo‥hi>` | ✓ | ✓ | ✓ | ✓ |
+| <a id="trapping-w-lo-hi"></a>`trapping<W, lo‥hi>` | ✓ | ✓ | ✓ | ✓ |
 | <a id="vel"></a>`vel` | ✓ | ✓ | ✓ | ✓ |
+| <a id="wrapping-w-lo-hi"></a>`wrapping<W, lo‥hi>` | ✓ | ✕ | ✓ | ✓ |
 | <a id=""></a>`§` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`¬` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`·` | ✓ | ✕ | ✓ | ✓ |
 | <a id=""></a>`×` | ✓ | ○ | ✓ | ✓ |
-| <a id=""></a>`‥` | ✓ | ✓ | ✓ | ✓ |
-| <a id=""></a>`…` | ✓ | ✓ | ✓ | ✓ |
+| <a id=""></a>`‥` | ✓ | ◐ | ✓ | ✓ |
+| <a id=""></a>`…` | ✓ | ✕ | ✓ | ✓ |
 | <a id=""></a>`←` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`→` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`↤` | ✓ | ✓ | ✓ | ✓ |
@@ -372,12 +375,15 @@ pages of the documentation site.
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="modulus-u8"></a>`modulus<u8>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="non-est"></a>`non est` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="saturating-w-lo-hi"></a>`saturating<W, lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
+| <a id="trapping-w-lo-hi"></a>`trapping<W, lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ◐ |
 | <a id="vel"></a>`vel` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="wrapping-w-lo-hi"></a>`wrapping<W, lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
 | <a id=""></a>`§` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`¬` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`·` | ◐ | ✕ | ✕ | ○ | ○ | ✓ | ✓ | ✓ |
 | <a id=""></a>`×` | ✓ | ○ | ○ | ○ | ○ | ✓ | ✓ | ✓ |
-| <a id=""></a>`‥` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`‥` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`…` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`←` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`→` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
