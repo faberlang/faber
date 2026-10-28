@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "package_go_codegen_failed",
-      "reason": "The Go package emitter fails this package's compilation with `package_go_codegen_failed` before any Go source is produced. Re-measure this row when the Go package emitter lowers the surface this proof imports."
+      "diagnostic_contains": "go_failable_call_order_unsupported",
+      "reason": "A carried Norma module (`toml/serialize`) calls a failable function after an expression with effects in the same statement, which the hoister refuses to reorder (`go_failable_call_order_unsupported`); the emitter unit is open."
     },
     "ts": {
       "outcome": "known-fail",

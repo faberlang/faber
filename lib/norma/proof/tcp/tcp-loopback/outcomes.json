@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "leaf_unsupported_on_target",
-      "reason": "The Go lane carries no `caelum:*` tcp port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
+      "diagnostic_contains": "direct failable Go call requires",
+      "reason": "The Go emitter reaches a failable call in a position that is neither a failable function body nor a fac/cape handler (a carried Norma module such as `time`, `http/server` or `net/connection`), so it fails closed at compile time; hoisting that call shape is a separate emitter unit."
     },
     "ts": {
       "outcome": "known-fail",

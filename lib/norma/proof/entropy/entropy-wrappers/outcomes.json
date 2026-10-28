@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: random",
-      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:random` module this proof imports, so the generated `main.go` calls `random.*` with no such package-level identifier and `go build` stops with `undefined: random`. Re-measure this row when the Go package emitter lowers that module binding."
+      "diagnostic_contains": "func() {…}() (no value) used as value",
+      "reason": "The Go emitter writes a void closure where a value is expected inside a carried Norma `random` function (`func() {...}() (no value) used as value`); the emitter unit is open."
     },
     "ts": {
       "outcome": "known-fail",

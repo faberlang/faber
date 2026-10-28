@@ -133,7 +133,7 @@ pub(crate) fn take_upgrade(
 }
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "http:agent",
     "http:get",
     "http:delete",

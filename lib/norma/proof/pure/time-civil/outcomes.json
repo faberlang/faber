@@ -9,8 +9,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "assignment mismatch: 1 variable but time.Parse returns 2 values",
-      "reason": "The Go package emitter binds `norma:time` calls to the Go `time` package instead of emitting Norma time-leaf helpers: `time.Parse` is called with one argument although it takes two, and `time.Render`, `time.Year`, `time.Day` and `time.Construct` do not exist, so `go build` stops at the first mismatch. Re-measure this row when the Go time bindings are emitted."
+      "diagnostic_contains": "direct failable Go call requires",
+      "reason": "The Go emitter reaches a failable call in a position that is neither a failable function body nor a fac/cape handler (a carried Norma module such as `time`, `http/server` or `net/connection`), so it fails closed at compile time; hoisting that call shape is a separate emitter unit."
     },
     "ts": {
       "outcome": "known-fail",

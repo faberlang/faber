@@ -706,6 +706,9 @@ pub enum RunTarget {
     /// Build the package as a Node project and run it with `node`.
     #[value(name = "ts")]
     Ts,
+    /// Build the package as a Go module and run the built program.
+    #[value(name = "go")]
+    Go,
 }
 
 /// Arguments for `faber run`.

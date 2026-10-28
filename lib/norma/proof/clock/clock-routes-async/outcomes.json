@@ -9,8 +9,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: time",
-      "reason": "The Go lane does not yet provide the Norma time leaf binding used by these async clock routes."
+      "diagnostic_contains": "direct failable Go call requires",
+      "reason": "The Go emitter reaches a failable call in a position that is neither a failable function body nor a fac/cape handler (a carried Norma module such as `time`, `http/server` or `net/connection`), so it fails closed at compile time; hoisting that call shape is a separate emitter unit."
     },
     "ts": {
       "outcome": "known-fail",

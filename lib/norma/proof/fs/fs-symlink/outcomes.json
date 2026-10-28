@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "leaf_unsupported_on_target",
-      "reason": "The Go lane carries no `solum:*` fs port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
+      "diagnostic_contains": "cannot use v (variable of type string) as <-chan string value in retur",
+      "reason": "The Go emitter types an async (`@ future`) function whose result is void or a plain value as a receive channel, so the generated Go does not compile (`missing channel element type` or a value returned as `<-chan T`); async function results on Go are a separate emitter unit."
     },
     "ts": {
       "outcome": "known-fail",
