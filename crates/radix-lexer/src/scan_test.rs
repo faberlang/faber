@@ -1812,7 +1812,7 @@ fn unterminated_ascii_literal_at_eof_recovers() {
             .any(|err| err.kind == LexErrorKind::UnterminatedString)
     );
     // Must produce at least an EOF token without panicking.
-    assert!(!result.tokens.is_empty());
+    assert_ne!(result.tokens, [] as [crate::Token; 0]);
     assert_eq!(result.tokens.last().unwrap().kind, TokenKind::Eof);
     // The unterminated ascii payload should be recovered.
     let TokenKind::AsciiString(sym) = result.tokens[0].kind else {
@@ -1834,7 +1834,7 @@ fn unterminated_backtick_literal_at_eof_recovers() {
             .any(|err| err.kind == LexErrorKind::UnterminatedString)
     );
     // Must produce at least an EOF token without panicking.
-    assert!(!result.tokens.is_empty());
+    assert_ne!(result.tokens, [] as [crate::Token; 0]);
     assert_eq!(result.tokens.last().unwrap().kind, TokenKind::Eof);
     // The unterminated backtick payload should be recovered.
     let TokenKind::BacktickString(sym) = result.tokens[0].kind else {
@@ -1856,7 +1856,7 @@ fn unterminated_guillemet_literal_at_eof_recovers() {
             .any(|err| err.kind == LexErrorKind::UnterminatedString)
     );
     // Must produce at least an EOF token without panicking.
-    assert!(!result.tokens.is_empty());
+    assert_ne!(result.tokens, [] as [crate::Token; 0]);
     assert_eq!(result.tokens.last().unwrap().kind, TokenKind::Eof);
     // The unterminated guillemet payload should be recovered.
     let TokenKind::String(sym) = result.tokens[0].kind else {
@@ -2904,7 +2904,7 @@ fn unknown_escape_backtick_emits_lex003() {
 
 #[test]
 fn unknown_escape_guillemet_own_delimiter_is_valid() {
-    let result = lex(r#"«a\»b»"#);
+    let result = lex(r"«a\»b»");
     assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
     assert_eq!(decode_textus_literal(first_string_payload(&result)), "a»b");
 }
