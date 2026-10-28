@@ -697,17 +697,20 @@ pub(super) fn merge_seeded_target_report(
     conservative: &KernelTargetRequirement,
     seeded: &[KernelTargetRequirement],
 ) -> KernelTargetRequirement {
-    let Some(first) = seeded.first() else {
+    if seeded.is_empty() {
         return conservative.clone();
-    };
+    }
     let failures = dedupe(
-        first
-            .failures
+        seeded
             .iter()
+            .flat_map(|report| report.failures.iter())
             .filter(|failure| {
-                seeded
-                    .iter()
-                    .all(|report| report.failures.contains(failure))
+                seeded.iter().all(|report| {
+                    report
+                        .failures
+                        .iter()
+                        .any(|candidate| same_seeded_failure(failure, candidate))
+                })
             })
             .cloned()
             .collect(),
@@ -745,6 +748,23 @@ pub(super) fn merge_seeded_target_report(
                 .collect(),
         ),
         failures,
+    }
+}
+
+/// Whether two seeded failures describe the same blocker. Range payloads can
+/// differ between constant call-site specializations, but the blocker remains
+/// real when every specialization exceeds the envelope at the same operation.
+fn same_seeded_failure(lhs: &KernelRequirementFailure, rhs: &KernelRequirementFailure) -> bool {
+    match (lhs, rhs) {
+        (
+            KernelRequirementFailure::IntermediateOutOfRange { span: lhs, .. },
+            KernelRequirementFailure::IntermediateOutOfRange { span: rhs, .. },
+        )
+        | (
+            KernelRequirementFailure::StoreOutOfRange { span: lhs, .. },
+            KernelRequirementFailure::StoreOutOfRange { span: rhs, .. },
+        ) => lhs == rhs,
+        _ => lhs == rhs,
     }
 }
 
