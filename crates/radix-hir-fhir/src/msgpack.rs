@@ -65,6 +65,17 @@ use std::collections::BTreeMap;
 /// artifacts nest far below this.
 const MAX_DEPTH: usize = 1024;
 
+/// `MessagePack` extension type id of a signed 128-bit integer.
+///
+/// `MessagePack` integers stop at 64 bits, so a Rust `i128` rides the one
+/// project-owned application extension (type ids 0..=127 are application
+/// owned): `fixext 16` (marker `0xd8`), this type id, then the value as 16
+/// bytes of big-endian two's complement. Every `i128` field is written this
+/// way, whatever its magnitude, so the wire form is a function of the Rust
+/// type alone (spec §1.6) and a value never reads back as a narrower `int`.
+/// Any other extension type fails closed.
+const I128_EXT_TYPE: u8 = 1;
+
 // ---------------------------------------------------------------------------
 // Error type
 // ---------------------------------------------------------------------------
@@ -176,6 +187,8 @@ enum Value {
     Bool(bool),
     Uint(u64),
     Int(i64),
+    /// The project `i128` extension ([`I128_EXT_TYPE`]); never a plain `int`.
+    Int128(i128),
     F32(f32),
     F64(f64),
     Str(String),
@@ -241,6 +254,13 @@ fn write_int(out: &mut Vec<u8>, n: i64) {
         out.push(0xd3);
         out.extend_from_slice(&n.to_be_bytes());
     }
+}
+
+/// Signed 128-bit integer as the [`I128_EXT_TYPE`] `fixext 16` value.
+fn write_i128(out: &mut Vec<u8>, n: i128) {
+    out.push(0xd8);
+    out.push(I128_EXT_TYPE);
+    out.extend_from_slice(&n.to_be_bytes());
 }
 
 fn write_f32(out: &mut Vec<u8>, n: f32) {
@@ -338,6 +358,7 @@ fn write_value(out: &mut Vec<u8>, value: &Value) -> Result<(), MsgpackError> {
         Value::Bool(b) => out.push(if *b { 0xc3 } else { 0xc2 }),
         Value::Uint(n) => write_uint(out, *n),
         Value::Int(n) => write_int(out, *n),
+        Value::Int128(n) => write_i128(out, *n),
         Value::F32(n) => write_f32(out, *n),
         Value::F64(n) => write_f64(out, *n),
         Value::Str(s) => write_str(out, s)?,
@@ -428,6 +449,17 @@ fn read_value(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Value, Msgp
             bytes, pos,
         )?)))),
         0xd3 => Ok(Value::Int(i64::from_be_bytes(read_exact::<8>(bytes, pos)?))),
+        0xd8 => {
+            let ext_type = read_u8(bytes, pos)?;
+            if ext_type != I128_EXT_TYPE {
+                return Err(MsgpackError::Decode(format!(
+                    "unsupported msgpack extension type {ext_type}"
+                )));
+            }
+            Ok(Value::Int128(i128::from_be_bytes(read_exact::<16>(
+                bytes, pos,
+            )?)))
+        }
         0xd9..=0xdb => {
             let len = read_len(bytes, pos, marker)?;
             read_str(bytes, pos, len)
@@ -551,6 +583,10 @@ impl<'a> serde::Serializer for Serializer<'a> {
     }
     fn serialize_i64(self, v: i64) -> Result<(), MsgpackError> {
         write_int(&mut *self.out, v);
+        Ok(())
+    }
+    fn serialize_i128(self, v: i128) -> Result<(), MsgpackError> {
+        write_i128(&mut *self.out, v);
         Ok(())
     }
 
@@ -989,6 +1025,7 @@ impl<'de> Deserializer<'de> for Value {
             Value::Bool(b) => visitor.visit_bool(b),
             Value::Uint(n) => visitor.visit_u64(n),
             Value::Int(n) => visitor.visit_i64(n),
+            Value::Int128(n) => visitor.visit_i128(n),
             Value::F32(n) => visitor.visit_f32(n),
             Value::F64(n) => visitor.visit_f64(n),
             Value::Str(s) => visitor.visit_string(s),
@@ -1026,6 +1063,15 @@ impl<'de> Deserializer<'de> for Value {
             Some(n) => visitor.visit_i64(n),
             None => Err(MsgpackError::Decode(format!(
                 "expected an int, found {self:?}"
+            ))),
+        }
+    }
+
+    fn deserialize_i128<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {
+        match self {
+            Value::Int128(n) => visitor.visit_i128(n),
+            other => Err(MsgpackError::Decode(format!(
+                "expected an i128 extension value, found {other:?}"
             ))),
         }
     }

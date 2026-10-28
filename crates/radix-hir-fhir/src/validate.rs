@@ -1151,11 +1151,42 @@ fn validate_type_form(
                 | radix_types::Type::SaturatingWord(_)
                 | radix_types::Type::SizedInstans(_)
                 | radix_types::Type::BoundedTextus { .. }
-                | radix_types::Type::BoundedAscii { .. }
-                | radix_types::Type::BoundedOcteti { .. } => {
+                | radix_types::Type::BoundedAscii { .. } => {
                     if level.0 != 0 || !form.args.is_empty() {
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
                     }
+                }
+                radix_types::Type::BoundedOcteti { .. } => {
+                    // The authored `list<b8, N>`: the bounded byte buffer is
+                    // authored as a list head over one raw-byte (`b8`) element
+                    // argument; the capacity lives in the root witness, as for
+                    // every bounded list.
+                    if level.0 != 0 || form.args.len() != 1 {
+                        return Err(type_presentation_issue("bounded_octeti_shape", site));
+                    }
+                    let radix_hir::HirTypeFormArg::Type(child) = &form.args[0] else {
+                        return Err(type_presentation_issue("type_argument_kind", site));
+                    };
+                    if !matches!(
+                        types.types().get(child.ty.0 as usize),
+                        Some(radix_types::Type::Bits(radix_types::BitsWidth::B8))
+                    ) {
+                        return Err(type_presentation_issue("bounded_octeti_element", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        child.ty,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        alias_params,
+                        conversation,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
                 }
                 radix_types::Type::Array(element) => {
                     // `octeti` is authored as the zero-argument primitive word
