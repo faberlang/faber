@@ -772,17 +772,26 @@ fn check_registered_intrinsic(
         // and `textus` is a failable call: an out-of-range index or a
         // missing key is reported on `⇥ textus`, so the call needs a
         // handler, a `⊥` default or an enclosing `⇥` (D17.8).
+        //
+        // need (slice 5): a list/text `at` or `slice` whose range is
+        // proven (`0 ≤ i < len`; `0 ≤ start ≤ end ≤ len`) cannot fail and
+        // needs none of those. A `⊥` default or `cape` already written on it
+        // stays legal (the proof is the checker's strength, not the
+        // program's), so a local handler still takes the error type.
         let value_ty = checker.check_known_method_args(args, params, ret, span);
-        let err = checker.textus_type();
-        let sig = FuncSig {
-            type_params: Vec::new(),
-            params: Vec::new(),
-            ret: value_ty,
-            err: Some(err),
-            is_async: false,
-            is_generator: false,
-        };
-        checker.reject_failable_call(&sig, span);
+        if !checker.list_text_access_proven(entry, receiver, args) || checker.has_local_error_sink()
+        {
+            let err = checker.textus_type();
+            let sig = FuncSig {
+                type_params: Vec::new(),
+                params: Vec::new(),
+                ret: value_ty,
+                err: Some(err),
+                is_async: false,
+                is_generator: false,
+            };
+            checker.reject_failable_call(&sig, span);
+        }
         value_ty
     } else if bounded_appende {
         // D6: bounded `appende` is a typed recoverable alternate exit.

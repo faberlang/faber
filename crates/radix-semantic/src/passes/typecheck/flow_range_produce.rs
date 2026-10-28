@@ -1,8 +1,9 @@
 //! Producers of integer interval facts (need, slice 3).
 //!
 //! The engine in `flow_range.rs` holds, joins and kills interval facts; this
-//! module decides what the checker may put in it. Nothing here removes a check
-//! or changes a handler requirement: the facts have no consumer yet.
+//! module decides what the checker may put in it. The one consumer so far is
+//! `flow_range_access.rs` (a proven list/text `at`/`slice` needs no handler);
+//! nothing here removes a runtime check.
 //!
 //! WHERE FACTS COME FROM
 //! =====================
@@ -30,9 +31,9 @@
 //! `value_range` (declared types, ranged cells, constants) with symbolic
 //! knowledge: a binding's flow fact, an immutable binding's own value, the live
 //! length of a list/text, a size parameter's extent, `⤒`/`⤓`, `% e` for a
-//! divisor proven positive, and `e - c`. Each side holds one endpoint: a lower
-//! endpoint prefers an absolute floor (consumers need `0 ≤ i`), an upper one
-//! prefers a relation (consumers need `i < len`).
+//! divisor proven positive, and `e ± c` for a literal `c`. Each side holds one
+//! endpoint: a lower endpoint prefers an absolute floor (consumers need
+//! `0 ≤ i`), an upper one prefers a relation (consumers need `i < len`).
 //!
 //! `FactKey::Field` joins are not built, so no field-path range fact is made.
 
@@ -85,11 +86,11 @@ fn pick_upper(candidates: impl IntoIterator<Item = Endpoint>) -> Option<Endpoint
         })
 }
 
-fn lo_const(range: &IntRange) -> Option<i128> {
+pub(super) fn lo_const(range: &IntRange) -> Option<i128> {
     range.lo.as_ref().and_then(const_of)
 }
 
-fn hi_const(range: &IntRange) -> Option<i128> {
+pub(super) fn hi_const(range: &IntRange) -> Option<i128> {
     range.hi.as_ref().and_then(const_of)
 }
 
@@ -129,7 +130,7 @@ impl TypeChecker<'_> {
     }
 
     /// The named binding a list/text expression stands for, if it is one.
-    fn length_source(&self, expr: &HirExpression) -> Option<DefId> {
+    pub(super) fn length_source(&self, expr: &HirExpression) -> Option<DefId> {
         let HirExpressionKind::Path(def_id) = &expr.kind else {
             return None;
         };
@@ -275,6 +276,37 @@ impl TypeChecker<'_> {
                 IntRange {
                     lo: Some(Endpoint::new(BoundKey::Const(0), false)),
                     hi: lower_through(true, &divisor.hi),
+                }
+            }
+            HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {
+                // `e + c` for a literal `c` (either side): the literal shifts
+                // every literal endpoint. A relation keeps its key only where
+                // integer order proves it: `e < K` gives `e + 1 ≤ K`, and a
+                // non-positive `c` only lowers the value. A variable addend
+                // has no fact (`column + shift` stays unproven).
+                let (operand, shift) = match (
+                    super::integer_range::const_int_value(rhs),
+                    super::integer_range::const_int_value(lhs),
+                ) {
+                    (Some(shift), _) => (lhs, shift),
+                    (None, Some(shift)) => (rhs, shift),
+                    (None, None) => return IntRange::default(),
+                };
+                let operand = self.range_of_expr(operand);
+                let shifted = |endpoint: &Option<Endpoint>| {
+                    endpoint.as_ref().and_then(|endpoint| {
+                        let value = const_of(endpoint)?.checked_add(shift)?;
+                        Some(Endpoint::new(BoundKey::Const(value), endpoint.strict))
+                    })
+                };
+                let relation = operand.hi.as_ref().and_then(|hi| match shift {
+                    ..=0 => Some(hi.clone()),
+                    1 if hi.strict => Some(Endpoint::new(hi.key.clone(), false)),
+                    _ => None,
+                });
+                IntRange {
+                    lo: shifted(&operand.lo),
+                    hi: shifted(&operand.hi).or(relation),
                 }
             }
             HirExpressionKind::Binary(HirBinOp::Sub, lhs, rhs) => {
