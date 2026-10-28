@@ -262,10 +262,10 @@ fn exempla_corpus_preserves_parity() {
 
 /// Drop the leading `+++ … +++` TOML frontmatter block from a corpus entry.
 fn strip_frontmatter(raw: &str) -> String {
-    if let Some(rest) = raw.strip_prefix("+++") {
-        if let Some(end) = rest.find("+++") {
-            return rest[end + 3..].to_string();
-        }
+    if let Some(rest) = raw.strip_prefix("+++")
+        && let Some(end) = rest.find("+++")
+    {
+        return rest[end + 3..].to_string();
     }
     raw.to_string()
 }

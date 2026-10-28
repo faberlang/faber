@@ -26,7 +26,10 @@ fn program(fns: &str, main: &str) -> String {
 fn assert_accepts(source: &str) {
     let result = analyze_en(source);
     assert!(
-        !result.diagnostics.iter().any(|d| d.is_error()),
+        !result
+            .diagnostics
+            .iter()
+            .any(super::super::error::SemanticError::is_error),
         "expected no error, got: {:?}",
         result.diagnostics
     );

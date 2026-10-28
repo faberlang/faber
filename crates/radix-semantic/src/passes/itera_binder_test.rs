@@ -569,24 +569,21 @@ struct ProductWalkTrace<'a> {
 
 impl HirVisitor for ProductWalkTrace<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Intervallum { start, .. } = &expr.kind {
-            if let HirExpressionKind::Literal(HirLiteral::Int(value)) = &start.kind {
-                self.events.push(match *value {
-                    0 => "range:0",
-                    1 => "range:1",
-                    2 => "range:2",
-                    _ => "range:?",
-                });
-            }
+        if let HirExpressionKind::Intervallum { start, .. } = &expr.kind
+            && let HirExpressionKind::Literal(HirLiteral::Int(value)) = &start.kind
+        {
+            self.events.push(match *value {
+                0 => "range:0",
+                1 => "range:1",
+                2 => "range:2",
+                _ => "range:?",
+            });
         }
         walk_expr(self, expr);
     }
 
     fn visit_def(&mut self, _def_id: radix_hir::DefId, name: radix_lexer::Symbol) {
-        let spelling = self
-            .interner
-            .map(|interner| interner.resolve(name))
-            .unwrap_or("?");
+        let spelling = self.interner.map_or("?", |interner| interner.resolve(name));
         self.events.push(match spelling {
             "i" => "def:i",
             "j" => "def:j",

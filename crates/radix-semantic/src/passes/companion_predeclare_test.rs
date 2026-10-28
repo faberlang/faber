@@ -1,7 +1,7 @@
 //! Coverage for backward-companion name predeclaration.
 //!
 //! These tests prove that `@ radix backward` annotations register companion
-//! DefIds in the resolver (using the 0x8000_0000 high-bit scheme) and that
+//! `DefIds` in the resolver (using the `0x8000_0000` high-bit scheme) and that
 //! only `"air"`-lane backward names are pre-registered.
 
 use crate::{PassConfig, SemanticError, SemanticErrorKind};

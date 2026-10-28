@@ -26,7 +26,7 @@ fn rejected(source: &str, reason: &str) {
         errors.iter().any(|d| d
             .args
             .iter()
-            .any(|arg| arg.name == "reason" && arg.value.to_string() == reason)),
+            .any(|arg| arg.name == "reason" && arg.value.clone() == reason)),
         "missing reason {reason}: {errors:?}"
     );
 }

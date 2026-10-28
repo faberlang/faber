@@ -414,7 +414,7 @@ incipit {
     sit f32 consumed ← consume(gx, gw)
     nota consumed
 }"#;
-    let result = analyze_result(&source);
+    let result = analyze_result(source);
     let errors = &result.diagnostics;
     assert!(
         result.is_ok(),
@@ -439,7 +439,7 @@ incipit {
 }
 
 /// Row (f): explicit type args at the wrong arity still reject with
-/// wrong_number_of_type_arguments — now counted against the real propagated
+/// `wrong_number_of_type_arguments` — now counted against the real propagated
 /// companion type-param list (2), per CTP-1.
 #[test]
 fn generic_companion_wrong_arity_type_args_still_rejected() {
