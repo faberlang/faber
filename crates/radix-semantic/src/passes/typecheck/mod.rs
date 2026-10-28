@@ -122,6 +122,12 @@ mod field_modifier_write_test;
 #[cfg(test)]
 #[path = "fieldless_type_access_test.rs"]
 mod fieldless_type_access_test;
+mod flow_range;
+#[cfg(test)]
+mod flow_range_probe;
+#[cfg(test)]
+#[path = "flow_range_test.rs"]
+mod flow_range_test;
 #[cfg(test)]
 #[path = "loop_shape_test.rs"]
 mod loop_shape_test;
@@ -762,6 +768,11 @@ pub(crate) struct TypeChecker<'a> {
     /// implicit fallthrough never carry them.
     pub(crate) field_facts: FxHashMap<(DefId, Vec<Symbol>), TypeId>,
 
+    /// Integer interval facts in force at the current point, with the mutation
+    /// versions of the sources their bounds name. Snapshotted,
+    /// restored and joined with the type facts at every branch edge.
+    range_flow: flow_range::RangeFlow,
+
     /// Conversation types of the `@ ad` routes this module can see, keyed
     /// by route (D6.11). Routes absent here type as bare `sermo`.
     pub ad_routes: FxHashMap<Symbol, sermo_route::AdRouteTypes>,
@@ -1007,6 +1018,7 @@ impl<'a> TypeChecker<'a> {
             assert_refinements: Vec::new(),
             flow_bases: FxHashMap::default(),
             field_facts: FxHashMap::default(),
+            range_flow: flow_range::RangeFlow::default(),
             ad_routes: FxHashMap::default(),
             current_member_owner: None,
             cross_package_structs: FxHashSet::default(),

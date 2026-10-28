@@ -825,6 +825,9 @@ impl TypeChecker<'_> {
                 let ty = self.check_call(callee, type_args, args, expected);
                 self.current_shape_call = previous_shape_call;
                 *conversion = self.pending_conversion.take();
+                // A call may write any mutable source it can reach (need
+                // 5d3a8afd, closed rule): arguments were evaluated first.
+                self.kill_mutable_source_ranges();
                 ty
             }
             HirExpressionKind::Gradient { .. } => {
@@ -838,10 +841,14 @@ impl TypeChecker<'_> {
                 self.error_type
             }
             HirExpressionKind::CopyInto { target, value } => {
-                self.check_copy_into(target, value, expr.span)
+                let ty = self.check_copy_into(target, value, expr.span);
+                self.kill_mutable_source_ranges();
+                ty
             }
             HirExpressionKind::SinkInto { sink, item } => {
-                self.check_sink_into(sink, item, expr.span)
+                let ty = self.check_sink_into(sink, item, expr.span);
+                self.kill_mutable_source_ranges();
+                ty
             }
             HirExpressionKind::Format { value, spec } => {
                 super::format::check_format_expr(self, value, *spec, expr.span)
@@ -852,6 +859,9 @@ impl TypeChecker<'_> {
                 self.current_shape_call = previous_shape_call;
                 *conversion = self.pending_conversion.take();
                 self.record_inferred_sermo_view_type_arg(receiver, *name, type_args, ty);
+                // Mutating intrinsic, closure call or ordinary method: all
+                // kill (need, closed rule).
+                self.kill_mutable_source_ranges();
                 ty
             }
             HirExpressionKind::Field(object, name) => self.check_field(object, *name),
