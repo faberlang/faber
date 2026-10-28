@@ -657,8 +657,11 @@ fn greet() args args {
 "#;
     let diagnostics = run_cli_package("cli-subcommand-exit", &[("main.fab", main)], &[])
         .expect_err("an exit expression cannot be dispatched with commands");
-    assert_eq!(surfaces(&diagnostics), ["CLI exit expressions"],
-        "{diagnostics:?}");
+    assert_eq!(
+        surfaces(&diagnostics),
+        ["CLI exit expressions"],
+        "{diagnostics:?}"
+    );
 }
 
 // ── fmir-text runtime planning ─────────────────────────────────────────────
@@ -695,7 +698,9 @@ main args args {}
 "#,
         CliPlanningMode::FmirTextRuntime,
     )
-    .unwrap_or_else(|diagnostics| panic!("must plan, got {:?}", diagnostic_identities(&diagnostics)));
+    .unwrap_or_else(|diagnostics| {
+        panic!("must plan, got {:?}", diagnostic_identities(&diagnostics))
+    });
     let section = plan.fmir_text_cli.expect("the image carries a CLI section");
     assert_eq!(section.root.record, "args");
     let operands: Vec<_> = section
@@ -723,7 +728,9 @@ fn fmir_text_runtime_plans_an_entry_without_operands_to_an_empty_operand_list() 
         "@ cli \"tool\"\nmain args args {}\n",
         CliPlanningMode::FmirTextRuntime,
     )
-    .unwrap_or_else(|diagnostics| panic!("must plan, got {:?}", diagnostic_identities(&diagnostics)));
+    .unwrap_or_else(|diagnostics| {
+        panic!("must plan, got {:?}", diagnostic_identities(&diagnostics))
+    });
     let section = plan.fmir_text_cli.expect("the image carries a CLI section");
     assert_eq!(section.root.record, "args");
     assert!(section.root.operand.is_empty());
@@ -768,7 +775,10 @@ fn greet() args args {}
     )
     .err()
     .expect("subcommand dispatch is outside the image runtime");
-    assert_eq!(surfaces(&diagnostics), ["fmir-text runtime CLI subcommand dispatch"]);
+    assert_eq!(
+        surfaces(&diagnostics),
+        ["fmir-text runtime CLI subcommand dispatch"]
+    );
 }
 
 // ── type import across tables ──────────────────────────────────────────────
@@ -794,7 +804,13 @@ fn import_semantic_type_preserves_bounded_and_map_shapes() {
     let outputs: Vec<_> = inputs
         .iter()
         .map(|&input| {
-            super::import_semantic_type_with_nominal(&source, &mut target, input, &mut imported, None)
+            super::import_semantic_type_with_nominal(
+                &source,
+                &mut target,
+                input,
+                &mut imported,
+                None,
+            )
         })
         .collect();
 
