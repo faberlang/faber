@@ -591,6 +591,7 @@ impl MirVisitor for ClifCapability<'_> {
             !matches!(
                 projection,
                 MirProjection::Index(_)
+                    | MirProjection::ProvenIndex(_)
                     | MirProjection::Field(_)
                     | MirProjection::VariantField { .. }
                     | MirProjection::ClosureCapture { .. }

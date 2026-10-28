@@ -333,7 +333,9 @@ fn push_operand_list_locals(operands: &[MirOperand], out: &mut Vec<MirLocalId>) 
 fn push_place_index_locals(place: &MirPlace, out: &mut Vec<MirLocalId>) {
     for projection in &place.projections {
         match projection {
-            MirProjection::Index(operand) => push_operand_locals(operand, out),
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
+                push_operand_locals(operand, out)
+            }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
             | MirProjection::ClosureCapture { .. }
@@ -370,7 +372,9 @@ fn push_operand_list_slots(operands: &[MirOperand], out: &mut Vec<MirPlaceBase>)
 fn push_place_index_slots(place: &MirPlace, out: &mut Vec<MirPlaceBase>) {
     for projection in &place.projections {
         match projection {
-            MirProjection::Index(operand) => push_operand_slots(operand, out),
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
+                push_operand_slots(operand, out)
+            }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
             | MirProjection::ClosureCapture { .. }
@@ -727,7 +731,9 @@ fn operand_list_reads_temp(operands: &[MirOperand], temp: MirTempId) -> bool {
 /// live operand. Nested places recurse through [`operand_reads_temp`].
 fn place_index_reads_temp(place: &MirPlace, temp: MirTempId) -> bool {
     place.projections.iter().any(|projection| match projection {
-        MirProjection::Index(operand) => operand_reads_temp(operand, temp),
+        MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
+            operand_reads_temp(operand, temp)
+        }
         MirProjection::Field(_)
         | MirProjection::VariantField { .. }
         | MirProjection::ClosureCapture { .. }

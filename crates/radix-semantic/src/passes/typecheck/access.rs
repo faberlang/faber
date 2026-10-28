@@ -43,6 +43,12 @@ impl TypeChecker<'_> {
     /// immutability but still return their declared type so the right-hand side
     /// can be checked. Field and index lvalues reuse the normal access rules.
     pub fn check_lvalue(&mut self, target: &mut HirExpression) -> TypeId {
+        // An index read inside a target is evaluated at the store, so it
+        // records no proof here (the store proves its own target).
+        self.without_index_proofs(|checker| checker.check_lvalue_place(target))
+    }
+
+    fn check_lvalue_place(&mut self, target: &mut HirExpression) -> TypeId {
         let ty = match &mut target.kind {
             HirExpressionKind::Path(def_id) => {
                 // WHY: write-once enforcement for `fixum` locals lives in the

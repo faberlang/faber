@@ -265,9 +265,20 @@ fn a_body_that_may_write_the_list_drops_its_length_bound_at_entry() {
 }
 
 #[test]
-fn an_immutable_list_keeps_its_length_bound_through_calls_in_the_body() {
+fn an_immutable_list_loses_its_length_bound_through_calls_in_the_body() {
+    // Was `..._keeps_...`: an unmarked parameter may alias a list a call writes.
     let source = int_fn(
         "lista<numerus> s",
+        "    itera ab 0‥s.longitudo() sit i {\n        n ← g(i)\n        n ← i\n    }",
+    );
+    let seen = reads(&source, "i");
+    assert_eq!(upper_key(&seen[1]), None, "{seen:?}");
+}
+
+#[test]
+fn an_immutable_text_keeps_its_length_bound_through_calls_in_the_body() {
+    let source = int_fn(
+        "textus s",
         "    itera ab 0‥s.longitudo() sit i {\n        n ← g(i)\n        n ← i\n    }",
     );
     let seen = reads(&source, "i");

@@ -437,7 +437,7 @@ fn classify_place_read(
     seen: &mut FxHashSet<String>,
 ) {
     for projection in &place.projections {
-        if let MirProjection::Index(index) = projection {
+        if let MirProjection::Index(index) | MirProjection::ProvenIndex(index) = projection {
             classify_operand(index, gaps, seen);
         }
     }

@@ -5956,6 +5956,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let index = self.eval_operand(index, span)?;
                 Self::collection_index(value, &index, span)
             }
+            radix_mir::MirProjection::ProvenIndex(index) => {
+                let index = self.eval_operand(index, span)?;
+                Self::collection_index_proven(value, &index, span)
+            }
             radix_mir::MirProjection::VectorLane(lane) => match value {
                 Value::Vector(lanes) => lanes
                     .borrow()

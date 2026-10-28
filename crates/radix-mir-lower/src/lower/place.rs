@@ -125,7 +125,7 @@ impl FunctionBuilder<'_> {
             return self.lower_vector_bracket_slice(object, index, expr);
         }
         let mut place = self.lower_projectable_place(object)?;
-        let projection = self.lower_index_projection(&place, object.ty, index)?;
+        let projection = self.lower_index_projection(&place, object.ty, index, expr.id)?;
         place.projections.push(projection);
         Some(MirOperand::Place(place))
     }
@@ -218,16 +218,27 @@ impl FunctionBuilder<'_> {
         base: &MirPlace,
         base_ty: Option<TypeId>,
         index: &HirExpression,
+        access: radix_hir::HirId,
     ) -> Option<MirProjection> {
         if base_ty.is_some_and(|ty| self.is_vector_lane_base(ty))
             && let Some(lane) = radix_semantic::passes::const_int_value(index).and_then(|lane| u8::try_from(lane).ok())
         {
             return Some(MirProjection::VectorLane(lane));
         }
+        // The checker's proof for this access (every component against its own
+        // container or axis) rides on the projection; nothing here derives one.
+        let proven = self.context.proven_indexes.contains(&access);
+        let index_projection = |operand| {
+            if proven {
+                MirProjection::ProvenIndex(operand)
+            } else {
+                MirProjection::Index(operand)
+            }
+        };
         if let Some(linear) = self.lower_device_tensor_linear_index(base, base_ty, index) {
-            return Some(MirProjection::Index(linear?));
+            return Some(index_projection(linear?));
         }
-        Some(MirProjection::Index(self.lower_expr_value(index)?))
+        Some(index_projection(self.lower_expr_value(index)?))
     }
 
     /// Under device lowering, an N-element (N >= 1) bracket index list into a rank-N
@@ -700,7 +711,7 @@ impl FunctionBuilder<'_> {
             }
             HirExpressionKind::Index(object, index) => {
                 let mut place = self.lower_projectable_place(object)?;
-                let projection = self.lower_index_projection(&place, object.ty, index)?;
+                let projection = self.lower_index_projection(&place, object.ty, index, expr.id)?;
                 place.projections.push(projection);
                 Some(place)
             }
@@ -775,7 +786,7 @@ impl FunctionBuilder<'_> {
                 Some(MirOperand::Place(place))
             }
             HirNonNullKind::Index(index) => {
-                let projection = self.lower_index_projection(&place, object.ty, index)?;
+                let projection = self.lower_index_projection(&place, object.ty, index, expr.id)?;
                 place.projections.push(projection);
                 Some(MirOperand::Place(place))
             }

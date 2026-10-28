@@ -1405,7 +1405,7 @@ fn is_output_index_place(place: &MirPlace, output: MirLocalId, index: MirLocalId
     place.base == MirPlaceBase::Local(output)
         && matches!(
             place.projections.as_slice(),
-            [MirProjection::Index(MirOperand::Place(index_place))]
+            [MirProjection::Index(MirOperand::Place(index_place)) | MirProjection::ProvenIndex(MirOperand::Place(index_place))]
                 if index_place.base == MirPlaceBase::Local(index) && index_place.projections.is_empty()
         )
 }

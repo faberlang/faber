@@ -1315,9 +1315,34 @@ impl TypeChecker<'_> {
     /// survives: its subject cannot be written. A binding that is not visible
     /// any more counts as mutable, which only over-kills.
     pub(crate) fn kill_mutable_source_ranges(&mut self) {
+        // A list bounding a fact may be the very object a `mut` name writes
+        // (`let xs ← ys`, an unmarked parameter beside a `mut` one, a field or
+        // element read), so every list source is killed, `let` or not. Only the
+        // sources some fact names matter, so the type is read for those.
+        let lists: Vec<DefId> = self
+            .range_flow
+            .live_length_sources()
+            .into_iter()
+            .filter(|source| self.is_list_source(*source))
+            .collect();
         let shadow = &self.binding_shadow;
-        self.range_flow
-            .kill_mutable_sources(|def_id| shadow.get(&def_id).is_none_or(|info| info.mutable));
+        self.range_flow.kill_mutable_sources(
+            |def_id| shadow.get(&def_id).is_none_or(|info| info.mutable),
+            |def_id| lists.contains(&def_id),
+        );
+    }
+
+    /// Whether `def_id` is a list binding (a reference collection) rather than
+    /// a text, whose value is never written in place.
+    fn is_list_source(&self, def_id: DefId) -> bool {
+        let Some(binding) = self.lookup_binding(def_id) else {
+            return true;
+        };
+        let peeled = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(binding.ty))
+            .1;
+        !self.is_text_family(peeled)
     }
 
     /// Loop-entry policy for interval facts: a body that can write a mutable
@@ -1326,9 +1351,16 @@ impl TypeChecker<'_> {
     /// not enter the loop. Bindings the body rebinds directly are dropped by
     /// the existing per-binding policy.
     fn kill_ranges_for_loop_effects(&mut self, block: &HirBlock) {
-        let mut collector = AssignmentTargetCollector::default();
+        let read_only = |receiver: &HirExpression, name: Symbol, arg_count: usize| {
+            self.is_read_only_intrinsic_call(receiver, name, arg_count)
+        };
+        let mut collector = AssignmentTargetCollector {
+            read_only: Some(&read_only),
+            ..Default::default()
+        };
         collector.visit_block(block);
-        if collector.kills_ranges {
+        let kills = collector.kills_ranges;
+        if kills {
             self.kill_mutable_source_ranges();
         }
     }
@@ -1514,7 +1546,7 @@ fn assignment_targets_in_expr(expr: &HirExpression) -> AssignmentTargetCollector
 }
 
 #[derive(Default)]
-struct AssignmentTargetCollector {
+struct AssignmentTargetCollector<'a> {
     /// Bindings re-pointed by a bare-path store.
     targets: FxHashSet<DefId>,
     /// Bindings that root a field-chain store; only their field facts go.
@@ -1523,9 +1555,12 @@ struct AssignmentTargetCollector {
     /// seen: any of them may write a mutable source, so interval facts about
     /// mutable sources are killed.
     kills_ranges: bool,
+    /// Whether a method call is a registry intrinsic that only reads and so
+    /// writes no list. Absent where only assignment targets are wanted.
+    read_only: Option<&'a dyn Fn(&HirExpression, Symbol, usize) -> bool>,
 }
 
-impl HirVisitor for AssignmentTargetCollector {
+impl HirVisitor for AssignmentTargetCollector<'_> {
     fn visit_stmt(&mut self, stmt: &HirStatement) {
         if let HirStatementKind::IncDec(inc_dec) = &stmt.kind {
             self.collect_target(&inc_dec.target);
@@ -1539,8 +1574,15 @@ impl HirVisitor for AssignmentTargetCollector {
             | HirExpressionKind::ConversioAssign { target, .. } => {
                 self.collect_target(target);
             }
+            HirExpressionKind::MethodCall(receiver, name, _, args, _) => {
+                let read_only = self
+                    .read_only
+                    .is_some_and(|is_read_only| is_read_only(receiver, *name, args.len()));
+                if !read_only {
+                    self.kills_ranges = true;
+                }
+            }
             HirExpressionKind::Call(..)
-            | HirExpressionKind::MethodCall(..)
             | HirExpressionKind::CopyInto { .. }
             | HirExpressionKind::SinkInto { .. } => self.kills_ranges = true,
             _ => {}
@@ -1549,7 +1591,7 @@ impl HirVisitor for AssignmentTargetCollector {
     }
 }
 
-impl AssignmentTargetCollector {
+impl AssignmentTargetCollector<'_> {
     fn collect_target(&mut self, target: &HirExpression) {
         // A field-chain store (`p.nomen ← v`, `p.a.b ← v`) has its place
         // rooted at the base binding: only the field facts rooted there go.

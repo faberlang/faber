@@ -1485,6 +1485,7 @@ impl Alpha {
                 .iter()
                 .map(|projection| match projection {
                     MirProjection::Index(operand) => MirProjection::Index(self.operand(operand, ids)),
+                    MirProjection::ProvenIndex(operand) => MirProjection::ProvenIndex(self.operand(operand, ids)),
                     other => other.clone(),
                 })
                 .collect(),

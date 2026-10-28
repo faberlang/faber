@@ -902,6 +902,9 @@ impl TypeChecker<'_> {
             self.reinstate_flow_fact(def_id, info);
         }
         let value_ty = self.check_store_expr(value, target_ty, site);
+        // The store happens after its right-hand side: prove an indexed target
+        // against the facts that survive it.
+        self.record_store_index_proof(target);
         self.invalidate_assignment_target(target);
         let unresolved_edge_view = self
             .tensor_edge_policies

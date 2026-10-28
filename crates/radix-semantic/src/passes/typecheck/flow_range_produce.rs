@@ -38,9 +38,11 @@
 //! `FactKey::Field` joins are not built, so no field-path range fact is made.
 
 use radix_hir::{HirBinOp, HirCallArg, HirExpression, HirExpressionKind, HirRangeKind};
+use radix_intrinsics::{IntrinsicReceiver, IntrinsicReturnKind};
 
 use super::control::{FactKey, LeafRefinement};
 use super::flow_range::{AxisIdentity, BoundKey, Endpoint, FactValue, IntRange, axis_bound};
+
 use super::*;
 
 /// An absolute bound out at the 64-bit representation limit is that limit, not
@@ -103,7 +105,7 @@ fn lower_through(strict: bool, via: &Option<Endpoint>) -> Option<Endpoint> {
 impl TypeChecker<'_> {
     /// The type an expression's value has. A binding read keeps the binding's
     /// declared type: the node's own type can be the slot it is stored into.
-    fn value_type(&self, expr: &HirExpression) -> Option<TypeId> {
+    pub(super) fn value_type(&self, expr: &HirExpression) -> Option<TypeId> {
         if let HirExpressionKind::Path(def_id) = &expr.kind
             && let Some(binding) = self.lookup_binding(*def_id)
         {
@@ -112,13 +114,13 @@ impl TypeChecker<'_> {
         expr.ty
     }
 
-    fn is_integer_expr(&self, expr: &HirExpression) -> bool {
+    pub(super) fn is_integer_expr(&self, expr: &HirExpression) -> bool {
         self.value_type(expr).is_some_and(|ty| self.is_integer(ty))
     }
 
     /// Whether `ty` is a list or text: the sources whose live length is a
     /// bound.
-    fn has_live_length(&self, ty: TypeId) -> bool {
+    pub(super) fn has_live_length(&self, ty: TypeId) -> bool {
         let peeled = self
             .types
             .peel_access_marker(self.resolve_inferred_type(ty))
@@ -167,6 +169,76 @@ impl TypeChecker<'_> {
         })
     }
 
+    /// The intrinsic receiver families a method receiver belongs to, before or
+    /// after it was checked. A checked expression has its own type; a name has
+    /// its binding's declared type; a call chain of read-only intrinsics (a loop
+    /// body is scanned before it is checked) has the family its return kind
+    /// names. Anything else, a user type included, is unknown.
+    fn builtin_families(&self, expr: &HirExpression) -> Option<Vec<IntrinsicReceiver>> {
+        let typed = expr.ty.or_else(|| match &expr.kind {
+            HirExpressionKind::Path(def_id) => self.lookup_binding(*def_id).map(|b| b.ty),
+            _ => None,
+        });
+        if let Some(ty) = typed {
+            let ty = self.resolve_inferred_type(ty);
+            return Some(radix_intrinsics::receivers_for_type_id(ty, self.types).to_vec());
+        }
+        let HirExpressionKind::MethodCall(receiver, name, _, args, _) = &expr.kind else {
+            return None;
+        };
+        let entry = self.read_only_entry(receiver, *name, args.len())?;
+        match entry.return_kind {
+            IntrinsicReturnKind::SameAsReceiver => self.builtin_families(receiver),
+            IntrinsicReturnKind::ArrayInner => Some(vec![IntrinsicReceiver::Lista]),
+            IntrinsicReturnKind::Textus => Some(vec![IntrinsicReceiver::Textus]),
+            IntrinsicReturnKind::Numerus => Some(vec![IntrinsicReceiver::Numeric]),
+            _ => None,
+        }
+    }
+
+    /// The registry row of a call that only reads: the catalog does not mark it
+    /// as mutating its receiver and it takes no closure (a closure argument runs
+    /// arbitrary code). `None` for an unresolved receiver or an ordinary method.
+    fn read_only_entry(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        arg_count: usize,
+    ) -> Option<&'static radix_intrinsics::MethodIntrinsic> {
+        use radix_intrinsics::IntrinsicParamKind as Param;
+        let interner = self.interner?;
+        let method = interner.resolve(name);
+        let entry = self
+            .builtin_families(receiver)?
+            .into_iter()
+            .find_map(|family| radix_intrinsics::lookup_method(family, method, arg_count))?;
+        let closure_taking = entry.params.iter().any(|param| {
+            matches!(
+                param,
+                Param::Predicate
+                    | Param::Mapper
+                    | Param::Reducer
+                    | Param::Accumulator
+                    | Param::TextusOrReplacer
+            )
+        });
+        (!radix_intrinsics::is_mutating_receiver(entry)
+            && !radix_intrinsics::mir_is_higher_order_lista(entry)
+            && !closure_taking)
+            .then_some(entry)
+    }
+
+    /// A registry intrinsic that only reads cannot write any list, so it ends
+    /// no interval fact (`longitudo`, `apud`, `sectio`, ...).
+    pub(super) fn is_read_only_intrinsic_call(
+        &self,
+        receiver: &HirExpression,
+        name: Symbol,
+        arg_count: usize,
+    ) -> bool {
+        self.read_only_entry(receiver, name, arg_count).is_some()
+    }
+
     /// A `numerus` or sized integer with no `wrapping`/`saturating` policy: a
     /// store into it keeps the value or traps.
     fn is_plain_integer(&self, ty: TypeId) -> bool {
@@ -204,14 +276,13 @@ impl TypeChecker<'_> {
             return fact;
         }
         // An immutable binding is its own bound.
-        let own = BoundKey::Binding(def_id);
+        // A fact the flow holds beats the binding's own name: that only
+        // restates the value, and would displace a literal ceiling a
+        // consumer compares against an extent.
+        let own = Endpoint::new(BoundKey::Binding(def_id), false);
         IntRange {
-            lo: pick_lower(
-                fact.lo
-                    .into_iter()
-                    .chain([Endpoint::new(own.clone(), false)]),
-            ),
-            hi: pick_upper(fact.hi.into_iter().chain([Endpoint::new(own, false)])),
+            lo: fact.lo.or_else(|| Some(own.clone())),
+            hi: fact.hi.or(Some(own)),
         }
     }
 
@@ -549,7 +620,7 @@ impl TypeChecker<'_> {
     /// The resolved extent of each axis of a shape; `None` per axis whose
     /// extent is an unsolved hole or unspecified, `None` overall for a shape
     /// that is not a literal or a tuple of dimensions.
-    fn axis_bounds(&mut self, shape: IndexId) -> Option<Vec<Option<BoundKey>>> {
+    pub(super) fn axis_bounds(&mut self, shape: IndexId) -> Option<Vec<Option<BoundKey>>> {
         let shape = self.resolve_index(shape);
         let dims = match self.types.get_index(shape).clone() {
             IndexExpr::Tuple(dims) => dims,

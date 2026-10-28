@@ -379,7 +379,7 @@ fn place_fmt(place: &MirPlace) -> String {
                 push_fmt!(out, ".{}.def#{}", closure_env_id(*environment), source.0);
             }
             MirProjection::SharedCell => out.push_str(".cell"),
-            MirProjection::Index(index) => {
+            MirProjection::Index(index) | MirProjection::ProvenIndex(index) => {
                 push_fmt!(out, "[{}]", operand(index));
             }
             MirProjection::VectorLane(index) => {

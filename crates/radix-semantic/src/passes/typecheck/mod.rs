@@ -127,6 +127,10 @@ mod flow_range_access;
 #[cfg(test)]
 #[path = "flow_range_access_test.rs"]
 mod flow_range_access_test;
+mod flow_range_index;
+#[cfg(test)]
+#[path = "flow_range_index_test.rs"]
+mod flow_range_index_test;
 #[cfg(test)]
 mod flow_range_probe;
 mod flow_range_produce;
@@ -535,6 +539,10 @@ pub(crate) struct TypeChecker<'a> {
     /// Generic call bindings retained until deferred edge-policy obligations
     /// can be discharged after every local body has been checked.
     tensor_edge_generic_calls: Vec<tensor_edge_policy_generic::GenericPolicyCall>,
+    /// Nesting depth of assignment-target checks. An index read inside a
+    /// target is evaluated at the store, not where the checker meets it, so it
+    /// records no proof (need, slice 4).
+    index_proof_suppressed: u32,
     /// Generic edge-policy obligations imported with namespace functions.
     /// These remain separate from local HIR summaries and carry only
     /// consumer-arena type identities.
@@ -967,6 +975,7 @@ impl<'a> TypeChecker<'a> {
             shape_obligations: ShapeObligationTable::default(),
             tensor_edge_policies: crate::TensorEdgePolicyTable::default(),
             tensor_edge_generic_calls: Vec::new(),
+            index_proof_suppressed: 0,
             tensor_edge_policy_imported_requirements: FxHashMap::default(),
             tensor_edge_policy_runtime_params: FxHashSet::default(),
             compile_time_locals: FxHashSet::default(),

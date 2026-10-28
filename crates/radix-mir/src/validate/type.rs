@@ -541,7 +541,10 @@ impl Validator<'_, '_> {
         };
         match base_layout.kind {
             MirLayoutKind::DeviceView(view) => {
-                if !matches!(projection, MirProjection::Index(_)) {
+                if !matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(span, "device view projection must be an index");
                 }
                 if !view.row_major || view.offset_elements != 0 {
@@ -603,7 +606,10 @@ impl Validator<'_, '_> {
                             | MirAggregateFamily::BoundedTextus
                     ) =>
             {
-                if !matches!(projection, MirProjection::Index(_)) {
+                if !matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(span, "bounded array projection must be an index");
                 }
                 let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
@@ -681,7 +687,10 @@ impl Validator<'_, '_> {
                 if layout.carrier == MirAggregateCarrier::PhysicalValue
                     && layout.family != MirAggregateFamily::Tuple =>
             {
-                if matches!(projection, MirProjection::Index(_)) {
+                if matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(
                         span,
                         "physical aggregate representation has no index projection contract",
@@ -691,7 +700,10 @@ impl Validator<'_, '_> {
             MirLayoutKind::Aggregate(layout)
                 if layout.family == MirAggregateFamily::TensorRuntime =>
             {
-                if matches!(projection, MirProjection::Index(_)) {
+                if matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(
                         span,
                         "tensor runtime aggregate has no device-view projection contract",
@@ -734,7 +746,10 @@ impl Validator<'_, '_> {
     ) {
         if !matches!(
             projection,
-            MirProjection::Field(_) | MirProjection::VectorLane(_) | MirProjection::Index(_)
+            MirProjection::Field(_)
+                | MirProjection::VectorLane(_)
+                | MirProjection::Index(_)
+                | MirProjection::ProvenIndex(_)
         ) {
             self.error(
                 span,
