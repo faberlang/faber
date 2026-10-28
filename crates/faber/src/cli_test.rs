@@ -1521,3 +1521,38 @@ fn manifest_build_target_vocabulary_matches_the_cli() {
         );
     }
 }
+
+#[test]
+fn cli_parses_format_width_flag() {
+    let format = Cli::try_parse_from(["faber", "format", "--width", "80", "main.fab"])
+        .expect("parse format --width");
+    let Some(crate::cli::Command::Format(args)) = format.command else {
+        panic!("expected format subcommand");
+    };
+    assert_eq!(args.width, Some(80));
+    let none = Cli::try_parse_from(["faber", "format", "main.fab"]).expect("parse format");
+    let Some(crate::cli::Command::Format(args)) = none.command else {
+        panic!("expected format subcommand");
+    };
+    assert_eq!(args.width, None, "no built-in default width");
+    for bad in ["0", "-3", "wide", "4294967296"] {
+        assert!(
+            Cli::try_parse_from(["faber", "format", "--width", bad, "main.fab"]).is_err(),
+            "--width {bad} must be rejected"
+        );
+    }
+}
+
+#[test]
+fn format_help_documents_width() {
+    let mut command = Cli::command();
+    let help = command
+        .find_subcommand_mut("format")
+        .expect("format subcommand")
+        .render_long_help()
+        .to_string();
+    let words = help.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(words.contains("--width <N>"), "{help}");
+    assert!(words.contains("[format] width"), "{help}");
+    assert!(words.contains("with neither set nothing wraps"), "{help}");
+}

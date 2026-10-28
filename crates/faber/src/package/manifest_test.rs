@@ -239,3 +239,95 @@ fn invalid_manifest_threads_fail_the_cpu_route() {
         .expect_err("an invalid manifest count fails the cpu route");
     assert_eq!(err.issue(), Some("package_device_threads_invalid"));
 }
+
+// `[format] width`: opt-in wrap width for `faber format`.
+
+/// A package directory whose manifest carries `format_lines` under `[format]`
+/// (no `[format]` table at all when `None`).
+fn format_package(label: &str, format_lines: Option<&str>) -> std::path::PathBuf {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("clock")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("faber-manifest-format-{label}-{nanos}"));
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    std::fs::write(dir.join("main.fab"), "main {\n}\n").expect("write entry");
+    let section = format_lines.map_or_else(String::new, |lines| format!("\n[format]\n{lines}"));
+    std::fs::write(
+        dir.join("faber.toml"),
+        format!(
+            "[package]\nname = \"format-width\"\nversion = \"0.1.0\"\nedition = \"1\"\n\n[paths]\nentry = \"main.fab\"\n\n[build]\nkind = \"bin\"\n{section}"
+        ),
+    )
+    .expect("write manifest");
+    dir
+}
+
+fn width(value: u32) -> Option<std::num::NonZeroU32> {
+    std::num::NonZeroU32::new(value)
+}
+
+#[test]
+fn format_width_absent_resolves_to_none() {
+    let no_table = format_package("no-table", None);
+    assert_eq!(resolve_format_width(None, &no_table).expect("resolves"), None);
+    let no_key = format_package("no-key", Some(""));
+    assert_eq!(resolve_format_width(None, &no_key).expect("resolves"), None);
+    // No manifest at all (a loose file next to nothing) is also no width.
+    let loose = std::env::temp_dir().join(format!(
+        "faber-format-loose-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&loose).expect("create loose dir");
+    assert_eq!(resolve_format_width(None, &loose).expect("resolves"), None);
+}
+
+#[test]
+fn format_width_valid_manifest_value_resolves() {
+    let dir = format_package("valid", Some("width = 80\n"));
+    assert_eq!(resolve_format_width(None, &dir).expect("resolves"), width(80));
+    // A file inside the package finds the same manifest.
+    assert_eq!(
+        resolve_format_width(None, &dir.join("main.fab")).expect("resolves"),
+        width(80)
+    );
+}
+
+#[test]
+fn format_width_flag_wins_over_manifest() {
+    let dir = format_package("flag-wins", Some("width = 80\n"));
+    assert_eq!(
+        resolve_format_width(width(40), &dir).expect("resolves"),
+        width(40)
+    );
+    let without = format_package("flag-only", None);
+    assert_eq!(
+        resolve_format_width(width(40), &without).expect("resolves"),
+        width(40)
+    );
+}
+
+#[test]
+fn format_width_invalid_values_fail_closed() {
+    for (label, line) in [
+        ("zero", "width = 0\n"),
+        ("negative", "width = -3\n"),
+        ("float", "width = 80.5\n"),
+        ("string", "width = \"wide\"\n"),
+        ("huge", "width = 99999999999\n"),
+    ] {
+        let dir = format_package(label, Some(line));
+        let err = resolve_format_width(None, &dir).expect_err(label);
+        assert_eq!(err.issue(), Some("package_format_width_invalid"), "{label}");
+        let manifest = read_manifest(&dir.join("faber.toml")).expect("manifest parses");
+        let err = validate_manifest(&manifest, Path::new("faber.toml")).expect_err(label);
+        assert_eq!(err.issue(), Some("package_format_width_invalid"), "{label}");
+    }
+}
+
+#[test]
+fn format_width_unknown_format_key_fails_closed() {
+    let dir = format_package("unknown-key", Some("width = 80\nindent = 4\n"));
+    let err = resolve_format_width(None, &dir).expect_err("unknown [format] key");
+    assert_eq!(err.issue(), Some("invalid_package_manifest"));
+}

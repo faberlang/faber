@@ -8,6 +8,7 @@ use radix::module::codegen::Target;
 use radix::module::driver::{Config, Session, peel_raw_source, split_frontmatter};
 use std::fs;
 use std::io::Read;
+use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 
 /// Arguments for `faber format`.
@@ -18,6 +19,22 @@ pub struct FormatCommand {
     pub stdout: bool,
     pub write: bool,
     pub stdin: bool,
+    /// `--width N`; wins over the package manifest `[format] width`. `None`
+    /// from both sources means no wrapping.
+    pub width: Option<NonZeroU32>,
+}
+
+/// Effective wrap width for one file: `--width` > manifest `[format] width` >
+/// none. `Err(status)` means a diagnostic was already printed.
+pub(super) fn effective_width(command: &FormatCommand, path: &Path) -> Result<Option<NonZeroU32>, i32> {
+    faber_cli::package::resolve_format_width(command.width, path).map_err(|diagnostic| {
+        faber_cli::postprocess::print_diagnostics(
+            &[(*diagnostic).clone()],
+            radix::services::DiagnosticMode::Normal,
+            None,
+        );
+        exit_status::status_for_diagnostic(&diagnostic)
+    })
 }
 
 pub fn cmd_format(command: &FormatCommand) {
@@ -31,7 +48,8 @@ pub fn cmd_format(command: &FormatCommand) {
             std::process::exit(exit_status::FAILURE);
         }
         let path = Path::new("<stdin>");
-        match format_single_doc(path, &source) {
+        // No package context on stdin: only the flag applies.
+        match format_single_doc(path, &source, command.width) {
             Ok(formatted) => {
                 print!("{formatted}");
                 return;
@@ -79,7 +97,14 @@ pub fn cmd_format(command: &FormatCommand) {
             }
         };
 
-        let formatted = match format_single_doc(path, &source) {
+        let width = match effective_width(command, path) {
+            Ok(width) => width,
+            Err(status) => {
+                tally.refuse(status);
+                continue;
+            }
+        };
+        let formatted = match format_single_doc(path, &source, width) {
             Ok(formatted) => formatted,
             Err(status) => {
                 tally.refuse(status);
@@ -327,7 +352,11 @@ pub(super) fn convert_single_doc(
 /// write/stdout (frontmatter preserved). `Err(())` means a diagnostic was
 /// already printed.
 #[cfg(not(feature = "hir-faber"))]
-fn format_single_doc(_path: &Path, _source: &str) -> Result<String, i32> {
+pub(super) fn format_single_doc(
+    _path: &Path,
+    _source: &str,
+    _width: Option<NonZeroU32>,
+) -> Result<String, i32> {
     eprintln!("error: formatting requires a faber build with feature `hir-faber`");
     Err(exit_status::FAILURE)
 }
@@ -343,8 +372,18 @@ pub(super) fn convert_single_doc(
     Err(exit_status::FAILURE)
 }
 
+///
+/// With a `width`, the canonical body is then wrapped at legal token breaks
+/// ([`radix_hir_faber::wrap_faber_source`]). The wrapped text is re-emitted
+/// and must equal the unwrapped canonical body; a wrap that would change the
+/// program is refused, never written. Without a width the output is exactly
+/// the canonical re-emit.
 #[cfg(feature = "hir-faber")]
-fn format_single_doc(path: &Path, source: &str) -> Result<String, i32> {
+pub(super) fn format_single_doc(
+    path: &Path,
+    source: &str,
+    width: Option<NonZeroU32>,
+) -> Result<String, i32> {
     let name = path.display().to_string();
     let session = match format_session(path, None, source) {
         Ok(session) => session,
@@ -391,13 +430,53 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, i32> {
         return Err(exit_status::DATA_ERROR);
     };
 
-    match formatted_source_for_write(path, source, &output.code) {
+    let body = match width {
+        None => output.code,
+        Some(width) => {
+            let wrapped = radix_hir_faber::wrap_faber_source(
+                &output.code,
+                width.get() as usize,
+                Some(emit_pack),
+            );
+            if wrapped != output.code
+                && !wrap_preserves_program(path, source, &session, emit_pack, &output.code, &wrapped)
+            {
+                eprintln!(
+                    "error: {}: wrapping at width {width} would change the program; nothing formatted",
+                    path.display()
+                );
+                return Err(exit_status::DATA_ERROR);
+            }
+            wrapped
+        }
+    };
+
+    match formatted_source_for_write(path, source, &body) {
         Ok(formatted) => Ok(formatted),
         Err(message) => {
             eprintln!("error: {message}");
             Err(exit_status::DATA_ERROR)
         }
     }
+}
+
+/// Whether `wrapped` re-emits to exactly the `canonical` body: the wrap moved
+/// only whitespace between tokens and the program reads the same.
+#[cfg(feature = "hir-faber")]
+fn wrap_preserves_program(
+    path: &Path,
+    source: &str,
+    session: &Session,
+    emit_pack: &radix::module::locale::LocalePack,
+    canonical: &str,
+    wrapped: &str,
+) -> bool {
+    let Ok(wrapped_source) = formatted_source_for_write(path, source, wrapped) else {
+        return false;
+    };
+    let name = path.display().to_string();
+    let again = radix::module::driver::reemit_faber(session, emit_pack, &name, &wrapped_source);
+    again.output.is_some_and(|output| output.code == canonical)
 }
 
 pub(super) fn format_session(
