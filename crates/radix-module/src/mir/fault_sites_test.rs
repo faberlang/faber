@@ -625,3 +625,164 @@ fn a_literal_or_constant_index_carries_no_fault_channel() {
     let (signature, _) = kernel(&constant_index("j"));
     assert!(has_fault_channel(&signature), "{:?}", kinds(&signature));
 }
+
+/// A two-dimensional stencil body in a lane kernel over `[H, W]` tensors.
+#[cfg(feature = "mir-metal")]
+fn stencil(body: &str) -> String {
+    format!(
+        r#"+++
+locale = "en"
++++
+@ kernel
+@ public
+fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → void {{
+    for from src at [i, j] thread lane let x {{
+{body}
+    }}
+}}
+
+main {{
+    mut tensor<f32, [2, 2]> src ← tf32[2, 2] {{}}
+    mut tensor<f32, [2, 2]> dst ← tf32[2, 2] {{}}
+    k(src, mut dst)
+}}
+"#
+    )
+}
+
+/// The `if (...) { fault... }` guard lines of the emitted text.
+#[cfg(feature = "mir-metal")]
+fn guard_lines(text: &str) -> Vec<&str> {
+    text.lines()
+        .map(str::trim_start)
+        .filter(|line| line.starts_with("if ((ulong)(") && line.contains("u9_fault["))
+        .collect()
+}
+
+/// Every bounds compare of the text (`(ulong)(a) >= (ulong)(b)`).
+#[cfg(feature = "mir-metal")]
+fn compares(text: &str) -> usize {
+    guard_lines(text)
+        .iter()
+        .map(|line| {
+            line.split('{')
+                .next()
+                .unwrap_or("")
+                .matches(">= (ulong)(")
+                .count()
+        })
+        .sum()
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_repeated_neighbour_read_is_checked_once_with_one_branch_per_access() {
+    // Three distinct unproven accesses (east: the column axis, south: the
+    // flat compare for the row axis, diagonal: both); each read twice more.
+    let source = stencil(
+        "        let f32 east ← src[[i, j + 1]]\n\
+         \x20       let f32 south ← src[[i + 1, j]]\n\
+         \x20       let f32 diag ← src[[i + 1, j + 1]]\n\
+         \x20       let f32 east2 ← src[[i, j + 1]]\n\
+         \x20       let f32 south2 ← src[[i + 1, j]]\n\
+         \x20       let f32 diag2 ← src[[i + 1, j + 1]]\n\
+         \x20       dst[[i, j]] ← x + east + south + diag + east2 + south2 + diag2",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    let guards = guard_lines(&text);
+    assert_eq!(guards.len(), 3, "one branch per distinct access: {text}");
+    // east: column axis; south: flat; diagonal: column axis (seen) + new flat.
+    assert_eq!(compares(&text), 3, "{text}");
+    // The extent is read from its buffer once per lane, not once per access.
+    assert_eq!(text.matches("b0_extent1[0]").count(), 1, "{text}");
+    assert!(text.contains("const auto b0_extent1_v = b0_extent1[0];"), "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn one_access_needing_two_compares_writes_one_branch() {
+    let source = stencil(
+        "        let f32 diag ← src[[i + 1, j + 1]]\n\
+         \x20       dst[[i, j]] ← x + diag",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    let guards = guard_lines(&text);
+    assert_eq!(guards.len(), 1, "{text}");
+    assert_eq!(compares(&text), 2, "a column compare and the flat compare: {text}");
+    assert!(guards[0].contains(" || "), "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_check_inside_a_branch_does_not_cover_the_code_after_it() {
+    // The read in the arm is guarded there; the read after the `if` runs on
+    // lanes that skipped the arm, so it is guarded again.
+    let source = stencil(
+        "        mut f32 acc ← x\n\
+         \x20       if i ≡ 0 {\n\
+         \x20           acc ← acc + src[[i, j + 1]]\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← acc + src[[i, j + 1]]",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_check_before_a_branch_covers_the_read_inside_it() {
+    let source = stencil(
+        "        mut f32 acc ← x + src[[i, j + 1]]\n\
+         \x20       if i ≡ 0 {\n\
+         \x20           acc ← acc + src[[i, j + 1]]\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← acc",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 1, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_reassigned_coordinate_is_checked_again() {
+    // `k` names a different column at the second read: the value changed.
+    let source = stencil(
+        "        mut i32 k ← j + 1\n\
+         \x20       let f32 first ← src[[i, k]]\n\
+         \x20       k ← j + 2\n\
+         \x20       dst[[i, j]] ← x + first + src[[i, k]]",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_coordinate_assigned_in_one_arm_is_checked_again_after_the_join() {
+    let source = stencil(
+        "        mut i32 k ← j + 1\n\
+         \x20       let f32 first ← src[[i, k]]\n\
+         \x20       if i ≡ 0 {\n\
+         \x20           k ← j + 2\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← x + first + src[[i, k]]",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_coordinate_a_loop_advances_is_checked_inside_the_loop() {
+    let source = stencil(
+        "        mut i32 k ← j\n\
+         \x20       mut f32 acc ← src[[i, k + 1]]\n\
+         \x20       while k ≺ 3 {\n\
+         \x20           acc ← acc + src[[i, k + 1]]\n\
+         \x20           k ← k + 1\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← acc",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
+}
