@@ -395,7 +395,7 @@ pub fn compare_traces(reference: &[KernelTraceRecord], device: &[KernelTraceReco
                 device: got.entry.clone(),
             })
         } else {
-            compare_record(want, got, &mut conforming_elements).and_then(|detail| diverge(detail))
+            compare_record(want, got, &mut conforming_elements).and_then(diverge)
         };
         if divergence.is_some() {
             return Comparison {
