@@ -2272,7 +2272,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.tensor_edge_policy_marker_not_runtime_value]
 message = "tensor edge-policy markers are type arguments, not runtime values"
-help = "use clampa, reflexa, or involuta only as the type argument to limes"
+help = "use clampa, reflexa, or involuta only as the type argument to {limes}"
 
 [diagnostics.SEM010.issues.array_element_type_mismatch]
 message = "array element type mismatch"
@@ -3380,18 +3380,18 @@ help = "include both element type and shape in the tensor type argument"
 
 [diagnostics.SEM011.issues.tensor_shift_nullable_source_unsupported]
 message = "disloco requirit elementa tensoris non-nulla et non potest novum motum super view nondum resolutum creare"
-help = "resolve pending edges with limes<Policy>() or tensor coalescing before another shift"
+help = "resolve pending edges with {limes}<Policy>() or tensor coalescing before another shift"
 
 [diagnostics.SEM011.issues.tensor_edge_view_requires_resolution]
-message = "tensor motus nondum resolutus a limes aut tensor coalescing tantum consumi potest"
-help = "resolve the edge view with limes<Policy>() or coalesce its optional edge cells"
+message = "tensor motus nondum resolutus a {limes} aut tensor coalescing tantum consumi potest"
+help = "resolve the edge view with {limes}<Policy>() or coalesce its optional edge cells"
 
 [diagnostics.SEM011.issues.tensor_limes_requires_shifted_view]
-message = "limes requirit tensoris view motus nondum resolutum"
-help = "call shift(offsets) before limes<Policy>()"
+message = "{limes} requirit tensoris view motus nondum resolutum"
+help = "call shift(offsets) before {limes}<Policy>()"
 
 [diagnostics.SEM011.issues.tensor_limes_policy_invalid]
-message = "limes requirit rationem marginis propriam aut genus sine campis instantiarum validum"
+message = "{limes} requirit rationem marginis propriam aut genus sine campis instantiarum validum"
 help = "provide remap(vector<int, R>) -> vector<int, R> and an optional transform(vector<int, R>, T) -> T method"
 
 [diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]

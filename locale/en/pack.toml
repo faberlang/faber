@@ -429,7 +429,7 @@ transpone = "transpose"
 # K6: an explicit zero-copy broadcast view; `expande` remains the Latin id.
 expande = "expanded"
 disloco = "shift"
-limes = "limes"
+limes = "edge"
 laminatio = "norm_layer"
 materialize = "materialize"
 # `formata` is a static type-directed view; keep the canonical spelling until
@@ -2616,7 +2616,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.tensor_edge_policy_marker_not_runtime_value]
 message = "tensor edge-policy markers are type arguments, not runtime values"
-help = "use clamp, reflect, or wrap only as the type argument to limes"
+help = "use clamp, reflect, or wrap only as the type argument to {limes}"
 
 [diagnostics.SEM010.issues.array_element_type_mismatch]
 message = "array element type mismatch"
@@ -3724,18 +3724,18 @@ help = "include both element type and shape in the tensor type argument"
 
 [diagnostics.SEM011.issues.tensor_shift_nullable_source_unsupported]
 message = "shift requires non-nullable tensor elements and cannot shift an unresolved edge view"
-help = "resolve pending edges with limes<Policy>() or tensor coalescing before another shift"
+help = "resolve pending edges with {limes}<Policy>() or tensor coalescing before another shift"
 
 [diagnostics.SEM011.issues.tensor_edge_view_requires_resolution]
-message = "an unresolved shifted tensor can only be consumed by limes or tensor coalescing"
-help = "resolve the edge view with limes<Policy>() or coalesce its optional edge cells"
+message = "an unresolved shifted tensor can only be consumed by {limes} or tensor coalescing"
+help = "resolve the edge view with {limes}<Policy>() or coalesce its optional edge cells"
 
 [diagnostics.SEM011.issues.tensor_limes_requires_shifted_view]
-message = "limes requires an unresolved shifted tensor view"
-help = "call shift(offsets) before limes<Policy>()"
+message = "{limes} requires an unresolved shifted tensor view"
+help = "call shift(offsets) before {limes}<Policy>()"
 
 [diagnostics.SEM011.issues.tensor_limes_policy_invalid]
-message = "limes needs a builtin edge policy or a valid zero-field policy class"
+message = "{limes} needs a builtin edge policy or a valid zero-field policy class"
 help = "provide remap(vector<int, R>) -> vector<int, R> and an optional transform(vector<int, R>, T) -> T method"
 
 [diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]

@@ -49,7 +49,7 @@ fn shifted_view_into_a_plain_tensor_initializer_is_rejected() {
 #[test]
 fn shifted_view_into_an_optional_element_slot_stays_pending() {
     accepts(&format!(
-        "main {{\n{}\nlet tensor<f32 ∪ none, [3]> s ← base.shift([1])\nlet tf32[3] w ← s.limes<wrap>()\nprint w.flatten()\n}}",
+        "main {{\n{}\nlet tensor<f32 ∪ none, [3]> s ← base.shift([1])\nlet tf32[3] w ← s.edge<wrap>()\nprint w.flatten()\n}}",
         tensor_seed()
     ));
 }
@@ -57,7 +57,7 @@ fn shifted_view_into_an_optional_element_slot_stays_pending() {
 #[test]
 fn shifted_optional_view_resolves_after_a_local_binding_or_coalesce() {
     accepts(&format!(
-        "main {{\n{}\nlet _ pending ← base.shift([1])\nlet tf32[3] wrapped ← pending.limes<wrap>()\nlet tf32[3] filled ← base.shift([1]) coalesce 0.0\nprint wrapped.flatten()\nprint filled.flatten()\n}}",
+        "main {{\n{}\nlet _ pending ← base.shift([1])\nlet tf32[3] wrapped ← pending.edge<wrap>()\nlet tf32[3] filled ← base.shift([1]) coalesce 0.0\nprint wrapped.flatten()\nprint filled.flatten()\n}}",
         tensor_seed()
     ));
 }
@@ -84,7 +84,7 @@ fn shifted_optional_view_cannot_be_re_shifted_or_flattened_before_resolution() {
 fn limes_requires_a_shifted_view() {
     rejects_with_issue(
         &format!(
-            "main {{\n{}\nlet tf32[3] invalid ← base.limes<clamp>()\n}}",
+            "main {{\n{}\nlet tf32[3] invalid ← base.edge<clamp>()\n}}",
             tensor_seed()
         ),
         "tensor_limes_requires_shifted_view",
@@ -94,13 +94,13 @@ fn limes_requires_a_shifted_view() {
 #[test]
 fn custom_limes_policy_requires_plain_instance_callbacks() {
     accepts(&format!(
-        "interface EdgePolicy<C> {{ fn remap(C coord) → C }}\nclass ZeroGhost implements EdgePolicy<vector<int, 1>> {{ fn remap(vector<int, 1> coord) → vector<int, 1> {{ return [0] ↦ vector<int, 1> }} }}\nmain {{\n{}\nlet tf32[3] mapped ← base.shift([1]).limes<ZeroGhost>()\n}}",
+        "interface EdgePolicy<C> {{ fn remap(C coord) → C }}\nclass ZeroGhost implements EdgePolicy<vector<int, 1>> {{ fn remap(vector<int, 1> coord) → vector<int, 1> {{ return [0] ↦ vector<int, 1> }} }}\nmain {{\n{}\nlet tf32[3] mapped ← base.shift([1]).edge<ZeroGhost>()\n}}",
         tensor_seed()
     ));
 
     rejects_with_issue(
         &format!(
-            "class InvalidPolicy {{ fn remap(vector<int, 1> coord) → int {{ return 0 }} }}\nmain {{\n{}\nlet tf32[3] invalid ← base.shift([1]).limes<InvalidPolicy>()\n}}",
+            "class InvalidPolicy {{ fn remap(vector<int, 1> coord) → int {{ return 0 }} }}\nmain {{\n{}\nlet tf32[3] invalid ← base.shift([1]).edge<InvalidPolicy>()\n}}",
             tensor_seed()
         ),
         "tensor_limes_policy_invalid",
