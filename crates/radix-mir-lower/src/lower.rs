@@ -2009,6 +2009,7 @@ impl<'a> MirLowerer<'a> {
         context.shape_functions = Arc::new(self.unit.shape_obligations.functions.clone());
         context.call_size_bindings = Arc::new(self.unit.shape_obligations.call_size_bindings.clone());
         context.shape_stores = Arc::new(self.unit.shape_obligations.stores.clone());
+        context.proven_indexes = Arc::new(self.unit.shape_obligations.proven_indexes.clone());
         context.function_size_bindings = Arc::new(self.unit.shape_obligations.function_size_bindings.clone());
         context.tensor_edge_policies = Arc::new(self.unit.tensor_edge_policies.clone());
         context.pending_tensor_limes = Arc::clone(&self.pending_tensor_limes);
@@ -2564,6 +2565,9 @@ pub struct FunctionBuilderContext<'a> {
     shape_functions: Arc<FxHashMap<DefId, Vec<ShapeRelation>>>,
     call_size_bindings: Arc<FxHashMap<radix_hir::HirId, Vec<RuntimeSizeBinding>>>,
     shape_stores: Arc<FxHashMap<radix_hir::HirId, Vec<ShapeRelation>>>,
+    /// Index accesses the checker proved in range: lowered as
+    /// [`MirProjection::ProvenIndex`]. Absent means checked.
+    proven_indexes: Arc<FxHashSet<radix_hir::HirId>>,
     function_size_bindings: Arc<FxHashMap<DefId, Vec<RuntimeSizeBinding>>>,
     structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
     /// Producer-side defaults for imported class fields.
@@ -2664,6 +2668,7 @@ impl<'a> FunctionBuilderContext<'a> {
             shape_functions: Arc::new(FxHashMap::default()),
             call_size_bindings: Arc::new(FxHashMap::default()),
             shape_stores: Arc::new(FxHashMap::default()),
+            proven_indexes: Arc::new(FxHashSet::default()),
             function_size_bindings: Arc::new(FxHashMap::default()),
             structs: Arc::new(FxHashMap::default()),
             imported_struct_defaults: Arc::new(FxHashMap::default()),
@@ -3679,7 +3684,7 @@ impl<'a> FunctionBuilder<'a> {
             }
             HirExpressionKind::Index(object, index) => {
                 let mut place = self.lower_projectable_place(object)?;
-                let projection = self.lower_index_projection(&place, object.ty, index)?;
+                let projection = self.lower_index_projection(&place, object.ty, index, expr.id)?;
                 place.projections.push(projection);
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);
                 Some((place, ty))

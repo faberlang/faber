@@ -2196,7 +2196,7 @@ fn rewrite_place_constants(
     rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
 ) -> bool {
     for projection in &mut place.projections {
-        if let MirProjection::Index(index) = projection
+        if let MirProjection::Index(index) | MirProjection::ProvenIndex(index) = projection
             && !rewrite_operand_constants(index, rewrite)
         {
             return false;

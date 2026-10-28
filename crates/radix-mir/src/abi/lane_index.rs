@@ -12,6 +12,11 @@
 //! - a store whose index simplifies to `lane`: the dispatcher's lane-domain
 //!   cover check refuses a written argument smaller than the lane domain.
 //!
+//! - an access the checker proved (`MirProjection::ProvenIndex`, need):
+//!   every coordinate was shown `0 <= c < extent` against its own axis from the
+//!   source's interval facts (loop and lane coordinates, clamps, guards). The
+//!   analysis reads that carrier and derives no proof of its own from it.
+//!
 //! Everything else (offsets such as `i + 1`, parameters, gathered values) is
 //! UNPROVEN and needs a device bounds compare plus a fault site. The analysis
 //! is purely structural over the lowered MIR, so no carrier is stored on the
@@ -183,15 +188,17 @@ struct IndexPlaces {
 impl MirVisitor for IndexPlaces {
     fn visit_stmt(&mut self, stmt: &MirStatement) {
         if let MirStatementKind::Assign { place, value } = &stmt.kind {
-            if place
-                .projections
-                .iter()
-                .any(|projection| matches!(projection, MirProjection::Index(_)))
-            {
+            if place.projections.iter().any(|projection| {
+                matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                )
+            }) {
                 self.found.push((place.clone(), true));
             }
             for projection in &place.projections {
-                if let MirProjection::Index(index) = projection {
+                if let MirProjection::Index(index) | MirProjection::ProvenIndex(index) = projection
+                {
                     self.visit_operand(index);
                 }
             }
@@ -202,11 +209,12 @@ impl MirVisitor for IndexPlaces {
     }
 
     fn visit_place(&mut self, place: &MirPlace) {
-        if place
-            .projections
-            .iter()
-            .any(|projection| matches!(projection, MirProjection::Index(_)))
-        {
+        if place.projections.iter().any(|projection| {
+            matches!(
+                projection,
+                MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+            )
+        }) {
             self.found.push((place.clone(), false));
         }
         crate::visit::walk_place(self, place);
@@ -433,6 +441,18 @@ impl<'a> LaneIndexProof<'a> {
         let Some((tensor, index)) = self.addressed_tensor(place) else {
             return Vec::new();
         };
+        // The checker proved every coordinate of this access against its own
+        // axis (`ProvenIndex`, need): it is in range for any lane, so
+        // it needs no compare and no fault site. The proof is read, never
+        // re-derived; an access without it falls through to the structural
+        // analysis below.
+        if place
+            .projections
+            .first()
+            .is_some_and(MirProjection::is_proven_index)
+        {
+            return Vec::new();
+        }
         self.index_guards(tensor, index, store)
     }
 
@@ -585,13 +605,18 @@ impl<'a> LaneIndexProof<'a> {
     /// run-time vector `Index`; those projections do not change which tensor
     /// coordinate is bounds-checked. `None` for other places.
     fn addressed_tensor<'p>(&self, place: &'p MirPlace) -> Option<(MirLocalId, &'p MirOperand)> {
-        let (MirProjection::Index(index), rest) = place.projections.split_first()? else {
+        let (MirProjection::Index(index) | MirProjection::ProvenIndex(index), rest) =
+            place.projections.split_first()?
+        else {
             return None;
         };
         let vector_lane = rest
             .iter()
             .all(|projection| matches!(projection, MirProjection::VectorLane(_)));
-        let vector_index = matches!(rest, [MirProjection::Index(_)]);
+        let vector_index = matches!(
+            rest,
+            [MirProjection::Index(_) | MirProjection::ProvenIndex(_)]
+        );
         if !vector_lane && !vector_index {
             return None;
         }
@@ -682,7 +707,8 @@ impl MirVisitor for VectorIndexPlaces<'_, '_> {
             MirPlaceBase::Temp(temp) => self.function.temp_ty(*temp),
         };
         for projection in &place.projections {
-            if let (Some(base_ty), MirProjection::Index(index)) = (ty, projection)
+            if let (Some(base_ty), MirProjection::Index(index) | MirProjection::ProvenIndex(index)) =
+                (ty, projection)
                 && matches!(
                     self.validation
                         .layouts
@@ -710,7 +736,7 @@ fn projected_index_type(
 ) -> Option<MirType> {
     if !matches!(
         projection,
-        MirProjection::Index(_) | MirProjection::VectorLane(_)
+        MirProjection::Index(_) | MirProjection::ProvenIndex(_) | MirProjection::VectorLane(_)
     ) {
         return None;
     }

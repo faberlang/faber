@@ -470,7 +470,7 @@ pub fn try_walk_operand<V: FallibleMirVisitor>(
 
 pub fn walk_place<V: MirVisitor>(visitor: &mut V, place: &MirPlace) {
     for projection in &place.projections {
-        if let MirProjection::Index(index) = projection {
+        if let MirProjection::Index(index) | MirProjection::ProvenIndex(index) = projection {
             visitor.visit_operand(index);
         }
     }
@@ -483,7 +483,7 @@ pub fn try_walk_place<V: FallibleMirVisitor>(
     place: &MirPlace,
 ) -> Result<(), V::Error> {
     for projection in &place.projections {
-        if let MirProjection::Index(index) = projection {
+        if let MirProjection::Index(index) | MirProjection::ProvenIndex(index) = projection {
             visitor.visit_operand(index)?;
         }
     }

@@ -868,7 +868,11 @@ impl TypeChecker<'_> {
                 ty
             }
             HirExpressionKind::Field(object, name) => self.check_field(object, *name),
-            HirExpressionKind::Index(object, index) => self.check_index(object, index),
+            HirExpressionKind::Index(object, index) => {
+                let ty = self.check_index(object, index);
+                self.record_index_proof(expr.id, object, index);
+                ty
+            }
             HirExpressionKind::OptionalChain(object, chain) => {
                 self.check_optional_chain(object, chain, expr.span)
             }

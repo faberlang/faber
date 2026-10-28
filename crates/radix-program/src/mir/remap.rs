@@ -199,7 +199,9 @@ pub(super) fn remap_place_text_symbols(
             MirProjection::Field(field) | MirProjection::VariantField { variant: _, field } => {
                 *field = remap_symbol(*field, source, target);
             }
-            MirProjection::Index(operand) => remap_operand_text_symbols(operand, source, target),
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
+                remap_operand_text_symbols(operand, source, target)
+            }
             MirProjection::ClosureCapture {
                 environment: _,
                 source: _,

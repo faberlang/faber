@@ -203,6 +203,13 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let expected_sig = expected.and_then(|ty| self.signature_from_type(ty));
 
+        // The body runs when the closure is called, not where it is written:
+        // every fact about a mutable source may be stale by then, so the body
+        // starts without them. Facts on `let` bindings, loop binders and tensor
+        // extents hold whenever it runs. The outer flow resumes untouched.
+        let ranges_outside = self.range_flow.snapshot();
+        self.kill_mutable_source_ranges();
+
         self.push_scope();
         for (idx, param) in params.iter().enumerate() {
             if let Some(sig) = &expected_sig
@@ -297,6 +304,7 @@ impl TypeChecker<'_> {
         };
 
         self.pop_scope();
+        self.range_flow.restore(&ranges_outside);
 
         let sig = FuncSig {
             type_params: Vec::new(),

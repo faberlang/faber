@@ -102,7 +102,7 @@ fn lower_through(strict: bool, via: &Option<Endpoint>) -> Option<Endpoint> {
 impl TypeChecker<'_> {
     /// The type an expression's value has. A binding read keeps the binding's
     /// declared type: the node's own type can be the slot it is stored into.
-    fn value_type(&self, expr: &HirExpression) -> Option<TypeId> {
+    pub(super) fn value_type(&self, expr: &HirExpression) -> Option<TypeId> {
         if let HirExpressionKind::Path(def_id) = &expr.kind
             && let Some(binding) = self.lookup_binding(*def_id)
         {
@@ -111,13 +111,13 @@ impl TypeChecker<'_> {
         expr.ty
     }
 
-    fn is_integer_expr(&self, expr: &HirExpression) -> bool {
+    pub(super) fn is_integer_expr(&self, expr: &HirExpression) -> bool {
         self.value_type(expr).is_some_and(|ty| self.is_integer(ty))
     }
 
     /// Whether `ty` is a list or text: the sources whose live length is a
     /// bound.
-    fn has_live_length(&self, ty: TypeId) -> bool {
+    pub(super) fn has_live_length(&self, ty: TypeId) -> bool {
         let peeled = self
             .types
             .peel_access_marker(self.resolve_inferred_type(ty))
@@ -129,7 +129,7 @@ impl TypeChecker<'_> {
     }
 
     /// The named binding a list/text expression stands for, if it is one.
-    fn length_source(&self, expr: &HirExpression) -> Option<DefId> {
+    pub(super) fn length_source(&self, expr: &HirExpression) -> Option<DefId> {
         let HirExpressionKind::Path(def_id) = &expr.kind else {
             return None;
         };
@@ -203,14 +203,13 @@ impl TypeChecker<'_> {
             return fact;
         }
         // An immutable binding is its own bound.
-        let own = BoundKey::Binding(def_id);
+        // A fact the flow holds beats the binding's own name: that only
+        // restates the value, and would displace a literal ceiling a
+        // consumer compares against an extent.
+        let own = Endpoint::new(BoundKey::Binding(def_id), false);
         IntRange {
-            lo: pick_lower(
-                fact.lo
-                    .into_iter()
-                    .chain([Endpoint::new(own.clone(), false)]),
-            ),
-            hi: pick_upper(fact.hi.into_iter().chain([Endpoint::new(own, false)])),
+            lo: fact.lo.or_else(|| Some(own.clone())),
+            hi: fact.hi.or(Some(own)),
         }
     }
 
@@ -517,7 +516,7 @@ impl TypeChecker<'_> {
     /// The resolved extent of each axis of a shape; `None` per axis whose
     /// extent is an unsolved hole or unspecified, `None` overall for a shape
     /// that is not a literal or a tuple of dimensions.
-    fn axis_bounds(&mut self, shape: IndexId) -> Option<Vec<Option<BoundKey>>> {
+    pub(super) fn axis_bounds(&mut self, shape: IndexId) -> Option<Vec<Option<BoundKey>>> {
         let shape = self.resolve_index(shape);
         let dims = match self.types.get_index(shape).clone() {
             IndexExpr::Tuple(dims) => dims,
