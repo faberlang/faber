@@ -1018,3 +1018,7 @@ pub fn load_fmir_image(
         || decode_binary_image(bytes, toolchain_version).map(FmirImagePayload::from),
     )
 }
+
+#[cfg(test)]
+#[path = "image_test.rs"]
+mod tests;
