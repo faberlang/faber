@@ -1278,12 +1278,14 @@ fn function_export_dangling_generic_param_name_fails_closed() {
                     }),
                 )],
                 unavailable: Vec::new(),
+                const_values: Vec::new(),
             },
         )],
         used_namespaces: Vec::new(),
         imported_nominal_types: Vec::new(),
         ambiguous_imported_nominal_types: Vec::new(),
         conversion_rows: Vec::new(),
+        module_bindings: Vec::new(),
     };
 
     let bytes = encode(&artifact).expect("encode artifact");
@@ -1331,12 +1333,14 @@ fn function_export_valid_generic_param_name_loads() {
                     }),
                 )],
                 unavailable: Vec::new(),
+                const_values: Vec::new(),
             },
         )],
         used_namespaces: Vec::new(),
         imported_nominal_types: Vec::new(),
         ambiguous_imported_nominal_types: Vec::new(),
         conversion_rows: Vec::new(),
+        module_bindings: Vec::new(),
     };
 
     let bytes = encode(&artifact).expect("encode artifact");

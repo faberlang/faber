@@ -139,6 +139,7 @@ fn minimal_test_artifact() -> HirArtifact {
             imported_nominal_types: Vec::new(),
             ambiguous_imported_nominal_types: Vec::new(),
             conversion_rows: Vec::new(),
+            module_bindings: Vec::new(),
         },
         libraries: LibraryRegistry::default(),
         function_facts: FunctionFactTableWire { entries: Vec::new(), entry: None },
@@ -148,6 +149,7 @@ fn minimal_test_artifact() -> HirArtifact {
         capability_provenance: radix_hir_fhir::FunctionProvenanceTableWire::default(),
         provider_units: BTreeMap::new(),
         shape_obligations: radix_hir_fhir::ShapeObligationTableWire::default(),
+        contract_roles: radix_hir_fhir::ContractRolesWire::default(),
         kernel_requirements: radix_hir_fhir::KernelRequirementsWire::default(),
         tensor_edge_policies: radix_hir_fhir::TensorEdgePolicyTableWire::default(),
         display_tokens: DisplayTokensWire {
@@ -1976,6 +1978,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
         capability_provenance: crate::hir::serialize::from_analyzed(unit, "x", "x").capability_provenance,
         provider_units: crate::hir::serialize::from_analyzed(unit, "x", "x").provider_units,
         shape_obligations: crate::hir::serialize::from_analyzed(unit, "x", "x").shape_obligations,
+        contract_roles: crate::hir::serialize::from_analyzed(unit, "x", "x").contract_roles,
         kernel_requirements: crate::hir::serialize::from_analyzed(unit, "x", "x").kernel_requirements,
         tensor_edge_policies: crate::hir::serialize::from_analyzed(unit, "x", "x").tensor_edge_policies,
         display_tokens: crate::hir::serialize::from_analyzed(unit, "x", "x").display_tokens,
@@ -2159,6 +2162,123 @@ fn runtime_tensor_shape_boundary_survives_fhir_round_trip_and_recovers() {
     let expected = ["entered", "4", "shape mismatch"];
     assert_eq!(direct_host.stdout_lines, expected);
     assert_eq!(loaded_host.stdout_lines, expected);
+}
+
+#[test]
+fn cli_binding_symbols_survive_fhir_round_trip() {
+    use crate::driver::{Config, Session, analyze_source};
+
+    let path = format!("{}/../../corpus/cli/cli.fab", env!("CARGO_MANIFEST_DIR"));
+    let source = std::fs::read_to_string(&path).expect("cli fixture");
+    let session = Session::new(Config::default().with_dev_locale_root());
+    let direct = analyze_source(&session, &path, &source, AnalyzeRequest::default()).expect("fixture analyzes");
+    let program = direct
+        .cli_program
+        .as_ref()
+        .expect("direct unit carries a CLI program");
+    let bound = |program: &crate::cli::CliProgram| {
+        let mut symbols = Vec::new();
+        for (options, operands) in std::iter::once((&program.options, &program.operands))
+            .chain(std::iter::once((&program.global_options, &program.global_operands)))
+            .chain(
+                program
+                    .commands
+                    .iter()
+                    .map(|command| (&command.options, &command.operands)),
+            )
+        {
+            symbols.extend(
+                options
+                    .iter()
+                    .map(|option| (option.binding.clone(), option.binding_symbol)),
+            );
+            symbols.extend(
+                operands
+                    .iter()
+                    .map(|operand| (operand.binding.clone(), operand.binding_symbol)),
+            );
+        }
+        symbols
+    };
+    let expected = bound(program);
+    assert!(!expected.is_empty(), "fixture declares CLI options or operands");
+
+    let artifact = crate::hir::serialize::from_analyzed(&direct, "cli-symbols", "cli.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize CLI program");
+    let loaded = load_fhir(&bytes).expect("CLI binding symbols survive validated FHIR load");
+    assert_eq!(bound(loaded.cli_program.as_ref().expect("loaded CLI program")), expected);
+    for (binding, symbol) in expected {
+        assert_eq!(loaded.interner.resolve(symbol), binding);
+    }
+}
+
+#[test]
+fn contract_roles_survive_fhir_round_trip() {
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
+    let mut unit = crate::driver::analyze_source(
+        &session,
+        "contract-roles.fab",
+        "functio echo(numerus value) → numerus { redde value }\nincipit { }\n",
+        AnalyzeRequest::default(),
+    )
+    .expect("analyze contract-role fixture");
+    let function_def = unit
+        .hir
+        .items
+        .iter()
+        .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
+        .expect("function item")
+        .def_id;
+    unit.types.ordering_contract = Some(function_def);
+    unit.types.ordering_contract_bindings.insert(function_def);
+    unit.types.closing_contract = Some(function_def);
+    unit.types.sinking_contract = Some(function_def);
+    unit.types.sinking_contract_bindings.insert(function_def);
+
+    let artifact = crate::hir::serialize::from_analyzed(&unit, "contract-roles", "contract-roles.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize contract roles");
+    let loaded = load_fhir(&bytes).expect("contract roles survive validated FHIR load");
+
+    assert_eq!(loaded.types.ordering_contract, Some(function_def));
+    assert!(
+        loaded
+            .types
+            .ordering_contract_bindings
+            .contains(&function_def)
+    );
+    assert_eq!(loaded.types.closing_contract, Some(function_def));
+    assert_eq!(loaded.types.sinking_contract, Some(function_def));
+    assert!(
+        loaded
+            .types
+            .sinking_contract_bindings
+            .contains(&function_def)
+    );
+}
+
+#[test]
+fn declaration_store_shape_pins_survive_fhir_round_trip() {
+    use crate::driver::{Config, Session, analyze_source};
+
+    let mut pinned = 0;
+    for name in [
+        "equality-whole",
+        "shape-bounded",
+        "runtime-extent-use",
+        "runtime-shape-boundary",
+    ] {
+        let path = format!("{}/../../corpus/tensor/{name}.fab", env!("CARGO_MANIFEST_DIR"));
+        let source = std::fs::read_to_string(&path).expect("tensor fixture");
+        let session = Session::new(Config::default().with_dev_locale_root());
+        let direct = analyze_source(&session, &path, &source, AnalyzeRequest::default()).expect("fixture analyzes");
+        pinned += direct.shape_obligations.stores.len();
+
+        let artifact = crate::hir::serialize::from_analyzed(&direct, "shape-store", name);
+        let bytes = postcard::to_allocvec(&artifact).expect("serialize shape obligations");
+        let loaded = load_fhir(&bytes).expect("shape obligations survive validated FHIR load");
+        assert_eq!(loaded.shape_obligations, direct.shape_obligations, "{name}");
+    }
+    assert!(pinned > 0, "no fixture exercised a declaration-store pin");
 }
 
 #[test]

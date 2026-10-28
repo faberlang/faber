@@ -687,6 +687,7 @@ fn resolver_snapshot_round_trips_imported_json_opt_in() {
                     },
                 )],
                 unavailable: Vec::new(),
+                const_values: Vec::new(),
             },
         )],
         ..Resolver::new().to_snapshot()
@@ -756,6 +757,7 @@ fn resolver_snapshot_round_trips_nondum_gates_for_functions_and_methods() {
                     ),
                 ],
                 unavailable: vec![(function, gate())],
+                const_values: Vec::new(),
             },
         )],
         ..Resolver::new().to_snapshot()
@@ -785,6 +787,144 @@ fn resolver_snapshot_round_trips_nondum_gates_for_functions_and_methods() {
         again.file_interfaces[0].1.unavailable,
         vec![(function, gate())]
     );
+}
+
+#[cfg(feature = "hir-fhir")]
+#[test]
+fn resolver_snapshot_round_trips_const_values() {
+    use crate::file_interface::InterfaceConstValue;
+    use radix_hir_fhir::artifact::{
+        ConstValueWire, FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot,
+    };
+    use radix_types::TypeId;
+
+    let namespace = LexSymbol(0);
+    let members = [
+        LexSymbol(1),
+        LexSymbol(2),
+        LexSymbol(3),
+        LexSymbol(4),
+        LexSymbol(5),
+    ];
+    let values = vec![
+        (
+            members[0],
+            ConstValueWire::Int {
+                high: -1,
+                low: u64::MAX - 6,
+            },
+        ),
+        (members[1], ConstValueWire::Float(2.5)),
+        (members[2], ConstValueWire::Bool(true)),
+        (members[3], ConstValueWire::Text("salve".to_owned())),
+        (
+            members[4],
+            ConstValueWire::List(vec![
+                ConstValueWire::Int {
+                    high: i64::MAX,
+                    low: u64::MAX,
+                },
+                ConstValueWire::Text("x".to_owned()),
+            ]),
+        ),
+    ];
+    let snapshot = ResolverSnapshot {
+        file_interfaces: vec![(
+            namespace,
+            FileInterfaceSnapshot {
+                exports: members
+                    .iter()
+                    .map(|&member| {
+                        (
+                            member,
+                            FileExportSnapshot::Type {
+                                ty: TypeId(8),
+                                def_id: None,
+                            },
+                        )
+                    })
+                    .collect(),
+                unavailable: Vec::new(),
+                const_values: values.clone(),
+            },
+        )],
+        ..Resolver::new().to_snapshot()
+    };
+    let resolver = Resolver::from_snapshot(snapshot);
+
+    assert_eq!(
+        resolver.namespace_file_const_value_canonical(namespace, members[0]),
+        Some(&InterfaceConstValue::Int(-7))
+    );
+    assert_eq!(
+        resolver.namespace_file_const_value_canonical(namespace, members[4]),
+        Some(&InterfaceConstValue::List(vec![
+            InterfaceConstValue::Int(i128::from(i64::MAX) << 64 | i128::from(u64::MAX)),
+            InterfaceConstValue::Text("x".to_owned()),
+        ]))
+    );
+    assert_eq!(
+        resolver.to_snapshot().file_interfaces[0].1.const_values,
+        values
+    );
+}
+
+#[cfg(feature = "hir-fhir")]
+#[test]
+fn resolver_snapshot_round_trips_struct_field_initializers() {
+    use radix_hir::{HirExpression, HirExpressionKind, HirId, HirLiteral};
+    use radix_hir_fhir::artifact::{
+        FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot, StructFieldSnapshot,
+    };
+    use radix_types::TypeId;
+
+    let namespace = LexSymbol(0);
+    let genus = LexSymbol(1);
+    let limit = LexSymbol(2);
+    let init = HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(7)),
+        ty: Some(TypeId(3)),
+        span: Span::default(),
+    };
+    let snapshot = ResolverSnapshot {
+        file_interfaces: vec![(
+            namespace,
+            FileInterfaceSnapshot {
+                exports: vec![(
+                    genus,
+                    FileExportSnapshot::Struct {
+                        def_id: DefId(7),
+                        ty: TypeId(8),
+                        fields: vec![StructFieldSnapshot {
+                            name: limit,
+                            ty: TypeId(3),
+                            optional: false,
+                            required: false,
+                            modifier: Some(radix_syntax::FieldModifier::Const),
+                            visibility: radix_syntax::MemberVisibility::Publica,
+                            init: Some(init.clone()),
+                        }],
+                        methods: Vec::new(),
+                        is_json: false,
+                        implements: Vec::new(),
+                    },
+                )],
+                unavailable: Vec::new(),
+                const_values: Vec::new(),
+            },
+        )],
+        ..Resolver::new().to_snapshot()
+    };
+    let resolver = Resolver::from_snapshot(snapshot);
+
+    let structs = resolver.imported_file_structs();
+    assert_eq!(structs[0].1[0].init, Some(init.clone()));
+    let again = resolver.to_snapshot();
+    let FileExportSnapshot::Struct { fields, .. } = &again.file_interfaces[0].1.exports[0].1 else {
+        panic!("struct export restored");
+    };
+    assert_eq!(fields[0].init, Some(init));
 }
 
 /// A-189: an imported enum's consumer-side variant rows (`imported_enum_variants`)

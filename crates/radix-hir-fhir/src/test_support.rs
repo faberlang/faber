@@ -102,6 +102,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
             imported_nominal_types: Vec::new(),
             ambiguous_imported_nominal_types: Vec::new(),
             conversion_rows: Vec::new(),
+            module_bindings: Vec::new(),
         },
         libraries: LibraryRegistry::default(),
         function_facts: FunctionFactTableWire {
@@ -114,6 +115,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         capability_provenance: FunctionProvenanceTableWire::default(),
         provider_units: BTreeMap::new(),
         shape_obligations: crate::artifact::ShapeObligationTableWire::default(),
+        contract_roles: crate::artifact::ContractRolesWire::default(),
         kernel_requirements: crate::artifact::KernelRequirementsWire::default(),
         tensor_edge_policies: crate::artifact::TensorEdgePolicyTableWire::default(),
         display_tokens: DisplayTokensWire {

@@ -1194,6 +1194,29 @@ fn first_modular_word_width_restored_from_snapshot() {
     assert_eq!(restored.first_modular_word_width(), Some(NumericWidth::U16));
 }
 
+#[test]
+fn first_authored_bits_snapshot_round_trip() {
+    for width in [
+        BitsWidth::B8,
+        BitsWidth::B16,
+        BitsWidth::B32,
+        BitsWidth::B64,
+    ] {
+        let mut types = TypeTable::new();
+        let _ = types.intern(Type::Bits(width));
+        let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot");
+        assert_eq!(restored.first_authored_bits(), Some(width));
+    }
+}
+
+#[test]
+fn seeded_octeti_byte_list_is_not_an_authored_bits_after_restore() {
+    let types = TypeTable::new();
+    assert_eq!(types.first_authored_bits(), None);
+    let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot");
+    assert_eq!(restored.first_authored_bits(), None);
+}
+
 // --- F-003: Alias wrappers break assignability / numeric carriers ---
 
 #[test]
