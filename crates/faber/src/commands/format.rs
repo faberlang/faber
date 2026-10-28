@@ -26,7 +26,10 @@ pub struct FormatCommand {
 
 /// Effective wrap width for one file: `--width` > manifest `[format] width` >
 /// none. `Err(status)` means a diagnostic was already printed.
-pub(super) fn effective_width(command: &FormatCommand, path: &Path) -> Result<Option<NonZeroU32>, i32> {
+pub(super) fn effective_width(
+    command: &FormatCommand,
+    path: &Path,
+) -> Result<Option<NonZeroU32>, i32> {
     faber_cli::package::resolve_format_width(command.width, path).map_err(|diagnostic| {
         faber_cli::postprocess::print_diagnostics(
             &[(*diagnostic).clone()],
@@ -439,7 +442,14 @@ pub(super) fn format_single_doc(
                 Some(emit_pack),
             );
             if wrapped != output.code
-                && !wrap_preserves_program(path, source, &session, emit_pack, &output.code, &wrapped)
+                && !wrap_preserves_program(
+                    path,
+                    source,
+                    &session,
+                    emit_pack,
+                    &output.code,
+                    &wrapped,
+                )
             {
                 eprintln!(
                     "error: {}: wrapping at width {width} would change the program; nothing formatted",

@@ -217,7 +217,10 @@ impl<'a> Wrapper<'a> {
                 | TokenKind::BangParen => nesting.depth += 1,
                 TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace => {
                     nesting.depth = nesting.depth.saturating_sub(1);
-                    if nesting.list_depth.is_some_and(|depth| nesting.depth < depth) {
+                    if nesting
+                        .list_depth
+                        .is_some_and(|depth| nesting.depth < depth)
+                    {
                         nesting.list_depth = None;
                     }
                 }
@@ -251,7 +254,11 @@ impl<'a> Wrapper<'a> {
         let indent = pieces.first().map_or("", |piece| piece.gap);
         let continuation = format!("{indent}{}", " ".repeat(CONTINUATION_INDENT));
         let width_of = |row: &[usize], at: usize| -> usize {
-            let lead = if at == 0 { indent } else { continuation.as_str() };
+            let lead = if at == 0 {
+                indent
+            } else {
+                continuation.as_str()
+            };
             let mut width = display_width(lead);
             for (k, &p) in row.iter().enumerate() {
                 if k > 0 {
@@ -269,8 +276,9 @@ impl<'a> Wrapper<'a> {
             while width_of(&rows[rows.len() - 1], rows.len() - 1) > self.width {
                 let at = rows.len() - 1;
                 let last = &mut rows[at];
-                let candidates: Vec<usize> =
-                    (1..last.len()).filter(|&k| pieces[last[k]].breakable).collect();
+                let candidates: Vec<usize> = (1..last.len())
+                    .filter(|&k| pieces[last[k]].breakable)
+                    .collect();
                 // Prefer the last break after a comma, unless it would leave
                 // less than half the width on the line; else the last break.
                 let split = candidates
