@@ -1,13 +1,13 @@
 +++
 term = "‥"
-explains = ["‥", "…"]
+explains = ["whole-width range"]
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "conversio_expr", "additive_expr", "expression", "literal", "nota_stmt"]
 category = "arithmetic"
 canonical = true
 summary = "The existing store-policy spellings are the whole-width range: saturating<u8> is saturating<u8, 0…255>, u8 is trapping<u8, 0…255>."
 syntax = "saturating<u8, 0…255>"
-related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>", "saturating", "wrapping"]
+related = ["‥", "…", "saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
 locale = "en"
 +++
 # =============================================================================

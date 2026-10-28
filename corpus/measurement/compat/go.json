@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 470,
-    "analyzable": 525
+    "capable": 471,
+    "analyzable": 526
   },
   "terms": [
     {
@@ -994,6 +994,12 @@
       "analyzable": 1
     },
     {
+      "term": "whole-width range",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
       "term": "wrapping<W, lo‥hi>",
       "rule": "operator-group",
       "capable": 0,
@@ -1032,7 +1038,7 @@
     {
       "term": "…",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
