@@ -676,6 +676,11 @@ fn open_device_session(
             DeviceImageBackend::MetalSpanned
         }
         DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
+        // A CUDA device spanning several partitions takes the lane-range
+        // image too (rule 18).
+        DeviceClass::Backend(DeviceBackend::Cuda) if receipt.partitions > 1 => {
+            DeviceImageBackend::CudaSpanned
+        }
         DeviceClass::Backend(DeviceBackend::Cuda) => DeviceImageBackend::Cuda,
         DeviceClass::Cpu => DeviceImageBackend::Cpu,
     };
@@ -773,7 +778,11 @@ fn session_dispatcher(
         session, backend, ..
     } = admitted;
     let image_start = Instant::now();
-    let cuda_libdevice = if backend == super::device::DeviceImageBackend::Cuda {
+    let cuda = matches!(
+        backend,
+        super::device::DeviceImageBackend::Cuda | super::device::DeviceImageBackend::CudaSpanned
+    );
+    let cuda_libdevice = if cuda {
         super::resolve_cuda_libdevice(input).map_err(|diagnostic| vec![*diagnostic])?
     } else {
         None
@@ -877,15 +886,17 @@ fn session_dispatcher(
             })
             .collect(),
     );
-    dispatcher
-        .borrow_mut()
-        .set_scalars_by_buffer(backend == super::device::DeviceImageBackend::Cuda);
+    dispatcher.borrow_mut().set_scalars_by_buffer(cuda);
     dispatcher.borrow_mut().set_extents(extents);
     dispatcher
         .borrow_mut()
         .set_empty_reductions(empty_reductions);
     dispatcher.borrow_mut().set_write_maps(write_maps);
-    if backend == super::device::DeviceImageBackend::MetalSpanned {
+    if matches!(
+        backend,
+        super::device::DeviceImageBackend::MetalSpanned
+            | super::device::DeviceImageBackend::CudaSpanned
+    ) {
         dispatcher.borrow_mut().set_span(lane_ranges);
     }
     dispatcher.borrow_mut().set_backward_functions(backward);
