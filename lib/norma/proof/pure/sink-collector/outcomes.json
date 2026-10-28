@@ -11,6 +11,12 @@
       "phase": "build",
       "diagnostic_contains": "undefined: Collector",
       "reason": "The Go package emitter does not yet lower the `norma:sink` Collector class this proof constructs, so the generated `main.go` names `Collector` with no definition and `go build` stops with `undefined: Collector`. Re-measure this row when the Go package emitter lowers that module."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "error TS2355",
+      "reason": "The generated project fails `tsc` with error TS2355: a type the TypeScript backend emits for the imported Norma modules does not check, so no program is produced."
     }
   }
 }

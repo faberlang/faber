@@ -49,6 +49,15 @@ pub(super) fn cmd_run(args: RunArgs) {
         exit_status::exit_usage();
     }
 
+    if let Some(crate::cli::RunTarget::Ts) = args.target {
+        package::cmd_run_ts(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+        );
+    }
+
     if let Some(seed) = args.shuffle_seed {
         if !radix::module::mir::configure_shuffle_seed(seed) {
             eprintln!("note: shuffle seed already configured; the first value stays in effect");

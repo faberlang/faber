@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "expected 'package', found 'var'",
       "reason": "The Go package assembler writes the `norma:console` host shim ahead of the entry `package main` clause, so `go build` rejects the generated `main.go` at line 3 with `expected 'package', found 'var'` before the entry program is checked. Re-measure this row when package assembly places the shim after the package header."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the stdio leaf is not supported on the ts target",
+      "reason": "The Node port of the stdio leaf (`consolum:*`) has not landed, so the emitter refuses any program that reaches a `consolum` route (leaf_unsupported_on_target). Porting it also needs the TypeScript backend to propagate a declared error conversion (the Norma console wrappers return `IoFault` from a leaf `call`), which it declines today."
     }
   }
 }
