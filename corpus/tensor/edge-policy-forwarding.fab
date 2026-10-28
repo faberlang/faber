@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "tensor"
 canonical = false
 summary = "A generic function forwards built-in and custom tensor edge policies."
-related = ["tensor", "limes", "generic"]
+related = ["tensor", "edge", "generic"]
 locale = "en"
 +++
 
@@ -27,7 +27,7 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
 }
 
 fn resolve_shift<P>(tf32[3] source) → tf32[3] {
-    return source.shift([1]).limes<P>().materialize()
+    return source.shift([1]).edge<P>().materialize()
 }
 
 main {

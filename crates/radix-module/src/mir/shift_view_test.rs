@@ -1,4 +1,4 @@
-//! Shift views inside a device kernel: `src.shift(s).limes<P>()` read at the
+//! Shift views inside a device kernel: `src.shift(s).edge<P>()` read at the
 //! lane's own coordinate lowers to a read of `src` at the shifted coordinate,
 //! with no view storage, and an edge policy the device cannot express is
 //! refused by name.
@@ -37,7 +37,7 @@ fn kernel_body(text: &str) -> &str {
 #[test]
 fn a_clamped_shift_view_reads_its_base_at_the_shifted_coordinate() {
     let text = compile_metal_text(&kernel(
-        "let tensor<f32, [H, W]> e ← src.shift([-1, 2]).limes<clamp>()\n        dst[[i, j]] ← v + e[[i, j]]",
+        "let tensor<f32, [H, W]> e ← src.shift([-1, 2]).edge<clamp>()\n        dst[[i, j]] ← v + e[[i, j]]",
     ))
     .unwrap_or_else(|error| panic!("metal text: {error}"));
     let body = kernel_body(&text);
@@ -51,7 +51,7 @@ fn a_clamped_shift_view_reads_its_base_at_the_shifted_coordinate() {
 fn iterating_a_wrapped_shift_view_reads_its_base() {
     let text = compile_metal_text(&kernel("dst[[i, j]] ← v").replace(
         "for from src at [i, j] thread lane let v",
-        "for from src.shift([0, -1]).limes<wrap>() at [i, j] thread lane let v",
+        "for from src.shift([0, -1]).edge<wrap>() at [i, j] thread lane let v",
     ))
     .unwrap_or_else(|error| panic!("metal text: {error}"));
     let body = kernel_body(&text);
@@ -62,7 +62,7 @@ fn iterating_a_wrapped_shift_view_reads_its_base() {
 #[test]
 fn a_reflected_shift_view_is_refused_by_name() {
     let error = compile_metal_text(&kernel(
-        "let tensor<f32, [H, W]> e ← src.shift([0, 1]).limes<reflect>()\n        dst[[i, j]] ← e[[i, j]]",
+        "let tensor<f32, [H, W]> e ← src.shift([0, 1]).edge<reflect>()\n        dst[[i, j]] ← e[[i, j]]",
     ))
     .expect_err("reflect is not lowered on devices");
     assert!(

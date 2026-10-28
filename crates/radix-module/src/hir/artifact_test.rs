@@ -2462,7 +2462,7 @@ import from "demo:policy" policy
 
 @ public
 fn resolve(tf32[3] source) → f32 ⇥ string {
-    return source.shift([1]).limes<policy.ZeroGhost>().materialize().get([2])
+    return source.shift([1]).edge<policy.ZeroGhost>().materialize().get([2])
 }
 "#;
     let consumer_path = home.join("consumer.fab");

@@ -577,7 +577,7 @@ fn map_edges<size N>(
     tensor<f32, [N]> input,
     mut tensor<f32, [N]> output
 ) → void {
-    let tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
+    let tensor<f32, [N]> mapped ← input.shift([1]).edge<ZeroGhost>()
     for from mapped at [i] let value {
         output[i] ← value
     }
