@@ -323,6 +323,87 @@ pub(crate) fn grid_reduce_node(
         })
 }
 
+/// The kernel tensor parameters a whole-grid reduction captures into a
+/// function-form term or group-key helper, in operand order (term first, then
+/// each key), each once. An index inside a helper body is never proven by the
+/// lane (the helper has no grid guard), so each such tensor owns one index
+/// fault slot and one element-count resource; the slots follow the grouped-key
+/// axis slots in the fault record. The helper bodies are separate
+/// functions the signature cannot see, so the set is the captures, not the
+/// indexes the bodies actually make.
+#[must_use]
+pub fn grid_reduce_helper_tensors(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Vec<MirLocalId> {
+    let Some((filum, _)) = grid_reduce_node(function) else {
+        return Vec::new();
+    };
+    let Some(call) = function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. }
+                if matches!(&call.intrinsic, crate::MirIntrinsic::FilumReduce(_)) =>
+            {
+                Some(call)
+            }
+            _ => None,
+        })
+    else {
+        return Vec::new();
+    };
+    let args = &call.args;
+    let key_operands: usize = filum.group.as_ref().map_or(0, |group| {
+        group.keys.iter().map(|key| key.captures as usize + 1).sum()
+    });
+    // Capture runs as `(start, count)` in the node's operand list.
+    let mut runs = Vec::new();
+    if let Some(captures) = filum.term_captures {
+        let captures = captures as usize;
+        if let Some(function_at) = args.len().checked_sub(key_operands + 1) {
+            if let Some(start) = function_at.checked_sub(captures) {
+                runs.push((start, captures));
+            }
+        }
+    }
+    if let Some(group) = &filum.group {
+        let mut at = args.len().saturating_sub(key_operands);
+        for key in &group.keys {
+            runs.push((at, key.captures as usize));
+            at += key.captures as usize + 1;
+        }
+    }
+    let aliases = ParameterAliases::new(function);
+    let mut tensors = Vec::new();
+    for (start, count) in runs {
+        for operand in args.iter().skip(start).take(count) {
+            let MirOperand::Place(place) = operand else {
+                continue;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                continue;
+            };
+            if !place.projections.is_empty() {
+                continue;
+            }
+            let local = aliases.resolve(local);
+            let is_tensor_param = function.params.iter().any(|param| {
+                param.local == local
+                    && matches!(
+                        validation.types.get(param.ty.semantic_id()),
+                        Type::Tensor(..)
+                    )
+            });
+            if is_tensor_param && !tensors.contains(&local) {
+                tensors.push(local);
+            }
+        }
+    }
+    tensors
+}
+
 /// The whole-source scan node and its source parameter (alias-resolved).
 pub(crate) fn scan_node(function: &MirFunction) -> Option<(&MirScanOp, MirLocalId)> {
     function
@@ -1072,7 +1153,9 @@ pub(crate) fn append_matmul_runtime_extent_resources(
 /// fault site, LAST. Sites are tensor index forms (loads before stores), then
 /// distinct run-time vector index operands in first-use MIR order, then one
 /// grouped-key validity slot per output axis, then one slot per constant throw
-/// (see [`super::throw_sites`]). A kernel whose every
+/// (see [`super::throw_sites`]). A whole-grid reduction adds, after its
+/// grouped-key slots, one slot per tensor captured into a term or key helper
+/// (see [`grid_reduce_helper_tensors`]). A kernel whose every
 /// tensor index is proven and that has no vector index or throw is untouched.
 fn append_fault_resources(
     function: &MirFunction,
@@ -1088,7 +1171,13 @@ fn append_fault_resources(
         + scan_node(function)
             .and_then(|(scan, _)| scan.group.as_ref())
             .map_or(0, |group| group.axes.len());
-    if forms.is_empty() && vector_forms.is_empty() && group_axes == 0 && throws == 0 {
+    let helper_tensors = grid_reduce_helper_tensors(function, validation);
+    if forms.is_empty()
+        && vector_forms.is_empty()
+        && group_axes == 0
+        && throws == 0
+        && helper_tensors.is_empty()
+    {
         return Ok(());
     }
     let word = validation
@@ -1099,6 +1188,11 @@ fn append_fault_resources(
     for form in &forms {
         if !tensors.contains(&form.tensor) {
             tensors.push(form.tensor);
+        }
+    }
+    for tensor in &helper_tensors {
+        if !tensors.contains(tensor) {
+            tensors.push(*tensor);
         }
     }
     let mut next_binding = next_free_binding(signature);
@@ -1125,8 +1219,10 @@ fn append_fault_resources(
         });
         next_binding += 1;
     }
-    let sites = u32::try_from(forms.len() + vector_forms.len() + group_axes + throws)
-        .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
+    let sites = u32::try_from(
+        forms.len() + vector_forms.len() + helper_tensors.len() + group_axes + throws,
+    )
+    .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
     signature.extra_inputs.push(MirKernelResource {
         group: DEFAULT_KERNEL_RESOURCE_GROUP,
         binding: next_binding,
