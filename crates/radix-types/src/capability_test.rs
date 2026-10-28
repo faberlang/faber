@@ -37,7 +37,7 @@ fn vocabulary_keeps_similar_type_capabilities_distinct() {
 #[test]
 fn every_classified_reason_has_a_stable_code() {
     for reason in CapabilityReason::ALL {
-        assert!(!reason.code().is_empty());
+        assert_ne!(reason.code(), "");
         assert_eq!(reason.to_string(), reason.code());
     }
 }
