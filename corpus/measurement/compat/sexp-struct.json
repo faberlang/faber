@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 473,
-    "analyzable": 531
+    "analyzable": 533
   },
   "terms": [
     {
@@ -415,7 +415,7 @@
       "term": "implendum",
       "rule": "keyword",
       "capable": 3,
-      "analyzable": 4
+      "analyzable": 5
     },
     {
       "term": "implet",
@@ -1129,7 +1129,7 @@
       "term": "∪",
       "rule": "keyword",
       "capable": 3,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "∴",
