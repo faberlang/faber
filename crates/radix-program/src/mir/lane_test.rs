@@ -1066,12 +1066,7 @@ fn package_mir_return_channel_mismatch_without_conversion_fails_closed() {
         "expected the declared-conversion-absent diagnostic, got {:?}",
         diagnostics
             .iter()
-            .map(|diagnostic| {
-                (
-                    diagnostic.code,
-                    diagnostic.issue().map(str::to_owned),
-                )
-            })
+            .map(|diagnostic| { (diagnostic.code, diagnostic.issue().map(str::to_owned),) })
             .collect::<Vec<_>>()
     );
 }

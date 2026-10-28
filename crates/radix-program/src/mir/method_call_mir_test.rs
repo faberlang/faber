@@ -233,9 +233,7 @@ fn package_mir_nested_library_method_calls_execute() {
         &crate::test_support::test_mir_seams(),
         &mut host,
     )
-    .unwrap_or_else(|diagnostics| {
-        panic!("nested tensor method calls must link: {diagnostics:?}")
-    });
+    .unwrap_or_else(|diagnostics| panic!("nested tensor method calls must link: {diagnostics:?}"));
     assert_nested_tensor_output(host.stdout_lines);
 }
 
@@ -343,9 +341,7 @@ fn package_test_self_provider_nested_tensor_methods_execute() {
         },
     )
     .unwrap_or_else(|diagnostics| {
-        panic!(
-            "self-provider nested tensor methods must lower: {diagnostics:?}",
-        )
+        panic!("self-provider nested tensor methods must lower: {diagnostics:?}",)
     });
     assert_nested_tensor_output(output);
 }
@@ -517,9 +513,7 @@ fn package_test_sibling_union_payloads_project() {
         },
     )
     .unwrap_or_else(|diagnostics| {
-        panic!(
-            "sibling union payload projections must link: {diagnostics:?}",
-        )
+        panic!("sibling union payload projections must link: {diagnostics:?}",)
     });
     assert_eq!(
         output,
@@ -589,9 +583,7 @@ fn package_mir_nested_library_method_calls_link_through_test_package() {
         },
     )
     .unwrap_or_else(|diagnostics| {
-        panic!(
-            "nested tensor method calls must lower on the test-link lane: {diagnostics:?}",
-        )
+        panic!("nested tensor method calls must lower on the test-link lane: {diagnostics:?}",)
     });
     assert_nested_tensor_output(output);
 }
