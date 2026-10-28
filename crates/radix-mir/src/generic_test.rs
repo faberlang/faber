@@ -498,6 +498,31 @@ fn witness_binds_shape_params_from_tensor_shapes() {
 }
 
 #[test]
+fn witness_binds_type_and_capacity_params_from_bounded_arrays() {
+    let mut types = TypeTable::new();
+    let element_param = types.intern(Type::Param(Symbol(300)));
+    let capacity_param = types.intern_index(IndexExpr::Param(Symbol(301)));
+    let expected = types.bounded_array(element_param, capacity_param);
+    let element = f32_ty(&mut types);
+    let literal_three = types.intern_index(IndexExpr::Literal(3));
+    let actual = types.bounded_array(element, literal_three);
+
+    let mut bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    assert!(bind_generic_type_witness_with_shapes(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+        &mut shape_bindings,
+    ));
+    let bound = bindings.get(&Symbol(300)).copied().expect("T bound");
+    assert!(types.equals(bound.semantic_id(), element));
+    let capacity = shape_bindings.get(&Symbol(301)).copied().expect("N bound");
+    assert_eq!(types.get_index(capacity), &IndexExpr::Literal(3));
+}
+
+#[test]
 fn union_mismatch_undoes_partial_shape_bindings() {
     let mut types = TypeTable::new();
     let element = f32_ty(&mut types);

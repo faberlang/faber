@@ -4,10 +4,30 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-fn temp_path(label: &str) -> PathBuf {
+struct TestTempDir(PathBuf);
+
+impl Drop for TestTempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn temp_path(label: &str) -> (TestTempDir, PathBuf) {
+    // The PID separates concurrent test binaries; the counter separates tests
+    // in one binary. create_dir also safely skips any stale path from PID reuse.
     static NEXT: AtomicU64 = AtomicU64::new(0);
-    let n = NEXT.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!("faber-leaf-fs-{label}-{n}"))
+    let temp_root = std::env::temp_dir();
+    let dir = loop {
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        let path = temp_root.join(format!("faber-leaf-fs-{label}-{}-{n}", std::process::id()));
+        match fs::create_dir(&path) {
+            Ok(()) => break path,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("create test temp directory {}: {error}", path.display()),
+        }
+    };
+    let path = dir.join(label);
+    (TestTempDir(dir), path)
 }
 
 fn serve_ok(route: &str, args: &[Arg]) -> Reply {
@@ -24,7 +44,7 @@ fn unknown_route_is_not_this_leaf() {
 
 #[test]
 fn write_then_read_text_round_trips() {
-    let path = temp_path("roundtrip");
+    let (_temp, path) = temp_path("roundtrip");
     let path_text = path.to_string_lossy().into_owned();
     assert!(matches!(
         serve_ok(
@@ -45,7 +65,7 @@ fn write_then_read_text_round_trips() {
 
 #[test]
 fn read_lines_splits_on_newlines() {
-    let path = temp_path("lines");
+    let (_temp, path) = temp_path("lines");
     let path_text = path.to_string_lossy().into_owned();
     fs::write(&path, "one\ntwo\nthree\n").expect("write");
     assert_eq!(
@@ -57,7 +77,7 @@ fn read_lines_splits_on_newlines() {
 
 #[test]
 fn find_reports_an_absolute_offset_or_minus_one() {
-    let path = temp_path("find");
+    let (_temp, path) = temp_path("find");
     let path_text = path.to_string_lossy().into_owned();
     fs::write(&path, "alpha beta gamma").expect("write");
     let find = |pattern: &str, offset: i64| {
@@ -121,7 +141,7 @@ fn temp_dir_is_canonical_without_trailing_separator() {
 
 #[test]
 fn status_reports_byte_length() {
-    let path = temp_path("status");
+    let (_temp, path) = temp_path("status");
     let path_text = path.to_string_lossy().into_owned();
     fs::write(&path, "stat").expect("write");
     let Reply::Map(fields) = serve_ok("solum:status", &[Arg::Str(path_text)]) else {
@@ -152,7 +172,7 @@ fn route_list_matches_serve() {
 
 #[test]
 fn conde_replaces_text_and_bytes_completely() {
-    let dir = temp_path("conde");
+    let (_temp, dir) = temp_path("conde");
     fs::create_dir_all(&dir).expect("create dir");
     let path = dir.join("target.bin");
     let path_text = path.to_string_lossy().into_owned();
@@ -207,7 +227,7 @@ fn conde_replaces_text_and_bytes_completely() {
 #[test]
 fn conde_failure_leaves_old_file_intact() {
     use std::os::unix::fs::PermissionsExt;
-    let dir = temp_path("conde-failure");
+    let (_temp, dir) = temp_path("conde-failure");
     fs::create_dir_all(&dir).expect("create dir");
     let target = dir.join("target.bin");
     fs::write(&target, b"old-complete").expect("write old");
@@ -246,7 +266,7 @@ fn conde_failure_leaves_old_file_intact() {
 #[test]
 fn conde_fails_before_replacing_when_the_directory_cannot_be_read() {
     use std::os::unix::fs::PermissionsExt;
-    let dir = temp_path("conde-unreadable-dir");
+    let (_temp, dir) = temp_path("conde-unreadable-dir");
     fs::create_dir_all(&dir).expect("create dir");
     let target = dir.join("target.bin");
     fs::write(&target, b"old-complete").expect("write old");
@@ -280,7 +300,7 @@ fn conde_fails_before_replacing_when_the_directory_cannot_be_read() {
 
 #[test]
 fn conde_directory_target_errors_and_leaves_no_temporary() {
-    let dir = temp_path("conde-directory");
+    let (_temp, dir) = temp_path("conde-directory");
     fs::create_dir_all(&dir).expect("create dir");
     let sibling = dir.join("sibling.bin");
     fs::write(&sibling, b"sibling").expect("write sibling");
@@ -316,7 +336,7 @@ fn conde_directory_target_errors_and_leaves_no_temporary() {
 
 #[test]
 fn touch_updates_mtime_and_does_not_truncate() {
-    let path = temp_path("touch");
+    let (_temp, path) = temp_path("touch");
     let path_text = path.to_string_lossy().into_owned();
     fs::write(&path, "content").expect("write");
     let file = fs::File::options().write(true).open(&path).expect("open");
@@ -346,7 +366,7 @@ fn touch_updates_mtime_and_does_not_truncate() {
 
 #[test]
 fn touch_creates_missing_file() {
-    let path = temp_path("touch-create");
+    let (_temp, path) = temp_path("touch-create");
     let path_text = path.to_string_lossy().into_owned();
     assert!(matches!(
         serve_ok("solum:tange", &[Arg::Str(path_text)]),
@@ -360,8 +380,8 @@ fn touch_creates_missing_file() {
 #[test]
 fn mode_follows_symlink() {
     use std::os::unix::fs::{PermissionsExt, symlink};
-    let target = temp_path("mode-target");
-    let link = temp_path("mode-link");
+    let (_target_temp, target) = temp_path("mode-target");
+    let (_link_temp, link) = temp_path("mode-link");
     fs::write(&target, "").expect("write");
     fs::set_permissions(&target, fs::Permissions::from_mode(0o640)).expect("perm");
     symlink(&target, &link).expect("symlink");

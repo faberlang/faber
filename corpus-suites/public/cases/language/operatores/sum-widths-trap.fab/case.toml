@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/operatores/sum-widths-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/sum-widths-trap.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout = "stdout.expected"
+stderr_contains = "300 does not fit in `u8`"
+check_only = false

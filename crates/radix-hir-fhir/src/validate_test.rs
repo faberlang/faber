@@ -657,6 +657,125 @@ fn zero_argument_non_u8_array_form_fails_closed() {
     }
 }
 
+/// Artifact with one declared local whose finalized type is the bounded byte
+/// buffer `list<b8, 8>` ([`Type::BoundedOcteti`]); the authored form is a
+/// semantic head at `level` carrying the `args` built from the interned
+/// `b8` element type.
+fn bounded_octeti_artifact(
+    level: TypeFormLevel,
+    args: impl FnOnce(radix_types::TypeId) -> Vec<radix_hir::HirTypeFormArg>,
+) -> crate::artifact::HirArtifact {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let b8 = types.intern(Type::Bits(BitsWidth::B8));
+    let capacity = types.intern_index(radix_types::IndexExpr::Literal(8));
+    let witness = types.bounded_array(b8, capacity);
+    assert!(matches!(types.get(witness), Type::BoundedOcteti { .. }));
+    let local_def = DefId(USER_DEF_ID_BASE + 20);
+    artifact.interner = vec!["main".to_owned(), "test".to_owned(), "b".to_owned()];
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Local(radix_hir::HirLocal {
+                def_id: local_def,
+                name: Symbol(2),
+                ty: Some(witness),
+                init: None,
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: None,
+                size_decl: false,
+                size_static: false,
+            }),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    let args = args(b8);
+    artifact.types = types.snapshot();
+    artifact.presentation.authored_types = vec![radix_hir::HirAuthoredTypeUse {
+        site: radix_hir::HirTypeSite {
+            owner: radix_hir::HirOwnerRef::Def(local_def),
+            slot: radix_hir::HirTypeSlot::Declared,
+        },
+        form: radix_hir::HirTypeForm {
+            ty: witness,
+            head: radix_hir::HirTypeFormHead::Semantic(level),
+            args,
+            label: None,
+        },
+    }];
+    artifact
+}
+
+fn bits_child(ty: radix_types::TypeId) -> radix_hir::HirTypeFormArg {
+    radix_hir::HirTypeFormArg::Type(Box::new(radix_hir::HirTypeForm {
+        ty,
+        head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::SHORT),
+        args: Vec::new(),
+        label: None,
+    }))
+}
+
+#[test]
+fn bounded_octeti_authored_list_form_validates() {
+    // The authored `list<b8, N>`: a LONG list head over one `b8` element, the
+    // capacity carried by the root witness.
+    let artifact = bounded_octeti_artifact(TypeFormLevel::LONG, |b8| vec![bits_child(b8)]);
+    crate::decode(&crate::encode(&artifact).expect("encode bounded octeti artifact"))
+        .unwrap_or_else(|err| panic!("an authored list<b8, N> form must validate: {err:?}"));
+}
+
+fn assert_bounded_octeti_rejected(
+    artifact: &crate::artifact::HirArtifact,
+    issue: &str,
+    what: &str,
+) {
+    let err = crate::decode(&crate::encode(artifact).expect("encode malformed artifact"))
+        .expect_err("a malformed bounded octeti form must fail closed");
+    assert!(
+        matches!(
+            &err,
+            crate::error::HirArtifactError::InvalidPresentation { issue: got, .. } if *got == issue
+        ),
+        "{what}: expected {issue}, got {err:?}"
+    );
+}
+
+#[test]
+fn bounded_octeti_malformed_forms_fail_closed() {
+    // No element argument (the old zero-argument spelling).
+    let artifact = bounded_octeti_artifact(TypeFormLevel::LONG, |_| Vec::new());
+    assert_bounded_octeti_rejected(&artifact, "bounded_octeti_shape", "no element argument");
+
+    // A list head is LONG; a short level is not a list spelling.
+    let artifact = bounded_octeti_artifact(TypeFormLevel::SHORT, |b8| vec![bits_child(b8)]);
+    assert_bounded_octeti_rejected(&artifact, "bounded_octeti_shape", "short level");
+
+    // A second argument has no place: the capacity is the root witness.
+    let artifact = bounded_octeti_artifact(TypeFormLevel::LONG, |b8| {
+        vec![bits_child(b8), bits_child(b8)]
+    });
+    assert_bounded_octeti_rejected(&artifact, "bounded_octeti_shape", "two arguments");
+
+    // A size argument in place of the element type.
+    let artifact = bounded_octeti_artifact(TypeFormLevel::LONG, |_| {
+        vec![radix_hir::HirTypeFormArg::Size(radix_types::IndexId(0))]
+    });
+    assert_bounded_octeti_rejected(&artifact, "type_argument_kind", "size argument");
+
+    // An element that is not the raw-byte word.
+    let artifact = bounded_octeti_artifact(TypeFormLevel::LONG, |_| {
+        vec![bits_child(radix_types::TypeId(0))]
+    });
+    assert_bounded_octeti_rejected(&artifact, "bounded_octeti_element", "non-b8 element");
+}
+
 /// Artifact with one generic transparent alias `type Pairs<T> = list<T>` and
 /// one declared local whose finalized witness is `list<int>`; the authored
 /// form names the alias head and carries `child` as its one type argument.

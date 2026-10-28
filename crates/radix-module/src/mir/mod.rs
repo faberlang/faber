@@ -81,6 +81,10 @@ mod kernel_host_lowering_test;
 #[cfg(test)]
 #[path = "fault_sites_test.rs"]
 mod fault_sites_test;
+
+#[cfg(test)]
+#[path = "index_proof_test.rs"]
+mod index_proof_test;
 #[cfg(all(test, feature = "mir-metal"))]
 #[path = "shift_view_test.rs"]
 mod shift_view_test;

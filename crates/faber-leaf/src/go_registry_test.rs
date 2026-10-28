@@ -18,6 +18,13 @@ fn go_registry_matches_leaf_routes() {
         "leaf_process.go",
         "leaf_clock.go",
         "leaf_entropy.go",
+        "leaf_fs.go",
+        "leaf_fs_path.go",
+        "leaf_tcp.go",
+        "leaf_http_client.go",
+        "leaf_http_server.go",
+        "leaf_websocket.go",
+        "leaf_machine.go",
     ];
     let mut go_routes = BTreeSet::new();
     for file in go_files {
@@ -40,6 +47,11 @@ fn go_registry_matches_leaf_routes() {
         .chain(crate::process::ROUTES)
         .chain(crate::clock::ROUTES)
         .chain(crate::entropy::ROUTES)
+        .chain(crate::fs::ROUTES)
+        .chain(crate::tcp::ROUTES)
+        .chain(crate::http::ROUTES)
+        .chain(crate::websocket::ROUTES)
+        .chain(crate::machine::ROUTES)
         .map(|route| (*route).to_owned())
         .collect::<BTreeSet<_>>();
 

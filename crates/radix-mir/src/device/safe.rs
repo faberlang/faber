@@ -832,11 +832,16 @@ impl<'a> DeviceSafeClassifier<'a> {
             let field_read =
                 |name: &radix_lexer::Symbol| layout.fields.iter().any(|field| field.name == *name);
             let admitted = match place.projections.as_slice() {
-                [MirProjection::Index(_), MirProjection::Field(name)]
-                | [
-                    MirProjection::Index(_),
+                [
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_),
                     MirProjection::Field(name),
-                    MirProjection::Index(_) | MirProjection::VectorLane(_),
+                ]
+                | [
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_),
+                    MirProjection::Field(name),
+                    MirProjection::Index(_)
+                    | MirProjection::ProvenIndex(_)
+                    | MirProjection::VectorLane(_),
                 ] => field_read(name),
                 _ => false,
             };
@@ -861,6 +866,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             matches!(
                 projection,
                 MirProjection::Index(_)
+                    | MirProjection::ProvenIndex(_)
                     | MirProjection::VectorLane(_)
                     | MirProjection::MatrixCell { .. }
             )

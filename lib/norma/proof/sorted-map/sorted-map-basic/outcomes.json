@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: sorted_map",
-      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:sorted_map` module this proof imports, so the generated `main.go` calls `sorted_map.*` with no such package-level identifier and `go build` stops with `undefined: sorted_map`. Re-measure this row when the Go package emitter lowers that module binding."
+      "diagnostic_contains": "invalid map key type K (missing comparable constraint)",
+      "reason": "The Go emitter does not constrain a generic map key type parameter with `comparable` (`invalid map key type K`), so a carried generic Norma map module does not compile; the emitter unit is open."
     }
   }
 }

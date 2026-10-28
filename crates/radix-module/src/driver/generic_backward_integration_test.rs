@@ -853,3 +853,89 @@ fn device_resident_backward_companion_carries_compute_stage() {
         "a host primal's companion stays a host helper; reference-only execution remains explicit"
     );
 }
+
+#[test]
+fn concrete_caller_calls_generic_primal_and_its_companion() {
+    let source = format!(
+        "{GENERIC_SIMPLE_LOSS_SOURCE}\n{}",
+        r"
+functio nil() → vacuum {
+    tacet
+}
+
+incipit {
+    sit tensor<f32, [2, 8]> x ← vacua
+    sit tensor<f32, [2, 8]> w ← vacua
+    sit f32 loss ← simple_loss(x, w)
+    sit [gx, gw] ← loss_backward(x, w, nil(), 1.0)
+    nota loss
+}
+"
+    );
+    let session = test_session_la(Target::MirLlvm);
+    let mut analysis = analyze_source(&session, "generic_primal_and_companion.fab", &source, AnalyzeRequest::default())
+        .expect("a concrete caller of a generic primal and its companion should analyze");
+    let lowered = expect_codegen_ok(
+        lower_mir_with_context_for_target(&mut analysis, false),
+        "a concrete caller of a generic primal and its companion should lower",
+    );
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
+    assert!(names.iter().any(|name| name == "loss_backward"), "functions: {names:?}");
+    assert_no_dangling_definition_callees(lowered.validated.program());
+}
+
+#[test]
+fn fmir_concrete_caller_calls_generic_primal_and_its_companion() {
+    let source = format!(
+        "{GENERIC_SIMPLE_LOSS_SOURCE}\n{}",
+        r"
+functio nil() → vacuum {
+    tacet
+}
+
+incipit {
+    sit tensor<f32, [2, 8]> x ← vacua
+    sit tensor<f32, [2, 8]> w ← vacua
+    sit f32 loss ← simple_loss(x, w)
+    sit [gx, gw] ← loss_backward(x, w, nil(), 1.0)
+    nota loss
+}
+"
+    );
+    let session = test_session_la(Target::MirFmirBinary);
+    let mut analysis = analyze_source(
+        &session,
+        "fmir_generic_primal_and_companion.fab",
+        &source,
+        AnalyzeRequest::default(),
+    )
+    .expect("a concrete caller of a generic primal and its companion should analyze");
+    let lowered = expect_codegen_ok(
+        lower_mir_with_context_for_target(&mut analysis, false),
+        "a concrete caller of a generic primal and its companion should lower",
+    );
+    let names = mir_function_names(lowered.validated.program(), &lowered.interner);
+    assert!(names.iter().any(|name| name == "loss_backward"), "functions: {names:?}");
+    assert_no_dangling_definition_callees(lowered.validated.program());
+}
+
+/// Every `Definition` callee of a lowered program names a function the program
+/// holds: a call left on a template or companion identity that no function
+/// carries would fail at run time with a missing-function error.
+fn assert_no_dangling_definition_callees(program: &crate::mir::MirProgram) {
+    use crate::mir::{MirCallee, MirStatementKind};
+    let sources: std::collections::HashSet<_> = program
+        .functions
+        .iter()
+        .filter_map(|function| function.source)
+        .collect();
+    for function in &program.functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::Call { callee: MirCallee::Definition { source, .. }, .. } = &statement.kind {
+                    assert!(sources.contains(source), "dangling callee definition {source:?}");
+                }
+            }
+        }
+    }
+}

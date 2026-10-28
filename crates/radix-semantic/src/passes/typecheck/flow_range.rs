@@ -22,9 +22,13 @@
 //! Any call, mutating intrinsic, closure call, or store through an alias or
 //! projection kills every fact about a mutable source: facts whose subject
 //! binding is mutable, and facts with a live-length endpoint on a mutable
-//! source. The kill also moves the source's mutation version, so a stale
+//! source. A list is a mutable source whatever its binding: a `let` list, an
+//! unmarked parameter, a field read or an element of another list can all be
+//! the same object a `mut` name writes, and the checker does not prove a list
+//! unaliased. The kill also moves the source's mutation version, so a stale
 //! live-length identity can never compare equal to a fresh one. Facts on `let`
-//! bindings, captured loop endpoints and fixed tensor extents survive.
+//! integer bindings, captured loop endpoints and fixed tensor extents survive;
+//! so does a text length (a text value is never written in place).
 //!
 //! `FactKey::Field` joins are not built, so interval facts are keyed by binding
 //! only; a range value attached to a field-path key is ignored.
@@ -423,11 +427,34 @@ impl RangeFlow {
         }
     }
 
+    /// Every source some fact is currently bounded by the live length of.
+    pub(super) fn live_length_sources(&self) -> Vec<DefId> {
+        let mut sources: Vec<DefId> = self
+            .now
+            .facts
+            .values()
+            .flat_map(IntRange::live_length_sources)
+            .map(|(source, _)| source)
+            .collect();
+        sources.sort_by_key(|def| def.0);
+        sources.dedup();
+        sources
+    }
+
     /// Kill every fact about a mutable source (the version-1 closed rule):
     /// facts whose subject is mutable, and the endpoints bounded by the live
-    /// length of a mutable source (the rest of such a fact stays). Every
-    /// killed source gets a fresh version.
-    pub(super) fn kill_mutable_sources(&mut self, is_mutable: impl Fn(DefId) -> bool) {
+    /// length of a source another name may write (the rest of such a fact
+    /// stays). Every killed source gets a fresh version.
+    ///
+    /// `is_mutable` is whether a binding can itself be stored to. `is_aliased`
+    /// is whether a source's contents can change through some other name: a
+    /// `let` list can alias a `mut` one, so a live length is bounded by a
+    /// binding that no store through it can write yet a call can.
+    pub(super) fn kill_mutable_sources(
+        &mut self,
+        is_mutable: impl Fn(DefId) -> bool,
+        is_aliased: impl Fn(DefId) -> bool,
+    ) {
         let mut moved: Vec<DefId> = Vec::new();
         self.now.facts.retain(|subject, range| {
             if is_mutable(*subject) {
@@ -439,7 +466,7 @@ impl RangeFlow {
                 let on_mutable = endpoint
                     .as_ref()
                     .and_then(|endpoint| endpoint.key.live_length_source())
-                    .filter(|(source, _)| is_mutable(*source));
+                    .filter(|(source, _)| is_mutable(*source) || is_aliased(*source));
                 if let Some((source, _)) = on_mutable {
                     moved.push(source);
                     *endpoint = None;

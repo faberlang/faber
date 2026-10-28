@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 473,
-    "analyzable": 533
+    "capable": 478,
+    "analyzable": 541
   },
   "terms": [
     {
@@ -18,8 +18,8 @@
     {
       "term": "!.",
       "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "![",
@@ -36,7 +36,7 @@
     {
       "term": "?(",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -492,8 +492,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 14,
-      "analyzable": 16
+      "capable": 15,
+      "analyzable": 18
     },
     {
       "term": "manifest",
@@ -688,12 +688,6 @@
       "analyzable": 1
     },
     {
-      "term": "primus_quem",
-      "rule": "concept",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
       "term": "privata",
       "rule": "keyword",
       "capable": 1,
@@ -744,6 +738,12 @@
     {
       "term": "reddet",
       "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "reducta-first",
+      "rule": "concept",
       "capable": 1,
       "analyzable": 1
     },
@@ -1074,8 +1074,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 29,
-      "analyzable": 43
+      "capable": 30,
+      "analyzable": 44
     },
     {
       "term": "⇇",
@@ -1086,8 +1086,8 @@
     {
       "term": "⇐",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "⇒",
@@ -1104,8 +1104,8 @@
     {
       "term": "⇥",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "∈",
@@ -1134,8 +1134,8 @@
     {
       "term": "∴",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 3,
+      "analyzable": 4
     },
     {
       "term": "∷",

@@ -1370,15 +1370,15 @@ functio grid(numerus m, numerus n) → numerus {
 #[test]
 fn suppresses_purity_declines_once_typecheck_has_failed() {
     // `x + flag` fails typecheck (tf32 + bivalens) and leaves the binary
-    // expression error-typed, so the `primus_quem` source has no reliable
+    // expression error-typed, so the `prima` reduction source has no reliable
     // tensor shape. The purity gate must be skipped rather than read that
-    // broken type and stack `first_match_unbounded_source` on the type
+    // broken type and stack `reducta_first_unbounded_source` on the type
     // error — the same skip `air_unroll` above it already applies.
     let errors = analyze(
         r#"
 @ radix lane "air"
 functio pick(tf32[2, 2] x, bivalens flag) → fractus ∪ nihil {
-    redde primus_quem(x + flag, ubi v { v ≻ 0.0 })
+    redde reducta via prima ex x + flag sit v { redde v ≻ 0.0 }
 }
 "#,
     );
@@ -1626,4 +1626,82 @@ functio f(tensor<f32, [4]> x) → f32 {
             .any(|err| err.kind == SemanticErrorKind::AirPurityViolation),
         "{errors:?}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// `reducta via prima`: the first reduction admits on the AIR lane over a
+// statically bounded source; every other reduction stays outside the subset.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn first_reduction_admits_over_static_tensor_shapes() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio elige(tf32[4] x) → fractus ∪ nihil {
+    redde reducta via prima ex x sit v { redde v ≻ 0.0 }
+}
+
+@ radix lane "air"
+functio elige_vacuum(tf32[0] x) → fractus ∪ nihil {
+    redde reducta via prima ex x sit v { redde v ≻ 0.0 }
+}
+
+@ radix lane "air"
+functio elige_matrix(tf32[2, 2] x) → fractus ∪ nihil {
+    redde reducta via prima ex x apud [i, j] sit v { redde v ≻ 0.0 }
+}
+"#,
+    );
+    assert!(
+        errors.is_empty(),
+        "first reductions admit over bounded sources: {errors:?}"
+    );
+}
+
+/// A tensor whose extent is a runtime value cannot be written in a signature,
+/// and a generic template is not an executable AIR body, so the unbounded
+/// gate is proven on the classifier it calls.
+#[test]
+fn first_source_bound_classifier_declines_a_non_literal_extent() {
+    use radix_hir::{HirExpression, HirExpressionKind, HirId};
+    use radix_types::{IndexExpr, Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let element = types.primitive(Primitive::Fractus);
+    let literal = types.intern_index(IndexExpr::Literal(4));
+    let bounded = types.tensor_with_shape(element, literal);
+    let parameter = types.intern_index(IndexExpr::Param(radix_lexer::Symbol(0)));
+    let unbounded = types.tensor_with_shape(element, parameter);
+    let source = |ty| HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Vacua,
+        ty: Some(ty),
+        span: radix_lexer::Span::new(0, 1),
+    };
+    assert!(super::air_unroll::first_source_is_bounded(
+        &source(bounded),
+        &types
+    ));
+    assert!(!super::air_unroll::first_source_is_bounded(
+        &source(unbounded),
+        &types
+    ));
+    assert!(!super::air_unroll::first_source_is_bounded(
+        &source(element),
+        &types
+    ));
+}
+
+#[test]
+fn other_reductions_stay_outside_the_air_subset() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio total(tf32[4] x) → fractus {
+    redde reducta via summa ex x
+}
+"#,
+    );
+    expect_air_issue(&errors, "reducta_expression_unsupported");
 }

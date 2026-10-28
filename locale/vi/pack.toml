@@ -88,8 +88,6 @@ reddet = "đợi_trả"
 tacebit = "đợi_bỏ"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "tập_rỗng"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "tổng"
 filum = "sợi"
 maxima = "lớn_nhất"
@@ -163,6 +161,7 @@ numeratio = "đếm"
 quilibet = "bất_kỳ"
 argmaxima = "argmax"
 argminima = "argmin"
+prima = "đầu_tiên"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "sắp_xếp"
 ascendens = "tăng_dần"
@@ -4017,18 +4016,6 @@ message = "cần ']' sau biểu thức chỉ mục không null"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "cần ')' sau các đối số lời gọi không null"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "cần '(' sau 'primus_quem'"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "cần ',' sau nguồn của first-match"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "cần phần đuôi predicate 'ubi'"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "cần ')' sau predicate của first-match"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường của bộ khởi tạo"
 
@@ -4212,3 +4199,9 @@ help = "'⇇' hiện sao chép các giá trị ở vế phải vào vùng lưu t
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "hợp đồng sinking phải khai báo chính xác `sink(T) → vacuum ⇥ E` và `flush() → vacuum ⇥ E` với một tham số kiểu"
 help = "khai báo `{implendum} Sink<T>` với `{functio} sink(T res) → vacuum ⇥ E` và `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "kernel `{kernel}` chạy tuần tự trên thiết bị {device}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "kernel `{kernel}`: {kind} của nó trên {partitions} phân vùng có thể tránh được: {avoidable} ({reason})"

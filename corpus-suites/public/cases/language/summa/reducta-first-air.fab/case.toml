@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/summa/reducta-first-air.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/reducta-first-air.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "requires a MIR-backed target; target 'rust' is currently HIR-direct"
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "TARGETLANE001:lane_requires_mir_backed_target"

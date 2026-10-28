@@ -16,7 +16,15 @@ use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Interner;
-use radix_mir::*;
+use radix_mir::{
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlockId,
+    MirCallee, MirCaptureMode, MirClosureEnvironment, MirClosureEnvironmentId, MirCollectionOp,
+    MirConstant, MirConversion, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic,
+    MirLocalId, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirParamMode,
+    MirPlace, MirPlaceBase, MirProgram, MirProjection, MirRuntimeCall, MirSermoOp, MirStatement,
+    MirStatementKind, MirSwitchCase, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirUnOp,
+    MirValue, MirValueId, MirValueKind,
+};
 use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{
     BitsWidth, MirMathFunction, NumericWidth, Primitive, SemanticMutability, Type, TypeId,
@@ -251,38 +259,11 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             }
             Ok(Rep::Record)
         }
-        Type::Func(signature) => {
-            if !signature.type_params.is_empty() || signature.is_async || signature.is_generator {
-                return Err(Decline::new("function value"));
-            }
-            for param in &signature.params {
-                rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
-            }
-            rep_of(table, MirType::semantic(signature.ret))?;
-            if let Some(err) = signature.err {
-                rep_of(table, MirType::semantic(err))?;
-            }
-            Ok(Rep::Func)
-        }
+        Type::Func(signature) => function_rep(table, signature),
         // An inline union is a box of one tagged payload, the optional's
         // layout without the null; a union with a none, bits or optional
         // member stays declined.
-        Type::Union(members) => {
-            for member in members {
-                if matches!(
-                    resolve(table, *member),
-                    Type::Primitive(
-                        Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
-                    ) | Type::Option(_)
-                        | Type::Bits(_)
-                        | Type::Union(_)
-                ) {
-                    return Err(Decline::new("union member"));
-                }
-                rep_of(table, MirType::semantic(*member))?;
-            }
-            Ok(Rep::Opt)
-        }
+        Type::Union(members) => union_rep(table, members),
         Type::Option(inner) => {
             if matches!(resolve(table, *inner), Type::Option(_)) {
                 return Err(Decline::new("nested optional value"));
@@ -354,6 +335,37 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
     }
 }
 
+fn union_rep(table: &TypeTable, members: &[TypeId]) -> Lowered<Rep> {
+    for member in members {
+        if matches!(
+            resolve(table, *member),
+            Type::Primitive(
+                Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
+            ) | Type::Option(_)
+                | Type::Bits(_)
+                | Type::Union(_)
+        ) {
+            return Err(Decline::new("union member"));
+        }
+        rep_of(table, MirType::semantic(*member))?;
+    }
+    Ok(Rep::Opt)
+}
+
+fn function_rep(table: &TypeTable, signature: &radix_types::FuncSig) -> Lowered<Rep> {
+    if !signature.type_params.is_empty() || signature.is_async || signature.is_generator {
+        return Err(Decline::new("function value"));
+    }
+    for param in &signature.params {
+        rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
+    }
+    rep_of(table, MirType::semantic(signature.ret))?;
+    if let Some(err) = signature.err {
+        rep_of(table, MirType::semantic(err))?;
+    }
+    Ok(Rep::Func)
+}
+
 fn abi_ty(ty: AbiTy, pointer: ClType) -> ClType {
     match ty {
         AbiTy::I8 => types::I8,
@@ -363,6 +375,14 @@ fn abi_ty(ty: AbiTy, pointer: ClType) -> ClType {
         AbiTy::Ptr => pointer,
     }
 }
+
+/// Where a failable call goes.
+enum TryTarget {
+    Direct(MirFunctionId, Option<Value>),
+    Indirect(Value, Value),
+}
+
+type TryCallInfo = (TryTarget, Vec<Rep>, Rep, Rep, Option<Signature>, Vec<bool>);
 
 /// Module-level state shared by every function being lowered.
 struct ModuleState<'a> {
@@ -405,7 +425,7 @@ fn sermo_handle_types(program: &MirProgram) -> FxHashSet<TypeId> {
     handles
 }
 
-impl<'a> ModuleState<'a> {
+impl ModuleState<'_> {
     /// Whether `ty` is a conversation handle this program opened.
     fn is_sermo_handle(&self, ty: MirType) -> bool {
         let mut id = ty.semantic_id();
@@ -834,9 +854,35 @@ impl FunctionLower<'_, '_> {
         self.builder.append_block_params_for_function_params(entry);
         self.builder.switch_to_block(entry);
 
+        let environment = self.state.closure_environment(function.id);
+        self.declare_function_slots(function, environment.as_ref())?;
+        self.bind_function_params(function, entry, environment.as_ref())?;
+
+        let reachable = self.reachable_blocks(function);
+        for (position, block) in function.blocks.iter().enumerate() {
+            let created = self.blocks[&block.id];
+            if position != 0 {
+                self.builder.switch_to_block(created);
+            }
+            if !reachable.contains(&block.id) {
+                self.builder.ins().trap(TrapCode::unwrap_user(1));
+                continue;
+            }
+            for statement in &block.statements {
+                self.statement(statement)?;
+            }
+            self.terminator(&block.terminator)?;
+        }
+        Ok(())
+    }
+
+    fn declare_function_slots(
+        &mut self,
+        function: &MirFunction,
+        environment: Option<&MirClosureEnvironment>,
+    ) -> Lowered<()> {
         let table = self.state.input.types;
         let unknown = |_: MirType| false;
-        let environment = self.state.closure_environment(function.id);
         let (cells, environments) = closure::construction_slots(function);
         self.cells = cells;
         for local in &function.locals {
@@ -891,6 +937,16 @@ impl FunctionLower<'_, '_> {
             self.declare(slot, rep);
             self.slot_tys.insert(slot, temp.ty);
         }
+        Ok(())
+    }
+
+    fn bind_function_params(
+        &mut self,
+        function: &MirFunction,
+        entry: Block,
+        environment: Option<&MirClosureEnvironment>,
+    ) -> Lowered<()> {
+        let table = self.state.input.types;
         let mut offset = usize::from(function.is_generator);
         if function.is_generator {
             self.collector = Some(self.builder.block_params(entry)[0]);
@@ -936,6 +992,10 @@ impl FunctionLower<'_, '_> {
             }
         }
 
+        Ok(())
+    }
+
+    fn reachable_blocks(&mut self, function: &MirFunction) -> FxHashSet<MirBlockId> {
         // A block no edge reaches never runs: it is closed with a trap
         // instead of being lowered, so dead code cannot decline the program.
         // A recovery region (a side-effecting `⊥` fallback) has no edge in the
@@ -1024,21 +1084,90 @@ impl FunctionLower<'_, '_> {
                 break;
             }
         }
-        for (position, block) in function.blocks.iter().enumerate() {
-            let created = self.blocks[&block.id];
-            if position != 0 {
-                self.builder.switch_to_block(created);
+        reachable
+    }
+
+    fn read_projection_bits(
+        &mut self,
+        projection: &MirProjection,
+        current: Value,
+        current_rep: Rep,
+        ty: MirType,
+    ) -> Lowered<Value> {
+        let bits = match projection {
+            MirProjection::ClosureCapture {
+                environment,
+                source,
+            } => {
+                if current_rep != Rep::Record {
+                    return Err(Decline::new("capture of a non-environment"));
+                }
+                let (position, _, _) = self.capture_slot(*environment, *source)?;
+                let position = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(position).map_err(|_| Decline::new("capture index"))?,
+                );
+                self.call_runtime(&abi::RECORD_GET, &[current, position])?
             }
-            if !reachable.contains(&block.id) {
-                self.builder.ins().trap(TrapCode::unwrap_user(1));
-                continue;
+            MirProjection::SharedCell => {
+                if current_rep != Rep::List {
+                    return Err(Decline::new("cell projection of a non-cell"));
+                }
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                self.call_runtime(&abi::LIST_GET, &[current, zero])?
             }
-            for statement in &block.statements {
-                self.statement(statement)?;
+            MirProjection::Index(index) | MirProjection::ProvenIndex(index)
+                if current_rep == Rep::Map =>
+            {
+                let (key_ty, _) = self.map_types(ty)?;
+                let (key, key_rep) = self.element_operand(index, key_ty)?;
+                let tag = self
+                    .builder
+                    .ins()
+                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key = self.element_bits(key, key_rep);
+                self.call_runtime(&abi::MAP_GET, &[current, tag, key])?
             }
-            self.terminator(&block.terminator)?;
+            MirProjection::Index(index) | MirProjection::ProvenIndex(index) => {
+                if current_rep != Rep::List && current_rep != Rep::Tuple {
+                    return Err(Decline::new("index of a non-list"));
+                }
+                let (index, index_rep) = self.scalar(index)?;
+                if index_rep != Rep::Int {
+                    return Err(Decline::new("list index representation"));
+                }
+                self.call_runtime(&abi::LIST_GET, &[current, index])?
+            }
+            MirProjection::Field(name) => {
+                if current_rep != Rep::Record {
+                    return Err(Decline::new("field of a non-genus"));
+                }
+                let (position, _) = self.field_slot(ty, *name)?;
+                let position = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+                );
+                self.call_runtime(&abi::RECORD_GET, &[current, position])?
+            }
+            MirProjection::VariantField { variant, field } => {
+                if current_rep != Rep::Record {
+                    return Err(Decline::new("variant field of a non-enum"));
+                }
+                let (position, _) = self.variant_slot(*variant, *field)?;
+                let position = self.builder.ins().iconst(
+                    types::I64,
+                    i64::try_from(position).map_err(|_| Decline::new("field index"))?,
+                );
+                self.call_runtime(&abi::RECORD_GET, &[current, position])?
+            }
+            _ => {
+                return Err(Decline::new(format!(
+                    "place projection {projection:?} read"
+                )));
+            }
         }
-        Ok(())
+        .ok_or_else(|| Decline::new("projection result"))?;
+        Ok(bits)
     }
 
     fn declare(&mut self, slot: Slot, rep: Rep) {
@@ -1349,7 +1478,7 @@ impl FunctionLower<'_, '_> {
     /// The type after one projection step.
     fn projected_type(&self, ty: MirType, projection: &MirProjection) -> Lowered<MirType> {
         match projection {
-            MirProjection::Index(index) => {
+            MirProjection::Index(index) | MirProjection::ProvenIndex(index) => {
                 match resolve(self.state.input.types, ty.semantic_id()) {
                     Type::Map(_, value) => Ok(MirType::semantic(*value)),
                     Type::Tuple(elements) => match index {
@@ -1702,7 +1831,9 @@ impl FunctionLower<'_, '_> {
         let mut current = self.builder.use_var(variable);
         let mut current_rep = rep;
         for projection in &place.projections {
-            if let (MirProjection::Index(index), Rep::Text) = (projection, current_rep) {
+            if let (MirProjection::Index(index) | MirProjection::ProvenIndex(index), Rep::Text) =
+                (projection, current_rep)
+            {
                 let (index, index_rep) = self.scalar(index)?;
                 if index_rep == Rep::Tuple {
                     // The runtime ends the run itself on a window outside the text.
@@ -1730,77 +1861,7 @@ impl FunctionLower<'_, '_> {
                 }
                 _ => rep_of(self.state.input.types, next)?,
             };
-            let bits = match projection {
-                MirProjection::ClosureCapture {
-                    environment,
-                    source,
-                } => {
-                    if current_rep != Rep::Record {
-                        return Err(Decline::new("capture of a non-environment"));
-                    }
-                    let (position, _, _) = self.capture_slot(*environment, *source)?;
-                    let position = self.builder.ins().iconst(
-                        types::I64,
-                        i64::try_from(position).map_err(|_| Decline::new("capture index"))?,
-                    );
-                    self.call_runtime(&abi::RECORD_GET, &[current, position])?
-                }
-                MirProjection::SharedCell => {
-                    if current_rep != Rep::List {
-                        return Err(Decline::new("cell projection of a non-cell"));
-                    }
-                    let zero = self.builder.ins().iconst(types::I64, 0);
-                    self.call_runtime(&abi::LIST_GET, &[current, zero])?
-                }
-                MirProjection::Index(index) if current_rep == Rep::Map => {
-                    let (key_ty, _) = self.map_types(ty)?;
-                    let (key, key_rep) = self.element_operand(index, key_ty)?;
-                    let tag = self
-                        .builder
-                        .ins()
-                        .iconst(types::I32, Self::element_tag(key_rep)?);
-                    let key = self.element_bits(key, key_rep);
-                    self.call_runtime(&abi::MAP_GET, &[current, tag, key])?
-                }
-                MirProjection::Index(index) => {
-                    if current_rep != Rep::List && current_rep != Rep::Tuple {
-                        return Err(Decline::new("index of a non-list"));
-                    }
-                    let (index, index_rep) = self.scalar(index)?;
-                    if index_rep != Rep::Int {
-                        return Err(Decline::new("list index representation"));
-                    }
-                    self.call_runtime(&abi::LIST_GET, &[current, index])?
-                }
-                MirProjection::Field(name) => {
-                    if current_rep != Rep::Record {
-                        return Err(Decline::new("field of a non-genus"));
-                    }
-                    let (position, _) = self.field_slot(ty, *name)?;
-                    let position = self.builder.ins().iconst(
-                        types::I64,
-                        i64::try_from(position).map_err(|_| Decline::new("field index"))?,
-                    );
-                    self.call_runtime(&abi::RECORD_GET, &[current, position])?
-                }
-                MirProjection::VariantField { variant, field } => {
-                    if current_rep != Rep::Record {
-                        return Err(Decline::new("variant field of a non-enum"));
-                    }
-                    let (position, _) = self.variant_slot(*variant, *field)?;
-                    let position = self.builder.ins().iconst(
-                        types::I64,
-                        i64::try_from(position).map_err(|_| Decline::new("field index"))?,
-                    );
-                    self.call_runtime(&abi::RECORD_GET, &[current, position])?
-                }
-                _ => {
-                    return Err(Decline::new(format!(
-                        "place projection {projection:?} read"
-                    )));
-                }
-            }
-            .ok_or_else(|| Decline::new("projection result"))?;
+            let bits = self.read_projection_bits(projection, current, current_rep, ty)?;
             current = self.element_value(bits, next_rep);
             current_rep = next_rep;
             ty = next;
@@ -1831,7 +1892,9 @@ impl FunctionLower<'_, '_> {
             .iconst(types::I32, Self::element_tag(rep)?);
         let bits = self.element_bits(value, rep);
         match last {
-            MirProjection::Index(last_index) if handle_rep == Rep::Map => {
+            MirProjection::Index(last_index) | MirProjection::ProvenIndex(last_index)
+                if handle_rep == Rep::Map =>
+            {
                 let (key_ty, _) = self.map_types(container_ty)?;
                 let (key, key_rep) = self.element_operand(last_index, key_ty)?;
                 let key_tag = self
@@ -1841,7 +1904,7 @@ impl FunctionLower<'_, '_> {
                 let key = self.element_bits(key, key_rep);
                 self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, tag, bits])?;
             }
-            MirProjection::Index(last_index) => {
+            MirProjection::Index(last_index) | MirProjection::ProvenIndex(last_index) => {
                 if handle_rep != Rep::List {
                     return Err(Decline::new("index of a non-list"));
                 }
@@ -2217,844 +2280,1578 @@ impl FunctionLower<'_, '_> {
             return self.list_lift(destination, lift, args);
         }
         let (handle, rep) = self.scalar(receiver)?;
-        let result = match (op, rep) {
-            (MirCollectionOp::Length, Rep::Text) => {
-                (self.call_runtime(&abi::TEXT_LEN, &[handle])?, Rep::Int)
-            }
-            (MirCollectionOp::Length, Rep::List) => {
-                (self.call_runtime(&abi::LIST_LEN, &[handle])?, Rep::Int)
-            }
-            (MirCollectionOp::IsEmpty, Rep::Text | Rep::List) => {
-                let symbol = if rep == Rep::Text {
-                    &abi::TEXT_LEN
-                } else {
-                    &abi::LIST_LEN
-                };
-                let length = self
-                    .call_runtime(symbol, &[handle])?
-                    .ok_or_else(|| Decline::new("length result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                (
-                    Some(self.builder.ins().icmp(IntCC::Equal, length, zero)),
-                    Rep::Bool,
-                )
-            }
+        self.collection_scalar(destination, op, args, receiver, handle, rep)
+    }
+
+    fn collection_scalar(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        match (op, rep) {
             (
                 MirCollectionOp::Floor
                 | MirCollectionOp::Ceiling
                 | MirCollectionOp::Round
                 | MirCollectionOp::Truncate,
                 Rep::Float,
-            ) => {
-                let rounded = match op {
-                    MirCollectionOp::Floor => self.builder.ins().floor(handle),
-                    MirCollectionOp::Ceiling => self.builder.ins().ceil(handle),
-                    MirCollectionOp::Round => self.builder.ins().nearest(handle),
-                    _ => self.builder.ins().trunc(handle),
-                };
-                (
-                    Some(self.builder.ins().fcvt_to_sint(types::I64, rounded)),
-                    Rep::Int,
-                )
-            }
+            ) => self.collection_floor_scalar(destination, op, handle),
             (MirCollectionOp::Absolute, Rep::Int) => {
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let negative = self.builder.ins().icmp(IntCC::SignedLessThan, handle, zero);
-                let flipped = self.builder.ins().ineg(handle);
-                (
-                    Some(self.builder.ins().select(negative, flipped, handle)),
-                    Rep::Int,
-                )
+                self.collection_absolute_int(destination, handle)
             }
             (MirCollectionOp::Absolute, Rep::Float) => {
-                (Some(self.builder.ins().fabs(handle)), Rep::Float)
+                self.collection_absolute_float(destination, handle)
             }
-            (MirCollectionOp::Signum, Rep::Int) => {
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let positive = self
-                    .builder
-                    .ins()
-                    .icmp(IntCC::SignedGreaterThan, handle, zero);
-                let negative = self.builder.ins().icmp(IntCC::SignedLessThan, handle, zero);
-                let positive = self.builder.ins().uextend(types::I64, positive);
-                let negative = self.builder.ins().uextend(types::I64, negative);
-                (Some(self.builder.ins().isub(positive, negative)), Rep::Int)
-            }
+            (MirCollectionOp::Signum, Rep::Int) => self.collection_signum_int(destination, handle),
             (MirCollectionOp::Minimum | MirCollectionOp::Maximum, Rep::Int | Rep::Float) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("minimum arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != rep {
-                    return Err(Decline::new("minimum operand representation"));
-                }
-                let smallest = op == MirCollectionOp::Minimum;
-                let picked = match (rep, smallest) {
-                    (Rep::Int, true) => self.builder.ins().smin(handle, other),
-                    (Rep::Int, false) => self.builder.ins().smax(handle, other),
-                    (_, true) => self.builder.ins().fmin(handle, other),
-                    (_, false) => self.builder.ins().fmax(handle, other),
-                };
-                (Some(picked), rep)
+                self.collection_minimum_scalar(destination, op, args, handle, rep)
             }
-            (MirCollectionOp::Minimum | MirCollectionOp::Maximum, Rep::List) => {
-                let [_, bound] = args else {
-                    return Err(Decline::new("list extremum arity"));
-                };
-                let element = self.element_type(self.operand_type(receiver)?)?;
-                let element_rep = rep_of(self.state.input.types, element)?;
-                let (bound, bound_rep) = self.scalar(bound)?;
-                if bound_rep != element_rep {
-                    return Err(Decline::new("list extremum bound representation"));
-                }
-                let mode = match (element_rep, op == MirCollectionOp::Minimum) {
-                    (Rep::Int, true) => 0,
-                    (Rep::Int, false) => 1,
-                    (Rep::Float, true) => 2,
-                    (Rep::Float, false) => 3,
-                    _ => return Err(Decline::new("list extremum over a non-number list")),
-                };
-                let bound = self.element_bits(bound, element_rep);
-                let mode = self.builder.ins().iconst(types::I32, mode);
-                (
-                    self.call_runtime(&abi::LIST_EXTREMUM, &[handle, bound, mode])?,
-                    Rep::List,
-                )
+            (MirCollectionOp::Compare, Rep::Int | Rep::Float | Rep::Text) => {
+                self.collection_compare_scalar(destination, args, handle, rep)
             }
-            (MirCollectionOp::TextEscape, Rep::Text) => {
-                (self.call_runtime(&abi::TEXT_ESCAPE, &[handle])?, Rep::Text)
+            (MirCollectionOp::Signum, Rep::Float) => {
+                self.collection_signum_float(destination, handle)
             }
+            (MirCollectionOp::ScalarMath(function), Rep::Float | Rep::Int) => {
+                self.collection_scalar_math(destination, handle, rep, function)
+            }
+            (MirCollectionOp::Approximate, Rep::Float | Rep::Int) => {
+                self.collection_approximate_scalar(destination, args)
+            }
+            _ => self.collection_pattern(destination, op, args, receiver, handle, rep),
+        }
+    }
+
+    fn collection_pattern(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        match (op, rep) {
             (
                 MirCollectionOp::RegexMatches
                 | MirCollectionOp::RegexFind
                 | MirCollectionOp::RegexFindAll
                 | MirCollectionOp::RegexSplit,
                 Rep::Regex,
-            ) => {
-                let [_, text] = args else {
-                    return Err(Decline::new("regex operation arity"));
-                };
-                let (text, text_rep) = self.scalar(text)?;
-                if !matches!(text_rep, Rep::Text | Rep::Char) {
-                    return Err(Decline::new("regex operation on a non-text"));
-                }
-                let (symbol, result) = match op {
-                    MirCollectionOp::RegexMatches => (&abi::REGEX_MATCHES, Rep::Bool),
-                    MirCollectionOp::RegexFind => (&abi::REGEX_FIND, Rep::Opt),
-                    MirCollectionOp::RegexFindAll => (&abi::REGEX_FIND_ALL, Rep::List),
-                    _ => (&abi::REGEX_SPLIT, Rep::List),
-                };
-                (self.call_runtime(symbol, &[handle, text])?, result)
-            }
+            ) => self.collection_query_regex(destination, op, args, handle),
             (MirCollectionOp::RegexReplace | MirCollectionOp::RegexReplaceEach, Rep::Regex) => {
-                let [_, text, replacement] = args else {
-                    return Err(Decline::new("regex replace arity"));
-                };
-                let (text, text_rep) = self.scalar(text)?;
-                let (replacement, replacement_rep) = self.scalar(replacement)?;
-                let wanted = if op == MirCollectionOp::RegexReplace {
-                    Rep::Text
-                } else {
-                    Rep::List
-                };
-                if !matches!(text_rep, Rep::Text | Rep::Char)
-                    || (replacement_rep != wanted
-                        && !(wanted == Rep::Text && replacement_rep == Rep::Char))
-                {
-                    return Err(Decline::new("regex replace operands"));
-                }
-                let symbol = if op == MirCollectionOp::RegexReplace {
-                    &abi::REGEX_REPLACE
-                } else {
-                    &abi::REGEX_REPLACE_EACH
-                };
-                (
-                    self.call_runtime(symbol, &[handle, text, replacement])?,
-                    Rep::Text,
-                )
+                self.collection_replace_regex(destination, op, args, handle)
             }
             (
                 MirCollectionOp::MatchText
                 | MirCollectionOp::MatchStart
                 | MirCollectionOp::MatchEnd,
                 Rep::Match,
-            ) => {
-                let (symbol, result) = match op {
-                    MirCollectionOp::MatchText => (&abi::MATCH_TEXT, Rep::Text),
-                    MirCollectionOp::MatchStart => (&abi::MATCH_START, Rep::Int),
-                    _ => (&abi::MATCH_END, Rep::Int),
-                };
-                (self.call_runtime(symbol, &[handle])?, result)
-            }
+            ) => self.collection_query_match(destination, op, handle),
             (MirCollectionOp::MatchGroup | MirCollectionOp::MatchNamed, Rep::Match) => {
-                let [_, selector] = args else {
-                    return Err(Decline::new("match group arity"));
-                };
-                let (selector, selector_rep) = self.scalar(selector)?;
-                let symbol = match (op, selector_rep) {
-                    (MirCollectionOp::MatchGroup, Rep::Int) => &abi::MATCH_GROUP,
-                    (MirCollectionOp::MatchNamed, Rep::Text | Rep::Char) => &abi::MATCH_NAMED,
-                    _ => return Err(Decline::new("match group selector")),
-                };
-                (self.call_runtime(symbol, &[handle, selector])?, Rep::Opt)
+                self.collection_select_match(destination, op, args, handle)
             }
-            (MirCollectionOp::Index, Rep::Text) => {
-                let [_, index] = args else {
-                    return Err(Decline::new("index arity"));
-                };
-                let (index, index_rep) = self.scalar(index)?;
-                if index_rep != Rep::Int {
-                    return Err(Decline::new("text index representation"));
-                }
-                let optional = match destination {
-                    Some(destination) => {
-                        let ty = self.place_type(destination)?;
-                        rep_of(self.state.input.types, ty)? == Rep::Opt
-                    }
-                    None => false,
-                };
-                if optional {
-                    let found = self
-                        .call_runtime(&abi::TEXT_INDEX_OPT, &[handle, index])?
-                        .ok_or_else(|| Decline::new("text index result"))?;
-                    (Some(found), Rep::Opt)
-                } else {
-                    let character = self
-                        .call_runtime(&abi::TEXT_INDEX, &[handle, index])?
-                        .ok_or_else(|| Decline::new("text index result"))?;
-                    (Some(character), Rep::Text)
-                }
-            }
+            _ => self.collection_interval(destination, op, args, receiver, handle, rep),
+        }
+    }
+
+    fn collection_interval(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        match (op, rep) {
             (MirCollectionOp::IntervalClamp, Rep::Int) => {
-                let [_, target] = args else {
-                    return Err(Decline::new("interval clamp arity"));
-                };
-                let (target, target_rep) = self.scalar(target)?;
-                if target_rep != Rep::Tuple {
-                    return Err(Decline::new("interval clamp representation"));
-                }
-                let mode = self.builder.ins().iconst(types::I32, 2);
-                (
-                    self.call_runtime(&abi::INTERVAL_QUERY, &[mode, target, handle])?,
-                    Rep::Int,
-                )
+                self.collection_clamp_int(destination, args, handle)
             }
             (MirCollectionOp::IntervalClamp, Rep::Tuple) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("interval clamp arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != Rep::Tuple {
-                    return Err(Decline::new("interval clamp representation"));
-                }
-                let mode = self.builder.ins().iconst(types::I32, 0);
-                let boxed = self
-                    .call_runtime(&abi::INTERVAL_COMBINE, &[mode, handle, other])?
-                    .ok_or_else(|| Decline::new("interval clamp result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let empty = self.builder.ins().icmp(IntCC::Equal, boxed, zero);
-                self.trap_if(empty, "interval clamp produced an empty interval")?;
-                (self.call_runtime(&abi::OPT_BITS, &[boxed])?, Rep::Tuple)
+                self.collection_interval_clamp(destination, args, handle)
             }
             (MirCollectionOp::IntervalLength | MirCollectionOp::IntervalContains, Rep::Tuple) => {
-                let (mode, value) = if op == MirCollectionOp::IntervalLength {
-                    (0, self.builder.ins().iconst(types::I64, 0))
-                } else {
-                    let [_, value] = args else {
-                        return Err(Decline::new("interval query arity"));
-                    };
-                    let (value, value_rep) = self.scalar(value)?;
-                    if value_rep != Rep::Int {
-                        return Err(Decline::new("interval query representation"));
-                    }
-                    (
-                        if op == MirCollectionOp::IntervalContains {
-                            1
-                        } else {
-                            2
-                        },
-                        value,
-                    )
-                };
-                let mode = self.builder.ins().iconst(types::I32, mode);
-                let answer = self
-                    .call_runtime(&abi::INTERVAL_QUERY, &[mode, handle, value])?
-                    .ok_or_else(|| Decline::new("interval query result"))?;
-                if op == MirCollectionOp::IntervalContains {
-                    let zero = self.builder.ins().iconst(types::I64, 0);
-                    (
-                        Some(self.builder.ins().icmp(IntCC::NotEqual, answer, zero)),
-                        Rep::Bool,
-                    )
-                } else {
-                    (Some(answer), Rep::Int)
-                }
+                self.collection_query_interval(destination, op, args, handle)
             }
             (MirCollectionOp::IntervalIntersect | MirCollectionOp::IntervalUnion, Rep::Tuple) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("interval combine arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != Rep::Tuple {
-                    return Err(Decline::new("interval combine representation"));
-                }
-                let mode = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, i64::from(op == MirCollectionOp::IntervalUnion));
-                (
-                    self.call_runtime(&abi::INTERVAL_COMBINE, &[mode, handle, other])?,
-                    Rep::Opt,
-                )
+                self.collection_combine_intervals(destination, op, args, handle)
             }
             (MirCollectionOp::IntervalMaterialize, Rep::Tuple) => {
-                if let Some(destination) = destination {
-                    let ty = self.place_type(destination)?;
-                    if rep_of(self.state.input.types, ty)? != Rep::List {
-                        return Err(Decline::new("interval materialized as a non-list"));
-                    }
-                }
-                (
-                    self.call_runtime(&abi::INTERVAL_MATERIALIZE, &[handle])?,
-                    Rep::List,
-                )
+                self.collection_materialize_interval(destination, handle)
+            }
+            _ => self.collection_list(destination, op, args, receiver, handle, rep),
+        }
+    }
+
+    fn collection_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        match (op, rep) {
+            (MirCollectionOp::Length, Rep::List) => {
+                self.collection_length_list(destination, handle)
+            }
+            (MirCollectionOp::Minimum | MirCollectionOp::Maximum, Rep::List) => {
+                self.collection_minimum_list(destination, op, args, receiver, handle)
             }
             (MirCollectionOp::Index, Rep::List) => {
-                let [_, index] = args else {
-                    return Err(Decline::new("index arity"));
-                };
-                let (index, index_rep) = self.scalar(index)?;
-                if index_rep == Rep::Tuple {
-                    let window = self
-                        .call_runtime(&abi::LIST_RANGE, &[handle, index])?
-                        .ok_or_else(|| Decline::new("list window result"))?;
-                    // The runtime ends the run itself on a window outside the list.
-                    let Some(destination) = destination else {
-                        return Ok(());
-                    };
-                    return self.define_result(destination, Some(window), Rep::List);
-                }
-                if index_rep != Rep::Int {
-                    return Err(Decline::new("list index representation"));
-                }
-                let Some(destination) = destination else {
-                    return Err(Decline::new("index without destination"));
-                };
-                let element = self.place_type(destination)?;
-                let element_rep = rep_of(self.state.input.types, element)?;
-                let list_element = self.element_type(self.operand_type(&args[0])?)?;
-                if element_rep == Rep::Opt
-                    && rep_of(self.state.input.types, list_element)? != Rep::Opt
-                {
-                    let found = self
-                        .call_runtime(&abi::LIST_GET_OPT, &[handle, index])?
-                        .ok_or_else(|| Decline::new("list get result"))?;
-                    (Some(found), Rep::Opt)
-                } else {
-                    let bits = self
-                        .call_runtime(&abi::LIST_GET, &[handle, index])?
-                        .ok_or_else(|| Decline::new("list get result"))?;
-                    (Some(self.element_value(bits, element_rep)), element_rep)
-                }
+                self.collection_index_list(destination, args, handle)
             }
             (MirCollectionOp::Append, Rep::List) => {
-                let [_, item] = args else {
-                    return Err(Decline::new("append arity"));
-                };
-                if let Type::BoundedArray { capacity, .. } = resolve(
-                    self.state.input.types,
-                    self.operand_type(receiver)?.semantic_id(),
-                ) {
-                    let radix_types::IndexExpr::Literal(bound) =
-                        self.state.input.types.get_index(*capacity)
-                    else {
-                        return Err(Decline::new("append to a list of computed capacity"));
-                    };
-                    let bound =
-                        i64::try_from(*bound).map_err(|_| Decline::new("bounded list capacity"))?;
-                    let live = self
-                        .call_runtime(&abi::LIST_LEN, &[handle])?
-                        .ok_or_else(|| Decline::new("length result"))?;
-                    let limit = self.builder.ins().iconst(types::I64, bound);
-                    let full =
-                        self.builder
-                            .ins()
-                            .icmp(IntCC::SignedGreaterThanOrEqual, live, limit);
-                    self.trap_if(full, "bounded collection push at capacity")?;
-                }
-                let element = self.element_type(self.operand_type(receiver)?)?;
-                let (value, item_rep) = self.element_operand(item, element)?;
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(item_rep)?);
-                let bits = self.element_bits(value, item_rep);
-                self.call_runtime(&abi::LIST_PUSH, &[handle, tag, bits])?;
-                return Ok(());
+                self.collection_append_list(args, receiver, handle)
             }
             (MirCollectionOp::Contains, Rep::List) => {
-                let [_, item] = args else {
-                    return Err(Decline::new("contains arity"));
-                };
-                let element = self.element_type(self.operand_type(receiver)?)?;
-                let (value, item_rep) = self.element_operand(item, element)?;
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(item_rep)?);
-                let bits = self.element_bits(value, item_rep);
-                (
-                    self.call_runtime(&abi::LIST_CONTAINS, &[handle, tag, bits])?,
-                    Rep::Bool,
-                )
-            }
-            (MirCollectionOp::Length, Rep::Map | Rep::Set) => {
-                (self.call_runtime(&abi::MAP_LEN, &[handle])?, Rep::Int)
-            }
-            (MirCollectionOp::IsEmpty, Rep::Map | Rep::Set) => {
-                let length = self
-                    .call_runtime(&abi::MAP_LEN, &[handle])?
-                    .ok_or_else(|| Decline::new("length result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                (
-                    Some(self.builder.ins().icmp(IntCC::Equal, length, zero)),
-                    Rep::Bool,
-                )
-            }
-            (MirCollectionOp::Index, Rep::Map) => {
-                let [_, key] = args else {
-                    return Err(Decline::new("index arity"));
-                };
-                let Some(destination) = destination else {
-                    return Err(Decline::new("index without destination"));
-                };
-                let (key_ty, _) = self.map_types(self.operand_type(receiver)?)?;
-                let (key, key_rep) = self.element_operand(key, key_ty)?;
-                let key_tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(key_rep)?);
-                let key = self.element_bits(key, key_rep);
-                let result_rep = rep_of(self.state.input.types, self.place_type(destination)?)?;
-                if result_rep == Rep::Opt {
-                    (
-                        self.call_runtime(&abi::MAP_GET_OPT, &[handle, key_tag, key])?,
-                        Rep::Opt,
-                    )
-                } else {
-                    let bits = self
-                        .call_runtime(&abi::MAP_GET, &[handle, key_tag, key])?
-                        .ok_or_else(|| Decline::new("map get result"))?;
-                    (Some(self.element_value(bits, result_rep)), result_rep)
-                }
-            }
-            (MirCollectionOp::Contains | MirCollectionOp::Delete, Rep::Map | Rep::Set) => {
-                let [_, key] = args else {
-                    return Err(Decline::new("key arity"));
-                };
-                let key_ty = match resolve(
-                    self.state.input.types,
-                    self.operand_type(receiver)?.semantic_id(),
-                ) {
-                    Type::Map(key, _) | Type::Set(key) => MirType::semantic(*key),
-                    _ => return Err(Decline::new("key access of a non-map")),
-                };
-                let (key, key_rep) = self.element_operand(key, key_ty)?;
-                let key_tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(key_rep)?);
-                let key = self.element_bits(key, key_rep);
-                let symbol = if op == MirCollectionOp::Delete {
-                    &abi::MAP_REMOVE
-                } else {
-                    &abi::MAP_HAS
-                };
-                (
-                    self.call_runtime(symbol, &[handle, key_tag, key])?,
-                    Rep::Bool,
-                )
-            }
-            (MirCollectionOp::Put, Rep::Map) => {
-                let [_, key, value] = args else {
-                    return Err(Decline::new("put arity"));
-                };
-                let (key_ty, value_ty) = self.map_types(self.operand_type(receiver)?)?;
-                let (key, key_rep) = self.element_operand(key, key_ty)?;
-                let (value, value_rep) = self.element_operand(value, value_ty)?;
-                let key_tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(key_rep)?);
-                let key = self.element_bits(key, key_rep);
-                let value_tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(value_rep)?);
-                let value = self.element_bits(value, value_rep);
-                self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, value_tag, value])?;
-                return Ok(());
-            }
-            (MirCollectionOp::Append, Rep::Set) => {
-                let [_, item] = args else {
-                    return Err(Decline::new("append arity"));
-                };
-                let element = match resolve(
-                    self.state.input.types,
-                    self.operand_type(receiver)?.semantic_id(),
-                ) {
-                    Type::Set(element) => MirType::semantic(*element),
-                    _ => return Err(Decline::new("set type")),
-                };
-                let (value, rep) = self.element_operand(item, element)?;
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(rep)?);
-                let bits = self.element_bits(value, rep);
-                let zero_tag = self.builder.ins().iconst(types::I32, 0);
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                self.call_runtime(&abi::MAP_SET, &[handle, tag, bits, zero_tag, zero])?;
-                return Ok(());
-            }
-            (MirCollectionOp::Keys, Rep::Map) => {
-                (self.call_runtime(&abi::MAP_KEYS, &[handle])?, Rep::List)
-            }
-            (MirCollectionOp::Values, Rep::Map) => {
-                (self.call_runtime(&abi::MAP_VALUES, &[handle])?, Rep::List)
-            }
-            (
-                MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim,
-                Rep::Text,
-            ) => {
-                let mode = match op {
-                    MirCollectionOp::Uppercase => 0,
-                    MirCollectionOp::Lowercase => 1,
-                    _ => 2,
-                };
-                let mode = self.builder.ins().iconst(types::I32, mode);
-                (
-                    self.call_runtime(&abi::TEXT_MAP, &[handle, mode])?,
-                    Rep::Text,
-                )
-            }
-            (
-                MirCollectionOp::StartsWith | MirCollectionOp::EndsWith | MirCollectionOp::Contains,
-                Rep::Text,
-            ) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("text test arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != Rep::Text {
-                    return Err(Decline::new("text test operand"));
-                }
-                let mode = match op {
-                    MirCollectionOp::StartsWith => 0,
-                    MirCollectionOp::EndsWith => 1,
-                    _ => 2,
-                };
-                let mode = self.builder.ins().iconst(types::I32, mode);
-                (
-                    self.call_runtime(&abi::TEXT_TEST, &[handle, other, mode])?,
-                    Rep::Bool,
-                )
-            }
-            (MirCollectionOp::Split, Rep::Text) => {
-                let [_, delimiter] = args else {
-                    return Err(Decline::new("split arity"));
-                };
-                let (delimiter, delimiter_rep) = self.scalar(delimiter)?;
-                if delimiter_rep != Rep::Text {
-                    return Err(Decline::new("split delimiter"));
-                }
-                (
-                    self.call_runtime(&abi::TEXT_SPLIT, &[handle, delimiter])?,
-                    Rep::List,
-                )
-            }
-            (MirCollectionOp::Replace, Rep::Text) => {
-                let [_, from, to] = args else {
-                    return Err(Decline::new("replace arity"));
-                };
-                let (from, from_rep) = self.scalar(from)?;
-                let (to, to_rep) = self.scalar(to)?;
-                if from_rep != Rep::Text || to_rep != Rep::Text {
-                    return Err(Decline::new("replace operands"));
-                }
-                (
-                    self.call_runtime(&abi::TEXT_REPLACE, &[handle, from, to])?,
-                    Rep::Text,
-                )
+                self.collection_contains_list(destination, args, receiver, handle)
             }
             (MirCollectionOp::Sum, Rep::List) => {
-                let element = self.element_type(self.operand_type(receiver)?)?;
-                match rep_of(self.state.input.types, element)? {
-                    Rep::Int => (self.call_runtime(&abi::LIST_SUM_I64, &[handle])?, Rep::Int),
-                    Rep::Float => (
-                        self.call_runtime(&abi::LIST_SUM_F64, &[handle])?,
-                        Rep::Float,
-                    ),
-                    _ => return Err(Decline::new("sum of a non-number list")),
-                }
-            }
-            (MirCollectionOp::Compare, Rep::Int | Rep::Float | Rep::Text) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("compare arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != rep {
-                    return Err(Decline::new("compare operand representation"));
-                }
-                let ordering = match rep {
-                    Rep::Text => self
-                        .call_runtime(&abi::TEXT_CMP, &[handle, other])?
-                        .ok_or_else(|| Decline::new("compare result"))?,
-                    Rep::Int => {
-                        let less = self
-                            .builder
-                            .ins()
-                            .icmp(IntCC::SignedLessThan, handle, other);
-                        let more = self
-                            .builder
-                            .ins()
-                            .icmp(IntCC::SignedGreaterThan, handle, other);
-                        let less = self.builder.ins().uextend(types::I64, less);
-                        let more = self.builder.ins().uextend(types::I64, more);
-                        self.builder.ins().isub(more, less)
-                    }
-                    _ => {
-                        let less = self.builder.ins().fcmp(FloatCC::LessThan, handle, other);
-                        let more = self.builder.ins().fcmp(FloatCC::GreaterThan, handle, other);
-                        let less = self.builder.ins().uextend(types::I64, less);
-                        let more = self.builder.ins().uextend(types::I64, more);
-                        self.builder.ins().isub(more, less)
-                    }
-                };
-                (Some(ordering), Rep::Int)
+                self.collection_sum_list(destination, receiver, handle)
             }
             (MirCollectionOp::SortByKeys, Rep::List) => {
-                let [_, keys] = args else {
-                    return Err(Decline::new("sort by keys arity"));
-                };
-                let (keys, keys_rep) = self.scalar(keys)?;
-                if keys_rep != Rep::List {
-                    return Err(Decline::new("sort keys representation"));
-                }
-                (
-                    self.call_runtime(&abi::LIST_SORTED_BY_KEYS, &[handle, keys])?,
-                    Rep::List,
-                )
+                self.collection_sort_list_by_keys(destination, args, handle)
             }
             (MirCollectionOp::AppendImmutable, Rep::List) => {
-                let [_, item] = args else {
-                    return Err(Decline::new("append arity"));
-                };
-                let element = self.element_type(self.operand_type(receiver)?)?;
-                let (value, item_rep) = self.element_operand(item, element)?;
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(item_rep)?);
-                let bits = self.element_bits(value, item_rep);
-                (
-                    self.call_runtime(&abi::LIST_APPENDED, &[handle, tag, bits])?,
-                    Rep::List,
-                )
-            }
-            (MirCollectionOp::Slice, Rep::List | Rep::Text) => {
-                let [_, start, end] = args else {
-                    return Err(Decline::new("slice arity"));
-                };
-                let (start, start_rep) = self.scalar(start)?;
-                let (end, end_rep) = self.scalar(end)?;
-                if start_rep != Rep::Int || end_rep != Rep::Int {
-                    return Err(Decline::new("slice bound representation"));
-                }
-                let symbol = if rep == Rep::Text {
-                    &abi::TEXT_SLICE
-                } else {
-                    &abi::LIST_SLICE
-                };
-                (self.call_runtime(symbol, &[handle, start, end])?, rep)
+                self.collection_append_list_copy(destination, args, receiver, handle)
             }
             (
                 MirCollectionOp::Take | MirCollectionOp::TakeLast | MirCollectionOp::DropFirst,
                 Rep::List,
-            ) => {
-                let [_, count] = args else {
-                    return Err(Decline::new("window arity"));
-                };
-                let (count, count_rep) = self.scalar(count)?;
-                if count_rep != Rep::Int {
-                    return Err(Decline::new("window count representation"));
-                }
-                let mode = match op {
-                    MirCollectionOp::Take => 0,
-                    MirCollectionOp::TakeLast => 1,
-                    _ => 2,
-                };
-                let mode = self.builder.ins().iconst(types::I32, mode);
-                (
-                    self.call_runtime(&abi::LIST_WINDOW, &[handle, mode, count])?,
-                    Rep::List,
-                )
-            }
+            ) => self.collection_take_list(destination, op, args, handle),
             (MirCollectionOp::First | MirCollectionOp::Last, Rep::List) => {
-                let index = if op == MirCollectionOp::First {
-                    self.builder.ins().iconst(types::I64, 0)
-                } else {
-                    let length = self
-                        .call_runtime(&abi::LIST_LEN, &[handle])?
-                        .ok_or_else(|| Decline::new("length result"))?;
-                    let one = self.builder.ins().iconst(types::I64, 1);
-                    self.builder.ins().isub(length, one)
-                };
-                (
-                    self.call_runtime(&abi::LIST_GET_OPT, &[handle, index])?,
-                    Rep::Opt,
-                )
+                self.collection_first_list(destination, op, handle)
             }
             (MirCollectionOp::RemoveFirst | MirCollectionOp::RemoveLast, Rep::List) => {
-                let symbol = if op == MirCollectionOp::RemoveFirst {
-                    &abi::LIST_REMOVE_FIRST
-                } else {
-                    &abi::LIST_REMOVE_LAST
-                };
-                (self.call_runtime(symbol, &[handle])?, Rep::Opt)
+                self.collection_remove_list_end(destination, op, handle)
             }
             (MirCollectionOp::ReverseInPlace, Rep::List) => {
-                self.call_runtime(&abi::LIST_REVERSE_IN_PLACE, &[handle])?;
-                return Ok(());
-            }
-            (MirCollectionOp::Signum, Rep::Float) => {
-                // `f64::signum`: the sign of the operand, NaN stays NaN.
-                let one = self.builder.ins().f64const(1.0);
-                let signed = self.builder.ins().fcopysign(one, handle);
-                let nan = self.builder.ins().fcmp(FloatCC::Unordered, handle, handle);
-                (
-                    Some(self.builder.ins().select(nan, handle, signed)),
-                    Rep::Float,
-                )
+                self.collection_reverse_list_in_place(handle)
             }
             (MirCollectionOp::Compare, Rep::Tuple | Rep::List) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("compare arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != rep {
-                    return Err(Decline::new("compare operand representation"));
-                }
-                (
-                    self.call_runtime(&abi::LIST_COMPARE, &[handle, other])?,
-                    Rep::Int,
-                )
+                self.collection_compare_list(destination, args, handle, rep)
             }
-            (MirCollectionOp::ScalarMath(function), Rep::Float | Rep::Int) => {
-                let Some(destination) = destination else {
-                    return Err(Decline::new("scalar math without destination"));
-                };
-                let number = if rep == Rep::Int {
-                    self.builder.ins().fcvt_from_sint(types::F64, handle)
-                } else {
-                    handle
-                };
-                let computed = match function {
-                    MirMathFunction::Abs => self.builder.ins().fabs(number),
-                    MirMathFunction::Sqrt => self.builder.ins().sqrt(number),
-                    other => {
-                        let code = match other {
-                            MirMathFunction::Exp => 0,
-                            MirMathFunction::Ln => 1,
-                            MirMathFunction::Log10 => 2,
-                            MirMathFunction::Sin => 3,
-                            MirMathFunction::Cos => 4,
-                            MirMathFunction::Cbrt => 6,
-                            _ => 5,
-                        };
-                        let code = self.builder.ins().iconst(types::I32, code);
-                        self.call_runtime(&abi::MATH_F64, &[code, number])?
-                            .ok_or_else(|| Decline::new("math result"))?
-                    }
-                };
-                // The result rounds to the destination's float width.
-                let rounded = if self.float_narrow_place(destination) == 1 {
-                    let narrow = self.builder.ins().fdemote(types::F32, computed);
-                    self.builder.ins().fpromote(types::F64, narrow)
-                } else {
-                    computed
-                };
-                (Some(rounded), Rep::Float)
-            }
-            (MirCollectionOp::Approximate, Rep::Float | Rep::Int) => self.approximate(args)?,
             (MirCollectionOp::ArgMax | MirCollectionOp::ArgMin, Rep::List) => {
-                let flag = i64::from(op == MirCollectionOp::ArgMax);
-                let flag = self.builder.ins().iconst(types::I32, flag);
-                (
-                    self.call_runtime(&abi::LIST_ARG_EXTREMUM, &[handle, flag])?,
-                    Rep::Opt,
-                )
+                self.collection_arg_extremum_list(destination, op, handle)
             }
+            (MirCollectionOp::Reverse, Rep::List) => {
+                self.collection_reverse_list(destination, handle)
+            }
+            (MirCollectionOp::Sort, Rep::List) => self.collection_sort_list(destination, handle),
+            _ => self.collection_map(destination, op, args, receiver, handle, rep),
+        }
+    }
+
+    fn collection_map(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        match (op, rep) {
+            (MirCollectionOp::Length, Rep::Map | Rep::Set) => {
+                self.collection_length_map(destination, handle)
+            }
+            (MirCollectionOp::IsEmpty, Rep::Map | Rep::Set) => {
+                self.collection_is_empty_map(destination, handle)
+            }
+            (MirCollectionOp::Index, Rep::Map) => {
+                self.collection_index_map(destination, args, receiver, handle)
+            }
+            (MirCollectionOp::Contains | MirCollectionOp::Delete, Rep::Map | Rep::Set) => {
+                self.collection_contains_map(destination, op, args, receiver, handle)
+            }
+            (MirCollectionOp::Put, Rep::Map) => self.collection_put_map(args, receiver, handle),
+            (MirCollectionOp::Append, Rep::Set) => {
+                self.collection_append_set(args, receiver, handle)
+            }
+            (MirCollectionOp::Keys, Rep::Map) => self.collection_keys_map(destination, handle),
+            (MirCollectionOp::Values, Rep::Map) => self.collection_values_map(destination, handle),
             (
                 MirCollectionOp::Union
                 | MirCollectionOp::Intersection
                 | MirCollectionOp::Difference
                 | MirCollectionOp::SymmetricDifference,
                 Rep::Set,
-            ) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("set algebra arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != Rep::Set {
-                    return Err(Decline::new("set algebra operand"));
-                }
-                let code = match op {
-                    MirCollectionOp::Union => 0,
-                    MirCollectionOp::Intersection => 1,
-                    MirCollectionOp::Difference => 2,
-                    _ => 3,
-                };
-                let code = self.builder.ins().iconst(types::I32, code);
-                (
-                    self.call_runtime(&abi::SET_ALGEBRA, &[handle, other, code])?,
-                    Rep::Set,
-                )
-            }
+            ) => self.collection_set_algebra(destination, op, args, handle),
             (MirCollectionOp::IsSubset | MirCollectionOp::IsSuperset, Rep::Set) => {
-                let [_, other] = args else {
-                    return Err(Decline::new("set algebra arity"));
-                };
-                let (other, other_rep) = self.scalar(other)?;
-                if other_rep != Rep::Set {
-                    return Err(Decline::new("set algebra operand"));
-                }
-                let mode = i64::from(op == MirCollectionOp::IsSuperset);
-                let mode = self.builder.ins().iconst(types::I32, mode);
-                (
-                    self.call_runtime(&abi::SET_SUBSET, &[handle, other, mode])?,
-                    Rep::Bool,
-                )
+                self.collection_set_relation(destination, op, args, handle)
             }
-            (MirCollectionOp::Reverse, Rep::List) => (
-                self.call_runtime(&abi::LIST_REVERSED, &[handle])?,
-                Rep::List,
-            ),
-            (MirCollectionOp::Sort, Rep::List) => {
-                (self.call_runtime(&abi::LIST_SORTED, &[handle])?, Rep::List)
+            _ => self.collection_text(destination, op, args, handle, rep),
+        }
+    }
+
+    fn collection_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        match (op, rep) {
+            (MirCollectionOp::Length, Rep::Text) => {
+                self.collection_length_text(destination, handle)
             }
-            _ => {
-                return Err(Decline::new(format!(
-                    "collection operation {op:?} on {rep:?}"
-                )));
+            (MirCollectionOp::TextEscape, Rep::Text) => {
+                self.collection_escape_text(destination, handle)
             }
-        };
+            (MirCollectionOp::Index, Rep::Text) => {
+                self.collection_index_text(destination, args, handle)
+            }
+            (
+                MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim,
+                Rep::Text,
+            ) => self.collection_map_text(destination, op, handle),
+            (
+                MirCollectionOp::StartsWith | MirCollectionOp::EndsWith | MirCollectionOp::Contains,
+                Rep::Text,
+            ) => self.collection_test_text(destination, op, args, handle),
+            (MirCollectionOp::Split, Rep::Text) => {
+                self.collection_split_text(destination, args, handle)
+            }
+            (MirCollectionOp::Replace, Rep::Text) => {
+                self.collection_replace_text(destination, args, handle)
+            }
+            _ => self.collection_shared(destination, op, args, handle, rep),
+        }
+    }
+
+    fn collection_shared(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        match (op, rep) {
+            (MirCollectionOp::IsEmpty, Rep::Text | Rep::List) => {
+                self.collection_is_empty_sequence(destination, handle, rep)
+            }
+            (MirCollectionOp::Slice, Rep::List | Rep::Text) => {
+                self.collection_slice_shared(destination, args, handle, rep)
+            }
+            _ => Err(Decline::new(format!(
+                "collection operation {op:?} on {rep:?}"
+            ))),
+        }
+    }
+
+    fn finish_collection(
+        &mut self,
+        destination: Option<&MirPlace>,
+        result: (Option<Value>, Rep),
+    ) -> Lowered<()> {
         match (destination, result.0) {
             (Some(destination), value @ Some(_)) => {
                 self.define_result(destination, value, result.1)
             }
             _ => Ok(()),
         }
+    }
+
+    fn collection_length_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (self.call_runtime(&abi::TEXT_LEN, &[handle])?, Rep::Int) };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_length_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (self.call_runtime(&abi::LIST_LEN, &[handle])?, Rep::Int) };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_is_empty_sequence(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        let result = {
+            let symbol = if rep == Rep::Text {
+                &abi::TEXT_LEN
+            } else {
+                &abi::LIST_LEN
+            };
+            let length = self
+                .call_runtime(symbol, &[handle])?
+                .ok_or_else(|| Decline::new("length result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            (
+                Some(self.builder.ins().icmp(IntCC::Equal, length, zero)),
+                Rep::Bool,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_floor_scalar(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let rounded = match op {
+                MirCollectionOp::Floor => self.builder.ins().floor(handle),
+                MirCollectionOp::Ceiling => self.builder.ins().ceil(handle),
+                MirCollectionOp::Round => self.builder.ins().nearest(handle),
+                _ => self.builder.ins().trunc(handle),
+            };
+            (
+                Some(self.builder.ins().fcvt_to_sint(types::I64, rounded)),
+                Rep::Int,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_absolute_int(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let negative = self.builder.ins().icmp(IntCC::SignedLessThan, handle, zero);
+            let flipped = self.builder.ins().ineg(handle);
+            (
+                Some(self.builder.ins().select(negative, flipped, handle)),
+                Rep::Int,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_absolute_float(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (Some(self.builder.ins().fabs(handle)), Rep::Float) };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_signum_int(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let positive = self
+                .builder
+                .ins()
+                .icmp(IntCC::SignedGreaterThan, handle, zero);
+            let negative = self.builder.ins().icmp(IntCC::SignedLessThan, handle, zero);
+            let positive = self.builder.ins().uextend(types::I64, positive);
+            let negative = self.builder.ins().uextend(types::I64, negative);
+            (Some(self.builder.ins().isub(positive, negative)), Rep::Int)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_minimum_scalar(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("minimum arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != rep {
+                return Err(Decline::new("minimum operand representation"));
+            }
+            let smallest = op == MirCollectionOp::Minimum;
+            let picked = match (rep, smallest) {
+                (Rep::Int, true) => self.builder.ins().smin(handle, other),
+                (Rep::Int, false) => self.builder.ins().smax(handle, other),
+                (_, true) => self.builder.ins().fmin(handle, other),
+                (_, false) => self.builder.ins().fmax(handle, other),
+            };
+            (Some(picked), rep)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_minimum_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, bound] = args else {
+                return Err(Decline::new("list extremum arity"));
+            };
+            let element = self.element_type(self.operand_type(receiver)?)?;
+            let element_rep = rep_of(self.state.input.types, element)?;
+            let (bound, bound_rep) = self.scalar(bound)?;
+            if bound_rep != element_rep {
+                return Err(Decline::new("list extremum bound representation"));
+            }
+            let mode = match (element_rep, op == MirCollectionOp::Minimum) {
+                (Rep::Int, true) => 0,
+                (Rep::Int, false) => 1,
+                (Rep::Float, true) => 2,
+                (Rep::Float, false) => 3,
+                _ => return Err(Decline::new("list extremum over a non-number list")),
+            };
+            let bound = self.element_bits(bound, element_rep);
+            let mode = self.builder.ins().iconst(types::I32, mode);
+            (
+                self.call_runtime(&abi::LIST_EXTREMUM, &[handle, bound, mode])?,
+                Rep::List,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_escape_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (self.call_runtime(&abi::TEXT_ESCAPE, &[handle])?, Rep::Text) };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_query_regex(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, text] = args else {
+                return Err(Decline::new("regex operation arity"));
+            };
+            let (text, text_rep) = self.scalar(text)?;
+            if !matches!(text_rep, Rep::Text | Rep::Char) {
+                return Err(Decline::new("regex operation on a non-text"));
+            }
+            let (symbol, result) = match op {
+                MirCollectionOp::RegexMatches => (&abi::REGEX_MATCHES, Rep::Bool),
+                MirCollectionOp::RegexFind => (&abi::REGEX_FIND, Rep::Opt),
+                MirCollectionOp::RegexFindAll => (&abi::REGEX_FIND_ALL, Rep::List),
+                _ => (&abi::REGEX_SPLIT, Rep::List),
+            };
+            (self.call_runtime(symbol, &[handle, text])?, result)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_replace_regex(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, text, replacement] = args else {
+                return Err(Decline::new("regex replace arity"));
+            };
+            let (text, text_rep) = self.scalar(text)?;
+            let (replacement, replacement_rep) = self.scalar(replacement)?;
+            let wanted = if op == MirCollectionOp::RegexReplace {
+                Rep::Text
+            } else {
+                Rep::List
+            };
+            if !matches!(text_rep, Rep::Text | Rep::Char)
+                || (replacement_rep != wanted
+                    && !(wanted == Rep::Text && replacement_rep == Rep::Char))
+            {
+                return Err(Decline::new("regex replace operands"));
+            }
+            let symbol = if op == MirCollectionOp::RegexReplace {
+                &abi::REGEX_REPLACE
+            } else {
+                &abi::REGEX_REPLACE_EACH
+            };
+            (
+                self.call_runtime(symbol, &[handle, text, replacement])?,
+                Rep::Text,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_query_match(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let (symbol, result) = match op {
+                MirCollectionOp::MatchText => (&abi::MATCH_TEXT, Rep::Text),
+                MirCollectionOp::MatchStart => (&abi::MATCH_START, Rep::Int),
+                _ => (&abi::MATCH_END, Rep::Int),
+            };
+            (self.call_runtime(symbol, &[handle])?, result)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_select_match(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, selector] = args else {
+                return Err(Decline::new("match group arity"));
+            };
+            let (selector, selector_rep) = self.scalar(selector)?;
+            let symbol = match (op, selector_rep) {
+                (MirCollectionOp::MatchGroup, Rep::Int) => &abi::MATCH_GROUP,
+                (MirCollectionOp::MatchNamed, Rep::Text | Rep::Char) => &abi::MATCH_NAMED,
+                _ => return Err(Decline::new("match group selector")),
+            };
+            (self.call_runtime(symbol, &[handle, selector])?, Rep::Opt)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_index_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, index] = args else {
+                return Err(Decline::new("index arity"));
+            };
+            let (index, index_rep) = self.scalar(index)?;
+            if index_rep != Rep::Int {
+                return Err(Decline::new("text index representation"));
+            }
+            let optional = match destination {
+                Some(destination) => {
+                    let ty = self.place_type(destination)?;
+                    rep_of(self.state.input.types, ty)? == Rep::Opt
+                }
+                None => false,
+            };
+            if optional {
+                let found = self
+                    .call_runtime(&abi::TEXT_INDEX_OPT, &[handle, index])?
+                    .ok_or_else(|| Decline::new("text index result"))?;
+                (Some(found), Rep::Opt)
+            } else {
+                let character = self
+                    .call_runtime(&abi::TEXT_INDEX, &[handle, index])?
+                    .ok_or_else(|| Decline::new("text index result"))?;
+                (Some(character), Rep::Text)
+            }
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_clamp_int(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, target] = args else {
+                return Err(Decline::new("interval clamp arity"));
+            };
+            let (target, target_rep) = self.scalar(target)?;
+            if target_rep != Rep::Tuple {
+                return Err(Decline::new("interval clamp representation"));
+            }
+            let mode = self.builder.ins().iconst(types::I32, 2);
+            (
+                self.call_runtime(&abi::INTERVAL_QUERY, &[mode, target, handle])?,
+                Rep::Int,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_interval_clamp(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("interval clamp arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != Rep::Tuple {
+                return Err(Decline::new("interval clamp representation"));
+            }
+            let mode = self.builder.ins().iconst(types::I32, 0);
+            let boxed = self
+                .call_runtime(&abi::INTERVAL_COMBINE, &[mode, handle, other])?
+                .ok_or_else(|| Decline::new("interval clamp result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let empty = self.builder.ins().icmp(IntCC::Equal, boxed, zero);
+            self.trap_if(empty, "interval clamp produced an empty interval")?;
+            (self.call_runtime(&abi::OPT_BITS, &[boxed])?, Rep::Tuple)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_query_interval(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let (mode, value) = if op == MirCollectionOp::IntervalLength {
+                (0, self.builder.ins().iconst(types::I64, 0))
+            } else {
+                let [_, value] = args else {
+                    return Err(Decline::new("interval query arity"));
+                };
+                let (value, value_rep) = self.scalar(value)?;
+                if value_rep != Rep::Int {
+                    return Err(Decline::new("interval query representation"));
+                }
+                (
+                    if op == MirCollectionOp::IntervalContains {
+                        1
+                    } else {
+                        2
+                    },
+                    value,
+                )
+            };
+            let mode = self.builder.ins().iconst(types::I32, mode);
+            let answer = self
+                .call_runtime(&abi::INTERVAL_QUERY, &[mode, handle, value])?
+                .ok_or_else(|| Decline::new("interval query result"))?;
+            if op == MirCollectionOp::IntervalContains {
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                (
+                    Some(self.builder.ins().icmp(IntCC::NotEqual, answer, zero)),
+                    Rep::Bool,
+                )
+            } else {
+                (Some(answer), Rep::Int)
+            }
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_combine_intervals(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("interval combine arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != Rep::Tuple {
+                return Err(Decline::new("interval combine representation"));
+            }
+            let mode = self
+                .builder
+                .ins()
+                .iconst(types::I32, i64::from(op == MirCollectionOp::IntervalUnion));
+            (
+                self.call_runtime(&abi::INTERVAL_COMBINE, &[mode, handle, other])?,
+                Rep::Opt,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_materialize_interval(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            if let Some(destination) = destination {
+                let ty = self.place_type(destination)?;
+                if rep_of(self.state.input.types, ty)? != Rep::List {
+                    return Err(Decline::new("interval materialized as a non-list"));
+                }
+            }
+            (
+                self.call_runtime(&abi::INTERVAL_MATERIALIZE, &[handle])?,
+                Rep::List,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_index_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, index] = args else {
+                return Err(Decline::new("index arity"));
+            };
+            let (index, index_rep) = self.scalar(index)?;
+            if index_rep == Rep::Tuple {
+                let window = self
+                    .call_runtime(&abi::LIST_RANGE, &[handle, index])?
+                    .ok_or_else(|| Decline::new("list window result"))?;
+                // The runtime ends the run itself on a window outside the list.
+                let Some(destination) = destination else {
+                    return Ok(());
+                };
+                return self.define_result(destination, Some(window), Rep::List);
+            }
+            if index_rep != Rep::Int {
+                return Err(Decline::new("list index representation"));
+            }
+            let Some(destination) = destination else {
+                return Err(Decline::new("index without destination"));
+            };
+            let element = self.place_type(destination)?;
+            let element_rep = rep_of(self.state.input.types, element)?;
+            let list_element = self.element_type(self.operand_type(&args[0])?)?;
+            if element_rep == Rep::Opt && rep_of(self.state.input.types, list_element)? != Rep::Opt
+            {
+                let found = self
+                    .call_runtime(&abi::LIST_GET_OPT, &[handle, index])?
+                    .ok_or_else(|| Decline::new("list get result"))?;
+                (Some(found), Rep::Opt)
+            } else {
+                let bits = self
+                    .call_runtime(&abi::LIST_GET, &[handle, index])?
+                    .ok_or_else(|| Decline::new("list get result"))?;
+                (Some(self.element_value(bits, element_rep)), element_rep)
+            }
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_append_list(
+        &mut self,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let [_, item] = args else {
+            return Err(Decline::new("append arity"));
+        };
+        if let Type::BoundedArray { capacity, .. } = resolve(
+            self.state.input.types,
+            self.operand_type(receiver)?.semantic_id(),
+        ) {
+            let radix_types::IndexExpr::Literal(bound) =
+                self.state.input.types.get_index(*capacity)
+            else {
+                return Err(Decline::new("append to a list of computed capacity"));
+            };
+            let bound = i64::try_from(*bound).map_err(|_| Decline::new("bounded list capacity"))?;
+            let live = self
+                .call_runtime(&abi::LIST_LEN, &[handle])?
+                .ok_or_else(|| Decline::new("length result"))?;
+            let limit = self.builder.ins().iconst(types::I64, bound);
+            let full = self
+                .builder
+                .ins()
+                .icmp(IntCC::SignedGreaterThanOrEqual, live, limit);
+            self.trap_if(full, "bounded collection push at capacity")?;
+        }
+        let element = self.element_type(self.operand_type(receiver)?)?;
+        let (value, item_rep) = self.element_operand(item, element)?;
+        let tag = self
+            .builder
+            .ins()
+            .iconst(types::I32, Self::element_tag(item_rep)?);
+        let bits = self.element_bits(value, item_rep);
+        self.call_runtime(&abi::LIST_PUSH, &[handle, tag, bits])?;
+        Ok(())
+    }
+
+    fn collection_contains_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, item] = args else {
+                return Err(Decline::new("contains arity"));
+            };
+            let element = self.element_type(self.operand_type(receiver)?)?;
+            let (value, item_rep) = self.element_operand(item, element)?;
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(item_rep)?);
+            let bits = self.element_bits(value, item_rep);
+            (
+                self.call_runtime(&abi::LIST_CONTAINS, &[handle, tag, bits])?,
+                Rep::Bool,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_length_map(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (self.call_runtime(&abi::MAP_LEN, &[handle])?, Rep::Int) };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_is_empty_map(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let length = self
+                .call_runtime(&abi::MAP_LEN, &[handle])?
+                .ok_or_else(|| Decline::new("length result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            (
+                Some(self.builder.ins().icmp(IntCC::Equal, length, zero)),
+                Rep::Bool,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_index_map(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, key] = args else {
+                return Err(Decline::new("index arity"));
+            };
+            let Some(destination) = destination else {
+                return Err(Decline::new("index without destination"));
+            };
+            let (key_ty, _) = self.map_types(self.operand_type(receiver)?)?;
+            let (key, key_rep) = self.element_operand(key, key_ty)?;
+            let key_tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(key_rep)?);
+            let key = self.element_bits(key, key_rep);
+            let result_rep = rep_of(self.state.input.types, self.place_type(destination)?)?;
+            if result_rep == Rep::Opt {
+                (
+                    self.call_runtime(&abi::MAP_GET_OPT, &[handle, key_tag, key])?,
+                    Rep::Opt,
+                )
+            } else {
+                let bits = self
+                    .call_runtime(&abi::MAP_GET, &[handle, key_tag, key])?
+                    .ok_or_else(|| Decline::new("map get result"))?;
+                (Some(self.element_value(bits, result_rep)), result_rep)
+            }
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_contains_map(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, key] = args else {
+                return Err(Decline::new("key arity"));
+            };
+            let key_ty = match resolve(
+                self.state.input.types,
+                self.operand_type(receiver)?.semantic_id(),
+            ) {
+                Type::Map(key, _) | Type::Set(key) => MirType::semantic(*key),
+                _ => return Err(Decline::new("key access of a non-map")),
+            };
+            let (key, key_rep) = self.element_operand(key, key_ty)?;
+            let key_tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(key_rep)?);
+            let key = self.element_bits(key, key_rep);
+            let symbol = if op == MirCollectionOp::Delete {
+                &abi::MAP_REMOVE
+            } else {
+                &abi::MAP_HAS
+            };
+            (
+                self.call_runtime(symbol, &[handle, key_tag, key])?,
+                Rep::Bool,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_put_map(
+        &mut self,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let [_, key, value] = args else {
+            return Err(Decline::new("put arity"));
+        };
+        let (key_ty, value_ty) = self.map_types(self.operand_type(receiver)?)?;
+        let (key, key_rep) = self.element_operand(key, key_ty)?;
+        let (value, value_rep) = self.element_operand(value, value_ty)?;
+        let key_tag = self
+            .builder
+            .ins()
+            .iconst(types::I32, Self::element_tag(key_rep)?);
+        let key = self.element_bits(key, key_rep);
+        let value_tag = self
+            .builder
+            .ins()
+            .iconst(types::I32, Self::element_tag(value_rep)?);
+        let value = self.element_bits(value, value_rep);
+        self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, value_tag, value])?;
+        Ok(())
+    }
+
+    fn collection_append_set(
+        &mut self,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let [_, item] = args else {
+            return Err(Decline::new("append arity"));
+        };
+        let element = match resolve(
+            self.state.input.types,
+            self.operand_type(receiver)?.semantic_id(),
+        ) {
+            Type::Set(element) => MirType::semantic(*element),
+            _ => return Err(Decline::new("set type")),
+        };
+        let (value, rep) = self.element_operand(item, element)?;
+        let tag = self
+            .builder
+            .ins()
+            .iconst(types::I32, Self::element_tag(rep)?);
+        let bits = self.element_bits(value, rep);
+        let zero_tag = self.builder.ins().iconst(types::I32, 0);
+        let zero = self.builder.ins().iconst(types::I64, 0);
+        self.call_runtime(&abi::MAP_SET, &[handle, tag, bits, zero_tag, zero])?;
+        Ok(())
+    }
+
+    fn collection_keys_map(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (self.call_runtime(&abi::MAP_KEYS, &[handle])?, Rep::List) };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_values_map(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (self.call_runtime(&abi::MAP_VALUES, &[handle])?, Rep::List) };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_map_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let mode = match op {
+                MirCollectionOp::Uppercase => 0,
+                MirCollectionOp::Lowercase => 1,
+                _ => 2,
+            };
+            let mode = self.builder.ins().iconst(types::I32, mode);
+            (
+                self.call_runtime(&abi::TEXT_MAP, &[handle, mode])?,
+                Rep::Text,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_test_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("text test arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != Rep::Text {
+                return Err(Decline::new("text test operand"));
+            }
+            let mode = match op {
+                MirCollectionOp::StartsWith => 0,
+                MirCollectionOp::EndsWith => 1,
+                _ => 2,
+            };
+            let mode = self.builder.ins().iconst(types::I32, mode);
+            (
+                self.call_runtime(&abi::TEXT_TEST, &[handle, other, mode])?,
+                Rep::Bool,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_split_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, delimiter] = args else {
+                return Err(Decline::new("split arity"));
+            };
+            let (delimiter, delimiter_rep) = self.scalar(delimiter)?;
+            if delimiter_rep != Rep::Text {
+                return Err(Decline::new("split delimiter"));
+            }
+            (
+                self.call_runtime(&abi::TEXT_SPLIT, &[handle, delimiter])?,
+                Rep::List,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_replace_text(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, from, to] = args else {
+                return Err(Decline::new("replace arity"));
+            };
+            let (from, from_rep) = self.scalar(from)?;
+            let (to, to_rep) = self.scalar(to)?;
+            if from_rep != Rep::Text || to_rep != Rep::Text {
+                return Err(Decline::new("replace operands"));
+            }
+            (
+                self.call_runtime(&abi::TEXT_REPLACE, &[handle, from, to])?,
+                Rep::Text,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_sum_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let element = self.element_type(self.operand_type(receiver)?)?;
+            match rep_of(self.state.input.types, element)? {
+                Rep::Int => (self.call_runtime(&abi::LIST_SUM_I64, &[handle])?, Rep::Int),
+                Rep::Float => (
+                    self.call_runtime(&abi::LIST_SUM_F64, &[handle])?,
+                    Rep::Float,
+                ),
+                _ => return Err(Decline::new("sum of a non-number list")),
+            }
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_compare_scalar(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("compare arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != rep {
+                return Err(Decline::new("compare operand representation"));
+            }
+            let ordering = match rep {
+                Rep::Text => self
+                    .call_runtime(&abi::TEXT_CMP, &[handle, other])?
+                    .ok_or_else(|| Decline::new("compare result"))?,
+                Rep::Int => {
+                    let less = self
+                        .builder
+                        .ins()
+                        .icmp(IntCC::SignedLessThan, handle, other);
+                    let more = self
+                        .builder
+                        .ins()
+                        .icmp(IntCC::SignedGreaterThan, handle, other);
+                    let less = self.builder.ins().uextend(types::I64, less);
+                    let more = self.builder.ins().uextend(types::I64, more);
+                    self.builder.ins().isub(more, less)
+                }
+                _ => {
+                    let less = self.builder.ins().fcmp(FloatCC::LessThan, handle, other);
+                    let more = self.builder.ins().fcmp(FloatCC::GreaterThan, handle, other);
+                    let less = self.builder.ins().uextend(types::I64, less);
+                    let more = self.builder.ins().uextend(types::I64, more);
+                    self.builder.ins().isub(more, less)
+                }
+            };
+            (Some(ordering), Rep::Int)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_sort_list_by_keys(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, keys] = args else {
+                return Err(Decline::new("sort by keys arity"));
+            };
+            let (keys, keys_rep) = self.scalar(keys)?;
+            if keys_rep != Rep::List {
+                return Err(Decline::new("sort keys representation"));
+            }
+            (
+                self.call_runtime(&abi::LIST_SORTED_BY_KEYS, &[handle, keys])?,
+                Rep::List,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_append_list_copy(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        receiver: &MirOperand,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, item] = args else {
+                return Err(Decline::new("append arity"));
+            };
+            let element = self.element_type(self.operand_type(receiver)?)?;
+            let (value, item_rep) = self.element_operand(item, element)?;
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(item_rep)?);
+            let bits = self.element_bits(value, item_rep);
+            (
+                self.call_runtime(&abi::LIST_APPENDED, &[handle, tag, bits])?,
+                Rep::List,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_slice_shared(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, start, end] = args else {
+                return Err(Decline::new("slice arity"));
+            };
+            let (start, start_rep) = self.scalar(start)?;
+            let (end, end_rep) = self.scalar(end)?;
+            if start_rep != Rep::Int || end_rep != Rep::Int {
+                return Err(Decline::new("slice bound representation"));
+            }
+            let symbol = if rep == Rep::Text {
+                &abi::TEXT_SLICE
+            } else {
+                &abi::LIST_SLICE
+            };
+            (self.call_runtime(symbol, &[handle, start, end])?, rep)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_take_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, count] = args else {
+                return Err(Decline::new("window arity"));
+            };
+            let (count, count_rep) = self.scalar(count)?;
+            if count_rep != Rep::Int {
+                return Err(Decline::new("window count representation"));
+            }
+            let mode = match op {
+                MirCollectionOp::Take => 0,
+                MirCollectionOp::TakeLast => 1,
+                _ => 2,
+            };
+            let mode = self.builder.ins().iconst(types::I32, mode);
+            (
+                self.call_runtime(&abi::LIST_WINDOW, &[handle, mode, count])?,
+                Rep::List,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_first_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let index = if op == MirCollectionOp::First {
+                self.builder.ins().iconst(types::I64, 0)
+            } else {
+                let length = self
+                    .call_runtime(&abi::LIST_LEN, &[handle])?
+                    .ok_or_else(|| Decline::new("length result"))?;
+                let one = self.builder.ins().iconst(types::I64, 1);
+                self.builder.ins().isub(length, one)
+            };
+            (
+                self.call_runtime(&abi::LIST_GET_OPT, &[handle, index])?,
+                Rep::Opt,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_remove_list_end(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let symbol = if op == MirCollectionOp::RemoveFirst {
+                &abi::LIST_REMOVE_FIRST
+            } else {
+                &abi::LIST_REMOVE_LAST
+            };
+            (self.call_runtime(symbol, &[handle])?, Rep::Opt)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_reverse_list_in_place(&mut self, handle: Value) -> Lowered<()> {
+        self.call_runtime(&abi::LIST_REVERSE_IN_PLACE, &[handle])?;
+        Ok(())
+    }
+
+    fn collection_signum_float(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            // `f64::signum`: the sign of the operand, NaN stays NaN.
+            let one = self.builder.ins().f64const(1.0);
+            let signed = self.builder.ins().fcopysign(one, handle);
+            let nan = self.builder.ins().fcmp(FloatCC::Unordered, handle, handle);
+            (
+                Some(self.builder.ins().select(nan, handle, signed)),
+                Rep::Float,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_compare_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+        handle: Value,
+        rep: Rep,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("compare arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != rep {
+                return Err(Decline::new("compare operand representation"));
+            }
+            (
+                self.call_runtime(&abi::LIST_COMPARE, &[handle, other])?,
+                Rep::Int,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_scalar_math(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+        rep: Rep,
+        function: MirMathFunction,
+    ) -> Lowered<()> {
+        let result = {
+            let Some(destination) = destination else {
+                return Err(Decline::new("scalar math without destination"));
+            };
+            let number = if rep == Rep::Int {
+                self.builder.ins().fcvt_from_sint(types::F64, handle)
+            } else {
+                handle
+            };
+            let computed = match function {
+                MirMathFunction::Abs => self.builder.ins().fabs(number),
+                MirMathFunction::Sqrt => self.builder.ins().sqrt(number),
+                other => {
+                    let code = match other {
+                        MirMathFunction::Exp => 0,
+                        MirMathFunction::Ln => 1,
+                        MirMathFunction::Log10 => 2,
+                        MirMathFunction::Sin => 3,
+                        MirMathFunction::Cos => 4,
+                        MirMathFunction::Cbrt => 6,
+                        _ => 5,
+                    };
+                    let code = self.builder.ins().iconst(types::I32, code);
+                    self.call_runtime(&abi::MATH_F64, &[code, number])?
+                        .ok_or_else(|| Decline::new("math result"))?
+                }
+            };
+            // The result rounds to the destination's float width.
+            let rounded = if self.float_narrow_place(destination) == 1 {
+                let narrow = self.builder.ins().fdemote(types::F32, computed);
+                self.builder.ins().fpromote(types::F64, narrow)
+            } else {
+                computed
+            };
+            (Some(rounded), Rep::Float)
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_approximate_scalar(
+        &mut self,
+        destination: Option<&MirPlace>,
+        args: &[MirOperand],
+    ) -> Lowered<()> {
+        let result = { self.approximate(args)? };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_arg_extremum_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let flag = i64::from(op == MirCollectionOp::ArgMax);
+            let flag = self.builder.ins().iconst(types::I32, flag);
+            (
+                self.call_runtime(&abi::LIST_ARG_EXTREMUM, &[handle, flag])?,
+                Rep::Opt,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_set_algebra(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("set algebra arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != Rep::Set {
+                return Err(Decline::new("set algebra operand"));
+            }
+            let code = match op {
+                MirCollectionOp::Union => 0,
+                MirCollectionOp::Intersection => 1,
+                MirCollectionOp::Difference => 2,
+                _ => 3,
+            };
+            let code = self.builder.ins().iconst(types::I32, code);
+            (
+                self.call_runtime(&abi::SET_ALGEBRA, &[handle, other, code])?,
+                Rep::Set,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_set_relation(
+        &mut self,
+        destination: Option<&MirPlace>,
+        op: MirCollectionOp,
+        args: &[MirOperand],
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            let [_, other] = args else {
+                return Err(Decline::new("set algebra arity"));
+            };
+            let (other, other_rep) = self.scalar(other)?;
+            if other_rep != Rep::Set {
+                return Err(Decline::new("set algebra operand"));
+            }
+            let mode = i64::from(op == MirCollectionOp::IsSuperset);
+            let mode = self.builder.ins().iconst(types::I32, mode);
+            (
+                self.call_runtime(&abi::SET_SUBSET, &[handle, other, mode])?,
+                Rep::Bool,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_reverse_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = {
+            (
+                self.call_runtime(&abi::LIST_REVERSED, &[handle])?,
+                Rep::List,
+            )
+        };
+
+        self.finish_collection(destination, result)
+    }
+
+    fn collection_sort_list(
+        &mut self,
+        destination: Option<&MirPlace>,
+        handle: Value,
+    ) -> Lowered<()> {
+        let result = { (self.call_runtime(&abi::LIST_SORTED, &[handle])?, Rep::List) };
+
+        self.finish_collection(destination, result)
     }
 
     /// 1 when `place` holds a float narrower than `f64`, else 0.
@@ -3230,48 +4027,49 @@ impl FunctionLower<'_, '_> {
 
     // STATEMENTS
 
+    fn assign(&mut self, place: &MirPlace, value: &MirValue) -> Lowered<()> {
+        let target_rep = rep_of(self.state.input.types, self.place_type(place)?)?;
+        let (computed, rep) = match (&value.kind, target_rep) {
+            (MirValueKind::Operand(MirOperand::Constant(constant)), Rep::Bits(width)) => {
+                (self.bits_constant(constant, width)?, Rep::Bits(width))
+            }
+            _ => self.value(value)?,
+        };
+        self.values.insert(value.id, (computed, rep));
+        let computed = match computed {
+            Some(computed) if rep == Rep::Int && target_rep != Rep::Inf => {
+                let wide = place.projections.is_empty()
+                    && self.wide_slots.contains(&Self::base_slot(place));
+                Some(self.fit_int(computed, wide)?)
+            }
+            other => other,
+        };
+        if !place.projections.is_empty() {
+            let Some(computed) = computed else {
+                return Err(Decline::new("unit element store"));
+            };
+            let computed = self.coerce(computed, rep, target_rep)?;
+            return self.write_projected(place, computed, target_rep);
+        }
+        let (variable, slot_rep) = self.place_slot(place)?;
+        if let Some(computed) = computed {
+            let computed = if rep == Rep::Opt && slot_rep != Rep::Opt && self.reads_union(value) {
+                // Narrowing a union to the member a type test proved.
+                let bits = self
+                    .call_runtime(&abi::OPT_BITS, &[computed])?
+                    .ok_or_else(|| Decline::new("narrowing result"))?;
+                self.element_value(bits, slot_rep)
+            } else {
+                self.coerce(computed, rep, slot_rep)?
+            };
+            self.builder.def_var(variable, computed);
+        }
+        Ok(())
+    }
+
     fn statement(&mut self, statement: &MirStatement) -> Lowered<()> {
         match &statement.kind {
-            MirStatementKind::Assign { place, value } => {
-                let target_rep = rep_of(self.state.input.types, self.place_type(place)?)?;
-                let (computed, rep) = match (&value.kind, target_rep) {
-                    (MirValueKind::Operand(MirOperand::Constant(constant)), Rep::Bits(width)) => {
-                        (self.bits_constant(constant, width)?, Rep::Bits(width))
-                    }
-                    _ => self.value(value)?,
-                };
-                self.values.insert(value.id, (computed, rep));
-                let computed = match computed {
-                    Some(computed) if rep == Rep::Int && target_rep != Rep::Inf => {
-                        let wide = place.projections.is_empty()
-                            && self.wide_slots.contains(&Self::base_slot(place));
-                        Some(self.fit_int(computed, wide)?)
-                    }
-                    other => other,
-                };
-                if !place.projections.is_empty() {
-                    let Some(computed) = computed else {
-                        return Err(Decline::new("unit element store"));
-                    };
-                    let computed = self.coerce(computed, rep, target_rep)?;
-                    return self.write_projected(place, computed, target_rep);
-                }
-                let (variable, slot_rep) = self.place_slot(place)?;
-                if let Some(computed) = computed {
-                    let computed =
-                        if rep == Rep::Opt && slot_rep != Rep::Opt && self.reads_union(value) {
-                            // Narrowing a union to the member a type test proved.
-                            let bits = self
-                                .call_runtime(&abi::OPT_BITS, &[computed])?
-                                .ok_or_else(|| Decline::new("narrowing result"))?;
-                            self.element_value(bits, slot_rep)
-                        } else {
-                            self.coerce(computed, rep, slot_rep)?
-                        };
-                    self.builder.def_var(variable, computed);
-                }
-                Ok(())
-            }
+            MirStatementKind::Assign { place, value } => self.assign(place, value),
             MirStatementKind::Call {
                 destination: Some(destination),
                 ..
@@ -3565,137 +4363,28 @@ impl FunctionLower<'_, '_> {
         error_place: &MirPlace,
         error_block: MirBlockId,
     ) -> Lowered<()> {
-        /// Where a failable call goes.
-        enum Target {
-            Direct(MirFunctionId, Option<Value>),
-            Indirect(Value, Value),
-        }
-        let types_table = self.state.input.types;
         let (target, param_reps, result_rep, error_rep, abi_signature, indirect_flags) =
             match callee {
-                MirCallee::Function(_) | MirCallee::Definition { .. } | MirCallee::Closure(_) => {
-                    let mut environment = None;
-                    let id = match callee {
-                        MirCallee::Function(id) => *id,
-                        MirCallee::Definition { source, type_args } if type_args.is_empty() => {
-                            let mut matches = self
-                                .state
-                                .input
-                                .program
-                                .functions
-                                .iter()
-                                .filter(|function| function.source == Some(*source));
-                            match (matches.next(), matches.next()) {
-                                (Some(function), None) => function.id,
-                                _ => return Err(Decline::new("ambiguous definition call")),
-                            }
-                        }
-                        MirCallee::Closure(closure) => {
-                            let (record, rep) = self.scalar(&closure.environment)?;
-                            if rep != Rep::Record {
-                                return Err(Decline::new("closure environment representation"));
-                            }
-                            environment = Some(record);
-                            closure.function
-                        }
-                        _ => return Err(Decline::new("indirect call")),
-                    };
-                    let target = self
-                        .state
-                        .input
-                        .program
-                        .functions
-                        .iter()
-                        .find(|function| function.id == id)
-                        .ok_or_else(|| Decline::new("unknown callee"))?;
-                    let params = target
-                        .params
-                        .iter()
-                        .enumerate()
-                        .map(|(index, param)| {
-                            rep_of(types_table, self.state.param_type(id, index, param.ty))
-                        })
-                        .collect::<Lowered<Vec<_>>>()?;
-                    let error = target
-                        .error_ty
-                        .map(|ty| rep_of(types_table, ty))
-                        .transpose()?
-                        .ok_or_else(|| Decline::new("try of a non-failable callee"))?;
-                    let result = rep_of(types_table, target.return_ty)?;
-                    (
-                        Target::Direct(id, environment),
-                        params,
-                        result,
-                        error,
-                        None,
-                        Vec::new(),
-                    )
-                }
-                MirCallee::Value(operand) => {
-                    let (object, rep) = self.scalar(operand)?;
-                    if rep != Rep::Func {
-                        return Err(Decline::new("call of a non-function"));
-                    }
-                    let ty = self.operand_type(operand)?;
-                    let Type::Func(signature) = resolve(types_table, ty.semantic_id()) else {
-                        return Err(Decline::new("call of a non-function"));
-                    };
-                    let Some(err) = signature.err else {
-                        return Err(Decline::new("try of a non-failable callee"));
-                    };
-                    let flags = self.type_address_flags(signature);
-                    let mut abi_signature = self.state.module.make_signature();
-                    abi_signature.params.push(AbiParam::new(types::I64));
-                    let mut params = Vec::with_capacity(signature.params.len());
-                    for (position, param) in signature.params.iter().enumerate() {
-                        let rep = rep_of(
-                            types_table,
-                            MirType::semantic(param_value_type(types_table, param.ty)),
-                        )?;
-                        let Some(cl) = rep.cl_type() else {
-                            return Err(Decline::new("unit parameter"));
-                        };
-                        let cl = if flags.get(position).copied().unwrap_or(false) {
-                            types::I64
-                        } else {
-                            cl
-                        };
-                        abi_signature.params.push(AbiParam::new(cl));
-                        params.push(rep);
-                    }
-                    let result = rep_of(types_table, MirType::semantic(signature.ret))?;
-                    let error = rep_of(types_table, MirType::semantic(err))?;
-                    abi_signature.returns.push(AbiParam::new(types::I8));
-                    if let Some(cl) = result.cl_type() {
-                        abi_signature.returns.push(AbiParam::new(cl));
-                    }
-                    abi_signature.returns.push(AbiParam::new(types::I64));
-                    let (code, environment) = self.function_parts(object)?;
-                    (
-                        Target::Indirect(code, environment),
-                        params,
-                        result,
-                        error,
-                        Some(abi_signature),
-                        flags,
-                    )
-                }
+                MirCallee::Value(operand) => self.try_indirect_target(operand)?,
+                _ => self.try_direct_target(callee)?,
             };
         let mut values = Vec::with_capacity(args.len() + 1);
-        if let Target::Direct(_, Some(environment)) | Target::Indirect(_, environment) = &target {
+        if let TryTarget::Direct(_, Some(environment)) | TryTarget::Indirect(_, environment) =
+            &target
+        {
             values.push(*environment);
         }
         let by_address = match &target {
-            Target::Direct(id, _) => self.address_flags(*id),
-            Target::Indirect(..) => indirect_flags.clone(),
+            TryTarget::Direct(id, _) => self.address_flags(*id),
+            TryTarget::Indirect(..) => indirect_flags.clone(),
         };
         let returns = self.call_arguments(&by_address, args, &param_reps, &mut values)?;
         let call = match target {
-            Target::Direct(id, _) => {
+            TryTarget::Direct(id, _) => {
                 let reference = self.function_ref(id)?;
                 self.builder.ins().call(reference, &values)
             }
-            Target::Indirect(code, _) => {
+            TryTarget::Indirect(code, _) => {
                 let signature = abi_signature.ok_or_else(|| Decline::new("indirect signature"))?;
                 let signature_ref = self.builder.import_signature(signature);
                 self.builder
@@ -3736,6 +4425,115 @@ impl FunctionLower<'_, '_> {
         self.builder.def_var(variable, error);
         self.builder.ins().jump(error_target, &[]);
         Ok(())
+    }
+
+    fn try_direct_target(&mut self, callee: &MirCallee) -> Lowered<TryCallInfo> {
+        let types_table = self.state.input.types;
+        let mut environment = None;
+        let id = match callee {
+            MirCallee::Function(id) => *id,
+            MirCallee::Definition { source, type_args } if type_args.is_empty() => {
+                let mut matches = self
+                    .state
+                    .input
+                    .program
+                    .functions
+                    .iter()
+                    .filter(|function| function.source == Some(*source));
+                match (matches.next(), matches.next()) {
+                    (Some(function), None) => function.id,
+                    _ => return Err(Decline::new("ambiguous definition call")),
+                }
+            }
+            MirCallee::Closure(closure) => {
+                let (record, rep) = self.scalar(&closure.environment)?;
+                if rep != Rep::Record {
+                    return Err(Decline::new("closure environment representation"));
+                }
+                environment = Some(record);
+                closure.function
+            }
+            _ => return Err(Decline::new("indirect call")),
+        };
+        let target = self
+            .state
+            .input
+            .program
+            .functions
+            .iter()
+            .find(|function| function.id == id)
+            .ok_or_else(|| Decline::new("unknown callee"))?;
+        let params = target
+            .params
+            .iter()
+            .enumerate()
+            .map(|(index, param)| rep_of(types_table, self.state.param_type(id, index, param.ty)))
+            .collect::<Lowered<Vec<_>>>()?;
+        let error = target
+            .error_ty
+            .map(|ty| rep_of(types_table, ty))
+            .transpose()?
+            .ok_or_else(|| Decline::new("try of a non-failable callee"))?;
+        let result = rep_of(types_table, target.return_ty)?;
+        Ok((
+            TryTarget::Direct(id, environment),
+            params,
+            result,
+            error,
+            None,
+            Vec::new(),
+        ))
+    }
+
+    fn try_indirect_target(&mut self, operand: &MirOperand) -> Lowered<TryCallInfo> {
+        let types_table = self.state.input.types;
+        let (object, rep) = self.scalar(operand)?;
+        if rep != Rep::Func {
+            return Err(Decline::new("call of a non-function"));
+        }
+        let ty = self.operand_type(operand)?;
+        let Type::Func(signature) = resolve(types_table, ty.semantic_id()) else {
+            return Err(Decline::new("call of a non-function"));
+        };
+        let Some(err) = signature.err else {
+            return Err(Decline::new("try of a non-failable callee"));
+        };
+        let flags = self.type_address_flags(signature);
+        let mut abi_signature = self.state.module.make_signature();
+        abi_signature.params.push(AbiParam::new(types::I64));
+        let mut params = Vec::with_capacity(signature.params.len());
+        for (position, param) in signature.params.iter().enumerate() {
+            let rep = rep_of(
+                types_table,
+                MirType::semantic(param_value_type(types_table, param.ty)),
+            )?;
+            let Some(cl) = rep.cl_type() else {
+                return Err(Decline::new("unit parameter"));
+            };
+            let cl = if flags.get(position).copied().unwrap_or(false) {
+                types::I64
+            } else {
+                cl
+            };
+            abi_signature.params.push(AbiParam::new(cl));
+            params.push(rep);
+        }
+        let result = rep_of(types_table, MirType::semantic(signature.ret))?;
+        let error = rep_of(types_table, MirType::semantic(err))?;
+        abi_signature.returns.push(AbiParam::new(types::I8));
+        if let Some(cl) = result.cl_type() {
+            abi_signature.returns.push(AbiParam::new(cl));
+        }
+        abi_signature.returns.push(AbiParam::new(types::I64));
+        let (code, environment) = self.function_parts(object)?;
+        Ok((
+            TryTarget::Indirect(code, environment),
+            params,
+            result,
+            error,
+            Some(abi_signature),
+            flags,
+        ))
     }
 
     fn runtime_call(
@@ -3792,57 +4590,12 @@ impl FunctionLower<'_, '_> {
             // A conversation opens on a route: the route literal lowers to raw
             // bytes — a bare data symbol, deliberately not the headered text
             // handle — and the leaf answers a handle the destination carries.
-            MirIntrinsic::SermoOpen => {
-                let Some(destination) = destination else {
-                    return Err(Decline::new("sermo open without destination"));
-                };
-                let [MirOperand::Constant(MirConstant::String(symbol))] = call.args.as_slice()
-                else {
-                    return Err(Decline::new("sermo route operand"));
-                };
-                let text = radix_lexer::textus_literal::decode_textus_literal(
-                    self.state.input.interner.resolve(*symbol),
-                );
-                let data = self.state.string_data(text.as_bytes())?;
-                let global = self
-                    .state
-                    .module
-                    .declare_data_in_func(data, self.builder.func);
-                let route = self.builder.ins().symbol_value(self.state.pointer, global);
-                let length = self
-                    .builder
-                    .ins()
-                    .iconst(types::I64, i64::try_from(text.len()).unwrap_or(0));
-                let handle = self.call_runtime(&abi::SERMO_OPEN, &[route, length])?;
-                self.define_result(destination, handle, Rep::Record)
-            }
+            MirIntrinsic::SermoOpen => self.runtime_sermo_open(destination, call),
             // The opener a conversation reopens on: `nihil` clears it, a
             // `numerus` passes itself, a boxed `valor` passes its tagged
             // payload, and no other representation has a leaf symbol. The
             // call answers nothing, so nothing is stored.
-            MirIntrinsic::SermoSetOpener => {
-                let [handle, opener] = call.args.as_slice() else {
-                    return Err(Decline::new("sermo opener shape"));
-                };
-                let (handle, _) = self.scalar(handle)?;
-                match self.operand(opener)? {
-                    (_, Rep::Unit) => {
-                        self.call_runtime(&abi::SERMO_SET_OPENER_NIL, &[handle])?;
-                    }
-                    (_, Rep::Opt) if matches!(opener, MirOperand::Constant(MirConstant::Nil)) => {
-                        self.call_runtime(&abi::SERMO_SET_OPENER_NIL, &[handle])?;
-                    }
-                    (Some(value), Rep::Int) => {
-                        let value = self.narrow(value)?;
-                        self.call_runtime(&abi::SERMO_SET_OPENER_I64, &[handle, value])?;
-                    }
-                    (Some(value), Rep::Opt) => {
-                        self.call_runtime(&abi::SERMO_SET_OPENER_VALOR, &[handle, value])?;
-                    }
-                    _ => return Err(Decline::new("sermo opener representation")),
-                }
-                Ok(())
-            }
+            MirIntrinsic::SermoSetOpener => self.runtime_sermo_set_opener(call),
             MirIntrinsic::Collection(op) => self.collection_op(destination, *op, &call.args),
             MirIntrinsic::TypeCheck(op) => {
                 let ([operand], Some(destination)) = (call.args.as_slice(), destination) else {
@@ -3851,37 +4604,8 @@ impl FunctionLower<'_, '_> {
                 let result = self.type_check(op, operand)?;
                 self.define_result(destination, Some(result), Rep::Bool)
             }
-            MirIntrinsic::Duplicate => {
-                let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
-                    return Err(Decline::new("duplicate shape"));
-                };
-                let (value, rep) = self.scalar(argument)?;
-                let copied = if matches!(rep, Rep::List | Rep::Record | Rep::Map | Rep::Set) {
-                    let tag = self
-                        .builder
-                        .ins()
-                        .iconst(types::I32, Self::element_tag(rep)?);
-                    self.call_runtime(&abi::DUPLICATE, &[tag, value])?
-                } else {
-                    Some(value)
-                };
-                self.define_result(destination, copied, rep)
-            }
-            MirIntrinsic::Cede => {
-                let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
-                    return Err(Decline::new("cede shape"));
-                };
-                let (value, rep) = self.operand_narrow(argument)?;
-                if let (Some(collector), Some(item)) = (self.collector, value) {
-                    let tag = self
-                        .builder
-                        .ins()
-                        .iconst(types::I32, Self::element_tag(rep)?);
-                    let bits = self.element_bits(item, rep);
-                    self.call_runtime(&abi::LIST_PUSH, &[collector, tag, bits])?;
-                }
-                self.define_result(destination, value, rep)
-            }
+            MirIntrinsic::Duplicate => self.runtime_duplicate(destination, call),
+            MirIntrinsic::Cede => self.runtime_cede(destination, call),
             MirIntrinsic::CursorStream(stream) => {
                 if stream.stepped {
                     return Err(Decline::new("stepped cursor stream"));
@@ -3891,30 +4615,7 @@ impl FunctionLower<'_, '_> {
                 };
                 self.cursor_stream(destination, stream.callee, &call.args)
             }
-            MirIntrinsic::Assert => {
-                let Some(condition) = call.args.first() else {
-                    return Err(Decline::new("assert arity"));
-                };
-                let (flag, rep) = self.scalar(condition)?;
-                if rep != Rep::Bool {
-                    return Err(Decline::new("assert on a non-boolean"));
-                }
-                let failing = self.builder.create_block();
-                self.builder.set_cold_block(failing);
-                let next = self.builder.create_block();
-                self.builder.ins().brif(flag, next, &[], failing, &[]);
-                self.builder.switch_to_block(failing);
-                let message = match call.args.get(1) {
-                    Some(argument) => {
-                        let (value, rep) = self.scalar(argument)?;
-                        self.render_text(value, rep)?
-                    }
-                    None => self.text_literal(b"assertion failed")?,
-                };
-                self.abort_with(message)?;
-                self.builder.switch_to_block(next);
-                Ok(())
-            }
+            MirIntrinsic::Assert => self.runtime_assert(call),
             MirIntrinsic::Panic => {
                 let [argument] = call.args.as_slice() else {
                     return Err(Decline::new("panic arity"));
@@ -3929,6 +4630,124 @@ impl FunctionLower<'_, '_> {
             }
             _ => Err(Decline::new("runtime call")),
         }
+    }
+
+    fn runtime_sermo_open(
+        &mut self,
+        destination: Option<&MirPlace>,
+        call: &MirRuntimeCall,
+    ) -> Lowered<()> {
+        let Some(destination) = destination else {
+            return Err(Decline::new("sermo open without destination"));
+        };
+        let [MirOperand::Constant(MirConstant::String(symbol))] = call.args.as_slice() else {
+            return Err(Decline::new("sermo route operand"));
+        };
+        let text = radix_lexer::textus_literal::decode_textus_literal(
+            self.state.input.interner.resolve(*symbol),
+        );
+        let data = self.state.string_data(text.as_bytes())?;
+        let global = self
+            .state
+            .module
+            .declare_data_in_func(data, self.builder.func);
+        let route = self.builder.ins().symbol_value(self.state.pointer, global);
+        let length = self
+            .builder
+            .ins()
+            .iconst(types::I64, i64::try_from(text.len()).unwrap_or(0));
+        let handle = self.call_runtime(&abi::SERMO_OPEN, &[route, length])?;
+        self.define_result(destination, handle, Rep::Record)
+    }
+
+    fn runtime_sermo_set_opener(&mut self, call: &MirRuntimeCall) -> Lowered<()> {
+        let [handle, opener] = call.args.as_slice() else {
+            return Err(Decline::new("sermo opener shape"));
+        };
+        let (handle, _) = self.scalar(handle)?;
+        match self.operand(opener)? {
+            (_, Rep::Unit) => {
+                self.call_runtime(&abi::SERMO_SET_OPENER_NIL, &[handle])?;
+            }
+            (_, Rep::Opt) if matches!(opener, MirOperand::Constant(MirConstant::Nil)) => {
+                self.call_runtime(&abi::SERMO_SET_OPENER_NIL, &[handle])?;
+            }
+            (Some(value), Rep::Int) => {
+                let value = self.narrow(value)?;
+                self.call_runtime(&abi::SERMO_SET_OPENER_I64, &[handle, value])?;
+            }
+            (Some(value), Rep::Opt) => {
+                self.call_runtime(&abi::SERMO_SET_OPENER_VALOR, &[handle, value])?;
+            }
+            _ => return Err(Decline::new("sermo opener representation")),
+        }
+        Ok(())
+    }
+
+    fn runtime_assert(&mut self, call: &MirRuntimeCall) -> Lowered<()> {
+        let Some(condition) = call.args.first() else {
+            return Err(Decline::new("assert arity"));
+        };
+        let (flag, rep) = self.scalar(condition)?;
+        if rep != Rep::Bool {
+            return Err(Decline::new("assert on a non-boolean"));
+        }
+        let failing = self.builder.create_block();
+        self.builder.set_cold_block(failing);
+        let next = self.builder.create_block();
+        self.builder.ins().brif(flag, next, &[], failing, &[]);
+        self.builder.switch_to_block(failing);
+        let message = match call.args.get(1) {
+            Some(argument) => {
+                let (value, rep) = self.scalar(argument)?;
+                self.render_text(value, rep)?
+            }
+            None => self.text_literal(b"assertion failed")?,
+        };
+        self.abort_with(message)?;
+        self.builder.switch_to_block(next);
+        Ok(())
+    }
+
+    fn runtime_duplicate(
+        &mut self,
+        destination: Option<&MirPlace>,
+        call: &MirRuntimeCall,
+    ) -> Lowered<()> {
+        let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
+            return Err(Decline::new("duplicate shape"));
+        };
+        let (value, rep) = self.scalar(argument)?;
+        let copied = if matches!(rep, Rep::List | Rep::Record | Rep::Map | Rep::Set) {
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(rep)?);
+            self.call_runtime(&abi::DUPLICATE, &[tag, value])?
+        } else {
+            Some(value)
+        };
+        self.define_result(destination, copied, rep)
+    }
+
+    fn runtime_cede(
+        &mut self,
+        destination: Option<&MirPlace>,
+        call: &MirRuntimeCall,
+    ) -> Lowered<()> {
+        let ([argument], Some(destination)) = (call.args.as_slice(), destination) else {
+            return Err(Decline::new("cede shape"));
+        };
+        let (value, rep) = self.operand_narrow(argument)?;
+        if let (Some(collector), Some(item)) = (self.collector, value) {
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(rep)?);
+            let bits = self.element_bits(item, rep);
+            self.call_runtime(&abi::LIST_PUSH, &[collector, tag, bits])?;
+        }
+        self.define_result(destination, value, rep)
     }
 
     /// Abort the process with `message`; the block ends in a trap.
@@ -4199,76 +5018,96 @@ impl FunctionLower<'_, '_> {
         if conversion.store.is_none() && self.state.is_sermo_handle(conversion.source_ty) {
             return Err(Decline::new("sermo materialization target"));
         }
-        let Some(site) = &conversion.store else {
-            let (value, rep) = self.scalar(argument)?;
-            let (variable, slot_rep) = self.place_slot(destination)?;
-            if rep == Rep::Set && slot_rep == Rep::List {
-                let keys = self
-                    .call_runtime(&abi::MAP_KEYS, &[value])?
-                    .ok_or_else(|| Decline::new("set keys result"))?;
-                self.builder.def_var(variable, keys);
-                return Ok(());
-            }
-            // Open data (`json`, `valor`) is a tagged box, so an operand
-            // carrying any other representation is boxed into it. A leaf
-            // opener is typed `valor` while its operand keeps its own scalar
-            // representation, so the box is keyed on the operand rather than
-            // on the conversion's (identical) declared types.
-            if rep != Rep::Opt
-                && slot_rep == Rep::Opt
-                && matches!(
-                    resolve(self.state.input.types, conversion.target_ty.semantic_id()),
-                    Type::Primitive(Primitive::Json | Primitive::Valor)
-                )
-            {
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(rep)?);
-                let bits = self.element_bits(value, rep);
-                let boxed = self
-                    .call_runtime(&abi::DYN_BOX, &[tag, bits])?
-                    .ok_or_else(|| Decline::new("open data result"))?;
-                self.builder.def_var(variable, boxed);
-                return Ok(());
-            }
-            // An identity conversion of an open-data box is a copy: the box
-            // already carries its tagged payload.
-            if rep == Rep::Opt
-                && slot_rep == Rep::Opt
-                && resolve(self.state.input.types, conversion.source_ty.semantic_id())
-                    == resolve(self.state.input.types, conversion.target_ty.semantic_id())
-                && matches!(
-                    resolve(self.state.input.types, conversion.target_ty.semantic_id()),
-                    Type::Primitive(Primitive::Json | Primitive::Valor)
-                )
-            {
-                self.builder.def_var(variable, value);
-                return Ok(());
-            }
-            if let Some(plan) = sequence_conversion(
-                self.state.input.types,
-                conversion.source_ty.semantic_id(),
-                conversion.target_ty.semantic_id(),
-            ) {
-                return self.sequence_convert(plan, conversion, value, variable);
-            }
-            if let Some(plan) = numeric_conversion(
-                self.state.input.types,
-                conversion.source_ty.semantic_id(),
-                conversion.target_ty.semantic_id(),
-            ) {
-                return self.numeric_convert(plan, conversion, value, variable);
-            }
-            if slot_rep != Rep::Text || rep == Rep::Unit {
-                return Err(Decline::new("explicit conversion"));
-            }
-            self.refuse_nested_tuple_display(argument)?;
-            let narrow = self.float_narrow(argument);
-            let rendered = self.render_text_at(value, rep, narrow)?;
-            self.builder.def_var(variable, rendered);
+        match &conversion.store {
+            None => self.explicit_convert(destination, conversion, argument),
+            Some(site) => self.store_convert(destination, conversion, argument, site),
+        }
+    }
+
+    /// An explicit conversion, including boxing, sequence conversion and rendering.
+    fn explicit_convert(
+        &mut self,
+        destination: &MirPlace,
+        conversion: &MirConversion,
+        argument: &MirOperand,
+    ) -> Lowered<()> {
+        let (value, rep) = self.scalar(argument)?;
+        let (variable, slot_rep) = self.place_slot(destination)?;
+        if rep == Rep::Set && slot_rep == Rep::List {
+            let keys = self
+                .call_runtime(&abi::MAP_KEYS, &[value])?
+                .ok_or_else(|| Decline::new("set keys result"))?;
+            self.builder.def_var(variable, keys);
             return Ok(());
-        };
+        }
+        // Open data (`json`, `valor`) is a tagged box, so an operand
+        // carrying any other representation is boxed into it. A leaf
+        // opener is typed `valor` while its operand keeps its own scalar
+        // representation, so the box is keyed on the operand rather than
+        // on the conversion's (identical) declared types.
+        if rep != Rep::Opt
+            && slot_rep == Rep::Opt
+            && matches!(
+                resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Json | Primitive::Valor)
+            )
+        {
+            let tag = self
+                .builder
+                .ins()
+                .iconst(types::I32, Self::element_tag(rep)?);
+            let bits = self.element_bits(value, rep);
+            let boxed = self
+                .call_runtime(&abi::DYN_BOX, &[tag, bits])?
+                .ok_or_else(|| Decline::new("open data result"))?;
+            self.builder.def_var(variable, boxed);
+            return Ok(());
+        }
+        // An identity conversion of an open-data box is a copy: the box
+        // already carries its tagged payload.
+        if rep == Rep::Opt
+            && slot_rep == Rep::Opt
+            && resolve(self.state.input.types, conversion.source_ty.semantic_id())
+                == resolve(self.state.input.types, conversion.target_ty.semantic_id())
+            && matches!(
+                resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+                Type::Primitive(Primitive::Json | Primitive::Valor)
+            )
+        {
+            self.builder.def_var(variable, value);
+            return Ok(());
+        }
+        if let Some(plan) = sequence_conversion(
+            self.state.input.types,
+            conversion.source_ty.semantic_id(),
+            conversion.target_ty.semantic_id(),
+        ) {
+            return self.sequence_convert(plan, conversion, value, variable);
+        }
+        if let Some(plan) = numeric_conversion(
+            self.state.input.types,
+            conversion.source_ty.semantic_id(),
+            conversion.target_ty.semantic_id(),
+        ) {
+            return self.numeric_convert(plan, conversion, value, variable);
+        }
+        if slot_rep != Rep::Text || rep == Rep::Unit {
+            return Err(Decline::new("explicit conversion"));
+        }
+        self.refuse_nested_tuple_display(argument)?;
+        let narrow = self.float_narrow(argument);
+        let rendered = self.render_text_at(value, rep, narrow)?;
+        self.builder.def_var(variable, rendered);
+        Ok(())
+    }
+
+    fn store_convert(
+        &mut self,
+        destination: &MirPlace,
+        conversion: &MirConversion,
+        argument: &MirOperand,
+        site: &radix_hir::HirStoreSite,
+    ) -> Lowered<()> {
         let (value, rep) = self.scalar_wide(argument)?;
         let (variable, slot_rep) = self.place_slot(destination)?;
         let (value, rep) = if rep == Rep::Int && slot_rep == Rep::Dec {
@@ -4930,42 +5769,7 @@ impl FunctionLower<'_, '_> {
                 self.trap_if(invalid, "sqrt of negative float")?;
                 Ok((self.builder.ins().sqrt(number), Rep::Float))
             }
-            (MirUnOp::Exp | MirUnOp::Log, Rep::Float | Rep::Int) => {
-                let number = if rep == Rep::Int {
-                    self.builder.ins().fcvt_from_sint(types::F64, value)
-                } else {
-                    value
-                };
-                let logarithm = op == MirUnOp::Log;
-                if logarithm {
-                    let zero = self.builder.ins().f64const(0.0);
-                    let positive = self.builder.ins().fcmp(FloatCC::GreaterThan, number, zero);
-                    let one = self.builder.ins().iconst(types::I8, 1);
-                    let invalid = self.builder.ins().bxor(positive, one);
-                    self.trap_if(invalid, "log requires positive input")?;
-                }
-                let code = self.builder.ins().iconst(types::I32, i64::from(logarithm));
-                let result = self
-                    .call_runtime(&abi::MATH_F64, &[code, number])?
-                    .ok_or_else(|| Decline::new("math result"))?;
-                let magnitude = self.builder.ins().fabs(result);
-                let infinity = self.builder.ins().f64const(f64::INFINITY);
-                let finite = self
-                    .builder
-                    .ins()
-                    .fcmp(FloatCC::LessThan, magnitude, infinity);
-                let one = self.builder.ins().iconst(types::I8, 1);
-                let trap = self.builder.ins().bxor(finite, one);
-                self.trap_if(
-                    trap,
-                    if logarithm {
-                        "log produced non-finite result"
-                    } else {
-                        "exp overflow"
-                    },
-                )?;
-                Ok((result, Rep::Float))
-            }
+            (MirUnOp::Exp | MirUnOp::Log, Rep::Float | Rep::Int) => self.exp_log(op, value, rep),
             (MirUnOp::BitNot, Rep::Int) => Ok((self.builder.ins().bnot(value), Rep::Int)),
             (MirUnOp::BitNot, Rep::Bits(width)) => {
                 let mask = if width == BitsWidth::B64 {
@@ -4978,6 +5782,43 @@ impl FunctionLower<'_, '_> {
             }
             _ => Err(Decline::new(format!("unary operation {op:?} on {rep:?}"))),
         }
+    }
+
+    fn exp_log(&mut self, op: MirUnOp, value: Value, rep: Rep) -> Lowered<(Value, Rep)> {
+        let number = if rep == Rep::Int {
+            self.builder.ins().fcvt_from_sint(types::F64, value)
+        } else {
+            value
+        };
+        let logarithm = op == MirUnOp::Log;
+        if logarithm {
+            let zero = self.builder.ins().f64const(0.0);
+            let positive = self.builder.ins().fcmp(FloatCC::GreaterThan, number, zero);
+            let one = self.builder.ins().iconst(types::I8, 1);
+            let invalid = self.builder.ins().bxor(positive, one);
+            self.trap_if(invalid, "log requires positive input")?;
+        }
+        let code = self.builder.ins().iconst(types::I32, i64::from(logarithm));
+        let result = self
+            .call_runtime(&abi::MATH_F64, &[code, number])?
+            .ok_or_else(|| Decline::new("math result"))?;
+        let magnitude = self.builder.ins().fabs(result);
+        let infinity = self.builder.ins().f64const(f64::INFINITY);
+        let finite = self
+            .builder
+            .ins()
+            .fcmp(FloatCC::LessThan, magnitude, infinity);
+        let one = self.builder.ins().iconst(types::I8, 1);
+        let trap = self.builder.ins().bxor(finite, one);
+        self.trap_if(
+            trap,
+            if logarithm {
+                "log produced non-finite result"
+            } else {
+                "exp overflow"
+            },
+        )?;
+        Ok((result, Rep::Float))
     }
 
     fn binary(
@@ -4998,20 +5839,7 @@ impl FunctionLower<'_, '_> {
             return self.dec_binary(op, (a, a_rep), (b, b_rep));
         }
         if a_rep == Rep::Ins && b_rep == Rep::Ins {
-            let cc = match op {
-                MirBinOp::Eq => IntCC::Equal,
-                MirBinOp::NotEq => IntCC::NotEqual,
-                MirBinOp::Lt => IntCC::SignedLessThan,
-                MirBinOp::Gt => IntCC::SignedGreaterThan,
-                MirBinOp::LtEq => IntCC::SignedLessThanOrEqual,
-                MirBinOp::GtEq => IntCC::SignedGreaterThanOrEqual,
-                _ => return Err(Decline::new("instant operation")),
-            };
-            let order = self
-                .call_runtime(&abi::INS_COMPARE, &[a, b])?
-                .ok_or_else(|| Decline::new("instant comparison result"))?;
-            let zero = self.builder.ins().iconst(types::I32, 0);
-            return Ok((self.builder.ins().icmp(cc, order, zero), Rep::Bool));
+            return self.instant_compare(op, a, b);
         }
         if (a_rep == Rep::Inf || b_rep == Rep::Inf || result == Rep::Inf)
             && op != MirBinOp::Coalesce
@@ -5057,19 +5885,7 @@ impl FunctionLower<'_, '_> {
             (Rep::Record, Rep::Record) | (Rep::List, Rep::List) | (Rep::Tuple, Rep::Tuple)
         ) && matches!(op, MirBinOp::Eq | MirBinOp::NotEq)
         {
-            let symbol = if a_rep == Rep::Record {
-                &abi::RECORD_EQ
-            } else {
-                &abi::LIST_EQ
-            };
-            let same = self
-                .call_runtime(symbol, &[a, b])?
-                .ok_or_else(|| Decline::new("structural equality result"))?;
-            if op == MirBinOp::Eq {
-                return Ok((same, Rep::Bool));
-            }
-            let one = self.builder.ins().iconst(types::I8, 1);
-            return Ok((self.builder.ins().bxor(same, one), Rep::Bool));
+            return self.structural_equal(op, a, b, a_rep);
         }
         if let Some(width) = [a_rep, b_rep, result]
             .into_iter()
@@ -5111,6 +5927,45 @@ impl FunctionLower<'_, '_> {
                 "operands of {a_rep:?} representation"
             ))),
         }
+    }
+
+    fn instant_compare(&mut self, op: MirBinOp, a: Value, b: Value) -> Lowered<(Value, Rep)> {
+        let cc = match op {
+            MirBinOp::Eq => IntCC::Equal,
+            MirBinOp::NotEq => IntCC::NotEqual,
+            MirBinOp::Lt => IntCC::SignedLessThan,
+            MirBinOp::Gt => IntCC::SignedGreaterThan,
+            MirBinOp::LtEq => IntCC::SignedLessThanOrEqual,
+            MirBinOp::GtEq => IntCC::SignedGreaterThanOrEqual,
+            _ => return Err(Decline::new("instant operation")),
+        };
+        let order = self
+            .call_runtime(&abi::INS_COMPARE, &[a, b])?
+            .ok_or_else(|| Decline::new("instant comparison result"))?;
+        let zero = self.builder.ins().iconst(types::I32, 0);
+        Ok((self.builder.ins().icmp(cc, order, zero), Rep::Bool))
+    }
+
+    fn structural_equal(
+        &mut self,
+        op: MirBinOp,
+        a: Value,
+        b: Value,
+        a_rep: Rep,
+    ) -> Lowered<(Value, Rep)> {
+        let symbol = if a_rep == Rep::Record {
+            &abi::RECORD_EQ
+        } else {
+            &abi::LIST_EQ
+        };
+        let same = self
+            .call_runtime(symbol, &[a, b])?
+            .ok_or_else(|| Decline::new("structural equality result"))?;
+        if op == MirBinOp::Eq {
+            return Ok((same, Rep::Bool));
+        }
+        let one = self.builder.ins().iconst(types::I8, 1);
+        Ok((self.builder.ins().bxor(same, one), Rep::Bool))
     }
 
     fn int_binary(&mut self, op: MirBinOp, a: Value, b: Value, cap: bool) -> Lowered<(Value, Rep)> {
@@ -5621,52 +6476,59 @@ impl FunctionLower<'_, '_> {
                 value,
                 cases,
                 default,
-            } => {
-                let (value, rep) = self.scalar(value)?;
-                for case in cases {
-                    let hit = match (&case.value, rep) {
-                        (MirConstant::Int(literal), Rep::Int) => {
-                            let literal = self.builder.ins().iconst(types::I64, *literal);
-                            self.builder.ins().icmp(IntCC::Equal, value, literal)
-                        }
-                        (MirConstant::UInt(literal), Rep::Int) => {
-                            let literal = i64::try_from(*literal)
-                                .map_err(|_| Decline::new("switch case constant"))?;
-                            let literal = self.builder.ins().iconst(types::I64, literal);
-                            self.builder.ins().icmp(IntCC::Equal, value, literal)
-                        }
-                        (MirConstant::Bool(literal), Rep::Bool) => {
-                            let literal = self.builder.ins().iconst(types::I8, i64::from(*literal));
-                            self.builder.ins().icmp(IntCC::Equal, value, literal)
-                        }
-                        (MirConstant::Float(literal), Rep::Float) => {
-                            let literal = self.builder.ins().f64const(*literal);
-                            self.builder.ins().fcmp(FloatCC::Equal, value, literal)
-                        }
-                        (MirConstant::String(symbol), Rep::Text) => {
-                            let text = radix_lexer::textus_literal::decode_textus_literal(
-                                self.state.input.interner.resolve(*symbol),
-                            );
-                            let literal = self.text_literal(text.as_bytes())?;
-                            self.call_runtime(&abi::TEXT_EQ, &[value, literal])?
-                                .ok_or_else(|| Decline::new("text equality result"))?
-                        }
-                        _ => return Err(Decline::new("switch case constant")),
-                    };
-                    let target = self.block(case.target)?;
-                    let next = self.builder.create_block();
-                    self.builder.ins().brif(hit, target, &[], next, &[]);
-                    self.builder.switch_to_block(next);
-                }
-                let default = self.block(*default)?;
-                self.builder.ins().jump(default, &[]);
-                Ok(())
-            }
+            } => self.switch(value, cases, *default),
             MirTerminatorKind::Unreachable => {
                 self.builder.ins().trap(TrapCode::unwrap_user(2));
                 Ok(())
             }
         }
+    }
+
+    fn switch(
+        &mut self,
+        value: &MirOperand,
+        cases: &[MirSwitchCase],
+        default: MirBlockId,
+    ) -> Lowered<()> {
+        let (value, rep) = self.scalar(value)?;
+        for case in cases {
+            let hit = match (&case.value, rep) {
+                (MirConstant::Int(literal), Rep::Int) => {
+                    let literal = self.builder.ins().iconst(types::I64, *literal);
+                    self.builder.ins().icmp(IntCC::Equal, value, literal)
+                }
+                (MirConstant::UInt(literal), Rep::Int) => {
+                    let literal = i64::try_from(*literal)
+                        .map_err(|_| Decline::new("switch case constant"))?;
+                    let literal = self.builder.ins().iconst(types::I64, literal);
+                    self.builder.ins().icmp(IntCC::Equal, value, literal)
+                }
+                (MirConstant::Bool(literal), Rep::Bool) => {
+                    let literal = self.builder.ins().iconst(types::I8, i64::from(*literal));
+                    self.builder.ins().icmp(IntCC::Equal, value, literal)
+                }
+                (MirConstant::Float(literal), Rep::Float) => {
+                    let literal = self.builder.ins().f64const(*literal);
+                    self.builder.ins().fcmp(FloatCC::Equal, value, literal)
+                }
+                (MirConstant::String(symbol), Rep::Text) => {
+                    let text = radix_lexer::textus_literal::decode_textus_literal(
+                        self.state.input.interner.resolve(*symbol),
+                    );
+                    let literal = self.text_literal(text.as_bytes())?;
+                    self.call_runtime(&abi::TEXT_EQ, &[value, literal])?
+                        .ok_or_else(|| Decline::new("text equality result"))?
+                }
+                _ => return Err(Decline::new("switch case constant")),
+            };
+            let target = self.block(case.target)?;
+            let next = self.builder.create_block();
+            self.builder.ins().brif(hit, target, &[], next, &[]);
+            self.builder.switch_to_block(next);
+        }
+        let default = self.block(default)?;
+        self.builder.ins().jump(default, &[]);
+        Ok(())
     }
 
     fn block(&self, id: MirBlockId) -> Lowered<Block> {

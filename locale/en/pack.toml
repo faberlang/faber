@@ -163,8 +163,6 @@ imperia = "commands"
 # Empty-collection expression marker (contextual, tokenless).
 # en accepts only `empty`; the Latin spelling is not an alias.
 vacua = "empty"
-primus_quem = "primus_quem"
-ubi = "ubi"
 # Prefix-scan expression surface. These clause words are shared verbatim by
 # all reader packs; `scan` is the industry term used by the source contract.
 scan = "scan"
@@ -185,6 +183,7 @@ numeratio = "count"
 quilibet = "any"
 argmaxima = "argmax"
 argminima = "argmin"
+prima = "first"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "sort"
 ascendens = "asc"
@@ -430,7 +429,7 @@ transpone = "transpose"
 # K6: an explicit zero-copy broadcast view; `expande` remains the Latin id.
 expande = "expanded"
 disloco = "shift"
-limes = "limes"
+limes = "edge"
 laminatio = "norm_layer"
 materialize = "materialize"
 # `formata` is a static type-directed view; keep the canonical spelling until
@@ -2645,7 +2644,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.tensor_edge_policy_marker_not_runtime_value]
 message = "tensor edge-policy markers are type arguments, not runtime values"
-help = "use clamp, reflect, or wrap only as the type argument to limes"
+help = "use clamp, reflect, or wrap only as the type argument to {limes}"
 
 [diagnostics.SEM010.issues.array_element_type_mismatch]
 message = "array element type mismatch"
@@ -3757,18 +3756,18 @@ help = "include both element type and shape in the tensor type argument"
 
 [diagnostics.SEM011.issues.tensor_shift_nullable_source_unsupported]
 message = "shift requires non-nullable tensor elements and cannot shift an unresolved edge view"
-help = "resolve pending edges with limes<Policy>() or tensor coalescing before another shift"
+help = "resolve pending edges with {limes}<Policy>() or tensor coalescing before another shift"
 
 [diagnostics.SEM011.issues.tensor_edge_view_requires_resolution]
-message = "an unresolved shifted tensor can only be consumed by limes or tensor coalescing"
-help = "resolve the edge view with limes<Policy>() or coalesce its optional edge cells"
+message = "an unresolved shifted tensor can only be consumed by {limes} or tensor coalescing"
+help = "resolve the edge view with {limes}<Policy>() or coalesce its optional edge cells"
 
 [diagnostics.SEM011.issues.tensor_limes_requires_shifted_view]
-message = "limes requires an unresolved shifted tensor view"
-help = "call shift(offsets) before limes<Policy>()"
+message = "{limes} requires an unresolved shifted tensor view"
+help = "call shift(offsets) before {limes}<Policy>()"
 
 [diagnostics.SEM011.issues.tensor_limes_policy_invalid]
-message = "limes needs a builtin edge policy or a valid zero-field policy class"
+message = "{limes} needs a builtin edge policy or a valid zero-field policy class"
 help = "provide remap(vector<int, R>) -> vector<int, R> and an optional transform(vector<int, R>, T) -> T method"
 
 [diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]
@@ -4987,13 +4986,9 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: expression statements are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
-[diagnostics.SEM059.issues.first_match_expression_unsupported]
-message = "@ radix lane \"{lane}\" rejects this function body: first-match expressions with coordinate bindings are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
-
-[diagnostics.SEM059.issues.first_match_unbounded_source]
-message = "@ radix lane \"{lane}\" rejects this function body: the source of a first-match expression has no statically known extent, which the v1 AIR subset requires"
-help = "use a literal array, a concrete range, or a source with a static shape (a fully shaped tensor or matrix, or a bounded array) as the first-match source"
+[diagnostics.SEM059.issues.reducta_first_unbounded_source]
+message = "@ radix lane \"{lane}\" rejects this function body: the source of a first-match reduction has no statically known extent, which the v1 AIR subset requires"
+help = "use a source with a static shape (a fully shaped tensor or matrix) as the `reduce via first` source"
 
 [diagnostics.SEM059.issues.generator_function]
 message = "@ radix lane \"{lane}\" rejects this function body: generator functions are outside the v1 AIR subset"
@@ -5575,14 +5570,6 @@ help = "use reddet only inside an async function"
 message = "tacebit requires an async context"
 help = "use tacebit only inside an async function"
 
-[diagnostics.SEM010.issues.first_match_requires_shaped_iterable]
-message = "first-match source is not a shaped iterable"
-help = "iterate a shaped iterable such as a list or tensor"
-
-[diagnostics.SEM010.issues.first_match_predicate_type]
-message = "first-match predicate is not a boolean"
-help = "make the predicate body evaluate to a boolean"
-
 [diagnostics.SEM010.issues.intervallum_value_step_unsupported]
 message = "value step is not supported for this range"
 help = "use a supported range step form"
@@ -5638,6 +5625,10 @@ help = "write the reduction body as one redde expression"
 [diagnostics.SEM010.issues.reducta_filum_requires_nucleum_kernel]
 message = "filum reduction requires a nucleum kernel"
 help = "use the filum reduction only inside a nucleum kernel"
+
+[diagnostics.SEM010.issues.reducta_first_requires_body]
+message = "a first reduction needs a body: the body is the predicate"
+help = "write `{reducta} {via} {prima} {ex} source` followed by a binder and a block whose `{redde}` value is the boolean predicate"
 
 [diagnostics.SEM010.issues.reducta_requires_shaped_iterable]
 message = "reduction source is not a shaped iterable"
@@ -5881,18 +5872,6 @@ message = "expected ']' after the non-null index expression"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "expected ')' after the non-null call arguments"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "expected '(' after 'primus_quem'"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "expected ',' after the first-match source"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "expected the 'ubi' predicate tail"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "expected ')' after the first-match predicate"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "expected a closing brace after the constructor fields"
 
@@ -6075,3 +6054,6 @@ message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
 
 [diagnostics.INFO001.issues.not_placed]
 message = "kernel `{kernel}` is not placed on the {device} device: {reason}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"

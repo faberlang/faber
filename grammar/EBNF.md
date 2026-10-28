@@ -445,7 +445,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [217] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [218] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [219] ad_expr
 ad_expr ::= 'ad' ASCII_STRING ad_opener?
 # [220] ad_opener
@@ -492,107 +492,105 @@ praefixum_expr ::= 'praefixum' block_stmt
 scriptum_expr ::= 'scriptum' '(' STRING (',' expression)* ')'
 # [241] lege_expr
 lege_expr ::= 'lege' 'lineam'?
-# [242] first_match_expr
-first_match_expr ::= 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
-# [243] reducta_expr
+# [242] reducta_expr
 reducta_expr ::= 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [244] reducta_op
-reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
-# [245] reducta_group
+# [243] reducta_op
+reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio' | 'prima'
+# [244] reducta_group
 reducta_group ::= 'pro' expression
-# [246] reducta_body
+# [245] reducta_body
 reducta_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
-# [247] reducta_identity
+# [246] reducta_identity
 reducta_identity ::= 'vel' expression
-# [248] scan_expr
+# [247] scan_expr
 scan_expr ::= 'scan' 'via' scan_op ('scan_total' ('scan_inclusive' | 'scan_exclusive'))? 'ex' expression apud_clause scan_group? scan_order_clause? filum_clause 'sit' IDENTIFIER block_stmt
-# [249] scan_op
+# [248] scan_op
 scan_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'omnia' | 'quilibet' | 'numeratio'
-# [250] scan_group
+# [249] scan_group
 scan_group ::= 'pro' expression
-# [251] scan_order_clause
+# [250] scan_order_clause
 scan_order_clause ::= 'scan_order' ('ascendens' | 'descendens')
-# [252] sort_expr
+# [251] sort_expr
 sort_expr ::= 'ordinata' 'via' sort_direction ('ex' | 'de') expression sort_body?
-# [253] sort_direction
+# [252] sort_direction
 sort_direction ::= 'ascendens' | 'descendens'
-# [254] sort_body
+# [253] sort_body
 sort_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
-# [255] filum_clause
+# [254] filum_clause
 filum_clause ::= 'filum' IDENTIFIER
-# [256] capta_expr
+# [255] capta_expr
 capta_expr ::= 'capta' block_stmt
-# [257] object_pattern
+# [256] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [258] pattern_property
+# [257] pattern_property
 pattern_property ::= 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
-# [259] array_pattern
+# [258] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [260] array_pattern_element
+# [259] array_pattern_element
 array_pattern_element ::= '_' | 'ceteri'? IDENTIFIER
-# [261] nota_stmt
+# [260] nota_stmt
 nota_stmt ::= ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
-# [262] entry_header
+# [261] entry_header
 entry_header ::= ('argumenta' IDENTIFIER)? ('exitus' expression)?
-# [263] incipit_stmt
+# [262] incipit_stmt
 incipit_stmt ::= 'incipit' entry_header block_stmt
-# [264] incipiet_stmt
+# [263] incipiet_stmt
 incipiet_stmt ::= 'incipiet' entry_header block_stmt
-# [265] probandum_decl
+# [264] probandum_decl
 probandum_decl ::= 'probandum' STRING proba_modifier* '{' probandum_body '}'
-# [266] probandum_body
+# [265] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [267] proba_stmt
+# [266] proba_stmt
 proba_stmt ::= 'proba' STRING proba_modifier* block_stmt
-# [268] proba_modifier
+# [267] proba_modifier
 proba_modifier ::= 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING | 'temporis' NATURAL | 'metior' | 'repete' NATURAL | 'fragilis' NATURAL | 'solum_in' STRING
-# [269] praepara_block
+# [268] praepara_block
 praepara_block ::= ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
-# [270] fac_stmt
+# [269] fac_stmt
 fac_stmt ::= 'fac' block_stmt cape_clause? ('dum' expression)?
-# [271] IDENTIFIER
+# [270] IDENTIFIER
 IDENTIFIER ::=
-# [272] NUMBER
+# [271] NUMBER
 NUMBER ::=
-# [273] NATURAL
+# [272] NATURAL
 NATURAL ::=
-# [274] STRING
+# [273] STRING
 STRING ::=
-# [275] ASCII_STRING
+# [274] ASCII_STRING
 ASCII_STRING ::=
-# [276] BACKTICK_STRING
+# [275] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [277] OCTETI_STRING
+# [276] OCTETI_STRING
 OCTETI_STRING ::=
-# [278] REGEX_TYPE_WORD
+# [277] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [279] REGEX_BODY
+# [278] REGEX_BODY
 REGEX_BODY ::=
-# [280] NEWLINE
+# [279] NEWLINE
 NEWLINE ::=
-# [281] WIDTH_MARKER
+# [280] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [282] LISTA_WIDTH_SUGAR
+# [281] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [283] TENSOR_WIDTH_SUGAR
+# [282] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [284] SPARSA_WIDTH_SUGAR
+# [283] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [285] VECTOR_WIDTH_SUGAR
+# [284] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [286] MATRIX_WIDTH_SUGAR
+# [285] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [287] FRONTMATTER_DELIMITER
+# [286] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [288] TOML_LINES
+# [287] TOML_LINES
 TOML_LINES ::=
-# [289] ANNOTATION_NAME
+# [288] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [290] ANNOTATION_FIELD_NAME
+# [289] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [291] NON_NEWLINE_TOKEN
+# [290] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [292] NO_NEWLINE
+# [291] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -863,7 +861,6 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#praefixum-expr` | live |
 | [`scriptum_expr`](#scriptum-expr) | `#scriptum-expr` | live |
 | [`lege_expr`](#lege-expr) | `#lege-expr` | live |
-| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
 | [`reducta_expr`](#reducta-expr) | `#reducta-expr` | live |
 | [`reducta_op`](#reducta-op) | `#reducta-op` | live |
 | [`reducta_group`](#reducta-group) | `#reducta-group` | live |
@@ -1027,7 +1024,7 @@ productions. It is not a second keyword authority.
 | Objects | `praefixum` | prefix expression |
 | Testing | `praepara` | setup |
 | Testing | `praeparabit` | async setup |
-| Grammar | `primus_quem` | first-match selection head |
+| Expression | `prima` | first-match reduction operator (en `first`; contextual) |
 | Expression | `pro` | grouped reduction clause (en `per`; contextual) |
 | Testing | `proba` | test |
 | Testing | `probandum` | test suite |
@@ -1066,7 +1063,6 @@ productions. It is not a second keyword authority.
 | Testing | `temporis` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `typus` | type alias |
-| Grammar | `ubi` | first-match predicate tail |
 | Iteration | `usque` | range until inclusive |
 | Params | `ut` | as / alias |
 | Declarations | `varia` | mutable binding |
@@ -2969,17 +2965,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } ex source`.
 ### Special Expressions
 
 
-`primus_quem(source, ubi binder { predicate })` is the dedicated first-match
-selection expression over a statically bounded source: the predicate is
-evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `nihil`
-(the result type is `T ∪ nihil`). The `ubi` predicate tail is owned by this
-head and never shares the reduce/scan `fixum`/`varia` binder tail.
-`primus_quem` claims only the expression-head position immediately followed
-by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`apud` coordinate clause binds per-axis indices as in `itera ex`.
-
-`reducta via <op> ex source [apud [coords]] [pro key | pro [key, …]] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, or `numeratio`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
+`reducta via <op> ex source [apud [coords]] [pro key | pro [key, …]] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, `numeratio`, or `prima`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `apud [coords]` binds one integer coordinate per source axis. A body is claimed only when `(fixum | varia) IDENTIFIER '{'` follows, so a declaration such as `fixum numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `redde` term per element. Without a body, each source element is the term. `filum f` requires a body and a kernel context; it retains the existing sum path, while other `filum` operators fail closed by name until their lowering is implemented. Without `filum`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2991,6 +2977,9 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 | `argmaxima`, `argminima` | numeric scalar | rank-one coordinate `numerus`; higher-rank `iuncta<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `vel` | `nihil` or the supplied coordinate identity |
 | `omnia`, `quilibet` | `bivalens` | `bivalens` | `verum`, `falsum` |
 | `numeratio` | `bivalens` | `numerus`, the number of true terms | `0` |
+| `prima` | `bivalens` predicate, required body | the first element whose predicate holds: `T ∪ nihil`, always optional | `nihil` |
+
+`prima` (en `first`) takes a required body that is the predicate over the element and yields the first element in row-major order for which it holds, or `nihil` for an empty source or no match. Evaluation is total: the predicate runs on every element, including those after the first match, and a predicate error is never turned into `nihil`. It takes no `pro` group (`reducta_group_op_unsupported`) and no `vel` identity, and a source that is not a tensor or matrix, like every reduction source, is refused; first-match over lists is not a reduction source. `prima` is the one reduction operator whose result is always optional, even over a statically non-empty source. On `@ radix lane "air"` it is admitted over a statically bounded source only (`reducta_first_unbounded_source`), forward-only: it never becomes an AIR tensor op, so reverse AD stays closed.
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
@@ -3205,9 +3194,7 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
-the owned predicate-tail introducer of the `primus_quem` first-match expression
-(see Special Expressions), not collection syntax.
+`prima` and `ultima` are ordinary method names, not transform keywords.
 
 `ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument

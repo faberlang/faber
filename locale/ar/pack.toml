@@ -88,8 +88,6 @@ reddet = "أعد_منتظرا"
 tacebit = "انتظر"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "فارغ"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "المجموع"
 filum = "خيط"
 maxima = "الأقصى"
@@ -163,6 +161,7 @@ numeratio = "العدّ"
 quilibet = "أي"
 argmaxima = "فهرس_الأكبر"
 argminima = "فهرس_الأصغر"
+prima = "الأول"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "رتب"
 ascendens = "تصاعدي"
@@ -4205,18 +4204,6 @@ message = "مطلوب ']' بعد تعبير الفهرس غير null"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "مطلوب ')' بعد وسائط الاستدعاء غير null"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "مطلوب '(' بعد 'primus_quem'"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "مطلوب ',' بعد مصدر المطابقة الأولى"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "مطلوب ذيل شرط 'ubi'"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "مطلوب ')' بعد شرط المطابقة الأولى"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول المنشئ"
 
@@ -4356,3 +4343,9 @@ help = "ينسخ '⇇' الآن قيم الطرف الأيمن إلى تخزين
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "يجب أن يعرّف عقد الإرسال بالضبط `sink(T) → vacuum ⇥ E` و`flush() → vacuum ⇥ E` باستخدام معامل نوع واحد"
 help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum ⇥ E` و`{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "النواة `{kernel}` تعمل بشكل متسلسل على جهاز {device}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "النواة `{kernel}`: يمكن تجنّب {kind} عبر الأقسام الـ {partitions}: {avoidable} ({reason})"

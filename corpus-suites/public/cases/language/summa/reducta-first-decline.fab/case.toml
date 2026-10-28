@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/summa/reducta-first-decline.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/reducta-first-decline.fab"
+category = "reduction"
+domain = "collections"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "reducta_first_requires_body"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "reducta_first_requires_body"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "reducta_first_requires_body"

@@ -75,8 +75,7 @@ impl HirVisitor for Ends {
             HirExpressionKind::Clausura(..)
             | HirExpressionKind::Reduction { .. }
             | HirExpressionKind::Scan { .. }
-            | HirExpressionKind::Sort { .. }
-            | HirExpressionKind::FirstMatch { .. } => {}
+            | HirExpressionKind::Sort { .. } => {}
             HirExpressionKind::Itera {
                 filum: Some(_),
                 iter,

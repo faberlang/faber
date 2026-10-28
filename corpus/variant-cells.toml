@@ -625,8 +625,8 @@ family = "bounded-conversio"
 cell = "octeti<N> ↦ lista<u8>"
 status = "direct"
 exemplum = "bounded/conversio-octeti-to-lista.fab"
-expected = false
-note = "batch 4: check-admitted u8 list bridge; runner lacks bounded octeti carrier (UnsupportedMir)"
+expected = true
+note = "batch 4: check-admitted u8 list bridge; the runner prints the two initialized bytes as list<u8>"
 
 [[cells]]
 id = "bconv.textus-to-bounded-textus"
@@ -682,8 +682,8 @@ family = "bounded-conversio"
 cell = "lista<T,magnitudo N> ↦ octeti<M>"
 status = "direct"
 exemplum = "bounded/conversio-lista-to-octeti.fab"
-expected = false
-note = "batch 4: check-admitted u8 byte bridge; runner lacks bounded octeti carrier (UnsupportedMir)"
+expected = true
+note = "batch 4: check-admitted u8 byte bridge; the golden is the display-token list, and the runner prints the raw bytes instead (pinned known-fail)"
 
 # =============================================================================
 # annotations (8 cells: 8 direct / 0 bare)

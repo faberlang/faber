@@ -256,7 +256,7 @@ pub(super) fn rewrite_place_sources(
                     *source = rewritten;
                 }
             }
-            MirProjection::Index(operand) => {
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
                 rewrite_operand_sources(operand, unit_path, source_rewrites);
             }
         }

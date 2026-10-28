@@ -181,6 +181,22 @@ pub struct ManifestTarget {
     /// Compiler options of the backend recipe to change. Each key replaces
     /// the recipe's same key; unnamed keys keep the backend default.
     pub compiler_options: BTreeMap<String, serde_json::Value>,
+
+    /// Extra tool flags, added to the backend recipe's build command line
+    /// where the recipe places them (`{flags}`).
+    pub flags: Vec<String>,
+
+    /// Build tags, passed through the flag the backend recipe names for
+    /// `tags` (for Go, `-tags`).
+    pub tags: Vec<String>,
+
+    /// Operating system to build for, set in the build tool's environment
+    /// under the variable the backend recipe names for `os`.
+    pub os: Option<String>,
+
+    /// Architecture to build for, set in the build tool's environment under
+    /// the variable the backend recipe names for `arch`.
+    pub arch: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]

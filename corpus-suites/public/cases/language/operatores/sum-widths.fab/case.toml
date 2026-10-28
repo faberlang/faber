@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/operatores/sum-widths.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/sum-widths.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

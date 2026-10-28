@@ -225,6 +225,16 @@ fn try_bind_generic_type_witness(
                 )
         }
         (
+            Type::BoundedArray {
+                element: expected_element,
+                capacity: expected_capacity,
+            },
+            Type::BoundedArray {
+                element: actual_element,
+                capacity: actual_capacity,
+            },
+        )
+        | (
             Type::BoundedQueue {
                 element: expected_element,
                 capacity: expected_capacity,
@@ -2220,7 +2230,7 @@ fn rewrite_place_constants(
     rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
 ) -> bool {
     for projection in &mut place.projections {
-        if let MirProjection::Index(index) = projection
+        if let MirProjection::Index(index) | MirProjection::ProvenIndex(index) = projection
             && !rewrite_operand_constants(index, rewrite)
         {
             return false;

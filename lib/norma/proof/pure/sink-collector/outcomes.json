@@ -6,12 +6,6 @@
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
     },
-    "go": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "undefined: Collector",
-      "reason": "The Go package emitter does not yet lower the `norma:sink` Collector class this proof constructs, so the generated `main.go` names `Collector` with no definition and `go build` stops with `undefined: Collector`. Re-measure this row when the Go package emitter lowers that module."
-    },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",

@@ -1,0 +1,40 @@
++++
+term = "/"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "multiplicative_expr", "assignment", "expr_stmt"]
+category = "arithmetic"
+summary = "An integer division by zero aborts the run: stdout before it is printed, the run exits non-zero."
+syntax = "<int> / <int>"
+related = ["/", "%", "÷"]
+locale = "en"
++++
+# =============================================================================
+# / — An integer division by zero aborts the run: stdout before it is printed, the run exits non-zero.
+# =============================================================================
+#
+# What this teaches:
+#   • Integer `/` and `%` with a non-zero divisor evaluate normally, so
+#     the first two lines print
+#   • A zero divisor is a run-time trap: the run ends at the division and
+#     exits non-zero
+#   • The line printed before the trap is kept; the line after it never
+#     runs
+#
+# Common mistakes:
+#   • Expecting `10 / 0` to give infinity or a wrapped value: integer
+#     division has no such result
+#   • Expecting the trap to be recoverable with `do … catch`: it is not in
+#     the `⇥` error channel
+#
+# See also: /, %, numerus-overflow
+# =============================================================================
+
+main {
+    mut int d ← 2
+    print 10 / d
+    print 10 % d
+    d ← d - 2
+    print "before"
+    print 10 / d
+    print "after"
+}

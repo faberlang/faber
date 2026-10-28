@@ -69,7 +69,7 @@ use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirFunction,
     MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirStatement,
     MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
-    MirValidationContext,
+    MirValidationContext, MirValueKind,
 };
 // The decomposition's own scan helpers moved to `crate::collection_ops`; the
 // collection-op types remain in scope for the `#[path]` test module.
@@ -421,6 +421,7 @@ pub fn decompose_kernel_function_with_limit(
     // body splits into consecutive elementwise sub-slices so every subchain
     // kernel fits the budget, preserving the plan semantics (the carried
     // data-flow edges between the subchains carry the same values).
+    let slices = sink_constant_statements(function, block, slices);
     let slices = split_oversized_elementwise_body(function, block, slices, validation, limit)?;
 
     // The explicit output parameter the final subchain stores into (fails
@@ -1800,6 +1801,80 @@ fn subchain_params(source: &MirFunction, indices: &[usize]) -> Vec<MirParam> {
             span,
         })
         .collect()
+}
+
+/// Move a constant statement to the subchains that read it.
+///
+/// A constant (`_30 = const float 0.5`, typed as a tensor so it broadcasts) has
+/// no operands, so the slicing walk folds it into whatever slice is open. When
+/// a LATER slice reads it, it becomes an extra output of that kernel at the
+/// tensor's full extent. A recipe kernel dispatches over its own result's
+/// extent, so such an output can be larger than the dispatch covers (a
+/// `[512,16]` matmul carrying five `[512,512]` constants). The constant needs
+/// no producer: each subchain that reads one computes it, and the slice that
+/// merely held it drops it.
+///
+/// Only a constant written once, read by a slice other than the one holding it,
+/// and not returned moves; every other statement keeps its place.
+fn sink_constant_statements(
+    function: &MirFunction,
+    block: &MirBlock,
+    mut slices: Vec<Vec<usize>>,
+) -> Vec<Vec<usize>> {
+    let statements = &block.statements;
+    let mut writes: BTreeMap<MirLocalId, usize> = BTreeMap::new();
+    for statement in statements {
+        if let Some(local) = crate::read_analysis::statement_destination(statement) {
+            *writes.entry(local).or_default() += 1;
+        }
+    }
+    let returned = crate::read_analysis::terminator_return_local(&block.terminator.kind);
+    let constants: Vec<(usize, MirLocalId)> = statements
+        .iter()
+        .enumerate()
+        .filter_map(|(index, statement)| {
+            let MirStatementKind::Assign { place, value } = &statement.kind else {
+                return None;
+            };
+            let MirValueKind::Operand(MirOperand::Constant(_)) = &value.kind else {
+                return None;
+            };
+            let local = crate::read_analysis::place_local_base(place)
+                .filter(|_| place.projections.is_empty())?;
+            let is_param = function.params.iter().any(|param| param.local == local);
+            (writes.get(&local) == Some(&1) && !is_param && returned != Some(local))
+                .then_some((index, local))
+        })
+        .collect();
+    for (index, local) in constants {
+        let readers: Vec<usize> = slices
+            .iter()
+            .enumerate()
+            .filter(|(_, slice)| {
+                slice.iter().any(|&other| {
+                    other != index
+                        && crate::read_analysis::statement_reads_local(&statements[other], local)
+                })
+            })
+            .map(|(position, _)| position)
+            .collect();
+        let holder = slices.iter().position(|slice| slice.contains(&index));
+        if readers.is_empty() || (readers.len() == 1 && holder == Some(readers[0])) {
+            continue;
+        }
+        for (position, slice) in slices.iter_mut().enumerate() {
+            let reads = readers.contains(&position);
+            let holds = slice.contains(&index);
+            if reads && !holds {
+                slice.push(index);
+                slice.sort_unstable();
+            } else if holds && !reads {
+                slice.retain(|&other| other != index);
+            }
+        }
+    }
+    slices.retain(|slice| !slice.is_empty());
+    slices
 }
 
 /// The source function's explicit output parameter, when its body stores into

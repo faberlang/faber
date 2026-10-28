@@ -318,13 +318,13 @@ fn run_accepts_shuffle_seed_and_debug_flags() {
 }
 
 #[test]
-fn test_accepts_solum_in_flag() {
+fn test_accepts_only_in_flag() {
     let cli =
-        Cli::try_parse_from(["faber", "test", "--solum-in", "ci"]).expect("parse test --solum-in");
+        Cli::try_parse_from(["faber", "test", "--only-in", "ci"]).expect("parse test --only-in");
     let Some(crate::cli::Command::Test(args)) = cli.command else {
         panic!("expected test subcommand");
     };
-    assert_eq!(args.solum_in.as_deref(), Some("ci"));
+    assert_eq!(args.only_in.as_deref(), Some("ci"));
 }
 
 #[test]

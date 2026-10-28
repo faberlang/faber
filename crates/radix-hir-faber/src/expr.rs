@@ -1425,30 +1425,6 @@ impl super::FaberCodegen<'_> {
                     writer,
                 );
             }
-            HirExpressionKind::FirstMatch {
-                source,
-                coordinates,
-                binding,
-                body,
-            } => {
-                // `primus_quem(source [apud [i, j]], ubi x { predicate })`: the
-                // head and the `ubi` tail are contextual keywords; the source
-                // is a complete expression, so it needs no parentheses.
-                writer.write(surface.contextual_keyword("primus_quem"));
-                writer.write("(");
-                self.write_expr(source, names, surface, writer);
-                self.write_apud_coordinates(coordinates, surface, writer);
-                writer.write(", ");
-                writer.write(surface.contextual_keyword("ubi"));
-                writer.write(" ");
-                writer.write(&self.symbol_to_string(binding.1));
-                writer.writeln(" {");
-                writer.indented(|writer| {
-                    self.write_block(body, names, surface, writer);
-                    self.write_block_end_trivia(body, writer);
-                });
-                writer.write("})");
-            }
             HirExpressionKind::CopyInto { target, value } => {
                 // `target ⇇ value` — the glyph is an operator token, never a
                 // keyword, so it is locale-invariant. It binds between

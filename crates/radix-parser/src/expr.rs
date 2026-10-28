@@ -1892,6 +1892,7 @@ impl Parser {
                 Some("omnia") => ReductaOp::All,
                 Some("quilibet") => ReductaOp::Any,
                 Some("numeratio") => ReductaOp::Count,
+                Some("prima") => ReductaOp::First,
                 _ => return Err(self.reducta_operator_error("reducta_unknown_operator")),
             },
             _ => return Err(self.reducta_operator_error("reducta_unknown_operator")),
@@ -2175,6 +2176,7 @@ impl Parser {
             "omnia",
             "quilibet",
             "numeratio",
+            "prima",
         ]
         .iter()
         .map(|key| {
@@ -2244,63 +2246,6 @@ impl Parser {
         )
     }
 
-    /// Return whether the current expression head is the dedicated
-    /// `primus_quem` first-match head.
-    ///
-    /// The spelling claims only through the keyword-registry surface (a
-    /// reader pack's own row, or the Latin spelling under `la`/no pack) and
-    /// only when immediately followed by `(`.
-    fn is_first_match_expr_head(&self) -> bool {
-        matches!(self.peek().kind, TokenKind::Ident(sym)
-            if self.keyword_claim_key(sym) == Some("primus_quem"))
-            && self.peek_at(1).kind == TokenKind::LParen
-    }
-
-    /// Parse the dedicated `primus_quem` first-match expression.
-    ///
-    /// The head spelling is contextual: it stays an ordinary identifier
-    /// unless it opens this production. The `ubi` predicate tail is owned by
-    /// this head and is never shared with the reduce/scan tails. The optional
-    /// `apud` clause delegates to the same production used by `itera` and
-    /// `summa`.
-    ///
-    /// GRAMMAR:
-    ///   first-match-expr := `primus_quem` `(` expression [apud-clause] `,`
-    ///                       `ubi` IDENTIFIER block `)`
-    fn parse_first_match_expr(&mut self) -> Result<Expr, ParseError> {
-        let start = self.current_span();
-        self.eat_identifier_text("primus_quem");
-        self.expect_issue(&TokenKind::LParen, "first_match_start")?;
-
-        let source = Box::new(self.parse_expression()?);
-        let apud = if self.eat_keyword_ident(TokenKind::Apud) {
-            self.parse_apud_clause()?
-        } else {
-            Vec::new()
-        };
-        self.expect_issue(&TokenKind::Comma, "first_match_source_separator")?;
-        if !self.eat_identifier_text("ubi") {
-            return Err(
-                ParseError::structured(ParseErrorKind::Expected, self.current_span())
-                    .with_arg("issue", "first_match_predicate_tail"),
-            );
-        }
-        let binding = self.parse_ident()?;
-        let body = self.parse_block()?;
-        self.expect_issue(&TokenKind::RParen, "first_match_end")?;
-
-        Ok(Expr {
-            id: self.next_id(),
-            kind: ExprKind::FirstMatch(Box::new(FirstMatchExpr {
-                source,
-                apud,
-                binding,
-                body,
-            })),
-            span: start.merge(self.previous_span()),
-        })
-    }
-
     /// Parse primary expressions, the atoms that postfix and infix forms compose.
     ///
     /// GRAMMAR:
@@ -2342,9 +2287,6 @@ impl Parser {
         }
         if let Some(head) = self.retired_reduction_expr_head() {
             return self.parse_retired_reduction_expr(head);
-        }
-        if self.is_first_match_expr_head() {
-            return self.parse_first_match_expr();
         }
         if let Some(expr) = self.try_parse_compact_clausura_expr()? {
             return Ok(expr);

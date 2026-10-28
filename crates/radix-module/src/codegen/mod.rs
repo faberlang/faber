@@ -559,10 +559,7 @@ fn generate_rust_from_analyzed(
     Err(unavailable_target_error(Target::HirRust))
 }
 
-/// The output tokens the module behind `analysis` prints through.
-///
-/// Plumbing only: every module fills Latin until the final
-/// unit (U9) makes this one function read the module's locale pack.
+/// Output tokens used by literals emitted from this analyzed module.
 #[cfg(any(
     feature = "hir-rust",
     feature = "hir-ts",

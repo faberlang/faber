@@ -750,6 +750,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Expression | `maxima` | maximum reduction operator (en `max`) |
 # | Expression | `minima` | minimum reduction operator (en `min`) |
 # | Expression | `numeratio` | count reduction operator (en `count`) |
+# | Expression | `prima` | first-match reduction operator (en `first`; contextual) |
 # | Expression | `ordinata` | sort expression head (en `sort`; contextual) |
 # | Expression | `ascendens` | ascending sort direction (en `asc`; contextual) |
 # | Expression | `descendens` | descending sort direction (en `desc`; contextual) |
@@ -768,8 +769,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Objects | `iuncta` | tuple type/constructor |
 # | Objects | `ratio` | named-field aggregate type/constructor |
 # | Objects | `praefixum` | prefix expression |
-# | Grammar | `primus_quem` | first-match selection head |
-# | Grammar | `ubi` | first-match predicate tail |
 # | Conversion | `via` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
@@ -1556,7 +1555,6 @@ regex_literal := REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 primary := IDENTIFIER | literal | regex_literal | 'ego'
          | array_literal | json_literal | typed_constructor | iuncta_expr
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
-         | first_match_expr
          | reducta_expr
          | scan_expr
          | sort_expr
@@ -1645,18 +1643,14 @@ qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
 praefixum_expr := 'praefixum' block_stmt
 scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
 lege_expr      := 'lege' 'lineam'?
-# Dedicated first-match selection: total over a bounded source, first-live
-# selection, `T ∪ nihil` for no-match/empty. The `ubi` predicate tail is owned
-# by this head — never the reduce/scan `fixum`/`varia` binder tail.
-first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
 # General shaped-source reduction. `via` is mandatory; the operator is one of
-# the nine locale-pack words below. Grouping is contextual, and the optional
+# the ten locale-pack words below. Grouping is contextual, and the optional
 # tail is either a body (with an optional `filum`) or a bodiless identity.
 # The body is claimed only by `(fixum | varia) IDENTIFIER '{'`, so a following
 # declaration remains a separate statement. `reducta` and its operator words
 # stay ordinary identifiers outside their grammar slots.
 reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
+reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio' | 'prima'
 reducta_group := 'pro' expression
 reducta_body := ('sit' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression

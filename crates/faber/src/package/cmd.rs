@@ -24,8 +24,6 @@ use super::cargo::{
     feature = "mir-wasm"
 ))]
 use super::discover_build_layout as discover_package_layout;
-#[cfg(feature = "hir-go")]
-use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
 #[cfg(feature = "hir-rust")]
 use super::manifest::FaberManifest;
 use super::manifest_build_target_for_input;
@@ -430,53 +428,36 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 return;
             }
             Err(diagnostics) => {
-                super::ts_build::report_and_exit(&diagnostics, locale_pack.as_ref())
+                super::build_recipe::report_and_exit(&diagnostics, locale_pack.as_ref())
             }
         }
     }
 
-    // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
-    // The multi-module file collection travels inside the compile result
-    // itself (FBR-P2-003) — no hidden thread-local state.
+    // Package Go builds write target/faber/go (module, vendored runtime) and
+    // run the backend recipe's build command. The multi-module file
+    // collection travels inside the compile result itself (FBR-P2-003).
     if is_package && target == Target::HirGo {
         #[cfg(not(feature = "hir-go"))]
         exit_target_feature_unavailable(Target::HirGo);
         #[cfg(feature = "hir-go")]
         {
-            let go_result = radix::program::emit::compile_package_result(
-                &config,
-                &input_path,
-                &super::faber_emission_seams(),
-            );
-            crate::postprocess::print_diagnostics(
-                &go_result.compile_result.diagnostics,
-                DiagnosticMode::Normal,
-                locale_pack.as_ref(),
-            );
-            let Some(output) = go_result.compile_result.output else {
-                fail_compilation(&go_result.compile_result.diagnostics);
-            };
             let layout = match discover_build_layout(&input_path, &command.out_dir) {
                 Ok(l) => l,
                 Err(d) => fail_with_diagnostic(&d),
             };
-            let go_layout = GoBuildLayout::from_package(&layout);
-            let code = radix::services::output_code(output);
-            if let Err(d) = emit_go_module_with_postprocess(
-                &go_layout,
-                &code,
-                &go_result.go_modules,
+            match super::go_build::go_program::build_go_program(
+                &config,
+                &input_path,
+                &layout,
                 format,
                 linter,
+                locale_pack.as_ref(),
             ) {
-                fail_with_diagnostic(&d);
-            }
-            match invoke_go_build(&go_layout) {
-                Ok(binary_path) => {
-                    println!("{}", binary_path.display());
+                Ok(program) => {
+                    println!("{}", program.binary.display());
                     return;
                 }
-                Err(d) => fail_with_diagnostic(&d),
+                Err(failure) => failure.exit(locale_pack.as_ref()),
             }
         }
     }
@@ -1070,10 +1051,6 @@ fn advice_target(request: DeviceAdviceRequest) -> (super::device::AdviceDevice, 
             crate::exit_status::exit_usage();
         }
     };
-    if request.partitions.is_some() && device == AdviceDevice::Cuda {
-        eprintln!("error: `--partitions` is valid only with `--device cpu` or `--device metal`");
-        crate::exit_status::exit_usage();
-    }
     (device, request.partitions.unwrap_or(1))
 }
 
@@ -1098,12 +1075,18 @@ fn print_device_advice(
     locale_pack: Option<&radix::module::locale::LocalePack>,
 ) {
     let mut advice = Vec::new();
+    let mut audit = Vec::new();
     let mut failures = Vec::new();
     for unit in lowering_units(config, input_path) {
         match super::mir::with_check_lowered_package_mir(config, &unit, |lowered| {
-            super::device::split_advice(lowered, device, partitions)
+            let rows = super::device::split_advice(lowered, device, partitions)?;
+            let syncs = super::device::span_audit(lowered, device, partitions)?;
+            Ok((rows, syncs))
         }) {
-            Ok(Ok(rows)) => advice.extend(rows),
+            Ok(Ok((rows, syncs))) => {
+                advice.extend(rows);
+                audit.extend(syncs);
+            }
             Ok(Err(errors)) | Err(errors) => failures.extend(errors),
         }
     }
@@ -1113,10 +1096,17 @@ fn print_device_advice(
     // A library's modules lower one by one and may share kernels.
     advice.sort_by(|a, b| a.kernel.cmp(&b.kernel));
     advice.dedup();
+    audit.sort();
+    audit.dedup();
     let file = input_path.display().to_string();
     let diagnostics: Vec<_> = advice
         .iter()
         .map(|row| super::device::advice_diagnostic(row, device, partitions, &file))
+        .chain(
+            audit
+                .iter()
+                .map(|row| super::device::audit_diagnostic(row, device, partitions, &file)),
+        )
         .collect();
     if mode == DiagnosticMode::Diagnostics {
         if !diagnostics.is_empty() {

@@ -445,7 +445,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [217] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [218] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'tôi' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | 'tôi' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [219] ad_expr
 ad_expr ::= 'gọi' ASCII_STRING ad_opener?
 # [220] ad_opener
@@ -492,107 +492,105 @@ praefixum_expr ::= 'tiền_tố' block_stmt
 scriptum_expr ::= 'văn_bản_hóa' '(' STRING (',' expression)* ')'
 # [241] lege_expr
 lege_expr ::= 'đọc' 'dòng'?
-# [242] first_match_expr
-first_match_expr ::= 'khớp_đầu_tiên' '(' expression apud_clause? ',' 'nơi' IDENTIFIER block_stmt ')'
-# [243] reducta_expr
+# [242] reducta_expr
 reducta_expr ::= 'rút_gọn' 'thông_qua' reducta_op 'từ' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [244] reducta_op
-reducta_op ::= 'tổng' | 'tích' | 'lớn_nhất' | 'nhỏ_nhất' | 'argmax' | 'argmin' | 'tất_cả' | 'bất_kỳ' | 'đếm'
-# [245] reducta_group
+# [243] reducta_op
+reducta_op ::= 'tổng' | 'tích' | 'lớn_nhất' | 'nhỏ_nhất' | 'argmax' | 'argmin' | 'tất_cả' | 'bất_kỳ' | 'đếm' | 'đầu_tiên'
+# [244] reducta_group
 reducta_group ::= 'theo' expression
-# [246] reducta_body
+# [245] reducta_body
 reducta_body ::= ('đặt' | 'biến') IDENTIFIER block_stmt
-# [247] reducta_identity
+# [246] reducta_identity
 reducta_identity ::= 'hoặc_nếu_rỗng' expression
-# [248] scan_expr
+# [247] scan_expr
 scan_expr ::= 'scan' 'thông_qua' scan_op ('total' ('inclusive' | 'exclusive'))? 'từ' expression apud_clause scan_group? scan_order_clause? filum_clause 'đặt' IDENTIFIER block_stmt
-# [249] scan_op
+# [248] scan_op
 scan_op ::= 'tổng' | 'tích' | 'lớn_nhất' | 'nhỏ_nhất' | 'tất_cả' | 'bất_kỳ' | 'đếm'
-# [250] scan_group
+# [249] scan_group
 scan_group ::= 'theo' expression
-# [251] scan_order_clause
+# [250] scan_order_clause
 scan_order_clause ::= 'order' ('tăng_dần' | 'giảm_dần')
-# [252] sort_expr
+# [251] sort_expr
 sort_expr ::= 'sắp_xếp' 'thông_qua' sort_direction ('từ' | 'ra') expression sort_body?
-# [253] sort_direction
+# [252] sort_direction
 sort_direction ::= 'tăng_dần' | 'giảm_dần'
-# [254] sort_body
+# [253] sort_body
 sort_body ::= ('đặt' | 'biến') IDENTIFIER block_stmt
-# [255] filum_clause
+# [254] filum_clause
 filum_clause ::= 'sợi' IDENTIFIER
-# [256] capta_expr
+# [255] capta_expr
 capta_expr ::= 'bẫy' block_stmt
-# [257] object_pattern
+# [256] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [258] pattern_property
+# [257] pattern_property
 pattern_property ::= 'còn_lại'? IDENTIFIER ('như' IDENTIFIER)?
-# [259] array_pattern
+# [258] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [260] array_pattern_element
+# [259] array_pattern_element
 array_pattern_element ::= '_' | 'còn_lại'? IDENTIFIER
-# [261] nota_stmt
+# [260] nota_stmt
 nota_stmt ::= ('ghi_chú' | 'xem' | 'cảnh_báo' | 'viết') expression (',' expression)*
-# [262] entry_header
+# [261] entry_header
 entry_header ::= ('đối_số' IDENTIFIER)? ('thoát' expression)?
-# [263] incipit_stmt
+# [262] incipit_stmt
 incipit_stmt ::= 'bắt_đầu' entry_header block_stmt
-# [264] incipiet_stmt
+# [263] incipiet_stmt
 incipiet_stmt ::= 'bắt_đầu_bất_đồng_bộ' entry_header block_stmt
-# [265] probandum_decl
+# [264] probandum_decl
 probandum_decl ::= 'đối_tượng_kiểm_thử' STRING proba_modifier* '{' probandum_body '}'
-# [266] probandum_body
+# [265] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [267] proba_stmt
+# [266] proba_stmt
 proba_stmt ::= 'kiểm_thử' STRING proba_modifier* block_stmt
-# [268] proba_modifier
+# [267] proba_modifier
 proba_modifier ::= 'mong_đợi_thất_bại' | 'bỏ_qua' STRING | 'việc_cần_làm' STRING | 'chỉ' | 'nhãn' STRING | 'thời_gian' NATURAL | 'đo_lường' | 'lặp_lại' NATURAL | 'mong_manh' NATURAL | 'chỉ_trong' STRING
-# [269] praepara_block
+# [268] praepara_block
 praepara_block ::= ('chuẩn_bị' | 'sẽ_chuẩn_bị' | 'sau_chuẩn_bị' | 'sẽ_sau_chuẩn_bị') 'tất_cả'? block_stmt
-# [270] fac_stmt
+# [269] fac_stmt
 fac_stmt ::= 'làm' block_stmt cape_clause? ('trong_khi' expression)?
-# [271] IDENTIFIER
+# [270] IDENTIFIER
 IDENTIFIER ::=
-# [272] NUMBER
+# [271] NUMBER
 NUMBER ::=
-# [273] NATURAL
+# [272] NATURAL
 NATURAL ::=
-# [274] STRING
+# [273] STRING
 STRING ::=
-# [275] ASCII_STRING
+# [274] ASCII_STRING
 ASCII_STRING ::=
-# [276] BACKTICK_STRING
+# [275] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [277] OCTETI_STRING
+# [276] OCTETI_STRING
 OCTETI_STRING ::=
-# [278] REGEX_TYPE_WORD
+# [277] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [279] REGEX_BODY
+# [278] REGEX_BODY
 REGEX_BODY ::=
-# [280] NEWLINE
+# [279] NEWLINE
 NEWLINE ::=
-# [281] WIDTH_MARKER
+# [280] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [282] LISTA_WIDTH_SUGAR
+# [281] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [283] TENSOR_WIDTH_SUGAR
+# [282] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [284] SPARSA_WIDTH_SUGAR
+# [283] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [285] VECTOR_WIDTH_SUGAR
+# [284] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [286] MATRIX_WIDTH_SUGAR
+# [285] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [287] FRONTMATTER_DELIMITER
+# [286] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [288] TOML_LINES
+# [287] TOML_LINES
 TOML_LINES ::=
-# [289] ANNOTATION_NAME
+# [288] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [290] ANNOTATION_FIELD_NAME
+# [289] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [291] NON_NEWLINE_TOKEN
+# [290] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [292] NO_NEWLINE
+# [291] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -863,7 +861,6 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#tiền_tố-expr` | live |
 | [`scriptum_expr`](#scriptum-expr) | `#văn_bản_hóa-expr` | live |
 | [`lege_expr`](#lege-expr) | `#đọc-expr` | live |
-| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
 | [`reducta_expr`](#reducta-expr) | `#rút_gọn-expr` | live |
 | [`reducta_op`](#reducta-op) | `#rút_gọn-op` | live |
 | [`reducta_group`](#reducta-group) | `#rút_gọn-group` | live |
@@ -1027,7 +1024,7 @@ productions. It is not a second keyword authority.
 | Objects | `tiền_tố` | prefix expression |
 | Testing | `chuẩn_bị` | setup |
 | Testing | `sẽ_chuẩn_bị` | async setup |
-| Grammar | `khớp_đầu_tiên` | first-match selection head |
+| Expression | `đầu_tiên` | first-match reduction operator (en `first`; contextual) |
 | Expression | `theo` | grouped reduction clause (en `qua`; contextual) |
 | Testing | `kiểm_thử` | test |
 | Testing | `đối_tượng_kiểm_thử` | test suite |
@@ -1066,7 +1063,6 @@ productions. It is not a second keyword authority.
 | Testing | `thời_gian` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `kiểu_tên` | type alias |
-| Grammar | `nơi` | first-match predicate tail |
 | Iteration | `tới` | range until inclusive |
 | Params | `như` | as / alias |
 | Declarations | `biến` | mutable binding |
@@ -2865,7 +2861,7 @@ xs[lo‥hi]
 ```
 
 The copy-out methods report on the error channel instead of trimming:
-`xs.sectio(start, end)` (en `slice`) and `xs.prima(n)` (en `take`) are failable
+`xs.sectio(start, end)` (en `slice`) and `xs.đầu_tiên(n)` (en `take`) are failable
 (`⇥`; a `⊥` default or a handler takes the fault), and the fault carries the
 requested bounds or count and the list length as data.
 
@@ -2969,17 +2965,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } từ source`.
 ### Special Expressions
 
 
-`khớp_đầu_tiên(source, nơi binder { predicate })` is the dedicated first-match
-selection expression over a statically bounded source: the predicate is
-evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `nihil`
-(the result type is `T ∪ nihil`). The `nơi` predicate tail is owned by this
-head and never shares the reduce/scan `hằng`/`biến` binder tail.
-`khớp_đầu_tiên` claims only the expression-head position immediately followed
-by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`tại` coordinate clause binds per-axis indices as in `lặp từ`.
-
-`rút_gọn thông_qua <op> từ source [tại [coords]] [theo key | theo [key, …]] ([sợi f] (hằng | biến) x { trả term } | hoặc_nếu_rỗng identity)?` is the general reduction form. The optional tail is either a body (with an optional `sợi`) or a bodiless identity; without either, the source elements are the terms. `thông_qua` is mandatory and selects exactly one of `tổng`, `tích`, `lớn_nhất`, `nhỏ_nhất`, `argmax`, `argmin`, `tất_cả`, `bất_kỳ`, or `đếm`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `thông_qua` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.rút_gọn(f)` (en `xs.reduce(f)`).
+`rút_gọn thông_qua <op> từ source [tại [coords]] [theo key | theo [key, …]] ([sợi f] (hằng | biến) x { trả term } | hoặc_nếu_rỗng identity)?` is the general reduction form. The optional tail is either a body (with an optional `sợi`) or a bodiless identity; without either, the source elements are the terms. `thông_qua` is mandatory and selects exactly one of `tổng`, `tích`, `lớn_nhất`, `nhỏ_nhất`, `argmax`, `argmin`, `tất_cả`, `bất_kỳ`, `đếm`, or `đầu_tiên`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `thông_qua` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.rút_gọn(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `tại [coords]` binds one integer coordinate per source axis. A body is claimed only when `(hằng | biến) IDENTIFIER '{'` follows, so a declaration such as `hằng numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `trả` term per element. Without a body, each source element is the term. `sợi f` requires a body and a kernel context; it retains the existing sum path, while other `sợi` operators fail closed by name until their lowering is implemented. Without `sợi`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2991,6 +2977,9 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 | `argmax`, `argmin` | numeric scalar | rank-one coordinate `numerus`; higher-rank `bộ<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `hoặc_nếu_rỗng` | `nihil` or the supplied coordinate identity |
 | `tất_cả`, `bất_kỳ` | `bivalens` | `bivalens` | `đúng`, `sai` |
 | `đếm` | `bivalens` | `numerus`, the number of true terms | `0` |
+| `đầu_tiên` | `bivalens` predicate, required body | the first element whose predicate holds: `T ∪ nihil`, always optional | `nihil` |
+
+`đầu_tiên` (en `first`) takes a required body that is the predicate over the element and yields the first element in row-major order for which it holds, or `nihil` for an empty source or no match. Evaluation is total: the predicate runs on every element, including those after the first match, and a predicate error is never turned into `nihil`. It takes no `theo` group (`reducta_group_op_unsupported`) and no `hoặc_nếu_rỗng` identity, and a source that is not a tensor or matrix, like every reduction source, is refused; first-match over lists is not a reduction source. `đầu_tiên` is the one reduction operator whose result is always optional, even over a statically non-empty source. On `@ radix làn "air"` it is admitted over a statically bounded source only (`reducta_first_unbounded_source`), forward-only: it never becomes an AIR tensor op, so reverse AD stays closed.
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
@@ -3205,9 +3194,7 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `nơi` is
-the owned predicate-tail introducer of the `khớp_đầu_tiên` first-match expression
-(see Special Expressions), not collection syntax.
+`đầu_tiên` and `ultima` are ordinary method names, not transform keywords.
 
 `ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `sắp_xếp(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument

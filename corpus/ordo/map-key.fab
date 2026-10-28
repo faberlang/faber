@@ -1,0 +1,64 @@
++++
+term = "map"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "ordo_decl", "discretio_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "type_arguments", "type_argument", "assignment", "expr_stmt"]
+category = "map"
+summary = "An enum member is a map key and a set member, and a union variant is a map key."
+syntax = "map<Color, int> | set<Color> | map<Shape, int>"
+related = ["enum", "ordo", "map", "set", "discretio"]
+locale = "en"
++++
+# =============================================================================
+# map — An enum member is a map key and a set member, and a union variant is a map key.
+# =============================================================================
+#
+# What this teaches:
+#   • An `enum` member is a hashable value: `map<Color, int>` stores and
+#     reads by `Color.red`, and `set<Color>` holds members
+#   • A union variant is a key too: its tag and payload make up the key,
+#     so the same variant with the same payload finds the same entry
+#   • A missing key reads as `none` through `get`
+#
+# Common mistakes:
+#   • Expecting a variant with a different payload to find the same entry:
+#     the payload is part of the key
+#   • Expecting the output to follow insertion order: print by looking
+#     keys up in a fixed order
+#
+# See also: enum-usage, composite-key, unio
+# =============================================================================
+
+enum Color { red, green, blue }
+
+union Shape {
+    Circle { int r },
+    Square { int side }
+}
+
+main {
+    mut map<Color, int> weight ← empty
+    weight[Color.red] ← 1
+    weight[Color.blue] ← 3
+    weight[Color.red] ← weight[Color.red] + 10
+    print weight[Color.red]
+    print weight[Color.blue]
+    print weight.get(Color.green)
+    print weight.length()
+
+    mut set<Color> seen ← empty
+    seen.add(Color.green)
+    seen.add(Color.green)
+    seen.add(Color.red)
+    print seen.length()
+    print seen.has(Color.green)
+    print seen.has(Color.blue)
+
+    mut map<Shape, int> area ← empty
+    area[variant Circle { r = 2 }] ← 12
+    area[variant Square { side = 3 }] ← 9
+    area[variant Circle { r = 2 }] ← 13
+    print area.length()
+    print area[variant Circle { r = 2 }]
+    print area[variant Square { side = 3 }]
+    print area.get(variant Circle { r = 3 })
+}

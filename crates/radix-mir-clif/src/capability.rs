@@ -21,7 +21,13 @@
 use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
-use radix_mir::*;
+use radix_mir::{
+    MirAggregate, MirAggregateKind, MirBinOp, MirCallee, MirCollectionOp, MirConstant,
+    MirConversion, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirOperand,
+    MirOptionChainLink, MirOptionOp, MirParam, MirPlace, MirProgram, MirProjection, MirRuntimeCall,
+    MirSermoOp, MirStatementKind, MirTemp, MirTerminator, MirTerminatorKind, MirType, MirUnOp,
+    MirValue, MirValueKind, ValidatedMir,
+};
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
 use radix_types::{Primitive, SemanticMutability, Type, TypeId, TypeTable};
 
@@ -236,15 +242,7 @@ impl<'a> ClifCapability<'a> {
             Type::Array(element) | Type::BoundedArray { element, .. } | Type::Cursor(element) => {
                 self.type_gap(MirType::semantic(*element))
             }
-            Type::Map(key, value) => self
-                .type_gap(MirType::semantic(*key))
-                .or_else(|| self.type_gap(MirType::semantic(*value)))
-                .or_else(|| {
-                    [*key, *value]
-                        .into_iter()
-                        .any(|member| self.is_letter(member))
-                        .then(|| Gap::Subset("character in a map".to_owned()))
-                }),
+            Type::Map(key, value) => self.map_type_gap(*key, *value),
             Type::Set(element) => self.type_gap(MirType::semantic(*element)).or_else(|| {
                 self.is_letter(*element)
                     .then(|| Gap::Subset("character in a set".to_owned()))
@@ -260,60 +258,18 @@ impl<'a> ClifCapability<'a> {
             Type::Tuple(elements) => elements
                 .iter()
                 .find_map(|element| self.type_gap(MirType::semantic(*element))),
-            Type::Union(members) => members.iter().find_map(|member| {
-                if matches!(
-                    self.types.get(*member),
-                    Type::Primitive(
-                        Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
-                    ) | Type::Option(_)
-                        | Type::Bits(_)
-                        | Type::Union(_)
-                ) {
-                    return Some(Gap::Subset("union value".to_owned()));
-                }
-                self.type_gap(MirType::semantic(*member))
-            }),
+            Type::Union(members) => members
+                .iter()
+                .find_map(|member| self.union_member_gap(*member)),
             Type::Intersection(_) => Some(Gap::Subset("union value".to_owned())),
             Type::Option(inner) => match self.types.get(*inner) {
                 Type::Option(_) => Some(Gap::Subset("optional value".to_owned())),
                 _ => self.type_gap(MirType::semantic(*inner)),
             },
-            Type::Func(sig) => {
-                if !sig.type_params.is_empty() || sig.is_async || sig.is_generator {
-                    return Some(Gap::Subset("function value".to_owned()));
-                }
-                sig.params
-                    .iter()
-                    .find_map(|param| {
-                        let value = match self.types.get(param.ty) {
-                            Type::Ref(_, inner) => *inner,
-                            _ => param.ty,
-                        };
-                        self.type_gap(MirType::semantic(value))
-                    })
-                    .or_else(|| self.type_gap(MirType::semantic(sig.ret)))
-                    .or_else(|| {
-                        sig.err
-                            .and_then(|err| self.type_gap(MirType::semantic(err)))
-                    })
-            }
+            Type::Func(sig) => self.function_type_gap(sig),
             // A read-only reference is the value it borrows; a mutable one is
             // only a shared handle for the kinds that are handles.
-            Type::Ref(SemanticMutability::Mutable, inner) => {
-                if matches!(
-                    self.types.get(*inner),
-                    Type::Array(_)
-                        | Type::BoundedArray { .. }
-                        | Type::Struct(_)
-                        | Type::Record(_)
-                        | Type::Map(..)
-                        | Type::Set(_)
-                ) {
-                    self.type_gap(MirType::semantic(*inner))
-                } else {
-                    Some(Gap::Subset("reference value".to_owned()))
-                }
-            }
+            Type::Ref(SemanticMutability::Mutable, inner) => self.mutable_reference_gap(*inner),
             Type::Ref(_, inner) | Type::Promissum(inner) => {
                 self.type_gap(MirType::semantic(*inner))
             }
@@ -341,25 +297,88 @@ impl<'a> ClifCapability<'a> {
             Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::Error => {
                 Some(Gap::Layout("unresolved type".to_owned()))
             }
-            Type::Alias(_, inner) => {
-                let mut inner = *inner;
-                loop {
-                    match self.types.get(inner) {
-                        Type::Alias(_, next) => inner = *next,
-                        resolved => {
-                            let probe = MirType::semantic(inner);
-                            return match resolved {
-                                Type::Param(_) | Type::Infer(_) | Type::Error => {
-                                    Some(Gap::Layout("unresolved type".to_owned()))
-                                }
-                                _ => self.type_gap(probe),
-                            };
-                        }
-                    }
-                }
-            }
+            Type::Alias(_, inner) => self.alias_type_gap(*inner),
             _ => Some(Gap::Subset("unsupported type".to_owned())),
         }
+    }
+
+    fn map_type_gap(&self, key: TypeId, value: TypeId) -> Option<Gap> {
+        self.type_gap(MirType::semantic(key))
+            .or_else(|| self.type_gap(MirType::semantic(value)))
+            .or_else(|| {
+                [key, value]
+                    .into_iter()
+                    .any(|member| self.is_letter(member))
+                    .then(|| Gap::Subset("character in a map".to_owned()))
+            })
+    }
+
+    fn function_type_gap(&self, sig: &radix_types::FuncSig) -> Option<Gap> {
+        if !sig.type_params.is_empty() || sig.is_async || sig.is_generator {
+            return Some(Gap::Subset("function value".to_owned()));
+        }
+        sig.params
+            .iter()
+            .find_map(|param| {
+                let value = match self.types.get(param.ty) {
+                    Type::Ref(_, inner) => *inner,
+                    _ => param.ty,
+                };
+                self.type_gap(MirType::semantic(value))
+            })
+            .or_else(|| self.type_gap(MirType::semantic(sig.ret)))
+            .or_else(|| {
+                sig.err
+                    .and_then(|err| self.type_gap(MirType::semantic(err)))
+            })
+    }
+
+    fn alias_type_gap(&self, inner: TypeId) -> Option<Gap> {
+        let mut inner = inner;
+        loop {
+            match self.types.get(inner) {
+                Type::Alias(_, next) => inner = *next,
+                resolved => {
+                    let probe = MirType::semantic(inner);
+                    return match resolved {
+                        Type::Param(_) | Type::Infer(_) | Type::Error => {
+                            Some(Gap::Layout("unresolved type".to_owned()))
+                        }
+                        _ => self.type_gap(probe),
+                    };
+                }
+            }
+        }
+    }
+
+    fn mutable_reference_gap(&self, inner: TypeId) -> Option<Gap> {
+        if matches!(
+            self.types.get(inner),
+            Type::Array(_)
+                | Type::BoundedArray { .. }
+                | Type::Struct(_)
+                | Type::Record(_)
+                | Type::Map(..)
+                | Type::Set(_)
+        ) {
+            self.type_gap(MirType::semantic(inner))
+        } else {
+            Some(Gap::Subset("reference value".to_owned()))
+        }
+    }
+
+    fn union_member_gap(&self, member: TypeId) -> Option<Gap> {
+        if matches!(
+            self.types.get(member),
+            Type::Primitive(
+                Primitive::Nihil | Primitive::Ignotum | Primitive::Json | Primitive::Valor
+            ) | Type::Option(_)
+                | Type::Bits(_)
+                | Type::Union(_)
+        ) {
+            return Some(Gap::Subset("union value".to_owned()));
+        }
+        self.type_gap(MirType::semantic(member))
     }
 
     /// Whether `id` is a `littera`: a map or set display of one is not
@@ -482,20 +501,215 @@ impl<'a> ClifCapability<'a> {
         }
     }
 
+    fn supported_conversion(&self, intrinsic: &MirIntrinsic) -> bool {
+        let scalar = self.supported_scalar_conversion(intrinsic);
+        let open = self.supported_open_conversion(intrinsic);
+        scalar || open
+    }
+
+    fn supported_scalar_conversion(&self, intrinsic: &MirIntrinsic) -> bool {
+        let renders_text = matches!(
+            intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && !self.is_sermo_handle(conversion.source_ty)
+                    && self.type_gap(conversion.source_ty).is_none()
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Primitive(Primitive::Textus | Primitive::Ascii)
+                    )
+        );
+        let set_to_list = matches!(
+            intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && matches!(
+                        self.types.get(conversion.source_ty.semantic_id()),
+                        Type::Set(_)
+                    )
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Array(_)
+                    )
+        );
+        let numeric = matches!(
+            intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && crate::lower::numeric_conversion(
+                        self.types,
+                        conversion.source_ty.semantic_id(),
+                        conversion.target_ty.semantic_id(),
+                    )
+                    .is_some()
+        );
+        let type_check = matches!(
+            intrinsic,
+            MirIntrinsic::TypeCheck(op)
+                if crate::lower::member_tests(self.types, op.ty.semantic_id()).is_some()
+        );
+        let sequence = matches!(
+            intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && crate::lower::sequence_conversion(
+                        self.types,
+                        conversion.source_ty.semantic_id(),
+                        conversion.target_ty.semantic_id(),
+                    )
+                    .is_some()
+        );
+        let sermo_materialization = matches!(
+            intrinsic,
+            MirIntrinsic::Convert(conversion) if self.sermo_materialization(conversion)
+        );
+        renders_text || sermo_materialization || numeric || sequence || type_check || set_to_list
+    }
+
+    fn supported_open_conversion(&self, intrinsic: &MirIntrinsic) -> bool {
+        let open_data = matches!(
+            intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && matches!(
+                        self.types.get(conversion.source_ty.semantic_id()),
+                        Type::Array(_) | Type::BoundedArray { .. } | Type::Map(..)
+                    )
+                    && matches!(
+                        self.types.get(conversion.target_ty.semantic_id()),
+                        Type::Primitive(Primitive::Json | Primitive::Valor)
+                    )
+        );
+        // A leaf opener is typed `valor` in HIR while the operand keeps its
+        // own scalar representation, so the `SermoSetOpener` conversion is an
+        // identity at the type table. It boxes the payload the shims read, so
+        // it is not the open-data gap the list and map conversions name.
+        let open_identity = matches!(
+            intrinsic,
+            MirIntrinsic::Convert(conversion)
+                if conversion.store.is_none()
+                    && self.resolve_alias(conversion.source_ty.semantic_id())
+                        == self.resolve_alias(conversion.target_ty.semantic_id())
+                    && matches!(
+                        self.types
+                            .get(self.resolve_alias(conversion.target_ty.semantic_id())),
+                        Type::Primitive(Primitive::Json | Primitive::Valor)
+                    )
+        );
+        open_data || open_identity
+    }
+
+    fn supported_collection(op: MirCollectionOp) -> bool {
+        matches!(
+            op,
+            MirCollectionOp::Length
+                | MirCollectionOp::Append
+                | MirCollectionOp::IsEmpty
+                | MirCollectionOp::Index
+                | MirCollectionOp::Contains
+                | MirCollectionOp::Reverse
+                | MirCollectionOp::Sort
+                | MirCollectionOp::Put
+                | MirCollectionOp::Delete
+                | MirCollectionOp::Keys
+                | MirCollectionOp::Values
+                | MirCollectionOp::AppendImmutable
+                | MirCollectionOp::Sum
+                | MirCollectionOp::Compare
+                | MirCollectionOp::SortByKeys
+                | MirCollectionOp::Uppercase
+                | MirCollectionOp::Lowercase
+                | MirCollectionOp::Trim
+                | MirCollectionOp::StartsWith
+                | MirCollectionOp::EndsWith
+                | MirCollectionOp::Split
+                | MirCollectionOp::Replace
+                | MirCollectionOp::Slice
+                | MirCollectionOp::Take
+                | MirCollectionOp::TakeLast
+                | MirCollectionOp::DropFirst
+                | MirCollectionOp::First
+                | MirCollectionOp::Last
+                | MirCollectionOp::RemoveFirst
+                | MirCollectionOp::RemoveLast
+                | MirCollectionOp::ReverseInPlace
+                | MirCollectionOp::Floor
+                | MirCollectionOp::Ceiling
+                | MirCollectionOp::Round
+                | MirCollectionOp::Truncate
+                | MirCollectionOp::CordCursor
+                | MirCollectionOp::TextEscape
+                | MirCollectionOp::RegexMatches
+                | MirCollectionOp::RegexFind
+                | MirCollectionOp::RegexFindAll
+                | MirCollectionOp::RegexSplit
+                | MirCollectionOp::RegexReplace
+                | MirCollectionOp::RegexReplaceEach
+                | MirCollectionOp::MatchText
+                | MirCollectionOp::MatchStart
+                | MirCollectionOp::MatchEnd
+                | MirCollectionOp::MatchGroup
+                | MirCollectionOp::MatchNamed
+                | MirCollectionOp::Absolute
+                | MirCollectionOp::Signum
+                | MirCollectionOp::Minimum
+                | MirCollectionOp::Maximum
+                | MirCollectionOp::Approximate
+                | MirCollectionOp::ArgMax
+                | MirCollectionOp::ArgMin
+                | MirCollectionOp::ScalarMath(_)
+                | MirCollectionOp::Union
+                | MirCollectionOp::Intersection
+                | MirCollectionOp::Difference
+                | MirCollectionOp::SymmetricDifference
+                | MirCollectionOp::IsSubset
+                | MirCollectionOp::IsSuperset
+        ) || Self::supported_lift_or_interval(op)
+    }
+
+    fn supported_lift_or_interval(op: MirCollectionOp) -> bool {
+        matches!(
+            op,
+            MirCollectionOp::ArrayAdd
+                | MirCollectionOp::ArraySub
+                | MirCollectionOp::ArrayMul
+                | MirCollectionOp::ArrayDiv
+                | MirCollectionOp::ArrayMod
+                | MirCollectionOp::ArrayTrueDiv
+                | MirCollectionOp::ArrayNeg
+                | MirCollectionOp::ArrayAnd
+                | MirCollectionOp::ArrayOr
+                | MirCollectionOp::ArrayNot
+                | MirCollectionOp::ArrayLt
+                | MirCollectionOp::ArrayGt
+                | MirCollectionOp::ArrayLtEq
+                | MirCollectionOp::ArrayGtEq
+                | MirCollectionOp::ArrayValueEq
+                | MirCollectionOp::ArrayValueNotEq
+                | MirCollectionOp::IntervalLength
+                | MirCollectionOp::IntervalContains
+                | MirCollectionOp::IntervalClamp
+                | MirCollectionOp::IntervalIntersect
+                | MirCollectionOp::IntervalUnion
+                | MirCollectionOp::IntervalMaterialize
+        )
+    }
+
     fn value_gap(value: &MirValue) -> Option<Gap> {
         match &value.kind {
-            MirValueKind::Operand(_) | MirValueKind::Unary { .. } | MirValueKind::Binary { .. } => {
-                None
-            }
-            MirValueKind::Closure(_) => None,
-            MirValueKind::Option(MirOptionOp::Chain {
-                link: MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_),
-                ..
-            }) => None,
-            MirValueKind::Option(MirOptionOp::Chain { .. }) => {
+            MirValueKind::Option(MirOptionOp::Chain { link, .. })
+                if !matches!(
+                    link,
+                    MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_)
+                ) =>
+            {
                 Some(Gap::Subset("optional chain".to_owned()))
             }
-            MirValueKind::Option(_) => None,
+            MirValueKind::Operand(_)
+            | MirValueKind::Unary { .. }
+            | MirValueKind::Binary { .. }
+            | MirValueKind::Closure(_)
+            | MirValueKind::Option(_) => None,
             MirValueKind::TensorExtent { .. } => Some(Gap::Policy("device value".to_owned())),
         }
     }
@@ -591,6 +805,7 @@ impl MirVisitor for ClifCapability<'_> {
             !matches!(
                 projection,
                 MirProjection::Index(_)
+                    | MirProjection::ProvenIndex(_)
                     | MirProjection::Field(_)
                     | MirProjection::VariantField { .. }
                     | MirProjection::ClosureCapture { .. }
@@ -627,98 +842,7 @@ impl MirVisitor for ClifCapability<'_> {
         // Scalar to text rendering, interpolation, and text length. A
         // conversation handle is not a renderable scalar: `sermo ↦ textus`
         // materializes a frame and has no CLIF symbol yet, so it stays a gap.
-        let renders_text = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && !self.is_sermo_handle(conversion.source_ty)
-                    && self.type_gap(conversion.source_ty).is_none()
-                    && matches!(
-                        self.types.get(conversion.target_ty.semantic_id()),
-                        Type::Primitive(Primitive::Textus | Primitive::Ascii)
-                    )
-        );
-        let set_to_list = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && matches!(
-                        self.types.get(conversion.source_ty.semantic_id()),
-                        Type::Set(_)
-                    )
-                    && matches!(
-                        self.types.get(conversion.target_ty.semantic_id()),
-                        Type::Array(_)
-                    )
-        );
-        let numeric = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && crate::lower::numeric_conversion(
-                        self.types,
-                        conversion.source_ty.semantic_id(),
-                        conversion.target_ty.semantic_id(),
-                    )
-                    .is_some()
-        );
-        let type_check = matches!(
-            &call.intrinsic,
-            MirIntrinsic::TypeCheck(op)
-                if crate::lower::member_tests(self.types, op.ty.semantic_id()).is_some()
-        );
-        let sequence = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && crate::lower::sequence_conversion(
-                        self.types,
-                        conversion.source_ty.semantic_id(),
-                        conversion.target_ty.semantic_id(),
-                    )
-                    .is_some()
-        );
-        let sermo_materialization = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion) if self.sermo_materialization(conversion)
-        );
-        let open_data = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && matches!(
-                        self.types.get(conversion.source_ty.semantic_id()),
-                        Type::Array(_) | Type::BoundedArray { .. } | Type::Map(..)
-                    )
-                    && matches!(
-                        self.types.get(conversion.target_ty.semantic_id()),
-                        Type::Primitive(Primitive::Json | Primitive::Valor)
-                    )
-        );
-        // A leaf opener is typed `valor` in HIR while the operand keeps its
-        // own scalar representation, so the `SermoSetOpener` conversion is an
-        // identity at the type table. It boxes the payload the shims read, so
-        // it is not the open-data gap the list and map conversions name.
-        let open_identity = matches!(
-            &call.intrinsic,
-            MirIntrinsic::Convert(conversion)
-                if conversion.store.is_none()
-                    && self.resolve_alias(conversion.source_ty.semantic_id())
-                        == self.resolve_alias(conversion.target_ty.semantic_id())
-                    && matches!(
-                        self.types
-                            .get(self.resolve_alias(conversion.target_ty.semantic_id())),
-                        Type::Primitive(Primitive::Json | Primitive::Valor)
-                    )
-        );
-        if renders_text
-            || sermo_materialization
-            || open_data
-            || open_identity
-            || numeric
-            || sequence
-            || type_check
-            || set_to_list
+        if self.supported_conversion(&call.intrinsic)
             || matches!(
                 call.intrinsic,
                 MirIntrinsic::FormatString { .. }
@@ -731,93 +855,8 @@ impl MirVisitor for ClifCapability<'_> {
                     | MirIntrinsic::SermoOpen
                     | MirIntrinsic::SermoSetOpener
                     | MirIntrinsic::Sermo(MirSermoOp::DrainCursor)
-                    | MirIntrinsic::Collection(
-                        MirCollectionOp::Length
-                            | MirCollectionOp::Append
-                            | MirCollectionOp::IsEmpty
-                            | MirCollectionOp::Index
-                            | MirCollectionOp::Contains
-                            | MirCollectionOp::Reverse
-                            | MirCollectionOp::Sort
-                            | MirCollectionOp::Put
-                            | MirCollectionOp::Delete
-                            | MirCollectionOp::Keys
-                            | MirCollectionOp::Values
-                            | MirCollectionOp::AppendImmutable
-                            | MirCollectionOp::Sum
-                            | MirCollectionOp::Compare
-                            | MirCollectionOp::SortByKeys
-                            | MirCollectionOp::Uppercase
-                            | MirCollectionOp::Lowercase
-                            | MirCollectionOp::Trim
-                            | MirCollectionOp::StartsWith
-                            | MirCollectionOp::EndsWith
-                            | MirCollectionOp::Split
-                            | MirCollectionOp::Replace
-                            | MirCollectionOp::Slice
-                            | MirCollectionOp::Take
-                            | MirCollectionOp::TakeLast
-                            | MirCollectionOp::DropFirst
-                            | MirCollectionOp::First
-                            | MirCollectionOp::Last
-                            | MirCollectionOp::RemoveFirst
-                            | MirCollectionOp::RemoveLast
-                            | MirCollectionOp::ReverseInPlace
-                            | MirCollectionOp::Floor
-                            | MirCollectionOp::Ceiling
-                            | MirCollectionOp::Round
-                            | MirCollectionOp::Truncate
-                            | MirCollectionOp::CordCursor
-                            | MirCollectionOp::TextEscape
-                            | MirCollectionOp::RegexMatches
-                            | MirCollectionOp::RegexFind
-                            | MirCollectionOp::RegexFindAll
-                            | MirCollectionOp::RegexSplit
-                            | MirCollectionOp::RegexReplace
-                            | MirCollectionOp::RegexReplaceEach
-                            | MirCollectionOp::MatchText
-                            | MirCollectionOp::MatchStart
-                            | MirCollectionOp::MatchEnd
-                            | MirCollectionOp::MatchGroup
-                            | MirCollectionOp::MatchNamed
-                            | MirCollectionOp::Absolute
-                            | MirCollectionOp::Signum
-                            | MirCollectionOp::Minimum
-                            | MirCollectionOp::Maximum
-                            | MirCollectionOp::Approximate
-                            | MirCollectionOp::ArgMax
-                            | MirCollectionOp::ArgMin
-                            | MirCollectionOp::ScalarMath(_)
-                            | MirCollectionOp::Union
-                            | MirCollectionOp::Intersection
-                            | MirCollectionOp::Difference
-                            | MirCollectionOp::SymmetricDifference
-                            | MirCollectionOp::IsSubset
-                            | MirCollectionOp::IsSuperset
-                            | MirCollectionOp::ArrayAdd
-                            | MirCollectionOp::ArraySub
-                            | MirCollectionOp::ArrayMul
-                            | MirCollectionOp::ArrayDiv
-                            | MirCollectionOp::ArrayMod
-                            | MirCollectionOp::ArrayTrueDiv
-                            | MirCollectionOp::ArrayNeg
-                            | MirCollectionOp::ArrayAnd
-                            | MirCollectionOp::ArrayOr
-                            | MirCollectionOp::ArrayNot
-                            | MirCollectionOp::ArrayLt
-                            | MirCollectionOp::ArrayGt
-                            | MirCollectionOp::ArrayLtEq
-                            | MirCollectionOp::ArrayGtEq
-                            | MirCollectionOp::ArrayValueEq
-                            | MirCollectionOp::ArrayValueNotEq
-                            | MirCollectionOp::IntervalLength
-                            | MirCollectionOp::IntervalContains
-                            | MirCollectionOp::IntervalClamp
-                            | MirCollectionOp::IntervalIntersect
-                            | MirCollectionOp::IntervalUnion
-                            | MirCollectionOp::IntervalMaterialize
-                    )
             )
+            || matches!(&call.intrinsic, MirIntrinsic::Collection(op) if Self::supported_collection(*op))
         {
             radix_mir::visit::walk_runtime_call(self, call);
             return;

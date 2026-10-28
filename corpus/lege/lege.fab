@@ -9,14 +9,14 @@ summary = "Reads input from the active input stream."
 syntax = "lege [lineam]"
 related = ["lineam", "scribe"]
 locale = "en"
-no_expected = "reads-stdin"
 +++
 # =============================================================================
 # lege — Reads input from the active input stream.
 # =============================================================================
 #
 # What this teaches:
-#   • stdin input with `lege` — reads one line from the active input stream
+#   • stdin input with `lege` — `read` returns all of stdin to end of input,
+#     here the one line of the sibling lege.stdin fixture
 #   • the `↦ regex` conversion — compiling a textus pattern into a regex value
 #
 # Common mistakes:
@@ -35,10 +35,12 @@ no_expected = "reads-stdin"
 #   readExpr :← 'lege'
 #
 # EXPECTED OUTPUT:
-#   Regex pattern diagnostic, then one stdin line (no .expected — interactive).
+#   lege.expected — the compiled regex pattern, then the fixture text. The text
+#   keeps its own final newline, so `print` leaves a blank line after it.
 #
-# BACKEND: Rust/Go/roundtrip e2e whitelist — lege not yet lowered for Rust/Go
-# (whitelist: lege/lege.fab).
+# BACKEND:
+#   Targets read the fixture through the case manifest's `stdin` field; the
+#   outcomes row of each target pins how it handles a whole-stream read.
 
 main {
     let regex pattern ← "(?i)\\d+" ↦ regex

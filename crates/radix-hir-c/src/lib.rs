@@ -404,19 +404,58 @@ impl Emitter<'_> {
     }
 }
 
-/// True when emitted C reads the hidden arena `faber_a` (as a name, not as
-/// the prefix of a helper such as `faber_add`).
+/// True when emitted C reads the hidden arena `faber_a` as an identifier,
+/// rather than mentioning it in a literal or as part of another identifier.
 pub(crate) fn mentions_arena(text: &str) -> bool {
     mentions_name(text, "faber_a")
 }
 
-/// Whether `text` reads `name` as a whole identifier (not as the prefix of a
-/// longer one, which the namer can produce for a collision).
+/// Whether `text` contains `name` as a C identifier token. String literals,
+/// character literals and comments do not count as reads of the identifier.
 pub(crate) fn mentions_name(text: &str, name: &str) -> bool {
-    text.match_indices(name).any(|(at, _)| {
-        !text[at + name.len()..]
-            .chars()
-            .next()
-            .is_some_and(|next| next == '_' || next.is_ascii_alphanumeric())
-    })
+    let bytes = text.as_bytes();
+    let mut at = 0;
+    while at < bytes.len() {
+        match bytes[at] {
+            quote @ (b'\'' | b'"') => {
+                at += 1;
+                while at < bytes.len() {
+                    if bytes[at] == b'\\' {
+                        at = (at + 2).min(bytes.len());
+                    } else {
+                        let closes = bytes[at] == quote;
+                        at += 1;
+                        if closes {
+                            break;
+                        }
+                    }
+                }
+            }
+            b'/' if bytes.get(at + 1) == Some(&b'/') => {
+                at += 2;
+                while at < bytes.len() && bytes[at] != b'\n' {
+                    at += 1;
+                }
+            }
+            b'/' if bytes.get(at + 1) == Some(&b'*') => {
+                at += 2;
+                while at + 1 < bytes.len() && bytes[at..at + 2] != *b"*/" {
+                    at += 1;
+                }
+                at = (at + 2).min(bytes.len());
+            }
+            byte if byte == b'_' || byte.is_ascii_alphabetic() => {
+                let start = at;
+                at += 1;
+                while at < bytes.len() && (bytes[at] == b'_' || bytes[at].is_ascii_alphanumeric()) {
+                    at += 1;
+                }
+                if &text[start..at] == name {
+                    return true;
+                }
+            }
+            _ => at += 1,
+        }
+    }
+    false
 }

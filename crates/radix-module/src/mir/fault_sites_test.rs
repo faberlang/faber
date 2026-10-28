@@ -407,6 +407,47 @@ main {{
     )
 }
 
+// ── the checker's proofs (need, slice 4) ──────────────────────────
+
+#[test]
+fn a_range_loop_coordinate_the_checker_proved_needs_no_fault_site() {
+    // `k` runs over `0‥4` and both tensors have at least that many elements on
+    // the axis it indexes (`[4]`, `[8]`): the checker proves `0 <= k < extent`
+    // for each access, and the lane analysis reads that proof.
+    let (signature, reflection) = kernel(&single_lane("dst[k] ← src[k] * 2.0", "dst[0] ← dst[0] + 0.5"));
+    assert!(!has_fault_channel(&signature), "{:?}", kinds(&signature));
+    assert!(reflection.fault_sites.is_empty());
+}
+
+#[test]
+fn a_shifted_range_loop_coordinate_keeps_its_fault_site() {
+    // `k + read` has no fact (the c4-index-fault shape): only the load stays
+    // checked; the proven store adds no site.
+    let (signature, reflection) = kernel(&single_lane("dst[k] ← src[k + read]", "dst[0] ← dst[0] + 0.5"));
+    let kinds = kinds(&signature);
+    assert_eq!(
+        kinds.last().map(|(_, kind)| *kind),
+        Some(Kind::FaultRecord { sites: 1 }),
+        "{kinds:?}"
+    );
+    assert_eq!(reflection.fault_sites.len(), 1);
+}
+
+#[test]
+fn a_range_loop_that_overruns_the_extent_keeps_its_fault_site() {
+    // `k` reaches 4 and `src` has 4 elements: the proof must not hold.
+    let source =
+        single_lane("dst[k] ← src[k] * 2.0", "dst[0] ← dst[0] + 0.5").replace("let i32 k_hi ← 4", "let i32 k_hi ← 5");
+    let (signature, reflection) = kernel(&source);
+    let kinds = kinds(&signature);
+    assert_eq!(
+        kinds.last().map(|(_, kind)| *kind),
+        Some(Kind::FaultRecord { sites: 1 }),
+        "{kinds:?}"
+    );
+    assert_eq!(reflection.fault_sites.len(), 1);
+}
+
 #[test]
 fn a_single_lane_kernel_with_unproven_indexes_carries_a_fault_channel() {
     let (signature, reflection) = kernel(&single_lane("dst[k + write] ← src[k + read] * 2.0", "dst[0] ← dst[0] + 0.5"));

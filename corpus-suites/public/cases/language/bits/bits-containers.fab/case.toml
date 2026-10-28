@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/bits/bits-containers.fab"
+group = "language"
+input_root = "corpus"
+input = "bits/bits-containers.fab"
+category = "bits"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

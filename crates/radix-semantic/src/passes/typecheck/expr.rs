@@ -860,15 +860,20 @@ impl TypeChecker<'_> {
                 *conversion = self.pending_conversion.take();
                 self.record_inferred_sermo_view_type_arg(receiver, *name, type_args, ty);
                 // Mutating intrinsic, closure call or ordinary method: all
-                // kill (need, closed rule). The one exemption is the
-                // registry's zero-argument `longitudo`, which only reads.
-                if !self.is_pure_length_call(receiver, *name, args) {
+                // kill (need, closed rule). The exemption is a
+                // registry intrinsic that only reads (`longitudo`, `apud`,
+                // `sectio`, ...): it cannot write any list.
+                if !self.is_read_only_intrinsic_call(receiver, *name, args.len()) {
                     self.kill_mutable_source_ranges();
                 }
                 ty
             }
             HirExpressionKind::Field(object, name) => self.check_field(object, *name),
-            HirExpressionKind::Index(object, index) => self.check_index(object, index),
+            HirExpressionKind::Index(object, index) => {
+                let ty = self.check_index(object, index);
+                self.record_index_proof(expr.id, object, index);
+                ty
+            }
             HirExpressionKind::OptionalChain(object, chain) => {
                 self.check_optional_chain(object, chain, expr.span)
             }
@@ -982,19 +987,6 @@ impl TypeChecker<'_> {
                 group.as_mut(),
                 group_domain,
                 *filum,
-                *binding,
-                body,
-                expr.span,
-            ),
-            HirExpressionKind::FirstMatch {
-                source,
-                coordinates,
-                binding,
-                body,
-            } => super::first_match::check_first_match_expr(
-                self,
-                source,
-                coordinates,
                 *binding,
                 body,
                 expr.span,

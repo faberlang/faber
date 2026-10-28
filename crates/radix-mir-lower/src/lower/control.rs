@@ -1,11 +1,10 @@
-//! Control-flow and alternate-exit lowering for MIR functions.
+//! Control-flow, iteration, reduction, and alternate-exit lowering for MIR functions.
 //!
-//! This module turns expression-level control constructs into explicit MIR
-//! blocks and terminators. It owns the contracts for `si`, `dum`, `rumpe`,
-//! `perge`, `iace`, and `cape`: each construct either wires concrete CFG edges
-//! or reports an unsupported lowering diagnostic. Value-producing control flow
-//! writes into a destination place so branch arms join through storage rather
-//! than through an implicit expression stack.
+//! This module lowers HIR control constructs, iteration, reductions, and
+//! alternate-exit paths into explicit MIR blocks and terminators, or reports an
+//! unsupported-lowering diagnostic. Value-producing control flow writes into a
+//! destination place so branch arms join through storage rather than through an
+//! implicit expression stack.
 //!
 //! ERROR HANDLING
 //! ==============
@@ -201,8 +200,10 @@ pub(super) fn grouped_key_tensor_reads_are_proven(
     reads.safe
 }
 
-fn mir_reduce_op(op: radix_hir::HirReductionOp) -> MirReduceOp {
-    match op {
+/// The device reduce recipe for an operator, or `None` for an operator no
+/// recipe carries (`first`).
+fn mir_reduce_op(op: radix_hir::HirReductionOp) -> Option<MirReduceOp> {
+    Some(match op {
         radix_hir::HirReductionOp::Sum => MirReduceOp::Sum,
         radix_hir::HirReductionOp::Product => MirReduceOp::Product,
         radix_hir::HirReductionOp::Max => MirReduceOp::Max,
@@ -212,12 +213,13 @@ fn mir_reduce_op(op: radix_hir::HirReductionOp) -> MirReduceOp {
         radix_hir::HirReductionOp::All => MirReduceOp::All,
         radix_hir::HirReductionOp::Any => MirReduceOp::Any,
         radix_hir::HirReductionOp::Count => MirReduceOp::Count,
-    }
+        radix_hir::HirReductionOp::First => return None,
+    })
 }
 
 /// A grid-form `filum` reduction whose term body lowers to its own function.
 struct FilumTermFunction<'a> {
-    op: radix_hir::HirReductionOp,
+    op: MirReduceOp,
     coordinates: &'a [(DefId, Symbol)],
     filum: &'a (DefId, Symbol),
     binding: Option<&'a (DefId, Symbol)>,
@@ -1426,6 +1428,8 @@ impl FunctionBuilder<'_> {
             Op::Sum | Op::Product => result_ty,
             Op::Count => integer,
             Op::All | Op::Any => boolean,
+            // The accumulator holds the selected element; the term is the predicate.
+            Op::First => MirType::semantic(element),
             _ => term_ty,
         };
         let source_value = self.lower_expr_value(source)?;
@@ -1548,6 +1552,7 @@ impl FunctionBuilder<'_> {
             group: group.cloned(),
             group_dims: group_dims.clone(),
             error_tensor,
+            element: Some(element_local),
         };
         let previous = self.reduction_fold.replace(fold);
         let after = self.fresh_block(expr.span);
@@ -1600,8 +1605,11 @@ impl FunctionBuilder<'_> {
         } else {
             MirOperand::Temp(bucket.accumulator)
         };
-        if matches!(op, Op::Max | Op::Min | Op::ArgMax | Op::ArgMin) {
-            if identity.is_none()
+        if matches!(op, Op::Max | Op::Min | Op::ArgMax | Op::ArgMin | Op::First) {
+            // A first reduction is optional even over a statically non-empty
+            // source: no element need satisfy the predicate.
+            if op != Op::First
+                && identity.is_none()
                 && dimensions
                     .as_ref()
                     .is_some_and(|d| !d.is_empty() && d.iter().all(|n| *n > 0))
@@ -2010,6 +2018,42 @@ impl FunctionBuilder<'_> {
             self.switch_to(join);
             return;
         }
+        if fold.op == Op::First {
+            // First live element: once `seen`, later live elements never store.
+            // The predicate already ran for this element (total evaluation).
+            let unseen = self.binary_temp(
+                MirBinOp::Eq,
+                MirOperand::Temp(bucket.seen),
+                MirOperand::Constant(MirConstant::Bool(false)),
+                boolean,
+                span,
+            );
+            let take = self.binary_temp(MirBinOp::And, value, unseen, boolean, span);
+            let selected = self.fresh_block(span);
+            let join = self.fresh_block(span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition: take, then_block: selected, else_block: join },
+                span,
+            );
+            self.switch_to(selected);
+            if let Some(element) = fold.element {
+                self.assign(
+                    MirPlace::temp(bucket.accumulator),
+                    MirOperand::Place(MirPlace::local(element)),
+                    fold.accumulator_ty,
+                    span,
+                );
+            }
+            self.assign(
+                MirPlace::temp(bucket.seen),
+                MirOperand::Constant(MirConstant::Bool(true)),
+                boolean,
+                span,
+            );
+            self.terminate_current(MirTerminatorKind::Goto(join), span);
+            self.switch_to(join);
+            return;
+        }
         if fold.op == Op::Count {
             let selected = self.fresh_block(span);
             let join = self.fresh_block(span);
@@ -2063,6 +2107,18 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         use radix_hir::HirReductionOp as Op;
         let FilumReduceLowering { op, form, source, group, coordinates, filum, binding, body, identity } = request;
+        let Some(reduce_op) = mir_reduce_op(op) else {
+            // The selected element rides a `T ∪ none` result and an earliest-lane
+            // selection no device reduce recipe carries yet: a named decline,
+            // never a quiet route through another reducer.
+            self.errors.push(MirError {
+                message: "a `thread` first reduction has no device lowering yet".to_owned(),
+                issue: super::lane_form::FIRST_REDUCE_DEVICE_ISSUE.to_owned(),
+                span: expr.span,
+                definition_span: None,
+            });
+            return None;
+        };
         let grid = form == MirFilumForm::Grid;
         let Some(result_ty) = expr.ty else {
             self.errors
@@ -2117,7 +2173,7 @@ impl FunctionBuilder<'_> {
             }
             if let Some(body) = body {
                 return self.lower_filum_term_function(FilumTermFunction {
-                    op,
+                    op: reduce_op,
                     coordinates,
                     filum,
                     binding,
@@ -2214,7 +2270,7 @@ impl FunctionBuilder<'_> {
         }
 
         let declaration = MirFilumReduceOp {
-            op: mir_reduce_op(op),
+            op: reduce_op,
             form,
             filum_binder: Some(filum.1),
             term_binder: binder_local,
@@ -2543,7 +2599,7 @@ impl FunctionBuilder<'_> {
             },
         );
         let declaration = MirFilumReduceOp {
-            op: mir_reduce_op(op),
+            op,
             form: MirFilumForm::Grid,
             filum_binder: Some(filum.1),
             term_binder: binder_local,

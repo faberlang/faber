@@ -1,0 +1,44 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "member_suffix", "range_expr", "range_tail", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A let name bound to a mut list shares it: a write through the mut name shortens the list the let name reads, and an index past the new end aborts."
+syntax = "let list<T> xs ← ys; for range 0‥xs.length() let i { … xs[i] … }"
+related = ["lista", "itera", "alias-on-bind"]
+locale = "en"
++++
+# =============================================================================
+# alias-length-index-trap — a let alias is not a frozen length.
+# =============================================================================
+#
+# What this teaches:
+#   • `let list<int> xs ← ys` shares the list: `xs` cannot be written, but
+#     `ys` can, and the change is visible through both names.
+#   • `0‥xs.length()` takes the length once, at loop entry. The call that
+#     shrinks `ys` in the body makes the later `xs[i]` read past the end, and
+#     the run aborts there: the compiler must not drop that index check on the
+#     ground that `xs` is a `let`.
+#
+# Common mistakes:
+#   • Treating a `let` list as a snapshot — `let` fixes the name, and the list
+#     it names can still be written through another name. Detach it with
+#     `copy ys` when a snapshot is wanted.
+#
+# See also: lista, alias-on-bind, range-index-oob
+# =============================================================================
+
+fn shrink(mut list<int> zs) {
+    zs.remove_last()
+}
+
+main {
+    mut list<int> ys ← [1, 2, 3]
+    let list<int> xs ← ys
+    for range 0‥xs.length() let i {
+        shrink(mut ys)
+        print xs[i]
+    }
+    print "unreached"
+}

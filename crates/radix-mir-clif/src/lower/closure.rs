@@ -9,7 +9,15 @@
 //! one-element runtime list; the binding's slot holds the cell and every read
 //! or write of it goes through the `SharedCell` projection.
 
-use super::*;
+use radix_mir::MirClosureValue;
+
+use super::{
+    AbiParam, Decline, FuncId, FunctionBuilder, FunctionBuilderContext, FunctionLower, InstBuilder,
+    Lowered, MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCaptureMode,
+    MirClosureEnvironment, MirClosureEnvironmentId, MirFunction, MirFunctionId, MirPlace,
+    MirPlaceBase, MirStatement, MirStatementKind, MirTempId, MirType, Module, ModuleState, Rep,
+    Slot, Value, abi, cranelift_error, rep_of, types,
+};
 
 /// The environment of a closure body, when `function` is one.
 fn environment_of(

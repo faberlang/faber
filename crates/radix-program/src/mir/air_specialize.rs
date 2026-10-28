@@ -558,18 +558,18 @@ fn declared_companion_primal(
 }
 
 #[derive(Clone)]
-struct RawNamespaceCall {
-    call_span: radix_module::lexer::Span,
-    callee_span: radix_module::lexer::Span,
-    old_target: DefId,
-    explicit_args: Vec<TypeId>,
+pub(super) struct RawNamespaceCall {
+    pub(super) call_span: radix_module::lexer::Span,
+    pub(super) callee_span: radix_module::lexer::Span,
+    pub(super) old_target: DefId,
+    pub(super) explicit_args: Vec<TypeId>,
 }
 
-struct NamespaceCallCollector<'a> {
-    unit_path: &'a Path,
-    interner: &'a radix_module::lexer::Interner,
-    links: &'a PackageMirLinks,
-    calls: Vec<RawNamespaceCall>,
+pub(super) struct NamespaceCallCollector<'a> {
+    pub(super) unit_path: &'a Path,
+    pub(super) interner: &'a radix_module::lexer::Interner,
+    pub(super) links: &'a PackageMirLinks,
+    pub(super) calls: Vec<RawNamespaceCall>,
 }
 
 impl HirVisitor for NamespaceCallCollector<'_> {

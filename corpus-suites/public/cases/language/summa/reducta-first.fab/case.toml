@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/summa/reducta-first.fab"
+group = "language"
+input_root = "corpus"
+input = "summa/reducta-first.fab"
+category = "reduction"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

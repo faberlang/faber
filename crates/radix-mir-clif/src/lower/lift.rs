@@ -8,7 +8,11 @@
 //! comparison) and then stored under the result element type's slot policy, so
 //! a range check happens once per element at the store.
 
-use super::*;
+use super::{
+    BlockArg, Decline, FunctionLower, InstBuilder, IntCC, Lowered, MirBinOp, MirCollectionOp,
+    MirOperand, MirPlace, MirType, NumericWidth, Primitive, Rep, Type, Value, abi, rep_of, resolve,
+    types,
+};
 
 /// Which elementwise operator a list operation applies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

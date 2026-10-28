@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "leaf_unsupported_on_target",
-      "reason": "The Go lane carries no `machina:*` port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
+      "diagnostic_contains": "go_bare_conversio_in_failable_context",
+      "reason": "A carried Norma module converts with a bare scalar `↦` inside a failable body in a shape the Go emitter does not hoist yet (`go_bare_conversio_in_failable_context`); the Go emitter unit for that conversion shape is open."
     },
     "ts": {
       "outcome": "known-fail",

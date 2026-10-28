@@ -226,7 +226,6 @@ fn perge_sites(statements: &[HirStatement], tail: Option<&HirExpression>) -> Vec
                     | HirExpressionKind::IteraRange { .. }
                     | HirExpressionKind::Reduction { .. }
                     | HirExpressionKind::Scan { .. }
-                    | HirExpressionKind::FirstMatch { .. }
                     | HirExpressionKind::Ad { .. }
                     | HirExpressionKind::Clausura(..)
             ) {

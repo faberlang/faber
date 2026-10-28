@@ -454,7 +454,9 @@ fn collect_place_variant_defs(place: &MirPlace, variants: &mut Vec<DefId>) {
     for projection in &place.projections {
         match projection {
             MirProjection::VariantField { variant, .. } => variants.push(*variant),
-            MirProjection::Index(operand) => collect_operand_variant_defs(operand, variants),
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
+                collect_operand_variant_defs(operand, variants)
+            }
             MirProjection::Field(_)
             | MirProjection::ClosureCapture { .. }
             | MirProjection::VectorLane(_)
@@ -3570,7 +3572,7 @@ fn rewrite_place_variant_defs(place: &mut MirPlace, variant_remap: &HashMap<DefI
                     *variant = *rewritten;
                 }
             }
-            MirProjection::Index(operand) => {
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
                 rewrite_operand_variant_defs(operand, variant_remap);
             }
             MirProjection::Field(_)
@@ -4251,7 +4253,9 @@ pub(super) fn shift_place_ids(place: &mut MirPlace, offset: u32) {
             MirProjection::ClosureCapture { environment, .. } => {
                 shift_environment_id(environment, offset);
             }
-            MirProjection::Index(operand) => shift_operand_ids(operand, offset),
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
+                shift_operand_ids(operand, offset)
+            }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
             | MirProjection::VectorLane(_)
@@ -5011,7 +5015,9 @@ fn scan_place_references(place: &MirPlace, scan: &mut MirReferenceScan) {
             MirProjection::ClosureCapture { environment, .. } => {
                 scan.environments.push(*environment);
             }
-            MirProjection::Index(operand) => scan_operand_references(operand, scan),
+            MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
+                scan_operand_references(operand, scan)
+            }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
             | MirProjection::VectorLane(_)

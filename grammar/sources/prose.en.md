@@ -1879,17 +1879,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } ex source`.
 ### Special Expressions
 
 
-`primus_quem(source, ubi binder { predicate })` is the dedicated first-match
-selection expression over a statically bounded source: the predicate is
-evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `nihil`
-(the result type is `T ∪ nihil`). The `ubi` predicate tail is owned by this
-head and never shares the reduce/scan `fixum`/`varia` binder tail.
-`primus_quem` claims only the expression-head position immediately followed
-by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`apud` coordinate clause binds per-axis indices as in `itera ex`.
-
-`reducta via <op> ex source [apud [coords]] [pro key | pro [key, …]] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, or `numeratio`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
+`reducta via <op> ex source [apud [coords]] [pro key | pro [key, …]] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, `numeratio`, or `prima`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `apud [coords]` binds one integer coordinate per source axis. A body is claimed only when `(fixum | varia) IDENTIFIER '{'` follows, so a declaration such as `fixum numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `redde` term per element. Without a body, each source element is the term. `filum f` requires a body and a kernel context; it retains the existing sum path, while other `filum` operators fail closed by name until their lowering is implemented. Without `filum`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -1901,6 +1891,9 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 | `argmaxima`, `argminima` | numeric scalar | rank-one coordinate `numerus`; higher-rank `iuncta<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `vel` | `nihil` or the supplied coordinate identity |
 | `omnia`, `quilibet` | `bivalens` | `bivalens` | `verum`, `falsum` |
 | `numeratio` | `bivalens` | `numerus`, the number of true terms | `0` |
+| `prima` | `bivalens` predicate, required body | the first element whose predicate holds: `T ∪ nihil`, always optional | `nihil` |
+
+`prima` (en `first`) takes a required body that is the predicate over the element and yields the first element in row-major order for which it holds, or `nihil` for an empty source or no match. Evaluation is total: the predicate runs on every element, including those after the first match, and a predicate error is never turned into `nihil`. It takes no `pro` group (`reducta_group_op_unsupported`) and no `vel` identity, and a source that is not a tensor or matrix, like every reduction source, is refused; first-match over lists is not a reduction source. `prima` is the one reduction operator whose result is always optional, even over a statically non-empty source. On `@ radix lane "air"` it is admitted over a statically bounded source only (`reducta_first_unbounded_source`), forward-only: it never becomes an AIR tensor op, so reverse AD stays closed.
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
@@ -2115,9 +2108,7 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
-the owned predicate-tail introducer of the `primus_quem` first-match expression
-(see Special Expressions), not collection syntax.
+`prima` and `ultima` are ordinary method names, not transform keywords.
 
 `ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument

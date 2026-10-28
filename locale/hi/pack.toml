@@ -88,8 +88,6 @@ reddet = "रुको_लौटाओ"
 tacebit = "रुको"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "खाली"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "योग"
 filum = "धागा"
 maxima = "अधिकतम"
@@ -163,6 +161,7 @@ numeratio = "गिनती"
 quilibet = "कोई"
 argmaxima = "argmax"
 argminima = "argmin"
+prima = "पहला"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "क्रमबद्ध_करो"
 ascendens = "आरोही"
@@ -4073,18 +4072,6 @@ message = "non-null index expression के बाद ']' अपेक्षि�
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null call arguments के बाद ')' अपेक्षित है"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "'primus_quem' के बाद '(' अपेक्षित है"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "first-match source के बाद ',' अपेक्षित है"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "'ubi' predicate tail अपेक्षित है"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "first-match predicate के बाद ')' अपेक्षित है"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor fields के बाद एक closing brace अपेक्षित है"
 
@@ -4224,3 +4211,9 @@ help = "'⇇' अब दाईं ओर के मानों को बाई
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking contract में एक type parameter पर ठीक `sink(T) → vacuum ⇥ E` और `flush() → vacuum ⇥ E` घोषित होना चाहिए"
 help = "`{implendum} Sink<T>` में `{functio} sink(T res) → vacuum ⇥ E` और `{functio} flush() → vacuum ⇥ E` घोषित करें"
+
+[diagnostics.INFO001]
+message = "कर्नेल `{kernel}` {device} डिवाइस पर क्रमिक रूप से चलता है"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "कर्नेल `{kernel}`: {partitions} विभाजनों के पार इसका {kind} टाला जा सकता है: {avoidable} ({reason})"

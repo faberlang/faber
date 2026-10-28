@@ -1,4 +1,4 @@
-//! A list length range on the FHIR wire (schema 56, need).
+//! A list length range on the FHIR wire (schema 59, need).
 //!
 //! `Type::RangedArray` carries the element and the inclusive length range in
 //! the type table, so a loaded unit lowers the same checked push, removal and
@@ -62,7 +62,7 @@ fn a_length_range_round_trips_through_the_msgpack_envelope() {
 #[test]
 fn the_wire_schema_version_moved_with_the_new_type_variant() {
     assert!(
-        crate::artifact::SCHEMA_VERSION >= 56,
-        "Type::RangedArray is part of the serialized type enum from schema 56"
+        crate::artifact::SCHEMA_VERSION >= 59,
+        "Type::RangedArray is part of the serialized type enum from schema 59"
     );
 }

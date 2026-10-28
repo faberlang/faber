@@ -688,6 +688,22 @@ fn type_form_signature(analysis: &AnalyzedModule, form: &HirTypeForm) -> String 
             HirTypeFormArg::Name(symbol) => {
                 format!("name({})", analysis.interner.resolve(*symbol))
             }
+            HirTypeFormArg::Range(range) => {
+                let bound = |bound: &radix_hir::HirRangeBound| match bound {
+                    radix_hir::HirRangeBound::Literal(value) => value.clone(),
+                    radix_hir::HirRangeBound::Unbounded { negative: true } => "-∞".to_owned(),
+                    radix_hir::HirRangeBound::Unbounded { negative: false } => "∞".to_owned(),
+                    radix_hir::HirRangeBound::Name { name, lifted } => {
+                        format!("{}{}", if *lifted { "size " } else { "" }, analysis.interner.resolve(*name))
+                    }
+                };
+                format!(
+                    "range({}{}{})",
+                    bound(&range.lo),
+                    if range.inclusive { "…" } else { "‥" },
+                    bound(&range.hi)
+                )
+            }
         })
         .collect::<Vec<_>>()
         .join(",");

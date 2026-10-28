@@ -745,11 +745,35 @@ pub enum MirProjection {
     /// content type, and this projection reads or writes that content.
     SharedCell,
     Index(MirOperand),
+    /// An [`MirProjection::Index`] whose operand the checker proved
+    /// `0 <= i < bound` at the access: the live length of a
+    /// list or text, or each axis extent of a tensor for its own coordinate.
+    /// Same meaning and same operand as `Index`; a consumer may omit the
+    /// bounds check and must never derive a proof of its own. Only checker
+    /// proofs reach it; a consumer that ignores proofs treats it as `Index`.
+    ProvenIndex(MirOperand),
     VectorLane(u8),
     MatrixCell {
         row: u8,
         column: u8,
     },
+}
+
+impl MirProjection {
+    /// The index operand of an [`Self::Index`] or [`Self::ProvenIndex`].
+    #[must_use]
+    pub fn index_operand(&self) -> Option<&MirOperand> {
+        match self {
+            Self::Index(index) | Self::ProvenIndex(index) => Some(index),
+            _ => None,
+        }
+    }
+
+    /// Whether the checker proved this projection's index in range.
+    #[must_use]
+    pub fn is_proven_index(&self) -> bool {
+        matches!(self, Self::ProvenIndex(_))
+    }
 }
 
 /// Literal values embedded directly in MIR.
