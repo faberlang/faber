@@ -3182,6 +3182,10 @@ help = "remove the explicit type argument list"
 message = "numeric {lista} elements required"
 help = "use numeric elements for this {lista} intrinsic"
 
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extende` needs a plain lista receiver; a bounded or length-ranged lista cannot grow in place"
+help = "extende into an unbounded lista, or add one element at a time with `appende`"
+
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "methodus `.ordinata(clavis)` remota est; utere expressione ordinandi"
 help = "scribe `{ordinata} {via} {ascendens} {ex} fons {fixum} x` cum caudice qui in `{redde}` clavis desinit; `{descendens}` ordinem inversum dat"

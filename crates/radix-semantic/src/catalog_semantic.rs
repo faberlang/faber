@@ -789,6 +789,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
         "json_duplicate_key" => Some("remove or rename the duplicate JSON object key".to_owned()),
+        "extend_requires_plain_list" => Some(
+            "extend into an unbounded list, or append one element at a time with append".to_owned(),
+        ),
         "numeric_lista_elements_required" => Some("use numeric elements for this lista intrinsic".to_owned()),
         "loop_collection_shape_change" => Some(
             "write a bracket store to update an element, or use a queue with while for a worklist".to_owned(),

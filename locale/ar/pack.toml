@@ -2437,6 +2437,10 @@ help = "أزل قائمة type argument الصريحة"
 message = "numeric {lista} elements مطلوبة"
 help = "استخدم numeric elements لـ {lista} intrinsic هذا"
 
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "يتطلب `extend` مستقبلًا من نوع list عادية؛ لا يمكن لقائمة محدودة أو محددة الطول أن تنمو في مكانها"
+help = "مدّد قائمة غير محدودة، أو ألحق عنصرًا واحدًا في كل مرة باستخدام `append`"
+
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "تمت إزالة الطريقة `.مرتب(مفتاح)` ذات المفتاح؛ استخدم تعبير الفرز"
 help = "اكتب `{ordinata} {via} {ascendens} {ex} مصدر {fixum} x` متبوعا بكتلة تنتهي بـ `{redde}` مفتاح؛ و`{descendens}` يعطي الترتيب العكسي"
@@ -3809,6 +3813,7 @@ argminima = "فهرس_الأصغر"
 continet = "يحتوي"
 cumulata = "تراكمي"
 decapita = "احذف_الأول"
+extende = "ألحق_الكل"
 filtrata = "رشح"
 immerge = "اغمر"
 inversa = "معكوس"

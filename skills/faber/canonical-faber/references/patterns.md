@@ -569,7 +569,7 @@ let tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
 
 ## endian-conversion-not-manual-packing
 
-**Byte payloads are `list<b8>` (la `lista<b8>`) with typed endian conversion (`↦ u32 via Be|Le`), never hand-rolled shift-and-append packing. The hint is a `via` clause; the type-argument spelling (`↦ ascii<4, Hex>`) is rejected.**
+**Byte payloads are `list<b8>` (la `lista<b8>`) with typed endian conversion (`↦ u32 via Be|Le`), never hand-rolled shift-and-append packing. The reverse direction is native too: `x ↦ list<b8, size N> via Le|Be` for one number, `list<f32> ↦ list<b8> via Le|Be` or `tensor<E, shape> ↦ list<b8> via Le|Be` for a whole list or tensor (`corpus/bits/bits-tensor-bytes.fab`), and `out.extend(part)` (la `extende`) joins byte lists (`corpus/lista/methodi-extende-octeti.fab`). The hint is a `via` clause; the type-argument spelling (`↦ ascii<4, Hex>`) is rejected.**
 
 non-preferred · Evidence: `corpus/conversio/octeti-endian.fab` (`|de ad be ef|[0‥4] ↦ u32 via Be`; endian-omitted conversion is rejected, `SEM016 octeti_to_numerus_unspecified`); `grammar/EBNF.md` (The `via` clause: hints are `Hex` `Bin` `Oct` `Be` `Le` `Bits` `Code`; `PARSE030 conversio_hint_type_argument` for the retired form); the manual form (eight `(n ⇒ k) ↦ u8` appends assembling a little-endian u64 by hand) also needs a `⊥` handler outside `main`
 

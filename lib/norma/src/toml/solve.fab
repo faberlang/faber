@@ -455,13 +455,8 @@ fn parse_header(string wire, int start) → cursor.Scan ⇥ string {
 }
 
 fn concat_keys(list<string> prefix, list<string> extra) → list<string> {
-    mut list<string> out ← empty
-    for from prefix let key {
-        out.append(key)
-    }
-    for from extra let key {
-        out.append(key)
-    }
+    mut list<string> out ← copy prefix
+    out.extend(extra)
     return out
 }
 

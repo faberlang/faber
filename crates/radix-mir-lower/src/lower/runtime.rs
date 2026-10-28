@@ -797,6 +797,15 @@ impl FunctionBuilder<'_> {
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
             if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                && matches!(entry.mir_kind, radix_intrinsics::IntrinsicMirKind::ListExtend)
+            {
+                return self.lower_extende(receiver, &args[0].expr, expr);
+            }
+        }
+
+        if let Some(receiver_ty) = receiver.ty {
+            let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+            if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
                 && radix_intrinsics::mir_is_higher_order_lista(entry)
             {
                 let closure = &args[0].expr;

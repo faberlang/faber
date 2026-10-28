@@ -2437,6 +2437,10 @@ help = "xóa danh sách đối số kiểu được chỉ rõ"
 message = "cần các phần tử số trong lista"
 help = "dùng các phần tử số cho intrinsic lista này"
 
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` cần bộ nhận là list thường; list có giới hạn hoặc có khoảng độ dài không thể dài ra tại chỗ"
+help = "dùng extend trên list không giới hạn, hoặc thêm từng phần tử bằng `append`"
+
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "phương thức có khóa `.đã_sắp_xếp(khóa)` đã bị gỡ bỏ; hãy dùng biểu thức sắp xếp"
 help = "viết `{ordinata} {via} {ascendens} {ex} nguồn {fixum} x` theo sau là một khối kết thúc bằng `{redde}` khóa; dùng `{descendens}` để đảo thứ tự"
@@ -3665,6 +3669,7 @@ argminima = "argmin"
 continet = "chứa"
 cumulata = "tích_lũy"
 decapita = "bỏ_đầu"
+extende = "nối_dài"
 filtrata = "lọc"
 immerge = "chìm"
 inversa = "nghịch_đảo"

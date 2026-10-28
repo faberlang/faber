@@ -2449,6 +2449,10 @@ help = "ลบรายการอาร์กิวเมนต์ชนิด
 message = "ต้องใช้องค์ประกอบ numeric ของ lista"
 help = "ใช้องค์ประกอบ numeric สำหรับ intrinsic ของ lista นี้"
 
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` ต้องใช้ตัวรับเป็น list ธรรมดา; list ที่มีขอบเขตหรือกำหนดช่วงความยาวขยายในที่เดิมไม่ได้"
+help = "ใช้ extend กับ list ที่ไม่มีขอบเขต หรือเพิ่มทีละองค์ประกอบด้วย `append`"
+
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "เมธอด `.เรียงแล้ว(คีย์)` แบบมีคีย์ถูกลบแล้ว ให้ใช้นิพจน์การเรียง"
 help = "เขียน `{ordinata} {via} {ascendens} {ex} ต้นทาง {fixum} x` ตามด้วยบล็อกที่จบด้วย `{redde}` คีย์ และใช้ `{descendens}` เพื่อเรียงย้อนกลับ"
@@ -3677,6 +3681,7 @@ argminima = "ดัชนีค่าต่ําสุด"
 continet = "ประกอบด้วย"
 cumulata = "สะสม"
 decapita = "ลบตัวแรก"
+extende = "ขยาย"
 filtrata = "กรอง"
 immerge = "จม"
 inversa = "ผกผัน"
