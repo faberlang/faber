@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 528
+    "analyzable": 529
   },
   "terms": [
     {
@@ -990,6 +990,12 @@
     {
       "term": "vide",
       "rule": "keyword",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "whole-width range",
+      "rule": "operator-group",
       "capable": 0,
       "analyzable": 1
     },

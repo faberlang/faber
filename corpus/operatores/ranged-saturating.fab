@@ -7,7 +7,7 @@ category = "arithmetic"
 canonical = true
 summary = "A range as the second argument of saturating: a store clamps into the range, not only into the width."
 syntax = "saturating<u32, 0‥8>"
-related = ["saturating", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>", "‥", "…"]
+related = ["trapping<W, lo‥hi>", "wrapping<W, lo‥hi>", "‥", "…"]
 locale = "en"
 +++
 # =============================================================================

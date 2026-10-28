@@ -7,7 +7,7 @@ category = "arithmetic"
 canonical = true
 summary = "A range as the second argument of trapping: a store inside the range keeps its value, a store outside it traps."
 syntax = "trapping<i32, -2‥3>"
-related = ["trapping", "saturating<W, lo‥hi>", "wrapping<W, lo‥hi>", "‥", "…", "ranged-trapping-trap"]
+related = ["saturating<W, lo‥hi>", "wrapping<W, lo‥hi>", "‥", "…"]
 locale = "en"
 +++
 # =============================================================================

@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 521,
-    "analyzable": 525
+    "capable": 522,
+    "analyzable": 526
   },
   "terms": [
     {
@@ -990,6 +990,12 @@
     {
       "term": "vide",
       "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "whole-width range",
+      "rule": "operator-group",
       "capable": 1,
       "analyzable": 1
     },

@@ -7,7 +7,7 @@ category = "arithmetic"
 canonical = true
 summary = "A range as the second argument of wrapping: a store wraps around the range, offset by its low end."
 syntax = "wrapping<u32, 0‥5>"
-related = ["wrapping", "saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "‥", "…"]
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "‥", "…"]
 locale = "en"
 +++
 # =============================================================================
