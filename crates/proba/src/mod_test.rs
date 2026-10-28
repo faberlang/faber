@@ -920,7 +920,7 @@ fn empty_selection_is_not_success() {
         report.skipped(),
         report.success()
     );
-    assert!(report.results.is_empty());
+    assert_eq!(report.results, []);
     assert!(!report.success());
 }
 
