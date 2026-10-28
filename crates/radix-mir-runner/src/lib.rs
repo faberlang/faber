@@ -2898,8 +2898,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     /// Append the record of one completed kernel call: every tensor argument
-    /// (`arg<N>`, as written at the call site) and a returned tensor
-    /// (`return`).
+    /// (`arg<N>`, as written at the call site), a returned tensor (`return`),
+    /// and a returned scalar.
     fn record_kernel_call(
         &mut self,
         function_id: MirFunctionId,
@@ -2937,6 +2937,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 entry,
                 physical_stages,
                 tensors,
+                result: kernel_trace::traced_result(returned),
             });
         }
         Ok(())

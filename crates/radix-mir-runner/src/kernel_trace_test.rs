@@ -1,7 +1,7 @@
 use super::kernel_dispatch::KernelDispatcher;
 use super::kernel_trace::{
     Comparison, Divergence, DivergenceDetail, ElementMatch, KernelTraceRecord, ReductionExtent,
-    TraceElement, TraceRole, TracedTensor, compare_traces, match_elements,
+    TraceElement, TraceRole, TracedTensor, compare_traces, match_elements, traced_result,
 };
 use super::*;
 use crate::dense::DenseStorage;
@@ -119,6 +119,7 @@ fn record(
             elements,
             reduction: None,
         }],
+        result: None,
     }
 }
 
@@ -425,6 +426,27 @@ fn capture_program() -> Capture {
         vec![param(1, MirParamMode::Ref), param(2, MirParamMode::MutRef)],
         compute,
     ));
+    // f3: a compute-stage kernel `(in t, mut t)` that returns the scalar
+    // 2.5 (the shape of a mean kernel).
+    let mut scalar_return = function(
+        3,
+        None,
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Constant(MirConstant::Float(
+                    2.5,
+                )))),
+                span,
+            },
+            span,
+        }],
+        vec![param(1, MirParamMode::Ref), param(2, MirParamMode::MutRef)],
+        compute,
+    );
+    scalar_return.return_ty = MirType::semantic(types.primitive(Primitive::Fractus));
+    program.functions.push(scalar_return);
     Capture {
         program,
         types,
@@ -607,4 +629,150 @@ fn a_dispatched_kernel_call_records_the_outputs_and_the_stage_count() {
     assert_eq!(trace.len(), 1);
     assert_eq!(trace[0].physical_stages, Some(2));
     assert_eq!(trace[0].tensors[1].elements, floats(&[0.0, 3.0]));
+}
+
+// ---- scalar kernel returns -------------------------------------------------
+
+#[test]
+fn an_executed_kernel_call_records_its_scalar_return() {
+    let fixture = capture_program();
+    let context = MirValidationContext::new(&fixture.types);
+    let mut host = BufferHost::default();
+    let mut runner = Runner::new(
+        &fixture.program,
+        &context,
+        &fixture.types,
+        &fixture.interner,
+        &mut host,
+    );
+    runner.kernel_policy = RunnerKernelPolicy::Execute;
+    runner.kernel_trace = Some(Vec::new());
+    seed(&mut runner);
+    for function in [1, 3] {
+        runner
+            .invoke_call(
+                &MirCallee::Function(MirFunctionId(function)),
+                &call_args(),
+                Span::default(),
+            )
+            .expect("the kernel runs");
+    }
+    let trace = runner.kernel_trace.take().expect("trace armed");
+    assert_eq!(trace.len(), 2);
+    assert_eq!(
+        trace[0].result, None,
+        "a call returning nothing has no result"
+    );
+    assert_eq!(trace[1].result, Some(TraceElement::Float(2.5)));
+    // The scalar return does not appear as a tensor.
+    assert_eq!(trace[1].tensors.len(), 2);
+}
+
+#[test]
+fn traced_result_keeps_numbers_and_bools_and_nothing_else() {
+    assert_eq!(
+        traced_result(&Value::Float(0.5)),
+        Some(TraceElement::Float(0.5))
+    );
+    assert_eq!(
+        traced_result(&Value::Int(-1)),
+        Some(TraceElement::Exact(u64::MAX))
+    );
+    assert_eq!(traced_result(&Value::UInt(9)), Some(TraceElement::Exact(9)));
+    assert_eq!(
+        traced_result(&Value::Bool(true)),
+        Some(TraceElement::Exact(1))
+    );
+    assert_eq!(traced_result(&Value::Unit), None);
+    assert_eq!(traced_result(&Value::Str("x".to_owned())), None);
+}
+
+fn with_result(result: Option<TraceElement>) -> Vec<KernelTraceRecord> {
+    let mut call = record(1, "mean_lin_32", &[1], floats(&[1.0]));
+    call.result = result;
+    vec![call]
+}
+
+#[test]
+fn a_changed_exact_scalar_return_is_a_divergence_naming_the_return() {
+    // The kernel-fused-mean-extents class: every tensor is identical, only the
+    // scalar the kernel returned is wrong.
+    let reference = with_result(Some(TraceElement::Exact(7)));
+    let device = with_result(Some(TraceElement::Exact(8)));
+    let comparison = compare_traces(&reference, &device);
+    assert_eq!(
+        comparison.divergence,
+        Some(Divergence {
+            call: 1,
+            physical_stages: None,
+            entry: "mean_lin_32".to_owned(),
+            detail: DivergenceDetail::Return {
+                reference: TraceElement::Exact(7),
+                device: TraceElement::Exact(8),
+            },
+        })
+    );
+    assert!(
+        comparison.report().contains("return value"),
+        "{}",
+        comparison.report()
+    );
+    assert!(!comparison.is_identical());
+}
+
+#[test]
+fn a_scalar_float_return_is_identical_conforming_or_divergent() {
+    let want = 0.024_414_063_f64;
+
+    let identical = compare_traces(
+        &with_result(Some(TraceElement::Float(want))),
+        &with_result(Some(TraceElement::Float(want))),
+    );
+    assert!(identical.is_identical(), "{}", identical.report());
+
+    // Inside atol + rtol * |reference|: conforming, never called identical.
+    let conforming = compare_traces(
+        &with_result(Some(TraceElement::Float(want))),
+        &with_result(Some(TraceElement::Float(want + 5e-7))),
+    );
+    assert!(conforming.divergence.is_none(), "{}", conforming.report());
+    assert_eq!(conforming.conforming_elements, 1);
+    assert!(!conforming.is_identical());
+    assert!(conforming.report().starts_with("CONFORMING"));
+
+    // The sign error the Metal reduction bug produced: -0.16015625 against
+    // 0.024414063.
+    let divergent = compare_traces(
+        &with_result(Some(TraceElement::Float(want))),
+        &with_result(Some(TraceElement::Float(-0.160_156_25))),
+    );
+    assert!(
+        matches!(
+            divergent.divergence.as_ref().map(|d| &d.detail),
+            Some(DivergenceDetail::Return { .. })
+        ),
+        "{}",
+        divergent.report()
+    );
+}
+
+#[test]
+fn a_scalar_return_on_one_side_only_is_a_layout_divergence() {
+    let comparison = compare_traces(
+        &with_result(Some(TraceElement::Float(1.0))),
+        &with_result(None),
+    );
+    assert!(
+        matches!(
+            comparison.divergence.as_ref().map(|d| &d.detail),
+            Some(DivergenceDetail::Layout(_))
+        ),
+        "{}",
+        comparison.report()
+    );
+    let comparison = compare_traces(
+        &with_result(None),
+        &with_result(Some(TraceElement::Float(1.0))),
+    );
+    assert!(comparison.divergence.is_some());
 }
