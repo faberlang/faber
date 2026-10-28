@@ -806,7 +806,6 @@ impl FunctionLower<'_, '_> {
         environment: Option<&MirClosureEnvironment>,
     ) -> Lowered<()> {
         let table = self.state.input.types;
-        let unknown = |_: MirType| false;
         let (cells, environments) = closure::construction_slots(function);
         self.cells = cells;
         for local in &function.locals {
@@ -814,9 +813,6 @@ impl FunctionLower<'_, '_> {
                 || environment
                     .as_ref()
                     .is_some_and(|environment| environment.environment_local == local.id);
-            if unknown(local.ty) && !env_slot {
-                continue;
-            }
             let declared = function
                 .params
                 .iter()
@@ -837,9 +833,6 @@ impl FunctionLower<'_, '_> {
         }
         let wide_temps = wide::wide_temps(table, function);
         for temp in &function.temps {
-            if unknown(temp.ty) && !environments.contains(&Slot::Temp(temp.id)) {
-                continue;
-            }
             let slot = Slot::Temp(temp.id);
             if wide_temps.contains(&temp.id)
                 && !self.cells.contains(&slot)
