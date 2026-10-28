@@ -177,27 +177,28 @@ fn fixed_multi_kernel_fixture_reports_the_product_receipt_on_metal() {
         device.runtime.allocated_bytes
     );
 
-    // Honest timing branches: a device with timestamps reports per-launch
-    // times; one without reports unavailable and never fabricated zeros.
-    if device.timed_launches > 0 {
-        let launches = |name: &str| {
-            device
-                .entries
-                .iter()
-                .find(|row| row.entry == name)
-                .unwrap_or_else(|| panic!("missing entry {name}: {:?}", device.entries))
-        };
-        // Emission order: `quadratum` is `k0` (two launches), `cubus` `k1`.
-        let quadratum = launches("k0");
-        let cubus = launches("k1");
-        assert_eq!(quadratum.launches, 2);
-        assert_eq!(cubus.launches, 1);
-        assert!(quadratum.gpu_us > 0, "{:?}", quadratum);
-        assert!(cubus.gpu_us > 0, "{:?}", cubus);
-    } else {
-        assert_eq!(device.gpu_timing, "unavailable");
-        assert_eq!(device.untimed_launches, 3);
-    }
+    // Every Metal device samples timestamps at encoder boundaries (Apple GPUs)
+    // or dispatch boundaries (discrete GPUs), so the product receipt carries
+    // per-entry GPU time: the field is true, every launch is timed, and the
+    // entries table is not empty (need: the M5 Max reported false).
+    assert_eq!(device.gpu_timer_available, Some(true));
+    assert_eq!(device.timed_launches, 3);
+    assert_eq!(device.untimed_launches, 0);
+    assert!(!device.entries.is_empty(), "{:?}", device.entries);
+    let launches = |name: &str| {
+        device
+            .entries
+            .iter()
+            .find(|row| row.entry == name)
+            .unwrap_or_else(|| panic!("missing entry {name}: {:?}", device.entries))
+    };
+    // Emission order: `quadratum` is `k0` (two launches), `cubus` `k1`.
+    let quadratum = launches("k0");
+    let cubus = launches("k1");
+    assert_eq!(quadratum.launches, 2);
+    assert_eq!(cubus.launches, 1);
+    assert!(quadratum.gpu_us > 0, "{:?}", quadratum);
+    assert!(cubus.gpu_us > 0, "{:?}", cubus);
 
     assert!(device.admit_ns > 0);
     assert!(device.prepare_ns > 0);
