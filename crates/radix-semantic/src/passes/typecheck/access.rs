@@ -1476,6 +1476,18 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// The type of a size-name read (size-type Z1 force). A size name reads as
+    /// a read-only `int`; inside a kernel it reads in the portable signed
+    /// carrier the lane coordinates use, because the launch requirements prove
+    /// each extent fits that carrier.
+    fn size_value_type(&mut self) -> TypeId {
+        if self.current_nucleum_entry {
+            self.width_type(radix_types::NumericWidth::I32)
+        } else {
+            self.types.primitive(Primitive::Numerus)
+        }
+    }
+
     /// Converts a resolved definition path into the value type visible at an
     /// expression site.
     ///
@@ -1521,9 +1533,7 @@ impl TypeChecker<'_> {
                 }
                 // Size-type Z1 force: a size name reads as a read-only int
                 // (safe widening at use); assignment is rejected in check_lvalue.
-                crate::SymbolKind::IndexParam => {
-                    return self.types.primitive(Primitive::Numerus);
-                }
+                crate::SymbolKind::IndexParam => return self.size_value_type(),
                 _ => {}
             }
 
@@ -1544,7 +1554,7 @@ impl TypeChecker<'_> {
         // function has a HirTypeParam def and no resolver symbol; it reads
         // as a read-only int (assignment is rejected in check_lvalue).
         if self.current_size_param_defs.contains(&def_id) {
-            return self.types.primitive(Primitive::Numerus);
+            return self.size_value_type();
         }
 
         // A selective import that binds a type (D22.5) names no value.
