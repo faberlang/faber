@@ -114,6 +114,7 @@ mod error;
 mod helpers;
 mod host_wiring;
 pub mod launch_geometry;
+mod loop_carry;
 mod program;
 mod registry;
 mod types;
