@@ -162,7 +162,10 @@ fn window_from_const_source_value_elements_passes() {
         result.diagnostics
     );
     assert!(
-        !result.diagnostics.iter().any(crate::error::SemanticError::is_error),
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::error::SemanticError::is_error),
         "expected the window bind to be accepted, got {:?}",
         result.diagnostics
     );

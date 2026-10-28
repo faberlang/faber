@@ -1098,7 +1098,10 @@ fn en_config() -> crate::PassConfig {
 fn en_unnecessary_varia_count(source: &str) -> usize {
     let result = crate::test_support::analyze_source_with_config(source, en_config());
     assert!(
-        !result.diagnostics.iter().any(super::super::error::SemanticError::is_error),
+        !result
+            .diagnostics
+            .iter()
+            .any(super::super::error::SemanticError::is_error),
         "en fixture must be error-free: {:?}",
         result.diagnostics
     );
