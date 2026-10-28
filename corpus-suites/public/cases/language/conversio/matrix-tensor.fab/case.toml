@@ -3,6 +3,8 @@ id = "corpus/conversio/matrix-tensor.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/matrix-tensor.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

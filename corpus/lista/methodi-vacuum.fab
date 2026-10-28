@@ -2,7 +2,7 @@
 term = "lista"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "cast_expr", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Empty-list answers of lista query and removal methods, and the elementwise maximum(n)/minimum(n) clamp."
 syntax = "<lista>.maximum(n) | <lista>.minimum(n)"

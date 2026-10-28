@@ -2,7 +2,7 @@
 term = "discerne type patterns"
 kind = "feature"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "type_pattern", "ut_pattern", "pattern_binding", "redde_stmt", "expression", "literal", "nota_stmt", "incipit_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = true
 summary = "Discerne cases can test nominal type members and bind the narrowed value."
 syntax = "discerne <union> { casu <type> sit <name> { ... } }"

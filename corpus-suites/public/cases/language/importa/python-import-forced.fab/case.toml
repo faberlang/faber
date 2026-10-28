@@ -3,6 +3,8 @@ id = "corpus/importa/python-import-forced.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/python-import-forced.fab"
+category = "package"
+domain = "program"
 
 args = ["a1b2"]
 

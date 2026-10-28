@@ -3,6 +3,8 @@ id = "corpus/matrix/element-access.fab"
 group = "language"
 input_root = "corpus"
 input = "matrix/element-access.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

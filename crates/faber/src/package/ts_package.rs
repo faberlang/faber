@@ -9,10 +9,10 @@ use std::path::Path;
 
 use radix::module::CompileResult;
 use radix::module::Output;
-use radix::module::codegen::Target;
 use radix::program::analyze::{AnalyzedProgram, AnalyzedProgramNode, ModuleId};
 
 use super::product::{augment_namespace_imports, top_level_ts_decl_names, wrap_module_exports};
+use super::ts_project::{TS_TARGET, visit};
 
 fn failure(diagnostics: Vec<radix::module::diagnostics::Diagnostic>) -> CompileResult {
     CompileResult {
@@ -41,7 +41,7 @@ pub(crate) fn generate_package_ts_result(package: &AnalyzedProgram, input: &Path
     let mut generated: Vec<(&AnalyzedProgramNode, String)> = Vec::new();
     for unit in package.nodes.values() {
         let raw = match radix::module::codegen::generate_from_analyzed(
-            Target::HirTypeScript,
+            TS_TARGET,
             &unit.analysis,
             &surface,
         ) {
@@ -122,6 +122,8 @@ fn internal_import_specifiers(package: &AnalyzedProgram) -> BTreeSet<String> {
             let path = unit.analysis.interner.resolve(import.path);
             if path.starts_with("./") || path.starts_with("../") {
                 specifiers.insert(path.to_owned());
+                // The emitted specifier carries the NodeNext `.js` extension.
+                specifiers.insert(format!("{path}.js"));
             }
         }
     }
@@ -169,19 +171,4 @@ fn ordered_module_units(
         modules.push((file_name, code.clone()));
     }
     modules
-}
-
-fn visit(
-    package: &AnalyzedProgram,
-    id: &ModuleId,
-    visited: &mut BTreeSet<ModuleId>,
-    order: &mut Vec<ModuleId>,
-) {
-    if !visited.insert(id.clone()) {
-        return;
-    }
-    for successor in package.imports.local_successors(id) {
-        visit(package, successor, visited, order);
-    }
-    order.push(id.clone());
 }

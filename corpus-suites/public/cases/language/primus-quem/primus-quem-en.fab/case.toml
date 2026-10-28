@@ -3,6 +3,8 @@ id = "corpus/primus-quem/primus-quem-en.fab"
 group = "language"
 input_root = "corpus"
 input = "primus-quem/primus-quem-en.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

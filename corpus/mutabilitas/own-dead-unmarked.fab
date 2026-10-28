@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
-category = "type"
+category = "binding"
 summary = "MU-3: unmarked last-use into own is a provably-dead source."
 syntax = "let list<int> b ← own unmarked_a"
 related = ["own"]

@@ -423,10 +423,16 @@ fn format_width_unset_is_byte_identical_to_the_canonical_corpus() {
             .expect("read expectation");
         let canonical = format_single_doc(&fixture, &source, None)
             .unwrap_or_else(|status| panic!("{stem}: format failed with status {status}"));
-        assert_eq!(canonical, expected, "{stem}: no width must not change output");
+        assert_eq!(
+            canonical, expected,
+            "{stem}: no width must not change output"
+        );
         let wide = format_single_doc(&fixture, &source, width(100_000))
             .unwrap_or_else(|status| panic!("{stem}: wide format failed with status {status}"));
-        assert_eq!(wide, expected, "{stem}: a width wider than every line must not change output");
+        assert_eq!(
+            wide, expected,
+            "{stem}: a width wider than every line must not change output"
+        );
     }
 }
 
@@ -442,8 +448,7 @@ fn format_width_60_roundtrips_format_corpus() {
         for fixture in fixture_sources() {
             let stem = fixture_stem(&fixture);
             let source = fs::read_to_string(&fixture).expect("read fixture source");
-            let (session, canonical_body, canonical) = match canonical_pipeline(&fixture, &source)
-            {
+            let (session, canonical_body, canonical) = match canonical_pipeline(&fixture, &source) {
                 Ok(result) => result,
                 Err(detail) => {
                     failures.push(format!("{stem}: {detail}"));
@@ -453,7 +458,9 @@ fn format_width_60_roundtrips_format_corpus() {
             let wrapped = match format_single_doc(&fixture, &source, width(columns)) {
                 Ok(wrapped) => wrapped,
                 Err(status) => {
-                    failures.push(format!("{stem}@{columns}: wrap refused with status {status}"));
+                    failures.push(format!(
+                        "{stem}@{columns}: wrap refused with status {status}"
+                    ));
                     continue;
                 }
             };
@@ -467,7 +474,9 @@ fn format_width_60_roundtrips_format_corpus() {
             let split = radix::module::driver::split_frontmatter(&wrapped).expect("frontmatter");
             let wrapped_body = &wrapped[split.body_byte_offset as usize..];
             if let Err(detail) = lex_parse_with_pack(wrapped_body, Some(pack)) {
-                failures.push(format!("{stem}@{columns}: wrapped body must re-parse: {detail}"));
+                failures.push(format!(
+                    "{stem}@{columns}: wrapped body must re-parse: {detail}"
+                ));
             }
             let name = fixture.display().to_string();
             match (
@@ -492,12 +501,19 @@ fn format_width_60_roundtrips_format_corpus() {
             // Idempotent under the same width.
             match format_single_doc(&fixture, &wrapped, width(columns)) {
                 Ok(again) if again == wrapped => {}
-                Ok(_) => failures.push(format!("{stem}@{columns}: wrapped format is not idempotent")),
-                Err(status) => failures.push(format!("{stem}@{columns}: second pass status {status}")),
+                Ok(_) => failures.push(format!(
+                    "{stem}@{columns}: wrapped format is not idempotent"
+                )),
+                Err(status) => {
+                    failures.push(format!("{stem}@{columns}: second pass status {status}"))
+                }
             }
         }
     }
-    assert!(wrapped_any, "no fixture wrapped at any width: the test proves nothing");
+    assert!(
+        wrapped_any,
+        "no fixture wrapped at any width: the test proves nothing"
+    );
     assert!(
         failures.is_empty(),
         "format width failures:\n{}",
@@ -512,9 +528,17 @@ fn format_width_wraps_the_long_lines_fixture() {
     let source = fs::read_to_string(&fixture).expect("read fixture source");
     let canonical = format_single_doc(&fixture, &source, None).expect("canonical");
     let wrapped = format_single_doc(&fixture, &source, width(60)).expect("wrapped");
-    let over = |text: &str| text.lines().filter(|line| line.chars().count() > 60).count();
+    let over = |text: &str| {
+        text.lines()
+            .filter(|line| line.chars().count() > 60)
+            .count()
+    };
     assert!(over(&canonical) >= 2, "fixture must have long lines");
-    assert_eq!(over(&wrapped), 0, "every breakable line fits 60 columns:\n{wrapped}");
+    assert_eq!(
+        over(&wrapped),
+        0,
+        "every breakable line fits 60 columns:\n{wrapped}"
+    );
 }
 
 /// Real exempla at the tightest width: every legal break is taken, and the

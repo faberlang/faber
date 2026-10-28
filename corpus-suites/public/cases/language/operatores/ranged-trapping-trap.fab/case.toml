@@ -3,6 +3,8 @@ id = "corpus/operatores/ranged-trapping-trap.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/ranged-trapping-trap.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

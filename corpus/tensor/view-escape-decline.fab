@@ -2,7 +2,7 @@
 term = "tensor view"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "Borrowed tensor views cannot be returned or stored in a mutable binding."
 related = ["tensor", "materialize"]

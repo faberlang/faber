@@ -3,6 +3,8 @@ id = "corpus/sort/unordered-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "sort/unordered-reject.fab"
+category = "sort"
+domain = "collections"
 
 
 [expect]

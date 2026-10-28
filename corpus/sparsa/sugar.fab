@@ -2,7 +2,7 @@
 term = "sparsa"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = true
 summary = "Sparse tensor width sugar mirrors dense tensor sugar with an s prefix."
 syntax = "sf32[2, 3] | si64[N] | su32[4]"

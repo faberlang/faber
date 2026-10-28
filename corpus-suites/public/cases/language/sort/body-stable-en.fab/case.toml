@@ -3,6 +3,8 @@ id = "corpus/sort/body-stable-en.fab"
 group = "language"
 input_root = "corpus"
 input = "sort/body-stable-en.fab"
+category = "sort"
+domain = "collections"
 
 
 [expect]

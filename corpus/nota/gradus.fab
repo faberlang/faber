@@ -2,7 +2,7 @@
 term = "nota"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt", "expression", "literal"]
-category = "output"
+category = "console"
 canonical = false
 summary = "Diagnostic output severities: nota, vide, and mone."
 syntax = "nota <expr> | vide <expr> | mone <expr>"

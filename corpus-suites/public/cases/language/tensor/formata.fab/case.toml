@@ -3,6 +3,8 @@ id = "corpus/tensor/formata.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/formata.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

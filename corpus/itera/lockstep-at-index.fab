@@ -2,7 +2,7 @@
 term = "apud"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "array_literal", "itera_stmt", "itera_binding", "apud_clause", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = true
 summary = "One shared at [i] coordinate on a lockstep list walk."
 syntax = "for from <a>, <b> at [i] let <x>, <y> { }"

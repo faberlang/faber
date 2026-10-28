@@ -3,6 +3,8 @@ id = "corpus/discerne/closed-set-decline.fab"
 group = "language"
 input_root = "corpus"
 input = "discerne/closed-set-decline.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/assignatio/assignatio.fab"
 group = "language"
 input_root = "corpus"
 input = "assignatio/assignatio.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "rumpe"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "si_stmt", "arm", "rumpe_stmt", "assignment", "place", "expression", "literal", "nota_stmt"]
-category = "transfer"
+category = "jump"
 canonical = false
 summary = "rumpe exits fac from nested si without entering cape"
 related = ["fac", "si", "cape"]

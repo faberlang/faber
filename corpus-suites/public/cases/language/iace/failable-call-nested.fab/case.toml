@@ -3,6 +3,8 @@ id = "corpus/iace/failable-call-nested.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/failable-call-nested.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

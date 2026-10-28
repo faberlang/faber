@@ -1483,7 +1483,10 @@ fn stdout_of(output: &std::process::Output) -> String {
 }
 
 fn max_line(text: &str) -> usize {
-    text.lines().map(|line| line.chars().count()).max().unwrap_or(0)
+    text.lines()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0)
 }
 
 #[test]
@@ -1501,7 +1504,10 @@ fn format_width_precedence_flag_then_manifest_then_none() {
 
     // The flag wins over the manifest, wider or narrower.
     let wide = run_faber_capture(&["format", "--stdout", "--width", "500", path_arg], None);
-    assert_eq!(stdout_of(&wide).lines().count(), WIDTH_SOURCE.lines().count());
+    assert_eq!(
+        stdout_of(&wide).lines().count(),
+        WIDTH_SOURCE.lines().count()
+    );
     let narrow = run_faber_capture(&["format", "--stdout", "--width", "30", path_arg], None);
     assert!(
         stdout_of(&narrow).lines().count() > manifest_out.lines().count(),
@@ -1513,7 +1519,11 @@ fn format_width_precedence_flag_then_manifest_then_none() {
     let path = without.path().join("main.fab");
     let plain = run_faber_capture(&["format", "--stdout", path.to_str().expect("utf8")], None);
     assert!(plain.status.success(), "{plain:?}");
-    assert!(stdout_of(&plain).contains("functio f(textus alpha, textus beta, textus gamma, textus delta) → textus {"));
+    assert!(
+        stdout_of(&plain).contains(
+            "functio f(textus alpha, textus beta, textus gamma, textus delta) → textus {"
+        )
+    );
 }
 
 #[test]
@@ -1534,8 +1544,16 @@ fn format_width_stdin_uses_only_the_flag() {
     let source = format!("+++\nlocale = \"la\"\n+++\n{WIDTH_SOURCE}");
     let plain = run_faber_capture(&["format", "--stdin"], Some(&source));
     assert!(plain.status.success(), "{plain:?}");
-    assert!(stdout_of(&plain).contains("functio f(textus alpha, textus beta, textus gamma, textus delta) → textus {"));
+    assert!(
+        stdout_of(&plain).contains(
+            "functio f(textus alpha, textus beta, textus gamma, textus delta) → textus {"
+        )
+    );
     let wrapped = run_faber_capture(&["format", "--stdin", "--width", "40"], Some(&source));
     assert!(wrapped.status.success(), "{wrapped:?}");
-    assert!(max_line(&stdout_of(&wrapped)) <= 40, "{}", stdout_of(&wrapped));
+    assert!(
+        max_line(&stdout_of(&wrapped)) <= 40,
+        "{}",
+        stdout_of(&wrapped)
+    );
 }

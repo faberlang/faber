@@ -3,6 +3,8 @@ id = "corpus/intervallum/arity-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "intervallum/arity-reject.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

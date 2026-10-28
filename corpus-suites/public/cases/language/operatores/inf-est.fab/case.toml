@@ -3,6 +3,8 @@ id = "corpus/operatores/inf-est.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/inf-est.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

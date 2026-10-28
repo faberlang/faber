@@ -3,6 +3,8 @@ id = "corpus/conversio/instans.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/instans.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

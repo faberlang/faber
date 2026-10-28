@@ -70,6 +70,14 @@ pub trait KernelDispatcher {
         false
     }
 
+    /// How many physical launch stages the last [`Self::dispatch`] ran, when
+    /// it expanded the call into several stages; `None` for a call that was one
+    /// launch. Read by the kernel trace (the C3 comparator) right after a
+    /// dispatch; never needed to run a program.
+    fn last_call_stages(&mut self) -> Option<u32> {
+        None
+    }
+
     /// Tag the launches of the next [`Self::dispatch`] with the innermost open
     /// handled block (`None`: no block is open). Called by the runner right
     /// before each dispatch; the tag comes back on a [`DeviceFault`].

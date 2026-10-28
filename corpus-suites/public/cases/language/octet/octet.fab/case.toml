@@ -3,6 +3,8 @@ id = "corpus/octet/octet.fab"
 group = "language"
 input_root = "corpus"
 input = "octet/octet.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

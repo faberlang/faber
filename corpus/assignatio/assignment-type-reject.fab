@@ -2,7 +2,7 @@
 term = "←"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expr_stmt", "assignment", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "assignment"
+category = "binding"
 canonical = false
 summary = "Assigning a value of the wrong type is refused by name."
 syntax = "<place> ← <expression of another type> — rejected"

@@ -3,6 +3,8 @@ id = "corpus/nota/nota.fab"
 group = "language"
 input_root = "corpus"
 input = "nota/nota.fab"
+category = "console"
+domain = "io"
 
 
 [expect]

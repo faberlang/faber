@@ -3,6 +3,8 @@ id = "corpus/clausa/clausa.fab"
 group = "language"
 input_root = "corpus"
 input = "clausa/clausa.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

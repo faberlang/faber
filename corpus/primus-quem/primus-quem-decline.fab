@@ -2,7 +2,7 @@
 term = "primus_quem"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "first_match_expr", "apud_clause", "optional_suffix", "expression", "literal"]
-category = "lane"
+category = "kernel"
 canonical = false
 summary = "primus_quem AIR decline rows: unbounded sources fail closed (not_bounded) and apud coordinates on first-match stay unsupported in v1."
 syntax = "primus_quem(<unbounded source>, ubi <binder> { <predicate> })"

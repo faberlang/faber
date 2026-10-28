@@ -11,6 +11,12 @@
       "phase": "build",
       "diagnostic_contains": "undefined: math",
       "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:math` module this proof imports, so the generated `main.go` calls `math.*` with no such package-level identifier and `go build` stops with `undefined: math`. Re-measure this row when the Go package emitter lowers that module binding."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "error TS2552",
+      "reason": "The generated project fails `tsc` with error TS2552: a type the TypeScript backend emits for the imported Norma modules does not check, so no program is produced."
     }
   }
 }

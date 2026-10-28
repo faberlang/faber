@@ -3,6 +3,8 @@ id = "corpus/conversio/rectangular-lista-literal-tensor.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/rectangular-lista-literal-tensor.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

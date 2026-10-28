@@ -2,7 +2,7 @@
 term = "cape"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "si_stmt", "cape_clause", "secus_clause", "elige_stmt", "casu_elige_clause", "ceterum_clause", "fac_stmt", "iace_stmt", "conversio_expr", "fixum_decl", "binding_decl", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "Locally-resolved handler recovery: per-arm si/secus/sin cape, whole-construct fac/elige cape, and inline-recovery conversio each resolve their throw to a value of the outer type."
 syntax = "si <cond> { iace } cape <err> { redde <outer value> } secus { … }"

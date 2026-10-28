@@ -2,7 +2,7 @@
 term = "vector"
 kind = "kernel"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal"]
-category = "gpu"
+category = "vector"
 summary = "vector elementwise arithmetic lowers for GPU text emit"
 locale = "en"
 +++

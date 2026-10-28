@@ -3,6 +3,8 @@ id = "corpus/iace/await-context-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/await-context-reject.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "nucleum"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "expression", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "additive_expr", "multiplicative_expr", "literal"]
-category = "gpu"
+category = "kernel"
 summary = "Kernel legality at check time: host output, host-only types, calls to non-kernels, host calls to private kernels, and raw thread-id calls are named diagnostics."
 syntax = "@ kernel fn k(list<f32> xs) → void { print xs }"
 related = ["nucleum", "publica", "nota"]

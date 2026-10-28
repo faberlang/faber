@@ -3,6 +3,8 @@ id = "corpus/functio/fn-value-named-mut.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/fn-value-named-mut.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

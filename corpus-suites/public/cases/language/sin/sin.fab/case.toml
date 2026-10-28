@@ -3,6 +3,8 @@ id = "corpus/sin/sin.fab"
 group = "language"
 input_root = "corpus"
 input = "sin/sin.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

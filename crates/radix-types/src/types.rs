@@ -155,6 +155,10 @@ pub struct TypeTableSnapshot {
     indices: Vec<IndexExpr>,
     unspecified_shape: Option<IndexId>,
     next_index_var: u32,
+    /// Raw-bits widths the source authored (bit 0 `b8` .. bit 3 `b64`). The
+    /// arena alone cannot tell an authored `b8` from the seeded `octeti` byte
+    /// list, so the fact travels beside it.
+    authored_bits: u8,
 }
 
 impl TypeTableSnapshot {
@@ -434,6 +438,7 @@ impl TypeTable {
             indices: self.indices.clone(),
             unspecified_shape: self.unspecified_shape,
             next_index_var: self.next_index_var,
+            authored_bits: self.authored_bits,
         }
     }
 
@@ -484,15 +489,10 @@ impl TypeTable {
         }
         let mut intern_map = FxHashMap::default();
         let mut first_modular_word = None;
-        // A restored table cannot tell an authored `b8` from the seeded
-        // `octeti` byte list, so it keeps only the wider widths as authored.
-        let mut authored_bits = 0_u8;
+        // The arena cannot tell an authored `b8` from the seeded `octeti` byte
+        // list, so the snapshot carries which widths were authored.
+        let authored_bits = snapshot.authored_bits;
         for (index, ty) in snapshot.types.iter().enumerate() {
-            if let Type::Bits(width) = ty
-                && *width != BitsWidth::B8
-            {
-                authored_bits |= Self::bits_mask(*width);
-            }
             // First occupancy wins — matches historical linear-scan first match.
             intern_map.entry(ty.clone()).or_insert(TypeId(index as u32));
             if first_modular_word.is_none()

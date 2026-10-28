@@ -3,6 +3,8 @@ id = "corpus/elige/duplicate-case-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "elige/duplicate-case-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

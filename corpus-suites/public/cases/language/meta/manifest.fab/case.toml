@@ -3,6 +3,8 @@ id = "corpus/meta/manifest.fab"
 group = "language"
 input_root = "corpus"
 input = "meta/manifest.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

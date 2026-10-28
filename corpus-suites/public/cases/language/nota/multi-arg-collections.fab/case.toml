@@ -3,6 +3,8 @@ id = "corpus/nota/multi-arg-collections.fab"
 group = "language"
 input_root = "corpus"
 input = "nota/multi-arg-collections.fab"
+category = "console"
+domain = "io"
 
 
 [expect]

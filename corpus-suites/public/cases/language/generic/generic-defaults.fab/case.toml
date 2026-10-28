@@ -3,6 +3,8 @@ id = "corpus/generic/generic-defaults.fab"
 group = "language"
 input_root = "corpus"
 input = "generic/generic-defaults.fab"
+category = "generic"
+domain = "types"
 
 
 [expect]

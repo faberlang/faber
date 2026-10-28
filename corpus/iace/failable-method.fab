@@ -2,7 +2,7 @@
 term = "failable method"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "comparison", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt", "genus_decl", "genus_member", "field_decl", "inline_default"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "A class method declares its own ⇥ error channel; callers recover with catch or ⊥."
 syntax = "fn <name>(<params>) → <type> ⇥ <error-type> <block>  |  <call> ⊥ <default>"

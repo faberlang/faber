@@ -2,7 +2,7 @@
 term = "vector"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "redde_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "comparison", "equality", "et_expr", "aut_expr", "unary_expr", "ternary", "expression", "literal", "nota_stmt"]
-category = "comparison"
+category = "vector"
 canonical = false
 summary = "Numeric comparisons lift per lane over a vector (a bool vector), and/or/not and the ✓ ✗ select work on bool vectors, and ≡ stays whole-value."
 syntax = "v < w | v ≥ 2.0 | 2.0 > v | v ≅ w | mask and mask | not mask | mask ✓ v ✗ w"

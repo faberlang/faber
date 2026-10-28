@@ -3,6 +3,8 @@ id = "corpus/genus/literal.fab"
 group = "language"
 input_root = "corpus"
 input = "genus/literal.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

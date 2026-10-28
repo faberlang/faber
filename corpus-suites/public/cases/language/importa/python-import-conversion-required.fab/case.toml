@@ -3,6 +3,8 @@ id = "corpus/importa/python-import-conversion-required.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/python-import-conversion-required.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

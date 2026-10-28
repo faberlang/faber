@@ -3,6 +3,8 @@ id = "corpus/importa/import-missing-member-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/import-missing-member-reject.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

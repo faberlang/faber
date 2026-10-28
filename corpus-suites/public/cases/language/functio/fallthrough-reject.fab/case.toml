@@ -3,6 +3,8 @@ id = "corpus/functio/fallthrough-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/fallthrough-reject.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

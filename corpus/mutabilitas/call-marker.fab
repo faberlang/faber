@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "function_type", "type_list", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "call_marker", "genus_decl", "genus_member", "functio_method_decl"]
-category = "type"
+category = "binding"
 summary = "An argument carries the marker its parameter declares: mut, own, copy, optional ref; on functions, method arguments, function values and fresh values."
 syntax = "bump(mut a); eat(own a); dup(copy a); peek(ref a)"
 related = ["mut", "own", "copy", "ref"]

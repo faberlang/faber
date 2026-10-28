@@ -2,7 +2,7 @@
 term = "list<b8>"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "A byte-list literal needs two hex digits per byte: |686| has three digits and rejects with SEM011:octeti_literal_odd_digit_count."
 syntax = "|686|"

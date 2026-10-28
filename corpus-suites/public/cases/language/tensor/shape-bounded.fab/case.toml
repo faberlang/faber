@@ -3,6 +3,8 @@ id = "corpus/tensor/shape-bounded.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/shape-bounded.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

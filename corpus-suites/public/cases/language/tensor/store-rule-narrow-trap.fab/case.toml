@@ -3,6 +3,8 @@ id = "corpus/tensor/store-rule-narrow-trap.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/store-rule-narrow-trap.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

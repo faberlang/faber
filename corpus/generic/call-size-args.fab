@@ -2,7 +2,7 @@
 term = "generic call size arguments"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "incipit_stmt", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "call_type_args", "call_type_arg", "argument_list", "argument", "member_suffix", "expression", "literal"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A generic call binds its size parameters explicitly with `size` arguments in the call's angle brackets."
 syntax = "take<size 2, size 2>(a)"

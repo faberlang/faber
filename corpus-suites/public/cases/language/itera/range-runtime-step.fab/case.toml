@@ -3,6 +3,8 @@ id = "corpus/itera/range-runtime-step.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/range-runtime-step.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

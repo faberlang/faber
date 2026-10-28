@@ -2,7 +2,7 @@
 locale = "en"
 term = "itera-filum-break-reject"
 kind = "reject"
-category = "control-flow"
+category = "loop"
 grammar = ["itera_stmt", "apud_clause", "filum_clause", "rumpe_stmt", "expression"]
 canonical = false
 summary = "A `break` that targets a `thread` loop is refused: lanes run independently, so it cannot stop the others."

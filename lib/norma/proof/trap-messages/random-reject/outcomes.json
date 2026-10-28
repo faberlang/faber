@@ -31,6 +31,12 @@
       "phase": "build",
       "diagnostic_contains": "undefined: random",
       "reason": "The Go lane does not yet provide the Norma entropy leaf binding used by this case."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the entropy leaf is not supported on the ts target",
+      "reason": "The Node port of the entropy leaf (`aleator:*`) has not landed, so the emitter refuses any program that reaches an `aleator` route (leaf_unsupported_on_target)."
     }
   }
 }

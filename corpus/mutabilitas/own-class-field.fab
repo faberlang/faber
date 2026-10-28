@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "member_suffix", "nota_stmt"]
-category = "type"
+category = "binding"
 summary = "MU-3: own bind of a class value; the binding reads the source's field."
 syntax = "let Holder f ← own d"
 related = ["own", "genus"]

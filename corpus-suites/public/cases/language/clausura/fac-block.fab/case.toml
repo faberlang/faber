@@ -3,6 +3,8 @@ id = "corpus/clausura/fac-block.fab"
 group = "language"
 input_root = "corpus"
 input = "clausura/fac-block.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

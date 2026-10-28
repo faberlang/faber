@@ -3,6 +3,8 @@ id = "corpus/conversio/octeti-lista.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/octeti-lista.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

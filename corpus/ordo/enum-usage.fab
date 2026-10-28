@@ -2,7 +2,7 @@
 term = "ordo"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "unary_expr", "literal", "member_suffix", "nota_stmt", "param_list", "itera_stmt", "elige_stmt", "casu_elige_clause", "array_literal", "type_arguments", "type_argument", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument"]
-category = "type"
+category = "variant"
 canonical = false
 summary = "Using enum values: equality, printing, lists, switch, and a class field."
 syntax = "a ≡ Color.red"

@@ -2,7 +2,7 @@
 term = "matrix"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "redde_stmt", "expression"]
-category = "register"
+category = "device"
 summary = "matrix<T, [R, C]> is not a tensor<T, [R, C]> alias."
 syntax = "matrix<T, [R, C]> != tensor<T, [R, C]>"
 related = ["tensor"]

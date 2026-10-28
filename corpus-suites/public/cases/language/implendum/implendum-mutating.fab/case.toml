@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/implendum/implendum-mutating.fab"
+group = "language"
+input_root = "corpus"
+input = "implendum/implendum-mutating.fab"
+category = "class"
+domain = "types"
+
+
+[expect]
+check_only = true

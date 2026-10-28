@@ -3,6 +3,8 @@ id = "corpus/vector/cross.fab"
 group = "language"
 input_root = "corpus"
 input = "vector/cross.fab"
+category = "vector"
+domain = "tensors"
 
 
 [expect]

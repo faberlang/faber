@@ -3,6 +3,8 @@ id = "corpus/bounded/itera-ex-scalar-buffers.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/itera-ex-scalar-buffers.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "leaf_unsupported_on_target",
       "reason": "The Go lane carries no `solum:*` port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the fs leaf is not supported on the ts target",
+      "reason": "The Node port of the fs leaf (`solum:*`) has not landed, and TypeScript declares a leaf whole or not at all, so the emitter refuses any program that reaches a `solum` route (leaf_unsupported_on_target)."
     }
   }
 }

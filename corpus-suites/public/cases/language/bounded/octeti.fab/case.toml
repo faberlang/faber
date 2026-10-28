@@ -3,6 +3,8 @@ id = "corpus/bounded/octeti.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/octeti.fab"
+category = "text"
+domain = "text"
 
 
 [expect]

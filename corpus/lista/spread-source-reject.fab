@@ -2,7 +2,7 @@
 term = "lista"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "A spread source must be a list; spreading an integer is refused."
 syntax = "[spread 1] — rejected"

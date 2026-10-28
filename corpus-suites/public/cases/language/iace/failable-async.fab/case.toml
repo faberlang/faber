@@ -3,6 +3,8 @@ id = "corpus/iace/failable-async.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/failable-async.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

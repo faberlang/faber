@@ -2,7 +2,7 @@
 term = "itera"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "itera_stmt", "itera_binding", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "Range product declines: source/binder arity, extent/binder shadowing, and a mixed range/plain series fail closed."
 syntax = "for range <a>‥<b>, <c>‥<d> let <i>, <j> { }"

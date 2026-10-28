@@ -362,10 +362,10 @@ pub fn grid_reduce_helper_tensors(
     let mut runs = Vec::new();
     if let Some(captures) = filum.term_captures {
         let captures = captures as usize;
-        if let Some(function_at) = args.len().checked_sub(key_operands + 1) {
-            if let Some(start) = function_at.checked_sub(captures) {
-                runs.push((start, captures));
-            }
+        if let Some(function_at) = args.len().checked_sub(key_operands + 1)
+            && let Some(start) = function_at.checked_sub(captures)
+        {
+            runs.push((start, captures));
         }
     }
     if let Some(group) = &filum.group {

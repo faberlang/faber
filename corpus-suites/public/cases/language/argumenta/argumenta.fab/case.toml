@@ -3,6 +3,8 @@ id = "corpus/argumenta/argumenta.fab"
 group = "language"
 input_root = "corpus"
 input = "argumenta/argumenta.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

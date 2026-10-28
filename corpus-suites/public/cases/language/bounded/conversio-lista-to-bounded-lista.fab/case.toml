@@ -3,6 +3,8 @@ id = "corpus/bounded/conversio-lista-to-bounded-lista.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/conversio-lista-to-bounded-lista.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

@@ -40,7 +40,7 @@ fn get<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
 }
 
 /// The unit's named top-level keys, in declaration order.
-const UNIT_KEYS: [&str; 23] = [
+const UNIT_KEYS: [&str; 24] = [
     "schema_version",
     "shape_hash",
     "source_identity",
@@ -60,6 +60,7 @@ const UNIT_KEYS: [&str; 23] = [
     "capability_provenance",
     "provider_units",
     "shape_obligations",
+    "contract_roles",
     "kernel_requirements",
     "tensor_edge_policies",
     "display_tokens",

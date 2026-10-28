@@ -3,6 +3,8 @@ id = "corpus/itera/cape-admit.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/cape-admit.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/typi/sized-family-error.fab"
 group = "language"
 input_root = "corpus"
 input = "typi/sized-family-error.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

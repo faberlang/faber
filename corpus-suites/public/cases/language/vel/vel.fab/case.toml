@@ -3,6 +3,8 @@ id = "corpus/vel/vel.fab"
 group = "language"
 input_root = "corpus"
 input = "vel/vel.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "textus"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "conversio_expr", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
-category = "type"
+category = "text"
 canonical = false
 summary = "Bounded textus<N>: scalar capacity N; longitudo is len; equality ignores spare slots."
 syntax = "textus<N>"

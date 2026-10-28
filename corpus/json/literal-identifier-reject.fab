@@ -2,7 +2,7 @@
 term = "json"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "json_literal", "json_member", "json_value", "json_object", "json_string", "json_number", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "format"
 canonical = false
 summary = "JSON values are strings, numbers, objects, arrays or the wire words true/false/null: any other identifier value rejects with PARSE002:json_unknown_identifier_value."
 syntax = "{ \"flag\": foo }"

@@ -3,6 +3,8 @@ id = "corpus/typi/sized-numerus.fab"
 group = "language"
 input_root = "corpus"
 input = "typi/sized-numerus.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

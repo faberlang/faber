@@ -3,6 +3,8 @@ id = "corpus/operatores/textus-ordo.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/textus-ordo.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

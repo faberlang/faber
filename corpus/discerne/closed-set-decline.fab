@@ -2,7 +2,7 @@
 term = "discerne closed set"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "type_pattern", "type_arguments", "type_argument", "redde_stmt", "expression", "literal", "incipit_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "Decline: discerne matches a closed set, so a length-shaped collection pattern or a numeric width pattern is not a member of the scrutinee type and is rejected with SEM010:discerne_pattern_not_in_closed_set."
 syntax = "discerne <list<T>> { case list<T, N> ... } — rejected; ask a length with .length() in an if, a width with is"

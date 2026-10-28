@@ -2,7 +2,7 @@
 term = "⤒"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "additive_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
-category = "arithmetic"
+category = "reduction"
 canonical = true
 summary = "Maximum/minimum infix arrows on scalars, lists, and tensors, including chained clamp syntax."
 syntax = "<expression> ⤒ <expression> | <expression> ⤓ <expression>"

@@ -3,6 +3,8 @@ id = "corpus/incrementa/incrementa.fab"
 group = "language"
 input_root = "corpus"
 input = "incrementa/incrementa.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

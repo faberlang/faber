@@ -3,6 +3,8 @@ id = "corpus/genus/fixum-field-assign-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "genus/fixum-field-assign-reject.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

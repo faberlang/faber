@@ -3,6 +3,8 @@ id = "corpus/operatores/inf-json.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/inf-json.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

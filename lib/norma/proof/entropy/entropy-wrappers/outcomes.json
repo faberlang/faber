@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "undefined: random",
       "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:random` module this proof imports, so the generated `main.go` calls `random.*` with no such package-level identifier and `go build` stops with `undefined: random`. Re-measure this row when the Go package emitter lowers that module binding."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the entropy leaf is not supported on the ts target",
+      "reason": "The Node port of the entropy leaf (`aleator:*`) has not landed, so the emitter refuses any program that reaches an `aleator` route (leaf_unsupported_on_target)."
     }
   }
 }

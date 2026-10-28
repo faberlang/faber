@@ -2,7 +2,7 @@
 term = "matrix"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "arithmetic"
+category = "tensor"
 canonical = false
 summary = "Matrix matmul partials are exact; a finished cell that does not fit the element type traps at the store."
 syntax = "a · c"

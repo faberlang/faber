@@ -3,6 +3,8 @@ id = "corpus/tensor/bracket-access.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/bracket-access.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

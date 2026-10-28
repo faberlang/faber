@@ -3,6 +3,8 @@ id = "corpus/generis/lectio.fab"
 group = "language"
 input_root = "corpus"
 input = "generis/lectio.fab"
+category = "generic"
+domain = "types"
 
 
 [expect]

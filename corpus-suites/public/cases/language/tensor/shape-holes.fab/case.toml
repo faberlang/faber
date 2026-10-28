@@ -3,6 +3,8 @@ id = "corpus/tensor/shape-holes.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/shape-holes.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

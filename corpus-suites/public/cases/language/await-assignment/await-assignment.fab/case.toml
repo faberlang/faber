@@ -3,6 +3,8 @@ id = "corpus/await-assignment/await-assignment.fab"
 group = "language"
 input_root = "corpus"
 input = "await-assignment/await-assignment.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

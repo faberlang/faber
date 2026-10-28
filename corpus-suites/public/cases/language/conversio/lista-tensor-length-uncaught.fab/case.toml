@@ -3,6 +3,8 @@ id = "corpus/conversio/lista-tensor-length-uncaught.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/lista-tensor-length-uncaught.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/itera/apud-decline.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/apud-decline.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

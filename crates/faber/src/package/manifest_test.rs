@@ -270,14 +270,14 @@ fn width(value: u32) -> Option<std::num::NonZeroU32> {
 #[test]
 fn format_width_absent_resolves_to_none() {
     let no_table = format_package("no-table", None);
-    assert_eq!(resolve_format_width(None, &no_table).expect("resolves"), None);
+    assert_eq!(
+        resolve_format_width(None, &no_table).expect("resolves"),
+        None
+    );
     let no_key = format_package("no-key", Some(""));
     assert_eq!(resolve_format_width(None, &no_key).expect("resolves"), None);
     // No manifest at all (a loose file next to nothing) is also no width.
-    let loose = std::env::temp_dir().join(format!(
-        "faber-format-loose-{}",
-        std::process::id()
-    ));
+    let loose = std::env::temp_dir().join(format!("faber-format-loose-{}", std::process::id()));
     std::fs::create_dir_all(&loose).expect("create loose dir");
     assert_eq!(resolve_format_width(None, &loose).expect("resolves"), None);
 }
@@ -285,7 +285,10 @@ fn format_width_absent_resolves_to_none() {
 #[test]
 fn format_width_valid_manifest_value_resolves() {
     let dir = format_package("valid", Some("width = 80\n"));
-    assert_eq!(resolve_format_width(None, &dir).expect("resolves"), width(80));
+    assert_eq!(
+        resolve_format_width(None, &dir).expect("resolves"),
+        width(80)
+    );
     // A file inside the package finds the same manifest.
     assert_eq!(
         resolve_format_width(None, &dir.join("main.fab")).expect("resolves"),

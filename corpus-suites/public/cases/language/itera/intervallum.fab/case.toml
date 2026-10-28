@@ -3,6 +3,8 @@ id = "corpus/itera/intervallum.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/intervallum.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

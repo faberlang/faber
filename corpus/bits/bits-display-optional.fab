@@ -2,7 +2,7 @@
 term = "bits"
 kind = "display"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "concrete_type", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "array_element_list", "array_element", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = true
 summary = "A bN inside an optional still prints as hex at full width; an absent optional prints none, and a nested list keeps its brackets."
 syntax = "b8 ∪ none x | list<b8> ∪ none xs | list<list<b8>> rows"

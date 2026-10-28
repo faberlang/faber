@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/own-arg-use-after.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/own-arg-use-after.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

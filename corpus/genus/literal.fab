@@ -2,7 +2,7 @@
 term = "genus"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "Genus literal instantiation with field overrides."
 syntax = "<Genus> { <field> = <expr>, … }"

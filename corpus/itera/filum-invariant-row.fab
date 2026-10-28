@@ -2,7 +2,7 @@
 term = "itera"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "apud_clause", "filum_clause", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "A `thread` loop may write a row of a matrix in place: its index is the lane coordinate plus components every lane shares."
 syntax = "for from row at [j] thread lane let v { cache[[pos, j]] ← v }"

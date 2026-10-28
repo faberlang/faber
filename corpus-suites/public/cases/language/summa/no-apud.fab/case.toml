@@ -3,6 +3,8 @@ id = "corpus/summa/no-apud.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/no-apud.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

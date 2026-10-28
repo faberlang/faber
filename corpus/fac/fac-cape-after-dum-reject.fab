@@ -2,7 +2,7 @@
 term = "fac"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "assignment", "place", "comparison", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "error"
 canonical = false
 summary = "The handler precedes the loop condition; catch after while is refused by name."
 syntax = "do { … } while <cond> catch <err> { … } — rejected; write catch before while"

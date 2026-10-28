@@ -3,6 +3,8 @@ id = "corpus/operatores/numeric-value-eq.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/numeric-value-eq.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

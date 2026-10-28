@@ -778,7 +778,11 @@ fn run_case(
     }
     row["phase"] = json!("run");
     let running = Instant::now();
-    let mut run_recipe = recipe.run.clone();
+    let mut run_recipe = if package_linked && !recipe.package_run.is_empty() {
+        recipe.package_run.clone()
+    } else {
+        recipe.run.clone()
+    };
     run_recipe.extend(case.args.iter().cloned());
     let run = run_command(
         &run_recipe,

@@ -2,7 +2,7 @@
 term = "discerne"
 kind = "feature"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "ut_pattern", "redde_stmt", "sit_decl", "finge_expr", "field_list", "field_init", "field_key", "cast_expr", "incipit_stmt", "expression", "multiplicative_expr", "literal", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "A casu arm can rename any payload field it binds with `as`, so the body reads that field under the local alias."
 syntax = "case <Variant> let <field> as <alias>, <field> { ... }"

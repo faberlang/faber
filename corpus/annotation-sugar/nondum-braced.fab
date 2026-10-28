@@ -2,7 +2,7 @@
 term = "nondum"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "implendum_decl", "implendum_method_decl", "annotation", "braced_annotation", "annotation_name", "annotation_field_list", "annotation_field", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "nota_stmt"]
-category = "availability"
+category = "annotation"
 canonical = true
 summary = "Braced canonical @ nondum availability record."
 syntax = "@ nondum { target = rs, ratio = \"…\" }"

@@ -2,7 +2,7 @@
 term = "failable generator"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "comparison", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt", "callable_posture", "itera_stmt", "range_expr", "cede_stmt", "incipiet_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "A generator declares its own ⇥ error channel; a failing yield leaves through the consuming loop's handler."
 syntax = "fn <name>(<params>) generator → <type> ⇥ <error-type> <block>  |  for from <generator-call> let <x> { … }"

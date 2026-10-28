@@ -2,7 +2,7 @@
 term = "implendum"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "implendum_decl", "implendum_method_decl", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "Dispatches interface-typed calls to concrete implementations of an implendum."
 syntax = "functio <name>(<Implendum> <parameter>) → <type>"

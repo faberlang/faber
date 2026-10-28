@@ -171,6 +171,16 @@ pub struct ManifestTarget {
 
     /// Target dependency pins, e.g. `[target.rust.dependencies]`.
     pub dependencies: BTreeMap<String, String>,
+
+    /// Build command line, replacing the backend recipe's `build`.
+    pub build: Option<Vec<String>>,
+
+    /// Run command line, replacing the backend recipe's `run`.
+    pub run: Option<Vec<String>>,
+
+    /// Compiler options of the backend recipe to change. Each key replaces
+    /// the recipe's same key; unnamed keys keep the backend default.
+    pub compiler_options: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]

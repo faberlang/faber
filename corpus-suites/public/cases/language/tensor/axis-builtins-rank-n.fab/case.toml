@@ -3,6 +3,8 @@ id = "corpus/tensor/axis-builtins-rank-n.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/axis-builtins-rank-n.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

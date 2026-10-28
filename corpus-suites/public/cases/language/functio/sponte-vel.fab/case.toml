@@ -3,6 +3,8 @@ id = "corpus/functio/sponte-vel.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/sponte-vel.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

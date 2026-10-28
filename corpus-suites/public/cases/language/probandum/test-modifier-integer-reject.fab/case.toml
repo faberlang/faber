@@ -3,6 +3,8 @@ id = "corpus/probandum/test-modifier-integer-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "probandum/test-modifier-integer-reject.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

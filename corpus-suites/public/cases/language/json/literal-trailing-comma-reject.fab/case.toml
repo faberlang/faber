@@ -3,6 +3,8 @@ id = "corpus/json/literal-trailing-comma-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "json/literal-trailing-comma-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

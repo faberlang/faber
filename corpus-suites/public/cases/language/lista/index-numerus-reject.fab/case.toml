@@ -3,6 +3,8 @@ id = "corpus/lista/index-numerus-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/index-numerus-reject.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

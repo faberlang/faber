@@ -3,6 +3,8 @@ id = "corpus/ad/ad-handler-multiple-routes-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/ad-handler-multiple-routes-reject.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

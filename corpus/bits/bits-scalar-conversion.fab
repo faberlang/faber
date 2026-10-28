@@ -2,7 +2,7 @@
 term = "bits"
 kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "conversio"
+category = "bits"
 canonical = false
 summary = "A scalar converts to bits and back at the same width: u8↔b8, i8→b8, u32→b32, b64→u64/i64, b32→i32/u32, b8→i8."
 syntax = "n ↦ b8 | c ↦ u8"

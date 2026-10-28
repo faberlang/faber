@@ -3,6 +3,8 @@ id = "corpus/bits/bits-display-optional.fab"
 group = "language"
 input_root = "corpus"
 input = "bits/bits-display-optional.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

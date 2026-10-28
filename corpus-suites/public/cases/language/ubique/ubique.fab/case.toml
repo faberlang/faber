@@ -3,6 +3,8 @@ id = "corpus/ubique/ubique.fab"
 group = "language"
 input_root = "corpus"
 input = "ubique/ubique.fab"
+category = "cli"
+domain = "program"
 
 
 [expect]

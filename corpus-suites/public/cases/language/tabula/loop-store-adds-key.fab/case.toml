@@ -3,6 +3,8 @@ id = "corpus/tabula/loop-store-adds-key.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/loop-store-adds-key.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

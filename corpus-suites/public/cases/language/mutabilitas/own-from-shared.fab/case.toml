@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/own-from-shared.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/own-from-shared.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/annotation-sugar/nucleum-fragment-braced.fab"
 group = "language"
 input_root = "corpus"
 input = "annotation-sugar/nucleum-fragment-braced.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

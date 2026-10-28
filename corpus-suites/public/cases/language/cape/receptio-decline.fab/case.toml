@@ -3,6 +3,8 @@ id = "corpus/cape/receptio-decline.fab"
 group = "language"
 input_root = "corpus"
 input = "cape/receptio-decline.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/itera/sort-source-reject-en.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/sort-source-reject-en.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

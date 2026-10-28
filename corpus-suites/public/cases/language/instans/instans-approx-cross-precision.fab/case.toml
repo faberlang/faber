@@ -3,6 +3,8 @@ id = "corpus/instans/instans-approx-cross-precision.fab"
 group = "language"
 input_root = "corpus"
 input = "instans/instans-approx-cross-precision.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

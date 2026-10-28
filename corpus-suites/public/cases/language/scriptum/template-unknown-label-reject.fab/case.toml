@@ -3,6 +3,8 @@ id = "corpus/scriptum/template-unknown-label-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "scriptum/template-unknown-label-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

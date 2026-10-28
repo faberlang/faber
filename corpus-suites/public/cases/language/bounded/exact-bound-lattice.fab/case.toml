@@ -3,6 +3,8 @@ id = "corpus/bounded/exact-bound-lattice.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/exact-bound-lattice.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

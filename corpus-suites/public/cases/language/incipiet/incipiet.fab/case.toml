@@ -3,6 +3,8 @@ id = "corpus/incipiet/incipiet.fab"
 group = "language"
 input_root = "corpus"
 input = "incipiet/incipiet.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

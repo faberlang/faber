@@ -3,6 +3,8 @@ id = "corpus/itera/filum-nested.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/filum-nested.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

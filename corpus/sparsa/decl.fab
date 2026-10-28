@@ -2,7 +2,7 @@
 term = "sparsa"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = true
 summary = "sparse<T, Figura> declaration shell with all-zero vacua."
 syntax = "sparse<T, Figura> | sparse<T, []>"

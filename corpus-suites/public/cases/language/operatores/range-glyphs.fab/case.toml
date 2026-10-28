@@ -3,6 +3,8 @@ id = "corpus/operatores/range-glyphs.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/range-glyphs.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/integratio/destructura-sparsa.fab"
 group = "language"
 input_root = "corpus"
 input = "integratio/destructura-sparsa.fab"
+category = "integration"
+domain = "program"
 
 
 [expect]

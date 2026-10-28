@@ -1,7 +1,7 @@
 +++
 term = "matrix"
 kind = "type"
-category = "collection"
+category = "tensor"
 canonical = false
 locale = "en"
 related = ["matrix", "apud", "ponde", "accipe"]

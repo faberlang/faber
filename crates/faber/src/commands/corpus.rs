@@ -10,6 +10,10 @@ mod gpu;
 mod runner_test;
 #[cfg(feature = "hir-rust")]
 mod rust;
+mod selection;
+#[cfg(test)]
+#[path = "corpus/selection_test.rs"]
+mod selection_test;
 
 use crate::cli::CorpusArgs;
 use faber_cli::exit_status;
@@ -51,6 +55,13 @@ struct SuiteManifest {
     roots: BTreeMap<String, PathBuf>,
     #[serde(default)]
     expectations: BTreeMap<String, BTreeMap<String, TargetExpectation>>,
+    /// Domain name to its categories; the partition `--domain`/`--category` select by.
+    #[serde(default)]
+    domains: BTreeMap<String, Vec<String>>,
+    /// Category of each product package, which has no corpus frontmatter. The
+    /// generator reads it; the loader only checks the categories are in the table.
+    #[serde(default)]
+    product_categories: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -66,6 +77,10 @@ struct SuiteTarget {
     build: Vec<String>,
     #[serde(default)]
     run: Vec<String>,
+    /// Run command for a package case whose `faber build` printed a linked
+    /// artifact; without it the case runs `run` like a single-file emit.
+    #[serde(default)]
+    package_run: Vec<String>,
     #[serde(default)]
     files: BTreeMap<PathBuf, String>,
     #[serde(default)]
@@ -77,6 +92,7 @@ struct SuiteTarget {
 struct LoadedSuite {
     cases: Vec<Case>,
     recipe: Option<SuiteTarget>,
+    domains: Option<selection::DomainTable>,
 }
 
 #[derive(Deserialize)]
@@ -85,6 +101,8 @@ struct CaseManifest {
     version: u32,
     id: Option<String>,
     group: Option<String>,
+    category: Option<String>,
+    domain: Option<String>,
     input_root: Option<String>,
     input: PathBuf,
     #[serde(default)]
@@ -162,6 +180,8 @@ impl Outcome {
 
 struct Case {
     id: String,
+    category: Option<String>,
+    domain: Option<String>,
     dir: PathBuf,
     input: PathBuf,
     args: Vec<String>,
@@ -362,16 +382,27 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             fail_usage("--expected applies only to a single input");
         }
         let mut suite = load_suite(&input, &args.target).unwrap_or_else(|error| error.exit());
-        if let Some(filter) = args.filter.as_deref() {
-            suite.cases.retain(|case| case.id.contains(filter));
-            if suite.cases.is_empty() {
-                fail_usage(&format!("no cases match filter {filter:?}"));
-            }
-        }
+        let selectors = selection::Selectors {
+            domains: args.domain.clone(),
+            categories: args.category.clone(),
+            cases: args.case.clone(),
+            filter: args.filter.clone(),
+        };
+        suite.cases = selection::select(suite.cases, suite.domains.as_ref(), &selectors)
+            .unwrap_or_else(|error| match error {
+                selection::SelectionError::Usage(message)
+                | selection::SelectionError::Empty(message) => fail_usage(&message),
+            });
         suite
     } else {
-        if args.filter.is_some() {
-            fail_usage("--filter applies only to a suite");
+        let named = [
+            ("--filter", args.filter.is_some()),
+            ("--domain", !args.domain.is_empty()),
+            ("--category", !args.category.is_empty()),
+            ("--case", !args.case.is_empty()),
+        ];
+        if let Some((flag, _)) = named.iter().find(|(_, given)| *given) {
+            fail_usage(&format!("{flag} applies only to a suite"));
         }
         if args.target != "runner" {
             fail_usage("non-runner targets require a suite with a target recipe");
@@ -381,6 +412,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
                 single_case(&input, args.expected.as_deref()).unwrap_or_else(|error| error.exit()),
             ],
             recipe: None,
+            domains: None,
         }
     };
     let discover_ms = ms(discovering);
@@ -563,6 +595,8 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, SuiteError
     };
     Ok(Case {
         id: input.display().to_string(),
+        category: None,
+        domain: None,
         dir,
         input: input.to_path_buf(),
         args: Vec::new(),
@@ -624,10 +658,25 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, SuiteError> {
     if manifests.is_empty() {
         return Err(format!("no case.toml files under {}", cases_root.display()).into());
     }
-    let cases = manifests
+    let mut cases = manifests
         .iter()
         .map(|path| load_case(path, &cases_root, target, &roots, &suite.expectations))
         .collect::<Result<Vec<_>, _>>()?;
+    let domains = selection::DomainTable::from_manifest(suite.domains)
+        .map_err(|message| format!("invalid {}: {message}", manifest_path.display()))?;
+    for (case_id, category) in &suite.product_categories {
+        if !domains
+            .as_ref()
+            .is_some_and(|table| table.has_category(category))
+        {
+            return Err(format!(
+                "invalid {}: product_categories {case_id}: category {category:?} is in no domain",
+                manifest_path.display()
+            )
+            .into());
+        }
+    }
+    selection::DomainTable::tag_cases(domains.as_ref(), &mut cases)?;
     let recipe = if target == "runner" {
         None
     } else {
@@ -701,7 +750,11 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, SuiteError> {
     } else {
         None
     };
-    Ok(LoadedSuite { cases, recipe })
+    Ok(LoadedSuite {
+        cases,
+        recipe,
+        domains,
+    })
 }
 
 fn resolve_suite_roots(
@@ -1001,6 +1054,8 @@ fn parse_case(
         .transpose()?;
     Ok(Case {
         id,
+        category: manifest.category.take(),
+        domain: manifest.domain.take(),
         dir: dir.to_path_buf(),
         input,
         args: expectation.args.clone().unwrap_or(manifest.args),
@@ -1449,6 +1504,12 @@ impl SuiteError {
 
     fn exit(&self) -> ! {
         fail_with(self.status, &self.message)
+    }
+}
+
+impl std::fmt::Display for SuiteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 

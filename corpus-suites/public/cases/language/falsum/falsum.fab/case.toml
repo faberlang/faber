@@ -3,6 +3,8 @@ id = "corpus/falsum/falsum.fab"
 group = "language"
 input_root = "corpus"
 input = "falsum/falsum.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

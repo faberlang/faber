@@ -3,6 +3,8 @@ id = "corpus/regex/escape.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/escape.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

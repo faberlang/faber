@@ -2,7 +2,7 @@
 term = "sorted-key-retired"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "The keyed .sorted(key) method is retired; the sort expression replaces it."
 syntax = "<lista>.sorted(<T x ∴ key>) — rejected; write sort via asc from <lista> let x { return key }"

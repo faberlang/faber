@@ -3,6 +3,8 @@ id = "corpus/mori/mori.fab"
 group = "language"
 input_root = "corpus"
 input = "mori/mori.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "product/regio"
 group = "product"
 input_root = "product"
 input = "regio"
+category = "package"
+domain = "program"
 
 
 [expect]

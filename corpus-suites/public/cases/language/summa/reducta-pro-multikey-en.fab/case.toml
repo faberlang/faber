@@ -3,6 +3,8 @@ id = "corpus/summa/reducta-pro-multikey-en.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/reducta-pro-multikey-en.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

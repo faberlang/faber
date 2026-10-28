@@ -3,6 +3,8 @@ id = "corpus/sort/list-empty-en.fab"
 group = "language"
 input_root = "corpus"
 input = "sort/list-empty-en.fab"
+category = "sort"
+domain = "collections"
 
 
 [expect]

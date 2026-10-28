@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "reject"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "argument_list", "argument", "call_marker"]
-category = "type"
+category = "binding"
 summary = "After eat(own a) the name a is dead: a later use is use_after_own, blamed on the call."
 syntax = "eat(own a); a.length()"
 related = ["own", "copy"]

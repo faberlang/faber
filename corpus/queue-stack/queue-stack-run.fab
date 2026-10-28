@@ -2,7 +2,7 @@
 term = "queue-stack"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "binding_decl", "itera_stmt", "itera_binding", "fac_stmt", "fac_block", "cape_clause", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "additive_expr", "multiplicative_expr", "primary", "literal", "vel_expr"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Queue FIFO, stack LIFO, bounded-push recovery, elementwise arithmetic, mismatched-length abort."
 syntax = "queue<T> / stack<T> run-time receivers"

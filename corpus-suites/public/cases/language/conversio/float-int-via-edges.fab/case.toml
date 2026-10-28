@@ -3,6 +3,8 @@ id = "corpus/conversio/float-int-via-edges.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/float-int-via-edges.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

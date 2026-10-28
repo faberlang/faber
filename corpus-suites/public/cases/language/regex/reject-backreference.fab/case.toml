@@ -3,6 +3,8 @@ id = "corpus/regex/reject-backreference.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/reject-backreference.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

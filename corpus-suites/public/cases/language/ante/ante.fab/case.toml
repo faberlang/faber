@@ -3,6 +3,8 @@ id = "corpus/ante/ante.fab"
 group = "language"
 input_root = "corpus"
 input = "ante/ante.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

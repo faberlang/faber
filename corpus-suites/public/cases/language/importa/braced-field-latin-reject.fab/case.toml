@@ -3,6 +3,8 @@ id = "corpus/importa/braced-field-latin-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/braced-field-latin-reject.fab"
+category = "locale"
+domain = "locales"
 
 
 [expect]

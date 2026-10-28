@@ -2,7 +2,7 @@
 term = "nucleum"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "nucleum_modifier", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "lane"
+category = "kernel"
 canonical = true
 summary = "Sugar @ nucleum fragment modifier marks a fragment-shader entry on the nucleum surface."
 syntax = "@ nucleum fragment"

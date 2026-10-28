@@ -2,7 +2,7 @@
 term = "⇇"
 kind = "operator"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "On the host a ⇇ may target a genus (class) field of a writable root, not only a local or a parameter."
 syntax = "<writable root>.<genus field> ⇇ <tensor>"

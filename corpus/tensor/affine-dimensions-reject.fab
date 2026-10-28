@@ -2,7 +2,7 @@
 term = "inexact generic tensor half"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal"]
-category = "type"
+category = "tensor"
 canonical = false
 summary = "A generic D/2 tensor parameter cannot pair an odd full extent with its truncated half."
 syntax = "pair_widths(full_extent, truncated_half)"

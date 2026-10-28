@@ -3,6 +3,8 @@ id = "corpus/instans/instans.fab"
 group = "language"
 input_root = "corpus"
 input = "instans/instans.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

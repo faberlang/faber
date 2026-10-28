@@ -3,6 +3,8 @@ id = "corpus/decimal/family-mix-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/family-mix-reject.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

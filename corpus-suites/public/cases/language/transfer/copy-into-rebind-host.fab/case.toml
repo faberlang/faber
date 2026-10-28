@@ -3,6 +3,8 @@ id = "corpus/transfer/copy-into-rebind-host.fab"
 group = "language"
 input_root = "corpus"
 input = "transfer/copy-into-rebind-host.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

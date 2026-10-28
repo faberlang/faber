@@ -3,6 +3,8 @@ id = "corpus/tensor/size-law.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/size-law.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

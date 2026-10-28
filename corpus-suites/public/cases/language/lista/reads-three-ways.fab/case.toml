@@ -3,6 +3,8 @@ id = "corpus/lista/reads-three-ways.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/reads-three-ways.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

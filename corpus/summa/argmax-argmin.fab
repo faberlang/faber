@@ -2,7 +2,7 @@
 term = "summa"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "incipit_stmt", "fixum_decl", "redde_stmt", "expression", "array_literal", "vel_expr", "vel_rhs", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
-category = "collection"
+category = "reduction"
 summary = "argmax/argmin method twins over lists: first-index ties, nihil on empty composing with coalesce, and the NaN-loses-to-numbers law."
 syntax = "<lista>.argmax() | <lista>.argmin()"
 related = ["summa", "maxima", "minima", "nihil", "coalesce"]

@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "func_modifier", "argument_list", "argument"]
-category = "type"
+category = "binding"
 summary = "MU-2 red: passing a ref value into an own position is rejected."
 syntax = "fn take(own list<int> xs); take(ref_value)"
 related = ["ref", "own"]

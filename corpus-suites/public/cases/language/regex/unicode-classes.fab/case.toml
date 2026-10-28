@@ -3,6 +3,8 @@ id = "corpus/regex/unicode-classes.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/unicode-classes.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

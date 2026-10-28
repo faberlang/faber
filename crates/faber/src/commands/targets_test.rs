@@ -308,9 +308,15 @@ fn run_column_matches_what_faber_run_dispatches() {
             .iter()
             .filter(|choice| choice.run_target_spelling() == Some(spec.name.as_str()))
             .collect();
+        if run_target_names().contains(&spec.name) {
+            let cli = Cli::try_parse_from(["faber", "run", "--target", &spec.name, "."])
+                .unwrap_or_else(|e| panic!("faber run rejects --target {}: {e}", spec.name));
+            assert!(matches!(cli.command, Some(Command::Run(_))));
+            continue;
+        }
         assert!(
             !reaching.is_empty(),
-            "{} claims run but no --device reaches it",
+            "{} claims run but neither --device nor --target reaches it",
             r.name
         );
         for choice in reaching {
@@ -340,9 +346,10 @@ fn run_column_matches_what_faber_run_dispatches() {
                 r.name
             );
         }
-        assert!(
-            Cli::try_parse_from(["faber", "run", "--target", &spec.name, "."]).is_err(),
-            "`faber run --target {}` must be refused: faber run takes no --target",
+        assert_eq!(
+            Cli::try_parse_from(["faber", "run", "--target", &spec.name, "."]).is_ok(),
+            run_target_names().contains(&spec.name),
+            "`faber run --target {}` is accepted exactly when the row claims a compiled run",
             spec.name
         );
     }

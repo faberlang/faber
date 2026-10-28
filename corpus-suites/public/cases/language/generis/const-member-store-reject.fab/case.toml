@@ -3,6 +3,8 @@ id = "corpus/generis/const-member-store-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "generis/const-member-store-reject.fab"
+category = "generic"
+domain = "types"
 
 
 [expect]

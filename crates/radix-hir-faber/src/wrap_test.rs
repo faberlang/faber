@@ -30,8 +30,7 @@ fn assert_same_tokens(before: &str, after: &str) {
     );
 }
 
-const LONG_CALL: &str =
-    "functio f() {\n    varia textus x ← g(alpha, beta, gamma, delta, epsilon, zeta, eta, theta)\n}\n";
+const LONG_CALL: &str = "functio f() {\n    varia textus x ← g(alpha, beta, gamma, delta, epsilon, zeta, eta, theta)\n}\n";
 
 #[test]
 fn wrap_faber_source_breaks_after_commas_inside_brackets() {
@@ -46,7 +45,10 @@ fn wrap_faber_source_breaks_after_commas_inside_brackets() {
     }
     // Continuation lines are indented one level past the statement.
     assert!(
-        wrapped.lines().skip(2).any(|line| line.starts_with("        ")),
+        wrapped
+            .lines()
+            .skip(2)
+            .any(|line| line.starts_with("        ")),
         "{wrapped}"
     );
 }
@@ -69,9 +71,8 @@ fn wrap_faber_source_keeps_unbreakable_text_whole_and_overflows() {
     let wrapped = wrap(source, 20);
     assert_same_tokens(source, &wrapped);
     assert!(
-        wrapped
-            .lines()
-            .any(|line| line.contains("\"a very long string literal that cannot be split anywhere at all\"")),
+        wrapped.lines().any(|line| line
+            .contains("\"a very long string literal that cannot be split anywhere at all\"")),
         "the string literal stays on one line: {wrapped}"
     );
 }
@@ -115,7 +116,8 @@ fn wrap_faber_source_keeps_frontmatter_free_blank_lines() {
 
 #[test]
 fn wrap_faber_source_keeps_line_comments_whole() {
-    let source = "# one two three four five six seven eight nine ten eleven twelve\nfunctio f() {\n}\n";
+    let source =
+        "# one two three four five six seven eight nine ten eleven twelve\nfunctio f() {\n}\n";
     assert_eq!(wrap(source, 10), source);
 }
 
@@ -130,7 +132,10 @@ fn wrap_faber_source_keeps_annotation_sugar_on_one_line() {
     ] {
         let source = format!("{annotation}\nfunctio f() {{\n}}\n");
         let wrapped = wrap(&source, 8);
-        assert_eq!(wrapped, source, "annotation sugar must not wrap: {annotation}");
+        assert_eq!(
+            wrapped, source,
+            "annotation sugar must not wrap: {annotation}"
+        );
     }
 }
 
@@ -170,7 +175,9 @@ fn wrap_faber_source_keeps_copy_with_changes_source_on_the_brace_line() {
         "`ex` stays on the closing brace's line: {wrapped}"
     );
     assert!(
-        !wrapped.lines().any(|line| line.trim_start().starts_with("ex ")),
+        !wrapped
+            .lines()
+            .any(|line| line.trim_start().starts_with("ex ")),
         "no line may begin with `ex`: {wrapped}"
     );
 }
@@ -181,7 +188,9 @@ fn wrap_faber_source_keeps_return_value_on_the_redde_line() {
     let wrapped = wrap(source, 14);
     assert_same_tokens(source, &wrapped);
     assert!(
-        wrapped.lines().any(|line| line.trim_start().starts_with("redde alpha")),
+        wrapped
+            .lines()
+            .any(|line| line.trim_start().starts_with("redde alpha")),
         "the value starts on the `redde` line: {wrapped}"
     );
 }
@@ -206,9 +215,14 @@ fn wrap_faber_source_keeps_the_conversion_hint_on_its_line() {
     let source = "functio f() {\n    varia numerus n ← valor_longus_nomine ↦ u32 via Hex\n}\n";
     let wrapped = wrap(source, 10);
     assert_same_tokens(source, &wrapped);
-    assert!(wrapped.contains("↦ u32 via Hex") || wrapped.contains("via Hex"), "{wrapped}");
     assert!(
-        !wrapped.lines().any(|line| line.trim_start().starts_with("via")),
+        wrapped.contains("↦ u32 via Hex") || wrapped.contains("via Hex"),
+        "{wrapped}"
+    );
+    assert!(
+        !wrapped
+            .lines()
+            .any(|line| line.trim_start().starts_with("via")),
         "{wrapped}"
     );
 }
@@ -219,7 +233,9 @@ fn wrap_faber_source_keeps_the_first_three_tokens_of_a_line_together() {
     let wrapped = wrap(source, 10);
     assert_same_tokens(source, &wrapped);
     assert!(
-        wrapped.lines().any(|line| line.trim_start().starts_with("varia mappa<")),
+        wrapped
+            .lines()
+            .any(|line| line.trim_start().starts_with("varia mappa<")),
         "the binding word, type and its first bracket stay together: {wrapped}"
     );
 }

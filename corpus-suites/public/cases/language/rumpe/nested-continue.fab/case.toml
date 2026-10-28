@@ -3,6 +3,8 @@ id = "corpus/rumpe/nested-continue.fab"
 group = "language"
 input_root = "corpus"
 input = "rumpe/nested-continue.fab"
+category = "jump"
+domain = "control"
 
 
 [expect]

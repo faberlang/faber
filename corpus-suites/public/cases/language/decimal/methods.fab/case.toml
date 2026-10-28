@@ -3,6 +3,8 @@ id = "corpus/decimal/methods.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/methods.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

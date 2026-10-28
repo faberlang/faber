@@ -3,6 +3,8 @@ id = "corpus/tensor/axis-int-mean.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/axis-int-mean.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

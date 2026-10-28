@@ -2,7 +2,7 @@
 locale = "en"
 term = "itera-filum-invariant-reject"
 kind = "reject"
-category = "control-flow"
+category = "loop"
 grammar = ["itera_stmt", "apud_clause", "filum_clause", "assignment", "place", "expression"]
 canonical = false
 summary = "A `thread` write whose index has no lane coordinate is refused: every lane would write the same cell."

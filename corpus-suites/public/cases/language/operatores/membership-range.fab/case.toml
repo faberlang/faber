@@ -3,6 +3,8 @@ id = "corpus/operatores/membership-range.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/membership-range.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

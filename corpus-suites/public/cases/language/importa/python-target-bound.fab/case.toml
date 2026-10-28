@@ -3,6 +3,8 @@ id = "corpus/importa/python-target-bound.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/python-target-bound.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

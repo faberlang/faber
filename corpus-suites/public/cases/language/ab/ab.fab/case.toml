@@ -3,6 +3,8 @@ id = "corpus/ab/ab.fab"
 group = "language"
 input_root = "corpus"
 input = "ab/ab.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "summa"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "expression", "literal", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
-category = "collection"
+category = "reduction"
 summary = "Non-empty tensor extrema without coalesce: reduce via max from <tensor> | reduce via min from <tensor>."
 syntax = "reduce via max from <tensor> | reduce via min from <tensor>"
 related = ["summa", "max", "min", "tensor"]

@@ -2,7 +2,7 @@
 term = "summa"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "apud_clause", "fixum_decl", "redde_stmt", "expression", "incipit_stmt", "literal"]
-category = "collection"
+category = "reduction"
 summary = "Maximum/minimum reducta over shaped tensors with optional coordinates, coalesce identities and nihil on empty."
 syntax = "reduce via max from <tensor> [at [i]] [coalesce <identity>] | reduce via min from <tensor> [at [i]] [coalesce <identity>]"
 related = ["summa", "tensor", "nihil"]

@@ -3,6 +3,8 @@ id = "corpus/morphologia/morphologia.fab"
 group = "language"
 input_root = "corpus"
 input = "morphologia/morphologia.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

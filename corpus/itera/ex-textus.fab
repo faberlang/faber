@@ -2,7 +2,7 @@
 term = "ex"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "additive_expr", "itera_stmt", "si_stmt", "comparison", "equality", "equality_tail", "conversio_expr", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "Value iteration over textus binds each Unicode scalar as a char (littera), including non-ASCII."
 syntax = "for from <textus> let <c> { }"

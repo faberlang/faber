@@ -3,6 +3,8 @@ id = "corpus/importa/constantia.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/constantia.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

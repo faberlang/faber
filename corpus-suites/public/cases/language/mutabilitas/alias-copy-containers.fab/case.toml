@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/alias-copy-containers.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/alias-copy-containers.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

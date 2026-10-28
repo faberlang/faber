@@ -2,7 +2,7 @@
 term = "vector"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "iace_stmt", "iace_expr", "redde_stmt", "expression", "literal"]
-category = "register"
+category = "vector"
 canonical = false
 summary = "Vector width inference placeholder for generic vector return syntax."
 syntax = "vector<elem, _>"

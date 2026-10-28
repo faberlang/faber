@@ -3,6 +3,8 @@ id = "corpus/summa/minmax-infix.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/minmax-infix.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

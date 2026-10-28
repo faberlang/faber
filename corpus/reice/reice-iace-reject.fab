@@ -2,7 +2,7 @@
 term = "reice"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "reice_stmt", "equality", "equality_tail", "expression", "literal", "incipit_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "Reject always names its payload with throw; the missing particle is refused by name."
 syntax = "reject <cond>"

@@ -3,6 +3,8 @@ id = "corpus/bounded/lista.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/lista.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/cape/fac-omnia.fab"
 group = "language"
 input_root = "corpus"
 input = "cape/fac-omnia.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

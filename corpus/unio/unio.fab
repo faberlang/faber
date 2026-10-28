@@ -2,7 +2,7 @@
 term = "∪"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "ut_pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "fixum_decl", "finge_expr", "qualified_ident", "field_list", "field_init", "field_key", "cast_expr", "call_expr", "call_suffix", "argument_list", "argument", "template_argument", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "variant"
 canonical = true
 summary = "Inline value unions and discerne on discretio variants."
 syntax = "typus <name> = <type> ∪ <type>"

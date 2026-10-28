@@ -3,6 +3,8 @@ id = "corpus/implendum/conformance-missing-method-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "implendum/conformance-missing-method-reject.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/scriptum/template-type-args-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "scriptum/template-type-args-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

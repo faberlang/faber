@@ -3,6 +3,8 @@ id = "corpus/operatores/clamp-families.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/clamp-families.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

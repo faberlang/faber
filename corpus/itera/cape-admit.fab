@@ -2,7 +2,7 @@
 term = "itera"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "itera_stmt", "cape_clause", "si_stmt", "iace_stmt", "redde_stmt", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "The trailing cape_clause on itera admits in the base lane: one handler wraps the whole loop and fires on the first throw."
 syntax = "for … { <body> } catch <err> { <recovery> }"

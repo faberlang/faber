@@ -3,6 +3,8 @@ id = "corpus/sponte/call-defaults.fab"
 group = "language"
 input_root = "corpus"
 input = "sponte/call-defaults.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

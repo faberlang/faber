@@ -3,6 +3,8 @@ id = "corpus/gpu-core-types/matrix-tensor-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "gpu-core-types/matrix-tensor-reject.fab"
+category = "device"
+domain = "gpu"
 
 
 [expect]

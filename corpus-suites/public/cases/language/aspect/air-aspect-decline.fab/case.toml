@@ -3,6 +3,8 @@ id = "corpus/aspect/air-aspect-decline.fab"
 group = "language"
 input_root = "corpus"
 input = "aspect/air-aspect-decline.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "unarius"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "unary_expr", "comparison", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
-category = "operators"
+category = "arithmetic"
 canonical = true
 summary = "Unary negation, logical not, sign comparisons, and optional presence tests."
 syntax = "-<expr> | non <expr> | <expr> > 0 | <expr> est nihil"

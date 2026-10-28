@@ -845,6 +845,13 @@ impl TensorValue {
         self.data.get(physical)
     }
 
+    /// Make the host copy of `range` current (a download when the device copy
+    /// is the current one). `false` when the download failed; the error is
+    /// kept for [`Self::host_read_error`].
+    pub(crate) fn make_host_current(&self, range: std::ops::Range<usize>) -> bool {
+        self.residency.ensure_host(range)
+    }
+
     /// Mark this tensor's storage (and every view of it) device-resident
     /// under `token`. `host_current` says the host copy is also current (an
     /// upload) rather than stale (a kernel result).

@@ -457,9 +457,27 @@ pub struct CorpusArgs {
     #[arg(long, value_name = "PATH")]
     pub expected: Option<PathBuf>,
 
-    /// Only run suite cases whose id contains this substring
+    /// Only run suite cases whose id contains this substring. Selectors
+    /// --domain, --category, --case and --filter all add up: a case runs when
+    /// any one of them names it (union; nothing narrows or excludes)
     #[arg(long, value_name = "SUBSTRING")]
     pub filter: Option<String>,
+
+    /// Run every case in these domains (comma list; adds to the other selectors).
+    /// The suite's corpus.toml [domains] table defines them; a suite without one
+    /// rejects this flag
+    #[arg(long, value_name = "DOMAIN,...", value_delimiter = ',')]
+    pub domain: Vec<String>,
+
+    /// Run every case in these categories (comma list; adds to the other
+    /// selectors). A suite without a [domains] table rejects this flag
+    #[arg(long, value_name = "CATEGORY,...", value_delimiter = ',')]
+    pub category: Vec<String>,
+
+    /// Run these exact case ids (comma list; adds to the other selectors). An
+    /// unknown id is an error
+    #[arg(long = "case", value_name = "ID,...", value_delimiter = ',')]
+    pub case: Vec<String>,
 }
 
 /// Shared source-input grammar for phase inspection commands.
@@ -682,12 +700,22 @@ pub struct ReplArgs {
     pub args: Vec<String>,
 }
 
+/// Compiled targets `faber run --target` builds and then runs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum RunTarget {
+    /// Build the package as a Node project and run it with `node`.
+    #[value(name = "ts")]
+    Ts,
+}
+
 /// Arguments for `faber run`.
 ///
-/// `run` is interpreted execution, always: a single `.fab` file, package
-/// directory, `faber.toml`, or archive is routed through the runner — never
-/// compiled. Compiled source artifacts are built with `faber build`, never
-/// executed by faber; device packages keep a host-driver execution route.
+/// Without `--target`, `run` is interpreted execution: a single `.fab` file,
+/// package directory, `faber.toml`, or archive is routed through the runner —
+/// never compiled. With `--target`, `run` builds the package for that target
+/// and runs the result with the arguments after `--`, standard streams and
+/// exit code passed straight through. Device packages keep a host-driver
+/// execution route.
 #[derive(clap::Args, Debug)]
 pub struct RunArgs {
     /// Path to run (defaults to current directory)
@@ -696,6 +724,10 @@ pub struct RunArgs {
 
     #[command(flatten)]
     pub library: LibraryHomeArgs,
+
+    /// Build the package for a compiled target, then run the built program.
+    #[arg(long = "target", short = 't', value_enum, value_name = "TARGET")]
+    pub target: Option<RunTarget>,
 
     /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]

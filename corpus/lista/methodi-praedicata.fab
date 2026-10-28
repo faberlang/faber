@@ -2,7 +2,7 @@
 term = "omnia"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "comparison", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "fac_stmt", "cape_clause", "iace_stmt", "iace_expr", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 summary = "List predicate twins: all and any, empty-list identities, decisive elements, and a reject guard."
 syntax = "<lista>.all(<predicate>) | <lista>.any(<predicate>)"
 related = ["omnia", "quilibet", "filtrata", "requirit", "reice"]

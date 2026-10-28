@@ -3,6 +3,8 @@ id = "corpus/conversio/failable-no-handler-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/failable-no-handler-reject.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

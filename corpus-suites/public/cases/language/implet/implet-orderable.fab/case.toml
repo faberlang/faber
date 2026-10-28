@@ -3,6 +3,8 @@ id = "corpus/implet/implet-orderable.fab"
 group = "language"
 input_root = "corpus"
 input = "implet/implet-orderable.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/literalia/textus.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/textus.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

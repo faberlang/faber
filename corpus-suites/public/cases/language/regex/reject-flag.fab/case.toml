@@ -3,6 +3,8 @@ id = "corpus/regex/reject-flag.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/reject-flag.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/summa/reducta-axis-rank3-en.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/reducta-axis-rank3-en.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]
