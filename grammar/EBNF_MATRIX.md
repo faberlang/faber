@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 524 | 528 | 99% |
-| go | 473 | 528 | 90% |
-| ts | 528 | 528 | 100% |
-| faber | 528 | 528 | 100% |
+| rust | 526 | 530 | 99% |
+| go | 475 | 530 | 90% |
+| ts | 530 | 530 | 100% |
+| faber | 530 | 530 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 459 | 531 | 86% |
-| wasm-text | 385 | 531 | 73% |
-| wasm | 384 | 531 | 72% |
-| metal-text | 5 | 531 | 1% |
-| wgsl-text | 5 | 531 | 1% |
-| sexp-struct | 473 | 531 | 89% |
-| sexp | 470 | 531 | 89% |
-| runner | 469 | 531 | 88% |
+| llvm-text | 463 | 533 | 87% |
+| wasm-text | 386 | 533 | 72% |
+| wasm | 385 | 533 | 72% |
+| metal-text | 5 | 533 | 1% |
+| wgsl-text | 5 | 533 | 1% |
+| sexp-struct | 473 | 533 | 89% |
+| sexp | 470 | 533 | 88% |
+| runner | 471 | 533 | 88% |
 
 ## Keywords — application lane
 
@@ -261,7 +261,7 @@ pages of the documentation site.
 | <a id="ego"></a>`ego` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="elige"></a>`elige` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="errata"></a>`errata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="est"></a>`est` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="est"></a>`est` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="ex"></a>`ex` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="exitus"></a>`exitus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="fac"></a>`fac` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -353,7 +353,7 @@ pages of the documentation site.
 | <a id="variandum"></a>`variandum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="verum"></a>`verum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="vide"></a>`vide` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`∪` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`∪` | ✓ | ✓ | ✓ | ✕ | ✕ | ◐ | ◐ | ✓ |
 
 ## Operators — systems lane
 

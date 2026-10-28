@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 528,
-    "analyzable": 528
+    "capable": 530,
+    "analyzable": 530
   },
   "terms": [
     {
@@ -414,8 +414,8 @@
     {
       "term": "implendum",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 5,
+      "analyzable": 5
     },
     {
       "term": "implet",
@@ -1128,8 +1128,8 @@
     {
       "term": "∪",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "∴",
