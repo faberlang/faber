@@ -770,16 +770,22 @@ pub struct RunArgs {
     #[arg(long = "threads", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
     pub threads: Option<u32>,
 
-    /// Virtual partition count for the `cpu` or `metal` device (default 1). The CPU's
+    /// Virtual partition count for the `cpu`, `metal` or `cuda` device (default 1). The CPU's
     /// logical device spans N partitions sharing one memory budget, one
     /// buffer store, and one pool of `--threads` workers. Each launch's
     /// workgroups are split into N contiguous ranges scheduled on that pool;
     /// increasing partitions never increases the worker count.
     /// Results are identical at any partition count. Valid with
-    /// `--device cpu`, and with `--device metal`. Metal partitions share one
-    /// buffer store and one command queue on the GPU. Split kernels dispatch
-    /// each nonempty share in order; single-lane kernels and other whole-call
-    /// stages execute once. No data moves between Metal partitions.
+    /// `--device cpu`, `--device metal` and `--device cuda`. Metal partitions
+    /// share one buffer store and one command queue on the GPU. Split kernels
+    /// dispatch each nonempty share in order; single-lane kernels and other
+    /// whole-call stages execute once. No data moves between Metal
+    /// partitions. On CUDA each partition is its own physical GPU: N takes
+    /// the N lowest-ordinal healthy devices (`CUDA_VISIBLE_DEVICES` is
+    /// applied first), each with its own memory, and fewer devices than N
+    /// fails closed naming both counts. CUDA partitions copy every buffer to
+    /// every GPU through the host and do not yet split kernels, so this
+    /// proves placement and fail-closed admission, not a speedup.
     #[arg(long = "partitions", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
     pub partitions: Option<u32>,
 
