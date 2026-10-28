@@ -492,7 +492,7 @@ impl TypeChecker<'_> {
                 }
                 // S0-G8: an applied generic nominal projects its field
                 // types through the application — `Box<3>.minima` is
-                // `vector<f32, 3>`, not the declared `vector<f32, N>`.
+                // `vector<f32, size 3>`, not the declared `vector<f32, size N>`.
                 let field_ty = self.applied_field_type(object_ty, struct_def, field.ty);
                 if field.optional {
                     let optional_ty = self.types.option(field_ty);

@@ -797,6 +797,15 @@ impl FunctionBuilder<'_> {
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
             if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                && matches!(entry.mir_kind, radix_intrinsics::IntrinsicMirKind::ListExtend)
+            {
+                return self.lower_extende(receiver, &args[0].expr, expr);
+            }
+        }
+
+        if let Some(receiver_ty) = receiver.ty {
+            let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+            if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
                 && radix_intrinsics::mir_is_higher_order_lista(entry)
             {
                 let closure = &args[0].expr;
@@ -4484,7 +4493,7 @@ impl FunctionBuilder<'_> {
                 expr.span,
             ));
         }
-        // `tensor<E, [N]> ↦ vector<E, N>`: the tensor flattens to its element
+        // `tensor<E, [N]> ↦ vector<E, size N>`: the tensor flattens to its element
         // lista and lane `k` reads slot `k`. A tensor source is not a literal,
         // so it never reaches the `lista` literal arm below.
         if recovery.is_none()
@@ -5095,7 +5104,7 @@ impl FunctionBuilder<'_> {
         id
     }
 
-    /// `tensor<E, [N]> ↦ vector<E, N>`: flatten the tensor to its element
+    /// `tensor<E, [N]> ↦ vector<E, size N>`: flatten the tensor to its element
     /// lista, then build lane `k` from slot `k` of that lista in order.
     fn lower_tensor_to_vector_conversio(
         &mut self,

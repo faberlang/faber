@@ -1,0 +1,60 @@
++++
+term = "machina"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fac_stmt", "fac_modifier", "cape_clause", "expression", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt"]
+category = "kernel"
+canonical = false
+summary = "A checked device region: `do device { … } catch e { … }` holds kernel launches that stay on the device, with one fault report at the block exit."
+syntax = "do device <block> catch <name> <block>"
+aliases = ["fac machina"]
+related = ["fac", "cape", "omnia", "nucleum"]
+locale = "la"
+no_expected = "declaration-only"
++++
+# =============================================================================
+# do device — a checked device-resident region
+# =============================================================================
+#
+# What this teaches:
+#   • `device` between `do` and the block (la `fac machina`) marks a region
+#     whose body is checked as device-resident: kernel launches, `for range`
+#     bounds and `if` conditions over captured scalars, `mut` scalar state,
+#     and nothing else
+#   • the region is checked in place by `faber check`; `faber check --device`
+#     prints its binding list and its launch and host-sync counts
+#   • a fault inside the block runs to the block exit and is reported once to
+#     the `catch` handler, exactly as `do all`
+#   • V0 lowers a region exactly as `do all`: same launches, same bytes
+#
+# Common mistakes:
+#   • printing, calling a host function, or building a tensor in the block —
+#     each is a named diagnostic (see region-reject)
+#   • reading a device value to decide control flow — the region refuses it
+#     by name until device loop control exists
+#
+# See also: fac, cape, omnia, nucleum
+# =============================================================================
+
+@ nucleum
+@ publica
+functio bump(tensor<f32, [4]> dom, varia tensor<f32, [4]> t, i32 step) → vacuum {
+    itera ex dom apud [i] filum lane sit v {
+        t[[i]] ← v + (step ↦ f32)
+    }
+}
+
+incipit {
+    varia tensor<f32, [4]> t ← tf32[4] {}
+    sit tensor<f32, [4]> z ← tf32[4] {}
+    fac machina {
+        itera ab 0 ‥ 8 sit k {
+            bump(z, varia t, k ↦ i32)
+            si k % 2 ≡ 0 {
+                bump(z, varia t, 1)
+            }
+        }
+    }
+    cape err {
+        nota err
+    }
+}

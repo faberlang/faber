@@ -186,6 +186,15 @@ impl WidthLowerIssue {
     /// (`list<T, 4>`, retired) or a bare range (`list<T, 1…8>`, which would
     /// bound a value). The count is `list<T, size 4>` or `list<T, size 1…8>`.
     pub const LIST_COUNT_NEEDS_SIZE: &str = "list_count_needs_size";
+    /// A capacity written without the `size` marker on a bounded head other
+    /// than the list: `queue<T, 4>`, `stack<T, 4>`, `string<4>`, `ascii<4>`
+    /// (retired; need). The capacity is `queue<T, size 4>` and so on.
+    pub const CAPACITY_NEEDS_SIZE: &str = "capacity_needs_size";
+    /// A vector lane count written without the `size` marker in the long form:
+    /// a bare number, name or affine term (`vector<f32, 4>`, retired). The count
+    /// is `vector<f32, size 4>`. The `vf32[4]` shorthand is unchanged: its
+    /// brackets already mark an extent.
+    pub const VECTOR_WIDTH_NEEDS_SIZE: &str = "vector_width_needs_size";
 
     /// Diagnostic issue identity for this failure.
     #[must_use]

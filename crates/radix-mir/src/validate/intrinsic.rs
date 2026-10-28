@@ -286,7 +286,7 @@ impl Validator<'_, '_> {
                     if !self.is_u32_vector3(call.return_ty) {
                         self.error(
                             span,
-                            "GPU vector builtin call does not return vector<u32, 3>",
+                            "GPU vector builtin call does not return vector<u32, size 3>",
                         );
                     }
                 } else if !self.is_u32_scalar(call.return_ty) {

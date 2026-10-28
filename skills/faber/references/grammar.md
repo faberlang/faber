@@ -354,12 +354,12 @@ Sized numerics are **bare markers**: `i8`…`i64`, `u8`…`u64`, `f16`, `bf16`, 
 Collections and buffers:
 
 - `list<T>`, `map<K,V>`, `set<T>`, `queue<T>`, `stack<T>` (la `lista`, `tabula`, `copia`)
-- bounded capacity forms take a `NATURAL` (or `_` to infer); a list writes its count after `size` (`list<T, size N>`, bare `list<T, N>` is retired), the others still write it bare: `queue<T, N>`, `stack<T, N>`,
-  `string<N>`, `ascii<N>`; capacities are compile-time values today (run-time capacities and
+- bounded capacity forms take a `NATURAL` (or `_` to infer, which stays bare) written after `size` (la `magnitudo`): `list<T, size N>`, `queue<T, size N>`, `stack<T, size N>`,
+  `string<size N>`, `ascii<size N>`; the bare `list<T, N>` is `SEM008 list_count_needs_size` and the bare `queue<T, N>`, `stack<T, N>`, `string<N>`, `ascii<N>` are `SEM008 capacity_needs_size`; capacities are compile-time values today (run-time capacities and
   extents are admitted, not shipped)
 - `promise<T>`, `iterator<T>` (la `promissum`, `cursor`)
 - `tensor<T, Figura>`, `sparsa<T, Figura>` — shaped buffers
-- `vector<T, N>`, `matrix<T, [R, C]>` — register-class, not buffer aliases
+- `vector<T, size N>`, `matrix<T, [R, C]>` — register-class, not buffer aliases. The vector long form writes its lane count after `size` (la `magnitudo`), as a list does; a bare `vector<T, 4>` or `vector<T, N>` is `SEM008 vector_width_needs_size` (clean break, no alias). The `vf32[4]` shorthand, `vector<T, [4]>` and the `_` hole are unchanged: the brackets already mark an extent
 - `atomic<T>` — storage-sensitive atomic cell; `T` is `i32` or `u32` only (`SEM008 atomic_element`), access through `load`/`store`/`exchange`/`compare_exchange`
 - `record<Label: T, …>` (la `ratio`) — labeled record type; every element needs a unique label, fields are accessed by label only (no positional or bracket access). Record identity ignores field order and compares field types exactly (no width subtyping); a record is not a class. `record<*>` (la `ratio<*>`) is the whole-field-list hole, legal only as the sole `record` argument: `record<g: f32, *>` is `PARSE001 ratio_field_list_hole_not_sole` and `record<_>` is `ratio_type_arg_label_required`. A bare `{ field = value }` with no typed cell is `record<*>`, each field taking its default type, while `_ { … }` still needs a cell. A record is immutable (no field assignment), prints like a genus value without the name (`{ g = 1.0, w = 2 }`, written order), and `↦` converts a record to and from a genus with the same fields. `faber explain record` for construction forms; see `corpus/ratio/ratio.fab`.
 
@@ -380,7 +380,7 @@ Type forms:
 - inferred constructor: `_ { x = 1 }` builds the cell's class, `_ [1, "a"]` its tuple or list; a bare `{ x = 1 }` or `[1, "a"]` takes the cell's type (sugar for `_ shape`); with no typed cell it is `SEM016 inferred_constructor_no_expected_type` (`corpus/genus/inferred-constructor*.fab`, `inferred-literals.fab`)
 - labeled tuple forms: `tuple` (la `iuncta`) type arguments, construction, and member access
 - width / shape sugar (type position only, identical to the long form): `lu32` = `list<u32>`, `tf32[2, 3]` =
-  `tensor<f32, [2, 3]>`, `sf32` = `sparsa<f32, _>`, `vf32[4]` = `vector<f32, 4>`, `mf32[4, 4]` =
+  `tensor<f32, [2, 3]>`, `sf32` = `sparsa<f32, _>`, `vf32[4]` = `vector<f32, size 4>`, `mf32[4, 4]` =
   `matrix<f32, [4, 4]>` (matrix needs both extents); `inf` takes no prefix (`linf` is an identifier)
 - `list<∪>` / `map<K, ∪>` infer a heterogeneous union element; `list<_>` the single inhabitant
 - inline intersection `A ∩ B` (nominal; binds tighter than `∪`); `class G implements A ∩ B` is the same as `implements A, B`
@@ -552,7 +552,8 @@ Grounded in `EBNF.md` and probes against the built binary.
 - Collection reads: `xs[i]` out of range dies, `xs.get(i)` gives `none`, `xs.at(i)` reports on the error channel (`do { } catch err { }`, la `fac { } cape err { }`, or `⊥ default`); text indexes by Unicode character; an out-of-range range index dies (`corpus/lista/reads-three-ways.fab`).
 - Value-side markers: `mut b ← copy a` duplicates, `mut b ← own a` takes over, an unmarked `b ← c` shares; read-only is deep, so a `let` (or `ref`, or unmarked-parameter) container or class into a `mut` cell is `SEM065 const_shared_into_var`; `ref`/`mut` may hold `T ∪ none` for a reference type, never a scalar (`corpus/mutabilitas/ref-optional-cursor.fab`) (`corpus/mutabilitas/copy-bind-deep.fab`, `const-share-into-var-reject.fab`). A method that changes the shape of the collection a loop walks is `SEM011 loop_collection_shape_change`; a bracket store that grows a map in its own loop traps `map changed size during iteration`.
 - Retired: `sum from …`, `max from …`, and `min from …` (la `summa ex …`, `maxima ex …`, and `minima ex …`) report `PARSE010`; use `reduce via <op> from …` (la `reducta via <op> ex …`).
-- Admitted but **not** accepted by the parser today: `do all` (la `fac omnia`), `for … thread` (la `itera … filum`),
+- `do device { … } catch e { … }` (la `fac machina`) is a checked device region: kernel launches, entry-known loops and guards, and no host effect, host call, allocation, direct lane loop, nested region or crossing `return`/`break` (named `SEM008` rows); `do all device` is `PARSE020`. V0 lowers it exactly as `do all` (`corpus/kernel/region.fab`, `region-reject.fab`, `docs/design/device-region.md`).
+- Admitted but **not** accepted by the parser today: `for … thread` (la `itera … filum`),
   superscript powers (`x²`), run-time capacities/extents, `trapping`/`saturating` float
   cells. See "Admitted, Not Shipped" in `grammar/EBNF.md`.
 

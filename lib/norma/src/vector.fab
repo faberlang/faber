@@ -7,32 +7,32 @@ locale = "en"
 # Public import: importa ex "norma:vector" privata vector
 
 @ public
-fn add<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
+fn add<elem, size N>(vector<elem, size N> a, vector<elem, size N> b) → vector<elem, size N> {
     return a.added(b)
 }
 
 @ public
-fn subtract<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
+fn subtract<elem, size N>(vector<elem, size N> a, vector<elem, size N> b) → vector<elem, size N> {
     return a.subtracted(b)
 }
 
 @ public
-fn multiply<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
+fn multiply<elem, size N>(vector<elem, size N> a, vector<elem, size N> b) → vector<elem, size N> {
     return a.multiplied(b)
 }
 
 @ public
-fn divide<elem, size N>(vector<elem, N> a, vector<elem, N> b) → vector<elem, N> {
+fn divide<elem, size N>(vector<elem, size N> a, vector<elem, size N> b) → vector<elem, size N> {
     return a.divided(b)
 }
 
 @ public
-fn dot<elem, size N>(vector<elem, N> a, vector<elem, N> b) → elem {
+fn dot<elem, size N>(vector<elem, size N> a, vector<elem, size N> b) → elem {
     return a.dot(b)
 }
 
 @ public
-fn cross<elem>(vector<elem, 3> a, vector<elem, 3> b) → vector<elem, 3> {
+fn cross<elem>(vector<elem, size 3> a, vector<elem, size 3> b) → vector<elem, size 3> {
     return a.cross(b)
 }
 

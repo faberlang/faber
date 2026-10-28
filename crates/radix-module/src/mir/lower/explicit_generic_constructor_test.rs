@@ -67,7 +67,7 @@ const SIZE_PARAMETER: &str = r#"+++
 locale = "en"
 +++
 class Box<size N> {
-    mut vector<f32, N> minima
+    mut vector<f32, size N> minima
 
     fn scalar() → f32 {
         return 1.5
@@ -75,7 +75,7 @@ class Box<size N> {
 }
 
 main {
-    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
     let Box<3> b ← Box<3> { minima = v }
     print b.scalar()
 }

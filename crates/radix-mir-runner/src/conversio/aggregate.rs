@@ -522,7 +522,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         crate::runtime::tensor_value_typed(self.types, data, Some(element), shape, span)
     }
 
-    /// `matrix<E, [R, C]> ↦ tensor<E2, S>` and `vector<E, N> ↦ tensor<E2, S>`:
+    /// `matrix<E, [R, C]> ↦ tensor<E2, S>` and `vector<E, size N> ↦ tensor<E2, S>`:
     /// the row-major cells or lanes become the tensor's flat data, with any
     /// declared element conversion applied. A literal target shape must match
     /// the cell count; a mismatch takes the recovery instead of building a

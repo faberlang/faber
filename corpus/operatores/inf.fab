@@ -155,7 +155,7 @@ main {
     # 10. Text: parse and render at a radix.
     print "ff" ↦ inf via Hex
     print big ↦ string
-    print big ↦ ascii<17> via Hex
+    print big ↦ ascii<size 17> via Hex
 
     # 11. `¶` formats like any integer.
     print big ¶ "x"

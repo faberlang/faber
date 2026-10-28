@@ -1033,7 +1033,7 @@ functio main() → vacuum {
 
 #[test]
 fn vector_conversio_from_lista_literal_parses() {
-    let result = parse_ok_la("sit _ v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>");
+    let result = parse_ok_la("sit _ v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, magnitudo 4>");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");
@@ -1045,9 +1045,10 @@ fn vector_conversio_from_lista_literal_parses() {
     let ConversioTarget::Explicit(target) = &conversio.target else {
         panic!("expected explicit conversio target");
     };
-    let TypeExprKind::Vector(elem, FiguraExpr::Literal(4)) = &target.kind else {
+    let TypeExprKind::Vector(elem, FiguraExpr::Lift(extent)) = &target.kind else {
         panic!("expected vector conversio target type");
     };
+    assert!(matches!(**extent, radix_syntax::LiftExtent::Literal(4)));
     let TypeExprKind::Named(name, _) = &elem.kind else {
         panic!("expected named vector element type");
     };

@@ -50,21 +50,21 @@ fn assert_accepted(body: &str) {
 #[test]
 fn vector_alias_of_de_param_rejects_element_write() {
     assert_rejected(
-        "functio f(de vector<f32, 4> v) → vacuum { sit vector<f32, 4> w ← v\n w[0] ← 9.0 }",
+        "functio f(de vector<f32, magnitudo 4> v) → vacuum { sit vector<f32, magnitudo 4> w ← v\n w[0] ← 9.0 }",
     );
 }
 
 #[test]
 fn vector_alias_of_de_param_allows_reads() {
     assert_accepted(
-        "functio f(de vector<f32, 4> v) → fractus { sit vector<f32, 4> w ← v\n redde w[0] }",
+        "functio f(de vector<f32, magnitudo 4> v) → fractus { sit vector<f32, magnitudo 4> w ← v\n redde w[0] }",
     );
 }
 
 #[test]
 fn vector_alias_of_mutable_local_still_writes() {
     assert_accepted(
-        "functio f() → vacuum { varia vector<f32, 4> v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>\n varia vector<f32, 4> w ← v\n w[0] ← 9.0 }",
+        "functio f() → vacuum { varia vector<f32, magnitudo 4> v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, magnitudo 4>\n varia vector<f32, magnitudo 4> w ← v\n w[0] ← 9.0 }",
     );
 }
 

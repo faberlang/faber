@@ -565,7 +565,7 @@ functio product(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2
 fn lowers_matrix_applica_to_cell_lane_mul_add() {
     let dump = dump_source(
         r"
-functio apply(matrix<f32, [2, 2]> m, vector<f32, 2> v) → vector<f32, 2> {
+functio apply(matrix<f32, [2, 2]> m, vector<f32, magnitudo 2> v) → vector<f32, magnitudo 2> {
     redde m.applica(v)
 }
 ",
@@ -619,7 +619,7 @@ fn lowers_vector_norma_to_sqrt_of_dot() {
     // The prior `contains(".lane0")` OR-fallback was near-vacuous for any vector dump.
     let dump = dump_source(
         r"
-functio length(vector<f32, 3> v) → f32 {
+functio length(vector<f32, magnitudo 3> v) → f32 {
     redde v.norm()
 }
 ",
@@ -631,11 +631,11 @@ functio length(vector<f32, 3> v) → f32 {
     );
     assert!(
         dump.contains("_0.lane1 * _0.lane1"),
-        "norm must square lane1 for vector<f32,3>\n{dump}"
+        "norm must square lane1 for vector<f32,magnitudo 3>\n{dump}"
     );
     assert!(
         dump.contains("_0.lane2 * _0.lane2"),
-        "norm must square lane2 for vector<f32,3>\n{dump}"
+        "norm must square lane2 for vector<f32,magnitudo 3>\n{dump}"
     );
 }
 
@@ -7887,14 +7887,14 @@ incipit {
 // ──────────────────────────────────────────────────────────────────────
 
 const VECTOR_LANE_SOURCE: &str = r"
-functio lane(vector<f32, 3> v) → f32 {
+functio lane(vector<f32, magnitudo 3> v) → f32 {
     redde v[1]
 }
-functio asserted(vector<f32, 3> ∪ nihil v) → f32 {
+functio asserted(vector<f32, magnitudo 3> ∪ nihil v) → f32 {
     redde v![2]
 }
-functio write(vector<f32, 3> v) → vector<f32, 3> {
-    varia vector<f32, 3> u ← copy v
+functio write(vector<f32, magnitudo 3> v) → vector<f32, magnitudo 3> {
+    varia vector<f32, magnitudo 3> u ← copy v
     u[0] ← 4.0
     redde u
 }
@@ -7918,11 +7918,11 @@ fn vector_constant_index_lowers_to_a_lane_projection() {
 // ──────────────────────────────────────────────────────────────────────
 
 const VECTOR_LANE_SELECT_SOURCE: &str = r"
-functio pick(vector<f32, 3> v, numerus i) → f32 {
+functio pick(vector<f32, magnitudo 3> v, numerus i) → f32 {
     redde v[i]
 }
-functio store(numerus i) → vector<f32, 3> {
-    varia vector<f32, 3> u ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+functio store(numerus i) → vector<f32, magnitudo 3> {
+    varia vector<f32, magnitudo 3> u ← [0.0, 0.0, 0.0] ↦ vector<f32, magnitudo 3>
     u[i] ← 4.0
     redde u
 }

@@ -1427,6 +1427,10 @@ mod argmaxima_test;
 mod predicate_twins_test;
 
 #[cfg(test)]
+#[path = "list_extend_test.rs"]
+mod list_extend_test;
+
+#[cfg(test)]
 #[path = "literal_inference_test.rs"]
 mod literal_inference_test;
 

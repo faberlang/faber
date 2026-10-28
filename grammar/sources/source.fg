@@ -713,6 +713,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Control | `ergo` | compact statement-body joint |
 # | Control | `fac` | do block / post-test loop |
 # | Control | `itera` | for |
+# | Control | `machina` | device region modifier after `fac` (en `device`); contextual |
 # | Control | `perge` | continue |
 # | Control | `redde` | return |
 # | Control | `rumpe` | break |
@@ -1088,7 +1089,7 @@ clausura_joint  := '∴'
 clausura_expr   := compact_clausura_expr | clausura_legacy_expr
 compact_clausura_expr := clausura_signature clausura_joint (expression | fac_block)
 clausura_signature := (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
-fac_block := 'fac' block_stmt cape_clause?
+fac_block := 'fac' fac_modifier? block_stmt cape_clause?
 clausura_legacy_expr := 'clausura' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
@@ -1287,7 +1288,9 @@ labeled_type_argument := IDENTIFIER ':' type_annotation
 # (`lista<T, magnitudo 1…∞>`): a list size range, trapping only, with no policy
 # word; there the range follows the `magnitudo` marker (`sized_range_argument`),
 # because a bare range bounds a value and a list's bound is a count. A bare
-# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`.
+# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`, and a bare
+# `queue<T, 4>`, `stack<T, 4>`, `textus<4>` or `ascii<4>` is `capacity_needs_size`:
+# a capacity is written after `magnitudo`.
 range_argument  := range_bound range_glyph range_bound
 sized_range_argument := 'magnitudo' range_argument
 range_glyph     := '‥' | '…'
@@ -1696,4 +1699,5 @@ proba_modifier := 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'ta
               | 'solum_in' STRING
 praepara_block := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
 
-fac_stmt := 'fac' block_stmt cape_clause? ('dum' expression)?
+fac_stmt := 'fac' fac_modifier? block_stmt cape_clause? ('dum' expression)?
+fac_modifier := 'omnia' | 'machina'

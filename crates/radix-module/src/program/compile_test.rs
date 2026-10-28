@@ -81,28 +81,28 @@ targets = ["rust"]
         provider.join("src/vectors.fab"),
         r#"@ public
 class Box<size N> {
-    mut vector<f32, N> minima
-    mut vector<f32, N> maxima
+    mut vector<f32, size N> minima
+    mut vector<f32, size N> maxima
 }
 
 @ public
-fn add<size N>(vector<f32, N> a, vector<f32, N> b) → vector<f32, N> {
+fn add<size N>(vector<f32, size N> a, vector<f32, size N> b) → vector<f32, size N> {
     return a.added(b)
 }
 
 @ public
-fn dot<size N>(vector<f32, N> a, vector<f32, N> b) → f32 {
+fn dot<size N>(vector<f32, size N> a, vector<f32, size N> b) → f32 {
     return a.dot(b)
 }
 
 @ public
-fn cross(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+fn cross(vector<f32, size 3> a, vector<f32, size 3> b) → vector<f32, size 3> {
     return a.cross(b)
 }
 
 @ public
-fn lane(vector<f32, 3> a) → f32 {
-    let vector<f32, 3> swapped ← a.swizzle("zyx")
+fn lane(vector<f32, size 3> a) → f32 {
+    let vector<f32, size 3> swapped ← a.swizzle("zyx")
     return swapped.dot(a)
 }
 
@@ -112,7 +112,7 @@ fn multiply(matrix<f32, [3, 2]> a, matrix<f32, [2, 3]> b) → matrix<f32, [3, 3]
 }
 
 @ public
-fn box_minima<size N>(Box<N> b) → vector<f32, N> {
+fn box_minima<size N>(Box<N> b) → vector<f32, size N> {
     return b.minima
 }
 "#,
@@ -129,22 +129,22 @@ locale = "en"
 import from "probevectors:vectors" gmt
 
 fn imported() → f32 {
-    let vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    let vector<f32, 3> b ← [2.0, 4.0, 6.0] ↦ vector<f32, 3>
-    let vector<f32, 3> s ← gmt.add(a, b)
-    let vector<f32, 3> x ← gmt.cross(a, b)
+    let vector<f32, size 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
+    let vector<f32, size 3> b ← [2.0, 4.0, 6.0] ↦ vector<f32, size 3>
+    let vector<f32, size 3> s ← gmt.add(a, b)
+    let vector<f32, size 3> x ← gmt.cross(a, b)
     return (s.dot(b) + x.dot(a)) + gmt.lane(a)
 }
 
-fn imported_signature() → vector<f32, 4> {
-    let vector<f32, 4> a ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    let vector<f32, 4> b ← [2.0, 4.0, 6.0, 8.0] ↦ vector<f32, 4>
+fn imported_signature() → vector<f32, size 4> {
+    let vector<f32, size 4> a ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, size 4>
+    let vector<f32, size 4> b ← [2.0, 4.0, 6.0, 8.0] ↦ vector<f32, size 4>
     return gmt.add(a, b)
 }
 
 fn imported_shapes() → matrix<f32, [3, 3]> {
-    let vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    let vector<f32, 2> narrow ← [1.0, 2.0] ↦ vector<f32, 2>
+    let vector<f32, size 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
+    let vector<f32, size 2> narrow ← [1.0, 2.0] ↦ vector<f32, size 2>
     let matrix<f32, [3, 2]> outer ← s ⊗ narrow
     let matrix<f32, [2, 3]> inner ← narrow ⊗ s
     return gmt.multiply(outer, inner)

@@ -1,0 +1,53 @@
++++
+term = "extende"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "List join: extend appends every element of another list of the same element type, in order and in place; a bounded byte buffer joins a list<b8>."
+syntax = "<lista>.extend(<lista>)"
+related = ["appende", "addita", "reperta"]
+locale = "en"
++++
+# =============================================================================
+# extende — list join (en `extend`).
+# =============================================================================
+#
+# What this teaches:
+#   • `xs.extend(ys)` appends every element of `ys` to `xs`, in `ys` order,
+#     in place. It is the whole-list form of `xs.append(v)`.
+#   • The receiver changes, so it must be `mut`; the argument is only read.
+#   • `xs.extend(xs)` is legal: the argument length is read once, so the
+#     original elements are appended exactly once.
+#   • A bounded byte buffer joins a `list<b8>` the same way; see
+#     methodi-extende-octeti.
+#
+# Common mistakes:
+#   • Writing `xs + ys` or `xs.append(ys)`: neither joins lists. `+` on
+#     numeric lists is elementwise, and `append` takes one element.
+#   • Extending a `let` list: the receiver must be `mut`.
+#   • Extending a bounded receiver: only a plain `list<T>` grows in place.
+#
+# See also: append, added, find
+# =============================================================================
+
+main {
+    # Two plain lists.
+    mut list<int> xs ← [1, 2]
+    let list<int> ys ← [3, 4, 5]
+    xs.extend(ys)
+    print xs
+
+    # The argument is read once up front, so a list can extend itself.
+    xs.extend(xs)
+    print xs
+
+    # An empty argument changes nothing.
+    let list<int> none_yet ← empty
+    xs.extend(none_yet)
+    print xs.length()
+
+    # Text elements join the same way.
+    mut list<string> names ← ["a"]
+    names.extend(["b", "c"])
+    print names
+}

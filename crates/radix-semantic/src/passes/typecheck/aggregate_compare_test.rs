@@ -11,7 +11,7 @@ use crate::test_support::analyze_source;
 use crate::{SemanticError, SemanticErrorKind};
 
 const T: &str = "tensor<f32, [2, 2]>";
-const V: &str = "vector<f32, 3>";
+const V: &str = "vector<f32, magnitudo 3>";
 const M: &str = "matrix<f32, [2, 3]>";
 
 fn accepts(source: &str) {
@@ -157,7 +157,11 @@ fn a_shape_that_is_part_of_the_type_must_agree() {
         &[("kind", "tensor")],
     );
     rejects(
-        &function("vector<f32, 3> a, vector<f32, 4> b", "bivalens", "a ≡ b"),
+        &function(
+            "vector<f32, magnitudo 3> a, vector<f32, magnitudo 4> b",
+            "bivalens",
+            "a ≡ b",
+        ),
         SemanticErrorKind::OperandTypesInvalid,
         "aggregate_equality_shape_mismatch",
         &[("kind", "vector")],
@@ -224,17 +228,17 @@ fn a_register_comparison_gives_a_bool_register_of_the_same_shape() {
     for op in ["≺", "≻", "≤", "≥", "≅", "≇"] {
         accepts(&function(
             &format!("{V} a, {V} b"),
-            "vector<bivalens, 3>",
+            "vector<bivalens, magnitudo 3>",
             &format!("a {op} b"),
         ));
         accepts(&function(
             &format!("{V} a"),
-            "vector<bivalens, 3>",
+            "vector<bivalens, magnitudo 3>",
             &format!("a {op} 1.0"),
         ));
         accepts(&function(
             &format!("{V} a"),
-            "vector<bivalens, 3>",
+            "vector<bivalens, magnitudo 3>",
             &format!("1.0 {op} a"),
         ));
         accepts(&function(
@@ -274,13 +278,13 @@ fn a_register_comparison_is_never_a_scalar() {
 #[test]
 fn register_comparisons_join_elements_by_value_as_scalars_do() {
     accepts(&function(
-        "vector<i32, 3> a, vector<f32, 3> b",
-        "vector<bivalens, 3>",
+        "vector<i32, magnitudo 3> a, vector<f32, magnitudo 3> b",
+        "vector<bivalens, magnitudo 3>",
         "a ≺ b",
     ));
     accepts(&function(
-        "vector<u8, 3> a",
-        "vector<bivalens, 3>",
+        "vector<u8, magnitudo 3> a",
+        "vector<bivalens, magnitudo 3>",
         "a ≻ 100",
     ));
     accepts(&function(
@@ -294,8 +298,8 @@ fn register_comparisons_join_elements_by_value_as_scalars_do() {
 fn register_comparisons_need_the_same_shape_and_numeric_operands() {
     rejects(
         &function(
-            "vector<f32, 3> a, vector<f32, 4> b",
-            "vector<bivalens, 3>",
+            "vector<f32, magnitudo 3> a, vector<f32, magnitudo 4> b",
+            "vector<bivalens, magnitudo 3>",
             "a ≺ b",
         ),
         SemanticErrorKind::TypeMismatch,
@@ -315,7 +319,7 @@ fn register_comparisons_need_the_same_shape_and_numeric_operands() {
     rejects(
         &function(
             &format!("{V} a, bivalens s"),
-            "vector<bivalens, 3>",
+            "vector<bivalens, magnitudo 3>",
             "a ≺ s",
         ),
         SemanticErrorKind::OperandTypesInvalid,
@@ -347,35 +351,39 @@ fn approximate_comparison_over_a_register_stays_deferred() {
 #[test]
 fn logic_lifts_over_bool_registers() {
     accepts(
-        r"functio f(vector<bivalens, 3> a, vector<bivalens, 3> b) → vector<bivalens, 3> { redde a et b }
-functio g(vector<bivalens, 3> a, vector<bivalens, 3> b) → vector<bivalens, 3> { redde a aut b }
-functio h(vector<bivalens, 3> a) → vector<bivalens, 3> { redde non a }
-functio i(vector<bivalens, 3> a) → vector<bivalens, 3> { redde a et verum }
-functio j(vector<bivalens, 3> a) → vector<bivalens, 3> { redde falsum aut a }
+        r"functio f(vector<bivalens, magnitudo 3> a, vector<bivalens, magnitudo 3> b) → vector<bivalens, magnitudo 3> { redde a et b }
+functio g(vector<bivalens, magnitudo 3> a, vector<bivalens, magnitudo 3> b) → vector<bivalens, magnitudo 3> { redde a aut b }
+functio h(vector<bivalens, magnitudo 3> a) → vector<bivalens, magnitudo 3> { redde non a }
+functio i(vector<bivalens, magnitudo 3> a) → vector<bivalens, magnitudo 3> { redde a et verum }
+functio j(vector<bivalens, magnitudo 3> a) → vector<bivalens, magnitudo 3> { redde falsum aut a }
 functio k(matrix<bivalens, [2, 2]> a, matrix<bivalens, [2, 2]> b) → matrix<bivalens, [2, 2]> { redde a et b }
 functio l(matrix<bivalens, [2, 2]> a) → matrix<bivalens, [2, 2]> { redde non a }
-functio m(vector<f32, 3> a, vector<f32, 3> b) → vector<bivalens, 3> { redde (a ≻ b) aut (a ≺ b) }",
+functio m(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<bivalens, magnitudo 3> { redde (a ≻ b) aut (a ≺ b) }",
     );
 }
 
 #[test]
 fn logic_over_registers_needs_bool_elements_and_one_shape() {
     rejects(
-        &function(&format!("{V} a, {V} b"), "vector<bivalens, 3>", "a et b"),
+        &function(
+            &format!("{V} a, {V} b"),
+            "vector<bivalens, magnitudo 3>",
+            "a et b",
+        ),
         SemanticErrorKind::OperandTypesInvalid,
         "boolean_operands_required",
         &[],
     );
     rejects(
-        &function(&format!("{V} a"), "vector<bivalens, 3>", "non a"),
+        &function(&format!("{V} a"), "vector<bivalens, magnitudo 3>", "non a"),
         SemanticErrorKind::OperandTypesInvalid,
         "boolean_operand_required",
         &[],
     );
     rejects(
         &function(
-            "vector<bivalens, 3> a, vector<bivalens, 4> b",
-            "vector<bivalens, 3>",
+            "vector<bivalens, magnitudo 3> a, vector<bivalens, magnitudo 4> b",
+            "vector<bivalens, magnitudo 3>",
             "a et b",
         ),
         SemanticErrorKind::TypeMismatch,
@@ -387,21 +395,21 @@ fn logic_over_registers_needs_bool_elements_and_one_shape() {
 #[test]
 fn select_lifts_over_a_bool_register_mask() {
     accepts(
-        r"functio f(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> { redde (a ≻ b) ✓ a ✗ b }
-functio g(vector<f32, 3> a) → vector<f32, 3> { redde (a ≻ 0.0) ✓ a ✗ 0.0 }
-functio h(vector<f32, 3> a) → vector<f32, 3> { redde (a ≻ 0.0) ✓ 1.0 ✗ 0.0 }
+        r"functio f(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<f32, magnitudo 3> { redde (a ≻ b) ✓ a ✗ b }
+functio g(vector<f32, magnitudo 3> a) → vector<f32, magnitudo 3> { redde (a ≻ 0.0) ✓ a ✗ 0.0 }
+functio h(vector<f32, magnitudo 3> a) → vector<f32, magnitudo 3> { redde (a ≻ 0.0) ✓ 1.0 ✗ 0.0 }
 functio i(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2, 2]> { redde (a ≻ b) ✓ a ✗ b }
 functio j(matrix<f32, [2, 2]> a) → matrix<f32, [2, 2]> { redde (a ≻ 0.0) ✓ a ✗ 0.0 }",
     );
     // A branch of another kind or shape is rejected.
     rejects(
-        "functio f(vector<f32, 3> a, vector<f32, 4> b) → vector<f32, 3> { redde (a ≻ a) ✓ a ✗ b }",
+        "functio f(vector<f32, magnitudo 3> a, vector<f32, magnitudo 4> b) → vector<f32, magnitudo 3> { redde (a ≻ a) ✓ a ✗ b }",
         SemanticErrorKind::TypeMismatch,
         "incompatible_tensor_index",
         &[],
     );
     rejects(
-        "functio f(vector<f32, 3> a, tensor<f32, [3]> b) → vector<f32, 3> { redde (a ≻ a) ✓ a ✗ b }",
+        "functio f(vector<f32, magnitudo 3> a, tensor<f32, [3]> b) → vector<f32, magnitudo 3> { redde (a ≻ a) ✓ a ✗ b }",
         SemanticErrorKind::OperandTypesInvalid,
         "common_type_mismatch",
         &[],
@@ -414,7 +422,7 @@ functio j(matrix<f32, [2, 2]> a) → matrix<f32, [2, 2]> { redde (a ≻ 0.0) ✓
 fn a_bool_aggregate_is_not_a_truth_value() {
     for (ty, kind) in [
         ("tensor<bivalens, [2]>", "tensor"),
-        ("vector<bivalens, 3>", "vector"),
+        ("vector<bivalens, magnitudo 3>", "vector"),
         ("matrix<bivalens, [2, 2]>", "matrix"),
     ] {
         rejects(

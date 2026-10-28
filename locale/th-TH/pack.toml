@@ -101,6 +101,7 @@ axis = "แกน"
 lege = "อ่าน"
 lineam = "บรรทัด"
 omnia = "ทั้งหมด"
+machina = "อุปกรณ์"
 scriptum = "จารึก"
 sparge = "กระจาย"
 ut = "ในชื่อ"
@@ -199,7 +200,7 @@ instans = "อินสแตนซ์"
 objectum = "ออบเจ็กต์"
 quidlibet = "อะไรก็ได้"
 lista = "รายการ"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "ตาราง"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "สมุดบัญชี"
@@ -725,6 +726,10 @@ help = "ใช้ {replacement}"
 message = "ในลูป '{fac}' ต้องเขียน '{cape}' ก่อน '{dum}'"
 help = "เขียนตัวจัดการก่อนเงื่อนไข: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "บล็อก '{fac}' รับคำปรับได้หนึ่งคำ ไม่ใช้ '{omnia}' ร่วมกับ '{machina}'"
+help = "'{machina}' ส่งมอบข้อผิดพลาดทั้งหมดหนึ่งครั้งเมื่อจบบล็อกอยู่แล้ว ให้ตัด '{omnia}' ออก"
+
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "เครื่องหมายจุลภาคไม่ใช้คั่นหัวข้อของ '{discerne}' อีกต่อไป"
 help = "คั่นหัวข้อด้วย '{et}'"
@@ -799,7 +804,7 @@ help = "ระบุชื่อ hint ต่อจาก via ทันที เ
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "convert hint ไม่ใช่อาร์กิวเมนต์ชนิด"
-help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "convert hint ไม่ได้ตามหลังเป้าหมายในวงเล็บแหลม"
@@ -1257,6 +1262,14 @@ help = "เขียนช่วงบนรายการ เช่น {lista}
 message = "จำนวนของรายการเขียนหลัง `{magnitudo}`"
 help = "เขียน `{lista}<int, {magnitudo} 4>` สำหรับไม่เกิน 4 รายการ หรือ `{lista}<int, {magnitudo} 1…8>` สำหรับช่วง; ช่วงเปล่า ๆ จำกัดค่า ไม่ใช่จำนวน"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "ความจุเขียนหลัง `{magnitudo}`"
+help = "เขียน `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` หรือ `{ascii}<{magnitudo} 8>` สำหรับความจุไม่เกินจำนวนนั้น; ตัวเลขเปล่า ๆ ไม่ใช่ความจุ"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "จำนวนเลนของเวกเตอร์เขียนหลัง `{magnitudo}`"
+help = "เขียน `{vector}<f32, {magnitudo} 4>` สำหรับสี่เลน; รูปย่อ `vf32[4]` ไม่เปลี่ยน"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1283,11 +1296,11 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue ต้องมีพารามิเตอร์ชนิดหนึ่งหรือสองตัว"
-help = "ใช้ queue<T> หรือ queue<T, N>"
+help = "ใช้ queue<T> หรือ queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack ต้องมีพารามิเตอร์ชนิดหนึ่งหรือสองตัว"
-help = "ใช้ stack<T> หรือ stack<T, N>"
+help = "ใช้ stack<T> หรือ stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu ต้องมีแพตเทิร์น"
@@ -1455,7 +1468,7 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "ชนิด primitive รับพารามิเตอร์ไม่ได้"
-help = "textus<N>, ascii<N> และ {lista}<b8, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N> และ {lista}<b8, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace ไม่ได้ส่งออก qualified type"
@@ -1596,6 +1609,26 @@ help = "ใช้ f32 สำหรับค่าทศนิยมของเ�
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "การเก็บค่าที่มีความกว้าง {width} อาจ trap ในเคอร์เนล nucleum"
 help = "พิสูจน์ว่าการเก็บค่าอยู่ในช่วง หรือใช้เซลล์แบบ wrapping หรือ saturating"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "ขอบเขต '{fac} {machina}' ต้องไม่ซ้อน '{fac} {machina}' อีกชั้น"
+help = "เก็บขอบเขตอุปกรณ์ไว้หนึ่งชั้นและเรียก kernel จากในนั้นโดยตรง"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' ออกจากขอบเขต '{fac} {machina}' ขอบเขตนี้ยังไม่มีคำสำหรับออก"
+help = "จบขอบเขตก่อนแล้วค่อยตัดสินใจ หรือย้ายการออกไปนอกบล็อก"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "ลูป lane ('{construct}') ตรงในขอบเขต '{fac} {machina}' ยังไม่ได้สร้าง"
+help = "เรียก kernel จากขอบเขตสำหรับงานแบบขนาน"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "ขอบเขต '{fac} {machina}' ยังจัดสรร tensor ไม่ได้ ({construct})"
+help = "จัดสรร tensor ก่อนขอบเขตแล้วใช้ภายใน"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' ในขอบเขต '{fac} {machina}' อ่านค่าที่คำนวณบนอุปกรณ์ การควบคุมลูปบนอุปกรณ์ยังไม่ได้สร้าง"
+help = "ให้เงื่อนไข ขอบเขต และอาร์กิวเมนต์สเกลาร์ใช้ค่าที่รู้ก่อนขอบเขต และอ่านผลจากอุปกรณ์หลังขอบเขต"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "ความกว้างจำนวนเต็ม {width} เกินความกว้างของเคอร์เนล nucleum ที่รองรับ"
@@ -2202,11 +2235,11 @@ message = "ชนิดสมาชิกเวกเตอร์ไม่ตร
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector ต้องมีชนิดสมาชิกและความกว้าง ใช้ vector<T, N>"
+message = "vector ต้องมีชนิดสมาชิกและความกว้าง ใช้ vector<T, ขนาด N>"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector ต้องมีความกว้าง ใช้ vector<T, 4> หรือ vf32[4]"
+message = "vector ต้องมีความกว้าง ใช้ vector<T, ขนาด 4> หรือ vf32[4]"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2448,6 +2481,10 @@ help = "ลบรายการอาร์กิวเมนต์ชนิด
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "ต้องใช้องค์ประกอบ numeric ของ lista"
 help = "ใช้องค์ประกอบ numeric สำหรับ intrinsic ของ lista นี้"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` ต้องใช้ตัวรับเป็น list ธรรมดา; list ที่มีขอบเขตหรือกำหนดช่วงความยาวขยายในที่เดิมไม่ได้"
+help = "ใช้ extend กับ list ที่ไม่มีขอบเขต หรือเพิ่มทีละองค์ประกอบด้วย `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "เมธอด `.เรียงแล้ว(คีย์)` แบบมีคีย์ถูกลบแล้ว ให้ใช้นิพจน์การเรียง"
@@ -2808,6 +2845,10 @@ help = "ใช้ chorda หรือ helper การแปลงไบต์�
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "การแปลงจาก {lista}<b8> เป็น fractus ไม่ได้ระบุไว้ (ความกว้าง IEEE และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+message = "tensor ของเรคคอร์ดอ่านไบต์ตามเลย์เอาต์ little-endian ของเรคคอร์ด; เขียน `via Le` ไม่ใช่ `via Be`"
+help = "เขียน {lista}<b8> ↦ tensor<Record, [n]> via Le; สมาชิกเรคคอร์ดมีลำดับไบต์เดียวที่เลย์เอาต์กำหนด"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3677,6 +3718,7 @@ argminima = "ดัชนีค่าต่ําสุด"
 continet = "ประกอบด้วย"
 cumulata = "สะสม"
 decapita = "ลบตัวแรก"
+extende = "ขยาย"
 filtrata = "กรอง"
 immerge = "จม"
 inversa = "ผกผัน"

@@ -55,7 +55,7 @@ fn scalar_textus_index_infers_ascii() {
     accepts(
         r#"incipit {
     sit textus s ← "ab"
-    sit ascii<1> c ← s[0]
+    sit ascii<magnitudo 1> c ← s[0]
     nota c
 }"#,
     );
@@ -190,11 +190,11 @@ fn ascii_literal_capacity_boundary() {
 #[test]
 fn bounded_ascii_literal_rejects_payload_over_capacity() {
     rejects_with_issue(
-        "incipit { sit ascii<8> too_long ← 'abcdefghi' nota too_long }",
+        "incipit { sit ascii<magnitudo 8> too_long ← 'abcdefghi' nota too_long }",
         "ascii_literal_too_long",
     );
     accepts(&format!(
-        "incipit {{ sit ascii<8> fits ← '{}' nota fits }}",
+        "incipit {{ sit ascii<magnitudo 8> fits ← '{}' nota fits }}",
         "a".repeat(8)
     ));
 }
@@ -203,7 +203,7 @@ fn bounded_ascii_literal_rejects_payload_over_capacity() {
 fn bounded_ascii_scalar_index_returns_littera() {
     accepts(
         r"incipit {
-    sit ascii<8> source ← 'abc'
+    sit ascii<magnitudo 8> source ← 'abc'
     sit littera c ← source[1]
     nota c
 }",
@@ -214,15 +214,15 @@ fn bounded_ascii_scalar_index_returns_littera() {
 fn bounded_ascii_capacity_widens_only_directionally() {
     accepts(
         r"incipit {
-    sit ascii<8> narrow ← 'abc'
-    sit ascii<16> wide ← narrow
+    sit ascii<magnitudo 8> narrow ← 'abc'
+    sit ascii<magnitudo 16> wide ← narrow
     nota wide
 }",
     );
     rejects_with_issue(
         r"incipit {
-    sit ascii<16> wide ← 'abc'
-    sit ascii<8> narrow ← wide
+    sit ascii<magnitudo 16> wide ← 'abc'
+    sit ascii<magnitudo 8> narrow ← wide
     nota narrow
 }",
         "incompatible_tensor_index",
@@ -233,10 +233,10 @@ fn bounded_ascii_capacity_widens_only_directionally() {
 fn bounded_ascii_d7_conversions_are_explicit() {
     accepts(
         r"incipit {
-    sit ascii<8> bounded ← 'abc'
+    sit ascii<magnitudo 8> bounded ← 'abc'
     sit ascii unbounded ← bounded ↦ ascii
     sit textus text ← bounded ↦ textus
-    sit ascii<8> roundtrip ← unbounded ↦ ascii<8>
+    sit ascii<magnitudo 8> roundtrip ← unbounded ↦ ascii<magnitudo 8>
     nota roundtrip
 }",
     );
@@ -246,8 +246,8 @@ fn bounded_ascii_d7_conversions_are_explicit() {
 fn bounded_ascii_equivalence_stays_same_type_only() {
     rejects_with_issue(
         r"incipit {
-    sit ascii<8> narrow ← 'abc'
-    sit ascii<16> wide ← 'abc'
+    sit ascii<magnitudo 8> narrow ← 'abc'
+    sit ascii<magnitudo 16> wide ← 'abc'
     si narrow ≡ wide { nota 'same' }
 }",
         EXACT_EQ_ISSUE,

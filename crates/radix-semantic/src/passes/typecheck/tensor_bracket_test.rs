@@ -335,8 +335,8 @@ fn vector_bracket_range_slice_accepts() {
     // WHY: a register vector slice stays in the vector family, and a literal
     // window gives the slice a statically computed width.
     accepts(
-        r"functio cut(vector<f32, 4> v) → vector<f32, 2> {
-    sit vector<f32, 2> w ← v[1 ‥ 3]
+        r"functio cut(vector<f32, magnitudo 4> v) → vector<f32, magnitudo 2> {
+    sit vector<f32, magnitudo 2> w ← v[1 ‥ 3]
     redde w
 }",
     );
@@ -345,8 +345,8 @@ fn vector_bracket_range_slice_accepts() {
 #[test]
 fn vector_bracket_range_step_accepts() {
     accepts(
-        r"functio passus(vector<f32, 4> v) → vector<f32, 2> {
-    sit vector<f32, 2> w ← v[0 ‥ 4 per 2]
+        r"functio passus(vector<f32, magnitudo 4> v) → vector<f32, magnitudo 2> {
+    sit vector<f32, magnitudo 2> w ← v[0 ‥ 4 per 2]
     redde w
 }",
     );
@@ -355,8 +355,8 @@ fn vector_bracket_range_step_accepts() {
 #[test]
 fn vector_bracket_range_out_of_range_rejects() {
     rejects_with_issue(
-        r"functio bad(vector<f32, 4> v) → vector<f32, 2> {
-    sit vector<f32, 2> w ← v[3 ‥ 7]
+        r"functio bad(vector<f32, magnitudo 4> v) → vector<f32, magnitudo 2> {
+    sit vector<f32, magnitudo 2> w ← v[3 ‥ 7]
     redde w
 }",
         "index_provably_out_of_bounds",
@@ -366,8 +366,8 @@ fn vector_bracket_range_out_of_range_rejects() {
 #[test]
 fn vector_bracket_range_runtime_bounds_rejects() {
     rejects_with_issue(
-        r"functio win(vector<f32, 4> v, numerus lo) → vector<f32, 2> {
-    sit vector<f32, 2> w ← v[lo ‥ 3]
+        r"functio win(vector<f32, magnitudo 4> v, numerus lo) → vector<f32, magnitudo 2> {
+    sit vector<f32, magnitudo 2> w ← v[lo ‥ 3]
     redde w
 }",
         "bracket_range_static_bounds_required",
@@ -377,8 +377,8 @@ fn vector_bracket_range_runtime_bounds_rejects() {
 #[test]
 fn matrix_bracket_slot_range_row_is_vector() {
     accepts(
-        r"functio row(matrix<f32, [2, 3]> m) → vector<f32, 3> {
-    sit vector<f32, 3> r ← m[[1, 0 ‥ 3]]
+        r"functio row(matrix<f32, [2, 3]> m) → vector<f32, magnitudo 3> {
+    sit vector<f32, magnitudo 3> r ← m[[1, 0 ‥ 3]]
     redde r
 }",
     );
@@ -387,7 +387,7 @@ fn matrix_bracket_slot_range_row_is_vector() {
 #[test]
 fn matrix_bracket_slot_range_column_is_vector() {
     accepts(
-        r"functio column(matrix<f32, [2, 3]> m) → vector<f32, 2> {
+        r"functio column(matrix<f32, [2, 3]> m) → vector<f32, magnitudo 2> {
     redde m[[0 ‥ 2, 1]]
 }",
     );
@@ -405,7 +405,7 @@ fn matrix_bracket_slot_range_block_is_matrix() {
 #[test]
 fn matrix_bracket_slot_float_rejects() {
     rejects_with_issue(
-        r"functio bad(matrix<f32, [2, 3]> m) → vector<f32, 2> {
+        r"functio bad(matrix<f32, [2, 3]> m) → vector<f32, magnitudo 2> {
     redde m[[0, 0.5 ‥ 2]]
 }",
         "tensor_bracket_slot_integer_or_range",
@@ -415,7 +415,7 @@ fn matrix_bracket_slot_float_rejects() {
 #[test]
 fn matrix_bracket_slot_runtime_bounds_rejects() {
     rejects_with_issue(
-        r"functio bad(matrix<f32, [2, 3]> m, numerus lo) → vector<f32, 2> {
+        r"functio bad(matrix<f32, [2, 3]> m, numerus lo) → vector<f32, magnitudo 2> {
     redde m[[0, lo ‥ 3]]
 }",
         "bracket_range_static_bounds_required",
@@ -425,7 +425,7 @@ fn matrix_bracket_slot_runtime_bounds_rejects() {
 #[test]
 fn matrix_bracket_slot_out_of_range_rejects() {
     rejects_with_issue(
-        r"functio bad(matrix<f32, [2, 3]> m) → vector<f32, 2> {
+        r"functio bad(matrix<f32, [2, 3]> m) → vector<f32, magnitudo 2> {
     redde m[[0, 1 ‥ 5]]
 }",
         "index_provably_out_of_bounds",

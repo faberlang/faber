@@ -1,0 +1,48 @@
++++
+term = "bits"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
+category = "bits"
+canonical = false
+summary = "A whole tensor of fixed-width numbers converts to its bytes with a via Le or via Be clause, in row-major order."
+syntax = "tensor<E, shape> ↦ list<b8> via Le | tensor<E, shape> ↦ list<b8> via Be"
+related = ["bits", "↦"]
+locale = "en"
++++
+# =============================================================================
+# bits — Whole-tensor encode: tensor ↦ list<b8> via Le | Be
+# =============================================================================
+#
+# What this teaches:
+#   • tensor<E, shape> ↦ list<b8> via Le encodes every element, row-major, as
+#     its little-endian bytes; via Be encodes big-endian
+#   • it is the reverse of list<b8> ↦ tensor<E, shape> via Le, so a round
+#     trip returns the original tensor
+#   • the byte count is the element count times the element width, whatever
+#     the rank
+#
+# Common mistakes:
+#   • leaving the clause off: the byte order is not guessed
+#   • expecting one byte per element: the width is the element's own
+#
+# See also: bits-bulk
+# =============================================================================
+
+main {
+    # f32 little-endian: 1.0 is 00 00 80 3f, -2.0 is 00 00 00 c0.
+    let tensor<f32, [2]> floats ← [1.0, -2.0] ↦ tensor<f32, [2]>
+    let list<b8> floats_le ← floats ↦ list<b8> via Le
+    print floats_le
+
+    # u16 big-endian over a rank-two tensor, row-major.
+    let list<u16> values ← [1, 2, 3, 258]
+    let tensor<u16, [2, 2]> words ← values ↦ tensor<u16, [2, 2]>
+    let list<b8> words_be ← words ↦ list<b8> via Be
+    print words_be
+    let list<b8> words_le ← words ↦ list<b8> via Le
+    print words_le
+
+    # The round trip returns the tensor.
+    let tensor<f32, [2]> back ← floats_le ↦ tensor<f32, [2]> via Le
+    print back
+}

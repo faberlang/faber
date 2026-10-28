@@ -187,11 +187,11 @@ interface EdgePolicy<C> {
 interface EdgeTransform<C, T> {
     fn transform(C coord, T value) → T
 }
-class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<int, 1>, f32> {
-    fn remap(vector<int, 1> coord) → vector<int, 1> {
-        return [0] ↦ vector<int, 1>
+class ZeroGhost implements EdgePolicy<vector<int, size 1>> ∩ EdgeTransform<vector<int, size 1>, f32> {
+    fn remap(vector<int, size 1> coord) → vector<int, size 1> {
+        return [0] ↦ vector<int, size 1>
     }
-    fn transform(vector<int, 1> coord, f32 value) → f32 {
+    fn transform(vector<int, size 1> coord, f32 value) → f32 {
         return -value
     }
 }
