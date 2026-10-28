@@ -532,7 +532,7 @@ fn run_package_with_options(
         match run_package_test_unit_with_options(
             config,
             input,
-            proba_filter,
+            &package,
             &unit_path,
             options,
             include_ignored,
@@ -546,12 +546,13 @@ fn run_package_with_options(
                     break;
                 }
             }
-            Err(diagnostics) => {
+            Err(failure) => {
+                let (diagnostics, what) = match failure {
+                    UnitFailure::Setup(diagnostics) => (diagnostics, "test unit setup failed"),
+                    UnitFailure::Link(diagnostics) => (diagnostics, "package MIR test link failed"),
+                };
                 super::eprint_compile_diagnostics(&diagnostics);
-                eprintln!(
-                    "error: package MIR test link failed for {}",
-                    unit_path.display()
-                );
+                eprintln!("error: {what} for {}", unit_path.display());
                 let report = blocked_unit_report_with_options(
                     &unit_path,
                     &cases,
@@ -570,53 +571,48 @@ fn run_package_with_options(
     Ok((combined, false, metadata))
 }
 
-/// Analyze, isolate, link, and run one test unit.
+/// Why one test unit could not run: it could not be scoped out of the
+/// package analysis, or the MIR link/lowering of its closure failed.
+enum UnitFailure {
+    Setup(Vec<radix::module::diagnostics::Diagnostic>),
+    Link(Vec<radix::module::diagnostics::Diagnostic>),
+}
+
+/// Isolate, link, and run one test unit of an already-analyzed package.
 ///
-/// The package analyzer gives us the complete graph so local imports still
-/// resolve. The MIR linker only receives this unit's local import closure, so
-/// an unrelated unit's unsupported lowering cannot fail this run.
+/// The package is analyzed once for the whole run, so local imports still
+/// resolve. The MIR linker only receives a copy of this unit's local import
+/// closure, so an unrelated unit's unsupported lowering cannot fail this run.
 fn run_package_test_unit_with_options(
     config: &Config,
     input: &Path,
-    proba_filter: Option<&TestSourceFilter>,
+    analyzed: &radix::program::analyze::AnalyzedProgram,
     unit_path: &Path,
     options: &TestRunOptions,
     include_ignored: bool,
     focused: bool,
     metadata: &mut RunMetadata,
-) -> Result<ProbaReport, Vec<radix::module::diagnostics::Diagnostic>> {
-    let mut package = package::analyze_package_for_tests(config, input, proba_filter)?;
-    if package
-        .diagnostics
-        .iter()
-        .any(radix::module::diagnostics::Diagnostic::is_error)
-    {
-        return Err(package.diagnostics);
-    }
-
-    let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![
+) -> Result<ProbaReport, UnitFailure> {
+    let Some((root_id, _)) = analyzed.node_by_path(unit_path) else {
+        return Err(UnitFailure::Setup(vec![
             radix::module::diagnostics::Diagnostic::error(format!(
-                "test unit disappeared during package re-analysis: {}",
+                "test unit is not part of the analyzed package: {}",
                 unit_path.display()
             ))
             .with_file(unit_path.display().to_string()),
-        ]);
+        ]));
     };
     let root_id = root_id.clone();
-    let included = package.imports.local_closure(std::iter::once(&root_id));
-    package.nodes.retain(|id, _| included.contains(id));
-    package.entry = Some(root_id.clone());
-    package.roots = vec![root_id.clone()];
+    let package = analyzed.scoped_to_closure(&root_id);
 
     let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![
+        return Err(UnitFailure::Setup(vec![
             radix::module::diagnostics::Diagnostic::error(format!(
                 "test unit was not retained in its local package closure: {}",
                 unit_path.display()
             ))
             .with_file(unit_path.display().to_string()),
-        ]);
+        ]));
     };
     let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
     let available = if focused {
@@ -699,7 +695,8 @@ fn run_package_test_unit_with_options(
                     CaseKernels::Dispatch(&open),
                 )
             },
-        );
+        )
+        .map_err(UnitFailure::Link);
     }
 
     package::mir::with_linked_test_package_mir(
@@ -714,6 +711,7 @@ fn run_package_test_unit_with_options(
             )
         },
     )
+    .map_err(UnitFailure::Link)
 }
 
 fn blocked_unit_report_with_options(
