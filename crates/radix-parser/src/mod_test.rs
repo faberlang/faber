@@ -1328,6 +1328,20 @@ fn import_privata_marker_rejected() {
         r#"importa ex "norma:solum" privata solum"#,
         ParseExpectation::Issue("import_privata_removed"),
     );
+    // The marker and re-export words belong to the reader pack's keyword
+    // rows; the parser passes no `keyword` argument, which would override
+    // the pack.
+    let result = parse_program(r#"importa ex "norma:solum" privata solum"#);
+    let error = result
+        .errors
+        .iter()
+        .find(|error| has_arg(error, "issue", "import_privata_removed"))
+        .expect("import_privata_removed error");
+    assert!(
+        error.args.iter().all(|arg| arg.name != "keyword"),
+        "parser must not pass a keyword argument: {:?}",
+        error.args
+    );
 }
 
 #[test]

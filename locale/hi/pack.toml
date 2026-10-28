@@ -947,8 +947,8 @@ message = "अमान्य import visibility"
 help = "{publica} उपयोग करें"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "import से `privata` हटा दिया गया; import डिफ़ॉल्ट रूप से re-export नहीं करते"
-help = "मार्कर हटाएँ, या re-export के लिए publica उपयोग करें"
+message = "import से `{privata}` हटा दिया गया; import डिफ़ॉल्ट रूप से re-export नहीं करते"
+help = "मार्कर हटाएँ, या re-export के लिए {publica} उपयोग करें"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "{path} से import नाम का अनुमान नहीं लगा सके"

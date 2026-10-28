@@ -947,8 +947,8 @@ message = "visibility ของการนำเข้าไม่ถูกต�
 help = "ใช้ {publica}"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "`privata` ถูกนำออกจากการนำเข้าแล้ว; การนำเข้าไม่ re-export โดยค่าเริ่มต้น"
-help = "ลบเครื่องหมายออก หรือใช้ publica เพื่อ re-export"
+message = "`{privata}` ถูกนำออกจากการนำเข้าแล้ว; การนำเข้าไม่ re-export โดยค่าเริ่มต้น"
+help = "ลบเครื่องหมายออก หรือใช้ {publica} เพื่อ re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "ไม่สามารถอนุมานชื่อการนำเข้าจาก {path} ได้"

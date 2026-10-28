@@ -1180,8 +1180,8 @@ message = "invalid import visibility"
 help = "use {publica}"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "`privata` on imports was removed; imports do not re-export by default"
-help = "drop the marker, or use publica to re-export"
+message = "`{privata}` on imports was removed; imports do not re-export by default"
+help = "drop the marker, or use {publica} to re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "could not infer import name from {path}"
