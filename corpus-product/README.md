@@ -13,6 +13,7 @@ their expected output. Pure single-file keyword programs live in
 | `regio/` | `module` default import name: `import from "./planum"` binds the sibling's declared `geometry` |
 | `contract-import/`, `contract-import-alias/`, `contract-import-wildcard/`, `alias-contract-import/` | Contract-import packages (plain, aliased, wildcard) with their expected output |
 | `go-failable-imports/` | Three plain local modules (`main`, `proc`, `flt`), no Norma: an imported `⇥` call is a failable call, a leaf fault inside a failable function reaches `catch` as an error value, and a declared `@ conversion` row converts at the propagation boundary |
+| `kernel-fused-mean-extents/` | A fused matmul + bias + mean kernel (`@ radix { lane = "air" }`) at extents 4, 8, 32, 64 and two non-square shapes; the printed means are exact integer-data values, the golden for the runner and for Metal (`fused_matmul_mean_hw_test`). The mean splits into several workgroup partials from 257 elements on, the case that once returned wrong values on Metal |
 | `format/` | `.fab` inputs with `.format.expected` files, the fixtures for `faber format` |
 | `reader-locale/` | Reader-locale packages (`ar`, `hi`, `th-TH`, `vi`, `zh-Hans`, `zh-Hant`), samples for `faber convert` and the package reader-locale tests; `th-TH/twins/main.la.fab` is the Latin twin and `<locale>/faults/*.fab` are the diagnostic fault inputs |
 
