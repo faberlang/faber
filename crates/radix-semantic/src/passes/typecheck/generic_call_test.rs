@@ -916,6 +916,21 @@ fn analyze_math_consumer(source: &str) -> crate::test_support::AnalyzedFixture {
 
 #[test]
 fn imported_namespace_generic_call_types_concrete_result() {
+    struct CallTypeCollector {
+        tys: Vec<Option<crate::TypeId>>,
+    }
+    impl radix_hir::visit::HirVisitor for CallTypeCollector {
+        fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
+            if matches!(
+                expr.kind,
+                radix_hir::HirExpressionKind::MethodCall(..)
+                    | radix_hir::HirExpressionKind::Call(..)
+            ) {
+                self.tys.push(expr.ty);
+            }
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
     // spike1 shape: concrete tensor params and expected result around the
     // imported size-generic `math.add`. Must typecheck the concrete
     // `tensor<f32, [4, 8]>` result instead of SEM010/IGNOTUM.
@@ -943,21 +958,6 @@ functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4,
     assert_eq!(sig.type_params.len(), 2, "add stays size-generic");
 
     // The call's recorded type is the concrete solved result.
-    struct CallTypeCollector {
-        tys: Vec<Option<crate::TypeId>>,
-    }
-    impl radix_hir::visit::HirVisitor for CallTypeCollector {
-        fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
-            if matches!(
-                expr.kind,
-                radix_hir::HirExpressionKind::MethodCall(..)
-                    | radix_hir::HirExpressionKind::Call(..)
-            ) {
-                self.tys.push(expr.ty);
-            }
-            radix_hir::visit::walk_expr(self, expr);
-        }
-    }
     let mut collector = CallTypeCollector { tys: Vec::new() };
     radix_hir::visit::walk_program(&mut collector, unit.hir.as_ref().expect("hir"));
     let call_ty = collector
@@ -1181,7 +1181,7 @@ incipit {
 #[test]
 fn inferred_generic_call_binds_through_queue_and_stack() {
     accepts(
-        r#"functio peek_lista<T>(lista<T> xs) → numerus {
+        r"functio peek_lista<T>(lista<T> xs) → numerus {
     redde 0
 }
 
@@ -1195,14 +1195,14 @@ functio peek_stack<T>(stack<T> s) → numerus {
 
 functio caller(lista<numerus> l, queue<numerus> q, stack<numerus> s) → numerus {
     redde peek_lista(l) + peek_queue(q) + peek_stack(s)
-}"#,
+}",
     );
 }
 
 #[test]
 fn inferred_generic_call_binds_through_bounded_queue_and_stack() {
     accepts(
-        r#"functio peek_bounded_queue<T>(queue<T, 4> q) → numerus {
+        r"functio peek_bounded_queue<T>(queue<T, 4> q) → numerus {
     redde 0
 }
 
@@ -1212,20 +1212,20 @@ functio peek_bounded_stack<T>(stack<T, 4> s) → numerus {
 
 functio caller(queue<numerus, 4> bq, stack<numerus, 4> bs) → numerus {
     redde peek_bounded_queue(bq) + peek_bounded_stack(bs)
-}"#,
+}",
     );
 }
 
 #[test]
 fn inferred_generic_call_binds_through_ledger() {
     accepts(
-        r#"functio peek_ledger<T>(tabulae<textus, T> m) → numerus {
+        r"functio peek_ledger<T>(tabulae<textus, T> m) → numerus {
     redde 0
 }
 
 functio caller(tabulae<textus, numerus> m) → numerus {
     redde peek_ledger(m)
-}"#,
+}",
     );
 }
 
@@ -1267,7 +1267,7 @@ functio caller_genus(Civis c) → numerus {
 #[test]
 fn inferred_generic_intersection_with_prior_concrete_use() {
     accepts(
-        r#"implendum Nomen {
+        r"implendum Nomen {
     functio nomen() → textus
 }
 
@@ -1285,14 +1285,14 @@ functio peek<T>(T ∩ Nomen x) → numerus {
 
 functio caller(Nomen ∩ Salutans ns) → numerus {
     redde peek(ns)
-}"#,
+}",
     );
 }
 
 #[test]
 fn inferred_generic_intersection_prior_use_of_other_member() {
     accepts(
-        r#"implendum Nomen {
+        r"implendum Nomen {
     functio nomen() → textus
 }
 
@@ -1310,14 +1310,14 @@ functio peek<T>(T ∩ Nomen x) → numerus {
 
 functio caller(Nomen ∩ Salutans ns) → numerus {
     redde peek(ns)
-}"#,
+}",
     );
 }
 
 #[test]
 fn inferred_generic_intersection_constraint_position() {
     accepts(
-        r#"implendum Nomen {
+        r"implendum Nomen {
     functio nomen() → textus
 }
 
@@ -1335,14 +1335,14 @@ functio peek<T>(Nomen ∩ T x) → numerus {
 
 functio caller(Salutans ∩ Nomen ns) → numerus {
     redde peek(ns)
-}"#,
+}",
     );
 }
 
 #[test]
 fn inferred_generic_intersection_rejects_missing_member() {
     rejects_with_issue(
-        r#"implendum Nomen {
+        r"implendum Nomen {
     functio nomen() → textus
 }
 
@@ -1364,7 +1364,7 @@ functio peek<T>(T ∩ Nomen x) → numerus {
 
 functio caller(Salutans ∩ Alius sa) → numerus {
     redde peek(sa)
-}"#,
+}",
         "argument_type_mismatch",
     );
 }
@@ -1372,13 +1372,13 @@ functio caller(Salutans ∩ Alius sa) → numerus {
 #[test]
 fn inferred_generic_call_rejects_container_element_mismatch() {
     rejects_with_issue(
-        r#"functio wants(queue<numerus> q) → numerus {
+        r"functio wants(queue<numerus> q) → numerus {
     redde 0
 }
 
 functio caller(queue<textus> q) → numerus {
     redde wants(q)
-}"#,
+}",
         "argument_type_mismatch",
     );
 }
@@ -1386,13 +1386,13 @@ functio caller(queue<textus> q) → numerus {
 #[test]
 fn inferred_generic_call_rejects_bounded_capacity_mismatch() {
     rejects_with_issue(
-        r#"functio wants(queue<numerus, 4> q) → numerus {
+        r"functio wants(queue<numerus, 4> q) → numerus {
     redde 0
 }
 
 functio caller(queue<numerus, 8> q) → numerus {
     redde wants(q)
-}"#,
+}",
         "incompatible_tensor_index",
     );
 }
