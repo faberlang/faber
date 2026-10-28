@@ -22,6 +22,7 @@ const ISSUE_REDUCTA_BODY_EFFECT: &str = "reducta_body_effect";
 const ISSUE_REDUCTA_BODY_CONTEXT: &str = "reducta_body_context";
 const ISSUE_REDUCTA_GROUP_KEYS_NOT_LITERAL: &str = "reducta_group_keys_not_literal";
 const ISSUE_REDUCTA_GROUP_RANK_MISMATCH: &str = "reducta_group_rank_mismatch";
+const ISSUE_REDUCTA_FIRST_REQUIRES_BODY: &str = "reducta_first_requires_body";
 
 /// Coordinate names the axis expansion binds; interned before typecheck. A
 /// rank-N source binds the first N names, so `MAX_AXIS_REDUCTION_RANK` is the
@@ -545,8 +546,10 @@ pub(super) fn check_reduction_expr(
                 span,
             );
         }
-        if matches!(op, HirReductionOp::ArgMax | HirReductionOp::ArgMin)
-            || (matches!(op, HirReductionOp::Max | HirReductionOp::Min) && identity.is_none())
+        if matches!(
+            op,
+            HirReductionOp::ArgMax | HirReductionOp::ArgMin | HirReductionOp::First
+        ) || (matches!(op, HirReductionOp::Max | HirReductionOp::Min) && identity.is_none())
         {
             checker.error_issue(
                 SemanticErrorKind::TypeMismatch,
@@ -554,6 +557,14 @@ pub(super) fn check_reduction_expr(
                 span,
             );
         }
+    }
+    let body_missing = body.is_none();
+    if op == HirReductionOp::First && body_missing {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_REDUCTA_FIRST_REQUIRES_BODY,
+            span,
+        );
     }
     let term_ty = if let (Some(binding), Some(body)) = (binding, body) {
         checker.insert_binding(binding.0, element);
@@ -575,10 +586,12 @@ pub(super) fn check_reduction_expr(
     let boolean = checker.types.primitive(Primitive::Bivalens);
     let bool_op = matches!(
         op,
-        HirReductionOp::All | HirReductionOp::Any | HirReductionOp::Count
+        HirReductionOp::All | HirReductionOp::Any | HirReductionOp::Count | HirReductionOp::First
     );
+    // A missing `first` body is already refused by name; its element is not a
+    // predicate, so the term law below would only repeat that error.
     if bool_op {
-        if term_ty != boolean {
+        if term_ty != boolean && !(op == HirReductionOp::First && body_missing) {
             checker.error_issue(
                 SemanticErrorKind::TypeMismatch,
                 "reducta_term_type_not_bool",
@@ -599,6 +612,8 @@ pub(super) fn check_reduction_expr(
         }
         HirReductionOp::Count | HirReductionOp::ArgMax | HirReductionOp::ArgMin => integer,
         HirReductionOp::Sum | HirReductionOp::Product => checker.summa_result_type(term_ty),
+        // The selected element, not the predicate term; always optional.
+        HirReductionOp::First => element,
         _ => term_ty,
     };
     let extremum = matches!(
@@ -620,7 +635,9 @@ pub(super) fn check_reduction_expr(
             identity.span,
             "reducta_identity_type_mismatch",
         );
-    } else if extremum && !grouped && dimensions.is_none_or(|d| d.is_empty() || d.contains(&0)) {
+    } else if (op == HirReductionOp::First && !grouped)
+        || (extremum && !grouped && dimensions.is_none_or(|d| d.is_empty() || d.contains(&0)))
+    {
         let nullable = checker.types.option(result);
         if let Some(expected) = expected {
             let expected = checker.resolve_inferred_type(expected);
@@ -900,12 +917,9 @@ impl ReductionBodyState {
             // check under the ordinary expression path; the fragment subset
             // treats the nested node as an unapproved effect, so the outer
             // body walk does not descend into it.
-            // Same fragment-subset posture for the dedicated first-match
-            // head: unadmitted until AFM-3/AFM-4, so never descended into.
             HirExpressionKind::Reduction { .. }
             | HirExpressionKind::Scan { .. }
-            | HirExpressionKind::Sort { .. }
-            | HirExpressionKind::FirstMatch { .. } => {
+            | HirExpressionKind::Sort { .. } => {
                 effect(checker, expr.span, "unapproved_effect");
             }
             HirExpressionKind::Intervallum {

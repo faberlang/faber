@@ -519,14 +519,6 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_block(body);
             }
         }
-        ExprKind::FirstMatch(first_match) => {
-            visitor.visit_expr(&first_match.source);
-            for coordinate in &first_match.apud {
-                visitor.visit_ident(coordinate);
-            }
-            visitor.visit_ident(&first_match.binding);
-            visitor.visit_block(&first_match.body);
-        }
         ExprKind::Vacua(_)
         | ExprKind::KeywordLiteral(_)
         | ExprKind::Literal(_)

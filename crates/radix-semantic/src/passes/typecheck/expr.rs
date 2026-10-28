@@ -966,19 +966,6 @@ impl TypeChecker<'_> {
                 body,
                 expr.span,
             ),
-            HirExpressionKind::FirstMatch {
-                source,
-                coordinates,
-                binding,
-                body,
-            } => super::first_match::check_first_match_expr(
-                self,
-                source,
-                coordinates,
-                *binding,
-                body,
-                expr.span,
-            ),
             HirExpressionKind::Intervallum {
                 start, end, step, ..
             } => self.check_intervallum_expr(start, end, step, expr.span),

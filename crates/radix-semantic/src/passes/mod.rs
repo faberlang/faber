@@ -359,10 +359,6 @@ mod summa_disambiguation_test;
 mod visibility_annotation_test;
 
 #[cfg(test)]
-#[path = "first_match_contract_test.rs"]
-mod first_match_contract_test;
-
-#[cfg(test)]
 #[path = "k8_filum_calls_test.rs"]
 mod k8_filum_calls_test;
 

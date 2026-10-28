@@ -443,7 +443,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [216] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [217] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | 'ذات' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [218] ad_expr
 ad_expr ::= 'اتصل' ASCII_STRING ad_opener?
 # [219] ad_opener
@@ -490,107 +490,105 @@ praefixum_expr ::= 'بادئة' block_stmt
 scriptum_expr ::= 'حرر' '(' STRING (',' expression)* ')'
 # [240] lege_expr
 lege_expr ::= 'اقرأ' 'سطرا'?
-# [241] first_match_expr
-first_match_expr ::= 'أول_مطابقة' '(' expression apud_clause? ',' 'حيث' IDENTIFIER block_stmt ')'
-# [242] reducta_expr
+# [241] reducta_expr
 reducta_expr ::= 'اختزل' 'عبر' reducta_op 'من' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [243] reducta_op
-reducta_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'الأدنى' | 'فهرس_الأكبر' | 'فهرس_الأصغر' | 'الكل' | 'أي' | 'العدّ'
-# [244] reducta_group
+# [242] reducta_op
+reducta_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'الأدنى' | 'فهرس_الأكبر' | 'فهرس_الأصغر' | 'الكل' | 'أي' | 'العدّ' | 'الأول'
+# [243] reducta_group
 reducta_group ::= 'حسب' expression
-# [245] reducta_body
+# [244] reducta_body
 reducta_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
-# [246] reducta_identity
+# [245] reducta_identity
 reducta_identity ::= 'عوض' expression
-# [247] scan_expr
+# [246] scan_expr
 scan_expr ::= 'scan' 'عبر' scan_op ('total' ('inclusive' | 'exclusive'))? 'من' expression apud_clause scan_group? scan_order_clause? filum_clause 'ليكن' IDENTIFIER block_stmt
-# [248] scan_op
+# [247] scan_op
 scan_op ::= 'المجموع' | 'حاصل_الضرب' | 'الأقصى' | 'الأدنى' | 'الكل' | 'أي' | 'العدّ'
-# [249] scan_group
+# [248] scan_group
 scan_group ::= 'حسب' expression
-# [250] scan_order_clause
+# [249] scan_order_clause
 scan_order_clause ::= 'order' ('تصاعدي' | 'تنازلي')
-# [251] sort_expr
+# [250] sort_expr
 sort_expr ::= 'رتب' 'عبر' sort_direction ('من' | 'عن') expression sort_body?
-# [252] sort_direction
+# [251] sort_direction
 sort_direction ::= 'تصاعدي' | 'تنازلي'
-# [253] sort_body
+# [252] sort_body
 sort_body ::= ('ليكن' | 'متغير') IDENTIFIER block_stmt
-# [254] filum_clause
+# [253] filum_clause
 filum_clause ::= 'خيط' IDENTIFIER
-# [255] capta_expr
+# [254] capta_expr
 capta_expr ::= 'فخ' block_stmt
-# [256] object_pattern
+# [255] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [257] pattern_property
+# [256] pattern_property
 pattern_property ::= 'باقي'? IDENTIFIER ('كـ' IDENTIFIER)?
-# [258] array_pattern
+# [257] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [259] array_pattern_element
+# [258] array_pattern_element
 array_pattern_element ::= '_' | 'باقي'? IDENTIFIER
-# [260] nota_stmt
+# [259] nota_stmt
 nota_stmt ::= ('اعرض' | 'شاهد' | 'نبه' | 'اكتب') expression (',' expression)*
-# [261] entry_header
+# [260] entry_header
 entry_header ::= ('وسائط' IDENTIFIER)? ('مخرج' expression)?
-# [262] incipit_stmt
+# [261] incipit_stmt
 incipit_stmt ::= 'بداية' entry_header block_stmt
-# [263] incipiet_stmt
+# [262] incipiet_stmt
 incipiet_stmt ::= 'استهلال' entry_header block_stmt
-# [264] probandum_decl
+# [263] probandum_decl
 probandum_decl ::= 'مختبر' STRING proba_modifier* '{' probandum_body '}'
-# [265] probandum_body
+# [264] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [266] proba_stmt
+# [265] proba_stmt
 proba_stmt ::= 'اختبر' STRING proba_modifier* block_stmt
-# [267] proba_modifier
+# [266] proba_modifier
 proba_modifier ::= 'توقع_الفشل' | 'أهمل' STRING | 'مستقبلي' STRING | 'فقط' | 'وسم' STRING | 'زمني' NATURAL | 'قس' | 'معاد' NATURAL | 'هش' NATURAL | 'حصري' STRING
-# [268] praepara_block
+# [267] praepara_block
 praepara_block ::= ('جهز' | 'سيهيئ' | 'لاحق' | 'سيلحق') 'الكل'? block_stmt
-# [269] fac_stmt
+# [268] fac_stmt
 fac_stmt ::= 'افعل' block_stmt cape_clause? ('طالما' expression)?
-# [270] IDENTIFIER
+# [269] IDENTIFIER
 IDENTIFIER ::=
-# [271] NUMBER
+# [270] NUMBER
 NUMBER ::=
-# [272] NATURAL
+# [271] NATURAL
 NATURAL ::=
-# [273] STRING
+# [272] STRING
 STRING ::=
-# [274] ASCII_STRING
+# [273] ASCII_STRING
 ASCII_STRING ::=
-# [275] BACKTICK_STRING
+# [274] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [276] OCTETI_STRING
+# [275] OCTETI_STRING
 OCTETI_STRING ::=
-# [277] REGEX_TYPE_WORD
+# [276] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [278] REGEX_BODY
+# [277] REGEX_BODY
 REGEX_BODY ::=
-# [279] NEWLINE
+# [278] NEWLINE
 NEWLINE ::=
-# [280] WIDTH_MARKER
+# [279] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [281] LISTA_WIDTH_SUGAR
+# [280] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [282] TENSOR_WIDTH_SUGAR
+# [281] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [283] SPARSA_WIDTH_SUGAR
+# [282] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [284] VECTOR_WIDTH_SUGAR
+# [283] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [285] MATRIX_WIDTH_SUGAR
+# [284] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [286] FRONTMATTER_DELIMITER
+# [285] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [287] TOML_LINES
+# [286] TOML_LINES
 TOML_LINES ::=
-# [288] ANNOTATION_NAME
+# [287] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [289] ANNOTATION_FIELD_NAME
+# [288] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [290] NON_NEWLINE_TOKEN
+# [289] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [291] NO_NEWLINE
+# [290] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -860,7 +858,6 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#بادئة-expr` | live |
 | [`scriptum_expr`](#scriptum-expr) | `#حرر-expr` | live |
 | [`lege_expr`](#lege-expr) | `#اقرأ-expr` | live |
-| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
 | [`reducta_expr`](#reducta-expr) | `#اختزل-expr` | live |
 | [`reducta_op`](#reducta-op) | `#اختزل-op` | live |
 | [`reducta_group`](#reducta-group) | `#اختزل-group` | live |
@@ -1024,7 +1021,7 @@ productions. It is not a second keyword authority.
 | Objects | `بادئة` | prefix expression |
 | Testing | `جهز` | setup |
 | Testing | `سيهيئ` | async setup |
-| Grammar | `أول_مطابقة` | first-match selection head |
+| Expression | `الأول` | first-match reduction operator (en `first`; contextual) |
 | Expression | `حسب` | grouped reduction clause (en `كل`; contextual) |
 | Testing | `اختبر` | test |
 | Testing | `مختبر` | test suite |
@@ -1063,7 +1060,6 @@ productions. It is not a second keyword authority.
 | Testing | `زمني` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `نمط` | type alias |
-| Grammar | `حيث` | first-match predicate tail |
 | Iteration | `حتى` | range until inclusive |
 | Params | `كـ` | as / alias |
 | Declarations | `متغير` | mutable binding |
@@ -2844,7 +2840,7 @@ xs[lo‥hi]
 ```
 
 The copy-out methods report on the error channel instead of trimming:
-`xs.sectio(start, end)` (en `slice`) and `xs.prima(n)` (en `take`) are failable
+`xs.sectio(start, end)` (en `slice`) and `xs.الأول(n)` (en `take`) are failable
 (`⇥`; a `⊥` default or a handler takes the fault), and the fault carries the
 requested bounds or count and the list length as data.
 
@@ -2948,17 +2944,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } من source`.
 ### Special Expressions
 
 
-`أول_مطابقة(source, حيث binder { predicate })` is the dedicated first-match
-selection expression over a statically bounded source: the predicate is
-evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `nihil`
-(the result type is `T ∪ nihil`). The `حيث` predicate tail is owned by this
-head and never shares the reduce/scan `ثابت`/`متغير` binder tail.
-`أول_مطابقة` claims only the expression-head position immediately followed
-by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`عند` coordinate clause binds per-axis indices as in `كرر من`.
-
-`اختزل عبر <op> من source [عند [coords]] [حسب key | حسب [key, …]] ([خيط f] (ثابت | متغير) x { أعد term } | عوض identity)?` is the general reduction form. The optional tail is either a body (with an optional `خيط`) or a bodiless identity; without either, the source elements are the terms. `عبر` is mandatory and selects exactly one of `المجموع`, `حاصل_الضرب`, `الأقصى`, `الأدنى`, `فهرس_الأكبر`, `فهرس_الأصغر`, `الكل`, `أي`, or `العدّ`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `عبر` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.اختزل(f)` (en `xs.reduce(f)`).
+`اختزل عبر <op> من source [عند [coords]] [حسب key | حسب [key, …]] ([خيط f] (ثابت | متغير) x { أعد term } | عوض identity)?` is the general reduction form. The optional tail is either a body (with an optional `خيط`) or a bodiless identity; without either, the source elements are the terms. `عبر` is mandatory and selects exactly one of `المجموع`, `حاصل_الضرب`, `الأقصى`, `الأدنى`, `فهرس_الأكبر`, `فهرس_الأصغر`, `الكل`, `أي`, `العدّ`, or `الأول`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `عبر` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.اختزل(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `عند [coords]` binds one integer coordinate per source axis. A body is claimed only when `(ثابت | متغير) IDENTIFIER '{'` follows, so a declaration such as `ثابت numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `أعد` term per element. Without a body, each source element is the term. `خيط f` requires a body and a kernel context; it retains the existing sum path, while other `خيط` operators fail closed by name until their lowering is implemented. Without `خيط`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2970,6 +2956,9 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 | `فهرس_الأكبر`, `فهرس_الأصغر` | numeric scalar | rank-one coordinate `numerus`; higher-rank `توبل<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `عوض` | `nihil` or the supplied coordinate identity |
 | `الكل`, `أي` | `bivalens` | `bivalens` | `صواب`, `خطأ` |
 | `العدّ` | `bivalens` | `numerus`, the number of true terms | `0` |
+| `الأول` | `bivalens` predicate, required body | the first element whose predicate holds: `T ∪ nihil`, always optional | `nihil` |
+
+`الأول` (en `first`) takes a required body that is the predicate over the element and yields the first element in row-major order for which it holds, or `nihil` for an empty source or no match. Evaluation is total: the predicate runs on every element, including those after the first match, and a predicate error is never turned into `nihil`. It takes no `حسب` group (`reducta_group_op_unsupported`) and no `عوض` identity, and a source that is not a tensor or matrix, like every reduction source, is refused; first-match over lists is not a reduction source. `الأول` is the one reduction operator whose result is always optional, even over a statically non-empty source. On `@ radix مسار "air"` it is admitted over a statically bounded source only (`reducta_first_unbounded_source`), forward-only: it never becomes an AIR tensor op, so reverse AD stays closed.
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
@@ -3184,9 +3173,7 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `حيث` is
-the owned predicate-tail introducer of the `أول_مطابقة` first-match expression
-(see Special Expressions), not collection syntax.
+`الأول` and `ultima` are ordinary method names, not transform keywords.
 
 `ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `رتب(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument

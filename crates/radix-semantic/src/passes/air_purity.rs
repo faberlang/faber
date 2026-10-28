@@ -353,13 +353,28 @@ impl AirPurityChecker<'_> {
                 self.check_block(body);
             }
             HirExpressionKind::Reduction {
+                op,
                 source,
                 group,
                 body,
                 identity,
                 ..
             } => {
-                self.reject(expr.span, "reducta_expression_unsupported");
+                // The first reduction admits over a statically bounded source
+                // (forward execution; reverse AD is fail-closed, see the vjp.rs
+                // forward-only note). Every other reduction stays outside the
+                // v1 subset. The body is still traversed so impure predicates
+                // keep their own decline causes.
+                if *op != radix_hir::HirReductionOp::First {
+                    self.reject(expr.span, "reducta_expression_unsupported");
+                } else if !super::air_unroll::first_source_is_bounded(source, self.types) {
+                    self.reject_with_arg(
+                        expr.span,
+                        "reducta_first_unbounded_source",
+                        "causa",
+                        "not_bounded",
+                    );
+                }
                 self.check_expr(source);
                 if let Some(group) = group {
                     self.check_expr(group);
@@ -389,30 +404,6 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 if let Some(body) = body {
                     self.check_block(body);
-                }
-            }
-            HirExpressionKind::FirstMatch {
-                source,
-                coordinates,
-                body,
-                ..
-            } => {
-                // AFM-4: bounded sources admit on the AIR lane (forward
-                // execution; reverse AD is fail-closed — see the vjp.rs
-                // forward-only note). The predicate is still traversed so
-                // impure bodies keep their own decline causes.
-                self.check_expr(source);
-                self.check_block(body);
-                if !coordinates.is_empty() {
-                    self.reject(expr.span, "first_match_expression_unsupported");
-                } else if super::air_unroll::first_match_source_route(source, self.types).is_none()
-                {
-                    self.reject_with_arg(
-                        expr.span,
-                        "first_match_unbounded_source",
-                        "causa",
-                        "not_bounded",
-                    );
                 }
             }
             HirExpressionKind::Intervallum {

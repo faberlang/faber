@@ -266,13 +266,12 @@ fn semantic_spec_help_backticks_are_balanced() {
     }
 }
 
-/// The five issues emitted through `reject(span, slug)` / `reject_with_arg`
+/// The four issues emitted through `reject(span, slug)` / `reject_with_arg`
 /// that had no `en` row each need their own catalog arm, for the same reason.
 #[test]
-fn air_purity_first_match_sort_and_recovery_issues_render_through_the_catalog() {
+fn air_purity_first_reduction_sort_and_recovery_issues_render_through_the_catalog() {
     for issue in [
-        "first_match_expression_unsupported",
-        "first_match_unbounded_source",
+        "reducta_first_unbounded_source",
         "recovery_type_mismatch",
         "rethrow_in_recovery",
         "sort_expression_unsupported",

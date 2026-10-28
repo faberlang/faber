@@ -1,0 +1,37 @@
++++
+term = "reducta-first-decline"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "expression", "reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
+category = "reduction"
+summary = "reducta via prima admission laws: a body is required, the term is a boolean predicate, there is no group or identity, and the source is a tensor or matrix."
+syntax = "reducta via prima ex <tensor> sit x { redde <predicate> }"
+related = ["reducta", "prima", "nihil", "tensor"]
+locale = "la"
++++
+
+# Decline rows (reject reason in each comment):
+#   1. no body — the body is the predicate, so `prima` needs one
+#   2. non-boolean term — the predicate must be `bivalens`
+#   3. a group — the result is one element, not a tensor of buckets
+#   4. an identity — the optional result has no accumulator seed
+#   5. a list source — a reduction source is a tensor or matrix
+
+functio sine_corpore(tf32[4] x) → fractus ∪ nihil {
+    redde reducta via prima ex x
+}
+
+functio praedicatum_non_bivalens(tf32[4] x) → fractus ∪ nihil {
+    redde reducta via prima ex x sit v { redde v + 1.0 }
+}
+
+functio cum_grege(tf32[4] x) → tensor<f32, [2]> {
+    redde reducta via prima ex x apud [i] pro [i] sit v { redde v ≻ 0.0 }
+}
+
+functio cum_identitate(tf32[4] x) → fractus {
+    redde reducta via prima ex x vel 0.0
+}
+
+functio ex_lista(lista<f32> xs) → fractus ∪ nihil {
+    redde reducta via prima ex xs sit v { redde v ≻ 0.0 }
+}

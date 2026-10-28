@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 469,
-    "analyzable": 531
+    "capable": 468,
+    "analyzable": 530
   },
   "terms": [
     {
@@ -688,12 +688,6 @@
       "analyzable": 1
     },
     {
-      "term": "primus_quem",
-      "rule": "concept",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
       "term": "privata",
       "rule": "keyword",
       "capable": 1,
@@ -744,6 +738,12 @@
     {
       "term": "reddet",
       "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "reducta-first",
+      "rule": "concept",
       "capable": 1,
       "analyzable": 1
     },

@@ -1367,75 +1367,28 @@ fn classify_ex_tensor_ready(
     }))
 }
 
-// ── First-match bounded-source admission (AFM-4) ───────────────────────
+// ── First-reduction bounded-source admission ──────────────────────────
 
-/// AIR-lane bounded-source route for a `primus_quem` source expression.
+/// Whether a `reducta via prima` source has a statically known extent.
 ///
-/// The first-match head admits on the AIR lane only over statically bounded
-/// sources; the MIR dataflow lowering (AFM-3) traverses the full extent with
-/// total predicate evaluation, so admission needs the bound, not an unroll.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FirstMatchSourceRoute {
-    /// Route T: array literal with per-element entries (no spread).
-    LiteralArray,
-    /// Routes A/B: concrete integer interval with a statically known extent.
-    ConcreteRange,
-    /// Route M: statically shaped tensor/matrix (or capacity-bounded array).
-    StaticShape,
-    /// Route C interplay: padded `conversio` with a static padded capacity.
-    /// The traversal consumes the padded extent; no mask is constructed
-    /// in-region (the caller-built 0/1 len-mask operand stays with the
-    /// caller).
-    PaddedConversio,
-}
-
-/// Classify a `primus_quem` source as a bounded AIR-lane route.
-///
-/// Returns `None` when the extent is not statically known: open or
-/// runtime-bound intervals, spreads, unbounded `lista`/array types, and
-/// incomplete tensor shapes all fail closed.
-pub(crate) fn first_match_source_route(
-    source: &HirExpression,
-    types: &TypeTable,
-) -> Option<FirstMatchSourceRoute> {
-    match &source.kind {
-        HirExpressionKind::Array(elements)
-            if elements
-                .iter()
-                .all(|element| matches!(element, HirArrayElement::Expr(_))) =>
-        {
-            Some(FirstMatchSourceRoute::LiteralArray)
+/// The first reduction admits on the AIR lane only over statically bounded
+/// sources; the MIR dataflow lowering traverses the full extent with total
+/// predicate evaluation, so admission needs the bound, not an unroll. The
+/// source is a tensor or matrix, as for every reduction. Incomplete tensor
+/// shapes fail closed, and a statically zero-extent shape is a bounded route.
+pub(crate) fn first_source_is_bounded(source: &HirExpression, types: &TypeTable) -> bool {
+    let Some(ty) = source.ty else {
+        return false;
+    };
+    let (_, peeled) = types.peel_access_marker(ty);
+    match types.get(peeled) {
+        Type::Tensor(_, _) => {
+            crate::tensor_type_directed::complete_tensor_type(ty, types).is_some()
         }
-        HirExpressionKind::Intervallum { .. } => {
-            concrete_range_values(source).map(|_| FirstMatchSourceRoute::ConcreteRange)
+        Type::Matrix(_, shape) => {
+            crate::i64s_from_literal_index(*shape, types).is_some_and(|dims| !dims.is_empty())
         }
-        HirExpressionKind::Conversio {
-            source: inner,
-            target: HirConversioTarget::Type(target),
-            ..
-        } => {
-            if bounded_capacity(*target, types).is_some() {
-                Some(FirstMatchSourceRoute::PaddedConversio)
-            } else {
-                first_match_source_route(inner, types)
-            }
-        }
-        _ => {
-            let ty = source.ty?;
-            let (_, peeled) = types.peel_access_marker(ty);
-            match types.get(peeled) {
-                Type::Tensor(_, _) => crate::tensor_type_directed::complete_tensor_type(ty, types)
-                    .map(|_| FirstMatchSourceRoute::StaticShape),
-                Type::Matrix(_, shape) => {
-                    let dims = crate::i64s_from_literal_index(*shape, types)?;
-                    (!dims.is_empty()).then_some(FirstMatchSourceRoute::StaticShape)
-                }
-                Type::BoundedArray { .. } => {
-                    bounded_capacity(ty, types).map(|_| FirstMatchSourceRoute::StaticShape)
-                }
-                _ => None,
-            }
-        }
+        _ => false,
     }
 }
 

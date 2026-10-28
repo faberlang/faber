@@ -150,7 +150,6 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         // `⇜` sink-into lowers to the typed HIR node; typecheck owns the
         // contract conformance, the exact item type, and the statement shape.
         ExprKind::SinkInto(sink) => lowerer.lower_sink_into(sink),
-        ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
         ExprKind::Trap(trap) => lower_trap(lowerer, trap),
         ExprKind::CallDefault(call_default) => lower_call_default(lowerer, call_default),
         // D2.1: `value ¶ "spec"` keeps the spec literal's text; typecheck
@@ -224,6 +223,7 @@ fn lower_reducta(
         radix_syntax::ReductaOp::All => radix_hir::HirReductionOp::All,
         radix_syntax::ReductaOp::Any => radix_hir::HirReductionOp::Any,
         radix_syntax::ReductaOp::Count => radix_hir::HirReductionOp::Count,
+        radix_syntax::ReductaOp::First => radix_hir::HirReductionOp::First,
     };
     HirExpressionKind::Reduction {
         op,
@@ -269,7 +269,9 @@ fn lower_scan(lowerer: &mut Lowerer, scan: &radix_syntax::ScanExpr) -> HirExpres
         radix_syntax::ReductaOp::All => radix_hir::HirReductionOp::All,
         radix_syntax::ReductaOp::Any => radix_hir::HirReductionOp::Any,
         radix_syntax::ReductaOp::Count => radix_hir::HirReductionOp::Count,
-        radix_syntax::ReductaOp::ArgMax | radix_syntax::ReductaOp::ArgMin => {
+        radix_syntax::ReductaOp::ArgMax
+        | radix_syntax::ReductaOp::ArgMin
+        | radix_syntax::ReductaOp::First => {
             unreachable!("scan parser admits only value-prefix operators")
         }
     };
@@ -323,43 +325,6 @@ fn lower_sort(lowerer: &mut Lowerer, sort: &radix_syntax::SortExpr) -> HirExpres
         binding,
         body,
         mutable: sort.mutability == radix_syntax::AstMutability::Mutable,
-    }
-}
-
-/// Lower the source shape of `primus_quem` while preserving its declaration
-/// in HIR.
-///
-/// The node keeps its own shape — it is never normalized onto `Itera` or a
-/// reduction expression, and no `rumpe` control transfer is involved. AFM-3/4
-/// own the base-lane admission and the AIR first-live mask after this
-/// source-shaped node lands.
-fn lower_first_match(
-    lowerer: &mut Lowerer,
-    first_match: &radix_syntax::FirstMatchExpr,
-) -> HirExpressionKind {
-    let source = lower_expr(lowerer, &first_match.source);
-
-    lowerer.push_scope();
-    let coordinates = first_match
-        .apud
-        .iter()
-        .map(|ident| {
-            let def_id = lowerer.next_def_id();
-            lowerer.bind_local(ident.name, def_id);
-            (def_id, ident.name)
-        })
-        .collect();
-    let binding_def_id = lowerer.next_def_id();
-    lowerer.bind_local(first_match.binding.name, binding_def_id);
-    let mut body = lowerer.lower_block(&first_match.body);
-    lift_trailing_expression_stmt(lowerer, &mut body);
-    lowerer.pop_scope();
-
-    HirExpressionKind::FirstMatch {
-        source: Box::new(source),
-        coordinates,
-        binding: (binding_def_id, first_match.binding.name),
-        body,
     }
 }
 

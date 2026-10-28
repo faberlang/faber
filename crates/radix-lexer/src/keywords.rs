@@ -119,9 +119,6 @@ pub enum KeywordOwner {
     /// Iteration mode keyword.
     IterationMode,
 
-    /// Predicate-style operator.
-    PredicateOperator,
-
     /// Optional callable-posture spelling in a signature slot
     /// (`fiet` / `fiunt` / `fient`).
     CallablePosture,
@@ -200,7 +197,7 @@ pub enum KeywordOwner {
 
     /// Operator word after `reducta via` (`summa` / `factum` / `maxima` /
     /// `minima` / `argmaxima` / `argminima` / `omnia` / `quilibet` /
-    /// `numeratio`).
+    /// `numeratio` / `prima`).
     ReductionOperator,
 
     /// Grouping word after the source and optional `apud` clause (`pro`).
@@ -362,7 +359,6 @@ const PARAMETER_MODE: &[KeywordOwner] = &[KeywordOwner::ParameterMode, KeywordOw
 const ALIAS_MARKER: &[KeywordOwner] = &[KeywordOwner::AliasMarker];
 const ITERATION_MODE: &[KeywordOwner] = &[KeywordOwner::IterationMode];
 const SPREAD_EXPRESSION: &[KeywordOwner] = &[KeywordOwner::SpreadExpression];
-const PREDICATE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::PredicateOperator];
 const CALLABLE_POSTURE: &[KeywordOwner] = &[KeywordOwner::CallablePosture];
 const CONTROL_OPERATION: &[KeywordOwner] = &[KeywordOwner::ControlOperation];
 const TYPE_NAME: &[KeywordOwner] = &[KeywordOwner::TypeName];
@@ -976,6 +972,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
         category: KeywordKind::Misc,
     },
+    KeywordSpec {
+        text: "prima",
+        token_kind: None,
+        scope: KeywordScope::Contextual(REDUCTION_OPERATOR),
+        category: KeywordKind::Misc,
+    },
     // === Keywords: Sort expression (`ordinata via Dir ex source`) ===
     // `ordinata` heads the expression and `ascendens` / `descendens` name the
     // direction after `via`. All three are tokenless: each lexes as an
@@ -1029,23 +1031,6 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         text: "scan_order",
         token_kind: None,
         scope: KeywordScope::Contextual(SCAN_ORDER),
-        category: KeywordKind::Misc,
-    },
-    // === Keywords: First-match selection ===
-    // `primus_quem` is the dedicated first-match expression head and `ubi`
-    // introduces its owned predicate tail. Both are tokenless: the parser
-    // claims each spelling only inside the first-match production slots, so
-    // the registry rows carry the pack-emit surface for reader packs.
-    KeywordSpec {
-        text: "primus_quem",
-        token_kind: None,
-        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
-        category: KeywordKind::Misc,
-    },
-    KeywordSpec {
-        text: "ubi",
-        token_kind: None,
-        scope: KeywordScope::Contextual(PREDICATE_OPERATOR),
         category: KeywordKind::Misc,
     },
     // === Keywords: Logical operators ===
@@ -1682,7 +1667,6 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::ParameterMode
         | KeywordOwner::AliasMarker
         | KeywordOwner::IterationMode
-        | KeywordOwner::PredicateOperator
         | KeywordOwner::CallablePosture
         | KeywordOwner::ControlOperation
         | KeywordOwner::TypeName
