@@ -18,7 +18,12 @@
 //! other product and every wide division go through the runtime, because
 //! Cranelift lowers neither an `i128` overflow check nor `i128` division.
 
-use super::*;
+use super::{
+    Decline, FunctionLower, InstBuilder, IntCC, Lowered, MirBinOp, MirFunction, MirOperand,
+    MirPlace, MirPlaceBase, MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp,
+    MirValueKind, NumericWidth, Primitive, Rep, RuntimeSymbol, Type, TypeTable, Value, abi, rep_of,
+    resolve, trap_text, types,
+};
 
 /// The lowest exact integer.
 const EXACT_MIN: i128 = i64::MIN as i128;
@@ -140,7 +145,9 @@ impl FunctionLower<'_, '_> {
     }
 
     pub(super) fn wide_const(&mut self, value: i128) -> Value {
-        let low = self.builder.ins().iconst(types::I64, value as i64);
+        let bytes = value.to_le_bytes();
+        let low = i64::from_le_bytes(std::array::from_fn(|index| bytes[index]));
+        let low = self.builder.ins().iconst(types::I64, low);
         let high = self.builder.ins().iconst(types::I64, (value >> 64) as i64);
         self.builder.ins().iconcat(low, high)
     }
