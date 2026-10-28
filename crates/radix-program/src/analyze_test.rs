@@ -78,9 +78,8 @@ fn package_test_analysis_deadline_fails_closed() {
         Some(expired),
         &test_seams(),
     );
-    let diagnostics = match diagnostics {
-        Ok(_) => panic!("expired package test analysis must fail closed"),
-        Err(diagnostics) => diagnostics,
+    let Err(diagnostics) = diagnostics else {
+        panic!("expired package test analysis must fail closed");
     };
     assert!(
         diagnostics
@@ -276,7 +275,7 @@ fn broken() → int {
     let _ = fs::remove_dir_all(&dir);
 }
 
-/// Binary programs expose one entry ModuleId, one root, and local import edges.
+/// Binary programs expose one entry `ModuleId`, one root, and local import edges.
 #[test]
 fn analyze_package_records_entry_roots_and_local_import_edges() {
     let dir = temp_root("program-graph");
@@ -558,13 +557,12 @@ fn add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<
     )
     .expect("write math");
 
-    let diagnostics = match analyze_package(
+    let Err(diagnostics) = analyze_package(
         &Config::default().with_target(radix_module::Target::MirWgsl),
         &dir,
         &test_seams(),
-    ) {
-        Err(diagnostics) => diagnostics,
-        Ok(_) => panic!("unexported generic kernel stays an orphan"),
+    ) else {
+        panic!("unexported generic kernel stays an orphan");
     };
     assert!(
         diagnostics
@@ -598,7 +596,7 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("k.fab"),
-        r#"
+        r"
 @ public
 fn fetch_cluster_scalar() → int {
   return 1
@@ -609,25 +607,25 @@ fn fetch_cluster_scalar() → int {
 fn helper<size H, size W>(tensor<f32, [H, W]> src) → tensor<f32, [H, W]> {
   return src
 }
-"#,
+",
     )
     .expect("write provider");
     fs::write(
         dir.join("independent.fab"),
-        r#"
+        r"
 @ public
 fn independent_probe() → int {
   return missing_independent_symbol
 }
-"#,
+",
     )
     .expect("write independent dependency");
 
-    let diagnostics =
-        match analyze_package(&Config::default(), &dir.join("main.fab"), &test_seams()) {
-            Err(diagnostics) => diagnostics,
-            Ok(_) => panic!("the unexported generic kernel must remain orphaned"),
-        };
+    let Err(diagnostics) =
+        analyze_package(&Config::default(), &dir.join("main.fab"), &test_seams())
+    else {
+        panic!("the unexported generic kernel must remain orphaned");
+    };
     assert!(
         diagnostics
             .iter()
@@ -674,7 +672,7 @@ fn unknown_library_module_diagnostic(source: &str, label: &str) -> Diagnostic {
     let spec = discover_package(&entry).expect("discover package");
     let resolver = locked_empty_provider_resolver(&dir);
 
-    let diagnostics = match analyze_package_spec_with_deadline(
+    let Err(diagnostics) = analyze_package_spec_with_deadline(
         &Config::default(),
         spec,
         &resolver,
@@ -682,9 +680,8 @@ fn unknown_library_module_diagnostic(source: &str, label: &str) -> Diagnostic {
         None,
         None,
         &test_seams(),
-    ) {
-        Ok(_) => panic!("unknown library module must fail package analysis"),
-        Err(diagnostics) => diagnostics,
+    ) else {
+        panic!("unknown library module must fail package analysis");
     };
     let _ = fs::remove_dir_all(&dir);
     diagnostics

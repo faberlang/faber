@@ -131,7 +131,7 @@ fn library_import_in_another_locale_keeps_its_own_tokens() {
         &entry,
         &crate::test_support::test_mir_seams(),
         |lowered| {
-            let words = printing_words(&lowered);
+            let words = printing_words(lowered);
             let mut spelled = words
                 .iter()
                 .map(|(_, word)| word.as_str())
@@ -161,7 +161,7 @@ fn generic_template_tokens_come_from_the_defining_file() {
         &entry,
         &crate::test_support::test_mir_seams(),
         |lowered| {
-            let words = printing_words(&lowered);
+            let words = printing_words(lowered);
             let mut spelled = words
                 .iter()
                 .map(|(_, word)| word.as_str())

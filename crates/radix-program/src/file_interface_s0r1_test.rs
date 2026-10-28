@@ -407,7 +407,7 @@ fn twin_provider_interface() -> FileInterface {
 
 /// Producer identity and export name survive the interface, and the twin's
 /// ordered size parameters arrive as `InterfaceCallable::type_params` with
-/// symbolic `Param` shape witnesses (PKG-REP done_when (b)).
+/// symbolic `Param` shape witnesses (PKG-REP `done_when` (b)).
 #[test]
 fn twin_export_preserves_producer_identity_and_export_name() {
     let interface = twin_provider_interface();

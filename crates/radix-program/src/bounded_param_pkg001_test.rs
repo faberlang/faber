@@ -84,7 +84,9 @@ fn bounded_param_exported_signature_emits_real_rendered_diagnostic() {
         "bounded param must still fail closed (file interface cannot represent the signature)"
     );
     assert!(
-        diagnostics.iter().any(|diag| diag.is_error()),
+        diagnostics
+            .iter()
+            .any(radix_module::diagnostics::Diagnostic::is_error),
         "the bounded-param rejection must be an error: {diagnostics:?}"
     );
     for diag in &diagnostics {

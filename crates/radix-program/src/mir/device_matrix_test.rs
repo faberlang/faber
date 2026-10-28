@@ -40,7 +40,7 @@ fn twin_add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → te
 /// visibility: unmarked, so under DECISIONS D5.1 it is module-private. A
 /// same-unit caller keeps it non-orphaned (ADM001) at the library's own
 /// analysis, so the proof isolates the consumer's import seam.
-const UNMARKED_TWIN_HELPER: &str = r#"
+const UNMARKED_TWIN_HELPER: &str = r"
 @ kernel
 fn twin_hidden<size M>(tensor<f32, [M]> a, tensor<f32, [M]> b) → tensor<f32, [M]> {
     return a + b
@@ -51,7 +51,7 @@ fn twin_hidden<size M>(tensor<f32, [M]> a, tensor<f32, [M]> b) → tensor<f32, [
 fn hidden_4(tensor<f32, [4]> a, tensor<f32, [4]> b) → tensor<f32, [4]> {
     return twin_hidden(a, b)
 }
-"#;
+";
 
 /// The consumer instantiates NEW shapes across the import boundary with
 /// concrete type/shape witnesses (the KPC-SEM contract exercised through the
@@ -270,7 +270,7 @@ fn imported_twin_instance_records_key_route_registration_and_visibility() {
             );
         },
     )
-    .unwrap_or_else(|errors| panic!("matrix package MIR must link, got {:?}", errors));
+    .unwrap_or_else(|errors| panic!("matrix package MIR must link, got {errors:?}"));
 }
 
 /// DECISIONS D5.1 converse of the pre-D5.1 "unmarked helper twin stays
@@ -447,9 +447,6 @@ fn fragment_role_twin_registers_as_fragment_never_kernel() {
     );
     match result {
         Ok(()) => {}
-        Err(errors) => panic!(
-            "fragment composition helper must stay composable, got {:?}",
-            errors
-        ),
+        Err(errors) => panic!("fragment composition helper must stay composable, got {errors:?}"),
     }
 }

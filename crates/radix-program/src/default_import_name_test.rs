@@ -95,7 +95,7 @@ fn local_default_import_does_not_bind_path_segment_when_module_declared() {
         "main.fab",
         "import from \"./geo\"\n\nmain {\n    print geo.one()\n}\n",
     );
-    assert!(!errors(&entry).is_empty());
+    assert_ne!(errors(&entry), [] as [ErrorFacts; 0]);
 }
 
 #[test]

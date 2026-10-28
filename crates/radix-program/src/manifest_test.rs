@@ -1,4 +1,4 @@
-//! Tests for the compiler-view manifest projection (radix-program, RP2a).
+//! Tests for the compiler-view manifest projection (radix-program, `RP2a`).
 //!
 //! The product-only device-backend projection tests stay in faber (product
 //! view); this file covers the moved compiler surface: projection parsing
@@ -133,7 +133,7 @@ fn projection_applies_defaults() {
     assert!(manifest.library.is_none());
     assert_eq!(manifest.build.kind, "bin");
     assert_eq!(manifest.build.target, None);
-    assert!(manifest.build.targets.is_empty());
+    assert_eq!(manifest.build.targets, [] as [String; 0]);
     assert_eq!(manifest.locale.locale, None);
     assert!(manifest.target.is_empty());
     assert!(manifest.dependencies.is_empty());

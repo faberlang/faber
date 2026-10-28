@@ -202,7 +202,7 @@ fn tensor_from_flat_shape_dims(function: &radix_mir::MirFunction) -> Option<Vec<
         .iter()
         .map(|item| match item {
             MirAggregateItem::Operand(operand) => operand_dim(function, operand),
-            _ => None,
+            MirAggregateItem::Spread(_) => None,
         })
         .collect()
 }
@@ -228,10 +228,7 @@ fn package_mir_bakes_symbolic_rank_two_pin_shape_operand() {
         },
     )
     .unwrap_or_else(|errors| {
-        panic!(
-            "symbolic generic pin package must link and finalize, got {:?}",
-            errors
-        )
+        panic!("symbolic generic pin package must link and finalize, got {errors:?}")
     });
 }
 

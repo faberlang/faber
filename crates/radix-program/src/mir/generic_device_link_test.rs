@@ -119,7 +119,7 @@ fn literal_shape(types: &radix_types::TypeTable, index: radix_types::IndexId) ->
     }
 }
 
-/// done_when (a), (d): one concrete `MirMonomorphizationKey` per requested
+/// `done_when` (a), (d): one concrete `MirMonomorphizationKey` per requested
 /// type/shape binding, with the route's provider identity and v2 device
 /// contract carried into the returned package lowering metadata. Under
 /// DECISIONS D5.1 only the `@ public` Kernel crosses the package boundary:
@@ -218,10 +218,10 @@ fn package_mir_registers_imported_device_instances() {
             );
         },
     )
-    .unwrap_or_else(|errors| panic!("device package MIR must link, got {:?}", errors));
+    .unwrap_or_else(|errors| panic!("device package MIR must link, got {errors:?}"));
 }
 
-/// done_when (g): repeated imports and instantiations deduplicate by
+/// `done_when` (g): repeated imports and instantiations deduplicate by
 /// `MirMonomorphizationKey` — two `kadd` calls at [2, 2] and one at [8, 8]
 /// leave exactly two kadd registrations, never one per call site.
 #[test]
@@ -261,7 +261,7 @@ fn package_mir_imported_device_registrations_deduplicate_by_key() {
             );
         },
     )
-    .unwrap_or_else(|errors| panic!("device package MIR must link, got {:?}", errors));
+    .unwrap_or_else(|errors| panic!("device package MIR must link, got {errors:?}"));
 }
 
 const SIGNATURE_ONLY_LIB: &str = r#"+++
@@ -284,7 +284,7 @@ main {
 }
 "#;
 
-/// done_when (e), (f): a signature-only imported device route fails closed
+/// `done_when` (e), (f): a signature-only imported device route fails closed
 /// with the named `imported_device_body_missing` reason — the role bit alone
 /// never validates the call, and no provider fallback or backend helper
 /// symbol makes the unresolved device call valid.
@@ -487,5 +487,5 @@ kind = "bin"
             assert_eq!(helper_shapes, vec![4], "khelper instance must bind [4]");
         },
     )
-    .unwrap_or_else(|errors| panic!("internal sibling device helper must link, got {:?}", errors));
+    .unwrap_or_else(|errors| panic!("internal sibling device helper must link, got {errors:?}"));
 }

@@ -9,9 +9,9 @@
 //!     id while the registry key became `env(N + offset)` → "closure
 //!     environment aggregate is missing metadata" (radix-mir validate).
 //!   * face 2 — `rewrite_program_sources` rewrote the closure BODY's
-//!     `MirProjection::ClosureCapture { source }` DefId but not the unit's
+//!     `MirProjection::ClosureCapture { source }` `DefId` but not the unit's
 //!     `closure_environments[].captures[].source` metadata → body and
-//!     environment row disagreed on the capture DefId → "closure capture
+//!     environment row disagreed on the capture `DefId` → "closure capture
 //!     projection is missing metadata".
 //!
 //! The entry unit merges first with offset 0, which is why entry-owned
@@ -157,7 +157,7 @@ fn run_closure_env_package_tests(package_root: &Path, stdlib_home: &Path) -> Vec
         None,
         &crate::test_support::test_analysis_seams(),
     )
-    .unwrap_or_else(|diagnostics| panic!("analyze closure-env package: {:?}", diagnostics));
+    .unwrap_or_else(|diagnostics| panic!("analyze closure-env package: {diagnostics:?}"));
     let proba_path = package_root.join("src").join("main.proba");
     let (root_id, _) = package
         .node_by_path(&proba_path)
@@ -331,7 +331,7 @@ fn _fold((int, int) → int f, int n) → int {
 "#;
 
 /// Face 2 (with face 1 riding): the sibling closure captures its OWN exported
-/// module const. The const's DefId is a `source_rewrites` key (linked const
+/// module const. The const's `DefId` is a `source_rewrites` key (linked const
 /// data member), so the closure body's capture projection is rewritten to the
 /// synthetic id while the environment's capture row kept the original — body
 /// and metadata must stay in sync.
@@ -361,7 +361,7 @@ test "sibling closure captures module const" {
 }
 
 /// Face 1 only: the sibling closure reads a THIRD unit's exported const
-/// (`keys.LIMIT`). The HIR-level member rewrite keeps the capture DefId
+/// (`keys.LIMIT`). The HIR-level member rewrite keeps the capture `DefId`
 /// consistent between closure body and environment metadata (synthetic on both
 /// sides), so only the aggregate-kind shift can break this link.
 #[test]

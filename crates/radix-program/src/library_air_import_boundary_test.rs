@@ -35,12 +35,12 @@ targets = ["fmir"]
 locale = "en"
 "#;
 
-const NN_SOURCE: &str = r#"
+const NN_SOURCE: &str = r"
 @ public
 fn scale_layer(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → tensor<f32, [2, 2]> {
     return x ⊙ w
 }
-"#;
+";
 
 const MAIN_SOURCE: &str = r#"+++
 locale = "en"
