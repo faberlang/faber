@@ -23,7 +23,7 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::*;
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
-use radix_types::{NumericWidth, Primitive, SemanticMutability, Type, TypeId, TypeTable};
+use radix_types::{Primitive, SemanticMutability, Type, TypeId, TypeTable};
 
 /// Slug for shapes the CLIF subset does not cover yet.
 pub const SLUG_CLIF_SUBSET: &str = "clif-subset";
@@ -218,7 +218,6 @@ impl<'a> ClifCapability<'a> {
                 | Primitive::Ignotum,
             )
             | Type::SizedNumeric(Primitive::Numerus, _)
-            | Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
             | Type::Bits(_)
             | Type::SizedInstans(_)
             | Type::BoundedTextus { .. }
