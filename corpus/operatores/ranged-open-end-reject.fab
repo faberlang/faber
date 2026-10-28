@@ -1,0 +1,29 @@
++++
+term = "‥"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Both ends of a range are always written: `0…` alone is refused, `0…∞` says there is no high end."
+syntax = "saturating<u32, 0…> — rejected"
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE040:range_bound_required"
++++
+# =============================================================================
+# ‥ — a one-sided range is a parse error
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • Both ends are always written, so a range never reads as half a range.
+#     "No bound on this side" is `∞` or `-∞`, written out.
+#
+# Common mistakes:
+#   • Dropping the high end to mean "no limit"; write `0…∞` instead.
+
+main {
+    let saturating<u32, 0…> x ← 1
+    print x
+}

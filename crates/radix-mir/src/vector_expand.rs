@@ -272,7 +272,8 @@ fn expand_site(
         }
         MirVectorOp::Dot => dot(&mut head, lhs, rhs, shape.width, shape.element),
         MirVectorOp::Cross => cross(&mut head, lhs, rhs, shape.element, site.return_ty),
-        MirVectorOp::Length => longitudo(&mut head, lhs, shape.width, shape.element),
+        MirVectorOp::Norm => norm_lanes(&mut head, lhs, shape.width, shape.element),
+        MirVectorOp::Count => MirOperand::Constant(MirConstant::Int(i64::from(shape.width))),
         MirVectorOp::Crea => crea(&mut head, shape.width, shape.element, site.return_ty, types),
         MirVectorOp::Swizzle(lanes) => swizzle(&mut head, lhs, lanes, site.return_ty),
         MirVectorOp::Normalized => {
@@ -690,7 +691,7 @@ fn dot(
 }
 
 /// `||v|| = sqrt(dot(v, v))`.
-fn longitudo(b: &mut Lanes<'_>, vector: &MirPlace, width: u8, element: MirType) -> MirOperand {
+fn norm_lanes(b: &mut Lanes<'_>, vector: &MirPlace, width: u8, element: MirType) -> MirOperand {
     let sum_squares = dot(b, vector, vector, width, element);
     b.assign_temp(
         MirValueKind::Unary {
@@ -944,7 +945,7 @@ fn normalized(
     } = *split;
     let (width, element, vector_ty, span) = (shape.width, shape.element, site.return_ty, site.span);
 
-    let length = longitudo(&mut head, vector, width, element);
+    let length = norm_lanes(&mut head, vector, width, element);
     let epsilon = MirOperand::Constant(MirConstant::Float(NORMALIZE_EPSILON));
     let nonzero = head.assign_temp(
         MirValueKind::Binary {

@@ -71,8 +71,12 @@ mod rust_runtime_dependency;
 pub mod target_gate;
 mod temp_dir;
 mod test_route;
+mod ts_build;
 #[cfg(feature = "hir-ts")]
 mod ts_package;
+mod ts_project;
+mod ts_recipe;
+mod ts_runtime;
 
 #[cfg(feature = "hir-rust")]
 #[cfg(test)]
@@ -113,7 +117,7 @@ pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     DeviceChoice, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders, manifest_package_build_target as manifest_build_target_for_input,
-    read_manifest,
+    read_manifest, resolve_format_width,
 };
 #[cfg(feature = "runner")]
 pub use manifest::{
@@ -135,6 +139,7 @@ use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibr
 use std::path::{Path, PathBuf};
 pub(crate) use temp_dir::unique_temp_sibling;
 pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
+pub use ts_build::cmd_run_ts;
 
 /// Materialized repository-shaped root for the runtime embedded in this binary.
 ///

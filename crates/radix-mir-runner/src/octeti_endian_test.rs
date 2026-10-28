@@ -97,7 +97,7 @@ fn octeti_endian_short_window_fails() {
     let err = eval_bytes(vec![0xde, 0xad, 0xbe], "Be", NumericWidth::U32)
         .expect_err("3-byte source must fail");
     assert_eq!(
-        err.issue, "runner_octeti_endian_width_mismatch",
+        err.issue, "runner_list_b8_endian_width_mismatch",
         "expected width mismatch, got: {err:?}"
     );
 }

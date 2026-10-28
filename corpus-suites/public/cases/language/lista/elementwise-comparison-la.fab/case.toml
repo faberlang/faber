@@ -3,6 +3,8 @@ id = "corpus/lista/elementwise-comparison-la.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/elementwise-comparison-la.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

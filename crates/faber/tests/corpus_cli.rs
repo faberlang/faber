@@ -1096,8 +1096,8 @@ fn corpus_loader_accepts_rejects_and_known_fail_why() {
     let output = run_corpus(suite.path(), "runner");
     assert_eq!(
         output.status.code(),
-        Some(1),
-        "a reason on a rejection must be refused"
+        Some(78),
+        "a reason on a rejection must be refused as a bad configuration"
     );
     assert!(
         records(&output.stdout)[0]["message"]
@@ -1112,8 +1112,8 @@ fn corpus_loader_accepts_rejects_and_known_fail_why() {
     let output = run_corpus(suite.path(), "runner");
     assert_eq!(
         output.status.code(),
-        Some(1),
-        "an empty known_fail_why must be refused"
+        Some(78),
+        "an empty known_fail_why must be refused as a bad configuration"
     );
     assert!(
         records(&output.stdout)[0]["message"]
@@ -1194,8 +1194,8 @@ fn corpus_rejects_pins_the_target_cannot_judge_instead_of_panicking() {
         let output = run_corpus(suite.path(), target);
         assert_eq!(
             output.status.code(),
-            Some(1),
-            "{target} {fragment}: a rejected pin must exit 1, not panic: {}",
+            Some(78),
+            "{target} {fragment}: a rejected pin must exit 78 (bad configuration), not panic: {}",
             String::from_utf8_lossy(&output.stderr)
         );
         let message = records(&output.stdout)[0]["message"]
@@ -1468,4 +1468,293 @@ fn corpus_embedded_only_rust_builds_against_materialized_runtime() {
     assert_eq!(summary["target"], "rust");
     assert_eq!(summary["passed"], 1);
     assert_eq!(summary["failed"], 0);
+}
+
+/// A suite with one runner-passing case and a `go` external recipe, so the
+/// `runner` target and a named external target are both selectable.
+fn exit_class_suite() -> tempfile::TempDir {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    check_only_case(temp.path(), "alpha");
+    fs::write(
+        temp.path().join("cases/alpha/case.toml"),
+        "version = 1\nid = \"alpha\"\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.runner]\noutcome = \"pass\"\n\n[targets.go]\noutcome = \"pass\"\n",
+    )
+    .expect("write case manifest");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[targets.go]\nemit = \"go\"\nextension = \"go\"\nrun = [\"sh\", \"-c\", \"exit 0\"]\n",
+    )
+    .expect("write suite manifest");
+    temp
+}
+
+/// Run `faber corpus` with `args` and return the exit status and the parsed
+/// JSON-lines stdout (every line must parse: a failure keeps the stream valid).
+fn corpus_exit(args: &[&str], input: &std::path::Path) -> (Option<i32>, Vec<serde_json::Value>) {
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .arg("corpus")
+        .args(args)
+        .arg(input)
+        .output()
+        .expect("run corpus");
+    (output.status.code(), records(&output.stdout))
+}
+
+const USAGE: i32 = 64;
+const NO_INPUT: i32 = 66;
+const CANT_CREATE: i32 = 73;
+const CONFIG: i32 = 78;
+
+#[test]
+fn corpus_invocation_and_config_exit_classes() {
+    let suite = exit_class_suite();
+
+    // A target the suite has no recipe for is a bad invocation of a valid suite.
+    let (code, rows) = corpus_exit(&["--target", "nosuch"], suite.path());
+    assert_eq!(code, Some(USAGE), "{rows:?}");
+    assert_eq!(rows[0]["type"], "error");
+    // A non-matching filter, and a suite-only option on a single input.
+    let (code, _) = corpus_exit(&["--target", "runner", "--filter", "zzz"], suite.path());
+    assert_eq!(code, Some(USAGE));
+    let (code, _) = corpus_exit(&["--filter", "alpha"], &smoke_case());
+    assert_eq!(code, Some(USAGE));
+    let (code, _) = corpus_exit(&["--target", "go"], suite.path());
+    assert_eq!(code, Some(0), "a valid suite and target still exit 0");
+
+    // A failed expectation is an outcome, not a configuration error: still 1.
+    let failing = tempfile::tempdir().expect("temporary suite");
+    check_only_case(failing.path(), "alpha");
+    fs::write(
+        failing.path().join("cases/alpha/case.toml"),
+        "version = 1\nid = \"alpha\"\ninput = \"main.fab\"\n\n[expect]\nstdout_contains = \"no-such-text\"\n\n[targets.runner]\noutcome = \"pass\"\n",
+    )
+    .expect("rewrite case manifest");
+    fs::write(
+        failing.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("write suite manifest");
+    let (code, rows) = corpus_exit(&["--target", "runner"], failing.path());
+    assert_eq!(code, Some(1), "{rows:?}");
+    assert_eq!(rows.last().expect("summary")["status"], "fail");
+
+    // A bad corpus.toml or case.toml, or a version it does not support.
+    let bad = exit_class_suite();
+    fs::write(bad.path().join("corpus.toml"), "version = [\n").expect("break toml");
+    let (code, rows) = corpus_exit(&["--target", "runner"], bad.path());
+    // Not a suite (no readable corpus.toml table), so it is judged as a single
+    // input only when corpus.toml is absent; a present-but-invalid one is 78.
+    assert_eq!(code, Some(CONFIG), "{rows:?}");
+    fs::write(
+        bad.path().join("corpus.toml"),
+        "version = 9\ncases_dir = \"cases\"\n",
+    )
+    .expect("break version");
+    let (code, _) = corpus_exit(&["--target", "runner"], bad.path());
+    assert_eq!(code, Some(CONFIG));
+    fs::write(
+        bad.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"no-such-cases\"\n",
+    )
+    .expect("break cases dir");
+    let (code, _) = corpus_exit(&["--target", "runner"], bad.path());
+    assert_eq!(code, Some(CONFIG));
+    fs::write(
+        bad.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n",
+    )
+    .expect("restore suite");
+    fs::write(bad.path().join("cases/alpha/case.toml"), "version = [\n").expect("break case");
+    let (code, _) = corpus_exit(&["--target", "runner"], bad.path());
+    assert_eq!(code, Some(CONFIG));
+
+    // A declared external recipe with a missing required field.
+    let recipe = exit_class_suite();
+    fs::write(
+        recipe.path().join("corpus.toml"),
+        "version = 1\ncases_dir = \"cases\"\n\n[targets.go]\nextension = \"go\"\n",
+    )
+    .expect("write incomplete recipe");
+    let (code, _) = corpus_exit(&["--target", "go"], recipe.path());
+    assert_eq!(code, Some(CONFIG));
+
+    // A missing input.
+    let missing = suite.path().join("no-such-input.fab");
+    let (code, rows) = corpus_exit(&["--target", "runner"], &missing);
+    assert_eq!(code, Some(NO_INPUT), "{rows:?}");
+}
+
+#[cfg(not(feature = "hir-rust"))]
+#[test]
+fn corpus_target_missing_from_the_build_exits_69() {
+    let suite = exit_class_suite();
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "rust"])
+        .arg(suite.path())
+        .output()
+        .expect("run corpus");
+    assert_eq!(output.status.code(), Some(69));
+}
+
+#[test]
+fn corpus_write_failures_exit_73() {
+    // The suite's `target` entry is a file, so no workspace can be created
+    // under it.
+    let suite = exit_class_suite();
+    fs::write(suite.path().join("target"), "not a directory").expect("block workspace");
+    let (code, rows) = corpus_exit(&["--target", "go"], suite.path());
+    assert_eq!(code, Some(CANT_CREATE), "{rows:?}");
+    assert_eq!(rows.last().expect("error row")["type"], "error");
+
+    // The runner target stages nothing, so the same suite still runs.
+    let (code, rows) = corpus_exit(&["--target", "runner"], suite.path());
+    assert_eq!(code, Some(0), "{rows:?}");
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn corpus_rust_workspace_write_failure_exits_73() {
+    let suite = probe_suite(
+        &runtime_recipe("rust"),
+        "[expect]\ncheck_only = true\n\n[targets.rust]\noutcome = \"pass\"\n",
+    );
+    fs::write(suite.path().join("target"), "not a directory").expect("block workspace");
+    let (code, rows) = corpus_exit(&["--target", "rust"], suite.path());
+    assert_eq!(code, Some(CANT_CREATE), "{rows:?}");
+    assert_eq!(rows.last().expect("error row")["type"], "error");
+}
+
+/// A three-case runner suite: `cases/{a,b,c}` with the given `corpus.toml` extras
+/// and per-case manifest extras (`category`/`domain` lines).
+fn selection_suite(suite_extra: &str, tags: [&str; 3]) -> tempfile::TempDir {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[expectations.check.runner]\noutcome = \"pass\"\n{suite_extra}"
+        ),
+    )
+    .expect("write suite manifest");
+    for (name, tag) in ["a", "b", "c"].into_iter().zip(tags) {
+        let case = temp.path().join("cases").join(name);
+        fs::create_dir_all(&case).expect("create case directory");
+        fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+        fs::write(
+            case.join("case.toml"),
+            format!(
+                "version = 1\ngroup = \"check\"\ninput = \"main.fab\"\n{tag}\n[expect]\ncheck_only = true\n"
+            ),
+        )
+        .expect("write case manifest");
+    }
+    temp
+}
+
+fn tagged_selection_suite() -> tempfile::TempDir {
+    selection_suite(
+        "\n[domains]\nd1 = [\"alpha\", \"beta\"]\nd2 = [\"gamma\"]\n",
+        [
+            "category = \"alpha\"\n",
+            "category = \"beta\"\ndomain = \"d1\"\n",
+            "category = \"gamma\"\n",
+        ],
+    )
+}
+
+/// Run the suite with selector arguments; the status and the ids of the cases it ran.
+fn selected(suite: &std::path::Path, selectors: &[&str]) -> (Option<i32>, Vec<String>) {
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .args(selectors)
+        .arg(suite)
+        .output()
+        .expect("run corpus selection");
+    let mut ids: Vec<String> = records(&output.stdout)
+        .iter()
+        .filter(|row| row["type"] == "case")
+        .map(|row| row["case"].as_str().expect("case id").to_owned())
+        .collect();
+    ids.sort();
+    (output.status.code(), ids)
+}
+
+fn strings(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_owned()).collect()
+}
+
+#[test]
+fn corpus_selection_cli_selectors_union_and_every_domain_selects_the_suite() {
+    let suite = tagged_selection_suite();
+    let path = suite.path();
+    assert_eq!(selected(path, &[]), (Some(0), strings(&["a", "b", "c"])));
+    assert_eq!(
+        selected(path, &["--domain", "d1"]),
+        (Some(0), strings(&["a", "b"]))
+    );
+    assert_eq!(
+        selected(path, &["--domain", "d2", "--case", "a"]),
+        (Some(0), strings(&["a", "c"]))
+    );
+    assert_eq!(
+        selected(path, &["--category", "beta,gamma"]),
+        (Some(0), strings(&["b", "c"]))
+    );
+    assert_eq!(
+        selected(path, &["--filter", "c", "--category", "alpha"]),
+        (Some(0), strings(&["a", "c"]))
+    );
+    assert_eq!(
+        selected(path, &["--domain", "d1,d2"]),
+        (Some(0), strings(&["a", "b", "c"]))
+    );
+}
+
+#[test]
+fn corpus_selection_cli_refuses_unknown_names_with_the_usage_status() {
+    let suite = tagged_selection_suite();
+    let path = suite.path();
+    for selectors in [
+        ["--case", "a,zzz"],
+        ["--domain", "zzz"],
+        ["--category", "zzz"],
+    ] {
+        assert_eq!(selected(path, &selectors), (Some(64), Vec::new()));
+    }
+}
+
+#[test]
+fn corpus_selection_cli_domain_and_category_need_a_domain_table() {
+    let suite = selection_suite("", ["", "", ""]);
+    let path = suite.path();
+    assert_eq!(selected(path, &["--domain", "d1"]), (Some(64), Vec::new()));
+    assert_eq!(
+        selected(path, &["--category", "alpha"]),
+        (Some(64), Vec::new())
+    );
+    assert_eq!(
+        selected(path, &["--case", "b", "--filter", "c"]),
+        (Some(0), strings(&["b", "c"]))
+    );
+}
+
+#[test]
+fn corpus_selection_cli_loader_rejects_tags_outside_the_partition() {
+    let untagged = selection_suite(
+        "\n[domains]\nd1 = [\"alpha\"]\n",
+        [
+            "category = \"alpha\"\n",
+            "category = \"alpha\"\n",
+            "category = \"beta\"\n",
+        ],
+    );
+    assert_eq!(selected(untagged.path(), &[]).0, Some(78));
+    let disagreeing = selection_suite(
+        "\n[domains]\nd1 = [\"alpha\"]\nd2 = [\"beta\"]\n",
+        [
+            "category = \"alpha\"\n",
+            "category = \"alpha\"\ndomain = \"d2\"\n",
+            "category = \"beta\"\n",
+        ],
+    );
+    assert_eq!(selected(disagreeing.path(), &[]).0, Some(78));
 }

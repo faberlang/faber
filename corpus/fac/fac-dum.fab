@@ -2,7 +2,7 @@
 term = "fac"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "assignment", "place", "comparison", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "error"
 canonical = false
 summary = "Postfix dum loop attached to a fac block."
 syntax = "fac <block> dum <condition>"

@@ -63,8 +63,10 @@ fn swap_carries_device_row(module: &str) {
                     .functions
                     .iter()
                     .find(|function| function.id == id)
-                    .map(|function| format!("{id:?}={:?}", function.name))
-                    .unwrap_or_else(|| format!("{id:?}=?"))
+                    .map_or_else(
+                        || format!("{id:?}=?"),
+                        |function| format!("{id:?}={:?}", function.name),
+                    )
             };
             let registration = lowered
                 .imported_device_registrations

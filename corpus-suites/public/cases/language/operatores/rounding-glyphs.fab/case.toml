@@ -3,6 +3,8 @@ id = "corpus/operatores/rounding-glyphs.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/rounding-glyphs.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

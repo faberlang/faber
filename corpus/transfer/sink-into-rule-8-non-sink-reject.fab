@@ -2,7 +2,7 @@
 term = "⇜"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "sink_into", "transfer", "assignment", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "Rule 8 rejects a left operand that does not implement the marked Sink<T> contract."
 syntax = "non-sink ⇜ item"

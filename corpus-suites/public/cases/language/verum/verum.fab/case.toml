@@ -3,6 +3,8 @@ id = "corpus/verum/verum.fab"
 group = "language"
 input_root = "corpus"
 input = "verum/verum.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

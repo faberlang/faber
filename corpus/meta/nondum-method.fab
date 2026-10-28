@@ -2,7 +2,7 @@
 term = "nondum"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "nondum_method_decl", "nondum_annotation", "genus_field_decl", "functio_method_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "block_stmt", "redde_stmt", "member_suffix", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt"]
-category = "availability"
+category = "annotation"
 canonical = false
 summary = "A genus method marked @ nondum may omit its body; any call of it is refused."
 syntax = "@ nondum [target] [reason] <method signature>"

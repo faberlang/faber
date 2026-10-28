@@ -2,7 +2,7 @@
 term = "textus"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "member_suffix", "expression", "literal", "nota_stmt", "range_expr", "range_tail"]
-category = "range"
+category = "text"
 canonical = false
 summary = "A range index reads a character window, half-open or inclusive, and never trims."
 syntax = "s[a‥b] · s[a…b]"

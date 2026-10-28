@@ -2,7 +2,7 @@
 locale = "la"
 term = "sort-float"
 kind = "concept"
-category = "collection"
+category = "sort"
 grammar = ["sort_expr", "sort_direction", "sort_body"]
 canonical = true
 +++

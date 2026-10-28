@@ -2,7 +2,7 @@
 locale = "en"
 term = "reducta-filum-en"
 kind = "concept"
-category = "collection"
+category = "reduction"
 grammar = ["reducta_expr", "reducta_op", "reducta_body", "filum_clause"]
 canonical = false
 +++

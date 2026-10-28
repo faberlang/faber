@@ -93,7 +93,7 @@ fn quote(string raw) → string {
     mut list<string> parts ← [«"»]
     mut int index ← 0
     while index ≺ raw.length() {
-        let string c ← raw.slice(index, index + 1)
+        let string c ← raw.slice(index, index + 1) ⊥ ""
         let string ∪ none escaped ← lexer.escape_char(c)
         if escaped not is none {
             parts.append(escaped coalesce "")

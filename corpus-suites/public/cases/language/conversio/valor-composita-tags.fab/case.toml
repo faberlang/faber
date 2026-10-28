@@ -3,6 +3,8 @@ id = "corpus/conversio/valor-composita-tags.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/valor-composita-tags.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

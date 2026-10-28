@@ -3,6 +3,8 @@ id = "corpus/bounded/conversio-octeti-to-octeti-decline.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/conversio-octeti-to-octeti-decline.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/ref-param-repoint.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/ref-param-repoint.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

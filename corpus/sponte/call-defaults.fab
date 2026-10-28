@@ -2,7 +2,7 @@
 term = "sponte"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "genus_decl", "genus_member", "field_decl", "expression", "literal", "nota_stmt", "incipit_stmt"]
-category = "declaration"
+category = "function"
 canonical = false
 summary = "Call sites of optional parameters: bare `optional` (omitted is none) and `optional coalesce N` defaults."
 syntax = "greet(\"A\")"

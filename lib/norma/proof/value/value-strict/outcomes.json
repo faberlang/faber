@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "package_go_codegen_failed",
       "reason": "The Go package emitter fails this package's compilation with `package_go_codegen_failed` before any Go source is produced. Re-measure this row when the Go package emitter lowers the surface this proof imports."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "missing variant field metadata",
+      "reason": "The TypeScript backend loses the variant field metadata of an imported definition in this program, so code generation stops before any file is written."
     }
   }
 }

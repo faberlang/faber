@@ -3,6 +3,8 @@ id = "corpus/decimal/conversio_channel.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/conversio_channel.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

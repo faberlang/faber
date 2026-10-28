@@ -2,7 +2,7 @@
 term = "summa"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "expression", "reducta_expr", "literal", "nota_stmt"]
-category = "collection"
+category = "reduction"
 canonical = false
 summary = "Rank-1 sequential sum without coordinates: reducta via summa ex <tensor> sit s { redde <term> }."
 syntax = "reducta via summa ex <source> sit <binder> { redde <term> }"

@@ -2,7 +2,7 @@
 term = "lista"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "unary_expr", "multiplicative_expr", "additive_expr", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Numeric lists take % and ÷ against a scalar, unary minus, and the glyphs ⊙ ⊘ ÷ between two lists; * and / between two lists are errors that name the glyphs; a bounded list pairs its live length, never its capacity."
 syntax = "xs % s | s ÷ xs | -xs | xs ⊙ ys | xs ⊘ ys | xs ÷ ys"

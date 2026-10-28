@@ -227,6 +227,31 @@ fn an_integer_typed_leaf_is_never_folded_as_an_exact_quotient() {
 }
 
 #[test]
+fn an_integer_constant_expression_in_a_float_slot_folds_to_a_float_literal() {
+    // Ruling 20: typecheck leaves the integer literals integer-typed under the
+    // float-typed root. Without the fold the runner kept the integer in the
+    // float slot and printed `300`.
+    let expr = last_init("sit fractus c ← 200 + 100");
+    assert!(
+        matches!(expr.kind, HirExpressionKind::Literal(HirLiteral::Float(value)) if value.to_bits() == 300.0_f64.to_bits()),
+        "{:?}",
+        expr.kind
+    );
+    assert_eq!(folded("sit f32 x ← 2 * 3"), 6.0);
+    // The integer operators run first: `/` and `%` floor, then one conversion.
+    assert_eq!(folded("sit fractus t ← 7 / 2"), 3.0);
+    assert_eq!(folded("sit fractus t ← (200 + 100) / 2"), 150.0);
+    assert_eq!(folded("sit fractus t ← 7 % 4"), 3.0);
+    assert_eq!(folded("sit fractus t ← 1 ⇐ 4"), 16.0);
+    assert_eq!(folded("sit fractus t ← -(2 + 3)"), -5.0);
+}
+
+#[test]
+fn an_integer_constant_expression_with_a_zero_divisor_is_left_to_run_time() {
+    assert!(is_binary(&last_init("sit fractus t ← 7 / 0")));
+}
+
+#[test]
 fn a_decimal_slot_is_not_rewritten() {
     // Typecheck stores the decimal sum through an implicit conversion; the
     // literal-only sum inside it is decimal-typed and keeps its two literals.

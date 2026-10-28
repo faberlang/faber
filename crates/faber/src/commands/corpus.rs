@@ -10,8 +10,13 @@ mod gpu;
 mod runner_test;
 #[cfg(feature = "hir-rust")]
 mod rust;
+mod selection;
+#[cfg(test)]
+#[path = "corpus/selection_test.rs"]
+mod selection_test;
 
 use crate::cli::CorpusArgs;
+use faber_cli::exit_status;
 use faber_cli::package;
 #[cfg(any(not(feature = "hir-rust"), not(feature = "mir-llvm")))]
 use radix::module::codegen::Target;
@@ -50,6 +55,13 @@ struct SuiteManifest {
     roots: BTreeMap<String, PathBuf>,
     #[serde(default)]
     expectations: BTreeMap<String, BTreeMap<String, TargetExpectation>>,
+    /// Domain name to its categories; the partition `--domain`/`--category` select by.
+    #[serde(default)]
+    domains: BTreeMap<String, Vec<String>>,
+    /// Category of each product package, which has no corpus frontmatter. The
+    /// generator reads it; the loader only checks the categories are in the table.
+    #[serde(default)]
+    product_categories: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -65,6 +77,10 @@ struct SuiteTarget {
     build: Vec<String>,
     #[serde(default)]
     run: Vec<String>,
+    /// Run command for a package case whose `faber build` printed a linked
+    /// artifact; without it the case runs `run` like a single-file emit.
+    #[serde(default)]
+    package_run: Vec<String>,
     #[serde(default)]
     files: BTreeMap<PathBuf, String>,
     #[serde(default)]
@@ -76,6 +92,7 @@ struct SuiteTarget {
 struct LoadedSuite {
     cases: Vec<Case>,
     recipe: Option<SuiteTarget>,
+    domains: Option<selection::DomainTable>,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +101,8 @@ struct CaseManifest {
     version: u32,
     id: Option<String>,
     group: Option<String>,
+    category: Option<String>,
+    domain: Option<String>,
     input_root: Option<String>,
     input: PathBuf,
     #[serde(default)]
@@ -161,6 +180,8 @@ impl Outcome {
 
 struct Case {
     id: String,
+    category: Option<String>,
+    domain: Option<String>,
     dir: PathBuf,
     input: PathBuf,
     args: Vec<String>,
@@ -358,29 +379,40 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
     let discovering = Instant::now();
     let suite = if input.is_dir() && input.join("corpus.toml").is_file() {
         if args.expected.is_some() {
-            fail("--expected applies only to a single input");
+            fail_usage("--expected applies only to a single input");
         }
-        let mut suite = load_suite(&input, &args.target).unwrap_or_else(|message| fail(&message));
-        if let Some(filter) = args.filter.as_deref() {
-            suite.cases.retain(|case| case.id.contains(filter));
-            if suite.cases.is_empty() {
-                fail(&format!("no cases match filter {filter:?}"));
-            }
-        }
+        let mut suite = load_suite(&input, &args.target).unwrap_or_else(|error| error.exit());
+        let selectors = selection::Selectors {
+            domains: args.domain.clone(),
+            categories: args.category.clone(),
+            cases: args.case.clone(),
+            filter: args.filter.clone(),
+        };
+        suite.cases = selection::select(suite.cases, suite.domains.as_ref(), &selectors)
+            .unwrap_or_else(|error| match error {
+                selection::SelectionError::Usage(message)
+                | selection::SelectionError::Empty(message) => fail_usage(&message),
+            });
         suite
     } else {
-        if args.filter.is_some() {
-            fail("--filter applies only to a suite");
+        let named = [
+            ("--filter", args.filter.is_some()),
+            ("--domain", !args.domain.is_empty()),
+            ("--category", !args.category.is_empty()),
+            ("--case", !args.case.is_empty()),
+        ];
+        if let Some((flag, _)) = named.iter().find(|(_, given)| *given) {
+            fail_usage(&format!("{flag} applies only to a suite"));
         }
         if args.target != "runner" {
-            fail("non-runner targets require a suite with a target recipe");
+            fail_usage("non-runner targets require a suite with a target recipe");
         }
         LoadedSuite {
             cases: vec![
-                single_case(&input, args.expected.as_deref())
-                    .unwrap_or_else(|message| fail(&message)),
+                single_case(&input, args.expected.as_deref()).unwrap_or_else(|error| error.exit()),
             ],
             recipe: None,
+            domains: None,
         }
     };
     let discover_ms = ms(discovering);
@@ -399,7 +431,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
                     .recipe
                     .as_ref()
                     .and_then(|item| item.runtime.as_deref())
-                    .unwrap_or_else(|| fail("rust target requires [targets.rust] runtime")),
+                    .unwrap_or_else(|| fail_config("rust target requires [targets.rust] runtime")),
                 &faber,
                 discover_ms,
                 started,
@@ -420,7 +452,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
                     .as_ref()
                     .and_then(|item| item.runtime.as_deref())
                     .unwrap_or_else(|| {
-                        fail("canonical target requires [targets.canonical] runtime")
+                        fail_config("canonical target requires [targets.canonical] runtime")
                     }),
                 &faber,
                 discover_ms,
@@ -446,7 +478,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             suite
                 .recipe
                 .as_ref()
-                .unwrap_or_else(|| fail("external target requires a suite target recipe")),
+                .unwrap_or_else(|| fail_config("external target requires a suite target recipe")),
             &faber,
             discover_ms,
             started,
@@ -537,14 +569,19 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
     }
 }
 
-fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
+fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, SuiteError> {
     let stdout = if let Some(path) = explicit {
         package::absolutize_path(path)
     } else if input.is_file() && input.extension().is_some_and(|ext| ext == "fab") {
         input.with_extension("expected")
     } else {
         package::discover_package(input)
-            .map_err(|diagnostic| diagnostic.message)?
+            .map_err(|diagnostic| {
+                SuiteError::with_status(
+                    exit_status::status_for_diagnostic(&diagnostic),
+                    diagnostic.message,
+                )
+            })?
             .entry
             .with_extension("expected")
     };
@@ -558,6 +595,8 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
     };
     Ok(Case {
         id: input.display().to_string(),
+        category: None,
+        domain: None,
         dir,
         input: input.to_path_buf(),
         args: Vec::new(),
@@ -587,33 +626,57 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
     })
 }
 
-fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
+fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, SuiteError> {
     let manifest_path = root.join("corpus.toml");
-    let text = fs::read_to_string(&manifest_path)
-        .map_err(|error| format!("cannot read {}: {error}", manifest_path.display()))?;
+    let text = fs::read_to_string(&manifest_path).map_err(|error| {
+        SuiteError::with_status(
+            exit_status::NO_INPUT,
+            format!("cannot read {}: {error}", manifest_path.display()),
+        )
+    })?;
     let suite: SuiteManifest = toml::from_str(&text)
         .map_err(|error| format!("invalid {}: {error}", manifest_path.display()))?;
     if suite.version != 1 {
-        return Err(format!("unsupported corpus.toml version {}", suite.version));
+        return Err(format!("unsupported corpus.toml version {}", suite.version).into());
+    }
+    // A target the suite declares no recipe for is a bad invocation of a valid
+    // suite, found before any case is read: every other target needs a recipe.
+    if target != "runner" && !suite.targets.contains_key(target) {
+        return Err(SuiteError::with_status(
+            exit_status::USAGE,
+            format!("suite has no [targets.{target}] recipe"),
+        ));
     }
     let roots = resolve_suite_roots(root, suite.roots)?;
     let cases_root = relative_path(root, &suite.cases_dir)?;
     if !cases_root.is_dir() {
-        return Err(format!(
-            "cases directory is missing: {}",
-            cases_root.display()
-        ));
+        return Err(format!("cases directory is missing: {}", cases_root.display()).into());
     }
     let mut manifests = Vec::new();
     find_cases(&cases_root, &mut manifests)?;
     manifests.sort();
     if manifests.is_empty() {
-        return Err(format!("no case.toml files under {}", cases_root.display()));
+        return Err(format!("no case.toml files under {}", cases_root.display()).into());
     }
-    let cases = manifests
+    let mut cases = manifests
         .iter()
         .map(|path| load_case(path, &cases_root, target, &roots, &suite.expectations))
         .collect::<Result<Vec<_>, _>>()?;
+    let domains = selection::DomainTable::from_manifest(suite.domains)
+        .map_err(|message| format!("invalid {}: {message}", manifest_path.display()))?;
+    for (case_id, category) in &suite.product_categories {
+        if !domains
+            .as_ref()
+            .is_some_and(|table| table.has_category(category))
+        {
+            return Err(format!(
+                "invalid {}: product_categories {case_id}: category {category:?} is in no domain",
+                manifest_path.display()
+            )
+            .into());
+        }
+    }
+    selection::DomainTable::tag_cases(domains.as_ref(), &mut cases)?;
     let recipe = if target == "runner" {
         None
     } else {
@@ -627,18 +690,24 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     };
     let recipe = if let Some(mut recipe) = recipe {
         if target == "gpu" && recipe.mode.as_deref() != Some("gpu") {
-            return Err("gpu target requires [targets.gpu] mode = \"gpu\"".to_owned());
+            return Err("gpu target requires [targets.gpu] mode = \"gpu\""
+                .to_owned()
+                .into());
         }
         if matches!(target, "rust" | "canonical") && suite.embedded_only {
             if recipe.runtime.is_some() {
                 return Err(format!(
                     "embedded_only suite must not set [targets.{target}] runtime in corpus.toml"
-                ));
+                )
+                .into());
             }
             let path = package::embedded_runtime_root()
                 .ok_or_else(|| {
-                    format!(
+                    SuiteError::with_status(
+                        exit_status::UNAVAILABLE,
+                        format!(
                         "embedded_only {target} target requires an embedded runtime, which is unavailable"
+                    ),
                     )
                 })?
                 .join("runtime/rust");
@@ -646,14 +715,16 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
                 return Err(format!(
                     "embedded_only embedded runtime is missing Cargo.toml: {}",
                     path.display()
-                ));
+                )
+                .into());
             }
             recipe.runtime = Some(path);
         } else {
             if matches!(target, "rust" | "canonical") && recipe.runtime.is_none() {
                 return Err(format!(
                     "{target} target requires [targets.{target}] runtime in corpus.toml"
-                ));
+                )
+                .into());
             }
             if let Some(configured) = recipe.runtime.as_deref() {
                 let path = if configured.is_absolute() {
@@ -662,13 +733,16 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
                     root.join(configured)
                 };
                 if !path.is_dir() {
-                    return Err(format!("target runtime is missing: {}", path.display()));
+                    return Err(format!("target runtime is missing: {}", path.display()).into());
                 }
                 if matches!(target, "rust" | "canonical") && !path.join("Cargo.toml").is_file() {
-                    return Err(format!("Rust runtime crate is missing: {}", path.display()));
+                    return Err(format!("Rust runtime crate is missing: {}", path.display()).into());
                 }
                 recipe.runtime = Some(path.canonicalize().map_err(|error| {
-                    format!("cannot resolve target runtime {}: {error}", path.display())
+                    SuiteError::with_status(
+                        exit_status::NO_INPUT,
+                        format!("cannot resolve target runtime {}: {error}", path.display()),
+                    )
                 })?);
             }
         }
@@ -676,7 +750,11 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     } else {
         None
     };
-    Ok(LoadedSuite { cases, recipe })
+    Ok(LoadedSuite {
+        cases,
+        recipe,
+        domains,
+    })
 }
 
 fn resolve_suite_roots(
@@ -715,19 +793,21 @@ fn resolve_suite_roots(
         .collect()
 }
 
-fn find_cases(dir: &Path, manifests: &mut Vec<PathBuf>) -> Result<(), String> {
+fn find_cases(dir: &Path, manifests: &mut Vec<PathBuf>) -> Result<(), SuiteError> {
     let marker = dir.join("case.toml");
     if marker.is_file() {
         manifests.push(marker);
         return Ok(());
     }
-    for entry in
-        fs::read_dir(dir).map_err(|error| format!("cannot read {}: {error}", dir.display()))?
+    let unreadable = |message: String| SuiteError::with_status(exit_status::NO_INPUT, message);
+    for entry in fs::read_dir(dir)
+        .map_err(|error| unreadable(format!("cannot read {}: {error}", dir.display())))?
     {
-        let entry = entry.map_err(|error| format!("cannot read case entry: {error}"))?;
+        let entry =
+            entry.map_err(|error| unreadable(format!("cannot read case entry: {error}")))?;
         let file_type = entry
             .file_type()
-            .map_err(|error| format!("cannot read case type: {error}"))?;
+            .map_err(|error| unreadable(format!("cannot read case type: {error}")))?;
         if file_type.is_dir() {
             find_cases(&entry.path(), manifests)?;
         } else if file_type.is_file()
@@ -739,7 +819,8 @@ fn find_cases(dir: &Path, manifests: &mut Vec<PathBuf>) -> Result<(), String> {
             return Err(format!(
                 "source or golden outside a case directory: {}",
                 entry.path().display()
-            ));
+            )
+            .into());
         }
     }
     Ok(())
@@ -751,10 +832,32 @@ fn load_case(
     target: &str,
     roots: &BTreeMap<String, PathBuf>,
     expectations: &BTreeMap<String, BTreeMap<String, TargetExpectation>>,
+) -> Result<Case, SuiteError> {
+    let text = fs::read_to_string(manifest_path).map_err(|error| {
+        SuiteError::with_status(
+            exit_status::NO_INPUT,
+            format!("cannot read {}: {error}", manifest_path.display()),
+        )
+    })?;
+    Ok(parse_case(
+        &text,
+        manifest_path,
+        cases_root,
+        target,
+        roots,
+        expectations,
+    )?)
+}
+
+fn parse_case(
+    text: &str,
+    manifest_path: &Path,
+    cases_root: &Path,
+    target: &str,
+    roots: &BTreeMap<String, PathBuf>,
+    expectations: &BTreeMap<String, BTreeMap<String, TargetExpectation>>,
 ) -> Result<Case, String> {
-    let text = fs::read_to_string(manifest_path)
-        .map_err(|error| format!("cannot read {}: {error}", manifest_path.display()))?;
-    let mut manifest: CaseManifest = toml::from_str(&text)
+    let mut manifest: CaseManifest = toml::from_str(text)
         .map_err(|error| format!("invalid {}: {error}", manifest_path.display()))?;
     if manifest.version != 1 {
         return Err(format!(
@@ -951,6 +1054,8 @@ fn load_case(
         .transpose()?;
     Ok(Case {
         id,
+        category: manifest.category.take(),
+        domain: manifest.domain.take(),
         dir: dir.to_path_buf(),
         input,
         args: expectation.args.clone().unwrap_or(manifest.args),
@@ -1383,10 +1488,73 @@ fn ms(started: Instant) -> f64 {
     (started.elapsed().as_secs_f64() * 1_000_000.0).round() / 1_000.0
 }
 
-fn fail(message: &str) -> ! {
+/// A corpus suite that could not be loaded, and the exit status that names
+/// why: a bad `corpus.toml` or case file is [`exit_status::CONFIG`] (the
+/// default for a message), an unreadable one [`exit_status::NO_INPUT`], a
+/// target the suite has no recipe for [`exit_status::USAGE`].
+struct SuiteError {
+    status: i32,
+    message: String,
+}
+
+impl SuiteError {
+    fn with_status(status: i32, message: String) -> Self {
+        Self { status, message }
+    }
+
+    fn exit(&self) -> ! {
+        fail_with(self.status, &self.message)
+    }
+}
+
+impl std::fmt::Display for SuiteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl From<String> for SuiteError {
+    fn from(message: String) -> Self {
+        Self::with_status(exit_status::CONFIG, message)
+    }
+}
+
+/// Print the corpus error row on stdout (the JSON-lines stream stays
+/// parseable) and exit with `status`.
+fn fail_with(status: i32, message: &str) -> ! {
     println!(
         "{}",
         json!({"schema": 1, "type": "error", "message": message})
     );
-    std::process::exit(1);
+    std::process::exit(status);
+}
+
+/// A failure with no known class.
+fn fail(message: &str) -> ! {
+    fail_with(exit_status::FAILURE, message)
+}
+
+/// A bad corpus invocation: an option or target the suite cannot serve.
+fn fail_usage(message: &str) -> ! {
+    fail_with(exit_status::USAGE, message)
+}
+
+/// A bad suite, case or target recipe configuration.
+fn fail_config(message: &str) -> ! {
+    fail_with(exit_status::CONFIG, message)
+}
+
+/// A feature, executor or tool this binary or host does not have.
+fn fail_unavailable(message: &str) -> ! {
+    fail_with(exit_status::UNAVAILABLE, message)
+}
+
+/// A corpus workspace or staged artifact that cannot be written.
+fn fail_cant_create(message: &str) -> ! {
+    fail_with(exit_status::CANT_CREATE, message)
+}
+
+/// An internal inconsistency in the corpus run itself.
+fn fail_software(message: &str) -> ! {
+    fail_with(exit_status::SOFTWARE, message)
 }

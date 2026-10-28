@@ -27,7 +27,7 @@ main {
     let tensor<f32, [3, 4]> t ← [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] ↦ tensor<f32, [3, 4]>
     let list<int> ids ← [0, 1, 2]
     do {
-        let tensor<f32, [3, 4]> r ← utilModule.gather<3, 4, 3>(t, ids)
+        let tensor<f32, [3, 4]> r ← utilModule.gather<size 3, size 4, size 3>(t, ids)
         let list<int, _> s ← r.shape()
         print s.length()
         print s[0]
@@ -45,7 +45,7 @@ main {
     let tensor<f32, [3, 4]> t ← [[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]] ↦ tensor<f32, [3, 4]>
     let list<int> ids ← [0, 1]
     do {
-        let tensor<f32, [2, 4]> r ← utilModule.gather<3, 4, 2>(t, ids)
+        let tensor<f32, [2, 4]> r ← utilModule.gather<size 3, size 4, size 2>(t, ids)
         let list<int, _> s ← r.shape()
         print s.length()
     }
@@ -202,7 +202,7 @@ fn tensor_from_flat_shape_dims(function: &radix_mir::MirFunction) -> Option<Vec<
         .iter()
         .map(|item| match item {
             MirAggregateItem::Operand(operand) => operand_dim(function, operand),
-            _ => None,
+            MirAggregateItem::Spread(_) => None,
         })
         .collect()
 }
@@ -228,10 +228,7 @@ fn package_mir_bakes_symbolic_rank_two_pin_shape_operand() {
         },
     )
     .unwrap_or_else(|errors| {
-        panic!(
-            "symbolic generic pin package must link and finalize, got {:?}",
-            errors
-        )
+        panic!("symbolic generic pin package must link and finalize, got {errors:?}")
     });
 }
 
@@ -258,24 +255,23 @@ fn package_mir_runs_symbolic_rank_two_pin_at_declared_shape() {
 }
 
 #[test]
-fn package_mir_symbolic_pin_wrong_count_fails_closed() {
+fn package_mir_symbolic_pin_wrong_count_is_a_catchable_failure() {
     let dir = crate::test_support::test_temp_dir("gsf2-generic-pin-wrong-count");
     let entry = write_pin_package(dir.as_ref(), PIN_MAIN_WRONG_COUNT);
     let config = Config::default();
 
     let mut host = radix_mir_runner::BufferHost::default();
-    let errors = run_package_mir(
+    run_package_mir(
         &config,
         &entry,
         &crate::test_support::test_mir_seams(),
         &mut host,
     )
-    .expect_err("a flat list longer than the declared [T, D] element count must fail closed");
-    assert!(
-        errors
-            .iter()
-            .any(|diagnostic| diagnostic.code == Some("PKG001")),
-        "the wrong-count failure must carry the structured PKG001 identity, got {:?}",
-        errors
+    .expect("a wrong-length list pin is a catchable conversion failure, not a runner abort");
+    assert_eq!(
+        host.stdout_lines,
+        vec!["gather failed".to_owned()],
+        "the 12-element flat list cannot become [2, 4]; the `⇥ string` caller must take the \
+         catch arm and never observe a shape"
     );
 }

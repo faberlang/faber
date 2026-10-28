@@ -3,6 +3,8 @@ id = "corpus/fiunt/pigritia.fab"
 group = "language"
 input_root = "corpus"
 input = "fiunt/pigritia.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

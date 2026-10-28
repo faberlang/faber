@@ -2,7 +2,7 @@
 term = "iace"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "iace_stmt", "iace_expr", "iace_guarded_expr", "equality", "equality_tail", "redde_stmt", "fac_stmt", "cape_clause", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "errors"
+category = "error"
 canonical = true
 summary = "Conditional throw with si guard."
 syntax = "iace <expression> si <condition>"

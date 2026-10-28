@@ -54,6 +54,78 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// A lifted operator builds a fresh container, so its elements are stores
+    /// into the destination's element type, exactly as a literal's are. The
+    /// exact range the operator gave each element (`list<u8> + list<u8>` is a
+    /// list of `0…510`) is not a type the author can spell, and no name shares
+    /// its storage, so type-argument invariance (ruling 21 row 25) does not
+    /// apply to it: a result whose element fits the expected container's
+    /// element takes that element type. A named container never does.
+    pub(in crate::passes::typecheck) fn adopt_expected_lift_element(
+        &mut self,
+        result: TypeId,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        let Some(expected) = expected else {
+            return result;
+        };
+        let result = self.resolve_inferred_type(result);
+        let expected = self.peel_nominal_aliases(expected);
+        let expected = self.types.peel_access_marker(expected).1;
+        let expected = self.peel_nominal_aliases(expected);
+        let adopted = match (
+            self.types.get(result).clone(),
+            self.types.get(expected).clone(),
+        ) {
+            (Type::Array(from), Type::Array(to)) => self
+                .lift_element_fits(from, to)
+                .then(|| self.types.array(to)),
+            (
+                Type::BoundedArray {
+                    element: from,
+                    capacity: from_cap,
+                },
+                Type::BoundedArray {
+                    element: to,
+                    capacity: to_cap,
+                },
+            ) if self.types.index_equals(from_cap, to_cap) => self
+                .lift_element_fits(from, to)
+                .then(|| self.types.bounded_array(to, to_cap)),
+            (Type::Tensor(from, from_shape), Type::Tensor(to, to_shape))
+                if self.types.index_equals(from_shape, to_shape) =>
+            {
+                self.lift_element_fits(from, to)
+                    .then(|| self.types.tensor_with_shape(to, to_shape))
+            }
+            (Type::Vector(from, from_shape), Type::Vector(to, to_shape))
+                if self.types.index_equals(from_shape, to_shape) =>
+            {
+                self.lift_element_fits(from, to)
+                    .then(|| self.types.vector_with_width(to, to_shape))
+            }
+            (Type::Matrix(from, from_shape), Type::Matrix(to, to_shape))
+                if self.types.index_equals(from_shape, to_shape) =>
+            {
+                self.lift_element_fits(from, to)
+                    .then(|| self.types.matrix_with_shape(to, to_shape))
+            }
+            _ => None,
+        };
+        adopted.unwrap_or(result)
+    }
+
+    /// Whether a lifted element widens into the destination element: a
+    /// different numeric type that the ordinary scalar store accepts.
+    fn lift_element_fits(&self, from: TypeId, to: TypeId) -> bool {
+        let from = self.resolve_inferred_type(from);
+        let to = self.resolve_inferred_type(to);
+        !self.types.equals(from, to)
+            && self.numeric_shape(from).is_some()
+            && self.numeric_shape(to).is_some()
+            && self.types.is_assignable(from, to)
+    }
+
     /// Check the elementwise list arithmetic law for `+ - * / % ÷`.
     ///
     /// `None` means neither operand is a `lista`, so the scalar/tensor caller

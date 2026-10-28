@@ -171,7 +171,7 @@ fn package_mir_mixed_shape_generic_instances_are_distinct() {
         );
         },
     )
-    .unwrap_or_else(|errors| panic!("mixed-shape package MIR must link, got {:?}", errors));
+    .unwrap_or_else(|errors| panic!("mixed-shape package MIR must link, got {errors:?}"));
 }
 
 #[test]
@@ -220,5 +220,5 @@ fn package_mir_mixed_shape_generic_links_through_test_package() {
         &crate::test_support::test_mir_seams(),
         |_validated, _function_ids| (),
     )
-    .unwrap_or_else(|errors| panic!("mixed-shape test-package MIR must link, got {:?}", errors));
+    .unwrap_or_else(|errors| panic!("mixed-shape test-package MIR must link, got {errors:?}"));
 }

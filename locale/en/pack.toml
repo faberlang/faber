@@ -33,6 +33,7 @@ insere = "embed"
 privata = "private"
 protecta = "protected"
 publica = "public"
+visibilitas = "visibility"
 sponte = "optional"
 # Control flow
 casu = "case"
@@ -445,6 +446,9 @@ applica = "apply"
 productum = "dot"
 transversum = "cross"
 normalizata = "normalize"
+# Q-X1: the tensor rank and the Euclidean norm (tensor and vector) are named methods; `longitudo` is the element count.
+rank = "rank"
+norm = "norm"
 swizzle = "swizzle"
 
 # range (5) — continet / longitudo shared with lista above.
@@ -1343,6 +1347,10 @@ help = "write the shape with {sugar} width sugar brackets"
 message = "`{form}` is a retired numeric type spelling"
 help = "write `{bare}`, not `{form}`; a width marker is its own type"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "a range needs both ends"
+help = "write both ends, such as 0‥8 or 0…7, with ∞ or -∞ for no bound on a side"
+
 [diagnostics.PARSE040.issues.iuncta_arity_exceeded]
 message = "iuncta arity {count} exceeds maximum of 16; use a class instead"
 help = "reduce the iuncta arity to 16 or fewer, or declare a class for more fields"
@@ -1385,31 +1393,35 @@ help = "check import syntax"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "unknown import field"
-help = "use ex, visibilitas, nomen, ut, or omnia"
+help = "use {ex}, {visibilitas}, {nomen}, {ut}, or {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "import field `{field}` is not declared on this reader surface"
+help = "use `{expected}` for this file's reader locale"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "duplicate import field `{field}`"
 help = "each import field may appear once; remove the repeated field"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "import record requires an ex source"
-help = "add ex = \"path\" to the import record"
+message = "import record requires an {ex} source"
+help = "add {ex} = \"path\" to the import record"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import cannot also name a binding"
-help = "use omnia by itself, or use nomen/ut for a named import"
+help = "use {omnia} by itself, or use {nomen}/{ut} for a named import"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "invalid import visibility"
-help = "use publica"
+help = "use {publica}"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "`privata` on imports was removed; imports do not re-export by default"
-help = "drop the marker, or use publica to re-export"
+message = "`{privata}` on imports was removed; imports do not re-export by default"
+help = "drop the marker, or use {publica} to re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "could not infer import name from {path}"
-help = "spell nomen or an explicit alias for {path}"
+help = "spell {nomen} or an explicit alias for {path}"
 
 [diagnostics.PARSE050.issues.import_target_unknown]
 message = "`{target}` is not a target name"
@@ -1437,7 +1449,7 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "unknown identifier"
-help = "write `{spelling} <expr>` without parentheses for the output statement"
+help = "`{spelling}` is the output statement, not a function: import the console function (`{importa} {ex} \"norma:console\" {fixum} print`, then write `print(...)`), or bind the value first (`{sit} _ x ← …`, then `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "unknown record field"
@@ -1790,6 +1802,38 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping width must be a bare width marker"
 help = "use a bare width marker such as u8 or i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "a range needs a store policy word; a bare width marker takes no range"
+help = "write the policy word first, such as saturating<u32, 0‥8>, trapping<i32, -2‥3> or wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "a range end must be an integer literal or ∞"
+help = "write both ends as integer literals, such as 0‥8; a named or size end is not built yet"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "a ranged store policy takes the width and then one range"
+help = "write policy<W, lo‥hi>, such as saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "the range holds no value"
+help = "the low end must be below the high end of lo‥hi, or not above it for lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "a range end lies outside the width"
+help = "keep both ends inside the width; ∞ is only a high end and -∞ only a low end"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "an unsigned width cannot have a negative low end"
+help = "start the range at 0, or use a signed width such as i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "a ranged store policy needs a bounded integer width"
+help = "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "a kernel cannot use a ranged store policy yet ({site}); a kernel applies no range"
+help = "use the plain width in the kernel and apply the range on the host"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' conflicts with written posture '{written_posture}'"
@@ -2235,6 +2279,10 @@ help = "write `size {name}` to spell the lift at this store, as in `tf32[2, size
 message = "value name cannot occupy a size slot"
 help = "write `size w` to use the value as a size witness"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "generic call size or shape argument is unsupported"
+help = "use a constant, a size name, or a value written `size w`"
+
 [diagnostics.SEM008.issues.unknown_type_name]
 message = "unknown type name"
 help = "fix the AST construct for lowering"
@@ -2326,6 +2374,14 @@ help = "use an integer width no wider than 32 bits"
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "kernel intermediate extent {extent} exceeds the portable integer range"
 help = "keep intermediate values within the portable integer range"
+
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "a shape after `size` in a call's type arguments admits natural-number dimensions only"
+help = "write each dimension as a natural number, as in `size [2, 3]`; pass a symbolic or run-time dimension through a `size` name instead"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "a bracketed shape after `size` is only admitted in a call's type arguments"
+help = "write the shape directly, as in `tensor<f32, [2, 3]>`, or use `size [2, 3]` in a call such as `construct<f32, size [2, 3]>(data)`"
 
 [diagnostics.SEM009]
 message = "CLI validation error"
@@ -2486,6 +2542,10 @@ help = "declare the type only; use a map ({tabula}) until the ledger operations 
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "the ledger type is not supported on this target yet"
 help = "use the MIR runner or the Faber source emitter, or a map ({tabula}), until this target carries a ledger"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "the ranged store policy is not supported on this target yet"
+help = "use the MIR runner, the Rust target or the Faber source emitter until this target applies ranges"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "the {leaf} leaf is not supported on this target"
@@ -4762,6 +4822,14 @@ help = "write the marker at the call as the signature declares it, for example `
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "the `axis` marker is written here but the parameter is not declared `axis`"
 help = "remove the `axis` marker, or declare the parameter `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "this argument is a `size` argument and must be written with the `size` marker"
+help = "write the marker as the signature declares the parameter, for example `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "the `size` marker is written here but the callee declares no `size` parameter"
+help = "remove the `size` marker, or declare the parameter `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"

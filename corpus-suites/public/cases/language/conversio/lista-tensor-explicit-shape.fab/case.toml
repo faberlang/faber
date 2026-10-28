@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/conversio/lista-tensor-explicit-shape.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/lista-tensor-explicit-shape.fab"
+category = "conversion"
+domain = "numerics"
+
+
+[expect]
+check_only = true

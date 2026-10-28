@@ -301,7 +301,10 @@ fn nested_tensor_vector_store_guards_each_unproven_index_in_metal_text() {
             assert!(!text.contains("u9_fault["), "{text}");
         } else {
             for site in 0..expected_faults {
-                assert!(text.contains(&format!("u9_fault[{site}]")), "missing fault site {site}: {text}");
+                assert!(
+                    deferred_slots(&text, expected_faults).contains(&site),
+                    "missing fault site {site}: {text}"
+                );
             }
         }
         if vector_index == "pick" {
@@ -502,10 +505,18 @@ fn a_single_lane_kernel_guards_its_unproven_indexes_in_metal_text() {
             .position(|line| line.contains(needle))
             .unwrap_or_else(|| panic!("no line with {needle}: {text}"))
     };
-    assert!(line("b0_count[0])) {") < line("b0[t"), "{text}");
-    assert!(line("&u9_fault[0]") == line("b0_count[0])) {"), "{text}");
-    assert!(line("b3_count[0])) {") < line("b3[t"), "{text}");
-    assert!(line("&u9_fault[1]") == line("b3_count[0])) {"), "{text}");
+    // Each check is a deferred compare line whose order key carries its slot.
+    assert_eq!(deferred_slots(&text, 2), [0, 1, 0, 1], "{text}");
+    assert!(line("b0_count[0]);") < line("b0[min((uint)"), "{text}");
+    assert!(line("b3_count[0]);") < line("b3[t"), "{text}");
+    // The lane leaves, writing the first failed slot, before its first store.
+    let store = line("b3[t");
+    assert!(
+        text.lines()
+            .nth(store - 1)
+            .is_some_and(|line| line.contains("&u9_fault[u9_first & 3u]")),
+        "{text}"
+    );
     // The literal `dst[0]` store is proven: its line carries no compare.
     let literal = text
         .lines()
@@ -535,7 +546,7 @@ main {
     let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
     assert!(text.contains("device atomic_uint* u9_fault"), "{text}");
-    assert!(text.contains("u9_fault[0]"), "the vector fault uses site 0: {text}");
+    assert_eq!(deferred_slots(&text, 1), [0], "the vector fault uses site 0: {text}");
     assert!(text.contains("(ulong)(4u)"), "the guard uses the vector width: {text}");
 }
 
@@ -583,7 +594,7 @@ main {
     let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
     assert!(text.contains("device atomic_uint* u9_fault"), "{text}");
-    assert!(text.contains("u9_fault[0]"), "the vector store uses site 0: {text}");
+    assert_eq!(deferred_slots(&text, 1), [0], "the vector store uses site 0: {text}");
     assert!(text.contains("(ulong)(4u)"), "the store guard uses the vector width: {text}");
 }
 
@@ -624,4 +635,177 @@ fn a_literal_or_constant_index_carries_no_fault_channel() {
     // The control: a lane coordinate is not proven against `clock`'s extent.
     let (signature, _) = kernel(&constant_index("j"));
     assert!(has_fault_channel(&signature), "{:?}", kinds(&signature));
+}
+
+/// A two-dimensional stencil body in a lane kernel over `[H, W]` tensors.
+#[cfg(feature = "mir-metal")]
+fn stencil(body: &str) -> String {
+    format!(
+        r#"+++
+locale = "en"
++++
+@ kernel
+@ public
+fn k<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → void {{
+    for from src at [i, j] thread lane let x {{
+{body}
+    }}
+}}
+
+main {{
+    mut tensor<f32, [2, 2]> src ← tf32[2, 2] {{}}
+    mut tensor<f32, [2, 2]> dst ← tf32[2, 2] {{}}
+    k(src, mut dst)
+}}
+"#
+    )
+}
+
+/// The deferred bounds checks of the emitted text: one
+/// `const bool u9_gN = <compares>;` line per access.
+#[cfg(feature = "mir-metal")]
+fn guard_lines(text: &str) -> Vec<&str> {
+    text.lines()
+        .map(str::trim_start)
+        .filter(|line| line.starts_with("const bool u9_g") && line.contains("(ulong)("))
+        .collect()
+}
+
+/// The record slot of each deferred check of the text, in order. A check folds
+/// its order key (`ordinal << bits | slot`) into `u9_first`, where `bits` is
+/// the field width for `sites` record slots.
+#[cfg(feature = "mir-metal")]
+fn deferred_slots(text: &str, sites: usize) -> Vec<usize> {
+    let bits = (usize::BITS - sites.leading_zeros()).max(1);
+    text.lines()
+        .filter_map(|line| {
+            let line = line
+                .trim_start()
+                .strip_prefix("u9_first = min(u9_first, u9_g")?;
+            let key: usize = line.split("? ").nth(1)?.split('u').next()?.parse().ok()?;
+            Some(key & ((1 << bits) - 1))
+        })
+        .collect()
+}
+
+/// Every bounds compare of the text (`(ulong)(a) >= (ulong)(b)`).
+#[cfg(feature = "mir-metal")]
+fn compares(text: &str) -> usize {
+    guard_lines(text)
+        .iter()
+        .map(|line| line.matches(">= (ulong)(").count())
+        .sum()
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_repeated_neighbour_read_is_checked_once_with_one_check_per_access() {
+    // Three distinct unproven accesses (east: the column axis, south: the
+    // flat compare for the row axis, diagonal: both); each read twice more.
+    let source = stencil(
+        "        let f32 east ← src[[i, j + 1]]\n\
+         \x20       let f32 south ← src[[i + 1, j]]\n\
+         \x20       let f32 diag ← src[[i + 1, j + 1]]\n\
+         \x20       let f32 east2 ← src[[i, j + 1]]\n\
+         \x20       let f32 south2 ← src[[i + 1, j]]\n\
+         \x20       let f32 diag2 ← src[[i + 1, j + 1]]\n\
+         \x20       dst[[i, j]] ← x + east + south + diag + east2 + south2 + diag2",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    let guards = guard_lines(&text);
+    assert_eq!(guards.len(), 3, "one check per distinct access: {text}");
+    // east: column axis; south: flat; diagonal: column axis (seen) + new flat.
+    assert_eq!(compares(&text), 3, "{text}");
+    // The extent is read from its buffer once per lane, not once per access.
+    assert_eq!(text.matches("b0_extent1[0]").count(), 1, "{text}");
+    assert!(text.contains("const auto b0_extent1_v = b0_extent1[0];"), "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn one_access_needing_two_compares_writes_one_check() {
+    let source = stencil(
+        "        let f32 diag ← src[[i + 1, j + 1]]\n\
+         \x20       dst[[i, j]] ← x + diag",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    let guards = guard_lines(&text);
+    assert_eq!(guards.len(), 1, "{text}");
+    assert_eq!(compares(&text), 2, "a column compare and the flat compare: {text}");
+    assert!(guards[0].contains(" || "), "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_check_inside_a_branch_does_not_cover_the_code_after_it() {
+    // The read in the arm is guarded there; the read after the `if` runs on
+    // lanes that skipped the arm, so it is guarded again.
+    let source = stencil(
+        "        mut f32 acc ← x\n\
+         \x20       if i ≡ 0 {\n\
+         \x20           acc ← acc + src[[i, j + 1]]\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← acc + src[[i, j + 1]]",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_check_before_a_branch_covers_the_read_inside_it() {
+    let source = stencil(
+        "        mut f32 acc ← x + src[[i, j + 1]]\n\
+         \x20       if i ≡ 0 {\n\
+         \x20           acc ← acc + src[[i, j + 1]]\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← acc",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 1, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_reassigned_coordinate_is_checked_again() {
+    // `k` names a different column at the second read: the value changed.
+    let source = stencil(
+        "        mut i32 k ← j + 1\n\
+         \x20       let f32 first ← src[[i, k]]\n\
+         \x20       k ← j + 2\n\
+         \x20       dst[[i, j]] ← x + first + src[[i, k]]",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_coordinate_assigned_in_one_arm_is_checked_again_after_the_join() {
+    let source = stencil(
+        "        mut i32 k ← j + 1\n\
+         \x20       let f32 first ← src[[i, k]]\n\
+         \x20       if i ≡ 0 {\n\
+         \x20           k ← j + 2\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← x + first + src[[i, k]]",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
+}
+
+#[cfg(feature = "mir-metal")]
+#[test]
+fn a_coordinate_a_loop_advances_is_checked_inside_the_loop() {
+    let source = stencil(
+        "        mut i32 k ← j\n\
+         \x20       mut f32 acc ← src[[i, k + 1]]\n\
+         \x20       while k ≺ 3 {\n\
+         \x20           acc ← acc + src[[i, k + 1]]\n\
+         \x20           k ← k + 1\n\
+         \x20       }\n\
+         \x20       dst[[i, j]] ← acc",
+    );
+    let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    assert_eq!(guard_lines(&text).len(), 2, "{text}");
 }

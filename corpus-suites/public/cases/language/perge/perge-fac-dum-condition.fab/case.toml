@@ -3,6 +3,8 @@ id = "corpus/perge/perge-fac-dum-condition.fab"
 group = "language"
 input_root = "corpus"
 input = "perge/perge-fac-dum-condition.fab"
+category = "jump"
+domain = "control"
 
 
 [expect]

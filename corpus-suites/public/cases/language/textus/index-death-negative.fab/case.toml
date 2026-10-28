@@ -3,6 +3,8 @@ id = "corpus/textus/index-death-negative.fab"
 group = "language"
 input_root = "corpus"
 input = "textus/index-death-negative.fab"
+category = "text"
+domain = "text"
 
 
 [expect]

@@ -187,7 +187,10 @@ fn rejects_en(source: &str) {
 fn accepts_en(source: &str) {
     let result = analyze_en(source);
     assert!(
-        !result.diagnostics.iter().any(|d| d.is_error()),
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::error::SemanticError::is_error),
         "expected no error, got: {:?}",
         result.diagnostics
     );

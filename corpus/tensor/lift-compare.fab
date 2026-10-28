@@ -2,7 +2,7 @@
 term = "tensor"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "comparison", "equality", "et_expr", "aut_expr", "unary_expr", "ternary", "vel_expr", "expression", "literal", "nota_stmt"]
-category = "comparison"
+category = "tensor"
 canonical = true
 summary = "Tensor comparisons and logic lift per element: comparisons give a bool tensor, and/or/not and the ✓ ✗ select evaluate both sides, and vel fills the none elements."
 syntax = "tensor > tensor | tensor ≤ scalar | mask and mask | not mask | mask ✓ a ✗ b | tensor coalesce fallback"

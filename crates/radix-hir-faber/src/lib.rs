@@ -19,6 +19,7 @@ pub mod stmt;
 pub mod surface;
 pub mod trivia;
 pub mod types;
+pub mod wrap;
 
 #[cfg(test)]
 mod cape_attach_emit_test;
@@ -73,5 +74,9 @@ mod lege_lineam_emit_test;
 #[cfg(test)]
 mod trivia_test;
 
+#[cfg(test)]
+mod wrap_test;
+
 pub use module::{FaberCodegen, FaberOutput, empty_presentation};
 pub use surface::{FrameFamily, KeywordSurface, TypeBindingKind};
+pub use wrap::wrap_faber_source;

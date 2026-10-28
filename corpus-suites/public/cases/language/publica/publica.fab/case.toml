@@ -3,6 +3,8 @@ id = "corpus/publica/publica.fab"
 group = "language"
 input_root = "corpus"
 input = "publica/publica.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

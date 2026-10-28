@@ -116,9 +116,13 @@ fn map_tensor_edge_policy_table(wire: radix_hir_fhir::TensorEdgePolicyTableWire)
                 policy: map_tensor_edge_policy(provider.policy),
             })
             .collect(),
-        // The FHIR wire does not carry `ordo` order rows yet; a loaded
-        // artifact lowers enum ordering without them.
-        ordo_order: radix_hir::OrdoOrderTable::default(),
+        ordo_order: radix_hir::OrdoOrderTable {
+            comparisons: wire
+                .ordo_order
+                .into_iter()
+                .map(|row| (row.lhs, row.rows))
+                .collect(),
+        },
     }
 }
 
@@ -270,7 +274,7 @@ fn map_cli_program(wire: CliProgramWire) -> crate::cli::CliProgram {
     fn map_cli_option(w: CliOptionWire) -> crate::cli::CliOption {
         crate::cli::CliOption {
             binding: w.binding,
-            binding_symbol: radix_lexer::Symbol(0),
+            binding_symbol: w.binding_symbol,
             ty: map_cli_type(w.ty),
             short: w.short,
             long: w.long,
@@ -285,7 +289,7 @@ fn map_cli_program(wire: CliProgramWire) -> crate::cli::CliProgram {
     fn map_cli_operand(w: CliOperandWire) -> crate::cli::CliOperand {
         crate::cli::CliOperand {
             binding: w.binding,
-            binding_symbol: radix_lexer::Symbol(0),
+            binding_symbol: w.binding_symbol,
             ty: map_cli_type(w.ty),
             rest: w.is_rest,
             description: w.description,
@@ -385,6 +389,19 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
     let mut types = TypeTable::from_snapshot(artifact.types)
         .map_err(|msg| HirArtifactError::MalformedSnapshot { kind: "types", detail: msg })?;
     types.resolved_generic_calls = artifact.resolved_generic_calls;
+    types.ordering_contract = artifact.contract_roles.ordering;
+    types.ordering_contract_bindings = artifact
+        .contract_roles
+        .ordering_bindings
+        .into_iter()
+        .collect();
+    types.closing_contract = artifact.contract_roles.closing;
+    types.sinking_contract = artifact.contract_roles.sinking;
+    types.sinking_contract_bindings = artifact
+        .contract_roles
+        .sinking_bindings
+        .into_iter()
+        .collect();
 
     // Interner: rebuild from ordered string table.
     let interner = Interner::from_string_table(artifact.interner);
@@ -647,6 +664,7 @@ fn map_shape_obligations(wire: radix_hir_fhir::ShapeObligationTableWire) -> crat
                     radix_hir_fhir::ShapeRelationBoundaryWire::FunctionReturn => {
                         crate::semantic::ShapeRelationBoundary::FunctionReturn
                     }
+                    radix_hir_fhir::ShapeRelationBoundaryWire::Store => crate::semantic::ShapeRelationBoundary::Store,
                 },
             })
             .collect()
@@ -677,8 +695,11 @@ fn map_shape_obligations(wire: radix_hir_fhir::ShapeObligationTableWire) -> crat
             .into_iter()
             .map(|entry| (entry.function, map_relations(entry.relations)))
             .collect(),
-        // Store pins are not serialized yet; decoded artifacts carry none.
-        stores: FxHashMap::default(),
+        stores: wire
+            .stores
+            .into_iter()
+            .map(|entry| (entry.initializer, map_relations(entry.relations)))
+            .collect(),
         function_size_bindings: wire
             .function_size_bindings
             .into_iter()

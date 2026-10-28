@@ -3,6 +3,8 @@ id = "corpus/varia/varia.fab"
 group = "language"
 input_root = "corpus"
 input = "varia/varia.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

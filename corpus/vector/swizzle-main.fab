@@ -2,7 +2,7 @@
 term = "vector"
 kind = "exemplum"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "redde_stmt", "incipit_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "register"
+category = "vector"
 canonical = false
 summary = "A host main runs a vector swizzle permutation and its inverse."
 syntax = "<vector>.swizzle(<mask>)"

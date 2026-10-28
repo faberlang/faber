@@ -3,6 +3,8 @@ id = "corpus/ordo/ordo-iteration-order.fab"
 group = "language"
 input_root = "corpus"
 input = "ordo/ordo-iteration-order.fab"
+category = "variant"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,27 @@
 //! The runner owns observations; this module owns the stable product schema and
 //! the two CLI output contracts.  The artifact is diagnostic-only and is never
 //! used as a benchmark input.
+//!
+//! # Device timers: which overlap
+//!
+//! The `device` block mixes wall windows and the GPU's own clock. Read them as
+//! follows; none of the overlapping ones may be summed.
+//!
+//! - `execution_ns`: the whole session window (host interpretation plus device
+//!   execution). Contains every other wall timer below.
+//! - `runtime.blocking_wait_ns`: host wall time blocked in commit-and-wait
+//!   calls, wherever they happen (readbacks, syncs, and mid-encode commits).
+//! - `host_blocked_ns`: the part of the blocked time that fell inside the
+//!   launch-encode window. A subset of `runtime.blocking_wait_ns`.
+//! - `host_encode_ns`: launch-encode wall time with `host_blocked_ns` taken
+//!   out. This is the host's own encode cost and is disjoint from
+//!   `host_blocked_ns`.
+//! - `gpu_busy_ns`: the GPU's own clock over completed command buffers.
+//!
+//! Versioning: `host_blocked_ns` was added at `format_version` 1 as an
+//! optional field, the way `gpu_timer_available` was. An artifact without it
+//! predates the split, and its `host_encode_ns` includes the blocked waits
+//! (GPU time counted a second time), so it must not be read as a host cost.
 
 use radix_mir_runner::{FunctionStats, IntrinsicStats, RunnerStats};
 use serde::{Deserialize, Serialize};
@@ -58,7 +79,8 @@ pub(crate) struct DeviceMetadata {
     pub(crate) image_build_ns: u64,
     pub(crate) module_compile_ns: u64,
     /// The session window: host interpretation plus device execution. This is
-    /// not GPU time; read `gpu_busy_ns` for that.
+    /// not GPU time; read `gpu_busy_ns` for that. See the module docs for
+    /// which device timers overlap.
     pub(crate) execution_ns: u64,
     /// GPU nanoseconds of completed command buffers (device time only). 0
     /// when the driver cannot read a device clock.
@@ -70,7 +92,20 @@ pub(crate) struct DeviceMetadata {
     pub(crate) gpu_timer_available: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) gpu_sample_launch_capacity: Option<u64>,
+    /// Host time spent encoding launches (argument binding, buffer binding,
+    /// launch encode). Excludes `host_blocked_ns`. Present with
+    /// `host_blocked_ns`; an artifact without that field predates the split
+    /// and its `host_encode_ns` includes the blocked waits (GPU time counted
+    /// a second time), so it is not a host cost.
     pub(crate) host_encode_ns: u64,
+    /// Host time blocked in commit-and-wait calls the driver made while a
+    /// launch was being encoded. GPU wait, not host work. A subset of
+    /// `runtime.blocking_wait_ns` (which also counts readback and sync waits
+    /// outside the encode window), so never add the two. Absent in artifacts
+    /// written before the split; 0 on a runtime that keeps no wait clock
+    /// (CPU, CUDA).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) host_blocked_ns: Option<u64>,
     pub(crate) uploads: u64,
     pub(crate) downloads: u64,
     pub(crate) uploaded_bytes: u64,
@@ -279,6 +314,7 @@ impl DeviceMetadata {
             gpu_timer_available: runtime.gpu_timer_available,
             gpu_sample_launch_capacity: runtime.gpu_sample_launch_capacity,
             host_encode_ns: receipt.host_encode_ns,
+            host_blocked_ns: Some(receipt.host_blocked_ns),
             uploads: receipt.uploads,
             downloads: receipt.downloads,
             uploaded_bytes: receipt.uploaded_bytes,
@@ -390,6 +426,22 @@ pub(crate) fn package_metadata(
 pub(crate) fn encode(artifact: &RunStatsArtifact) -> io::Result<String> {
     serde_json::to_string(artifact)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+/// Exit for a statistics emission failure: [`exit_status::SOFTWARE`] when the
+/// artifact could not be serialized (`encode` marks that with a
+/// `serde_json::Error`), [`exit_status::CANT_CREATE`] when the file or stdout
+/// could not be written.
+pub(crate) fn exit_for_emit_error(what: &str, error: &io::Error) -> ! {
+    eprintln!("error: could not write {what}: {error}");
+    let serialization = error
+        .get_ref()
+        .is_some_and(|inner| inner.is::<serde_json::Error>());
+    std::process::exit(if serialization {
+        faber_cli::exit_status::SOFTWARE
+    } else {
+        faber_cli::exit_status::CANT_CREATE
+    });
 }
 
 /// Emit the requested file artifact and/or framed stdout artifact.

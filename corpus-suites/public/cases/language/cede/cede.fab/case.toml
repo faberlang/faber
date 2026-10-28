@@ -3,6 +3,8 @@ id = "corpus/cede/cede.fab"
 group = "language"
 input_root = "corpus"
 input = "cede/cede.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

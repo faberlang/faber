@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/conversio/tensor-construct-length.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/tensor-construct-length.fab"
+category = "conversion"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -120,7 +120,7 @@ fn octeti_to_textus_conversio_emits_from_utf8_with_expect() {
     assert!(code.contains("std::str::from_utf8("), "expected from_utf8, got:\n{code}");
     assert!(
         code.contains("faber::trap::ok(std::str::from_utf8(")
-            && code.contains("faber::Trap::Other(\"octeti to textus conversion failed: invalid UTF-8\")"),
+            && code.contains("faber::Trap::Other(\"list<b8> to textus conversion failed: invalid UTF-8\")"),
         "expected expect, got:\n{code}"
     );
 }
@@ -237,7 +237,7 @@ fn ascii_to_bivalens_conversio_parses_the_locale_words() {
     assert!(
         code.contains("\"verum\" => true")
             && code.contains("\"falsum\" => false")
-            && code.contains("panic!(\"text to bivalens conversion failed\")"),
+            && code.contains("::Conversion(\"text\", \"bivalens\")"),
         "expected the code locale's true/false words and failure arm, got:\n{code}"
     );
     assert!(!code.contains(".is_empty()"), "text truthiness is retired, got:\n{code}");

@@ -155,6 +155,10 @@ pub struct TypeTableSnapshot {
     indices: Vec<IndexExpr>,
     unspecified_shape: Option<IndexId>,
     next_index_var: u32,
+    /// Raw-bits widths the source authored (bit 0 `b8` .. bit 3 `b64`). The
+    /// arena alone cannot tell an authored `b8` from the seeded `octeti` byte
+    /// list, so the fact travels beside it.
+    authored_bits: u8,
 }
 
 impl TypeTableSnapshot {
@@ -434,6 +438,7 @@ impl TypeTable {
             indices: self.indices.clone(),
             unspecified_shape: self.unspecified_shape,
             next_index_var: self.next_index_var,
+            authored_bits: self.authored_bits,
         }
     }
 
@@ -484,15 +489,10 @@ impl TypeTable {
         }
         let mut intern_map = FxHashMap::default();
         let mut first_modular_word = None;
-        // A restored table cannot tell an authored `b8` from the seeded
-        // `octeti` byte list, so it keeps only the wider widths as authored.
-        let mut authored_bits = 0_u8;
+        // The arena cannot tell an authored `b8` from the seeded `octeti` byte
+        // list, so the snapshot carries which widths were authored.
+        let authored_bits = snapshot.authored_bits;
         for (index, ty) in snapshot.types.iter().enumerate() {
-            if let Type::Bits(width) = ty
-                && *width != BitsWidth::B8
-            {
-                authored_bits |= Self::bits_mask(*width);
-            }
             // First occupancy wins — matches historical linear-scan first match.
             intern_map.entry(ty.clone()).or_insert(TypeId(index as u32));
             if first_modular_word.is_none()
@@ -618,6 +618,7 @@ impl TypeTable {
                 | Type::Bits(_)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::RangedInt { .. }
                 | Type::PolicyFloat(_, _)
                 | Type::SizedInstans(_)
                 | Type::Struct(_)
@@ -923,6 +924,7 @@ impl TypeTable {
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_) => true,
             _ => false,
@@ -1158,6 +1160,86 @@ impl TypeTable {
         self.intern(Type::SizedNumeric(prim, width))
     }
 
+    /// Allocate a ranged integer cell (`policy<W, lo…hi>`, inclusive ends).
+    ///
+    /// A range that is the whole width interns as the plain form the range
+    /// abbreviates: `trapping<u8, 0…255>` is `u8`, `saturating<u8, 0…255>` is
+    /// `saturating<u8>`, `wrapping<u8, 0…255>` is `wrapping<u8>`. Callers have
+    /// already checked that `lo ≤ hi` lies inside the width's range.
+    pub fn ranged_int(
+        &mut self,
+        policy: IntPolicy,
+        width: NumericWidth,
+        lo: i128,
+        hi: i128,
+    ) -> TypeId {
+        if width.integer_range() == Some((lo, hi)) {
+            return match policy {
+                IntPolicy::Trapping => self.sized_numeric(Primitive::Numerus, width),
+                IntPolicy::Wrapping => self.intern(Type::ModularWord(width)),
+                IntPolicy::Saturating => self.intern(Type::SaturatingWord(width)),
+            };
+        }
+        // The plain form the cell refines is interned with it, so a read-only
+        // checker can find it again (`ranged_int_base_existing`).
+        if let Some((width_lo, width_hi)) = width.integer_range() {
+            self.ranged_int(policy, width, width_lo, width_hi);
+        }
+        self.intern(Type::RangedInt {
+            policy,
+            width,
+            lo,
+            hi,
+        })
+    }
+
+    /// The policy, width and inclusive range of a ranged integer cell, aliases
+    /// peeled. `None` for every other type, including the plain forms.
+    #[must_use]
+    pub fn ranged_int_parts(&self, ty: TypeId) -> Option<(IntPolicy, NumericWidth, i128, i128)> {
+        match self.get(ty) {
+            Type::RangedInt {
+                policy,
+                width,
+                lo,
+                hi,
+            } => Some((*policy, *width, *lo, *hi)),
+            Type::Alias(_, inner) => self.ranged_int_parts(*inner),
+            _ => None,
+        }
+    }
+
+    /// The plain type a ranged integer refines: `u8` for a trapping cell,
+    /// `wrapping<u8>` or `saturating<u8>` otherwise. Any other type is itself.
+    ///
+    /// WHY: arithmetic is exact and a range applies only at a store, so a value
+    /// read from a ranged cell computes as its width.
+    pub fn ranged_int_base(&mut self, ty: TypeId) -> TypeId {
+        match self.ranged_int_parts(ty) {
+            Some((policy, width, _, _)) => {
+                let (lo, hi) = width.integer_range().unwrap_or((0, 0));
+                self.ranged_int(policy, width, lo, hi)
+            }
+            None => ty,
+        }
+    }
+
+    /// [`Self::ranged_int_base`] for a read-only caller. Every ranged cell is
+    /// interned together with the plain form it refines, so the lookup finds
+    /// it; a type that is not a ranged cell is itself.
+    #[must_use]
+    pub fn ranged_int_base_existing(&self, ty: TypeId) -> TypeId {
+        let Some((policy, width, _, _)) = self.ranged_int_parts(ty) else {
+            return ty;
+        };
+        let candidate = match policy {
+            IntPolicy::Trapping => Type::SizedNumeric(Primitive::Numerus, width),
+            IntPolicy::Wrapping => Type::ModularWord(width),
+            IntPolicy::Saturating => Type::SaturatingWord(width),
+        };
+        self.find_equal(&candidate).unwrap_or(ty)
+    }
+
     /// Allocate a raw-bits `bN` type.
     pub fn bits(&mut self, width: BitsWidth) -> TypeId {
         self.intern(Type::Bits(width))
@@ -1271,6 +1353,20 @@ impl TypeTable {
             (Type::Bits(aw), Type::Bits(bw)) => aw == bw,
             (Type::ModularWord(aw), Type::ModularWord(bw))
             | (Type::SaturatingWord(aw), Type::SaturatingWord(bw)) => aw == bw,
+            (
+                Type::RangedInt {
+                    policy: ap,
+                    width: aw,
+                    lo: alo,
+                    hi: ahi,
+                },
+                Type::RangedInt {
+                    policy: bp,
+                    width: bw,
+                    lo: blo,
+                    hi: bhi,
+                },
+            ) => ap == bp && aw == bw && alo == blo && ahi == bhi,
             (Type::PolicyFloat(ap, aw), Type::PolicyFloat(bp, bw)) => ap == bp && aw == bw,
             (Type::SizedInstans(ap), Type::SizedInstans(bp)) => ap == bp,
             // Bare seconds default and explicit `instans<N>` are distinct semantic types.
@@ -1722,8 +1818,12 @@ impl TypeTable {
             // valor, so octeti widens to valor too.
             (Type::Primitive(Primitive::Octeti), Type::Primitive(Primitive::Valor)) => true,
 
-            // Structural assignability: applied types are invariant; collections
-            // and aggregates are element-covariant.
+            // Structural assignability: type-argument positions are invariant
+            // everywhere (ruling 21 row 25, ruling 51 A7). A container of one
+            // element type never stands in for a container of another, because
+            // the shared storage would be written through the wrong policy.
+            // Fresh literals are not affected: their elements are stores into
+            // the expected element type and are typed before they get here.
 
             // Applied: generic application is invariant (type args are structural).
             (Type::Applied(_, _), Type::Applied(_, _)) => self.equals(from, to),
@@ -1733,7 +1833,7 @@ impl TypeTable {
                     && from_elems
                         .iter()
                         .zip(to_elems.iter())
-                        .all(|(f, t)| self.is_assignable(*f, *t))
+                        .all(|(f, t)| self.equals(*f, *t))
             }
 
             // Steps are part of the type identity: assigning across steps is a
@@ -1748,37 +1848,34 @@ impl TypeTable {
             | (Type::Promissum(from_elem), Type::Promissum(to_elem))
             | (Type::Cursor(from_elem), Type::Cursor(to_elem))
             | (Type::Queue(from_elem), Type::Queue(to_elem))
-            | (Type::Stack(from_elem), Type::Stack(to_elem)) => {
-                self.is_assignable(*from_elem, *to_elem)
-            }
+            | (Type::Stack(from_elem), Type::Stack(to_elem)) => self.equals(*from_elem, *to_elem),
 
             // Infallible promissum<T> widens to promissum<T ⇥ E> (numquam bottom).
             (Type::PromissumFailable(ft, fe), Type::PromissumFailable(tt, te)) => {
-                self.is_assignable(*ft, *tt) && self.is_assignable(*fe, *te)
+                self.equals(*ft, *tt) && self.equals(*fe, *te)
             }
-            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => self.is_assignable(*ft, *tt),
+            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => self.equals(*ft, *tt),
             // Failable promises do not narrow to infallible (erases the alternate channel).
             (Type::PromissumFailable(_, _), Type::Promissum(_)) => false,
 
             (Type::AsyncCursor(fi, fe), Type::AsyncCursor(ti, te)) => {
-                self.is_assignable(*fi, *ti) && self.is_assignable(*fe, *te)
+                self.equals(*fi, *ti) && self.equals(*fe, *te)
             }
 
             (Type::Map(from_key, from_val), Type::Map(to_key, to_val))
             | (Type::Ledger(from_key, from_val), Type::Ledger(to_key, to_val)) => {
-                self.is_assignable(*from_key, *to_key) && self.is_assignable(*from_val, *to_val)
+                self.equals(*from_key, *to_key) && self.equals(*from_val, *to_val)
             }
 
-            // Indexed containers: element-covariant, shape/width invariant.
+            // Indexed containers: element, shape and width all invariant.
             (Type::Tensor(from_elem, from_shape), Type::Tensor(to_elem, to_shape))
             | (Type::Vector(from_elem, from_shape), Type::Vector(to_elem, to_shape))
             | (Type::Matrix(from_elem, from_shape), Type::Matrix(to_elem, to_shape))
             | (Type::Sparsa(from_elem, from_shape), Type::Sparsa(to_elem, to_shape)) => {
-                self.is_assignable(*from_elem, *to_elem)
-                    && self.index_equals(*from_shape, *to_shape)
+                self.equals(*from_elem, *to_elem) && self.index_equals(*from_shape, *to_shape)
             }
 
-            // Bounded buffers: element-covariant, capacity invariant except
+            // Bounded buffers: element invariant, capacity invariant except
             // for ascii's directional widening rule. Bare primitives are not
             // assignable to or from bounded forms (D4/D5); the one-byte char
             // carrier is the sole implicit bridge into bare ascii (D17).
@@ -1791,7 +1888,7 @@ impl TypeTable {
                     element: to_elem,
                     capacity: to_cap,
                 },
-            ) => self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
+            ) => self.equals(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
             (
                 Type::BoundedQueue {
                     element: from_elem,
@@ -1811,7 +1908,7 @@ impl TypeTable {
                     element: to_elem,
                     capacity: to_cap,
                 },
-            ) => self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
+            ) => self.equals(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
             (
                 Type::BoundedTextus { capacity: from_cap },
                 Type::BoundedTextus { capacity: to_cap },
@@ -1995,6 +2092,23 @@ pub enum Type {
     /// arithmetic clamps at both ends of `W` (D11.1). Signed or unsigned.
     SaturatingWord(NumericWidth),
 
+    /// Ranged integer cell (`trapping|wrapping|saturating<W, lo‥hi>`): the
+    /// width stays the representation, and the range is a refinement a store
+    /// applies inside it. Both ends are finite and inclusive
+    /// here (`lo…hi`; the half-open `lo‥hi` is stored as `lo…hi-1`), and the
+    /// range is strictly inside the width: a range that is the whole width
+    /// interns as the plain form (`u8`, `wrapping<u8>`, `saturating<u8>`), so
+    /// each existing spelling is the one explicit ranged form it abbreviates.
+    /// Constructible only through [`TypeTable::ranged_int`].
+    RangedInt {
+        policy: IntPolicy,
+        width: NumericWidth,
+        #[serde(with = "wide_bound")]
+        lo: i128,
+        #[serde(with = "wide_bound")]
+        hi: i128,
+    },
+
     /// Policy-carrying float cell (`trapping<W>` or `saturating<W>` with `W`
     /// a float width, D5 of the N7e delivery). One variant for both policies:
     /// the policy is data. The width is always a float width. Constructible
@@ -2113,6 +2227,17 @@ impl Hash for Type {
             }
             Self::Bits(w) => w.hash(state),
             Self::ModularWord(w) | Self::SaturatingWord(w) => w.hash(state),
+            Self::RangedInt {
+                policy,
+                width,
+                lo,
+                hi,
+            } => {
+                policy.hash(state);
+                width.hash(state);
+                lo.hash(state);
+                hi.hash(state);
+            }
             Self::PolicyFloat(policy, w) => {
                 policy.hash(state);
                 w.hash(state);
@@ -2172,6 +2297,60 @@ impl BuiltinTensorEdgePolicy {
     #[must_use]
     pub fn from_latin(text: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|policy| policy.latin() == text)
+    }
+}
+
+/// Wire form of a ranged-integer end. The ends are `i128` in memory (a `u64`
+/// width reaches `2^64 - 1`, past `i64`), but the msgpack envelope has no
+/// 128-bit integer, so an end travels as its two 64-bit halves: the signed
+/// high word, then the unsigned low word.
+mod wide_bound {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub(super) fn serialize<S: Serializer>(value: &i128, serializer: S) -> Result<S::Ok, S::Error> {
+        let high = i64::try_from(*value >> 64).unwrap_or_default();
+        let low = u64::try_from(*value & i128::from(u64::MAX)).unwrap_or_default();
+        (high, low).serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<i128, D::Error> {
+        let (high, low) = <(i64, u64)>::deserialize(deserializer)?;
+        Ok((i128::from(high) << 64) | i128::from(low))
+    }
+}
+
+/// Overflow policy of a [`Type::RangedInt`] cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum IntPolicy {
+    /// `trapping<W, lo‥hi>`: a store outside the range traps.
+    Trapping,
+    /// `wrapping<W, lo‥hi>`: a store reduces modulo `hi - lo + 1`, offset by `lo`.
+    Wrapping,
+    /// `saturating<W, lo‥hi>`: a store clamps into the range.
+    Saturating,
+}
+
+impl IntPolicy {
+    /// Policy word used in diagnostics and pretty-print.
+    #[must_use]
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Trapping => "trapping",
+            Self::Wrapping => "wrapping",
+            Self::Saturating => "saturating",
+        }
+    }
+
+    /// Canonical Latin identity of the policy word (`exactus`, `modulus`, `saturatus`).
+    #[must_use]
+    pub fn latin(self) -> &'static str {
+        match self {
+            Self::Trapping => "exactus",
+            Self::Wrapping => "modulus",
+            Self::Saturating => "saturatus",
+        }
     }
 }
 
@@ -2602,6 +2781,7 @@ fn is_numeric_carrier(ty: &Type) -> bool {
             | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
     )
 }
@@ -2720,6 +2900,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
+        | Type::RangedInt { .. }
         | Type::PolicyFloat(_, _)
         | Type::SizedInstans(_)
         | Type::Struct(_)

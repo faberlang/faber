@@ -24,6 +24,8 @@ pub const SPARSA_MISSING_FIGURA_MSG: &str =
 pub const FIGURA_UNKNOWN_INDEX_MSG: &str = "unknown index variable in Figura";
 pub const FIGURA_TYPE_PARAM_IN_INDEX_MSG: &str = "type parameter cannot appear in index position";
 pub const FIGURA_NOT_INDEX_PARAM_MSG: &str = "name does not refer to an index parameter";
+pub const FIGURA_LIFT_SHAPE_MSG: &str =
+    "a bracketed shape after `size` is only admitted in a call's type-argument list";
 pub const FIGURA_ARITHMETIC_DIVIDE_BY_ZERO_MSG: &str = "Figura divisor must be greater than zero";
 pub const FIGURA_ARITHMETIC_NEGATIVE_MSG: &str = "Figura expression produces a negative extent";
 pub const FIGURA_ARITHMETIC_NON_INTEGRAL_MSG: &str = "Figura division must divide evenly";
@@ -86,6 +88,7 @@ pub fn lower_figura_expr(
             }
             LiftExtent::Paren(term) => lower_figura_expr(term, resolver, types),
             LiftExtent::Negative { .. } => Err(FIGURA_NOT_INDEX_PARAM_MSG),
+            LiftExtent::Shape(_) => Err(FIGURA_LIFT_SHAPE_MSG),
         },
         FiguraExpr::Add(_, _) | FiguraExpr::Subtract(_, _) => {
             lower_figura_affine_expr(figura, resolver, types)

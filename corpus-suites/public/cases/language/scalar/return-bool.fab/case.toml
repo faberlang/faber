@@ -3,6 +3,8 @@ id = "corpus/scalar/return-bool.fab"
 group = "language"
 input_root = "corpus"
 input = "scalar/return-bool.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

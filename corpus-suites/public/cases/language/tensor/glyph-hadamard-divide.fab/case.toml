@@ -3,6 +3,8 @@ id = "corpus/tensor/glyph-hadamard-divide.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/glyph-hadamard-divide.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

@@ -41,7 +41,7 @@ use serde::ser::{
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::artifact::{
-    CliProgramWire, DisplayTokensWire, FunctionFactTableWire, FunctionFactWire,
+    CliProgramWire, ContractRolesWire, DisplayTokensWire, FunctionFactTableWire, FunctionFactWire,
     FunctionProvenanceTableWire, GpuBuiltinWire, HirArtifact, KernelRequirementsWire,
     ProviderCarriageEntryWire, RadixLaneEntryWire, ResolvedUseWire, ResolverSnapshot,
     SCHEMA_VERSION, ShapeObligationTableWire, SourceIdentity, TensorEdgePolicyTableWire,
@@ -1276,6 +1276,7 @@ struct HirArtifactDto {
     capability_provenance: FunctionProvenanceTableWire,
     provider_units: BTreeMap<String, ProviderCarriageEntryWire>,
     shape_obligations: ShapeObligationTableWire,
+    contract_roles: ContractRolesWire,
     kernel_requirements: KernelRequirementsWire,
     tensor_edge_policies: TensorEdgePolicyTableWire,
     display_tokens: DisplayTokensWire,
@@ -1319,6 +1320,7 @@ impl From<HirArtifact> for HirArtifactDto {
             capability_provenance: artifact.capability_provenance,
             provider_units: artifact.provider_units,
             shape_obligations: artifact.shape_obligations,
+            contract_roles: artifact.contract_roles,
             kernel_requirements: artifact.kernel_requirements,
             tensor_edge_policies: artifact.tensor_edge_policies,
             display_tokens: artifact.display_tokens,
@@ -1367,6 +1369,7 @@ impl From<&HirArtifact> for HirArtifactDto {
             capability_provenance: artifact.capability_provenance.clone(),
             provider_units: artifact.provider_units.clone(),
             shape_obligations: artifact.shape_obligations.clone(),
+            contract_roles: artifact.contract_roles.clone(),
             kernel_requirements: artifact.kernel_requirements.clone(),
             tensor_edge_policies: artifact.tensor_edge_policies.clone(),
             display_tokens: artifact.display_tokens.clone(),
@@ -1409,6 +1412,7 @@ impl From<HirArtifactDto> for HirArtifact {
             capability_provenance: dto.capability_provenance,
             provider_units: dto.provider_units,
             shape_obligations: dto.shape_obligations,
+            contract_roles: dto.contract_roles,
             kernel_requirements: dto.kernel_requirements,
             tensor_edge_policies: dto.tensor_edge_policies,
             display_tokens: dto.display_tokens,

@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/unio/mut-param.fab"
+group = "language"
+input_root = "corpus"
+input = "unio/mut-param.fab"
+category = "variant"
+domain = "types"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

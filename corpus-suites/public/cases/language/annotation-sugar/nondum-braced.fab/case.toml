@@ -3,6 +3,8 @@ id = "corpus/annotation-sugar/nondum-braced.fab"
 group = "language"
 input_root = "corpus"
 input = "annotation-sugar/nondum-braced.fab"
+category = "annotation"
+domain = "program"
 
 
 [expect]

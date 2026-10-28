@@ -49,7 +49,7 @@ fn analyze_en(source: &str) -> crate::test_support::AnalyzedFixture {
     analyze_source_with_config(source, config)
 }
 
-const TENSOR_VIEW_LAST_USE_SOURCE: &str = r#"
+const TENSOR_VIEW_LAST_USE_SOURCE: &str = r"
 main {
     let list<f32> data ← [1.0, 2.0, 3.0, 4.0]
     mut tensor<f32, [2, 2]> base ← data ↦ tensor<f32, [2, 2]>
@@ -58,7 +58,7 @@ main {
     base.set([0, 0], 9.0)
     print dimensions
 }
-"#;
+";
 
 #[test]
 fn tensor_view_base_write_is_allowed_after_last_view_use() {
@@ -89,12 +89,12 @@ fn tensor_view_base_write_is_rejected_before_later_view_use() {
 
 #[test]
 fn tensor_view_ternary_cannot_escape_through_mutable_binding() {
-    let source = r#"
+    let source = r"
 main {
     mut tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
     mut tf32[2, 2] view ← true ✓ base.transpose() ✗ base.transpose()
 }
-"#;
+";
     let result = analyze_en(source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
@@ -108,14 +108,14 @@ main {
 
 #[test]
 fn tensor_view_ternary_can_be_consumed_by_materialize() {
-    let source = r#"
+    let source = r"
 main {
     mut tf32[2, 2] base ← [[1.0, 2.0], [3.0, 4.0]] ↦ tf32[2, 2]
     let tf32[2, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
     base.set([0, 0], 9.0)
     print owned.length()
 }
-"#;
+";
     let result = analyze_en(source);
     assert!(
         result.is_ok(),
@@ -128,13 +128,13 @@ main {
 fn ternary_of_equal_shape_view_calls_joins_by_shape() {
     // Each branch carries its own derived shape index; the join unifies them
     // structurally, so the result has the transposed shape [3, 2].
-    let source = r#"
+    let source = r"
 main {
     mut tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     let tf32[3, 2] owned ← (true ✓ base.transpose() ✗ base.transpose()).materialize()
     print owned.length()
 }
-"#;
+";
     let result = analyze_en(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);
 }
@@ -143,13 +143,13 @@ main {
 fn ternary_of_unequal_shape_views_is_rejected_at_the_join() {
     // [2, 3] against its transpose [3, 2] share no shape: the join reports
     // the shape mismatch instead of silently picking one side.
-    let source = r#"
+    let source = r"
 main {
     mut tf32[2, 3] base ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ tf32[2, 3]
     let tf32[3, 2] owned ← (true ✓ base ✗ base.transpose()).materialize()
     print owned.length()
 }
-"#;
+";
     let result = analyze_en(source);
     assert!(
         result
@@ -163,12 +163,12 @@ main {
 
 #[test]
 fn expanded_transpose_chain_cannot_escape_through_mutable_binding() {
-    let source = r#"
+    let source = r"
 main {
     mut tf32[1, 2] base ← [[1.0, 2.0]] ↦ tf32[1, 2]
     mut tf32[2, 1] escaped ← base.expanded([1, 2]).transpose()
 }
-"#;
+";
     let result = analyze_en(source);
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
@@ -180,7 +180,7 @@ main {
     );
 }
 
-const TENSOR_EDGE_POLICY_DECLARATIONS: &str = r#"
+const TENSOR_EDGE_POLICY_DECLARATIONS: &str = r"
 interface EdgePolicy<C> {
     fn remap(C coord) → C
 }
@@ -195,16 +195,16 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
         return -value
     }
 }
-"#;
+";
 
 #[test]
 fn shifted_limes_view_keeps_provenance_through_wrapper_and_policy_type_args() {
-    let main = r#"
+    let main = r"
 main {
     mut tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
     mut tf32[3] escaped ← true ✓ base.shift([1]).limes<ZeroGhost>() ✗ base.shift([1]).limes<ZeroGhost>()
 }
-"#;
+";
     let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
     let result = analyze_en(&source);
     assert!(
@@ -219,14 +219,14 @@ main {
 
 #[test]
 fn custom_limes_view_conflicts_with_base_write_until_last_use() {
-    let main = r#"
+    let main = r"
 main {
     mut tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
     let tf32[3] view ← base.shift([1]).limes<ZeroGhost>()
     base.set([0], 9.0)
     print view.length()
 }
-"#;
+";
     let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
     let result = analyze_en(&source);
     assert!(
@@ -552,8 +552,11 @@ incipit { }
         row.returned_borrow,
         radix_types::ReturnedBorrowProvenance::None
     );
-    assert!(row.required_regions.is_empty());
-    assert!(row.last_uses.is_empty());
+    assert_eq!(
+        row.required_regions,
+        [] as [radix_types::RegionRelationship; 0]
+    );
+    assert_eq!(row.last_uses, [] as [crate::capability::LastUseFact; 0]);
 }
 
 #[test]
@@ -613,7 +616,10 @@ incipit { }
         row.returned_borrow,
         radix_types::ReturnedBorrowProvenance::Parameter(param)
     );
-    assert!(row.required_regions.is_empty());
+    assert_eq!(
+        row.required_regions,
+        [] as [radix_types::RegionRelationship; 0]
+    );
 }
 
 #[test]

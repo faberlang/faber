@@ -2217,13 +2217,25 @@ impl Validator<'_, '_> {
                     self.error(span, "numeric rounding receiver is not fractus");
                 }
             }
-            // Placeholder so this exhaustive dispatch compiles; the numerus
-            // contract lands in 2eecb23a-7.1.1.3.
-            MirCollectionOp::TensorRank
+            MirCollectionOp::TensorRank => {
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Numerus),
+                    span,
+                    "tensor rank result is not numerus",
+                );
+                if let Some(receiver_ty) = first_arg_ty {
+                    self.require_tensor_type(
+                        receiver_ty,
+                        span,
+                        "tensor rank receiver is not tensor",
+                    );
+                }
+            }
             // This is a compiler-owned operation. Its tensor/const contract is
             // validated by radix-mir::abi::contract after lowering, rather
             // than by the source-level collection validator.
-            | MirCollectionOp::TensorBatchedAttention => {}
+            MirCollectionOp::TensorBatchedAttention => {}
             MirCollectionOp::TensorNorm => {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
@@ -2973,6 +2985,7 @@ impl Validator<'_, '_> {
             .args
             .first()
             .and_then(|arg| self.validate_operand(scope, arg, span));
+        let receiver_rank = receiver_ty.and_then(|ty| self.static_tensor_rank(ty));
         if let Some(receiver_ty) = receiver_ty {
             self.require_tensor_type(receiver_ty, span, "tensor slice-nd receiver is not tensor");
         }
@@ -3023,6 +3036,11 @@ impl Validator<'_, '_> {
                 }
                 Some(_) => {}
             }
+        }
+        if let (Some(rank), Some(length)) = (receiver_rank, axis_length)
+            && usize::try_from(length).ok() != Some(rank)
+        {
+            self.error(span, "tensor slice-nd lists do not match receiver rank");
         }
     }
 
@@ -3807,7 +3825,10 @@ impl Validator<'_, '_> {
     /// Whether `element` is a `wrapping` or `saturating` word and `result` is
     /// a plain integer whose range holds every value of the word's width.
     fn word_sum_widens(&self, element: MirType, result: MirType) -> bool {
-        let (Type::ModularWord(word) | Type::SaturatingWord(word)) = self.type_kind(element) else {
+        let (Type::ModularWord(word)
+        | Type::SaturatingWord(word)
+        | Type::RangedInt { width: word, .. }) = self.type_kind(element)
+        else {
             return false;
         };
         let result_width = match self.type_kind(result) {
@@ -3828,6 +3849,7 @@ impl Validator<'_, '_> {
                 | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::RangedInt { .. }
                 | Type::PolicyFloat(_, _)
         )
     }
@@ -3839,6 +3861,7 @@ impl Validator<'_, '_> {
                 | Type::SizedNumeric(Primitive::Numerus, _)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::RangedInt { .. }
         )
     }
 

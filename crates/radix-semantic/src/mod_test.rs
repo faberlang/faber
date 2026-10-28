@@ -215,7 +215,7 @@ fn lowering_issues(source: &str) -> Vec<(String, usize)> {
                 .args
                 .iter()
                 .find(|arg| arg.name == "issue")
-                .map(|arg| arg.value.to_string())
+                .map(|arg| arg.value.clone())
                 .expect("issue arg");
             (
                 issue,

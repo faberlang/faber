@@ -2,7 +2,7 @@
 term = "vector"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "register"
+category = "vector"
 canonical = false
 summary = "A generic function returns a width-generic vector; the call result takes the argument's width."
 syntax = "fn <name><size N>(vector<elem, N> v) → vector<elem, N>"

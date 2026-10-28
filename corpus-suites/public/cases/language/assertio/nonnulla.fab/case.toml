@@ -3,6 +3,8 @@ id = "corpus/assertio/nonnulla.fab"
 group = "language"
 input_root = "corpus"
 input = "assertio/nonnulla.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

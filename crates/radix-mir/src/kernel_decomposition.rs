@@ -30,6 +30,15 @@
 //!   or elementwise value math (Assign / Construct / Call);
 //! - every **live** recipe op resolves its own dispatch contract and plan.
 //!
+//! A body that stores into an explicit output parameter (the indexed-view
+//! kernel shape `y ⇇ d`) is carried by its FINAL subchain: that subchain is
+//! built as the indexed-view kernel the source is, so its output IS the
+//! parameter and the fused tail behind its recipe is emitted
+//! ([`KernelSubchain::output_param`]). A store to an output parameter in any
+//! earlier subchain, a second output parameter, or a read of the output
+//! parameter fails closed with a typed [`PlanMappingError`]; no path drops the
+//! store.
+//!
 //! The pass slices the statement stream at recipe-op boundaries: consecutive
 //! elementwise statements fold into the adjacent recipe subchain (the
 //! S3-B1 mul-mean forward folds its mul into the reduction load), and a new
@@ -109,6 +118,15 @@ pub struct KernelSubchain {
     /// signature carries as `extra_outputs` and the emitters' multi-output
     /// tuple-tail paths lower.
     pub outputs: Vec<MirLocalId>,
+    /// The source function's explicit output parameter (the `varia` tensor
+    /// parameter of an indexed-view kernel, `y ⇇ d`) this subchain stores
+    /// into. Only the LAST subchain can carry it: the final store is the
+    /// kernel's output, so that subchain is built as a whole-function
+    /// indexed-view kernel whose output IS this parameter (its synthetic
+    /// declares the parameter and the source's trailing index parameters)
+    /// instead of a contract-shaped kernel that binds the recipe result as
+    /// its output and would write a dead local.
+    pub output_param: Option<MirLocalId>,
 }
 
 impl Eq for KernelSubchain {}
@@ -405,6 +423,10 @@ pub fn decompose_kernel_function_with_limit(
     // data-flow edges between the subchains carry the same values).
     let slices = split_oversized_elementwise_body(function, block, slices, validation, limit)?;
 
+    // The explicit output parameter the final subchain stores into (fails
+    // closed when a store to an output parameter has no kernel to carry it).
+    let output_param = explicit_output_param(function, block, &slices)?;
+
     // Build the subchains. `written` records each subchain's produced
     // locals so the data-flow edges can be derived. The subchains preserve
     // the source local tables, so `inputs` (each subchain's external reads,
@@ -416,14 +438,42 @@ pub fn decompose_kernel_function_with_limit(
     let mut recipe_results: Vec<Option<MirLocalId>> = Vec::new();
     for (position, indices) in slices.iter().enumerate() {
         let is_last = position + 1 == slices.len();
-        let mut synthetic = build_subchain_function(
+        // The final subchain needs the indexed-view reading unless its
+        // existing emission surface already binds the output parameter: a
+        // parameter the function RETURNS is the last subchain's output (the
+        // consumed-output pass), and a recipe result forwarded straight into
+        // the parameter (`out ⇇ a.matmul(b)`) is the contract output. Any other
+        // store — a fused tail behind a recipe, an elementwise body, a recipe
+        // result copied in through a stage local — is a statement the
+        // contract-shaped surface cannot bind: it names the recipe result
+        // local as the output and leaves the parameter unwritten.
+        let plain = build_subchain_function(
             function,
             indices,
             &[],
             is_last,
             false,
+            None,
             validation.types.as_table(),
         );
+        let subchain_output_param = output_param.filter(|&output| {
+            is_last
+                && crate::read_analysis::terminator_return_local(&block.terminator.kind)
+                    != Some(output)
+                && !crate::device_program_plans::recipe_result_is_param(&plain, output)
+        });
+        let mut synthetic = plain;
+        if subchain_output_param.is_some() {
+            synthetic = build_subchain_function(
+                function,
+                indices,
+                &[],
+                is_last,
+                false,
+                subchain_output_param,
+                validation.types.as_table(),
+            );
+        }
         // The S3-A5 dead filter resolves reads against the SOURCE function
         // (the subchain's produced local is consumed by a later subchain,
         // invisible inside the slice itself).
@@ -446,6 +496,7 @@ pub fn decompose_kernel_function_with_limit(
                     &[],
                     is_last,
                     true,
+                    subchain_output_param,
                     validation.types.as_table(),
                 );
                 plan_elementwise(&synthetic, validation).ok()
@@ -494,6 +545,7 @@ pub fn decompose_kernel_function_with_limit(
             consumes,
             produced,
             outputs: Vec::new(),
+            output_param: subchain_output_param,
         });
     }
 
@@ -1212,6 +1264,7 @@ impl KernelDecomposition {
             &self.subchains[index].outputs,
             is_last,
             plan_is_elementwise,
+            self.subchains[index].output_param,
             types,
         )
     }
@@ -1592,6 +1645,12 @@ fn needs_synthetic_tuple_return(
 /// liveness see that read while the full-ABI synthesis binds the join's
 /// output buffer.
 ///
+/// `output_param` (the LAST subchain of a source that stores into an explicit
+/// output parameter) makes the synthetic an indexed-view kernel like the
+/// source: its params are the slice's inputs, then the output parameter, then
+/// the source's trailing index parameters — see
+/// [`explicit_output_subchain_params`].
+///
 /// # Panics
 /// Panics when an intermediate subchain carries additional outputs but the
 /// caller has not interned the tuple return type in `types`.
@@ -1601,11 +1660,15 @@ fn build_subchain_function(
     outputs: &[MirLocalId],
     is_last: bool,
     plan_is_elementwise: bool,
+    output_param: Option<MirLocalId>,
     types: &TypeTable,
 ) -> MirFunction {
     let block = &source.blocks[0];
     let span = source.span;
-    let params = subchain_params(source, indices);
+    let params = match output_param {
+        Some(output) => explicit_output_subchain_params(source, indices, output),
+        None => subchain_params(source, indices),
+    };
 
     let mut statements: Vec<MirStatement> = indices
         .iter()
@@ -1737,6 +1800,118 @@ fn subchain_params(source: &MirFunction, indices: &[usize]) -> Vec<MirParam> {
             span,
         })
         .collect()
+}
+
+/// The source function's explicit output parameter, when its body stores into
+/// one (the indexed-view kernel shape `y ⇇ d`, a `varia` parameter).
+///
+/// The final store to `y` is the kernel's output, so the subchain holding it
+/// must be built as an indexed-view kernel whose output IS `y`; the
+/// contract-shaped subchain signature binds the recipe result as the output
+/// instead, and the store to `y` (with the fused tail behind the recipe) is
+/// lost. Only the LAST subchain can be that kernel, and it must be the only
+/// writer of `y`: an earlier subchain's store to `y` would leave a later
+/// subchain nothing to bind it to, and a read of `y` makes it an input as well
+/// as the output. Those shapes fail closed rather than drop the store.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when a store to an output parameter sits in a
+/// subchain other than the last, when two output parameters are stored to, or
+/// when an output parameter is read.
+fn explicit_output_param(
+    function: &MirFunction,
+    block: &MirBlock,
+    slices: &[Vec<usize>],
+) -> Result<Option<MirLocalId>, PlanMappingError> {
+    let outputs: BTreeSet<MirLocalId> = function
+        .params
+        .iter()
+        .filter(|param| param.mode == MirParamMode::MutRef)
+        .map(|param| param.local)
+        .collect();
+    if outputs.is_empty() {
+        return Ok(None);
+    }
+    let mut stored: Option<MirLocalId> = None;
+    for (position, indices) in slices.iter().enumerate() {
+        let is_last = position + 1 == slices.len();
+        for &index in indices {
+            let Some(destination) =
+                crate::read_analysis::statement_destination(&block.statements[index])
+                    .filter(|local| outputs.contains(local))
+            else {
+                continue;
+            };
+            if !is_last {
+                return Err(PlanMappingError::mapping(format!(
+                    "device function body stores to its output parameter local {} in subchain \
+                     {position} of {}; only the final subchain can store to an output parameter",
+                    destination.0,
+                    slices.len()
+                )));
+            }
+            if stored.is_some_and(|earlier| earlier != destination) {
+                return Err(PlanMappingError::mapping(
+                    "device function body stores to more than one output parameter and cannot \
+                     decompose into subchain kernels (the final subchain has one output)",
+                ));
+            }
+            stored = Some(destination);
+        }
+    }
+    let Some(output) = stored else {
+        return Ok(None);
+    };
+    let reads_output = slices.iter().flatten().any(|&index| {
+        crate::read_analysis::statement_reads_local(&block.statements[index], output)
+    });
+    if reads_output {
+        return Err(PlanMappingError::mapping(format!(
+            "device function body reads its output parameter local {} and cannot decompose into \
+             subchain kernels (a subchain output parameter is write-only)",
+            output.0
+        )));
+    }
+    Ok(Some(output))
+}
+
+/// The params of the final subchain that stores into the explicit output
+/// parameter `output`: the slice's external inputs in read order, then the
+/// output parameter, then the source's trailing parameters that its body never
+/// reads (the invocation-index parameter of the indexed-view shape
+/// `(inputs…, output, index)`). Names and modes are the source's, so the
+/// subchain's ABI synthesis reads the same indexed-view surface as the source.
+fn explicit_output_subchain_params(
+    source: &MirFunction,
+    indices: &[usize],
+    output: MirLocalId,
+) -> Vec<MirParam> {
+    let mut params: Vec<MirParam> = subchain_params(source, indices)
+        .into_iter()
+        .filter(|param| param.local != output)
+        .collect();
+    let Some(output_position) = source.params.iter().position(|param| param.local == output) else {
+        return params;
+    };
+    params.push(source.params[output_position].clone());
+    let read_anywhere: BTreeSet<MirLocalId> = source
+        .blocks
+        .iter()
+        .flat_map(|block| {
+            block
+                .statements
+                .iter()
+                .flat_map(crate::read_analysis::statement_read_locals)
+        })
+        .collect();
+    let trailing_unread = source.params[output_position + 1..]
+        .iter()
+        .rev()
+        .take_while(|param| !read_anywhere.contains(&param.local))
+        .count();
+    let trailing_start = source.params.len() - trailing_unread;
+    params.extend(source.params[trailing_start..].iter().cloned());
+    params
 }
 
 fn elementwise_subchain_return(

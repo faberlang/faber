@@ -187,7 +187,7 @@ fn scanner_reads_the_slug_of_a_split_reject_with_arg_call() {
 
 #[test]
 fn scanner_skips_the_reject_with_arg_definition() {
-    let source = r#"
+    let source = r"
     fn reject_with_arg(
         &mut self,
         span: Span,
@@ -196,7 +196,7 @@ fn scanner_skips_the_reject_with_arg_definition() {
         value: impl Into<String>,
     ) {
     }
-    "#;
+    ";
     assert!(emitted_issue_slugs(source).is_empty());
 }
 

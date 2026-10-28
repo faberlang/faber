@@ -399,6 +399,17 @@ impl TypeChecker<'_> {
                 width: *width,
                 family: IntFamily::Saturating,
             }),
+            // A ranged cell is a value of its width in its policy's family:
+            // reads compute as the width, and only a store applies the range.
+            Type::RangedInt { policy, width, .. } => Some(NumericShape {
+                prim: Primitive::Numerus,
+                width: *width,
+                family: match policy {
+                    radix_types::IntPolicy::Trapping => IntFamily::Plain,
+                    radix_types::IntPolicy::Wrapping => IntFamily::Modular,
+                    radix_types::IntPolicy::Saturating => IntFamily::Saturating,
+                },
+            }),
             Type::PolicyFloat(policy, width) => Some(NumericShape {
                 prim: Primitive::Fractus,
                 width: *width,
@@ -442,6 +453,13 @@ impl TypeChecker<'_> {
                 | Type::PolicyFloat(_, _)
         ) {
             return rhs;
+        }
+        // A ranged cell computes as the plain form it refines.
+        if self.types.ranged_int_parts(lhs).is_some() {
+            return self.types.ranged_int_base(lhs);
+        }
+        if self.types.ranged_int_parts(rhs).is_some() {
+            return self.types.ranged_int_base(rhs);
         }
         match shape.prim {
             Primitive::Numerus => self.numerus_type(),
@@ -1347,6 +1365,17 @@ impl TypeChecker<'_> {
     /// text `+` requires both operands to be cord text, and coalescing encodes the local
     /// optional/`nihil` result contract.
     pub fn check_binary(
+        &mut self,
+        op: HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        let result = self.check_binary_unadopted(op, lhs, rhs, expected);
+        self.adopt_expected_lift_element(result, expected)
+    }
+
+    fn check_binary_unadopted(
         &mut self,
         op: HirBinOp,
         lhs: &mut HirExpression,
@@ -2848,7 +2877,7 @@ fn is_decimal_text_literal(expr: &HirExpression) -> bool {
     }
 }
 
-fn numeric_literal_family(expr: &HirExpression) -> Option<Primitive> {
+pub(super) fn numeric_literal_family(expr: &HirExpression) -> Option<Primitive> {
     match &expr.kind {
         HirExpressionKind::Literal(HirLiteral::Int(_) | HirLiteral::BigInt(_)) => {
             Some(Primitive::Numerus)

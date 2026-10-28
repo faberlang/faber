@@ -5,7 +5,7 @@ use radix_hir::DefId;
 fn gaps_empty_when_sets_agree() {
     let referenced = [DefId(1), DefId(7)].into_iter().collect();
     let emit = [DefId(1), DefId(7), DefId(9)].into_iter().collect();
-    assert!(def_id_closure_gaps(&referenced, &emit).is_empty());
+    assert_eq!(def_id_closure_gaps(&referenced, &emit), []);
 }
 
 #[test]

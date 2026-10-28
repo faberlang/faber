@@ -3,6 +3,8 @@ id = "corpus/importa/default-minimal.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/default-minimal.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

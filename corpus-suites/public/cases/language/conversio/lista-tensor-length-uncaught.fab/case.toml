@@ -1,0 +1,19 @@
+version = 1
+id = "corpus/conversio/lista-tensor-length-uncaught.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/lista-tensor-length-uncaught.fab"
+category = "conversion"
+domain = "numerics"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 65
+stderr_contains = "tensor conversion expected 4 elements, got 1"
+check_only = false

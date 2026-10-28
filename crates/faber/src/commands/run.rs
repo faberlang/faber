@@ -49,6 +49,15 @@ pub(super) fn cmd_run(args: RunArgs) {
         exit_status::exit_usage();
     }
 
+    if let Some(crate::cli::RunTarget::Ts) = args.target {
+        package::cmd_run_ts(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+        );
+    }
+
     if let Some(seed) = args.shuffle_seed {
         if !radix::module::mir::configure_shuffle_seed(seed) {
             eprintln!("note: shuffle seed already configured; the first value stays in effect");
@@ -201,9 +210,8 @@ fn interpret_path(
                         exit,
                     );
                     if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
-                        eprintln!("error: could not write run statistics: {error}");
                         drop(archive);
-                        std::process::exit(1);
+                        run_stats::exit_for_emit_error("run statistics", &error);
                     }
                     if let Err(mut diagnostics) = outcome.result {
                         archive.remap_diagnostics(&mut diagnostics);
@@ -284,8 +292,7 @@ fn interpret_path(
                         exit,
                     );
                     if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
-                        eprintln!("error: could not write run statistics: {error}");
-                        std::process::exit(1);
+                        run_stats::exit_for_emit_error("run statistics", &error);
                     }
                     if let Err(diagnostics) = outcome.result {
                         super::eprint_compile_diagnostics(&diagnostics);
@@ -807,8 +814,7 @@ fn finish_device_run(
                 });
         artifact.device = Some(run_stats::DeviceMetadata::from_receipt(&device));
         if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
-            eprintln!("error: could not write run statistics: {error}");
-            std::process::exit(1);
+            run_stats::exit_for_emit_error("run statistics", &error);
         }
     }
     Ok(())
@@ -950,7 +956,7 @@ pub(super) fn cmd_repl(args: ReplArgs) {
             Ok(_) => {}
             Err(err) => {
                 eprintln!("error: cannot read repl input: {err}");
-                std::process::exit(1);
+                exit_status::exit_no_input();
             }
         }
 

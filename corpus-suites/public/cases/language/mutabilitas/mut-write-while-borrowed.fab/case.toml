@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/mut-write-while-borrowed.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/mut-write-while-borrowed.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

@@ -33,6 +33,12 @@ enum UnifyPolicy {
     Join,
     /// Enforce source-to-destination flow (`is_assignable(left, right)` only).
     Assign,
+    /// A type-argument position: the two sides must be the same type, with
+    /// only inference holes free to bind. A container of one element type is
+    /// never a container of another (ruling 21 row 25, ruling 51 A7), because
+    /// both names would share one storage and the store policy belongs to the
+    /// destination cell, not to the alias that happens to write through it.
+    Invariant,
 }
 
 impl TypeChecker<'_> {
@@ -462,47 +468,51 @@ impl TypeChecker<'_> {
             }
             (Type::Primitive(a), Type::Primitive(b)) if a == b => return left,
             (Type::Array(a), Type::Array(b)) => {
-                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                let inner = self.unify_with_policy(a, b, span, issue, UnifyPolicy::Invariant);
                 return self.types.array(inner);
             }
             (Type::Queue(a), Type::Queue(b)) => {
-                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                let inner = self.unify_with_policy(a, b, span, issue, UnifyPolicy::Invariant);
                 return self.types.queue(inner);
             }
             (Type::Stack(a), Type::Stack(b)) => {
-                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                let inner = self.unify_with_policy(a, b, span, issue, UnifyPolicy::Invariant);
                 return self.types.stack(inner);
             }
             (Type::Map(ka, va), Type::Map(kb, vb)) => {
-                let key = self.unify_with_policy(ka, kb, span, issue, policy);
-                let value = self.unify_with_policy(va, vb, span, issue, policy);
+                let key = self.unify_with_policy(ka, kb, span, issue, UnifyPolicy::Invariant);
+                let value = self.unify_with_policy(va, vb, span, issue, UnifyPolicy::Invariant);
                 return self.types.map(key, value);
             }
             (Type::Ledger(ka, va), Type::Ledger(kb, vb)) => {
-                let key = self.unify_with_policy(ka, kb, span, issue, policy);
-                let value = self.unify_with_policy(va, vb, span, issue, policy);
+                let key = self.unify_with_policy(ka, kb, span, issue, UnifyPolicy::Invariant);
+                let value = self.unify_with_policy(va, vb, span, issue, UnifyPolicy::Invariant);
                 return self.types.ledger(key, value);
             }
             (Type::Set(a), Type::Set(b)) => {
-                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                let inner = self.unify_with_policy(a, b, span, issue, UnifyPolicy::Invariant);
                 return self.types.set(inner);
             }
             (Type::Promissum(a), Type::Promissum(b)) => {
-                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                let inner = self.unify_with_policy(a, b, span, issue, UnifyPolicy::Invariant);
                 return self.types.promissum(inner);
             }
             (Type::PromissumFailable(asuccess, aerr), Type::PromissumFailable(bsuccess, berr)) => {
-                let success = self.unify_with_policy(asuccess, bsuccess, span, issue, policy);
-                let alternate = self.unify_with_policy(aerr, berr, span, issue, policy);
+                let success =
+                    self.unify_with_policy(asuccess, bsuccess, span, issue, UnifyPolicy::Invariant);
+                let alternate =
+                    self.unify_with_policy(aerr, berr, span, issue, UnifyPolicy::Invariant);
                 return self.types.promissum_failable(success, alternate);
             }
             (Type::Cursor(a), Type::Cursor(b)) => {
-                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                let inner = self.unify_with_policy(a, b, span, issue, UnifyPolicy::Invariant);
                 return self.types.cursor(inner);
             }
             (Type::AsyncCursor(aitem, aerr), Type::AsyncCursor(bitem, berr)) => {
-                let item = self.unify_with_policy(aitem, bitem, span, issue, policy);
-                let alternate = self.unify_with_policy(aerr, berr, span, issue, policy);
+                let item =
+                    self.unify_with_policy(aitem, bitem, span, issue, UnifyPolicy::Invariant);
+                let alternate =
+                    self.unify_with_policy(aerr, berr, span, issue, UnifyPolicy::Invariant);
                 return self.types.async_cursor(item, alternate);
             }
             (Type::Option(a), Type::Option(b)) => {
@@ -517,7 +527,9 @@ impl TypeChecker<'_> {
                 let elements = from
                     .into_iter()
                     .zip(to)
-                    .map(|(from, to)| self.unify_with_policy(from, to, span, issue, policy))
+                    .map(|(from, to)| {
+                        self.unify_with_policy(from, to, span, issue, UnifyPolicy::Invariant)
+                    })
                     .collect();
                 return self.types.tuple(elements);
             }
@@ -558,11 +570,11 @@ impl TypeChecker<'_> {
                 return self.types.record(fields);
             }
             (Type::Ref(ma, a), Type::Ref(mb, b)) if ma == mb => {
-                let inner = self.unify_with_policy(a, b, span, issue, policy);
+                let inner = self.unify_with_policy(a, b, span, issue, UnifyPolicy::Invariant);
                 return self.types.reference(ma, inner);
             }
             (Type::Tensor(ea, sa), Type::Tensor(eb, sb)) => {
-                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let elem = self.unify_with_policy(ea, eb, span, issue, UnifyPolicy::Invariant);
                 let shape = match self.unify_shape_at_boundary(sa, sb, span) {
                     Some(Ok(shape)) => shape,
                     Some(Err(())) => return self.error_type,
@@ -578,7 +590,8 @@ impl TypeChecker<'_> {
             (Type::Applied(base_a, args_a), Type::Applied(base_b, args_b))
                 if self.types.equals(base_a, base_b) && args_a.len() == args_b.len() =>
             {
-                let Some(args) = self.unify_applied_args(args_a, args_b, span, issue, policy)
+                let Some(args) =
+                    self.unify_applied_args(args_a, args_b, span, issue, UnifyPolicy::Invariant)
                 else {
                     return self.error_type;
                 };
@@ -586,7 +599,7 @@ impl TypeChecker<'_> {
             }
             // F-010: structural unify for Vector, Matrix, Sparsa, Atomic, Intervallum.
             (Type::Vector(ea, wa), Type::Vector(eb, wb)) => {
-                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let elem = self.unify_with_policy(ea, eb, span, issue, UnifyPolicy::Invariant);
                 let Ok(width) = super::tensor_index::unify_tensor_shape_indices(self, wa, wb, span)
                 else {
                     return self.error_type;
@@ -594,7 +607,7 @@ impl TypeChecker<'_> {
                 return self.types.vector_with_width(elem, width);
             }
             (Type::Matrix(ea, sa), Type::Matrix(eb, sb)) => {
-                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let elem = self.unify_with_policy(ea, eb, span, issue, UnifyPolicy::Invariant);
                 let Ok(shape) = super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span)
                 else {
                     return self.error_type;
@@ -602,7 +615,7 @@ impl TypeChecker<'_> {
                 return self.types.matrix_with_shape(elem, shape);
             }
             (Type::Sparsa(ea, sa), Type::Sparsa(eb, sb)) => {
-                let elem = self.unify_with_policy(ea, eb, span, issue, policy);
+                let elem = self.unify_with_policy(ea, eb, span, issue, UnifyPolicy::Invariant);
                 let Ok(shape) = super::tensor_index::unify_tensor_shape_indices(self, sa, sb, span)
                 else {
                     return self.error_type;
@@ -659,7 +672,7 @@ impl TypeChecker<'_> {
                     capacity: cb,
                 },
             ) => {
-                let element = self.unify_with_policy(ea, eb, span, issue, policy);
+                let element = self.unify_with_policy(ea, eb, span, issue, UnifyPolicy::Invariant);
                 let Ok(capacity) =
                     super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
                 else {
@@ -677,7 +690,7 @@ impl TypeChecker<'_> {
                     capacity: cb,
                 },
             ) => {
-                let element = self.unify_with_policy(ea, eb, span, issue, policy);
+                let element = self.unify_with_policy(ea, eb, span, issue, UnifyPolicy::Invariant);
                 let Ok(capacity) =
                     super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
                 else {
@@ -695,7 +708,7 @@ impl TypeChecker<'_> {
                     capacity: cb,
                 },
             ) => {
-                let element = self.unify_with_policy(ea, eb, span, issue, policy);
+                let element = self.unify_with_policy(ea, eb, span, issue, UnifyPolicy::Invariant);
                 let Ok(capacity) =
                     super::tensor_index::unify_tensor_shape_indices(self, ca, cb, span)
                 else {
@@ -704,7 +717,8 @@ impl TypeChecker<'_> {
                 return self.types.bounded_stack(element, capacity);
             }
             (Type::Atomic(inner_a), Type::Atomic(inner_b)) => {
-                let inner = self.unify_with_policy(inner_a, inner_b, span, issue, policy);
+                let inner =
+                    self.unify_with_policy(inner_a, inner_b, span, issue, UnifyPolicy::Invariant);
                 return self.types.atomic(inner);
             }
             (Type::Intervallum(inner_a, a_step), Type::Intervallum(inner_b, b_step)) => {
@@ -719,7 +733,7 @@ impl TypeChecker<'_> {
                 return self.types.intervallum_with_step(inner, b_step);
             }
             (Type::Func(sig_a), Type::Func(sig_b)) => {
-                return self.unify_function_signatures(sig_a, sig_b, span, issue, policy);
+                return self.unify_function_signatures(sig_a, sig_b, span, issue);
             }
             _ => match policy {
                 UnifyPolicy::Join => {
@@ -732,6 +746,11 @@ impl TypeChecker<'_> {
                 }
                 UnifyPolicy::Assign => {
                     if self.types.is_assignable(left, right) {
+                        return right;
+                    }
+                }
+                UnifyPolicy::Invariant => {
+                    if self.types.equals(left, right) {
                         return right;
                     }
                 }
@@ -910,7 +929,6 @@ impl TypeChecker<'_> {
         sig_b: FuncSig,
         span: radix_lexer::Span,
         issue: &'static str,
-        policy: UnifyPolicy,
     ) -> TypeId {
         if sig_a.params.len() != sig_b.params.len() {
             self.error_issue(SemanticErrorKind::ArityMismatch, issue, span);
@@ -929,28 +947,13 @@ impl TypeChecker<'_> {
                 self.error_issue(SemanticErrorKind::TypeMismatch, issue, span);
                 return self.error_type;
             }
-            let param_ty = match policy {
-                // WHY: function parameters are contravariant under assignment.
-                UnifyPolicy::Assign => {
-                    self.unify_with_policy(param_b.ty, param_a.ty, span, issue, policy)
-                }
-                // F-012: under Join, parameters are also contravariant (GLB,
-                // not LUB). Use Assign to enforce contravariance instead of
-                // the covariant Join which unsoundly picks the wider param type.
-                UnifyPolicy::Join => {
-                    let ty = self.unify_with_policy(
-                        param_b.ty,
-                        param_a.ty,
-                        span,
-                        issue,
-                        UnifyPolicy::Assign,
-                    );
-                    if self.resolve_inferred_type(ty) == self.error_type {
-                        return self.error_type;
-                    }
-                    ty
-                }
-            };
+            // Function types are invariant (ruling 21 row 25, ruling 51 A7):
+            // a parameter or result of another type is another function type.
+            let param_ty =
+                self.unify_with_policy(param_b.ty, param_a.ty, span, issue, UnifyPolicy::Invariant);
+            if self.resolve_inferred_type(param_ty) == self.error_type {
+                return self.error_type;
+            }
             params.push(ParamType {
                 ty: param_ty,
                 mode: param_a.mode,
@@ -958,10 +961,10 @@ impl TypeChecker<'_> {
                 sponte: param_a.sponte,
             });
         }
-        let ret = self.unify_with_policy(sig_a.ret, sig_b.ret, span, issue, policy);
+        let ret = self.unify_with_policy(sig_a.ret, sig_b.ret, span, issue, UnifyPolicy::Invariant);
         let err = match (sig_a.err, sig_b.err) {
             (Some(a_err), Some(b_err)) => {
-                Some(self.unify_with_policy(a_err, b_err, span, issue, policy))
+                Some(self.unify_with_policy(a_err, b_err, span, issue, UnifyPolicy::Invariant))
             }
             (None, None) => None,
             _ => {

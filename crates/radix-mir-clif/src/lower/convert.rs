@@ -727,7 +727,10 @@ impl FunctionLower<'_, '_> {
                     .ok_or_else(|| Decline::new("length result"))?;
                 let need = self.builder.ins().iconst(types::I64, i64::from(bytes));
                 let wrong = self.builder.ins().icmp(IntCC::NotEqual, length, need);
-                let failure = Some((wrong, Failure::Static("octeti endian width mismatch")));
+                let failure = Some((
+                    wrong,
+                    Failure::Static(trap_text::BYTES_ENDIAN_WIDTH_MISMATCH),
+                ));
                 if float {
                     let float = self
                         .builder
@@ -898,11 +901,23 @@ impl FunctionLower<'_, '_> {
             (Num::Dyn, target)
                 if matches!(target, Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text) =>
             {
-                let (tag, rep, label) = match target {
-                    Num::Int(_) => (abi::TAG_INT, Rep::Int, "numerus"),
-                    Num::Float(_) => (abi::TAG_FLOAT, Rep::Float, "fractus"),
-                    Num::Bool => (abi::TAG_BOOL, Rep::Bool, "bivalens"),
-                    _ => (abi::TAG_TEXT, Rep::Text, "textus"),
+                let (tag, rep, message) = match target {
+                    Num::Int(_) => (abi::TAG_INT, Rep::Int, "valor to numerus conversion failed"),
+                    Num::Float(_) => (
+                        abi::TAG_FLOAT,
+                        Rep::Float,
+                        "valor to fractus conversion failed",
+                    ),
+                    Num::Bool => (
+                        abi::TAG_BOOL,
+                        Rep::Bool,
+                        "valor to bivalens conversion failed",
+                    ),
+                    _ => (
+                        abi::TAG_TEXT,
+                        Rep::Text,
+                        "valor to textus conversion failed",
+                    ),
                 };
                 let wanted = self.builder.ins().iconst(types::I32, tag);
                 let has = self
@@ -926,8 +941,6 @@ impl FunctionLower<'_, '_> {
                 }
                 let one = self.builder.ins().iconst(types::I8, 1);
                 let failed = self.builder.ins().bxor(has, one);
-                let message = format!("valor to {label} conversion failed");
-                let message = Box::leak(message.into_boxed_str());
                 (extracted, Some((failed, Failure::Static(message))))
             }
             (Num::Text, Num::Ins(code)) => {

@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/ref-assign-projection.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/ref-assign-projection.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

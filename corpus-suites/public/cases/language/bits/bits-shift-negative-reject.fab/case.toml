@@ -3,6 +3,8 @@ id = "corpus/bits/bits-shift-negative-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "bits/bits-shift-negative-reject.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

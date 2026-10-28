@@ -3,6 +3,8 @@ id = "corpus/omitte/omitte.fab"
 group = "language"
 input_root = "corpus"
 input = "omitte/omitte.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

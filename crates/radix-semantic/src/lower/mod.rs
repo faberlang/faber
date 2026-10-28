@@ -1323,6 +1323,7 @@ fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
         crate::FIGURA_UNKNOWN_INDEX_MSG => issue_args("figura_unknown_index"),
         crate::FIGURA_TYPE_PARAM_IN_INDEX_MSG => issue_args("figura_type_param_in_index"),
         crate::FIGURA_NOT_INDEX_PARAM_MSG => issue_args("figura_not_index_param"),
+        crate::figura::FIGURA_LIFT_SHAPE_MSG => issue_args("size_shape_outside_call_args"),
         crate::VECTOR_WIDTH_SINGLE_DIM_MSG => issue_args("vector_width_single_dim"),
         crate::MATRIX_SHAPE_TWO_DIM_MSG => issue_args("matrix_shape_two_dim"),
         crate::ATOMIC_ELEMENT_MSG => issue_args("atomic_element"),

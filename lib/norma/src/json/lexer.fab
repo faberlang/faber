@@ -25,7 +25,7 @@ fn is_whitespace(string c) → bool {
 fn skip_whitespace(string s, int i) → int {
     mut int pos ← i
     while pos ≺ s.length() {
-        if is_whitespace(s.slice(pos, pos + 1)) {
+        if is_whitespace(s.slice(pos, pos + 1) ⊥ "") {
             pos ← pos + 1
         }
         else then return pos
@@ -98,7 +98,7 @@ fn control_escape(string c) → string {
 }
 
 fn hex_digit(int digit) → string {
-    return "0123456789abcdef".slice(digit, digit + 1)
+    return "0123456789abcdef".slice(digit, digit + 1) ⊥ ""
 }
 
 # =========================================================================
@@ -134,7 +134,7 @@ fn hex_value(string c) → int ∪ none {
     let string upper ← "0123456789ABCDEF"
     mut int digit ← 0
     while digit ≺ 16 {
-        if lower.slice(digit, digit + 1) ≡ c or upper.slice(digit, digit + 1) ≡ c then return digit
+        if (lower.slice(digit, digit + 1) ⊥ "") ≡ c or (upper.slice(digit, digit + 1) ⊥ "") ≡ c then return digit
         digit ← digit + 1
     }
     return null

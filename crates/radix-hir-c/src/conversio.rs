@@ -222,7 +222,6 @@ impl Emitter<'_> {
                 };
                 return self.bits_list_width_change(
                     source,
-                    source_ty,
                     target,
                     from,
                     to,
@@ -714,11 +713,9 @@ impl Emitter<'_> {
     /// Lower a width-changing list pair through the runtime byte view. The
     /// shared predicate admits the pair; this C lane carries b8 and the u16,
     /// u32, u64, b16, b32 and b64 families only.
-    #[allow(clippy::too_many_arguments)]
     fn bits_list_width_change(
         &mut self,
         source: &HirExpression,
-        source_ty: TypeId,
         target_ty: TypeId,
         from: String,
         to: String,
@@ -728,6 +725,9 @@ impl Emitter<'_> {
         if has_recovery {
             return Err(list_width_refusal(&from, &to));
         }
+        let Some(source_ty) = source.ty else {
+            return Err(list_width_refusal(&from, &to));
+        };
         let Some(from_type) = list_element_type(self.types, source_ty) else {
             return Err(list_width_refusal(&from, &to));
         };

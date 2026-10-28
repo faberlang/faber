@@ -1,0 +1,16 @@
++++
+locale = "en"
++++
+
+# stdio-print — the imported `print` convenience member of norma:console.
+#
+# Route:
+#   consolum:scribe — console.print (stdout + newline), the write_line route
+
+import from "norma:console" const print
+
+main {
+    print("print-one")
+    print("§"((8.0).cbrt()))
+    print("stdio-print-ok")
+}

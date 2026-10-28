@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/own-transfer.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/own-transfer.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

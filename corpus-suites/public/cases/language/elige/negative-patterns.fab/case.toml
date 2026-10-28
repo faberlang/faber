@@ -3,6 +3,8 @@ id = "corpus/elige/negative-patterns.fab"
 group = "language"
 input_root = "corpus"
 input = "elige/negative-patterns.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

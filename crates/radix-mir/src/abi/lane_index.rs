@@ -60,7 +60,7 @@ use crate::{
     MirType, MirValidationContext, MirValueKind, visit::MirVisitor,
 };
 
-use super::signature::resolve_parameter_alias;
+use super::signature::ParameterAliases;
 
 #[path = "lane_index_counter.rs"]
 mod counter;
@@ -163,6 +163,7 @@ pub struct LaneIndexProof<'a> {
     function: &'a MirFunction,
     validation: &'a MirValidationContext<'a>,
     defs: Defs<'a>,
+    aliases: ParameterAliases<'a>,
     /// The lane-form kernel's lane id, or `None` for a whole-grid reduction
     /// term (which has no grid guard).
     lane: Option<MirLocalId>,
@@ -270,6 +271,7 @@ impl<'a> LaneIndexProof<'a> {
                 function,
                 validation,
                 defs: collect_writes(function),
+                aliases: ParameterAliases::new(function),
                 lane: None,
                 guard_factors: Vec::new(),
                 counters: BTreeMap::new(),
@@ -296,6 +298,7 @@ impl<'a> LaneIndexProof<'a> {
             function,
             validation,
             defs: collect_writes(function),
+            aliases: ParameterAliases::new(function),
             lane: Some(lane),
             guard_factors: Vec::new(),
             counters: BTreeMap::new(),
@@ -304,6 +307,25 @@ impl<'a> LaneIndexProof<'a> {
         proof.guard_factors = factors(&total);
         proof.counters = counter::bounded_counters(&proof);
         Some(proof)
+    }
+
+    /// The proof state of a whole-grid reduction's term or group-key helper.
+    /// The helper has no lane and no grid guard, so only a literal or
+    /// sequential-counter coordinate is proven; every other tensor index is
+    /// unproven and needs the kernel's device bounds compare.
+    #[must_use]
+    pub fn for_helper(function: &'a MirFunction, validation: &'a MirValidationContext<'a>) -> Self {
+        let mut proof = Self {
+            function,
+            validation,
+            defs: collect_writes(function),
+            aliases: ParameterAliases::new(function),
+            lane: None,
+            guard_factors: Vec::new(),
+            counters: BTreeMap::new(),
+        };
+        proof.counters = counter::bounded_counters(&proof);
+        proof
     }
 
     /// `total` of the entry guard `lane >= total`.
@@ -379,7 +401,7 @@ impl<'a> LaneIndexProof<'a> {
                 else {
                     return Sym::Opaque;
                 };
-                let local = resolve_parameter_alias(self.function, *local);
+                let local = self.aliases.resolve(*local);
                 self.tensor_dims(local)
                     .and_then(|dims| dims.get(*axis as usize).cloned())
                     .unwrap_or(Sym::Opaque)
@@ -576,7 +598,7 @@ impl<'a> LaneIndexProof<'a> {
         let MirPlaceBase::Local(local) = &place.base else {
             return None;
         };
-        let local = resolve_parameter_alias(self.function, *local);
+        let local = self.aliases.resolve(*local);
         self.tensor_dims(local)?;
         Some((local, index))
     }

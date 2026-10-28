@@ -3,6 +3,8 @@ id = "product/reader-locale/th-TH"
 group = "product"
 input_root = "product"
 input = "reader-locale/th-TH"
+category = "locale"
+domain = "locales"
 
 
 [expect]

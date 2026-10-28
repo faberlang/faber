@@ -34,6 +34,7 @@ optiones = "optiones"
 privata = "privata"
 protecta = "protecta"
 publica = "publica"
+visibilitas = "visibilitas"
 sponte = "sponte"
 casu = "casu"
 ceterum = "ceterum"
@@ -1114,6 +1115,10 @@ help = "write the shape with {sugar} width sugar brackets"
 message = "`{form}` is a retired numeric type spelling"
 help = "write `{bare}`, not `{form}`; a width marker is its own type"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "ambitus utrumque finem requirit"
+help = "scribe utrumque finem, ut 0‥8 aut 0…7, cum ∞ aut -∞ pro nullo fine in latere"
+
 [diagnostics.PARSE040.issues.iuncta_arity_exceeded]
 message = "iuncta arity {count} exceeds maximum of 16; use a genus instead"
 help = "reduce the iuncta arity to 16 or fewer, or declare a genus for more fields"
@@ -1156,31 +1161,35 @@ help = "check import syntax"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "unknown import field"
-help = "use ex, visibilitas, nomen, ut, or omnia"
+help = "use {ex}, {visibilitas}, {nomen}, {ut}, or {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "campus importationis `{field}` non est declaratus in hac superficie lectoris"
+help = "utere `{expected}` pro lingua lectoris huius fasciculi"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "duplicate import field `{field}`"
 help = "each import field may appear once; remove the repeated field"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "import record requires an ex source"
-help = "add ex = \"path\" to the import record"
+message = "import record requires an {ex} source"
+help = "add {ex} = \"path\" to the import record"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import cannot also name a binding"
-help = "use omnia by itself, or use nomen/ut for a named import"
+help = "use {omnia} by itself, or use {nomen}/{ut} for a named import"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "invalid import visibility"
-help = "use publica"
+help = "use {publica}"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "`privata` on imports was removed; imports do not re-export by default"
-help = "drop the marker, or use publica to re-export"
+message = "`{privata}` on imports was removed; imports do not re-export by default"
+help = "drop the marker, or use {publica} to re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "could not infer import name from {path}"
-help = "spell nomen or an explicit alias for {path}"
+help = "spell {nomen} or an explicit alias for {path}"
 
 [diagnostics.PARSE050.issues.import_target_unknown]
 message = "`{target}` is not a target name"
@@ -1208,7 +1217,7 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "unknown identifier"
-help = "write `{spelling} <expr>` without parentheses for the output statement"
+help = "`{spelling}` is the output statement, not a function: import the console function (`{importa} {ex} \"norma:console\" {fixum} print`, then write `print(...)`), or bind the value first (`{sit} _ x ← …`, then `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "unknown record field"
@@ -1505,6 +1514,38 @@ help = "scribe exactus cum una latitudine, ut exactus<u8> aut exactus<i64>"
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "latitudo exacti signum latitudinis nudum esse debet"
 help = "utere signo latitudinis nudo, ut u8 aut i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "ambitus verbum modi condendi requirit; signum latitudinis nudum ambitum non accipit"
+help = "scribe verbum modi primum, ut saturatus<u32, 0‥8>, exactus<i32, -2‥3> aut modulus<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "finis ambitus numerus integer litteralis aut ∞ esse debet"
+help = "scribe utrumque finem ut numerum integrum litteralem, ut 0‥8; finis nominatus aut magnitudinis nondum paratur"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "modus condendi cum ambitu latitudinem et deinde unum ambitum accipit"
+help = "scribe modus<W, lo‥hi>, ut saturatus<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "ambitus nullum valorem tenet"
+help = "finis infimus infra summum in lo‥hi esse debet, aut non supra eum in lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "finis ambitus extra latitudinem iacet"
+help = "utrumque finem intra latitudinem serva; ∞ solum finis summus est et -∞ solum infimus"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "latitudo sine signo finem infimum negativum habere non potest"
+help = "ambitum a 0 incipe, aut latitudine cum signo utere, ut i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "modus condendi cum ambitu latitudinem integram finitam requirit"
+help = "latitudine integra utere, ut u8 aut i32; latitudines fractae, decimales et inf nondum ambitum accipiunt"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "nucleum modum condendi cum ambitu nondum adhibere potest ({site}); nucleum nullum ambitum applicat"
+help = "in nucleo latitudine nuda utere et ambitum in hospite applica"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
@@ -1950,6 +1991,10 @@ help = "scribe `magnitudo {name}` ut iter elevandi in hoc reposito demonstretur,
 message = "nomen valoris locum magnitudinis tenere non potest"
 help = "scribe `magnitudo w` ut valor ut testimonium magnitudinis utatur"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "vocatio generica argumentum magnitudinis vel figurae sustinere non potest"
+help = "utere constante aut nomine magnitudinis aut valore `magnitudo w` scripto"
+
 [diagnostics.SEM008.issues.unknown_type_name]
 message = "unknown type name"
 help = "fix the AST construct for lowering"
@@ -1985,6 +2030,14 @@ help = "use an integer width for {saturatus}: i8, i16, i32, i64, u8, u16, u32, o
 [diagnostics.SEM008.issues.unsupported_trapping_word_width]
 message = "{exactus} width must be an integer width or d64"
 help = "use an integer width or d64 for {exactus}: i8, i16, i32, i64, u8, u16, u32, u64, or d64"
+
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "a shape after `size` in a call's type arguments admits natural-number dimensions only"
+help = "write each dimension as a natural number, as in `size [2, 3]`; pass a symbolic or run-time dimension through a `size` name instead"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "a bracketed shape after `size` is only admitted in a call's type arguments"
+help = "write the shape directly, as in `tensor<f32, [2, 3]>`, or use `size [2, 3]` in a call such as `construct<f32, size [2, 3]>(data)`"
 
 [diagnostics.SEM009]
 message = "CLI validation error"
@@ -2145,6 +2198,10 @@ help = "typum tantum declara; tabula ({tabula}) utere donec operationes tabulae 
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "typus tabulae in hoc proposito nondum adhibetur"
 help = "exsecutore MIR aut emissore fontis Faber utere, aut tabula ({tabula}), donec hoc propositum tabulas ferat"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "modus condendi cum ambitu in hoc proposito nondum sustinetur"
+help = "exsecutore MIR, proposito Rust aut emissore fontis Faber utere, donec hoc propositum ambitus applicet"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "folium {leaf} in hoc proposito non adhibetur"
@@ -4321,6 +4378,14 @@ help = "write the marker at the call as the signature declares it, for example `
 [diagnostics.SEM057.issues.axis_marker_unexpected]
 message = "the `axis` marker is written here but the parameter is not declared `axis`"
 help = "remove the `axis` marker, or declare the parameter `axis int`"
+
+[diagnostics.SEM057.issues.size_marker_required]
+message = "this argument is a `size` argument and must be written with the `size` marker"
+help = "write the marker as the signature declares the parameter, for example `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "the `size` marker is written here but the callee declares no `size` parameter"
+help = "remove the `size` marker, or declare the parameter `size N`"
 
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "cannot bind an unmarked value into `own`"

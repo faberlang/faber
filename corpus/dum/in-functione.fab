@@ -2,7 +2,7 @@
 term = "dum"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "assignment", "place", "dum_stmt", "comparison", "additive_expr", "multiplicative_expr", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "While loops inside function bodies."
 syntax = "dum <condition> <block>"

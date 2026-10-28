@@ -635,6 +635,27 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::UNSUPPORTED_TRAPPING_WORD_WIDTH => Some(
             "use an integer width or d64 for exactus: i8, i16, i32, i64, u8, u16, u32, u64, or d64".to_owned(),
         ),
+        WidthLowerIssue::RANGED_POLICY_WORD_REQUIRED => Some(
+            "write the policy word first, such as saturating<u32, 0‥8>, trapping<i32, -2‥3> or wrapping<u32, 0‥8>".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_BOUND_NOT_CONSTANT => Some(
+            "write both ends as integer literals, such as 0‥8; a named or size end is not built yet".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_ARITY => {
+            Some("write policy<W, lo‥hi>, such as saturating<u32, 0‥8>".to_owned())
+        }
+        WidthLowerIssue::RANGED_EMPTY => Some(
+            "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_OUTSIDE_WIDTH => Some(
+            "keep both ends inside the width; ∞ is only a high end and -∞ only a low end".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_UNSIGNED_NEGATIVE => {
+            Some("start the range at 0, or use a signed width such as i32".to_owned())
+        }
+        WidthLowerIssue::RANGED_WIDTH_UNSUPPORTED => Some(
+            "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet".to_owned(),
+        ),
         "policy_float_family_mismatch" => Some(
             "convert the other operand to the same float cell with `↦`; a trapping or saturating float never mixes with a bare float, another cell, or another width implicitly".to_owned(),
         ),
@@ -1074,7 +1095,7 @@ fn semantic_undefined_variable_help(args: &[DiagnosticArg]) -> Option<String> {
         "scribe_callee" => {
             let spelling = arg_value(args, "spelling")?;
             Some(format!(
-                "write `{spelling} <expr>` without parentheses for the output statement"
+                "`{spelling}` is the output statement, not a function: import the console function (`import from \"norma:console\" const print`, then write `print(...)`), or bind the value first (`let _ x ← …`, then `{spelling} x`)"
             ))
         }
         "unknown_identifier" => {

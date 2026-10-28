@@ -109,10 +109,10 @@ pub use abi::{
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor,
     MirWebGpuDispatchWorkgroups, MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor,
     MirWebGpuVertexAttributeDescriptor, MirWebGpuVertexBufferLayoutDescriptor,
-    MirWebGpuVertexStepMode, MirWorkgroupSize, ThrowSite, UnprovenIndex, UnprovenVectorIndex,
-    collection_op_workgroup_count, rank_extension_broadcast_fact, reject_kernel_matrix_abi,
-    resolve_parameter_alias, throw_sites, unproven_indexes, unproven_vector_indexes,
-    validate_varying_consistency,
+    MirWebGpuVertexStepMode, MirWorkgroupSize, ParameterAliases, ThrowSite, UnprovenIndex,
+    UnprovenVectorIndex, collection_op_workgroup_count, grid_reduce_helper_tensors,
+    rank_extension_broadcast_fact, reject_kernel_matrix_abi, throw_sites, unproven_indexes,
+    unproven_vector_indexes, validate_varying_consistency,
 };
 pub use ai_workbench_stage5::{
     AiWorkbenchStage5Facet, AiWorkbenchStage5Row, AiWorkbenchStage5Status,

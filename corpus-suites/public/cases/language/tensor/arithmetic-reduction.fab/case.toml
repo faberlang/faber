@@ -3,6 +3,8 @@ id = "corpus/tensor/arithmetic-reduction.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/arithmetic-reduction.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

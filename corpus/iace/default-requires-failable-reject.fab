@@ -2,7 +2,7 @@
 term = "iace"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "errors"
+category = "error"
 summary = "A ⊥ default follows a failable call or a conversion; anything else is rejected."
 syntax = "print x ⊥ 0"
 related = ["iace", "⊥", "↦"]

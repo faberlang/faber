@@ -3,6 +3,8 @@ id = "corpus/transfer/copy-into-view-target-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "transfer/copy-into-view-target-reject.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

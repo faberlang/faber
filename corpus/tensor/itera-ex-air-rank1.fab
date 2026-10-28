@@ -2,7 +2,7 @@
 term = "itera-ex-air-rank1"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "shape_suffix", "expression", "assignment", "itera_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "AIR-lane itera ex over a rank-1 tensor unrolls into guard-free element lets within the per-function lane budget."
 syntax = "@ radix lane \"air\"; itera ex tensor<T, [N]>"

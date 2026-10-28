@@ -2,7 +2,7 @@
 term = "atomic"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt"]
-category = "storage"
+category = "device"
 summary = "atomic<T> v1 accepts only i32 and u32 elements."
 syntax = "atomic<i32> | atomic<u32>"
 related = ["numerus"]

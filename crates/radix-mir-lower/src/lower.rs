@@ -547,7 +547,10 @@ fn portable_tensor_edge_type_identity(
                 .collect::<Option<Vec<_>>>()?,
         ),
         Type::Record(fields) => portable_tensor_edge_record_identity(types, interner, fields)?,
-        Type::BoundedArray { .. }
+        // A ranged cell has no portable tensor-edge identity (tensor edges
+        // over ranges are need 5 of the ranged-policy series).
+        Type::RangedInt { .. }
+        | Type::BoundedArray { .. }
         | Type::Queue(_)
         | Type::BoundedQueue { .. }
         | Type::Stack(_)
@@ -2271,15 +2274,10 @@ fn device_role_for_function(function: &HirFunction) -> Option<MirDeviceRole> {
     }
 }
 
-/// Map HIR function flags to MIR shader stage identity.
+/// Map HIR stage flags to MIR shader-stage identity.
 ///
-/// `MirKernelShaderStage` carries execution-stage identity (Compute/
-/// Vertex/Fragment). Assigned during HIR→MIR lowering so that lowered
-/// `MirFunction`s carry the stage seam even before full body lowering
-/// lands. Conflicting annotations fail-closed to `None`.
-///
-/// Residual: body lowering through `MirProgram` + WGSL emit + backend impact
-/// is the next unit. Stage assignment is the identity seam, not the body path.
+/// `MirKernelShaderStage` distinguishes execution stages from composition
+/// roles. Conflicting annotations fail closed to `None`.
 pub fn shader_stage_for_function(function: &HirFunction) -> Option<MirKernelShaderStage> {
     if !annotations_exclusive(function) {
         return None;
@@ -3606,7 +3604,10 @@ impl<'a> FunctionBuilder<'a> {
             // Every integer slot takes the node: at the cap the exact successor
             // (`i64::MAX + 1`) is a value the carrier holds, so only the store
             // check keeps it out of an `i64` slot (ruling 17).
-            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::Primitive(Primitive::Numerus) => true,
+            Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
+            | Type::Primitive(Primitive::Numerus) => true,
             // Deliberate: a store into `inf` is total (nothing to fit), so it
             // takes no store node; `integer_range()` is `None` for `inf`.
             Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
@@ -3996,6 +3997,7 @@ impl<'a> FunctionBuilder<'a> {
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
                 | Type::ModularWord(NumericWidth::U64)
                 | Type::SaturatingWord(NumericWidth::U64)
+                | Type::RangedInt { width: NumericWidth::U64, .. }
                 // A raw-bits cell always holds the zero-extended unsigned
                 // pattern.
                 | Type::Bits(_) => return true,
@@ -4013,7 +4015,7 @@ impl<'a> FunctionBuilder<'a> {
     fn lower_octeti_literal(&mut self, sym: Symbol, ty: Option<TypeId>, span: Span) -> Option<MirOperand> {
         if ty.is_none() {
             self.errors
-                .push(MirError::missing_type(span, "octeti literal"));
+                .push(MirError::missing_type(span, "list<b8> literal"));
             return None;
         }
         let Some(interner) = self.context.interner else {
@@ -4021,8 +4023,10 @@ impl<'a> FunctionBuilder<'a> {
         };
         let raw = interner.resolve(sym);
         let Ok(bytes) = radix_lexer::octeti_literal::decode_octeti_hex(raw) else {
-            self.errors
-                .push(MirError::unsupported(span, "octeti literal failed decode before MIR lowering"));
+            self.errors.push(MirError::unsupported(
+                span,
+                "list<b8> literal failed decode before MIR lowering",
+            ));
             return None;
         };
         // Need: a byte literal is a `lista<b8>`, so it lowers to a
@@ -4307,6 +4311,80 @@ impl<'a> FunctionBuilder<'a> {
         ))
     }
 
+    /// Lower argument `index` (receiver excluded) of a collection runtime call.
+    /// The text operands the MIR validator requires to be exactly `textus`
+    /// (`starts_with`/`ends_with`/`split` separator, `replace` pair) widen
+    /// from the ASCII family first.
+    pub(super) fn lower_collection_call_arg(
+        &mut self,
+        op: MirCollectionOp,
+        index: usize,
+        arg: &HirExpression,
+    ) -> Option<MirOperand> {
+        let lowered = self.lower_call_arg_value(arg)?;
+        let text_operand = match op {
+            MirCollectionOp::StartsWith | MirCollectionOp::EndsWith | MirCollectionOp::Split => index == 0,
+            MirCollectionOp::Replace => index < 2,
+            _ => false,
+        };
+        if text_operand {
+            self.widen_text_argument(lowered, arg)
+        } else {
+            Some(lowered)
+        }
+    }
+
+    /// Widen an ASCII-family text argument to the `textus` carrier the MIR
+    /// text rows require. The checker admits bare `ascii` and `ascii<1>` where
+    /// `textus` is expected (implicit ASCII widening) and retypes the argument
+    /// expression to the parameter, so the operand's own carrier is read from
+    /// MIR. Bare `ascii` is retyped the way `let string t ← x` retypes it; a
+    /// bounded cord takes the `↦ textus` copy.
+    fn widen_text_argument(&mut self, operand: MirOperand, expr: &HirExpression) -> Option<MirOperand> {
+        let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+        let carrier = self.operand_carrier_ty(&operand);
+        match carrier.map(|ty| self.normalized_type(ty.semantic_id())) {
+            Some(Type::Primitive(Primitive::Ascii)) => {
+                Some(self.assign_temp(MirValueKind::Operand(operand), textus, expr.span))
+            }
+            Some(Type::BoundedTextus { .. } | Type::BoundedAscii { .. }) => {
+                let source_ty = carrier?;
+                Some(self.runtime_call_value(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty,
+                        target_ty: textus,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![operand],
+                    textus,
+                    expr.span,
+                ))
+            }
+            _ => Some(operand),
+        }
+    }
+
+    /// The carrier type of a lowered operand when it is a constant, a temp, or
+    /// a projection-free local. `None` for operands whose type is not recorded
+    /// on the builder.
+    fn operand_carrier_ty(&self, operand: &MirOperand) -> Option<MirType> {
+        match operand {
+            MirOperand::Constant(MirConstant::Ascii(_)) => {
+                Some(MirType::semantic(self.types.primitive(Primitive::Ascii)))
+            }
+            MirOperand::Temp(temp) => self.temps.iter().find(|t| t.id == *temp).map(|t| t.ty),
+            MirOperand::Place(place) if place.projections.is_empty() => match place.base {
+                MirPlaceBase::Local(local) => self.locals.iter().find(|l| l.id == local).map(|l| l.ty),
+                MirPlaceBase::Temp(temp) => self.temps.iter().find(|t| t.id == temp).map(|t| t.ty),
+            },
+            _ => None,
+        }
+    }
+
     /// Lower an `ordo` ordering comparison by converting both operands to their
     /// declared discriminants and comparing the integers.
     fn lower_ordo_order_compare(
@@ -4505,6 +4583,7 @@ impl<'a> FunctionBuilder<'a> {
                     | Type::SizedNumeric(Primitive::Numerus, _)
                     | Type::ModularWord(_)
                     | Type::SaturatingWord(_)
+                    | Type::RangedInt { .. }
             ) && !matches!(
                 this.normalized_type(semantic),
                 Type::SizedNumeric(_, width) if width.is_decimal()

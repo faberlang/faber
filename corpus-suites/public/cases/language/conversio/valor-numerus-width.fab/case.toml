@@ -3,6 +3,8 @@ id = "corpus/conversio/valor-numerus-width.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/valor-numerus-width.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "lista"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "call_expr", "call_suffix", "member_suffix", "expression", "range_expr", "range_tail", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Range index forms on a list and a text: ‥ omits the end, … keeps it, until is the inclusive word form, before the exclusive one, step strides."
 syntax = "<collection>[<start>‥<end>] | [<start>…<end>] | [<start> until <end>] | [<start> before <end>] | [<start>‥<end> step <n>]"

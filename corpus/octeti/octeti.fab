@@ -1,9 +1,9 @@
 +++
-term = "octeti"
-explains = ["octeti"]
+term = "list<b8>"
+explains = ["list<b8>"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = true
 summary = "A byte buffer is a list<b8>; hex literals like |de ad be ef| write one."
 syntax = "list<b8>"

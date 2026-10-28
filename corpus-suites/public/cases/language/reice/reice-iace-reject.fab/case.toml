@@ -3,6 +3,8 @@ id = "corpus/reice/reice-iace-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "reice/reice-iace-reject.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

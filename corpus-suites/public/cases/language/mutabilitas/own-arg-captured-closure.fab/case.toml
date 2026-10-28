@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/own-arg-captured-closure.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/own-arg-captured-closure.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

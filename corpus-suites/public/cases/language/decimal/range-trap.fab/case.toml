@@ -3,6 +3,8 @@ id = "corpus/decimal/range-trap.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/range-trap.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/typi/inf-tensor-error.fab"
 group = "language"
 input_root = "corpus"
 input = "typi/inf-tensor-error.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

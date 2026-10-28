@@ -3,6 +3,8 @@ id = "corpus/intrinseca/fractus-math.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/fractus-math.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

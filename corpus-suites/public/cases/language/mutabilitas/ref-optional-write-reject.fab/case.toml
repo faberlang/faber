@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/ref-optional-write-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/ref-optional-write-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

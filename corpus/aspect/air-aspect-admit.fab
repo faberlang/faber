@@ -2,7 +2,7 @@
 term = "air-aspect-admit"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "binding_decl", "itera_stmt", "range_expr", "range_tail", "redde_stmt", "expression", "literal", "nota_stmt"]
-category = "lane"
+category = "kernel"
 canonical = false
 summary = "Shapes the AIR proof-aspect report admits: a literal-range itera ab loop (unroll-equivalence obligation) and a pure scalar let/return function (gate-purity obligation)."
 syntax = "itera ab <literal range> sit <ident>; return <path>"

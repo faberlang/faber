@@ -3,6 +3,8 @@ id = "corpus/implet/multi-bound.fab"
 group = "language"
 input_root = "corpus"
 input = "implet/multi-bound.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

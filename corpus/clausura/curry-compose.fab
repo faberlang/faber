@@ -2,7 +2,7 @@
 term = "clausura"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt", "array_literal", "itera_stmt", "assignment", "place"]
-category = "declaration"
+category = "function"
 canonical = false
 summary = "Closures returned from functions: counters with captured state, compose, curry, two-level nesting, and a list of closures called in a loop."
 syntax = "fn mk(int start) → () → int"

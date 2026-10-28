@@ -83,6 +83,7 @@ product default); `la` spellings differ (`print` is `nota`, `fn` is `functio`).
 | mutating a `let` list/set | `SEM020` (`xs.append(3)`, `xs.sort()` on a `let` receiver); declare `mut` |
 | `mut b ← a` copies, or `let` shares read-only | unmarked `b ← c` shares (a container or class value aliases); the markers sit on the value side: `mut b ← copy a` duplicates deeply, `mut b ← own a` takes it over. Read-only is deep: a `let` (or `ref`, or unmarked parameter) container or genus into a `mut` cell is `SEM065 const_shared_into_var` (spell `copy` or `own`). `ref T x ← place` is a re-pointable read-only name; `ref`/`mut` may hold `T ∪ none` when the non-none member is a reference type (never over a scalar: `SEM008 scalar_access_marker`; `corpus/mutabilitas/ref-optional-cursor.fab`). `Genus { f = v } from a` takes values (omitted collection fields are duplicated). `corpus/mutabilitas/{copy-bind-deep,const-share-into-var-reject,alias-on-bind}.fab` |
 | `xs[i]` returns null / throws, or `xs.get(i)` panics | three reads: `xs[i]` out of range dies (the run ends); `xs.get(i)` gives `T ∪ none`; `xs.at(i)` reports on the error channel (`do { } catch err { }`, la `fac { } cape err { }`, or `⊥ default`). Text indexes by Unicode character, not byte; a range index `xs[a‥b]` out of range dies (`corpus/lista/reads-three-ways.fab`) |
+| `"hello".slice(2, 99)` trims to `llo`, or `t.length()` is a tensor's rank, or `v.length()` a vector's norm | `slice` reports an end past the length, a negative bound or a start past the end on the error channel, on text as on lists (`s.slice(a, b) ⊥ ""`, or `do { } catch err { }`), and an unhandled call outside `main` is `SEM011 failable_call_requires_handler`. `length()` is the element count on every collection, a `tf32[2, 3]` has 6; `t.rank()` is the number of extents and `t.norm()` / `v.norm()` the Euclidean norm (`corpus/textus/slice-window.fab`, `corpus/tensor/rank-norm.fab`) |
 | `xs.sorted(key)`, `sort(xs)`, `for from sort via asc from xs …` | the sort is an expression: `sort via asc from xs` / `sort via desc from xs` (la `ordinata via ascendens ex xs`), keyed by a body `sort via asc from xs let r { return r.k }`; stable, builds a new list (a map: `from` sorts values, `ref` sorts keys). The keyed `.sorted(key)` method is `SEM011 sorted_key_retired` (keyless `.sorted()` and in-place `xs.sort(key)` remain). A bare sort or reduce as a `for` source is `PARSE030 itera_source_sort_reduce_unbound`: bind it to a name first (`corpus/sort/`, `corpus/itera/sort-source-reject-en.fab`) |
 | appending inside `for from xs` | a method that changes the shape of the collection being walked is `SEM011 loop_collection_shape_change`; a bracket store that grows a map in its own loop is unchecked and traps `map changed size during iteration` (`corpus/itera/loop-shape-reject.fab`, `corpus/tabula/loop-store-adds-key-trap.fab`) |
 | `match` on numbers or open types | `match` (la `discerne`) matches closed sets only (unions, enums, variants): `SEM010 discerne_pattern_not_in_closed_set`; use `switch` (la `elige`) for open scrutinees |
@@ -94,6 +95,7 @@ product default); `la` spellings differ (`print` is `nota`, `fn` is `functio`).
 | `int → float` is implicit | crossing integer / decimal / float needs `↦` (`let f64 f ← n` is SEM010; untyped constants are exempt). Comparisons across families are exact and need no `↦` |
 | `x ↦ int` rounds or truncates a float | a float or `d64` goes to an integer only with a rounding choice: `x ↦ int via Floor` / `Ceil` / `HalfEven` (nearest, ties to even) / `Trunc`; a bare `x ↦ int` is `SEM016 float_to_integer_requires_rounding`. `⊥ default` and `⇥` still apply after the `via` (`corpus/conversio/float-to-int-via.fab`) |
 | `u8 + u8` wraps or traps at the `+` | arithmetic is exact (`u8 + u8` is `u16`, value 400); the slot checks at the store: a trapping slot traps (`400 does not fit in u8`), `wrapping<W>` reduces, `saturating<W>` clamps |
+| `u8<0‥8>` or `saturating<u8, 0…>` is a range type | a range needs its policy word and both ends: `saturating<u8, 0‥8>` (`‥` half open, `…` inclusive, `∞`/`-∞` for no bound on that side); `u8<0‥8>` is `ranged_policy_word_required` and `0…` is `range_bound_required`. The range applies at the store only (saturating clamps into it, trapping traps, wrapping reduces modulo `hi - lo` offset by `lo`); integer widths only, runner and Rust only, a `size` end is not built |
 | `saturating` clamps every step | it clamps **once, at the store**: `x + 200 - 100` with `x = 250` is `255` (exact 350 clamped), not `155` |
 | shifts mask the count | on numbers unmasked: `x ⇐ n` is `x·2ⁿ`, `x ⇒ n` is `floor(x / 2ⁿ)`; `¬x` is `-x - 1` (`¬250` is `-251`); fixed-width complement is `wrapping<W>`. Raw bits `b8`/`b16`/`b32`/`b64` are not numbers and act at their own width every operation: `(b ⇐ 4)` on a `b8` drops the high bits, `¬` flips exactly N bits, a shift by N or more gives zeros, a negative count is an error (`0xF0 ⇐ 4` is `0x00`, `¬0xF0` is `0x0f`) |
 | `u64 + i8` widens somewhere | compile error (`u64_signed_arithmetic_requires_conversion`); convert one side with `↦`. A constant is exempt (`x - 1` on `u64` is fine) |
@@ -130,10 +132,16 @@ Exit statuses of the tool (not of the program it runs; a program's own exit
 code passes through): `0` success (warnings alone are success), `65` the source
 has error diagnostics (`check`, `build`, `run`, `test`, `emit`, `format`; a
 warning promoted by `--deny` / `--deny-warnings` counts), `64` bad
-command-line arguments (including an unknown `--deny` code), `78` a bad
-`faber.toml` key or a locale pack that fails to load, `1` only a failure with no
-known class (unreadable file, failed write, failing `faber test` cases,
-`faber format` drift). Branch on the status, not on stderr text.
+command-line arguments (including an unknown `--deny` code, and a
+`faber corpus --target` the suite has no recipe for), `66` an input file, path
+or stdin that cannot be read, `69` a feature, runner or target this binary was
+not built with, `70` an internal serialization or render failure, `73` an
+output file or directory that cannot be written, `78` a bad `faber.toml` key,
+a locale pack that fails to load, or a malformed `corpus.toml` / `case.toml`,
+`1` only a failure with no known class. Outcomes keep their own status:
+failing `faber test` cases and `faber format --check` drift exit `1`;
+`faber update --check` exits `0` current, `1` update available, `2` lookup
+error. Branch on the status, not on stderr text.
 
 Build from the repo, not from an installed binary, when behavior matters:
 installed `faber` binaries go stale and lag the grammar, which shows up as false

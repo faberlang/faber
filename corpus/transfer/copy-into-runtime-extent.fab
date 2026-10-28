@@ -2,7 +2,7 @@
 term = "⇇ runtime extent"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "generic_params", "generic_param", "incipit_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "array_literal", "fac_stmt", "cape_clause", "assignment", "transfer", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt", "expression", "literal"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "A ⇇ whose extents are run-time values is a failable statement; a mismatched shape is a recoverable error caught by do/catch."
 related = ["⇇", "tensor", "magnitudo", "fac"]

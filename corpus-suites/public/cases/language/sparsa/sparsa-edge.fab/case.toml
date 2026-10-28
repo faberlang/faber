@@ -3,6 +3,8 @@ id = "corpus/sparsa/sparsa-edge.fab"
 group = "language"
 input_root = "corpus"
 input = "sparsa/sparsa-edge.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/format/format-chained-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "format/format-chained-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

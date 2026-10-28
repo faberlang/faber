@@ -1,0 +1,49 @@
++++
+term = "‥"
+explains = ["whole-width range"]
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "conversio_expr", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "The existing store-policy spellings are the whole-width range: saturating<u8> is saturating<u8, 0…255>, u8 is trapping<u8, 0…255>."
+syntax = "saturating<u8, 0…255>"
+related = ["‥", "…", "saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
++++
+# =============================================================================
+# ‥ … — the existing spellings are the whole-width range
+# =============================================================================
+#
+# What this teaches:
+#   • `saturating<u8>` is `saturating<u8, 0…255>`, `wrapping<u8>` is
+#     `wrapping<u8, 0…255>`, and bare `u8` is `trapping<u8, 0…255>` (`inf` is
+#     `trapping<inf, -∞…∞>`, see `ranged-sugar-inf`). One type each, so a value
+#     moves between the two spellings with no conversion and no check.
+#   • `‥` is half open and `…` is inclusive: `0‥256` and `0…255` are the same
+#     range for a u8.
+#   • A half-open range holds its low end and stops before its high end:
+#     `-2‥3` holds -2 to 2.
+#
+# Common mistakes:
+#   • Expecting the two spellings to be different types — they are one.
+#   • Writing only one end of a range. Both ends are always written.
+#
+# See also: saturating, wrapping, trapping
+# =============================================================================
+
+fn through(saturating<u8, 0‥256> a) → saturating<u8> {
+    return a
+}
+
+main {
+    let saturating<u8> s ← 300
+    let saturating<u8, 0…255> sr ← s
+    print through(sr)
+    let trapping<u8, 0…255> t ← 200
+    let u8 plain ← t
+    let trapping<u8> named ← plain
+    print named
+    let wrapping<u8> w ← 300 ↦ wrapping<u8>
+    let wrapping<u8, 0…255> wr ← w
+    print wr
+}

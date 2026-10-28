@@ -371,7 +371,7 @@ fn generator_callable_import_wraps_return_in_array() {
     assert_eq!(*item, types.primitive(Primitive::Numerus));
 }
 
-/// Fail-closed pins (PKG-REP done_when (d)): inference holes, error types,
+/// Fail-closed pins (PKG-REP `done_when` (d)): inference holes, error types,
 /// and still-inferring tensor indexes stay unrepresentable at the seam even
 /// though symbolic `Param` witnesses are accepted.
 #[test]

@@ -466,7 +466,7 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // need: the `slice` window (`sectio`) reports out-of-range
     // bounds on `⇥`, the same fault family as the `at` read: the payload is
     // data (start, end, list length), never prose. `Textus "sectio"` below
-    // keeps trimming — the text library depends on it.
+    // reports the same way (Q-B3).
     MethodIntrinsic {
         failable: true,
         ..intrinsic!(
@@ -554,7 +554,20 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Textus, "munita", 0, &[], Textus, collection TextEscape),
     intrinsic!(Textus, "muta", 2, &[IntrinsicParamKind::Textus, IntrinsicParamKind::Textus], Textus, collection Replace),
     intrinsic!(Textus, "recide", 0, &[], Textus, collection Trim),
-    intrinsic!(Textus, "sectio", 2, &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::NumerusIndex], Textus, collection Slice),
+    // Q-B3 (operator ruling 2026-10-15): the text window reports an
+    // out-of-range bound on `⇥` exactly like the `lista` window above; it no
+    // longer clamps.
+    MethodIntrinsic {
+        failable: true,
+        ..intrinsic!(
+            Textus,
+            "sectio",
+            2,
+            &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::NumerusIndex],
+            Textus,
+            collection Slice
+        )
+    },
     intrinsic!(Textus, "vacua", 0, &[], Bool, collection IsEmpty),
     // queue (FIFO)
     intrinsic!(Queue, "appende", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
@@ -820,7 +833,12 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         collection SparseSet
     ),
     // tensor
+    // Q-X1 (operator ruling 2026-10-15): `longitudo` is the element count on
+    // every collection; the number of extents and the Euclidean norm are the
+    // named methods `rank` and `norm`.
     intrinsic!(Tensor, "longitudo", 0, &[], Numerus, collection Length),
+    intrinsic!(Tensor, "rank", 0, &[], Numerus, collection TensorRank),
+    intrinsic!(Tensor, "norm", 0, &[], Inner, collection TensorNorm),
     intrinsic!(Tensor, "magnitudines", 0, &[], ArrayInner, collection TensorShape),
     intrinsic!(
         Tensor,
@@ -1250,6 +1268,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
+    // Q-X1: `longitudo` is the element count (rows times columns).
+    intrinsic!(Matrix, "longitudo", 0, &[], Numerus, collection Length),
     // Ruling 2026-10-15 / need: the three Matrix coordinate reads.
     // `m.get([r, c])` is the nullable read (`T ∪ none`, see the lista
     // `accipe` above); `m.at([r, c])` and `m.set([r, c], v)` report an
@@ -1354,7 +1374,9 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         CodegenOnly
     ),
-    intrinsic!(Vector, "longitudo", 0, &[], Inner, CodegenOnly),
+    // Q-X1: `longitudo` is the lane count; the Euclidean norm is `norm`.
+    intrinsic!(Vector, "longitudo", 0, &[], Numerus, CodegenOnly),
+    intrinsic!(Vector, "norm", 0, &[], Inner, CodegenOnly),
     intrinsic!(Vector, "normalizata", 0, &[], SameAsReceiver, CodegenOnly),
     intrinsic!(
         Vector,

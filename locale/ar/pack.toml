@@ -32,6 +32,7 @@ insere = "تضمين"
 privata = "خاص"
 protecta = "محمي"
 publica = "عام"
+visibilitas = "الظهور"
 sponte = "اختياري"
 casu = "حالة"
 ceterum = "افتراضي"
@@ -889,6 +890,10 @@ help = "اكتب shape باستخدام {sugar} width sugar brackets"
 message = "الصيغة المغلّفة `{form}` للنوع العددي ملغاة"
 help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي نوع بحد ذاتها"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "يحتاج النطاق إلى طرفين"
+help = "اكتب الطرفين، مثل 0‥8 أو 0…7، واستخدم ∞ أو -∞ حين لا يكون لجهة حدّ"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "النوع '{type}' غير معلن على سطح القارئ هذا"
 help = "استخدم تهجئة النوع المعلنة في لغة القارئ هذه{?expected|: '|'}"
@@ -923,7 +928,11 @@ help = "تحقق من صياغة الاستيراد"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "حقل استيراد غير معروف"
-help = "استخدم {ex} أو visibilitas أو nomen أو {ut} أو {omnia}"
+help = "استخدم {ex} أو {visibilitas} أو {nomen} أو {ut} أو {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "حقل الاستيراد `{field}` غير معلن في سطح القارئ هذا"
+help = "استخدم `{expected}` للغة القارئ في هذا الملف"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "حقل استيراد مكرر `{field}`"
@@ -935,7 +944,7 @@ help = "أضف {ex} = \"path\" إلى import record"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import لا يمكنه تسمية binding أيضا"
-help = "استخدم {omnia} وحده، أو nomen/{ut} لاستيراد named"
+help = "استخدم {omnia} وحده، أو {nomen}/{ut} لاستيراد named"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "visibility للاستيراد غير صالحة"
@@ -943,7 +952,7 @@ help = "استخدم {privata} أو {publica}"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "تعذر استنتاج اسم الاستيراد من {path}"
-help = "اكتب nomen أو alias صريحا لـ {path}"
+help = "اكتب {nomen} أو alias صريحا لـ {path}"
 
 [diagnostics.SEM001]
 message = "متغير غير معرف"
@@ -959,7 +968,7 @@ help = "صرح عن المعرف قبل استخدامه{?suggestion|؛ هل ق�
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "معرف غير معروف"
-help = "اكتب `{spelling} <expr>` بدون أقواس لجملة الإخراج"
+help = "`{spelling}` جملة إخراج وليست دالة: استورد دالة وحدة التحكم (`{importa} {ex} \"norma:console\" {fixum} print` ثم اكتب `print(...)`)، أو اربط القيمة أولاً (`{sit} _ x ← …` ثم `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "record field غير معروف"
@@ -1137,6 +1146,10 @@ help = "أصلح تركيب AST للتخفيض"
 message = "اسم القيمة {name} لا يمكن أن يشغل موضع مدى في التعليق"
 help = "اكتب `size {name}` لتهجئة الرفع في هذا الموضع، مثل `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "وسيط الحجم أو الشكل في استدعاء generic غير مدعوم"
+help = "استخدم ثابتًا أو اسم حجم أو قيمة مكتوبة `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring يتطلب initializer"
 help = "أصلح تركيب AST للتخفيض"
@@ -1176,6 +1189,38 @@ help = "اكتب نوع trapping بعرض واحد، مثل trapping<u8> أو tr
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "عرض trapping يجب أن يكون علامة عرض مجردة"
 help = "استخدم علامة عرض مجردة مثل u8 أو i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "يحتاج النطاق إلى كلمة سياسة تخزين؛ علامة العرض المجردة لا تقبل نطاقًا"
+help = "اكتب كلمة السياسة أولًا، مثل saturating<u32, 0‥8> أو trapping<i32, -2‥3> أو wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "يجب أن يكون طرف النطاق عددًا صحيحًا حرفيًا أو ∞"
+help = "اكتب الطرفين كعددين صحيحين حرفيين، مثل 0‥8؛ الطرف المسمّى أو طرف size غير مدعوم بعد"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "تأخذ سياسة التخزين ذات النطاق العرض ثم نطاقًا واحدًا"
+help = "اكتب policy<W, lo‥hi>، مثل saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "النطاق لا يحوي أي قيمة"
+help = "يجب أن يكون الطرف الأدنى أصغر من الأعلى في lo‥hi، أو غير أكبر منه في lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "أحد طرفي النطاق خارج العرض"
+help = "أبقِ الطرفين داخل العرض؛ ∞ طرف أعلى فقط و -∞ طرف أدنى فقط"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "لا يمكن أن يكون للعرض غير المُوقَّع طرف أدنى سالب"
+help = "ابدأ النطاق من 0، أو استخدم عرضًا مُوقَّعًا مثل i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "تحتاج سياسة التخزين ذات النطاق إلى عرض عدد صحيح محدود"
+help = "استخدم عرض عدد صحيح مثل u8 أو i32؛ عروض float وdecimal وinf لا تقبل نطاقًا بعد"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "لا يستطيع kernel استخدام سياسة تخزين ذات نطاق بعد ({site}); لا يطبّق kernel النطاقات"
+help = "استخدم العرض العادي داخل kernel وطبّق النطاق على المضيف"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
@@ -1525,6 +1570,14 @@ help = "استخدم عرض عدد صحيح لا يتجاوز 32 بت"
 message = "امتداد القيمة الوسيطة للنواة {extent} يتجاوز مدى الأعداد الصحيحة المحمول"
 help = "أبقِ القيم الوسيطة ضمن مدى الأعداد الصحيحة المحمول"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "الشكل بعد `size` في وسائط النوع للاستدعاء يقبل أبعادا من الأعداد الطبيعية فقط"
+help = "اكتب كل بعد كعدد طبيعي، مثلا `size [2, 3]`؛ ومرر البعد الرمزي أو وقت التشغيل عبر اسم `size`"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "الشكل المحصور بين أقواس بعد `size` مسموح فقط في وسائط النوع للاستدعاء"
+help = "اكتب الشكل مباشرة، مثلا `tensor<f32, [2, 3]>`، أو استخدم `size [2, 3]` في استدعاء مثل `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "خطأ في CLI validation"
 help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
@@ -1684,6 +1737,10 @@ help = "صرّح بالنوع فقط؛ استخدم {tabula} حتى تتوفر �
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "نوع الدفتر غير مدعوم في هذا الهدف بعد"
 help = "استخدم مشغّل MIR أو مُصدِر مصدر Faber أو {tabula} حتى يدعم هذا الهدف الدفتر"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "هذا الهدف لا يدعم سياسة التخزين ذات النطاق بعد"
+help = "استخدم MIR runner أو هدف Rust أو مُصدِر مصدر Faber إلى أن يطبّق هذا الهدف النطاقات"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "ورقة {leaf} غير مدعومة في هذا الهدف"
@@ -3221,6 +3278,14 @@ help = "اكتب العلامة عند الاستدعاء كما يعلنها ا
 message = "علامة `axis` مكتوبة هنا لكن المعامل غير معلن كـ `axis`"
 help = "أزل علامة `axis`، أو أعلن المعامل `axis int`"
 
+[diagnostics.SEM057.issues.size_marker_required]
+message = "هذا الوسيط وسيط `size` ويجب كتابته بعلامة `size`"
+help = "اكتب العلامة كما يعلن التوقيع المعامل، مثلا `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "علامة `size` مكتوبة هنا لكن الدالة المستدعاة لا تعلن أي معامل `size`"
+help = "أزل علامة `size`، أو أعلن المعامل `size N`"
+
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "لا يمكن ربط قيمة غير معلَّمة في `own`"
 help = "اربط عبر `copy` لتكرار المصدر"
@@ -3825,6 +3890,9 @@ applica = "طبق"
 productum = "الجداء_النقطي"
 transversum = "الجداء_الاتجاهي"
 normalizata = "طبّع"
+# Q-X1: the tensor rank and the Euclidean norm (tensor and vector) are named methods; `longitudo` is the element count.
+rank = "rank"
+norm = "norm"
 swizzle = "swizzle"
 coercere = "قيد"
 inter = "تقاطع"

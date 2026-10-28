@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/const-loop-binder-field-store-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/const-loop-binder-field-store-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

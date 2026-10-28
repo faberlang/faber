@@ -3,7 +3,7 @@ term = "sponte"
 explains = ["sponte"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "genus_decl", "genus_member", "field_decl", "expression", "literal", "nota_stmt"]
-category = "declaration"
+category = "function"
 canonical = true
 summary = "Marks a named declaration slot (parameter or genus field) as voluntary — the caller or provider may omit the value."
 syntax = "<type> <name> sponte [= default | vel default]"

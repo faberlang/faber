@@ -32,6 +32,7 @@ insere = "अंतःस्थापित"
 privata = "निजी"
 protecta = "संरक्षित"
 publica = "सार्वजनिक"
+visibilitas = "दृश्यता"
 sponte = "स्वेच्छा"
 casu = "स्थिति"
 ceterum = "अन्यतम"
@@ -889,6 +890,10 @@ help = "shape को {sugar} width sugar brackets में लिखें"
 message = "`{form}` संख्यात्मक प्रकार की हटाई गई वर्तनी है"
 help = "`{form}` की जगह `{bare}` लिखें; width marker स्वयं एक प्रकार है"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "रेंज के दोनों सिरे चाहिए"
+help = "दोनों सिरे लिखें, जैसे 0‥8 या 0…7; किसी ओर सीमा न हो तो ∞ या -∞ लिखें"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "type '{type}' इस reader surface पर घोषित नहीं है"
 help = "इस reader locale में घोषित टाइप वर्तनी का उपयोग करें{?expected|: '|'}"
@@ -923,31 +928,35 @@ help = "import syntax जांचें"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "अज्ञात import field"
-help = "ex, visibilitas, nomen, ut, या omnia उपयोग करें"
+help = "{ex}, {visibilitas}, {nomen}, {ut}, या {omnia} उपयोग करें"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "import field `{field}` इस reader surface पर घोषित नहीं है"
+help = "इस फ़ाइल की reader locale के लिए `{expected}` का उपयोग करें"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "डुप्लिकेट import field `{field}`"
 help = "हर import field केवल एक बार आ सकता है; दोहराया गया field हटाएँ"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "import record के लिए ex source आवश्यक है"
-help = "import record में ex = \"path\" जोड़ें"
+message = "import record के लिए {ex} source आवश्यक है"
+help = "import record में {ex} = \"path\" जोड़ें"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import में binding का नाम भी नहीं दे सकते"
-help = "अकेले omnia उपयोग करें, या named import के लिए nomen/ut उपयोग करें"
+help = "अकेले {omnia} उपयोग करें, या named import के लिए {nomen}/{ut} उपयोग करें"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "अमान्य import visibility"
-help = "publica उपयोग करें"
+help = "{publica} उपयोग करें"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "import से `privata` हटा दिया गया; import डिफ़ॉल्ट रूप से re-export नहीं करते"
-help = "मार्कर हटाएँ, या re-export के लिए publica उपयोग करें"
+message = "import से `{privata}` हटा दिया गया; import डिफ़ॉल्ट रूप से re-export नहीं करते"
+help = "मार्कर हटाएँ, या re-export के लिए {publica} उपयोग करें"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "{path} से import नाम का अनुमान नहीं लगा सके"
-help = "{path} के लिए nomen या स्पष्ट alias लिखें"
+help = "{path} के लिए {nomen} या स्पष्ट alias लिखें"
 
 [diagnostics.SEM001]
 message = "अपरिभाषित चर"
@@ -963,7 +972,7 @@ help = "उपयोग से पहले चर घोषित करें{
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "अज्ञात identifier"
-help = "आउटपुट कथन के लिए कोष्ठक के बिना `{spelling} <expr>` लिखें"
+help = "`{spelling}` आउटपुट कथन है, फ़ंक्शन नहीं: कंसोल फ़ंक्शन आयात करें (`{importa} {ex} \"norma:console\" {fixum} print`, फिर `print(...)` लिखें), या पहले मान को बाँधें (`{sit} _ x ← …`, फिर `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "अज्ञात record field"
@@ -1149,6 +1158,10 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "मान का नाम {name} एनोटेशन के extent स्थान पर नहीं रह सकता"
 help = "इस स्टोर पर लिफ्ट लिखने के लिए `size {name}` लिखें, जैसे `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "generic call का size या shape argument समर्थित नहीं है"
+help = "constant, size name, या `size w` के रूप में लिखा value उपयोग करें"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring के लिए initializer आवश्यक है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -1188,6 +1201,38 @@ help = "trapping प्रकार को एक चौड़ाई के स�
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping चौड़ाई एक सादा चौड़ाई चिह्न होना चाहिए"
 help = "u8 या i64 जैसा सादा चौड़ाई चिह्न उपयोग करें"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "रेंज के लिए स्टोर नीति शब्द चाहिए; केवल चौड़ाई चिह्न रेंज नहीं लेता"
+help = "पहले नीति शब्द लिखें, जैसे saturating<u32, 0‥8>, trapping<i32, -2‥3> या wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "रेंज का सिरा पूर्णांक लिटरल या ∞ होना चाहिए"
+help = "दोनों सिरे पूर्णांक लिटरल के रूप में लिखें, जैसे 0‥8; नामित या size सिरा अभी उपलब्ध नहीं है"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "रेंज वाली स्टोर नीति चौड़ाई और फिर एक रेंज लेती है"
+help = "policy<W, lo‥hi> लिखें, जैसे saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "रेंज में कोई मान नहीं है"
+help = "lo‥hi में निचला सिरा ऊपरी सिरे से छोटा होना चाहिए, और lo…hi में उससे बड़ा नहीं"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "रेंज का एक सिरा चौड़ाई से बाहर है"
+help = "दोनों सिरे चौड़ाई के भीतर रखें; ∞ केवल ऊपरी सिरा और -∞ केवल निचला सिरा हो सकता है"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "बिना चिह्न वाली चौड़ाई का निचला सिरा ऋणात्मक नहीं हो सकता"
+help = "रेंज 0 से शुरू करें, या i32 जैसी चिह्न वाली चौड़ाई इस्तेमाल करें"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "रेंज वाली स्टोर नीति को सीमित पूर्णांक चौड़ाई चाहिए"
+help = "u8 या i32 जैसी पूर्णांक चौड़ाई इस्तेमाल करें; float, decimal और inf चौड़ाई अभी रेंज नहीं लेतीं"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "kernel अभी रेंज वाली स्टोर नीति इस्तेमाल नहीं कर सकता ({site}); kernel रेंज लागू नहीं करता"
+help = "kernel के भीतर सामान्य चौड़ाई इस्तेमाल करें और रेंज होस्ट पर लगाएँ"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
@@ -1537,6 +1582,14 @@ help = "32 बिट से अधिक चौड़ाई वाला पू�
 message = "कर्नेल intermediate extent {extent} पोर्टेबल पूर्णांक श्रेणी से अधिक है"
 help = "intermediate मानों को पोर्टेबल पूर्णांक श्रेणी के भीतर रखें"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "call के type arguments में `size` के बाद का shape केवल प्राकृतिक संख्या dimensions स्वीकार करता है"
+help = "हर dimension को प्राकृतिक संख्या के रूप में लिखें, जैसे `size [2, 3]`; symbolic या run-time dimension `size` नाम से पास करें"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "`size` के बाद bracketed shape केवल call के type arguments में स्वीकार है"
+help = "shape सीधे लिखें, जैसे `tensor<f32, [2, 3]>`, या call में `size [2, 3]` उपयोग करें, जैसे `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "CLI सत्यापन त्रुटि"
 help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
@@ -1696,6 +1749,10 @@ help = "केवल प्रकार घोषित करें; ledger स
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "इस लक्ष्य पर ledger प्रकार अभी समर्थित नहीं है"
 help = "MIR runner या Faber source emitter उपयोग करें, या map ({tabula}) उपयोग करें"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "यह लक्ष्य रेंज वाली स्टोर नीति अभी समर्थित नहीं करता"
+help = "जब तक यह लक्ष्य रेंज लागू नहीं करता, MIR runner, Rust लक्ष्य या Faber स्रोत उत्सर्जक इस्तेमाल करें"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "इस लक्ष्य पर {leaf} पत्ती समर्थित नहीं है"
@@ -3233,6 +3290,14 @@ help = "call पर marker वैसा ही लिखें जैसा sign
 message = "यहां `axis` marker लिखा है लेकिन parameter `axis` घोषित नहीं है"
 help = "`axis` marker हटाएं, या parameter को `axis int` घोषित करें"
 
+[diagnostics.SEM057.issues.size_marker_required]
+message = "यह argument एक `size` argument है और इसे `size` marker के साथ लिखा जाना चाहिए"
+help = "marker वैसा ही लिखें जैसा signature parameter घोषित करता है, उदाहरण के लिए `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "यहां `size` marker लिखा है लेकिन callee कोई `size` parameter घोषित नहीं करता"
+help = "`size` marker हटाएं, या parameter को `size N` घोषित करें"
+
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "unmarked value को `own` में bind नहीं कर सकते"
 help = "source की प्रतिलिपि बनाने के लिए `copy` के माध्यम से bind करें"
@@ -3693,6 +3758,9 @@ applica = "लगाओ"
 productum = "बिंदु_गुणनफल"
 transversum = "सदिश_गुणनफल"
 normalizata = "सामान्यीकृत"
+# Q-X1: the tensor rank and the Euclidean norm (tensor and vector) are named methods; `longitudo` is the element count.
+rank = "rank"
+norm = "norm"
 swizzle = "swizzle"
 coercere = "सीमित_करो"
 inter = "प्रतिच्छेद"

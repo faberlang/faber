@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "package"
 canonical = true
 summary = "Canonical braced import record with private binding inferred from the path."
-syntax = "importa { ex = \"norma:text\" }"
+syntax = "import { from = \"norma:text\" }"
 aliases = ["import"]
 related = ["ex", "privata", "annotation-sugar"]
 locale = "en"
@@ -29,6 +29,6 @@ locale = "en"
 # The canonical record spells the source field and lets visibility/name defaults
 # materialize the same ImportDecl as `importa ex "norma:text"`.
 
-import { ex = "norma:text" }
+import { from = "norma:text" }
 
 print "importa-braced"

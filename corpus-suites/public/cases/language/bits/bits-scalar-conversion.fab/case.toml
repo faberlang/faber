@@ -3,6 +3,8 @@ id = "corpus/bits/bits-scalar-conversion.fab"
 group = "language"
 input_root = "corpus"
 input = "bits/bits-scalar-conversion.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

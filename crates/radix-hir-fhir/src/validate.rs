@@ -1137,8 +1137,9 @@ fn validate_type_form(
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
                     }
                 }
-                radix_types::Type::PolicyFloat(_, _) => {
-                    // `trapping<f32>` / `saturating<f64>` are authored at the
+                radix_types::Type::PolicyFloat(_, _) | radix_types::Type::RangedInt { .. } => {
+                    // `trapping<f32>` / `saturating<f64>` and a ranged store
+                    // policy (`trapping<i32, -2‥3>`) are authored at the
                     // POLICY level; the long form remains legal.
                     if !matches!(level.0, 0 | 2) || !form.args.is_empty() {
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
@@ -2647,6 +2648,11 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                         collect_expr(init, &mut registry);
                     }
                 }
+                if let Some(cli_args) = &func.cli_args
+                    && let Some(default) = &cli_args.default
+                {
+                    collect_expr(default, &mut registry);
+                }
                 if let Some(ref body) = func.body {
                     collect_block(body, &mut registry);
                 }
@@ -2668,6 +2674,11 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                         if let Some(ref init) = param.default {
                             collect_expr(init, &mut registry);
                         }
+                    }
+                    if let Some(cli_args) = &method.func.cli_args
+                        && let Some(default) = &cli_args.default
+                    {
+                        collect_expr(default, &mut registry);
                     }
                     if let Some(ref body) = method.func.body {
                         collect_block(body, &mut registry);
@@ -2742,6 +2753,21 @@ impl IntegrityChecks<'_> {
         Ok(())
     }
 
+    /// A backward companion identity is synthesized in the companion `DefId`
+    /// family and names a function the reverse-AD transform generates later,
+    /// so it is declared nowhere in the artifact: it must be in that family,
+    /// not in the definition registry.
+    fn check_companion_def(&self, def_id: radix_types::DefId) -> Result<(), HirArtifactError> {
+        if def_id.is_companion() {
+            return Ok(());
+        }
+        Err(HirArtifactError::DanglingIndex {
+            kind: "DefId",
+            index: def_id.0,
+            arena_size: self.def_registry.len(),
+        })
+    }
+
     fn check_hir(&self, hir_id: radix_hir::HirId) -> Result<(), HirArtifactError> {
         if !self.hir_registry.contains(&hir_id) {
             return Err(HirArtifactError::DanglingIndex {
@@ -2810,6 +2836,30 @@ fn validate_tensor_shift_context(
     checks.check_hir(context.shift_expression)
 }
 
+/// Every `ordo` order row must name a comparison site and member variants that
+/// exist in the artifact's arenas, and each site may carry at most one row set
+/// (the live table is keyed by the left-operand id, so a duplicate would
+/// silently overwrite).
+fn validate_ordo_order_rows(
+    table: &crate::artifact::TensorEdgePolicyTableWire,
+    checks: &IntegrityChecks<'_>,
+) -> Result<(), HirArtifactError> {
+    let mut sites = FxHashSet::default();
+    for comparison in &table.ordo_order {
+        checks.check_hir(comparison.lhs)?;
+        if !sites.insert(comparison.lhs) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "tensor edge policies",
+                detail: format!("duplicate ordo order row for HirId({})", comparison.lhs.0),
+            });
+        }
+        for (variant, _) in &comparison.rows {
+            checks.check_def(*variant)?;
+        }
+    }
+    Ok(())
+}
+
 fn validate_tensor_edge_policy_ids(
     table: &crate::artifact::TensorEdgePolicyTableWire,
     checks: &IntegrityChecks<'_>,
@@ -2848,7 +2898,7 @@ fn validate_tensor_edge_policy_ids(
         checks.check_type(provider.element_type)?;
         validate_resolved_tensor_edge_policy(&provider.policy, checks)?;
     }
-    Ok(())
+    validate_ordo_order_rows(table, checks)
 }
 
 fn validate_shape_obligation_table(
@@ -2879,10 +2929,27 @@ fn validate_shape_obligation_table(
         for relation in &row.relations {
             checks.check_index(relation.left)?;
             checks.check_index(relation.right)?;
-            if relation.boundary == crate::artifact::ShapeRelationBoundaryWire::Call {
+            if matches!(
+                relation.boundary,
+                crate::artifact::ShapeRelationBoundaryWire::Call
+                    | crate::artifact::ShapeRelationBoundaryWire::Store
+            ) {
                 return Err(HirArtifactError::MalformedSnapshot {
                     kind: "shape obligations",
-                    detail: "function row contains a call relation".to_owned(),
+                    detail: "function row contains a call or store relation".to_owned(),
+                });
+            }
+        }
+    }
+    for row in &table.stores {
+        checks.check_hir(row.initializer)?;
+        for relation in &row.relations {
+            checks.check_index(relation.left)?;
+            checks.check_index(relation.right)?;
+            if relation.boundary != crate::artifact::ShapeRelationBoundaryWire::Store {
+                return Err(HirArtifactError::MalformedSnapshot {
+                    kind: "shape obligations",
+                    detail: "store row contains a non-store relation".to_owned(),
                 });
             }
         }
@@ -3067,6 +3134,9 @@ pub(crate) fn validate_referential_integrity(
             checks.check_def(cli_args.def_id)?;
             checks.check_symbol(cli_args.name)?;
             checks.check_type(cli_args.ty)?;
+            if let Some(ref init) = cli_args.default {
+                validate_expr(init, checks)?;
+            }
         }
         if let Some(ty) = func.ret_ty {
             checks.check_type(ty)?;
@@ -3969,6 +4039,7 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::ModularWord(_)
             | radix_types::Type::Bits(_)
             | radix_types::Type::SaturatingWord(_)
+            | radix_types::Type::RangedInt { .. }
             | radix_types::Type::PolicyFloat(_, _)
             | radix_types::Type::SizedInstans(_)
             | radix_types::Type::Infer(_)
@@ -4076,6 +4147,96 @@ pub(crate) fn validate_referential_integrity(
 
     // ── Resolver snapshot walk helper ───────────────────────────────────
 
+    /// Field initializers cross the interface as definition-free expressions
+    /// (literals, operators, aggregates, `scriptum`, `verte`). Their `HirId`s
+    /// belong to the exporting unit, so only the arena references they carry
+    /// are checked, and any other form is refused.
+    fn validate_field_init(
+        expr: &radix_hir::HirExpression,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        use radix_hir::{HirArrayElement, HirLiteral, HirObjectKey};
+        if let Some(ty) = expr.ty {
+            checks.check_type(ty)?;
+        }
+        match &expr.kind {
+            HirExpressionKind::Literal(literal) => match literal {
+                HirLiteral::String(sym) | HirLiteral::Ascii(sym) | HirLiteral::Octeti(sym) => {
+                    checks.check_symbol(*sym)
+                }
+                HirLiteral::FloatText { text, .. } => checks.check_symbol(*text),
+                HirLiteral::Regex(pattern, flags) => {
+                    checks.check_symbol(*pattern)?;
+                    flags.map_or(Ok(()), |flags| checks.check_symbol(flags))
+                }
+                _ => Ok(()),
+            },
+            HirExpressionKind::Vacua => Ok(()),
+            HirExpressionKind::Unary(_, inner) => validate_field_init(inner, checks),
+            HirExpressionKind::Binary(_, left, right) => {
+                validate_field_init(left, checks)?;
+                validate_field_init(right, checks)
+            }
+            HirExpressionKind::Array(items) => {
+                for item in items {
+                    match item {
+                        HirArrayElement::Expr(inner) | HirArrayElement::Spread(inner) => {
+                            validate_field_init(inner, checks)?;
+                        }
+                        HirArrayElement::Infer(_) => return Err(unsupported_field_init()),
+                    }
+                }
+                Ok(())
+            }
+            HirExpressionKind::Tuple(items, arguments) => {
+                for item in items {
+                    validate_field_init(item, checks)?;
+                }
+                for argument in arguments.iter().flatten() {
+                    checks.check_type(*argument)?;
+                }
+                Ok(())
+            }
+            HirExpressionKind::Scriptum(template, items) => {
+                checks.check_symbol(*template)?;
+                for item in items {
+                    validate_field_init(item, checks)?;
+                }
+                Ok(())
+            }
+            HirExpressionKind::Verte {
+                source,
+                target,
+                entries,
+            } => {
+                checks.check_type(*target)?;
+                validate_field_init(source, checks)?;
+                for entry in entries.iter().flatten() {
+                    match &entry.key {
+                        HirObjectKey::Ident(name) | HirObjectKey::String(name) => {
+                            checks.check_symbol(*name)?;
+                        }
+                        HirObjectKey::Computed(inner) | HirObjectKey::Spread(inner) => {
+                            validate_field_init(inner, checks)?;
+                        }
+                    }
+                    if let Some(value) = &entry.value {
+                        validate_field_init(value, checks)?;
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(unsupported_field_init()),
+        }
+    }
+
+    fn unsupported_field_init() -> HirArtifactError {
+        HirArtifactError::MalformedSnapshot {
+            kind: "file interface field initializer",
+            detail: "expression form is outside the definition-free initializer surface".to_owned(),
+        }
+    }
+
     fn validate_file_interface_snapshot(
         iface: &crate::artifact::FileInterfaceSnapshot,
         checks: &IntegrityChecks<'_>,
@@ -4122,6 +4283,9 @@ pub(crate) fn validate_referential_integrity(
                     for field in fields {
                         checks.check_symbol(field.name)?;
                         checks.check_type(field.ty)?;
+                        if let Some(init) = &field.init {
+                            validate_field_init(init, checks)?;
+                        }
                     }
                     for contract in implements {
                         for arg in &contract.args {
@@ -4257,7 +4421,26 @@ pub(crate) fn validate_referential_integrity(
         checks.check_def(*pair)?;
     }
 
-    // 6. cli_program: resolved-use-like fields only (no Symbol-bearing fields in CliProgramWire).
+    // 6. cli_program: the option and operand binding symbols key the CLI
+    // argument record, so they must name interner entries.
+    if let Some(program) = &artifact.cli_program {
+        let groups = std::iter::once((&program.global_options, &program.global_operands))
+            .chain(std::iter::once((&program.options, &program.operands)))
+            .chain(
+                program
+                    .commands
+                    .iter()
+                    .map(|command| (&command.options, &command.operands)),
+            );
+        for (options, operands) in groups {
+            for option in options {
+                checks.check_symbol(option.binding_symbol)?;
+            }
+            for operand in operands {
+                checks.check_symbol(operand.binding_symbol)?;
+            }
+        }
+    }
 
     // 7. resolver snapshot: deep walk. E3 conversion rows are validated
     // here rather than silently dropped at the artifact boundary.
@@ -4269,6 +4452,10 @@ pub(crate) fn validate_referential_integrity(
         validate_file_interface_snapshot(iface, &checks)?;
     }
     for sym in &artifact.resolver.used_namespaces {
+        checks.check_symbol(*sym)?;
+    }
+    for (def_id, sym) in &artifact.resolver.module_bindings {
+        checks.check_def(*def_id)?;
         checks.check_symbol(*sym)?;
     }
     for ((_, sym), ty) in &artifact.resolver.imported_nominal_types {
@@ -4342,6 +4529,22 @@ pub(crate) fn validate_referential_integrity(
     // 8a. Runtime shape obligations (schema v31): each site and every
     //     relation/binding index must resolve before lowering consumes it.
     validate_shape_obligation_table(&artifact.shape_obligations, &checks)?;
+    {
+        let roles = &artifact.contract_roles;
+        for def_id in [roles.ordering, roles.closing, roles.sinking]
+            .into_iter()
+            .flatten()
+        {
+            checks.check_def(def_id)?;
+        }
+        for def_id in roles
+            .ordering_bindings
+            .iter()
+            .chain(&roles.sinking_bindings)
+        {
+            checks.check_def(*def_id)?;
+        }
+    }
 
     // 8b. Per-target kernel requirements (schema v32) retain the semantic
     //     admission contract across FHIR loading. Every callable and symbolic
@@ -4549,6 +4752,7 @@ pub(crate) fn validate_referential_integrity(
             });
         }
     }
+    validate_ordo_order_rows(edge_policies, &checks)?;
     validate_nested_provider_edge_policy_tables(&artifact.provider_units)?;
 
     // 9. Presentation sidecar (anchors from v2, authored types from v9): every
@@ -4600,7 +4804,7 @@ pub(crate) fn validate_referential_integrity(
         checks.check_def(entry.def_id)?;
         if let Some(backward) = &entry.backward {
             checks.check_symbol(backward.companion_name)?;
-            checks.check_def(backward.companion_def_id)?;
+            checks.check_companion_def(backward.companion_def_id)?;
         }
     }
 

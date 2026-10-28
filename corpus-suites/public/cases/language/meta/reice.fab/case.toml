@@ -3,6 +3,8 @@ id = "corpus/meta/reice.fab"
 group = "language"
 input_root = "corpus"
 input = "meta/reice.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

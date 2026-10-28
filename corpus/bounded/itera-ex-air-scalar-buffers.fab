@@ -2,11 +2,11 @@
 term = "itera-ex-air-scalar-buffers"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "AIR-lane itera ex over full-literal list<b8, N> / ascii<N> / string<N> unrolls guard-free with the scalar element type (b8 / ascii<1>); runtime-length values decline not_concrete."
 syntax = "@ radix lane \"air\"; itera ex list<b8, N> | ascii<N> | string<N>"
-related = ["bytes", "ascii", "string", "ex", "itera", "radix"]
+related = ["list<b8>", "ascii", "string", "ex", "itera", "radix"]
 locale = "en"
 no_expected = "rejects"
 diagnostic = "SEM059:runtime_conversion"

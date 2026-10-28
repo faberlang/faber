@@ -116,7 +116,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 Some(EndianHint::Le) => Ok(from_magnus(Magnus::from_bytes_le(&bytes))),
                 None => Err(RunnerError::internal(
                     span,
-                    "unsupported conversio to numerus from Octeti",
+                    "unsupported conversio to numerus from list<b8>",
                 )),
             },
             Value::Sermo(sermo) => {
@@ -151,7 +151,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             let Some(exact) = to_magnus(&value) else {
                 return Err(RunnerError::internal(
                     span,
-                    "inf to octeti conversio carried a non-integer value",
+                    "inf to list<b8> conversio carried a non-integer value",
                 ));
             };
             return Ok(Value::Octeti(match endian {

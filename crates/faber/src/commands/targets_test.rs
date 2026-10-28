@@ -129,15 +129,16 @@ fn fmir_family_rows_share_the_fmir_feature_override() {
 fn small_build_reports_only_compiled_capabilities() {
     let rows = target_rows(&small_compiled()).expect("every CLI target maps to a faber feature");
 
-    // The rust host lane is present under hir-rust.
+    // The rust host lane is present under hir-rust. `faber run` interprets
+    // source and never runs the Rust build, so the lane claims no `run`.
     let rust = row(&rows, "rust");
     assert!(rust.available);
     assert!(
         rust.capabilities.check
             && rust.capabilities.build
-            && rust.capabilities.run
+            && !rust.capabilities.run
             && rust.capabilities.package,
-        "rust host lane must claim its full capability set:\n{}",
+        "rust host lane must claim check/build/package and no run:\n{}",
         rust.render()
     );
 
@@ -204,15 +205,16 @@ fn default_build_reports_full_surface() {
         );
     }
 
-    // FMIR rows are faber package build/run/package targets.
+    // FMIR rows are faber package build/package targets; `faber run` refuses
+    // a built image, so they claim no `run`.
     for name in ["fmir-text", "fmir"] {
         let r = row(&rows, name);
         assert!(
             r.capabilities.check
                 && r.capabilities.build
-                && r.capabilities.run
+                && !r.capabilities.run
                 && r.capabilities.package,
-            "faber package FMIR row must show package build/run truth:\n{}",
+            "faber package FMIR row must show package build truth and no run:\n{}",
             r.render()
         );
         assert!(
@@ -277,5 +279,89 @@ fn every_row_feature_is_compiled_in_the_default_test_build() {
             spec.name,
             spec.feature
         );
+    }
+}
+
+/// The `run` column and `faber run`'s dispatch agree, both ways.
+///
+/// `faber run` interprets source and takes no `--target`; a device choice is
+/// the only way one of its target routes is reached. So a row is `run=yes`
+/// exactly when some `--device` spelling `faber run` accepts launches that
+/// row's target, and no row spelling is accepted as `--target`.
+#[cfg(all(feature = "full-targets", feature = "hir-rust"))]
+#[test]
+fn run_column_matches_what_faber_run_dispatches() {
+    use crate::cli::{Cli, Command};
+    use clap::Parser;
+
+    let rows = target_rows(&compiled_features()).expect("every CLI target maps to a faber feature");
+    let specs = faber_target_row_specs().expect("every CLI target maps to a faber feature");
+
+    // Forward: a row that claims `run` is reached by a device spelling that
+    // `faber run` parses and that names that row's target.
+    for (spec, r) in specs.iter().zip(&rows) {
+        assert_eq!(spec.name, r.name, "rows follow the spec order");
+        if !r.capabilities.run {
+            continue;
+        }
+        let reaching: Vec<_> = DeviceChoice::value_variants()
+            .iter()
+            .filter(|choice| choice.run_target_spelling() == Some(spec.name.as_str()))
+            .collect();
+        if run_target_names().contains(&spec.name) {
+            let cli = Cli::try_parse_from(["faber", "run", "--target", &spec.name, "."])
+                .unwrap_or_else(|e| panic!("faber run rejects --target {}: {e}", spec.name));
+            assert!(matches!(cli.command, Some(Command::Run(_))));
+            continue;
+        }
+        assert!(
+            !reaching.is_empty(),
+            "{} claims run but neither --device nor --target reaches it",
+            r.name
+        );
+        for choice in reaching {
+            let cli = Cli::try_parse_from(["faber", "run", "--device", choice.spelling(), "."])
+                .unwrap_or_else(|e| {
+                    panic!("faber run rejects --device {}: {e}", choice.spelling())
+                });
+            let Some(Command::Run(args)) = cli.command else {
+                panic!(
+                    "`faber run --device {}` did not parse as run",
+                    choice.spelling()
+                );
+            };
+            assert_eq!(args.device, Some(*choice));
+        }
+    }
+
+    // Converse: a row that does not claim `run` is reached by no device
+    // choice, and `faber run` accepts no row spelling as a target.
+    for (spec, r) in specs.iter().zip(&rows) {
+        if r.available && !r.capabilities.run {
+            assert!(
+                DeviceChoice::value_variants()
+                    .iter()
+                    .all(|choice| choice.run_target_spelling() != Some(spec.name.as_str())),
+                "{} is reached by a --device choice but reports run=no",
+                r.name
+            );
+        }
+        assert_eq!(
+            Cli::try_parse_from(["faber", "run", "--target", &spec.name, "."]).is_ok(),
+            run_target_names().contains(&spec.name),
+            "`faber run --target {}` is accepted exactly when the row claims a compiled run",
+            spec.name
+        );
+    }
+
+    // Every device choice that names a target names an emit row.
+    for choice in DeviceChoice::value_variants() {
+        if let Some(name) = choice.run_target_spelling() {
+            assert!(
+                specs.iter().any(|spec| spec.name == name),
+                "--device {} maps to {name}, which is not a faber targets row",
+                choice.spelling()
+            );
+        }
     }
 }

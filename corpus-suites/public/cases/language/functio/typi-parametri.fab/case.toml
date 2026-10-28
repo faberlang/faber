@@ -3,6 +3,8 @@ id = "corpus/functio/typi-parametri.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/typi-parametri.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

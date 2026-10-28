@@ -3,6 +3,8 @@ id = "corpus/annotation-sugar/futura-braced.fab"
 group = "language"
 input_root = "corpus"
 input = "annotation-sugar/futura-braced.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

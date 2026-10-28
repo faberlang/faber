@@ -3,6 +3,8 @@ id = "corpus/ad/sermo-recovery.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/sermo-recovery.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

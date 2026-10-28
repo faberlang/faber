@@ -31,6 +31,7 @@ use crate::{
     MirStatementKind, MirType, MirUnOp, MirValidationContext, MirValueKind, MirWorkgroupSize,
 };
 use handroll::FxHashMap;
+use radix_lexer::Interner;
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use std::fmt;
 
@@ -421,6 +422,7 @@ fn live_recipe_statements(
 /// declaration facts plus the source local its lone tensor argument reads.
 /// The caller admits exactly one per kernel (one recipe per kernel).
 fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumReduceOp, MirLocalId)> {
+    let aliases = crate::abi::ParameterAliases::new(function);
     let mut declarations = Vec::new();
     for block in &function.blocks {
         for statement in &block.statements {
@@ -448,6 +450,10 @@ fn filum_sum_declarations(function: &MirFunction) -> Vec<(crate::MirFilumReduceO
             let MirPlaceBase::Local(source_local) = place.base else {
                 continue;
             };
+            // Composition binds a callee's tensor parameter by a whole copy of
+            // the caller's: the declaration reads the parameter's buffer
+            // through the copy.
+            let source_local = aliases.resolve(source_local);
             declarations.push((filum.clone(), source_local));
         }
     }
@@ -3717,6 +3723,60 @@ pub fn subchain_signature_for_emission_with_source(
     Ok(signature)
 }
 
+/// The emission signature for the decomposition subchain that stores into the
+/// source function's explicit output parameter ([`crate::kernel_decomposition::KernelSubchain::output_param`]
+/// `Some`).
+///
+/// That subchain is the indexed-view kernel the source is: its synthetic
+/// declares the slice's inputs, the output parameter `y` and the source's
+/// trailing index parameters, so the whole-function ABI synthesis binds `y` as
+/// the output at its own position and the index as the builtin. The
+/// contract-shaped subchain signature
+/// ([`subchain_signature_for_emission_with_source`]) cannot: it binds the
+/// recipe result as the output, so the final store to `y` and the fused tail
+/// behind the recipe are never emitted and the kernel writes a dead local.
+///
+/// The whole-function ABI lays the inputs out in the synthetic's parameter
+/// order (the slice's read order) and the emitters take the first two as the
+/// recipe's operands, so the recipe operands must lead that order; a body
+/// whose folded elementwise prefix reads something first fails closed.
+///
+/// # Errors
+/// Returns [`PlanMappingError`] when the ABI synthesis refuses the synthetic,
+/// when its output is not the explicit output parameter, or when the recipe
+/// operands do not lead the bound inputs.
+pub fn explicit_output_subchain_signature(
+    function: &MirFunction,
+    output_param: MirLocalId,
+    validation: &MirValidationContext<'_>,
+    interner: &Interner,
+) -> Result<MirKernelSignature, PlanMappingError> {
+    let signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        function, validation, interner,
+    )
+    .map_err(|error| PlanMappingError::mapping(error.message))?;
+    if signature.output.source_local != Some(output_param) {
+        return Err(PlanMappingError::mapping(format!(
+            "subchain ABI synthesis did not bind the output parameter local {} as its output",
+            output_param.0
+        )));
+    }
+    if let Ok(operands) = recipe_operand_locals(function) {
+        let inputs = std::iter::once(&signature.input).chain(signature.extra_inputs.iter());
+        for (position, (operand, input)) in operands.iter().zip(inputs).enumerate() {
+            if input.source_local != Some(*operand) {
+                return Err(PlanMappingError::mapping(format!(
+                    "subchain storing to its output parameter binds input {position} to a \
+                     different local than recipe operand local {}; the recipe operands must \
+                     lead the subchain's inputs",
+                    operand.0
+                )));
+            }
+        }
+    }
+    Ok(signature)
+}
+
 /// Whether a subchain's data-flow surface carries a run-time-shaped buffer:
 /// any non-vacuum param type or any outputs local type whose tensor shape has
 /// a run-time extent ([`crate::tensor_type::Dim::Runtime`]). Callers use this
@@ -4367,6 +4427,19 @@ fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> 
         }
     }
     Some(identity)
+}
+
+/// Whether the subchain's recipe result is forwarded straight into the
+/// declared parameter `param` (the lowering's `out ⇇ a.matmul(b)`: the recipe
+/// writes a result temp and the very next statement copies it into `param`,
+/// the mut-out tail [`recipe_destination_local_for`] resolves): the
+/// contract-shaped emission signature then already binds `param` as its
+/// output, so the subchain needs no indexed-view reading of its own. A body
+/// with no recipe, or a recipe whose result reaches `param` through a stage
+/// local or a fused tail, answers `false`.
+pub(crate) fn recipe_result_is_param(function: &MirFunction, param: MirLocalId) -> bool {
+    let recipe_op = find_collection_call(function, |op, _, _| is_recipe_op(op).then_some(op));
+    recipe_op.is_some_and(|op| recipe_destination_local_for(function, op) == Some(param))
 }
 
 /// The recipe statement's operand locals, in operand order (the read inputs

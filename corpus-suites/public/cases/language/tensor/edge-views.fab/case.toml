@@ -3,6 +3,8 @@ id = "corpus/tensor/edge-views.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/edge-views.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

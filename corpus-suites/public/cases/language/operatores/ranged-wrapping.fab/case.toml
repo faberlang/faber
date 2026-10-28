@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/operatores/ranged-wrapping.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/ranged-wrapping.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

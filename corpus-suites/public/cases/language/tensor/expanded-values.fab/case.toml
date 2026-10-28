@@ -3,6 +3,8 @@ id = "corpus/tensor/expanded-values.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/expanded-values.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

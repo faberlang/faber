@@ -3,6 +3,8 @@ id = "corpus/operatores/optional-chain.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/optional-chain.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

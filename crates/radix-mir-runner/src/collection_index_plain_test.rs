@@ -143,7 +143,7 @@ fn out_of_range_plain_index_keeps_its_error_text_and_code() {
     assert_same_error(
         &error,
         &with_facts(
-            RunnerError::internal(span, "octeti index out of bounds"),
+            RunnerError::internal(span, "list<b8> index out of bounds"),
             &[("index", 5), ("len", 1)],
         ),
     );
@@ -197,7 +197,7 @@ fn interval_index_still_slices() {
     assert_same_error(
         &error,
         &with_facts(
-            RunnerError::internal(Span::default(), "octeti index out of bounds"),
+            RunnerError::internal(Span::default(), "list<b8> index out of bounds"),
             &[("start", 1), ("end", 9), ("len", 2)],
         ),
     );

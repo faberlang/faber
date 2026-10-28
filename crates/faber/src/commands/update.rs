@@ -27,6 +27,48 @@ use handroll::sha256_hex;
 use semver::Version;
 use serde::Deserialize;
 
+/// An updater failure and the exit status that names its class. A failure
+/// with no known class (`From<String>`) is [`FAILURE`](faber_cli::exit_status::FAILURE);
+/// a file or directory the install could not write is
+/// [`CANT_CREATE`](faber_cli::exit_status::CANT_CREATE).
+#[derive(Debug)]
+pub(crate) struct UpdateError {
+    status: i32,
+    message: String,
+}
+
+impl UpdateError {
+    fn cant_create(message: String) -> Self {
+        Self {
+            status: faber_cli::exit_status::CANT_CREATE,
+            message,
+        }
+    }
+}
+
+impl From<String> for UpdateError {
+    fn from(message: String) -> Self {
+        Self {
+            status: faber_cli::exit_status::FAILURE,
+            message,
+        }
+    }
+}
+
+impl std::fmt::Display for UpdateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::ops::Deref for UpdateError {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.message
+    }
+}
+
 /// Release repository that hosts the public `faber-v*` releases.
 const RELEASES_REPO: &str = "faberlang/releases";
 /// GitHub release list endpoint for [`RELEASES_REPO`].
@@ -114,17 +156,17 @@ pub(crate) fn cmd_update(args: &UpdateArgs) {
         check_for_update();
         return;
     }
-    if let Err(message) = run_update(args) {
-        eprintln!("error: {message}");
-        std::process::exit(1);
+    if let Err(error) = run_update(args) {
+        eprintln!("error: {error}");
+        std::process::exit(error.status);
     }
 }
 
 /// Dispatch `faber uninstall`.
 pub(crate) fn cmd_uninstall(args: &UninstallArgs) {
-    if let Err(message) = run_uninstall(args) {
-        eprintln!("error: {message}");
-        std::process::exit(1);
+    if let Err(error) = run_uninstall(args) {
+        eprintln!("error: {error}");
+        std::process::exit(error.status);
     }
 }
 
@@ -187,7 +229,7 @@ fn check_for_update() {
     }
 }
 
-fn run_update(args: &UpdateArgs) -> Result<(), String> {
+fn run_update(args: &UpdateArgs) -> Result<(), UpdateError> {
     let current = current_version()?;
     let target = match args.version.as_deref() {
         Some(raw) => parse_version(raw)?,
@@ -225,7 +267,7 @@ fn run_update(args: &UpdateArgs) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn run_uninstall(args: &UninstallArgs) -> Result<(), String> {
+pub(crate) fn run_uninstall(args: &UninstallArgs) -> Result<(), UpdateError> {
     let bin_dir = managed_bin_dir(args.prefix.as_deref())?;
     let active = active_version(&bin_dir);
     let targets: Vec<Version> = if args.all {
@@ -258,7 +300,7 @@ pub(crate) fn run_uninstall(args: &UninstallArgs) -> Result<(), String> {
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
                 println!("missing {}", path.display());
             }
-            Err(err) => return Err(format!("cannot remove {}: {err}", path.display())),
+            Err(err) => return Err(format!("cannot remove {}: {err}", path.display()).into()),
         }
         if active.as_deref() == Some(name.as_str()) && !removed_link {
             match fs::remove_file(&link) {
@@ -267,7 +309,7 @@ pub(crate) fn run_uninstall(args: &UninstallArgs) -> Result<(), String> {
                     removed_link = true;
                 }
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                Err(err) => return Err(format!("cannot remove {}: {err}", link.display())),
+                Err(err) => return Err(format!("cannot remove {}: {err}", link.display()).into()),
             }
         }
     }
@@ -379,11 +421,14 @@ fn github_token() -> Option<String> {
 
 /// Read a release asset from an HTTP(S) URL or a local directory path. Local
 /// paths keep the updater and its tests usable against a mirror or fixture.
-pub(crate) fn fetch_location(location: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn fetch_location(location: &str) -> Result<Vec<u8>, UpdateError> {
     if location.contains("://") {
-        return http_get(location);
+        return Ok(http_get(location)?);
     }
-    fs::read(location).map_err(|err| format!("cannot read {location}: {err}"))
+    fs::read(location).map_err(|err| UpdateError {
+        status: faber_cli::exit_status::NO_INPUT,
+        message: format!("cannot read {location}: {err}"),
+    })
 }
 
 /// Download, verify, and stage one release binary inside `bin_dir`. Nothing is
@@ -393,7 +438,7 @@ pub(crate) fn install_release(
     version: &Version,
     triple: &str,
     bin_dir: &Path,
-) -> Result<(), String> {
+) -> Result<(), UpdateError> {
     let archive_name = format!("faber-v{version}-{triple}.tar.gz");
     let archive_url = format!("{base}/faber-v{version}/{archive_name}");
     let checksum_url = format!("{archive_url}.sha256");
@@ -404,24 +449,29 @@ pub(crate) fn install_release(
     if actual != expected {
         return Err(format!(
             "checksum mismatch for {archive_url}\n  expected: {expected}\n  actual:   {actual}\n  the downloaded archive was not installed"
-        ));
+        )
+        .into());
     }
 
-    fs::create_dir_all(bin_dir)
-        .map_err(|err| format!("cannot create {}: {err}", bin_dir.display()))?;
+    fs::create_dir_all(bin_dir).map_err(|err| {
+        UpdateError::cant_create(format!("cannot create {}: {err}", bin_dir.display()))
+    })?;
     let staged = bin_dir.join(format!(".faber-{version}.tmp"));
     fs::remove_file(&staged).ok();
     extract_bin(&archive, &staged)?;
     let target = bin_dir.join(format!("faber-{version}"));
     if let Err(err) = fs::rename(&staged, &target) {
         fs::remove_file(&staged).ok();
-        return Err(format!("cannot install {}: {err}", target.display()));
+        return Err(UpdateError::cant_create(format!(
+            "cannot install {}: {err}",
+            target.display()
+        )));
     }
     Ok(())
 }
 
 /// Extract exactly `bin/faber` from the release archive.
-pub(crate) fn extract_bin(archive: &[u8], dest: &Path) -> Result<(), String> {
+pub(crate) fn extract_bin(archive: &[u8], dest: &Path) -> Result<(), UpdateError> {
     let decoder = flate2::read::GzDecoder::new(std::io::Cursor::new(archive));
     let mut tar = tar::Archive::new(decoder);
     let entries = tar
@@ -438,56 +488,65 @@ pub(crate) fn extract_bin(archive: &[u8], dest: &Path) -> Result<(), String> {
             continue;
         }
         if !entry.header().entry_type().is_file() {
-            return Err("the release archive's bin/faber is not a regular file".to_owned());
+            return Err("the release archive's bin/faber is not a regular file"
+                .to_owned()
+                .into());
         }
-        let mut file = fs::File::create(dest)
-            .map_err(|err| format!("cannot create {}: {err}", dest.display()))?;
+        let mut file = fs::File::create(dest).map_err(|err| {
+            UpdateError::cant_create(format!("cannot create {}: {err}", dest.display()))
+        })?;
         std::io::copy(&mut entry, &mut file)
-            .map_err(|err| format!("cannot extract bin/faber: {err}"))?;
+            .map_err(|err| UpdateError::cant_create(format!("cannot extract bin/faber: {err}")))?;
         set_executable(dest)?;
         return Ok(());
     }
-    Err("the release archive does not contain bin/faber".to_owned())
+    Err("the release archive does not contain bin/faber"
+        .to_owned()
+        .into())
 }
 
 #[cfg(unix)]
-fn set_executable(path: &Path) -> Result<(), String> {
+fn set_executable(path: &Path) -> Result<(), UpdateError> {
     use std::os::unix::fs::PermissionsExt;
     let mut permissions = fs::metadata(path)
         .map_err(|err| format!("cannot read {}: {err}", path.display()))?
         .permissions();
     permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions)
-        .map_err(|err| format!("cannot make {} executable: {err}", path.display()))
+    fs::set_permissions(path, permissions).map_err(|err| {
+        UpdateError::cant_create(format!("cannot make {} executable: {err}", path.display()))
+    })
 }
 
 #[cfg(not(unix))]
-fn set_executable(_path: &Path) -> Result<(), String> {
+fn set_executable(_path: &Path) -> Result<(), UpdateError> {
     Ok(())
 }
 
 /// Point `<bin_dir>/faber` at `faber-<version>` with an atomic rename of a
 /// freshly created symlink. The target is relative so the prefix can move.
 #[cfg(unix)]
-pub(crate) fn point_symlink(bin_dir: &Path, version: &Version) -> Result<(), String> {
+pub(crate) fn point_symlink(bin_dir: &Path, version: &Version) -> Result<(), UpdateError> {
     let link = bin_dir.join("faber");
     let staged = bin_dir.join(".faber.link.tmp");
     fs::remove_file(&staged).ok();
-    std::os::unix::fs::symlink(format!("faber-{version}"), &staged)
-        .map_err(|err| format!("cannot create the faber symlink: {err}"))?;
+    std::os::unix::fs::symlink(format!("faber-{version}"), &staged).map_err(|err| {
+        UpdateError::cant_create(format!("cannot create the faber symlink: {err}"))
+    })?;
     if let Err(err) = fs::rename(&staged, &link) {
         fs::remove_file(&staged).ok();
-        return Err(format!(
+        return Err(UpdateError::cant_create(format!(
             "cannot point {} at faber-{version}: {err}",
             link.display()
-        ));
+        )));
     }
     Ok(())
 }
 
 #[cfg(not(unix))]
-pub(crate) fn point_symlink(_bin_dir: &Path, _version: &Version) -> Result<(), String> {
-    Err("faber updates require a Unix filesystem (symlinks)".to_owned())
+pub(crate) fn point_symlink(_bin_dir: &Path, _version: &Version) -> Result<(), UpdateError> {
+    Err("faber updates require a Unix filesystem (symlinks)"
+        .to_owned()
+        .into())
 }
 
 /// The active version's file name, read from the `faber` symlink.

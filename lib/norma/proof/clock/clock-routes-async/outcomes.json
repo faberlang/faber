@@ -11,6 +11,12 @@
       "phase": "build",
       "diagnostic_contains": "undefined: time",
       "reason": "The Go lane does not yet provide the Norma time leaf binding used by these async clock routes."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the clock leaf is not supported on the ts target",
+      "reason": "The Node port of the clock leaf (`tempus:*`) has not landed, so the emitter refuses any program that reaches a `tempus` route (leaf_unsupported_on_target)."
     }
   }
 }

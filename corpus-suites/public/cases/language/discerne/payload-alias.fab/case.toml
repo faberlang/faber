@@ -3,6 +3,8 @@ id = "corpus/discerne/payload-alias.fab"
 group = "language"
 input_root = "corpus"
 input = "discerne/payload-alias.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

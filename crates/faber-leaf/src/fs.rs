@@ -155,7 +155,7 @@ fn expect_bytes<'a>(
 ) -> Result<&'a [u8], FsError> {
     match args.get(index) {
         Some(Arg::Bytes(value)) => Ok(value),
-        Some(_) => Err(FsError::invalid_argument(route, "data must be octeti")),
+        Some(_) => Err(FsError::invalid_argument(route, "data must be list<b8>")),
         None => Err(FsError::invalid_argument(route, "missing data")),
     }
 }
@@ -316,7 +316,7 @@ fn write_durably(args: &[Arg]) -> Result<Reply, FsError> {
         Some(_) => {
             return Err(FsError::invalid_argument(
                 ROUTE,
-                "data must be textus or octeti",
+                "data must be textus or list<b8>",
             ));
         }
         None => return Err(FsError::invalid_argument(ROUTE, "missing data")),

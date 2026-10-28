@@ -69,9 +69,11 @@ fn all_entries_validate() {
     // term; need adds `guillemet`); 211 = 198 + 13 (need
     // adds trapped); `generis` moved from an explained term to a legacy
     // redirect (the retired static member word): 197 + 14 = 211; 212 = 198 + 14
-    // (the sink-into `⇜` exemplum adds one explained term). See reference_test
-    // for history.
-    assert_eq!(registry.entries().len(), 212);
+    // (the sink-into `⇜` exemplum adds one explained term); 216 = 202 + 14
+    // (the ranged store policies add `saturating<W, lo‥hi>`,
+    // `trapping<W, lo‥hi>`, `wrapping<W, lo‥hi>` and `whole-width range`). See
+    // reference_test for history.
+    assert_eq!(registry.entries().len(), 216);
 
     for entry in registry.entries() {
         assert!(!entry.term.is_empty());

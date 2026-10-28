@@ -3,6 +3,8 @@ id = "corpus/integratio/minimum-smoke.fab"
 group = "language"
 input_root = "corpus"
 input = "integratio/minimum-smoke.fab"
+category = "integration"
+domain = "program"
 
 
 [expect]

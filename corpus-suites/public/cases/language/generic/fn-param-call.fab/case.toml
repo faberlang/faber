@@ -3,6 +3,8 @@ id = "corpus/generic/fn-param-call.fab"
 group = "language"
 input_root = "corpus"
 input = "generic/fn-param-call.fab"
+category = "generic"
+domain = "types"
 
 
 [expect]

@@ -74,6 +74,7 @@ impl MirKernelReflection {
         }
         let indexes = super::unproven_indexes(function, validation).len()
             + super::unproven_vector_indexes(function, validation).len()
+            + super::grid_reduce_helper_tensors(function, validation).len()
             + super::grid_reduce_node(function)
                 .and_then(|(filum, _)| filum.group.as_ref())
                 .map_or(0, |group| group.keys.len());

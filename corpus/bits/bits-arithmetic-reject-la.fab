@@ -2,7 +2,7 @@
 term = "bits"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "Arithmetic on bits is refused; use the bit operations or convert with ↦ first."
 syntax = "a + b on b8 — rejected"

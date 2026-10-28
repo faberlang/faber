@@ -3,6 +3,8 @@ id = "corpus/primus-quem/primus-quem-air.fab"
 group = "language"
 input_root = "corpus"
 input = "primus-quem/primus-quem-air.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

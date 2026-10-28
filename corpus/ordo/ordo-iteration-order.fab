@@ -2,7 +2,7 @@
 term = "ordo-iteration-order"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "incipit_stmt", "itera_stmt", "itera_binding", "expr_stmt", "comparison", "expression", "member_suffix", "literal", "nota_stmt"]
-category = "comparison"
+category = "variant"
 canonical = false
 summary = "An ordo iterates its members in declaration order; ordering compares declared values."
 syntax = "for from <Ordo> let <member> … | <ordo-value> (≺ | ≻ | ≤ | ≥) <ordo-value>"

@@ -3,6 +3,8 @@ id = "corpus/prae/prae.fab"
 group = "language"
 input_root = "corpus"
 input = "prae/prae.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

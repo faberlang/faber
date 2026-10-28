@@ -3,6 +3,8 @@ id = "corpus/unarius/unarius.fab"
 group = "language"
 input_root = "corpus"
 input = "unarius/unarius.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

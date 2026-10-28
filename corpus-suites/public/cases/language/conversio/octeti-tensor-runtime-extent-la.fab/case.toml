@@ -3,6 +3,8 @@ id = "corpus/conversio/octeti-tensor-runtime-extent-la.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/octeti-tensor-runtime-extent-la.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

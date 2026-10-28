@@ -3,6 +3,8 @@ id = "corpus/functio/recursion-mutual.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/recursion-mutual.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

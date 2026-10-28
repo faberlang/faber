@@ -316,7 +316,7 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         "Tensor.laminatio/4" => (None, vec!["axis 0".into(), el.clone(), "r".into(), "r".into()]),
         "Tensor.crux_entropia/1" => (None, vec!["r".into()]),
         // Matrix-vector application takes a conformable vector operand.
-        "Matrix.applica/1" => (Some("matrix<fractus, [2, 2]> r, vf32[2] v".to_string()), vec!["v".into()]),
+        "Matrix.applica/1" => (Some("matrix<fractus, [2, 2]> r, vf64[2] v".to_string()), vec!["v".into()]),
         // Same-width swizzle mask (width 3 receiver).
         "Vector.swizzle/1" => (None, vec!["\"xyz\"".into()]),
         "Tensor.pone/2" | "Sparsa.pone/2" => (None, vec![idx, el]),
@@ -398,8 +398,9 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
             GenericParamSort::Typus if is_limes => "clampa".to_owned(),
             GenericParamSort::Typus => dtype.param.clone(),
             // The tensor probe has width three, so two is an admitted even
-            // dimension for the generic RoPE row.
-            GenericParamSort::Magnitudo => "2".to_owned(),
+            // dimension for the generic RoPE row; a size argument carries
+            // the (Latin) `magnitudo` marker.
+            GenericParamSort::Magnitudo => "magnitudo 2".to_owned(),
         })
         .collect::<Vec<_>>();
     let generic_suffix = if generic_args.is_empty() {
@@ -821,6 +822,9 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::Ceiling,
         MirCollectionOp::Truncate,
         MirCollectionOp::TensorShape,
+        // Q-X1: the named rank and norm methods (`rank`, `norm`).
+        MirCollectionOp::TensorRank,
+        MirCollectionOp::TensorNorm,
         MirCollectionOp::TensorReshape,
         MirCollectionOp::TensorGet,
         MirCollectionOp::TensorSet,

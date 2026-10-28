@@ -2,7 +2,7 @@
 term = "async tempus dormiet"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipiet_stmt", "importa_decl", "importa_sugar", "named_import", "tacebit_stmt", "expr_stmt", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "adfirma_stmt"]
-category = "ad"
+category = "endpoint"
 canonical = true
 summary = "Async tempus.sleep_async and sync tempus.sleep share the tempus:dormiet route."
 syntax = "tempus.sleep(ms) | tacebit tempus.sleep_async(ms)"

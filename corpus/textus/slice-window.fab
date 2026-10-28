@@ -1,0 +1,61 @@
++++
+term = "textus"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "fac_stmt", "cape_clause", "expression", "literal", "nota_stmt"]
+category = "text"
+canonical = false
+summary = "A text window s.slice(a, b) reports an end past the length, a negative bound or a start past the end on the error channel; it never clamps."
+syntax = "s.slice(<start>, <end>) ⊥ <default> | do { s.slice(<start>, <end>) } catch err { }"
+related = ["textus", "lista", "at", "⊥", "fac", "cape"]
+locale = "en"
++++
+# =============================================================================
+# textus — the slice window reports out of range
+# =============================================================================
+#
+# What this teaches:
+#   • `s.slice(a, b)` is the half-open window of characters `a` up to `b`.
+#     Like the list window and `take`, it reports on the error channel when
+#     the window does not lie inside the text: an end past the length, a
+#     negative bound, or a start past the end. A default (`⊥`) or a handler
+#     takes the report; the text is never clamped to what exists.
+#   • An empty window at a legal position is fine: `s.slice(2, 2)` is "".
+#
+# Common mistakes:
+#   • expecting `"hello".slice(2, 99)` to give "llo" — it is a report
+#   • calling `slice` outside `main` with no handler — that is
+#     `SEM011 failable_call_requires_handler`
+#
+# See also: corpus/textus/slice-unhandled-reject.fab, corpus/lista/methodi-copiae.fab
+# =============================================================================
+
+fn window(string s, int lo, int hi) → string {
+    return s.slice(lo, hi) ⊥ "reported"
+}
+
+main {
+    let string s ← "héllo"
+    mut int far ← 2
+    far ← far + 97
+
+    print s.slice(1, 3) ⊥ "reported"
+    print s.slice(2, 2) ⊥ "reported"
+    print s.slice(0, 5) ⊥ "reported"
+    print window(s, 2, far)
+    print window(s, 0 - 1, 3)
+    print window(s, 4, 2)
+    print window(s, 6, 7)
+
+    do {
+        print s.slice(2, far)
+    }
+    catch err {
+        print "end past the length reported"
+    }
+    do {
+        print s.slice(far, far + 1)
+    }
+    catch err {
+        print "start past the end reported"
+    }
+}

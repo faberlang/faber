@@ -2,7 +2,7 @@
 term = "rumpe"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "dum_stmt", "si_stmt", "arm", "ergo_joint", "rumpe_stmt", "perge_stmt", "itera_stmt", "sit_decl", "assignment", "place", "comparison", "equality", "equality_tail", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "transfer"
+category = "jump"
 canonical = false
 summary = "Break and continue in nested while and for-range loops."
 syntax = "continue | break inside nested loops"

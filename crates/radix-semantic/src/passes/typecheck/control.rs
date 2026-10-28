@@ -38,6 +38,7 @@
 //!   facts for bindings they touch before entry; untouched immutable facts may
 //!   enter as loop-invariant knowledge.
 
+use super::flow_range::{FactValue, RangeSnapshot};
 use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
@@ -55,18 +56,22 @@ use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 struct FlowState {
     bindings: FxHashMap<DefId, BindingInfo>,
     invalidated: FxHashSet<DefId>,
+    /// Integer interval facts and mutation versions at this edge. Joined by
+    /// interval hull, independently of the type facts in `bindings`.
+    ranges: RangeSnapshot,
 }
 
 /// One leaf condition's `(then_refinement, else_refinement)` pair (nn-u1 null
 /// checks, U1R nominal `est M` tests): each side is an optional
-/// `(FactKey, narrowed TypeId)` fact, keyed by the binding or the field path
-/// rooted at a binding that the fact refines.
-type LeafRefinement = (Option<(FactKey, TypeId)>, Option<(FactKey, TypeId)>);
+/// `(FactKey, FactValue)` fact, keyed by the binding or the field path rooted
+/// at a binding that the fact refines. The value carries a narrowed type
+/// and/or an integer interval.
+pub(super) type LeafRefinement = (Option<(FactKey, FactValue)>, Option<(FactKey, FactValue)>);
 
-/// The facts that hold on one edge of a condition: every `(FactKey, narrowed
-/// TypeId)` that is true when the edge is taken, keyed by the binding or the
-/// field path rooted at a binding that the fact refines.
-type Facts = Vec<(FactKey, TypeId)>;
+/// The facts that hold on one edge of a condition: every `(FactKey, FactValue)`
+/// that is true when the edge is taken, keyed by the binding or the field path
+/// rooted at a binding that the fact refines.
+type Facts = Vec<(FactKey, FactValue)>;
 
 /// The subject of a flow fact: a visible binding, or a field path rooted at a
 /// visible binding (`base.path…`).
@@ -74,8 +79,8 @@ type Facts = Vec<(FactKey, TypeId)>;
 // 2) and consumed only inside the proving branch body; the branch-edge and
 // assertion consumers still skip it until the join units land.
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
-enum FactKey {
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(super) enum FactKey {
     Binding(DefId),
     Field { base: DefId, path: Vec<Symbol> },
 }
@@ -504,11 +509,16 @@ impl TypeChecker<'_> {
         // The condition is checked once against the incoming facts. Both edge
         // refinements must be computed before either branch can mutate the
         // visible binding map.
-        let incoming = self.snapshot_flow_state();
+        let mut incoming = self.snapshot_flow_state();
         self.remember_flow_bases(&incoming);
         // A `tensor<bivalens, S>` condition is the mask of the `✓ ✗` select
         // (K4), not a branch condition: both branches are evaluated.
-        if let Some(mask_ty) = self.check_condition_or_mask(cond) {
+        let mask = self.check_condition_or_mask(cond);
+        // The condition runs on every path: a call inside it kills interval
+        // facts before either edge starts, so both edges begin from the facts
+        // that survive it, not from the pre-condition snapshot.
+        incoming.ranges = self.range_flow.snapshot();
+        if let Some(mask_ty) = mask {
             if then_catch.is_some() {
                 self.report_mask_not_truth_value(mask_ty, cond.span);
                 return self.error_type;
@@ -639,6 +649,11 @@ impl TypeChecker<'_> {
     /// Refinement for one non-compound condition (null probe, member test,
     /// or null equality).
     fn leaf_refinement(&mut self, cond: &HirExpression) -> LeafRefinement {
+        // Integer guards (`x ≺ n`, `x ≡ y`, …) carry interval facts; any other
+        // leaf falls through to the null and member probes.
+        if let Some(guard) = self.guard_refinement(cond) {
+            return guard;
+        }
         if let HirExpressionKind::TypeCheck { positive, expr, ty } = &cond.kind {
             // A type test against the null type is the null-presence probe:
             // `x non est nihil` narrows the taken branch, `x est nihil` the
@@ -725,9 +740,9 @@ impl TypeChecker<'_> {
             FactKey::Field { base, path }
         };
         if positive {
-            (None, Some((key, refined)))
+            (None, Some((key, FactValue::ty(refined))))
         } else {
-            (Some((key, refined)), None)
+            (Some((key, FactValue::ty(refined))), None)
         }
     }
 
@@ -773,13 +788,13 @@ impl TypeChecker<'_> {
         let remainder = self.peel_member_type(binding_ty, member);
         if positive {
             (
-                Some((FactKey::Binding(*def_id), member)),
-                remainder.map(|ty| (FactKey::Binding(*def_id), ty)),
+                Some((FactKey::Binding(*def_id), FactValue::ty(member))),
+                remainder.map(|ty| (FactKey::Binding(*def_id), FactValue::ty(ty))),
             )
         } else {
             (
-                remainder.map(|ty| (FactKey::Binding(*def_id), ty)),
-                Some((FactKey::Binding(*def_id), member)),
+                remainder.map(|ty| (FactKey::Binding(*def_id), FactValue::ty(ty))),
+                Some((FactKey::Binding(*def_id), FactValue::ty(member))),
             )
         }
     }
@@ -908,7 +923,13 @@ impl TypeChecker<'_> {
     ) -> (TypeId, FlowState) {
         let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
         let mut field_saved: Vec<(DefId, Vec<Symbol>)> = Vec::new();
-        for (key, ty) in refine {
+        // Interval facts are scoped to the branch the same way: whatever the
+        // block establishes or kills is captured in `state` below, and the
+        // entry facts return at block exit.
+        let ranges_at_entry = self.range_flow.snapshot();
+        for (key, value) in refine {
+            self.assume_range_fact(&key, &value);
+            let Some(ty) = value.ty else { continue };
             match key {
                 // A binding fact overrides the visible binding for the branch
                 // body; the incoming binding returns when the scope ends.
@@ -939,6 +960,7 @@ impl TypeChecker<'_> {
         state.invalidated.extend(assignment_targets_in_block(block));
         self.pop_assert_refinement_frame();
         self.pop_scope();
+        self.range_flow.restore(&ranges_at_entry);
 
         for (def_id, original) in saved.into_iter().rev() {
             if let Some(original) = original {
@@ -961,6 +983,7 @@ impl TypeChecker<'_> {
         for def_id in touched {
             self.invalidate_flow_fact(def_id);
         }
+        self.kill_ranges_for_loop_effects(block);
         self.check_block(block, None);
     }
 
@@ -983,6 +1006,7 @@ impl TypeChecker<'_> {
         for def_id in touched {
             self.invalidate_flow_fact(def_id);
         }
+        self.kill_ranges_for_loop_effects(block);
         // The condition is re-tested before every iteration, so its
         // then-facts hold at body entry each time and are seeded fresh; a
         // re-point inside the body ends them for the rest of that iteration
@@ -997,12 +1021,14 @@ impl TypeChecker<'_> {
         FlowState {
             bindings: self.binding_shadow.clone(),
             invalidated: FxHashSet::default(),
+            ranges: self.range_flow.snapshot(),
         }
     }
 
     /// Restore a visible state without changing lexical scope ownership.
     fn restore_flow_state(&mut self, state: &FlowState) {
         self.binding_shadow.clone_from(&state.bindings);
+        self.range_flow.restore(&state.ranges);
         for (&def_id, &info) in &state.bindings {
             if let Some(scope) = self
                 .scopes
@@ -1028,6 +1054,7 @@ impl TypeChecker<'_> {
 
     /// Apply a joined state only where it differs from the incoming state.
     fn apply_flow_state(&mut self, incoming: &FlowState, joined: &FlowState) {
+        self.range_flow.restore(&joined.ranges);
         for (&def_id, &info) in &joined.bindings {
             let Some(before) = incoming.bindings.get(&def_id) else {
                 continue;
@@ -1046,6 +1073,9 @@ impl TypeChecker<'_> {
         let Some(first) = states.first() else {
             return incoming.clone();
         };
+        // Interval facts join by hull, independently of the type facts below.
+        let edge_ranges: Vec<&RangeSnapshot> = states.iter().map(|state| &state.ranges).collect();
+        let ranges = self.range_flow.join(&incoming.ranges, &edge_ranges);
         if states.len() == 1 {
             let mut joined = (*first).clone();
             for def_id in &first.invalidated {
@@ -1053,9 +1083,11 @@ impl TypeChecker<'_> {
                     joined.bindings.insert(*def_id, base);
                 }
             }
+            joined.ranges = ranges;
             return joined;
         }
         let mut joined = incoming.clone();
+        joined.ranges = ranges;
         for (&def_id, &before) in &incoming.bindings {
             let Some(candidate) = first.bindings.get(&def_id).copied() else {
                 continue;
@@ -1127,10 +1159,12 @@ impl TypeChecker<'_> {
     /// Return an edge snapshot with one condition refinement applied.
     fn state_with_refinement(&mut self, refine: Facts) -> FlowState {
         let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
-        for (key, ty) in refine {
+        let ranges_at_entry = self.range_flow.snapshot();
+        for (key, value) in refine {
+            self.assume_range_fact(&key, &value);
             // Field facts are not carried on the implicit fallthrough edge in
             // this need.
-            let FactKey::Binding(def_id) = key else {
+            let (FactKey::Binding(def_id), Some(ty)) = (key, value.ty) else {
                 continue;
             };
             saved.push((def_id, self.override_binding(def_id, ty)));
@@ -1141,6 +1175,7 @@ impl TypeChecker<'_> {
                 self.restore_binding(def_id, original);
             }
         }
+        self.range_flow.restore(&ranges_at_entry);
         state
     }
 
@@ -1158,10 +1193,14 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let (facts, _) = self.condition_refinement(lhs);
         let mut saved: Vec<(DefId, Option<BindingInfo>)> = Vec::new();
-        for (key, ty) in facts {
+        let mut range_undo = Vec::new();
+        for (key, value) in facts {
+            if let Some(undo) = self.assume_range_fact(&key, &value) {
+                range_undo.push(undo);
+            }
             // Field facts do not join across the short-circuit edge in this
             // need.
-            let FactKey::Binding(def_id) = key else {
+            let (FactKey::Binding(def_id), Some(ty)) = (key, value.ty) else {
                 continue;
             };
             saved.push((def_id, self.override_binding(def_id, ty)));
@@ -1171,6 +1210,11 @@ impl TypeChecker<'_> {
             if let Some(original) = original {
                 self.restore_binding(def_id, original);
             }
+        }
+        // The right conjunct may or may not have run, so a kill inside it
+        // stays killed; only an interval it left untouched is taken back.
+        for (def_id, undo) in range_undo.into_iter().rev() {
+            self.range_flow.retract(def_id, undo);
         }
         rhs_ty
     }
@@ -1188,6 +1232,9 @@ impl TypeChecker<'_> {
     /// Restore the declared binding state and remove all active assert facts
     /// for a binding whose cell has been assigned.
     pub(crate) fn invalidate_flow_fact(&mut self, def_id: DefId) {
+        // A store re-points the cell: its interval and every fact bounded by
+        // its old live length are dead whether or not a type fact existed.
+        self.range_flow.drop_subject(def_id);
         let Some(current) = self.lookup_binding(def_id) else {
             return;
         };
@@ -1233,12 +1280,15 @@ impl TypeChecker<'_> {
         // drops every field fact rooted at the base (conservative across
         // sibling fields) but leaves the base's own fact: writing through a
         // narrowed `ref Node ∪ none cur` does not make `cur` none again.
-        if let Some((base, path)) = field_path_key(target) {
-            if path.is_empty() {
-                self.invalidate_flow_fact(base);
-            } else {
+        match field_path_key(target) {
+            Some((base, path)) if path.is_empty() => self.invalidate_flow_fact(base),
+            Some((base, _)) => {
                 self.field_facts.retain(|(root, _), _| *root != base);
+                self.kill_mutable_source_ranges();
             }
+            // An indexed or dereferenced place: a store through a projection
+            // may reach any mutable source through an alias.
+            None => self.kill_mutable_source_ranges(),
         }
     }
 
@@ -1247,13 +1297,54 @@ impl TypeChecker<'_> {
     /// their target is typed; this post-pass covers assignments nested in a
     /// larger statement expression and inc/dec targets.
     pub(crate) fn invalidate_assignments_in_expr(&mut self, expr: &HirExpression) {
-        let (rebound, field_roots) = assignment_targets_in_expr(expr);
-        for def_id in rebound {
+        let effects = assignment_targets_in_expr(expr);
+        for def_id in effects.targets {
             self.invalidate_flow_fact(def_id);
         }
-        for base in field_roots {
+        for base in effects.field_roots {
             self.field_facts.retain(|(root, _), _| *root != base);
         }
+        // Calls and projected stores were already killed where they were
+        // checked (`kills_ranges` serves the loop-entry scan only).
+    }
+
+    /// Kill every interval fact about a mutable source (need, the
+    /// version-1 closed rule). Called after any call, mutating intrinsic or
+    /// closure call, and for a store through an alias or projection. A fact on
+    /// a `let` binding, a captured loop endpoint or a fixed tensor extent
+    /// survives: its subject cannot be written. A binding that is not visible
+    /// any more counts as mutable, which only over-kills.
+    pub(crate) fn kill_mutable_source_ranges(&mut self) {
+        let shadow = &self.binding_shadow;
+        self.range_flow
+            .kill_mutable_sources(|def_id| shadow.get(&def_id).is_none_or(|info| info.mutable));
+    }
+
+    /// Loop-entry policy for interval facts: a body that can write a mutable
+    /// source (any call or projected store) may do so before the next
+    /// iteration reads a fact established before the loop, so those facts do
+    /// not enter the loop. Bindings the body rebinds directly are dropped by
+    /// the existing per-binding policy.
+    fn kill_ranges_for_loop_effects(&mut self, block: &HirBlock) {
+        let mut collector = AssignmentTargetCollector::default();
+        collector.visit_block(block);
+        if collector.kills_ranges {
+            self.kill_mutable_source_ranges();
+        }
+    }
+
+    /// Apply the interval half of a fact on the branch being entered. Only a
+    /// binding key carries one: `FactKey::Field` joins are not built, so a
+    /// range value on a field path is ignored.
+    fn assume_range_fact(
+        &mut self,
+        key: &FactKey,
+        value: &FactValue,
+    ) -> Option<(DefId, super::flow_range::RangeUndo)> {
+        let (FactKey::Binding(def_id), Some(range)) = (key, &value.range) else {
+            return None;
+        };
+        Some((*def_id, self.range_flow.assume(*def_id, range)))
     }
 
     /// Install a joined fact in the scope containing the current statement.
@@ -1326,9 +1417,11 @@ impl TypeChecker<'_> {
         if self.assert_refinements.is_empty() {
             return;
         }
-        for (key, ty) in facts {
-            // Field facts are not carried through `adfirma` in this need.
-            let FactKey::Binding(def_id) = key else {
+        for (key, value) in facts {
+            // Field facts are not carried through `adfirma` in this need, and
+            // neither are interval facts: no producer exists yet, and the
+            // assert frames restore binding types only.
+            let (FactKey::Binding(def_id), Some(ty)) = (key, value.ty) else {
                 continue;
             };
             let saved = self.override_binding(def_id, ty);
@@ -1414,10 +1507,10 @@ fn assignment_targets_in_block(block: &HirBlock) -> FxHashSet<DefId> {
     collector.targets
 }
 
-fn assignment_targets_in_expr(expr: &HirExpression) -> (FxHashSet<DefId>, FxHashSet<DefId>) {
+fn assignment_targets_in_expr(expr: &HirExpression) -> AssignmentTargetCollector {
     let mut collector = AssignmentTargetCollector::default();
     collector.visit_expr(expr);
-    (collector.targets, collector.field_roots)
+    collector
 }
 
 #[derive(Default)]
@@ -1426,6 +1519,10 @@ struct AssignmentTargetCollector {
     targets: FxHashSet<DefId>,
     /// Bindings that root a field-chain store; only their field facts go.
     field_roots: FxHashSet<DefId>,
+    /// A call, a store through a projection, or a copy/sink into a place was
+    /// seen: any of them may write a mutable source, so interval facts about
+    /// mutable sources are killed.
+    kills_ranges: bool,
 }
 
 impl HirVisitor for AssignmentTargetCollector {
@@ -1442,6 +1539,10 @@ impl HirVisitor for AssignmentTargetCollector {
             | HirExpressionKind::ConversioAssign { target, .. } => {
                 self.collect_target(target);
             }
+            HirExpressionKind::Call(..)
+            | HirExpressionKind::MethodCall(..)
+            | HirExpressionKind::CopyInto { .. }
+            | HirExpressionKind::SinkInto { .. } => self.kills_ranges = true,
             _ => {}
         }
         walk_expr(self, expr);
@@ -1452,12 +1553,15 @@ impl AssignmentTargetCollector {
     fn collect_target(&mut self, target: &HirExpression) {
         // A field-chain store (`p.nomen ← v`, `p.a.b ← v`) has its place
         // rooted at the base binding: only the field facts rooted there go.
-        if let Some((base, path)) = field_path_key(target) {
-            if path.is_empty() {
+        match field_path_key(target) {
+            Some((base, path)) if path.is_empty() => {
                 self.targets.insert(base);
-            } else {
-                self.field_roots.insert(base);
             }
+            Some((base, _)) => {
+                self.field_roots.insert(base);
+                self.kills_ranges = true;
+            }
+            None => self.kills_ranges = true,
         }
     }
 }

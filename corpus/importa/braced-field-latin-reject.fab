@@ -1,0 +1,38 @@
++++
+term = "importa"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_record", "import_field_list", "import_field", "ex_field", "nota_stmt", "expression", "literal"]
+category = "locale"
+canonical = false
+summary = "The Latin record field word ex in an en file is a wrong-locale error (expect parse error)."
+syntax = "import { ex = \"norma:text\" } — rejected in an en file; write from"
+related = ["importa", "ex"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE050:wrong_locale_import_field"
++++
+# =============================================================================
+# importa — Latin record field word in an en file (expect parse error)
+# =============================================================================
+#
+# What this teaches:
+#   • Locale surfaces are sealed — the en spelling of the source field is
+#     `from`, so the Latin `ex` is refused in an en file
+#   • Parse error — `PARSE050:wrong_locale_import_field` names the word written
+#     and the en word to use instead
+#
+# Common mistakes:
+#   • writing `ex`, `visibilitas`, `nomen`, `ut` or `omnia` in an en record —
+#     write `from`, `visibility`, `name`, `as` or `all`
+#
+# See also: importa, ex
+# =============================================================================
+
+# Latin record field word in an en file (expect parse error)
+#
+# DELIBERATE: this exemplum keeps the Latin field word (`ex`) on purpose, to pin
+# the PARSE050 `wrong_locale_import_field` diagnostic.
+
+import { ex = "norma:text" }
+
+print "unreachable"

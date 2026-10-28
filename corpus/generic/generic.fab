@@ -2,7 +2,7 @@
 term = "generic"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = true
 summary = "Generic functions with angle-bracket type and magnitudo parameters."
 syntax = "functio <name><T, magnitudo N>(<params>) → <type> <block>"

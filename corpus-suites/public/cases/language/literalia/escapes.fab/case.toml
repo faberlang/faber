@@ -3,6 +3,8 @@ id = "corpus/literalia/escapes.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/escapes.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

@@ -184,7 +184,7 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             build: true,
             run: true,
             package: true,
-            note: "primary backend; full package build + run via `faber`",
+            note: "primary backend; full package build via `faber build`; `faber run` interprets source rather than running the Rust build",
         },
         crate::codegen::Target::HirFaber => TargetCapabilities {
             check: true,
@@ -258,7 +258,7 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             build: false,
             run: false,
             package: false,
-            note: "native host executable product target delegated to `faber build/run --target llvm-host`; radix emit rejects this target",
+            note: "native host executable product target delegated to `faber build --target llvm-host`; radix emit rejects this target",
         },
         crate::codegen::Target::MirClif => TargetCapabilities {
             check: true,
@@ -333,36 +333,51 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
     }
 }
 
+/// The Faber command-surface rows.
+///
+/// `run` is false in every row on purpose: `faber run` interprets source and
+/// takes no `--target`, so no target is "run" by this table. The one target
+/// route `faber run` reaches (a device selected with `--device`) is owned by
+/// `DeviceChoice::run_target_spelling` in the `faber` crate, and `faber targets` sets
+/// the `run` column from it. Keeping the flag here would be a second list.
 fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabilities {
     let mut capabilities = radix_target_capabilities(target);
+    capabilities.run = false;
     match target {
         crate::codegen::Target::MirScena => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
             note: "hidden legacy source-backed MIR package runtime; use `fmir-text` or `fmir` for package MIR artifacts",
         },
         crate::codegen::Target::MirFmir => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
-            note: "source-independent package MIR image via `faber build --target fmir-text`; run through FMIR loader",
+            note: "source-independent package MIR image via `faber build --target fmir-text`; `faber run` does not take the image",
         },
         crate::codegen::Target::MirFmirBinary => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
-            note: "compact package MIR binary image via `faber build --target fmir`; run through FMIR loader",
+            note: "compact package MIR binary image via `faber build --target fmir`; `faber run` does not take the image",
+        },
+        crate::codegen::Target::HirTypeScript => TargetCapabilities {
+            check: true,
+            build: true,
+            run: false,
+            package: true,
+            note: "file emission; `faber build` on a package writes a self-contained Node project (`tsc` and `node` from PATH); `faber run --target ts` builds and runs it",
         },
         crate::codegen::Target::HirFhir => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
-            note: "portable FHIR package envelope via `faber build --target fhir`; load and lower to FMIR for run (Rust stays explicit)",
+            note: "portable FHIR package envelope via `faber build --target fhir`; `faber run` does not load the envelope",
         },
         // Faber device execution uses runtime backends rather than
         // target-specific text emitters. These rows describe the runtime
@@ -372,20 +387,20 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
         crate::codegen::Target::MirMetal => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
             note: "Metal device execution via `faber run --device metal` (in process, Apple GPUs); `-t metal-text` remains emit-only",
         },
         crate::codegen::Target::MirLlvm => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
             note: "CUDA device execution via `faber run --device cuda` (in process through the NVIDIA driver; PTX built at run time with clang's NVPTX target; whole-tensor kernels, lane-form kernels execute through the NVVM lane emitter (statements, control flow, genus parameters, bounds faults, constant throws)); `-t llvm-text` remains emit-only",
         },
         crate::codegen::Target::HirRust => capabilities,
         // Stage 9 (llvm-host-parity product slice): llvm-host is the native
-        // host executable product target. check/build/run are true on the
+        // host executable product target. check/build/package are true on the
         // supported local host triple, and package is true because the Stage 8
         // package graph (one `.ll` per unit + entry + Norma modules) is green
         // through the shared package-to-LLVM builder. Build fails with a
@@ -394,13 +409,12 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
         crate::codegen::Target::MirLlvmHost => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
-            note: "native host executable via `faber build/run --target llvm-host` (MIR-to-LLVM emitter + llvm-as/clang + faber-host-llvm runtime archive on the local host triple)",
+            note: "native host executable via `faber build --target llvm-host` (MIR-to-LLVM emitter + llvm-as/clang + faber-host-llvm runtime archive on the local host triple); `faber run` does not take a target",
         },
         _ => {
             capabilities.package = false;
-            capabilities.run = false;
             capabilities
         }
     }

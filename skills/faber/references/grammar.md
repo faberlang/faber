@@ -143,6 +143,14 @@ Parameter and field markers:
 - `coalesce` (la `vel`) — default expression on a declaration slot
 - generic parameters live in `<>` after the name: `fn f<T, size N>(…)`, type parameters first,
   `size` (la `magnitudo`) size parameters after them; there is no `prae typus` parameter form
+- explicit generic arguments at a call echo the kind the signature declares: an explicit size
+  carries the `size` marker (la `magnitudo`), `mk<int, size 4>(xs)` for `fn mk<T, size N>`,
+  `tensor.construct<int, size [4]>(xs)` for a whole shape (`size [2, 3]`, naturals only), and
+  `f<size n>(x)` for an in-scope integer. The list binds by marker (a `size` argument binds the
+  next `size` parameter, an unmarked one the next type parameter), and the marker is required:
+  a bare `mk<int, 4>(xs)` is `SEM057 size_marker_required`, `size` on a callee with no `size`
+  parameter is `size_marker_unexpected` (`corpus/generic/call-size-args.fab`,
+  `corpus/conversio/lista-tensor-explicit-shape.fab`)
 
 Recoverable errors:
 
@@ -299,7 +307,7 @@ import from "hono" Hono
 import from "norma:console" console
 # binds `text`; no marker means no re-export
 import from "norma:text"
-import { ex = "norma:json/solve", ut = solve_mod }
+import { from = "norma:json/solve", as = solve_mod }
 # kernel manifest glob (script mode only), not wildcard import
 import from "faber:*" faber
 import from "lodash" * as _
@@ -309,6 +317,11 @@ import from "./types" public User
 import from "norma:console" const write_partial as output
 import from "norma:fs" const write_file as out_file, write_bytes as out_bytes
 ```
+
+The record form's five field names are reader-pack words like every other keyword: en `from`, `visibility`
+(value `public`), `name`, `as`, `all` (la `ex`, `visibilitas`, `nomen`, `ut`, `omnia`; the other packs follow their
+own keyword rows). A field word from another locale is `PARSE050 wrong_locale_import_field`, so the Latin `ex = …`
+in an en file fails and names `from`; an English word in a la record is `unknown_import_field`.
 
 The `private` import marker (la `privata`) was removed (`PARSE050 import_privata_removed`): an import without a marker
 does not re-export and `public` is the only marker. Norma module names are the English source names
@@ -330,6 +343,7 @@ Primitives:
 - `trapping<W>` (la `exactus<W>`) — the trapping policy spelled out: the same type as the bare marker `W`, and a store traps when the value does not fit (integer widths and `d64`; `trapping<f32>` is `trapping_float_not_implemented`)
 - `wrapping<W>` (la `modulus<W>`) — modular word, signed or unsigned; the value reduces mod 2^W at the store, and `↦` into it reduces and cannot fail
 - `saturating<W>` (la `saturatus<W>`) — saturating integer, signed or unsigned; arithmetic is exact and the value clamps to `W` **once, at the store** (never per operation); `↦` into it clamps and cannot fail
+- **Ranged store policy** — `saturating|trapping|wrapping<W, lo‥hi>` (la `saturatus|exactus|modulus<W, lo‥hi>`), integer widths only (teaching exempla `corpus/operatores/ranged-saturating.fab`, `ranged-trapping.fab`, `ranged-wrapping.fab`, `ranged-sugar.fab`). A range is the second argument of the policy word; the width stays explicit and the range refines it. `‥` is half open (`0‥8` holds 0 to 7) and `…` is inclusive (`1…5` holds 1 to 5); both ends are always written, and `∞` / `-∞` write "no bound on this side" (`-∞‥8`, `4‥∞`). The store applies the range once and arithmetic stays exact: saturating clamps into it, trapping traps (message names ``trapping<i32, -2‥3>``), wrapping reduces modulo `hi - lo` offset by `lo` (12 in `wrapping<u8, 3‥9>` is 6). The whole-width range is the existing spelling (`saturating<u8, 0…255>` is `saturating<u8>`, `trapping<u8, 0…255>` is `u8`, `trapping<inf, -∞…∞>` is `inf`: one type). Narrowing a range of the same policy is a store; another policy family still needs `↦` (superseded by ruling 51, operator 2026-10-27, ruled and not yet built: a value of any policy stores into a cell and the cell's policy applies to the exact value; until it is built the compiler still refuses the store, so keep writing `↦`; see `docs/design/numeric-model.md` §8). Refused by name: `u8<0‥8>` (`ranged_policy_word_required`), `0…` (`PARSE040 range_bound_required`), `5‥5` (`ranged_policy_range_empty`), `0‥300` on `u8` (`ranged_policy_range_outside_width`), `-1‥5` on `u8` (`ranged_policy_unsigned_negative_bound`), a float, decimal or `inf` width with a finite range (`ranged_policy_width_unsupported`), and a name or `size` extent as an end (`ranged_policy_bound_not_constant`, not built). Built on the runner and Rust only; other targets decline (`ranged_policy_target_unsupported`) and kernels refuse (`nucleum_ranged_policy_not_built`)
 - `none`, `void`, `never`, `unknown`, `instant`
 - `char` (la `littera`) — one Unicode scalar value (4 bytes, never allocates); element of `string`/`ascii` iteration and `string[i]`/`ascii[i]` indexing
 - There is no `bytes` or `byte` type. A byte string is `list<b8>` (la `lista<b8>`, bounded `list<b8, N>`); a raw byte is `b8`; a numeric byte is `u8`. `list<b8>` is not a list of numbers: it converts to `list<u8>` only with an explicit `↦`

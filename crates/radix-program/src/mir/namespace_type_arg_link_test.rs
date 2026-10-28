@@ -3,7 +3,7 @@
 //!
 //! A size-generic function exported by a sibling package file must link and
 //! instantiate through the package-MIR namespace-call rewrite both when the
-//! caller spells the sizes (`utilModule.id<2>(t)`) and when the checker
+//! caller spells the sizes (`utilModule.id<size 2>(t)`) and when the checker
 //! infers them from the argument (`utilModule.id(t)`). Inferred call sites
 //! arrive with empty HIR `type_args` — the semantic lowering writes them
 //! only for spelled `<...>` arguments — so one forward-on-rewrite covers
@@ -22,7 +22,7 @@ const TYPEARG_EXPLICIT_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn run() → f32 {
     let tensor<f32, [2]> t ← [1.5, 2.5] ↦ tensor<f32, [2]>
-    let tensor<f32, [2]> r ← utilModule.id<2>(t)
+    let tensor<f32, [2]> r ← utilModule.id<size 2>(t)
     return r[1]
 }
 
@@ -47,14 +47,14 @@ main {
 const TYPEARG_FORWARD_MAIN: &str = r#"import from "./util" * as utilModule
 
 fn forward<size N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
-    return utilModule.id<N>(x)
+    return utilModule.id<size N>(x)
 }
 
 fn run() → f32 {
     let tensor<f32, [3]> a ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
     let tensor<f32, [5]> b ← [1.0, 2.0, 3.0, 4.0, 5.0] ↦ tensor<f32, [5]>
-    let tensor<f32, [3]> ra ← forward<3>(a)
-    let tensor<f32, [5]> rb ← forward<5>(b)
+    let tensor<f32, [3]> ra ← forward<size 3>(a)
+    let tensor<f32, [5]> rb ← forward<size 5>(b)
     let tensor<f32, [3]> rc ← ra ↦ tensor<f32, [3]>
     return rc[1]
 }
@@ -220,12 +220,7 @@ fn package_mir_links_explicit_type_arg_namespace_call() {
             );
         },
     )
-    .unwrap_or_else(|errors| {
-        panic!(
-            "explicit type-arg namespace call must link, got {:?}",
-            errors
-        )
-    });
+    .unwrap_or_else(|errors| panic!("explicit type-arg namespace call must link, got {errors:?}",));
 }
 
 #[test]
@@ -273,12 +268,7 @@ fn package_mir_links_inferred_type_arg_namespace_call() {
             );
         },
     )
-    .unwrap_or_else(|errors| {
-        panic!(
-            "inferred type-arg namespace call must link, got {:?}",
-            errors
-        )
-    });
+    .unwrap_or_else(|errors| panic!("inferred type-arg namespace call must link, got {errors:?}",));
 }
 
 #[test]
@@ -314,17 +304,14 @@ fn package_mir_links_generic_caller_forwarding_type_args_to_namespace_callee() {
         },
     )
     .unwrap_or_else(|errors| {
-        panic!(
-            "generic namespace forwarding package must link and run, got {:?}",
-            errors
-        );
+        panic!("generic namespace forwarding package must link and run, got {errors:?}",);
     });
 }
 
 const AIR_TYPEARG_UTIL: &str = r#"@ radix lane "air"
 @ public
 fn rope<size D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {
-    return x.norm_rope<D>(0, table)
+    return x.norm_rope<size D>(0, table)
 }
 "#;
 
@@ -336,8 +323,8 @@ fn main() → void {
     let tf32[2, 4, 3] table ← empty
     do {
         let tf32[2, 64] y ← y_flat ↦ tf32[2, 64]
-        let _ a ← utilModule.rope<8>(x, table)
-        let _ b ← utilModule.rope<64>(y, table)
+        let _ a ← utilModule.rope<size 8>(x, table)
+        let _ b ← utilModule.rope<size 64>(y, table)
         let _ c ← utilModule.rope(y, table)
     }
     catch err {
@@ -481,12 +468,7 @@ fn package_mir_links_generic_failable_namespace_call() {
             );
         },
     )
-    .unwrap_or_else(|errors| {
-        panic!(
-            "failable type-arg namespace call must link, got {:?}",
-            errors
-        )
-    });
+    .unwrap_or_else(|errors| panic!("failable type-arg namespace call must link, got {errors:?}",));
 }
 
 const NORMA_FS_READ_FILE_MAIN: &str = r#"import from "norma:fs" fs

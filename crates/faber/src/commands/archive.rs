@@ -92,7 +92,9 @@ fn create_temp_root(archive: &Path) -> ArchiveResult<PathBuf> {
             Ok(()) => return Ok(candidate),
             Err(err) if err.kind() == io::ErrorKind::AlreadyExists => {}
             Err(err) => {
-                return Err(Box::new(Diagnostic::io_error(&candidate, &err)));
+                return Err(Box::new(faber_cli::exit_status::write_diagnostic_error(
+                    &candidate, &err,
+                )));
             }
         }
     }
@@ -151,18 +153,28 @@ fn extract_zip(archive: &Path, temp_root: &Path) -> ArchiveResult<()> {
             .map_err(|()| unsafe_entry_diagnostic(archive, &entry_name))?;
         let output = temp_root.join(relative);
         if entry.is_dir() {
-            fs::create_dir_all(&output)
-                .map_err(|err| Box::new(Diagnostic::io_error(&output, &err)))?;
+            fs::create_dir_all(&output).map_err(|err| {
+                Box::new(faber_cli::exit_status::write_diagnostic_error(
+                    &output, &err,
+                ))
+            })?;
             continue;
         }
         if let Some(parent) = output.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|err| Box::new(Diagnostic::io_error(parent, &err)))?;
+            fs::create_dir_all(parent).map_err(|err| {
+                Box::new(faber_cli::exit_status::write_diagnostic_error(parent, &err))
+            })?;
         }
-        let mut out = fs::File::create(&output)
-            .map_err(|err| Box::new(Diagnostic::io_error(&output, &err)))?;
-        io::copy(&mut entry, &mut out)
-            .map_err(|err| Box::new(Diagnostic::io_error(&output, &err)))?;
+        let mut out = fs::File::create(&output).map_err(|err| {
+            Box::new(faber_cli::exit_status::write_diagnostic_error(
+                &output, &err,
+            ))
+        })?;
+        io::copy(&mut entry, &mut out).map_err(|err| {
+            Box::new(faber_cli::exit_status::write_diagnostic_error(
+                &output, &err,
+            ))
+        })?;
     }
 
     Ok(())

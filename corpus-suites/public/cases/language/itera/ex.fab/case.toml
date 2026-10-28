@@ -3,6 +3,8 @@ id = "corpus/itera/ex.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/ex.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

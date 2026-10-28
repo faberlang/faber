@@ -27,7 +27,8 @@ use super::ast::{
     ArrayElement, BindingPattern, BlockStmt, CapeClause, ClassMemberKind, ClausuraBody,
     ConversioTarget, Expr, ExprKind, FacStmt, FiguraExpr, FuncDecl, GenericArgExpr,
     GenericParamDefault, Ident, IfBody, ImportKind, LiftExtent, NonNullKind, OptionalChainKind,
-    Pattern, PatternBind, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind, TypeParam,
+    Pattern, PatternBind, Program, RangeBoundExpr, SecusClause, Stmt, StmtKind, TypeExpr,
+    TypeExprKind, TypeParam,
 };
 
 /// Maximum AST nesting depth before the walker refuses to descend further.
@@ -688,6 +689,13 @@ fn walk_generic_arg_expr<V: Visitor>(visitor: &mut V, arg: &GenericArgExpr) {
         GenericArgExpr::Type(ty) => visitor.visit_type_expr(ty),
         GenericArgExpr::Size(figura) => walk_figura_expr(visitor, figura),
         GenericArgExpr::Name(ident) => visitor.visit_ident(ident),
+        GenericArgExpr::Range(range) => {
+            for bound in [&range.lo, &range.hi] {
+                if let RangeBoundExpr::Name { name, .. } = bound {
+                    visitor.visit_ident(name);
+                }
+            }
+        }
     }
 }
 
@@ -705,6 +713,11 @@ fn walk_figura_expr<V: Visitor>(visitor: &mut V, figura: &FiguraExpr) {
             LiftExtent::Literal(_) | LiftExtent::Negative { .. } => {}
             LiftExtent::Name(ident) => visitor.visit_ident(ident),
             LiftExtent::Paren(term) => walk_figura_expr(visitor, term),
+            LiftExtent::Shape(dims) => {
+                for dim in dims {
+                    walk_figura_expr(visitor, dim);
+                }
+            }
         },
         FiguraExpr::Tuple(dims) => {
             for dim in dims {

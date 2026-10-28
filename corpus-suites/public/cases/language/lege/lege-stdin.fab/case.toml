@@ -3,6 +3,8 @@ id = "corpus/lege/lege-stdin.fab"
 group = "language"
 input_root = "corpus"
 input = "lege/lege-stdin.fab"
+category = "console"
+domain = "io"
 stdin = "stdin.txt"
 
 

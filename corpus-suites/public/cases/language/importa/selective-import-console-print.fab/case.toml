@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/importa/selective-import-console-print.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/selective-import-console-print.fab"
+category = "package"
+domain = "program"
+
+
+[expect]
+check_only = true

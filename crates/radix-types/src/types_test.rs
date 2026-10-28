@@ -1194,6 +1194,29 @@ fn first_modular_word_width_restored_from_snapshot() {
     assert_eq!(restored.first_modular_word_width(), Some(NumericWidth::U16));
 }
 
+#[test]
+fn first_authored_bits_snapshot_round_trip() {
+    for width in [
+        BitsWidth::B8,
+        BitsWidth::B16,
+        BitsWidth::B32,
+        BitsWidth::B64,
+    ] {
+        let mut types = TypeTable::new();
+        let _ = types.intern(Type::Bits(width));
+        let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot");
+        assert_eq!(restored.first_authored_bits(), Some(width));
+    }
+}
+
+#[test]
+fn seeded_octeti_byte_list_is_not_an_authored_bits_after_restore() {
+    let types = TypeTable::new();
+    assert_eq!(types.first_authored_bits(), None);
+    let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot");
+    assert_eq!(restored.first_authored_bits(), None);
+}
+
 // --- F-003: Alias wrappers break assignability / numeric carriers ---
 
 #[test]
@@ -1634,23 +1657,18 @@ fn f065_from_snapshot_rejects_dangling_nested_index_ref() {
 // --- F-066: structural assignability arms ---
 
 #[test]
-fn f066_tuple_covariant_assignable() {
-    // Tuple<i32, i64> must be assignable to Tuple<i64, i64> (pointwise covariant).
+fn f066_tuple_members_invariant() {
+    // Tuple members are type-argument positions: Tuple<i32, i64> is not a
+    // Tuple<i64, i64> in either direction (ruling 21 row 25).
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
     let tuple_i32_i64 = types.tuple(vec![i32, i64]);
     let tuple_i64_i64 = types.tuple(vec![i64, i64]);
 
-    assert!(
-        types.is_assignable(tuple_i32_i64, tuple_i64_i64),
-        "F-066: Tuple<i32,i64> must be assignable to Tuple<i64,i64> (element-covariant)"
-    );
-    // Narrowing element → not assignable.
-    assert!(
-        !types.is_assignable(tuple_i64_i64, tuple_i32_i64),
-        "F-066: Tuple<i64,i64> must NOT be assignable to Tuple<i32,i64> (narrowing element)"
-    );
+    assert!(!types.is_assignable(tuple_i32_i64, tuple_i64_i64));
+    assert!(!types.is_assignable(tuple_i64_i64, tuple_i32_i64));
+    assert!(types.is_assignable(tuple_i32_i64, tuple_i32_i64));
 }
 
 #[test]
@@ -1738,70 +1756,64 @@ fn intervallum_step_is_part_of_type_identity() {
 }
 
 #[test]
-fn f066_collection_covariant_assignable() {
-    // lista<numerus<i32>> must be assignable to lista<numerus<i64>> (element-covariant).
+fn f066_collection_type_arguments_invariant() {
+    // lista<i32> is not a lista<i64>, in either direction: both names would
+    // share one storage and the store policy belongs to the destination cell
+    // (ruling 21 row 25, ruling 51 A7).
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
     let lista_i32 = types.array(i32);
     let lista_i64 = types.array(i64);
+    assert!(!types.is_assignable(lista_i32, lista_i64));
+    assert!(!types.is_assignable(lista_i64, lista_i32));
+    assert!(types.is_assignable(lista_i32, lista_i32));
 
-    assert!(
-        types.is_assignable(lista_i32, lista_i64),
-        "F-066: lista<i32> must be assignable to lista<i64> (covariant)"
-    );
-    assert!(
-        !types.is_assignable(lista_i64, lista_i32),
-        "F-066: lista<i64> must NOT be assignable to lista<i32> (narrowing)"
-    );
-
-    // Set, Promissum, Cursor also covariant.
     let set_i32 = types.set(i32);
     let set_i64 = types.set(i64);
-    assert!(types.is_assignable(set_i32, set_i64));
+    assert!(!types.is_assignable(set_i32, set_i64));
     assert!(!types.is_assignable(set_i64, set_i32));
 
     let prom_i32 = types.promissum(i32);
     let prom_i64 = types.promissum(i64);
-    assert!(types.is_assignable(prom_i32, prom_i64));
+    assert!(!types.is_assignable(prom_i32, prom_i64));
     assert!(!types.is_assignable(prom_i64, prom_i32));
 
     let cur_i32 = types.cursor(i32);
     let cur_i64 = types.cursor(i64);
-    assert!(types.is_assignable(cur_i32, cur_i64));
+    assert!(!types.is_assignable(cur_i32, cur_i64));
     assert!(!types.is_assignable(cur_i64, cur_i32));
+
+    let queue_i32 = types.queue(i32);
+    let queue_i64 = types.queue(i64);
+    assert!(!types.is_assignable(queue_i32, queue_i64));
+    let stack_i32 = types.stack(i32);
+    let stack_i64 = types.stack(i64);
+    assert!(!types.is_assignable(stack_i32, stack_i64));
 }
 
 #[test]
-fn f066_map_covariant_assignable() {
-    // tabula<K1, V1> must be assignable to tabula<K2, V2> when K1→K2 and V1→V2.
+fn f066_map_type_arguments_invariant() {
     let mut types = TypeTable::new();
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
     let map_i32_i32 = types.map(i32, i32);
     let map_i64_i64 = types.map(i64, i64);
-
-    assert!(
-        types.is_assignable(map_i32_i32, map_i64_i64),
-        "F-066: tabula<i32,i32> must be assignable to tabula<i64,i64> (covariant)"
-    );
-    assert!(
-        !types.is_assignable(map_i64_i64, map_i32_i32),
-        "F-066: tabula<i64,i64> must NOT be assignable to tabula<i32,i32> (narrowing)"
-    );
-
-    // Mixed: key widens, value narrows → not assignable.
     let map_i64_i32 = types.map(i64, i32);
-    assert!(
-        !types.is_assignable(map_i64_i64, map_i64_i32),
-        "F-066: value narrowing alone blocks map assignability"
-    );
+    let map_i32_i64 = types.map(i32, i64);
+
+    assert!(!types.is_assignable(map_i32_i32, map_i64_i64));
+    assert!(!types.is_assignable(map_i64_i64, map_i32_i32));
+    // Key and value are each invariant on their own.
+    assert!(!types.is_assignable(map_i32_i32, map_i64_i32));
+    assert!(!types.is_assignable(map_i32_i32, map_i32_i64));
+    assert!(types.is_assignable(map_i32_i32, map_i32_i32));
 }
 
 #[test]
-fn f066_tensor_vector_matrix_sparsa_element_covariant_shape_invariant() {
-    // tensor<F32, [2,3]> must be assignable to tensor<F64, [2,3]>
-    // (element covariant, shape invariant).
+fn f066_tensor_vector_matrix_sparsa_element_and_shape_invariant() {
+    // tensor<F32, [2,3]> is not a tensor<F64, [2,3]> (element and shape both
+    // invariant).
     let mut types = TypeTable::new();
     let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     let f64 = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
@@ -1816,33 +1828,34 @@ fn f066_tensor_vector_matrix_sparsa_element_covariant_shape_invariant() {
     let t_f32_2x4 = types.tensor_with_shape(f32, shape_2x4);
 
     assert!(
-        types.is_assignable(t_f32_2x3, t_f64_2x3),
-        "F-066: tensor<F32,[2,3]> must be assignable to tensor<F64,[2,3]> (element covariant)"
+        !types.is_assignable(t_f32_2x3, t_f64_2x3),
+        "tensor<F32,[2,3]> must NOT be assignable to tensor<F64,[2,3]> (element invariant)"
     );
+    assert!(types.is_assignable(t_f32_2x3, t_f32_2x3));
     assert!(
         !types.is_assignable(t_f32_2x3, t_f32_2x4),
         "F-066: tensor<F32,[2,3]> must NOT be assignable to tensor<F32,[2,4]> (shape invariant)"
     );
 
-    // Vector: element covariant, width invariant.
+    // Vector: element and width invariant.
     let v_f32_w2 = types.vector_with_width(f32, dim2);
     let v_f64_w2 = types.vector_with_width(f64, dim2);
     let v_f32_w3 = types.vector_with_width(f32, dim3);
-    assert!(types.is_assignable(v_f32_w2, v_f64_w2));
+    assert!(!types.is_assignable(v_f32_w2, v_f64_w2));
     assert!(!types.is_assignable(v_f32_w2, v_f32_w3));
 
-    // Matrix: element covariant, shape invariant.
+    // Matrix: element and shape invariant.
     let m_f32_2x3 = types.matrix_with_shape(f32, shape_2x3);
     let m_f64_2x3 = types.matrix_with_shape(f64, shape_2x3);
     let m_f32_2x4 = types.matrix_with_shape(f32, shape_2x4);
-    assert!(types.is_assignable(m_f32_2x3, m_f64_2x3));
+    assert!(!types.is_assignable(m_f32_2x3, m_f64_2x3));
     assert!(!types.is_assignable(m_f32_2x3, m_f32_2x4));
 
-    // Sparsa: element covariant, shape invariant.
+    // Sparsa: element and shape invariant.
     let s_f32_2x3 = types.sparsa_with_shape(f32, shape_2x3);
     let s_f64_2x3 = types.sparsa_with_shape(f64, shape_2x3);
     let s_f32_2x4 = types.sparsa_with_shape(f32, shape_2x4);
-    assert!(types.is_assignable(s_f32_2x3, s_f64_2x3));
+    assert!(!types.is_assignable(s_f32_2x3, s_f64_2x3));
     assert!(!types.is_assignable(s_f32_2x3, s_f32_2x4));
 }
 

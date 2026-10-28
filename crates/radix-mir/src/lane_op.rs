@@ -99,6 +99,7 @@ fn is_integer_lane(types: &TypeTable, ty: MirType) -> bool {
             | Type::SizedNumeric(Primitive::Numerus, _)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
     )
 }
 

@@ -3,6 +3,8 @@ id = "corpus/est/variant-test.fab"
 group = "language"
 input_root = "corpus"
 input = "est/variant-test.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

@@ -213,7 +213,9 @@ Short form of the "Numeric model" in `grammar/EBNF.md`:
 - Arithmetic computes the exact value; the **slot** applies its policy at the store. A bare marker
   (`u8`, `i32`) traps when the value does not fit; `wrapping<u8>` (la `modulus<u8>`) reduces;
   `saturating<u8>` (la `saturatus<u8>`) clamps. Policy words keep their `<W>`; the bare marker is the
-  canonical width spelling.
+  canonical width spelling. A range refines the policy: `saturating<u32, 0‥8>` clamps into 0 to 7,
+  `trapping<i32, -2‥3>` traps outside -2 to 2, `wrapping<u32, 0‥5>` wraps around 5 slots (`‥` half open,
+  `…` inclusive, both ends written, `∞` for no bound); the range applies at the store only.
 - `/` floors on integers and `%` takes the divisor's sign (`-7 / 2` is -4, `-7 % 2` is 1); `÷` is true
   division and yields a float. Writing `let f64 avg ← a / b` with integer operands is
   `integer_quotient_to_float_requires_true_division`; write `a ÷ b`.
@@ -600,7 +602,10 @@ reminders, not a second EBNF.
   shape witness such as `Box<tf32[4]>`. `size` (la `magnitudo`) parameters
   follow the type parameters (`<T, size N>`, `max_dynamic<size Figura>` in
   `corpus/summa/max-min.fab`); an applied natural-number argument is a
-  capacity fact, not a width marker.
+  capacity fact, not a width marker. A call passes an explicit size behind
+  the same word, as `axis` is passed: `mk<int, size 4>(xs)`,
+  `tensor.construct<int, size [4]>(xs)`; a bare natural there is
+  `SEM057 size_marker_required`.
 
 ### Kernel fragments versus graphics fragments
 

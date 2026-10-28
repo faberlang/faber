@@ -2,7 +2,7 @@
 term = "elige negative patterns"
 kind = "feature"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "literal", "elige_stmt", "casu_elige_clause", "ceterum_clause", "incipit_stmt", "fixum_decl", "expression", "unary_expr", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
-category = "control-flow"
+category = "branch"
 canonical = true
 summary = "A leading minus before a number literal is a case value in elige."
 syntax = "elige <number> { casu -1 ... casu -2.5 ... casu -∞ ... }"

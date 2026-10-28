@@ -3,6 +3,8 @@ id = "corpus/json/json.fab"
 group = "language"
 input_root = "corpus"
 input = "json/json.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

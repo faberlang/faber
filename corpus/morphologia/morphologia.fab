@@ -2,7 +2,7 @@
 term = "morphologia"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "cast_expr", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_joint", "equality", "equality_tail", "comparison", "additive_expr", "multiplicative_expr", "expr_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = true
 summary = "Verb-form dispatch on collection methodi (imperative vs participle endings)."
 syntax = "<collection>.<verb-a|verb-ata|verb-e|verb-ita>(<args>)"

@@ -2,7 +2,7 @@
 term = "vacua"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "expr_stmt"]
-category = "collection"
+category = "set"
 canonical = false
 summary = "en empty-collection marker vs is_empty intrinsic in one file."
 syntax = "mut list<T> xs ← empty"

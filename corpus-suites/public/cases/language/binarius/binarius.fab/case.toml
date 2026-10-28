@@ -3,6 +3,8 @@ id = "corpus/binarius/binarius.fab"
 group = "language"
 input_root = "corpus"
 input = "binarius/binarius.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

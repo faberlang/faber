@@ -3,6 +3,8 @@ id = "corpus/varia/typi-ligata.fab"
 group = "language"
 input_root = "corpus"
 input = "varia/typi-ligata.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

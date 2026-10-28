@@ -242,6 +242,12 @@ impl TypeChecker<'_> {
                 let (lo, hi) = width.integer_range()?;
                 Some(value.clamp(lo, hi))
             }
+            // A ranged cell applies its policy to the range once, at the store.
+            Type::RangedInt { policy, lo, hi, .. } => Some(match policy {
+                radix_types::IntPolicy::Trapping => within((*lo, *hi))?,
+                radix_types::IntPolicy::Wrapping => lo + (value - lo).rem_euclid(hi - lo + 1),
+                radix_types::IntPolicy::Saturating => value.clamp(*lo, *hi),
+            }),
             _ => None,
         }
     }

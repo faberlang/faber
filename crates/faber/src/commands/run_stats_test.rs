@@ -229,6 +229,7 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
         gpu_timer_available: Some(true),
         gpu_sample_launch_capacity: Some(1_024),
         host_encode_ns: 16,
+        host_blocked_ns: Some(20),
         uploads: 2,
         downloads: 1,
         uploaded_bytes: 64,
@@ -265,6 +266,8 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     assert!(value["device"].is_object());
     assert_eq!(value["device"]["entries"][0]["entry"], "quadratum");
     assert_eq!(value["device"]["gpu_busy_ns"], 18);
+    assert_eq!(value["device"]["host_encode_ns"], 16);
+    assert_eq!(value["device"]["host_blocked_ns"], 20);
     assert_eq!(value["device"]["gpu_timer_available"], true);
     assert_eq!(value["device"]["gpu_sample_launch_capacity"], 1_024);
     let decoded: RunStatsArtifact = serde_json::from_str(&encoded).expect("device schema");
@@ -273,11 +276,16 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     let device = value["device"].as_object_mut().expect("device object");
     device.remove("gpu_timer_available");
     device.remove("gpu_sample_launch_capacity");
+    device.remove("host_blocked_ns");
     let old_decoded: RunStatsArtifact =
         serde_json::from_value(value).expect("old device artifact without sampling metadata");
     let old_device = old_decoded.device.expect("old device metadata");
     assert_eq!(old_device.gpu_timer_available, None);
     assert_eq!(old_device.gpu_sample_launch_capacity, None);
+    // An artifact from before the encode/blocked split reads as unsplit: its
+    // `host_encode_ns` still includes the waits.
+    assert_eq!(old_device.host_blocked_ns, None);
+    assert_eq!(old_device.host_encode_ns, 16);
 }
 
 #[test]

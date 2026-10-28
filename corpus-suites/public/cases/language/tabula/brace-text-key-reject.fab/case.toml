@@ -3,6 +3,8 @@ id = "corpus/tabula/brace-text-key-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/brace-text-key-reject.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

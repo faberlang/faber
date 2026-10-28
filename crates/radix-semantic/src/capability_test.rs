@@ -64,8 +64,9 @@ fn every_classified_reason_remains_an_answer_not_a_negative_proof() {
 fn combined_query_interface_is_implemented_by_fail_closed_provider() {
     fn accepts_combined_provider<T: CapabilityQueries>(_: &T) {}
 
-    accepts_combined_provider(&FailClosedCapabilityQueries);
     fn accepts_singular_provider<T: CapabilityQuery>(_: &T) {}
+
+    accepts_combined_provider(&FailClosedCapabilityQueries);
     accepts_singular_provider(&FailClosedCapabilityQueries);
 }
 
@@ -679,7 +680,7 @@ incipit { }
     }
     match queries.function_capability(plana, FunctionCapabilityKind::CapturePosture) {
         CapabilityAnswer::Proven(FunctionCapabilityProof::Capture(captures)) => {
-            assert!(captures.is_empty());
+            assert_eq!(captures, []);
         }
         other => panic!("expected proven empty captures, got {other:?}"),
     }
@@ -1010,7 +1011,7 @@ fn derived_queries_implement_the_combined_interface_and_attach_regions() {
     accepts_combined(&*queries.queries);
     assert!(!queries.has_regions());
 
-    let access = analyze_access_facts_table(&hir, &types);
+    let access = analyze_access_facts_table(hir, types);
     let regions = crate::passes::borrow_region::analyze(hir, types, &access)
         .expect("region analysis succeeds");
     let with_regions = queries.queries.with_regions(Box::leak(Box::new(regions)));

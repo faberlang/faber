@@ -3,6 +3,8 @@ id = "corpus/erratur/erratur.fab"
 group = "language"
 input_root = "corpus"
 input = "erratur/erratur.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

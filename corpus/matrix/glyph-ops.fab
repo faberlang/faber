@@ -2,7 +2,7 @@
 term = "matrix"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "expression", "multiplicative_expr", "equality", "literal", "vel_expr", "nota_stmt"]
-category = "arithmetic"
+category = "tensor"
 canonical = false
 summary = "The matrix glyph surface: matmul, transpose, matvec, elementwise product, inverse and whole-value equality."
 syntax = "o · right | o.transpose() | o.apply(v) | o ⊙ o | m.invert() | m ≡ m"

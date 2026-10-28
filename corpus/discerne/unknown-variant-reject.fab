@@ -2,7 +2,7 @@
 term = "discerne unknown variant"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "Decline: a variant pattern must name a member of the matched union; `case Shape.Circe let r` names a variant of no closed set and rejects with SEM001:unknown_variant."
 syntax = "case Shape.Circe let r — rejected; name a declared variant: case Shape.Circle let r"

@@ -44,8 +44,8 @@ fn stringify(Event event) → string {
 fn parse(string wire) → list<Event> ⇥ string {
     mut string src ← wire
     let string bom ↤ |ef bb bf|
-    if src.length() ≻ 0 and src.slice(0, 1) ≡ bom {
-        src ← src.slice(1, src.length())
+    if src.length() ≻ 0 and (src.slice(0, 1) ⊥ "") ≡ bom {
+        src ← src.slice(1, src.length()) ⊥ ""
     }
     mut list<Event> events ← []
     mut string last_id ← ""
@@ -59,7 +59,7 @@ fn parse(string wire) → list<Event> ⇥ string {
     let int n ← src.length()
     while i ≺ n {
         let int line_end_pos ← line_end(src, i)
-        let string line ← src.slice(i, line_end_pos)
+        let string line ← src.slice(i, line_end_pos) ⊥ ""
         i ← after_line(src, line_end_pos)
         if line.length() ≡ 0 {
             let Event ∪ none ev ← finish_event(name, data, id, retry, last_id, has_data, has_id)
@@ -77,7 +77,7 @@ fn parse(string wire) → list<Event> ⇥ string {
             has_data ← false
             has_id ← false
         }
-        elif line.slice(0, 1) ≡ ":" {
+        elif (line.slice(0, 1) ⊥ "") ≡ ":" {
             # comment / keep-alive
         }
         else {
@@ -85,10 +85,10 @@ fn parse(string wire) → list<Event> ⇥ string {
             mut string field_name ← line
             mut string field_value ← ""
             if colon ≥ 0 {
-                field_name ← line.slice(0, colon)
-                field_value ← line.slice(colon + 1, line.length())
-                if field_value.length() ≻ 0 and field_value.slice(0, 1) ≡ " " {
-                    field_value ← field_value.slice(1, field_value.length())
+                field_name ← line.slice(0, colon) ⊥ ""
+                field_value ← line.slice(colon + 1, line.length()) ⊥ ""
+                if field_value.length() ≻ 0 and (field_value.slice(0, 1) ⊥ "") ≡ " " {
+                    field_value ← field_value.slice(1, field_value.length()) ⊥ ""
                 }
             }
             if field_name ≡ "data" {
@@ -130,8 +130,8 @@ fn data_lines(string data) → list<string> {
     mut int start ← 0
     mut int i ← 0
     while i ≺ data.length() {
-        if data.slice(i, i + 1) ≡ "\n" {
-            lines.append(data.slice(start, i))
+        if (data.slice(i, i + 1) ⊥ "") ≡ "\n" {
+            lines.append(data.slice(start, i) ⊥ "")
             i ← i + 1
             start ← i
         }
@@ -139,14 +139,14 @@ fn data_lines(string data) → list<string> {
             i ← i + 1
         }
     }
-    lines.append(data.slice(start, data.length()))
+    lines.append(data.slice(start, data.length()) ⊥ "")
     return lines
 }
 
 fn line_end(string s, int start) → int {
     mut int i ← start
     while i ≺ s.length() {
-        let string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1) ⊥ ""
         if c ≡ "\n" or c ≡ "\r" then return i
         i ← i + 1
     }
@@ -155,8 +155,8 @@ fn line_end(string s, int start) → int {
 
 fn after_line(string s, int line_end) → int {
     if line_end ≥ s.length() then return s.length()
-    if s.slice(line_end, line_end + 1) ≡ "\r" {
-        if line_end + 1 ≺ s.length() and s.slice(line_end + 1, line_end + 2) ≡ "\n" {
+    if (s.slice(line_end, line_end + 1) ⊥ "") ≡ "\r" {
+        if line_end + 1 ≺ s.length() and (s.slice(line_end + 1, line_end + 2) ⊥ "") ≡ "\n" {
             return line_end + 2
         }
         return line_end + 1
@@ -167,7 +167,7 @@ fn after_line(string s, int line_end) → int {
 fn colon_at(string line) → int {
     mut int i ← 0
     while i ≺ line.length() {
-        if line.slice(i, i + 1) ≡ ":" then return i
+        if (line.slice(i, i + 1) ⊥ "") ≡ ":" then return i
         i ← i + 1
     }
     return -1
@@ -177,7 +177,7 @@ fn has_nul(string s) → bool {
     mut int i ← 0
     while i ≺ s.length() {
         # NUL is valid UTF-8, so the conversion cannot fail; the default only satisfies D17.8.
-        if s.slice(i, i + 1) ≡ (|00| ↦ string ⊥ "") then return true
+        if (s.slice(i, i + 1) ⊥ "") ≡ (|00| ↦ string ⊥ "") then return true
         i ← i + 1
     }
     return false
@@ -187,7 +187,7 @@ fn is_digits(string s) → bool {
     if s.length() ≡ 0 then return false
     mut int i ← 0
     while i ≺ s.length() {
-        if not "0123456789".contains(s.slice(i, i + 1)) then return false
+        if not "0123456789".contains(s.slice(i, i + 1) ⊥ "") then return false
         i ← i + 1
     }
     return true
@@ -196,8 +196,8 @@ fn is_digits(string s) → bool {
 fn finish_event(string name, string data, string id, string retry, string last_id, bool has_data, bool has_id) → Event ∪ none {
     if not has_data then return null
     mut string payload ← data
-    if payload.length() ≻ 0 and payload.slice(payload.length() - 1, payload.length()) ≡ "\n" {
-        payload ← payload.slice(0, payload.length() - 1)
+    if payload.length() ≻ 0 and (payload.slice(payload.length() - 1, payload.length()) ⊥ "") ≡ "\n" {
+        payload ← payload.slice(0, payload.length() - 1) ⊥ ""
     }
     if payload.length() ≡ 0 then return null
     mut string evid ← last_id

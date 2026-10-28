@@ -29,7 +29,10 @@ fn analyze_en(source: &str) -> AnalyzedFixture {
 fn assert_accepts(source: &str) {
     let result = analyze_en(source);
     assert!(
-        !result.diagnostics.iter().any(|d| d.is_error()),
+        !result
+            .diagnostics
+            .iter()
+            .any(super::super::error::SemanticError::is_error),
         "expected no error, got: {:?}",
         result.diagnostics
     );
@@ -215,10 +218,10 @@ fn rule8_a_bounded_list_receiver_sinks_its_element_without_a_contract_declaratio
 fn rule8_a_list_receiver_rejects_a_wider_item() {
     assert_rejects(
         &with_sinking(
-            r#"fn write(mut list<string> xs) → void {
+            r"fn write(mut list<string> xs) → void {
     xs ⇜ 1
 }
-main {}"#,
+main {}",
         ),
         SemanticErrorKind::TypeMismatch,
         "sink_into_item_type_mismatch",

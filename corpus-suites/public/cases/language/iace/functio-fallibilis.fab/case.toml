@@ -3,6 +3,8 @@ id = "corpus/iace/functio-fallibilis.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/functio-fallibilis.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

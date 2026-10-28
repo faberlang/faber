@@ -2,7 +2,7 @@
 term = "implet"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "implendum_decl", "implendum_method_decl", "generic_params", "generic_param", "generic_bound", "contract_ref", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "si_stmt", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "Bounds a type parameter with a generic contract via implet."
 syntax = "functio <name><T implet <Contract><T>>(…) | genus <name> implet <Contract><<name>> <block>"

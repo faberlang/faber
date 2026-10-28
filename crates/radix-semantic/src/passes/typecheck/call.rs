@@ -746,6 +746,44 @@ impl TypeChecker<'_> {
         surface.to_owned()
     }
 
+    /// The float width a method call's expected type hands down to an unsized
+    /// float literal receiver (`(8.0).cbrt()` stored into an `f32` slot).
+    ///
+    /// A float literal has no width until it is stored, and a `SameAsReceiver`
+    /// float method returns its receiver's own type, so the store's width
+    /// applies to the literal exactly as it does to the operands of
+    /// `2.0 * 3.0`: one rule for every such method, resolved through the
+    /// registry. A method chain over a literal (`(8.0).cbrt().abs()`) passes
+    /// the width down to its own receiver the same way. A bare `f64` slot, a
+    /// policy cell, a decimal or a missing expectation leave the receiver to
+    /// default as before.
+    fn float_literal_receiver_expected(
+        &mut self,
+        receiver: &HirExpression,
+        expected: Option<TypeId>,
+    ) -> Option<TypeId> {
+        let expected = self.resolve_inferred_type(expected?);
+        let Type::SizedNumeric(Primitive::Fractus, width) = *self.types.get(expected) else {
+            return None;
+        };
+        if width.is_decimal() || !self.is_unsized_float_literal_chain(receiver) {
+            return None;
+        }
+        Some(self.numeric_expected_type(expected))
+    }
+
+    /// A float literal (possibly negated), or a `SameAsReceiver` float method
+    /// call whose receiver is one.
+    fn is_unsized_float_literal_chain(&mut self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::MethodCall(inner, name, _, args, _) => {
+                self.is_unsized_float_literal_chain(inner)
+                    && super::intrinsics::is_float_same_as_receiver_method(self, *name, args.len())
+            }
+            _ => super::ops::numeric_literal_family(expr) == Some(Primitive::Fractus),
+        }
+    }
+
     /// Checks method-call syntax after the receiver has been synthesized.
     ///
     /// Declared/interface methods are preferred. The array branch preserves a
@@ -780,7 +818,8 @@ impl TypeChecker<'_> {
         {
             claimed
         } else {
-            self.check_expr(receiver)
+            let receiver_expected = self.float_literal_receiver_expected(receiver, expected);
+            self.check_expr_with_expected(receiver, receiver_expected)
         };
         if let Some(def_id) = self
             .struct_def_from_type(receiver_ty)
@@ -2474,8 +2513,9 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// R1 asks for the same element type, not a widening one: the tensor
-    /// assignment relation is element-covariant, so an exact check follows it.
+    /// R1 asks for the same element type, not a widening one. Tensor element
+    /// types are invariant in assignment, and this check reads the two element
+    /// types directly so a copy never depends on that relation.
     fn require_exact_tensor_element(
         &mut self,
         value_ty: TypeId,

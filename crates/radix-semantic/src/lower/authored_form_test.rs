@@ -20,8 +20,6 @@ fn first_declared_form<'a>(
     fixture: &'a AnalyzedFixture,
     source_name: &str,
 ) -> (&'a HirTypeForm, Option<radix_types::TypeId>) {
-    let hir = fixture.result.hir.as_ref().expect("hir");
-
     fn scan_statements<'a>(
         fixture: &'a AnalyzedFixture,
         statements: &'a [HirStatement],
@@ -48,10 +46,12 @@ fn first_declared_form<'a>(
         None
     }
 
-    if let Some(entry) = &hir.entry {
-        if let Some(found) = scan_statements(fixture, &entry.statements, source_name) {
-            return found;
-        }
+    let hir = fixture.result.hir.as_ref().expect("hir");
+
+    if let Some(entry) = &hir.entry
+        && let Some(found) = scan_statements(fixture, &entry.statements, source_name)
+    {
+        return found;
     }
     for item in &hir.items {
         let HirItemKind::Function(function) = &item.kind else {

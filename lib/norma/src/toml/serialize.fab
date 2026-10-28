@@ -38,7 +38,7 @@ fn quote(string s) → string {
     mut string out ← «"»
     mut int i ← 0
     while i ≺ s.length() {
-        let string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1) ⊥ ""
         if c ≡ «"» {
             out ← out + «\\"»
         }
@@ -66,7 +66,7 @@ fn is_bare_key(string key) → bool {
     if key.length() ≡ 0 then return false
     mut int i ← 0
     while i ≺ key.length() {
-        let string c ← key.slice(i, i + 1)
+        let string c ← key.slice(i, i + 1) ⊥ ""
         if not "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-".contains(c) {
             return false
         }

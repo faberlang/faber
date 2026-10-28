@@ -2289,3 +2289,60 @@ fn record_resource(element_ty: MirType) -> MirKernelResource {
         reduced_projection: None,
     }
 }
+
+fn copy_statement(target: u32, source: u32, ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(target)),
+            value: MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Operand(MirOperand::Place(MirPlace::local(MirLocalId(source)))),
+                ty,
+                span: Span::default(),
+            },
+        },
+        span: Span::default(),
+    }
+}
+
+#[test]
+fn parameter_aliases_follow_single_assignment_copy_chains() {
+    let ty = MirType::semantic(TypeId(0));
+    let mut function = scalar_kernel_function(ty);
+    let local = |id: u32| MirLocalId(id);
+    function.locals = (1..=9)
+        .map(|id| MirLocal {
+            id: MirLocalId(id),
+            name: None,
+            ty,
+            mutable: true,
+            span: Span::default(),
+        })
+        .collect();
+    // l1 = l0; l2 = l1; l3 = l2 resolve to the parameter l0.
+    // l4 is assigned twice: the chain stops at l4.
+    // l5 = l4 therefore ends at l4 as well.
+    // l6 and l7 copy each other: resolution terminates.
+    function.blocks[0].statements.extend([
+        copy_statement(1, 0, ty),
+        copy_statement(2, 1, ty),
+        copy_statement(3, 2, ty),
+        copy_statement(4, 0, ty),
+        copy_statement(4, 1, ty),
+        copy_statement(5, 4, ty),
+        copy_statement(6, 7, ty),
+        copy_statement(7, 6, ty),
+    ]);
+    let aliases = ParameterAliases::new(&function);
+    assert_eq!(aliases.resolve(local(0)), local(0), "a parameter");
+    assert_eq!(aliases.resolve(local(3)), local(0), "three copies deep");
+    assert_eq!(aliases.resolve(local(4)), local(4), "two assignments");
+    assert_eq!(
+        aliases.resolve(local(5)),
+        local(4),
+        "stops at the ambiguity"
+    );
+    assert_eq!(aliases.resolve(local(9)), local(9), "never assigned");
+    let cycle = aliases.resolve(local(6));
+    assert!(cycle == local(6) || cycle == local(7), "cycle terminates");
+}

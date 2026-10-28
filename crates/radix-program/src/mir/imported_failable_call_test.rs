@@ -41,11 +41,11 @@ main {
 }
 "#;
 
-const PLAIN_UTIL: &str = r#"@ public
+const PLAIN_UTIL: &str = r"@ public
 fn make(int n) → int {
     return n + 1
 }
-"#;
+";
 
 const SIBLING_AND_LIBRARY_GENERIC_MAIN: &str = r#"import from "norma:fs" fs
 import from "./util" util

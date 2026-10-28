@@ -825,6 +825,9 @@ impl TypeChecker<'_> {
                 let ty = self.check_call(callee, type_args, args, expected);
                 self.current_shape_call = previous_shape_call;
                 *conversion = self.pending_conversion.take();
+                // A call may write any mutable source it can reach (need
+                // 5d3a8afd, closed rule): arguments were evaluated first.
+                self.kill_mutable_source_ranges();
                 ty
             }
             HirExpressionKind::Gradient { .. } => {
@@ -838,10 +841,14 @@ impl TypeChecker<'_> {
                 self.error_type
             }
             HirExpressionKind::CopyInto { target, value } => {
-                self.check_copy_into(target, value, expr.span)
+                let ty = self.check_copy_into(target, value, expr.span);
+                self.kill_mutable_source_ranges();
+                ty
             }
             HirExpressionKind::SinkInto { sink, item } => {
-                self.check_sink_into(sink, item, expr.span)
+                let ty = self.check_sink_into(sink, item, expr.span);
+                self.kill_mutable_source_ranges();
+                ty
             }
             HirExpressionKind::Format { value, spec } => {
                 super::format::check_format_expr(self, value, *spec, expr.span)
@@ -852,6 +859,12 @@ impl TypeChecker<'_> {
                 self.current_shape_call = previous_shape_call;
                 *conversion = self.pending_conversion.take();
                 self.record_inferred_sermo_view_type_arg(receiver, *name, type_args, ty);
+                // Mutating intrinsic, closure call or ordinary method: all
+                // kill (need, closed rule). The one exemption is the
+                // registry's zero-argument `longitudo`, which only reads.
+                if !self.is_pure_length_call(receiver, *name, args) {
+                    self.kill_mutable_source_ranges();
+                }
                 ty
             }
             HirExpressionKind::Field(object, name) => self.check_field(object, *name),
@@ -891,10 +904,17 @@ impl TypeChecker<'_> {
                 mode,
                 coordinates: coordinate_bindings,
                 binding,
+                binding_name,
                 iter,
                 body: block,
                 ..
-            } => self.check_itera_expr(mode, coordinate_bindings, binding, iter, block),
+            } => self.check_itera_expr(
+                mode,
+                coordinate_bindings,
+                (*binding, *binding_name),
+                iter,
+                block,
+            ),
             HirExpressionKind::IteraLockstep {
                 sources,
                 coordinates,
@@ -1400,7 +1420,7 @@ impl TypeChecker<'_> {
         &mut self,
         mode: &radix_hir::HirIteraMode,
         coordinate_bindings: &[(DefId, Symbol)],
-        binding: &DefId,
+        (binding, binding_name): (DefId, Symbol),
         iter: &mut Box<HirExpression>,
         block: &mut HirBlock,
     ) -> TypeId {
@@ -1515,8 +1535,23 @@ impl TypeChecker<'_> {
                 coordinate_bindings,
             );
         }
-        self.insert_binding(*binding, elem_ty);
+        self.insert_binding(binding, elem_ty);
+        // Interval facts for the binders, seeded before the loop-entry policy
+        // runs so a body that may write a mutable source drops them (need
+        // 5d3a8afd, slice 3).
+        match mode {
+            radix_hir::HirIteraMode::Ab => {
+                self.seed_range_loop_binder(binding, binding_name, iter);
+            }
+            radix_hir::HirIteraMode::Ex if has_coordinates => {
+                self.seed_coordinates(dispatch_ty, Some(iter), coordinate_bindings);
+            }
+            _ => {}
+        }
         self.check_loop_block_over(std::iter::once(&**iter), block);
+        self.release_range_binders(
+            std::iter::once(binding).chain(coordinate_bindings.iter().map(|(def_id, _)| *def_id)),
+        );
         self.pop_scope();
         self.vacuum_type()
     }

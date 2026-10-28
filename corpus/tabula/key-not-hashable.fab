@@ -2,7 +2,7 @@
 term = "tabula"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "call_expr", "call_suffix", "member_suffix", "expression"]
-category = "collection"
+category = "map"
 canonical = false
 summary = "Map keys and set elements must be hashable: floats and mutable collections are rejected."
 syntax = "tabula<K, V> / copia<T> with hashable K / T"

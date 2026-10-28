@@ -3,6 +3,8 @@ id = "corpus/tensor/generic-sdpa-call.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/generic-sdpa-call.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

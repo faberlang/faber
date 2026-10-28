@@ -3,6 +3,8 @@ id = "corpus/matrix/glyph-ops.fab"
 group = "language"
 input_root = "corpus"
 input = "matrix/glyph-ops.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

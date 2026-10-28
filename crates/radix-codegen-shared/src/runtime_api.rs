@@ -505,8 +505,10 @@ pub const FLOAT_F32_TO_BF16_BITS: RuntimeItem = RuntimeItem {
 /// `trap` rows (R0, `faber::trap`): the one place generated Rust fails. A
 /// failing index, key, conversion or assertion calls a `trap` function with a
 /// [`Trap`](`faber::Trap`) kind instead of writing `.expect(..)` / `panic!(..)`
-/// inline. The functions are unwinding panics with the failure text the inline
-/// form printed. `trap.Trap` is the closed kind enum, spelled at the crate root
+/// inline. The functions unwind with the failure text the inline form printed;
+/// `trap.exit_on_trap`, called first by the generated `main`, makes them print
+/// the shared trap line and exit with the trap's sysexits class instead
+/// (`faber::trap` module doc). `trap.Trap` is the closed kind enum, spelled at the crate root
 /// as `faber::Trap`. No row applies a width limit.
 const TRAP_RUST: &[Target] = &[Target::HirRust];
 
@@ -521,6 +523,9 @@ const fn trap_row(name: &'static str, kind: RuntimeKind) -> RuntimeItem {
 
 pub const TRAP_TRAP: RuntimeItem = trap_row("Trap", RuntimeKind::Type);
 pub const TRAP_FAIL: RuntimeItem = trap_row("fail", RuntimeKind::Fn);
+pub const TRAP_RAISE: RuntimeItem = trap_row("raise", RuntimeKind::Fn);
+pub const TRAP_ABORT: RuntimeItem = trap_row("abort", RuntimeKind::Fn);
+pub const TRAP_EXIT_ON_TRAP: RuntimeItem = trap_row("exit_on_trap", RuntimeKind::Fn);
 pub const TRAP_SOME: RuntimeItem = trap_row("some", RuntimeKind::Fn);
 pub const TRAP_OK: RuntimeItem = trap_row("ok", RuntimeKind::Fn);
 pub const TRAP_OK_STATIC: RuntimeItem = trap_row("ok_static", RuntimeKind::Fn);
@@ -847,6 +852,12 @@ pub const SERMO_INSTALL_ROUTES: RuntimeItem = sermo_row("install_routes", Runtim
 pub const SERMO_AS_MEUS: RuntimeItem = sermo_row("as_meus", RuntimeKind::Fn);
 pub const SERMO_AS_TUUS: RuntimeItem = sermo_row("as_tuus", RuntimeKind::Fn);
 pub const SERMO_READ_TEXT: RuntimeItem = sermo_row("read_text", RuntimeKind::Fn);
+/// `sermo.read_text_result`: the non-trapping text reader, `(string, error)`; a
+/// terminal `error` frame is a `*FrameFault` (Go).
+pub const SERMO_READ_TEXT_RESULT: RuntimeItem = sermo_row("read_text_result", RuntimeKind::Fn);
+/// `sermo.fault_record`: the `{kind, path}` crossing record of a failed read, the
+/// dynamic value a `valor ↦ E` conversion row takes (Go).
+pub const SERMO_FAULT_RECORD: RuntimeItem = sermo_row("fault_record", RuntimeKind::Fn);
 pub const SERMO_READ_NUMERUS: RuntimeItem = sermo_row("read_numerus", RuntimeKind::Fn);
 pub const SERMO_DRAIN: RuntimeItem = sermo_row("drain", RuntimeKind::Fn);
 /// `sermo.read_line`: one process-wide stdin line as `string ∪ none` (Go).
@@ -1276,6 +1287,9 @@ pub const TABLE: &[RuntimeItem] = &[
     FLOAT_F32_TO_BF16_BITS,
     TRAP_TRAP,
     TRAP_FAIL,
+    TRAP_ABORT,
+    TRAP_EXIT_ON_TRAP,
+    TRAP_RAISE,
     TRAP_SOME,
     TRAP_OK,
     TRAP_OK_STATIC,
@@ -1349,6 +1363,8 @@ pub const TABLE: &[RuntimeItem] = &[
     SERMO_AS_MEUS,
     SERMO_AS_TUUS,
     SERMO_READ_TEXT,
+    SERMO_READ_TEXT_RESULT,
+    SERMO_FAULT_RECORD,
     SERMO_READ_NUMERUS,
     SERMO_DRAIN,
     SERMO_READ_LINE,

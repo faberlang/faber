@@ -3,6 +3,8 @@ id = "corpus/tabula/map-index-type-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/map-index-type-reject.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

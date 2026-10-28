@@ -160,7 +160,10 @@ fn bad(tensor<f32, [8]> x, int j) → f32 {
 
     let pick = target_row(&fixture, "pick", Target::MirWgsl);
     assert!(pick.admitted, "{:?}", pick.failures);
-    assert!(pick.failures.is_empty());
+    assert_eq!(
+        pick.failures,
+        [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
+    );
 
     let bad = target_row(&fixture, "bad", Target::MirWgsl);
     assert!(
@@ -189,7 +192,10 @@ fn wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> {
     for target in [Target::MirMetal, Target::MirWgsl] {
         let report = target_row(&fixture, "wrapping_sum", target);
         assert!(report.admitted, "{target:?}: {:?}", report.failures);
-        assert!(report.trapping_stores.is_empty());
+        assert_eq!(
+            report.trapping_stores,
+            [] as [crate::passes::kernel_requirements::KernelTrappingStore; 0]
+        );
         assert!(report.widths.iter().any(|width| {
             width.policy == crate::passes::kernel_requirements::KernelNumericPolicy::Wrapping
                 && width.width == crate::NumericWidth::I32
@@ -826,7 +832,10 @@ main {}
     );
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     assert!(report.admitted, "{:?}", report.failures);
-    assert!(report.trapping_stores.is_empty());
+    assert_eq!(
+        report.trapping_stores,
+        [] as [crate::passes::kernel_requirements::KernelTrappingStore; 0]
+    );
 }
 
 #[test]
@@ -1142,7 +1151,10 @@ fn bad(i32 x) → i32 {
     );
     let sample = target_row(&fixture, "sample", Target::MirMetal);
     assert!(sample.admitted, "{:?}", sample.failures);
-    assert!(sample.failures.is_empty());
+    assert_eq!(
+        sample.failures,
+        [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
+    );
     let bad = target_row(&fixture, "bad", Target::MirMetal);
     assert!(bad.failures.iter().any(|failure| matches!(
         failure,
@@ -1546,6 +1558,35 @@ fn merge_seeded_target_report_intersects_failures_and_unions_requirements() {
     assert_eq!(merged.callees.first(), Some(&DefId(11)));
     assert!(merged.callees.contains(&DefId(21)));
 
+    let range_failure = |minimum, maximum| KernelRequirementFailure::IntermediateOutOfRange {
+        span,
+        range: KernelValueRange {
+            minimum: KernelRangeExpr::Constant(minimum),
+            maximum: KernelRangeExpr::Constant(maximum),
+        },
+    };
+    let range_report_a = KernelTargetRequirement {
+        admitted: false,
+        failures: vec![range_failure(8_000_000_000, 8_000_000_000)],
+        ..conservative.clone()
+    };
+    let range_report_b = KernelTargetRequirement {
+        admitted: false,
+        failures: vec![range_failure(27_000_000_000, 27_000_000_000)],
+        ..conservative.clone()
+    };
+    let merged_ranges =
+        merge_seeded_target_report(&conservative, &[range_report_a, range_report_b]);
+    assert!(
+        !merged_ranges.admitted,
+        "each specialization exceeds the envelope"
+    );
+    assert_eq!(
+        merged_ranges.failures.len(),
+        2,
+        "retain both concrete ranges"
+    );
+
     let clean = KernelTargetRequirement {
         admitted: true,
         failures: Vec::new(),
@@ -1553,13 +1594,50 @@ fn merge_seeded_target_report_intersects_failures_and_unions_requirements() {
     };
     let merged_clean = merge_seeded_target_report(&conservative, &[clean.clone(), clean]);
     assert!(merged_clean.admitted);
-    assert!(merged_clean.failures.is_empty());
+    assert_eq!(
+        merged_clean.failures,
+        [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
+    );
 
     assert_eq!(
         merge_seeded_target_report(&conservative, &[]),
         conservative,
         "no seeded report leaves the conservative row alone"
     );
+}
+
+#[test]
+fn out_of_range_specializations_with_different_ranges_keep_callee_closed() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+fn helper(tensor<f32, [24]> clock, i32 base) → f32 {
+    return clock[base * base * base]
+}
+
+@ kernel
+@ public
+fn caller_a(tensor<f32, [24]> clock) → f32 {
+    return helper(clock, 2000)
+}
+
+@ kernel
+@ public
+fn caller_b(tensor<f32, [24]> clock) → f32 {
+    return helper(clock, 3000)
+}
+",
+    );
+    let helper = target_row(&fixture, "helper", Target::MirWgsl);
+    assert!(
+        !helper.admitted,
+        "both specialized intermediate ranges exceed the envelope: {:?}",
+        helper.failures
+    );
+    assert!(helper.failures.iter().any(|failure| matches!(
+        failure,
+        KernelRequirementFailure::IntermediateOutOfRange { .. }
+    )));
 }
 
 #[test]

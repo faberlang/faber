@@ -3,6 +3,8 @@ id = "corpus/textus/index-unicode.fab"
 group = "language"
 input_root = "corpus"
 input = "textus/index-unicode.fab"
+category = "text"
+domain = "text"
 
 
 [expect]

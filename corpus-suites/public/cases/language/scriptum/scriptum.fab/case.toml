@@ -3,6 +3,8 @@ id = "corpus/scriptum/scriptum.fab"
 group = "language"
 input_root = "corpus"
 input = "scriptum/scriptum.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

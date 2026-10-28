@@ -21,7 +21,7 @@ import from "norma:fault" fault
 
 # The part of `path` below `base`, which is the stable name of the crossing.
 fn below(string path, string base) → string {
-    return path.slice(base.length() + 1, path.length())
+    return path.slice(base.length() + 1, path.length()) ⊥ ""
 }
 
 # Local typed channel over the fs read. Declaring the concrete `⇥ fault.IoFault`

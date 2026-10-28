@@ -614,28 +614,28 @@ functio swap(matrix<f32, [2, 3]> m) → matrix<f32, [3, 2]> {
 }
 
 #[test]
-fn lowers_vector_longitudo_to_sqrt_of_dot() {
+fn lowers_vector_norma_to_sqrt_of_dot() {
     // R-W3-lane (wave3 residual C-1): assert the full sum-of-squares structure.
     // The prior `contains(".lane0")` OR-fallback was near-vacuous for any vector dump.
     let dump = dump_source(
         r"
 functio length(vector<f32, 3> v) → f32 {
-    redde v.longitudo()
+    redde v.norm()
 }
 ",
     );
-    assert!(dump.contains("sqrt"), "longitudo must lower through sqrt\n{dump}");
+    assert!(dump.contains("sqrt"), "norm must lower through sqrt\n{dump}");
     assert!(
         dump.contains("_0.lane0 * _0.lane0"),
-        "longitudo must square lane0 for dot(v,v)\n{dump}"
+        "norm must square lane0 for dot(v,v)\n{dump}"
     );
     assert!(
         dump.contains("_0.lane1 * _0.lane1"),
-        "longitudo must square lane1 for vector<f32,3>\n{dump}"
+        "norm must square lane1 for vector<f32,3>\n{dump}"
     );
     assert!(
         dump.contains("_0.lane2 * _0.lane2"),
-        "longitudo must square lane2 for vector<f32,3>\n{dump}"
+        "norm must square lane2 for vector<f32,3>\n{dump}"
     );
 }
 
@@ -5616,7 +5616,7 @@ functio describe(Resultatus<numerus> r) → textus {
         .expect("generic enum payload MIR validates");
 }
 
-/// A generic `rope_norm<d>(pos)` template lowers its compile-time dimension to
+/// A generic `rope_norm<magnitudo d>(pos)` template lowers its compile-time dimension to
 /// the existing symbolic shape-size MIR constant, so the non-AIR MIR
 /// monomorphizer can bind it later. The path must never resolve to a runtime
 /// local.
@@ -5624,7 +5624,7 @@ functio describe(Resultatus<numerus> r) → textus {
 fn generic_rope_dim_lowers_to_symbolic_shape_size_operand() {
     let source = r"
 functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, varia tensor<T, [D, d]> output) → vacuum {
-    output ⇇ input.rope_norm<d>(0, rota)
+    output ⇇ input.rope_norm<magnitudo d>(0, rota)
 }
 ";
     let unit = analyze(source);
@@ -6148,7 +6148,7 @@ functio take<magnitudo M, magnitudo K, magnitudo N>(tensor<f32, [M, N]> x) → t
 
 incipit {
     sit tensor<f32, [2, 2]> a ← vacua
-    sit tensor<f32, [2, 2]> b ← take<2, 2, 2>(a)
+    sit tensor<f32, [2, 2]> b ← take<magnitudo 2, magnitudo 2, magnitudo 2>(a)
     nota b.longitudo()
 }
 ";
@@ -7725,7 +7725,7 @@ fn copia_filtrata_and_mappata_walk_on_the_runner() {
     let lines = run_lines(
         "sit copia<numerus> s ← [1, 2, 3]\n\
          sit copia<numerus> f ← s.filtrata(numerus x ∴ x ≻ 1)\n\
-         sit copia<numerus> m ← s.mappata(numerus x ∴ x % 2)\n\
+         sit copia<numerus> m ← s.mappata(numerus x → numerus ∴ x % 2)\n\
          nota ordinata via ascendens ex f\n\
          nota ordinata via ascendens ex m",
     )

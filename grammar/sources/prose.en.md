@@ -227,7 +227,7 @@ The body joint keeps the existing closure law: `∴` followed by one expression,
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `iace` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `fac { ... } cape err { ... }` may catch `iace` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `fac`/`cape` wrapper, mirroring how bare `↦` conversio and `iace` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
 - In a signature, `⇥` only ever names an error type (`→ T ⇥ E`). It never carries a value. The error type named after `⇥` is the payload; the value that actually travels is the compiler-owned carrier `erratum<T>` (en `error<T>`), a builtin generic genus with one field `payload: T`, in the same wrapper family as `promissum<T>` and `cursor<T>`. `⇥ T` means the channel carries `erratum<T>`, and `⇥ erratum<T>` is written only for a nested carrier (mechanical expansion, no special diagnostic). `cape` (en `catch`) binds the payload `T`, never the carrier, and a form that binds the carrier is not built. The catch-all channel is `ignotum` (en `unknown`), which accepts every error with no `@ conversio` row and needs the ordinary narrowing to read back, while `quilibet` (en `any`) is the reduction keyword and stays a non-canonical alias of the same primitive, never the catch-all spelling. An `@ conversio` row is written on the payload types and is one direct (source, destination) pair.
 - Parameter access markers live in the type position: `de`/`ref` (read), `in`/`mut` (mutate), `own` (consume), and `copy` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `ex`/`from` remains the import/iteration/extraction token identity.
-- Call-site access markers: an argument passed to a parameter declared `mut` / `own` / `copy` carries the same marker at the call (en `mut` `own` `copy`; la `in` `own` `copy`), as in `bump(mut a)`, `eat(own a)`, `dup(copy a)`; the read marker `ref` (la `de`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. The one exception is the `axis` marker: the built-in reductions and row operations (`t.sum(axis n)`, `t.mean(axis n)`, `rms_norm(axis n, ...)`, `laminatio(axis n, ...)`, `softmax(axis n)`, last axis only) require it, and a bare integer in that position is `SEM057 axis_marker_required`, an `axis` before any other argument is `axis_marker_unexpected`. `axis` is a second kind of marker beside those four: they say how a value is passed, this one says what a number means, and the kind is kept to this one word. A parameter declares it before its type (`axis int a`), the call echoes it (`t.mean(axis 1)`), and inside the callee the parameter is an ordinary `int`; `axis n` names the axis that is reduced over. The explicit form `reduce via sum from t at [i, j] per i` names the axis that is kept. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `own` and `copy` with the matching marker. Call-site `copy` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value (a `mut` tensor parameter may also be rebound whole by `←` on the host; inside a kernel use `⇇`), and an `own` or `copy` parameter is always writable by the callee (method call, field store, reassignment, element store; an `own` tensor parameter may be rebound whole). Only a whole local binding may be passed as `own`: a field or element, an unmarked parameter, a module constant, or an `itera` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`copy b.xs` is fine and does not kill `b`). After `eat(own a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`own`/`copy`) source keeps `use_after_move` at the later read; a fresh value (`eat(own make())`) is always fine.
+- Call-site access markers: an argument passed to a parameter declared `mut` / `own` / `copy` carries the same marker at the call (en `mut` `own` `copy`; la `in` `own` `copy`), as in `bump(mut a)`, `eat(own a)`, `dup(copy a)`; the read marker `ref` (la `de`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. The one exception is the `axis` marker: the built-in reductions and row operations (`t.sum(axis n)`, `t.mean(axis n)`, `rms_norm(axis n, ...)`, `laminatio(axis n, ...)`, `softmax(axis n)`, last axis only) require it, and a bare integer in that position is `SEM057 axis_marker_required`, an `axis` before any other argument is `axis_marker_unexpected`. `axis` is a second kind of marker beside those four: they say how a value is passed, this one says what a number means, and the kind is kept to two words: `axis` for a call's arguments and `size` (la `magnitudo`) for the explicit arguments of a call's generic list (`mk<int, size 4>(xs)`), which says an argument is a size and not a type. `size` follows the same echo rule as `axis`: a callee that declares a `size` parameter is called with the `size` marker, a bare natural, shape or size name in that list is `SEM057 size_marker_required`, and `size` on a callee that declares no `size` parameter is `size_marker_unexpected`. A parameter declares it before its type (`axis int a`), the call echoes it (`t.mean(axis 1)`), and inside the callee the parameter is an ordinary `int`; `axis n` names the axis that is reduced over. The explicit form `reduce via sum from t at [i, j] per i` names the axis that is kept. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `own` and `copy` with the matching marker. Call-site `copy` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value (a `mut` tensor parameter may also be rebound whole by `←` on the host; inside a kernel use `⇇`), and an `own` or `copy` parameter is always writable by the callee (method call, field store, reassignment, element store; an `own` tensor parameter may be rebound whole). Only a whole local binding may be passed as `own`: a field or element, an unmarked parameter, a module constant, or an `itera` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`copy b.xs` is fine and does not kill `b`). After `eat(own a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`own`/`copy`) source keeps `use_after_move` at the later read; a fresh value (`eat(own make())`) is always fine.
 - Post-name marker: `sponte` (voluntary/optional provision)
 - `ceteri` marks rest parameter
 - Ordinary `functio` declarations and genus methods require bodies. Signature-only methods belong in `implendum`. The one exception is a top-level `functio` or a genus method marked `@ nondum`, which may omit its block (see `nondum_functio_decl`, `nondum_method_decl`).
@@ -524,6 +524,8 @@ importa ex "norma:consolum" fixum dic ut output
 
 A record import needs its `ex = "…"` source (`missing_import_source`), and `omnia` cannot be combined with `nomen` or `ut` (`mixed_wildcard_and_named_import`).
 
+The five record field names are reader-pack keywords like the rest of the surface: the `en` reader spells `ex`, `visibilitas`, `nomen`, `ut` and `omnia` as `from`, `visibility`, `name`, `as` and `all` (`import { from = "norma:text", name = text, as = t }`), and every other pack spells them with its own words. A field word from another locale is `PARSE050 wrong_locale_import_field`, not `unknown_import_field`.
+
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `publica` is the re-export marker. Missing named binding
 defaults to the
@@ -543,7 +545,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
-- A call-site argument list (`callTypeArgs`) admits the same size forms: a natural (`take<2, 2>(a)`), a bracketed shape, a spelled lift (`size n`) or a dimension term (`n + 1`, `d / 2`). A bare name or `_` is a type there; the callee decides whether it binds a type or a `magnitudo` parameter.
+- A call-site argument list (`callTypeArgs`) carries each explicit size argument behind the `size` marker (la `magnitudo`), the way the call echoes `axis` and `mut`/`own`/`copy`: `take<size 2, size 2>(a)`, `construct<int, size [4]>(xs)`, `f<size n>(x)`. The grammar still parses the bare forms (a natural, a bracketed shape, a dimension term such as `n + 1`) so the checker can name the missing marker: a bare natural, shape, dimension term or caller `size` name in a call list is `SEM057 size_marker_required`, and a `size` argument on a callee that declares no `size` parameter is `SEM057 size_marker_unexpected` (one past the declared `size` parameters is an arity miss, `wrong_number_of_type_arguments`). The list binds by marker: a `size` argument binds the next `size` parameter of the callee and an unmarked argument the next type parameter, the two cursors advancing independently, so `mk<int, size 4>(xs)` binds `fn mk<T, size N>` and a list of only `size` arguments (`construct<size [4]>(xs)`) leaves every type to inference. The operand decides the binding time: `size 4` and `size [2, 3]` are compile-time witnesses and a shape travels as one argument (`tensor.construct<int, size [4]>(xs)`, checked against its store as a scalar size is: `tensor<int, [5]>` is `SEM010 incompatible_tensor_index`); `size n` of an in-scope integer stays the run-time extent described above, checked at its store; `size D` of a caller `size` parameter forwards it. A shape inside a call list holds natural literals only: a `_` hole, a name, a run-time lift or a nested term in it is `size_shape_dimension_unsupported`, and `size [..]` outside a call's list is `size_shape_outside_call_args`. An unmarked name or `_` stays a type there; the callee decides which type parameter it binds.
 - Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
 - **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `via` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
@@ -729,11 +731,20 @@ results by storing into a `wrapping<W>` slot before dividing, shifting right or
 comparing. Within one policy
 family a store into a narrower width applies the slot's policy
 (`wrapping<u32>` into `wrapping<u8>` reduces); crossing policy families needs
-`↦`. A constant stored with `←` follows the slot's policy
+`↦` (superseded 2026-10-27 by ruling 51, ruled and not yet built: a value read
+from any cell is a number and the destination's policy applies to the exact
+value whatever the source's policy; `docs/design/numeric-model.md` section 8,
+*Store policy belongs to the destination*; until it is built the compiler still
+refuses a store from another policy). A constant stored with `←` follows the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
 (a `fixum T X = e` constant at module level, in a block or as a `genus` member, field
-default, enum member) must fit `W` whatever the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
+default, enum member) must fit `W` whatever the policy; a construction field
+written with `=` is the same fact (ruling 51, not yet built for named constants
+and construction fields). Under ruling 51 a compile-time-known value (a literal,
+a named constant or an expression made only of those) is checked
+at the store at compile time: a misfit into a trapping cell is a compile error and
+a `modulus<W>` or `saturatus<W>` cell applies its policy.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never
 applies a size policy.
@@ -756,6 +767,50 @@ propagates, and nothing clamps to the largest finite value. Only `trapping<F>`
 errors, and only when a non-finite value is stored or converted into it.
 `modulus<F>` (en `wrapping<F>`) is still rejected: a modular word takes an
 integer width. The trapping float cell is not available on device targets.
+
+**Ranged store policies.** A store policy takes a range as a
+second argument after the width: `saturatus<u32, 0‥8>` (en
+`saturating<u32, 0‥8>`) stores into `u32` and clamps into `[0, 8)`;
+`exactus<i32, -2‥3>` (en `trapping<i32, -2‥3>`) traps outside `[-2, 3)`;
+`modulus<u32, 0‥8>` (en `wrapping<u32, 0‥8>`) reduces modulo the range's
+length, offset by its low end, so `10` stored in `wrapping<u32, 0‥8>` is `2`.
+The range is its own type-argument slot (`range_argument`), told apart from a
+type or a `size` argument by the range glyph after its first bound.
+
+- **The width stays explicit.** The representation, the ABI and the kernel index
+  envelope are the width's; the range refines inside it and must fit it. Both
+  ends are always written (`0…` alone is `PARSE040 range_bound_required`).
+  `‥` is half-open (`0‥8` holds `0` through `7`) and `…` is inclusive (`0…7`).
+  `∞` and `-∞` mean no bound on that side (`saturating<i32, -∞‥8>`); `∞` stays
+  illegal as an integer value. Unsigned widths need a low end of at least 0;
+  signed widths take negative ends (`-2‥3`). A range the width cannot hold, an
+  empty range, a named or `size` end (not built: `ranged_policy_bound_not_constant`)
+  and a float, decimal or `inf` width are named `SEM008` refusals.
+- **The policy word is mandatory.** `u8<0‥8>` is
+  `SEM008 ranged_policy_word_required`; the edge behaviour is always visible.
+- **Each existing form is sugar for one explicit form.** `saturating<u8>` is
+  `saturating<u8, 0…255>`, a bare `u8` is `trapping<u8, 0…255>` and `inf` is
+  `trapping<inf, -∞…∞>`. A range that is the whole width is the plain form:
+  the two spellings are one type, and no existing program changes.
+- **Arithmetic stays unbounded; the store applies the range.** A value read from
+  a ranged cell computes as its width, so `cx + 1` is exact and
+  `saturating<u32, 0‥8>` mixes with any other `saturating<u32, ..>` value in
+  arithmetic. Only a store into a ranged cell (declaration, assignment, argument,
+  return, field, element, `↑` `↓`) applies the policy once; storing a value of
+  another range is a store. A constant stored with `←` follows the policy, and a
+  trapping cell's certain trap is a compile error. The policy families do not
+  mix implicitly: a plain integer reaches a `saturating` or `wrapping` ranged
+  cell through `↦`, which reduces or clamps and cannot fail, exactly as for the
+  unranged words; `↦` into a `trapping` ranged cell is a checked narrowing and is
+  failable. (Superseded 2026-10-27 by ruling 51, ruled and not yet built: a value
+  of any policy stores into a ranged cell and the destination range applies, so
+  `↦` is not needed there, though it stays legal.)
+- **Where it is built.** The MIR runner and the Rust target apply a range;
+  the Faber source emitter keeps the authored form (`faber format` prints a
+  range half-open); every other target and every kernel refuse the type by name
+  (`SEM010 ranged_policy_target_unsupported`, `SEM008 nucleum_ranged_policy_not_built`).
+  Float ranges, index containment, kernel facts and list length ranges are the
+  later parts of the series.
 **Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with
@@ -851,7 +906,9 @@ any integer type.
 different number families with no `↦` and compare the true mathematical values
 (`i64 ≺ f64` is exact even above 2⁵³; NaN compares false). `≈`/`≉` compute in
 the float operand's width. `≡`/`≢` stay structural and exact-type, so
-`1 ≡ 1.0` is rejected. A comparison stores nothing, so the family-crossing rule
+`1 ≡ 1.0` is rejected. (Ruling 51, 2026-10-27, ruled and not yet built: between
+integers of any width and policy `≡`/`≢` compare by exact value, as `≺` does;
+across number families they are unchanged.) A comparison stores nothing, so the family-crossing rule
 does not reach it.
 
 **Conversion.** `↦` is the checked, recoverable form (D1.11: `∷` states only
@@ -921,14 +978,17 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   may (the MIR runner has a configurable bit-length ceiling).
 - **Comparison and keys.** `≺ ≻ ≤ ≥ ≅ ≇` compare exact mathematical values
   against any integer width, `d64` or float (±∞ order beyond every integer);
-  `≡ ≢` stay exact-type (`inf ≡ i64` is rejected). An `inf` value is hashable
+  `≡ ≢` stay exact-type (`inf ≡ i64` is rejected; superseded for integers by
+  ruling 51, ruled and not yet built: they compare by exact value). An `inf` value is hashable
   and totally ordered, so it is a valid `tabula` key and `copia` element.
 - **Stores.** A store into an `inf` slot is total and emits no check. A store
   from an `inf` value into a bounded trapping slot is an implicit checked
   narrowing: it traps (`implicit_store_out_of_range`, never `⇥`), unless a
   constant is proven to fit. `inf` is in the trapping family, so a store into a
   `wrapping<W>` or `saturating<W>` slot needs `↦`, which reduces or clamps the
-  exact value and cannot fail. `saturating<u64> hi; hi ↑` at the bound still
+  exact value and cannot fail (superseded 2026-10-27 by ruling 51, ruled and not
+  yet built: an `inf` value is a number and a `wrapping<W>` or `saturating<W>`
+  slot reduces or clamps it with no `↦`; `↦` stays legal). `saturating<u64> hi; hi ↑` at the bound still
   traps; the clamp is written `((hi ↦ inf) + 1) ↦ saturating<u64>`.
 - **Conversion `↦`.** Any bounded integer, including a word, converts to `inf`
   and never fails. `inf ↦` a trapping width is a magnitude-checked narrowing and

@@ -444,7 +444,13 @@ fn explicit_size_index(ty: TypeId, types: &TypeTable, interner: &Interner) -> Op
     let Type::Param(symbol) = types.get(ty) else {
         return None;
     };
-    let value = radix_types::parse_natural_capacity(interner.resolve(*symbol))?;
+    // Old-artifact fallback: only a natural size has a literal witness here;
+    // a shape or a name stays fail-closed.
+    let radix_types::ExplicitSize::Natural(value) =
+        radix_types::parse_explicit_size(interner.resolve(*symbol))?
+    else {
+        return None;
+    };
     find_or_intern_literal(value, types)
 }
 
@@ -522,6 +528,7 @@ fn contains_unresolved_type(
         | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
+        | Type::RangedInt { .. }
         | Type::PolicyFloat(_, _)
         | Type::TensorEdgePolicy(_)
         | Type::SizedInstans(_)
@@ -720,6 +727,27 @@ fn substitute_type(
             {
                 let numeric = interner.intern(&value.to_string());
                 return types.intern(Type::Param(numeric));
+            }
+            // A marked size argument that forwards a size param of the
+            // template (`size D`) becomes the marked natural the instance
+            // binds that param to.
+            let forwarded = match radix_types::parse_explicit_size(interner.resolve(symbol)) {
+                Some(radix_types::ExplicitSize::Name(operand)) => {
+                    index_map.iter().find_map(|(name, index)| {
+                        if interner.resolve(*name) != operand {
+                            return None;
+                        }
+                        match types.get_index(*index) {
+                            IndexExpr::Literal(value) => Some(*value),
+                            _ => None,
+                        }
+                    })
+                }
+                _ => None,
+            };
+            if let Some(value) = forwarded {
+                let marked = interner.intern(&radix_types::spell_explicit_size(&value.to_string()));
+                return types.intern(Type::Param(marked));
             }
             Type::Param(symbol)
         }

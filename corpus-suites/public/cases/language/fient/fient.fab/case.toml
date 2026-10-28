@@ -3,6 +3,8 @@ id = "corpus/fient/fient.fab"
 group = "language"
 input_root = "corpus"
 input = "fient/fient.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

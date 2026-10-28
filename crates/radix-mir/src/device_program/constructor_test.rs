@@ -69,6 +69,25 @@ fn index_store_statement(out: u32, index: u32, value: u32, ty: MirType) -> MirSt
     }
 }
 
+/// `destination ← source` — a plain copy of a local into another local or an
+/// output parameter (`y ⇇ d`).
+fn copy_statement(destination: u32, source: u32, ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(destination)),
+            value: crate::MirValue {
+                id: crate::MirValueId(destination),
+                kind: crate::MirValueKind::Operand(MirOperand::Place(MirPlace::local(MirLocalId(
+                    source,
+                )))),
+                ty,
+                span: span(),
+            },
+        },
+        span: span(),
+    }
+}
+
 fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
     let f32_id = f32(types).semantic_id();
     let dim_ids = dims
@@ -804,6 +823,170 @@ fn constructor_decomposes_a_runtime_shaped_elementwise_tail() {
     program
         .validate_with_semantics(&semantics)
         .expect("the decomposed program passes the shared semantic gate");
+}
+
+/// An indexed-view kernel `(x, w, v, b, mut y, id) → vacuum` with two matmuls
+/// and a fused bias tail (`c = x·w; e = c·v; d = e + b; y ⇇ d`): the body
+/// decomposes into one kernel per matmul, and the store to `y` must land in
+/// the final subchain's output instead of a dead local.
+#[test]
+fn constructor_binds_the_final_subchain_to_the_explicit_output_parameter() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let x = rank2_tensor_ty(&mut types, [4, 3]);
+    let w = rank2_tensor_ty(&mut types, [3, 2]);
+    let v = rank2_tensor_ty(&mut types, [2, 2]);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    let id = u32_ty(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let mut function = device_function(
+        1,
+        &mut interner,
+        "linear_two",
+        &[
+            (0, "x", x),
+            (1, "w", w),
+            (2, "v", v),
+            (3, "b", r2),
+            (4, "y", r2),
+            (5, "id", id),
+            (6, "c", r2),
+            (7, "e", r2),
+            (8, "d", r2),
+        ],
+        &[0, 1, 2, 3, 4, 5],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 6, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[6, 2], 7, r2),
+            collection_statement(MirCollectionOp::TensorAdd, &[7, 3], 8, r2),
+            copy_statement(4, 8, r2),
+        ],
+        None,
+        Vec::new(),
+        vacuum,
+        true,
+    );
+    function.params[4].mode = MirParamMode::MutRef;
+    let validated = validated(&types, vec![function]);
+
+    let (program, semantics, _) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("the two-matmul output-parameter body decomposes instead of failing closed");
+
+    assert_eq!(program.kernels.len(), 2, "one kernel per matmul");
+    let names = |kernel: usize, access: MirKernelResourceAccess| -> Vec<(u32, String)> {
+        program.kernels[kernel]
+            .resources
+            .iter()
+            .filter(|resource| resource.access == access)
+            .map(|resource| (resource.binding.binding, resource.buffer.name.clone()))
+            .collect()
+    };
+    assert_eq!(
+        names(0, MirKernelResourceAccess::Write),
+        vec![(2, "c".to_owned())],
+        "the first matmul's product is the carried data-flow buffer"
+    );
+    assert_eq!(
+        names(1, MirKernelResourceAccess::Read),
+        vec![
+            (0, "c".to_owned()),
+            (1, "v".to_owned()),
+            (2, "b".to_owned())
+        ],
+        "the final kernel reads the carried product, the right operand and the fused bias"
+    );
+    assert_eq!(
+        names(1, MirKernelResourceAccess::Write),
+        vec![(3, "y".to_owned())],
+        "the final kernel's output is the declared output parameter, not the recipe result"
+    );
+    // `y` is the caller's buffer, the `c` buffer is shared by both kernels.
+    let written = |kernel: usize| {
+        program.kernels[kernel]
+            .resources
+            .iter()
+            .find(|resource| resource.access == MirKernelResourceAccess::Write)
+            .map(|resource| resource.buffer.id)
+            .expect("each kernel writes one buffer")
+    };
+    let carried = program.kernels[1]
+        .resources
+        .iter()
+        .find(|resource| resource.binding.binding == 0)
+        .map(|resource| resource.buffer.id)
+        .expect("the final kernel reads the carried product");
+    assert_eq!(written(0), carried, "kernel 1 reads what kernel 0 wrote");
+    assert_ne!(
+        written(1),
+        carried,
+        "the output parameter is its own buffer"
+    );
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the decomposed program passes the shared semantic gate");
+}
+
+/// A store to the output parameter that no kernel can carry (the first
+/// matmul's subchain holds it, the second returns `e`) fails closed at the
+/// constructor with a named refusal instead of dropping the store.
+#[test]
+fn constructor_refuses_an_output_parameter_stored_before_the_final_subchain() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let x = rank2_tensor_ty(&mut types, [4, 3]);
+    let w = rank2_tensor_ty(&mut types, [3, 2]);
+    let v = rank2_tensor_ty(&mut types, [2, 2]);
+    let r2 = rank2_tensor_ty(&mut types, [4, 2]);
+    let id = u32_ty(&mut types);
+    let mut function = device_function(
+        1,
+        &mut interner,
+        "linear_two",
+        &[
+            (0, "x", x),
+            (1, "w", w),
+            (2, "v", v),
+            (4, "y", r2),
+            (5, "id", id),
+            (6, "c", r2),
+            (7, "e", r2),
+        ],
+        &[0, 1, 2, 4, 5],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 6, r2),
+            copy_statement(4, 6, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[6, 2], 7, r2),
+        ],
+        Some(MirOperand::Place(MirPlace::local(MirLocalId(7)))),
+        Vec::new(),
+        r2,
+        true,
+    );
+    function.params[3].mode = MirParamMode::MutRef;
+    let validated = validated(&types, vec![function]);
+
+    let error = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect_err("the early store to the output parameter has no kernel to carry it");
+    assert!(
+        error.to_string().contains("only the final subchain"),
+        "named refusal: {error}"
+    );
 }
 
 // ── DPSC-U4a gap 3: dependency-ordered launches (oracle: faber

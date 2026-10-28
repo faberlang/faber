@@ -295,7 +295,7 @@ fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
 #[test]
 fn generic_companion_explicit_shape_args_bind_both_dimensions() {
     let source = generic_companion_probe_source(
-        "sit _ grads ← loss_backward<2, 2>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<magnitudo 2, magnitudo 2>(x, w, nil(), upstream)",
         "",
     );
     let result = analyze_result(&source);
@@ -414,7 +414,7 @@ incipit {
     sit f32 consumed ← consume(gx, gw)
     nota consumed
 }"#;
-    let result = analyze_result(&source);
+    let result = analyze_result(source);
     let errors = &result.diagnostics;
     assert!(
         result.is_ok(),
@@ -439,13 +439,13 @@ incipit {
 }
 
 /// Row (f): explicit type args at the wrong arity still reject with
-/// wrong_number_of_type_arguments — now counted against the real propagated
+/// `wrong_number_of_type_arguments` — now counted against the real propagated
 /// companion type-param list (2), per CTP-1.
 #[test]
 fn generic_companion_wrong_arity_type_args_still_rejected() {
     for call in [
-        "sit _ grads ← loss_backward<2>(x, w, nil(), upstream)",
-        "sit _ grads ← loss_backward<2, 2, 4>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<magnitudo 2>(x, w, nil(), upstream)",
+        "sit _ grads ← loss_backward<magnitudo 2, magnitudo 2, magnitudo 4>(x, w, nil(), upstream)",
     ] {
         let source = generic_companion_probe_source(call, "");
         let errors = analyze_errors(&source);

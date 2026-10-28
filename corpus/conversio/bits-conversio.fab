@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "Exact-width IEEE bit patterns between int and float through the raw-bits markers b16, b32 and b64, including the u16↔f16 row and the extended composition law."
 syntax = "u16|u32|u64 ↦ b16|b32|b64 ↦ f16|f32|f64 and f16|f32|f64 ↦ b16|b32|b64 ↦ u16|u32|u64"
-related = ["↦", "int", "float", "octeti"]
+related = ["↦", "int", "float", "list<b8>"]
 locale = "en"
 +++
 

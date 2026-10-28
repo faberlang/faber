@@ -3,6 +3,8 @@ id = "corpus/keyword-as-ident/rust-reserved-names.fab"
 group = "language"
 input_root = "corpus"
 input = "keyword-as-ident/rust-reserved-names.fab"
+category = "identifier"
+domain = "program"
 
 
 [expect]

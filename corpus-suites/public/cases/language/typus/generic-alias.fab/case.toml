@@ -3,6 +3,8 @@ id = "corpus/typus/generic-alias.fab"
 group = "language"
 input_root = "corpus"
 input = "typus/generic-alias.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

@@ -38,7 +38,7 @@ fn literal_width_methods_leave_no_deferred_op_in_the_program() {
         for (result, call) in [
             ("vf32", "a.addita(b)"),
             ("f32", "a.productum(b)"),
-            ("f32", "a.longitudo()"),
+            ("f32", "a.norm()"),
             ("vf32", "a.normalizata()"),
             ("vf32", "a.crea()"),
         ] {
@@ -96,8 +96,21 @@ fn projected_receiver_is_copied_to_a_temp_before_deferral() {
     let lines = run(r"incipit {
     sit vf32[3] v ← [3.0, 4.0, 0.0] ↦ vf32[3]
     sit lista<vf32[3]> xs ← [v]
-    nota xs[0].longitudo()
+    nota xs[0].norm()
 }
 ");
     assert_eq!(lines, ["5.0"]);
+}
+
+/// Q-X1: `longitudo` is the lane count (the element count); the Euclidean
+/// norm is `norm`.
+#[test]
+fn vector_longitudo_is_the_lane_count_and_norma_is_the_norm() {
+    let lines = run(r"incipit {
+    sit vf32[3] v ← [3.0, 4.0, 0.0] ↦ vf32[3]
+    nota v.longitudo()
+    nota v.norm()
+}
+");
+    assert_eq!(lines, ["3", "5.0"]);
 }

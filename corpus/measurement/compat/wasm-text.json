@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 377,
-    "analyzable": 512
+    "capable": 386,
+    "analyzable": 533
   },
   "terms": [
     {
@@ -415,7 +415,7 @@
       "term": "implendum",
       "rule": "keyword",
       "capable": 1,
-      "analyzable": 3
+      "analyzable": 5
     },
     {
       "term": "implet",
@@ -426,8 +426,8 @@
     {
       "term": "importa",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 11
+      "capable": 9,
+      "analyzable": 14
     },
     {
       "term": "in",
@@ -482,6 +482,12 @@
       "rule": "keyword",
       "capable": 2,
       "analyzable": 2
+    },
+    {
+      "term": "list<b8>",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 3
     },
     {
       "term": "lista",
@@ -590,12 +596,6 @@
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
-    },
-    {
-      "term": "octeti",
-      "rule": "keyword",
-      "capable": 1,
-      "analyzable": 3
     },
     {
       "term": "omitte",
@@ -772,6 +772,12 @@
       "analyzable": 4
     },
     {
+      "term": "saturating<W, lo‥hi>",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
       "term": "scribe",
       "rule": "keyword",
       "capable": 1,
@@ -780,8 +786,8 @@
     {
       "term": "scriptum",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "secus",
@@ -889,19 +895,25 @@
       "term": "tensor",
       "rule": "type",
       "capable": 14,
-      "analyzable": 25
+      "analyzable": 27
     },
     {
       "term": "textus",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 8
+      "capable": 8,
+      "analyzable": 10
     },
     {
       "term": "trapped",
       "rule": "type",
       "capable": 0,
       "analyzable": 1
+    },
+    {
+      "term": "trapping<W, lo‥hi>",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 2
     },
     {
       "term": "typus",
@@ -982,6 +994,18 @@
       "analyzable": 1
     },
     {
+      "term": "whole-width range",
+      "rule": "operator-group",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "wrapping<W, lo‥hi>",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
       "term": "§",
       "rule": "operator-group",
       "capable": 1,
@@ -1008,8 +1032,8 @@
     {
       "term": "‥",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 3
     },
     {
       "term": "…",
@@ -1050,8 +1074,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 13,
-      "analyzable": 41
+      "capable": 14,
+      "analyzable": 43
     },
     {
       "term": "⇇",
@@ -1104,8 +1128,8 @@
     {
       "term": "∪",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "∴",

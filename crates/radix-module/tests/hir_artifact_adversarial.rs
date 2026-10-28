@@ -112,6 +112,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
             imported_nominal_types: Vec::new(),
             ambiguous_imported_nominal_types: Vec::new(),
             conversion_rows: Vec::new(),
+            module_bindings: Vec::new(),
         },
         libraries: LibraryRegistry::default(),
         function_facts: FunctionFactTableWire { entries: Vec::new(), entry: None },
@@ -121,6 +122,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
         capability_provenance: FunctionProvenanceTableWire::default(),
         provider_units: std::collections::BTreeMap::new(),
         shape_obligations: radix_hir_fhir::ShapeObligationTableWire::default(),
+        contract_roles: radix_hir_fhir::ContractRolesWire::default(),
         kernel_requirements: Default::default(),
         tensor_edge_policies: Default::default(),
         display_tokens: radix_hir_fhir::DisplayTokensWire {

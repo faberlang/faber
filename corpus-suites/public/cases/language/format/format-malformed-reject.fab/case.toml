@@ -3,6 +3,8 @@ id = "corpus/format/format-malformed-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "format/format-malformed-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

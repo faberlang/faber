@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/operatores/ranged-sugar.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/ranged-sugar.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

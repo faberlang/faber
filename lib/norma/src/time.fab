@@ -41,7 +41,7 @@ fn pad4(int n) → string {
 fn field(instant t, int start, int end) → int {
     let string wire ↤ t
     # An instant's canonical wire has digits at every civil position, so the default never applies.
-    return wire.slice(start, end) ↦ int ⊥ 0
+    return (wire.slice(start, end) ⊥ "") ↦ int ⊥ 0
 }
 
 # Why: Build canonical UTC RFC3339 wire from civil components (always ends with Z).

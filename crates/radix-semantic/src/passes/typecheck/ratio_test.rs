@@ -1,4 +1,4 @@
-//! RR-2 pins: ratio Type::Record lowering, uniqueness, access, fence closure.
+//! RR-2 pins: ratio `Type::Record` lowering, uniqueness, access, fence closure.
 
 use crate::test_support::{self, AnalyzedFixture};
 use crate::{PassConfig, Type};

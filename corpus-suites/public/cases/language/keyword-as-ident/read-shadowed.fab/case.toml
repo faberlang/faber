@@ -3,6 +3,8 @@ id = "corpus/keyword-as-ident/read-shadowed.fab"
 group = "language"
 input_root = "corpus"
 input = "keyword-as-ident/read-shadowed.fab"
+category = "identifier"
+domain = "program"
 
 
 [expect]

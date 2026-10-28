@@ -3,6 +3,8 @@ id = "corpus/temporis/temporis.fab"
 group = "language"
 input_root = "corpus"
 input = "temporis/temporis.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

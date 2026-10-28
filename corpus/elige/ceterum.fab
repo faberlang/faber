@@ -2,7 +2,7 @@
 term = "elige"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "elige_stmt", "casu_elige_clause", "ceterum_clause", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "Value branch with a default ceterum clause."
 syntax = "elige <expression> { casu … ceterum { … } }"

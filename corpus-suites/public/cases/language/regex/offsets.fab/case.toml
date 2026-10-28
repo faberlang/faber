@@ -3,6 +3,8 @@ id = "corpus/regex/offsets.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/offsets.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

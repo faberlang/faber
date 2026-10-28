@@ -3,6 +3,8 @@ id = "corpus/lineam/lineam-stdin.fab"
 group = "language"
 input_root = "corpus"
 input = "lineam/lineam-stdin.fab"
+category = "console"
+domain = "io"
 stdin = "stdin.txt"
 
 

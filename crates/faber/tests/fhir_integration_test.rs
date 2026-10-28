@@ -80,8 +80,8 @@ fn targets_reports_fhir_package_capabilities() {
         .find(|line| line.starts_with("fhir "))
         .unwrap_or_else(|| panic!("missing fhir row:\n{stdout}"));
     assert!(
-        row.contains("check=yes build=yes run=yes package=yes"),
-        "FHIR package row must show package build/load/run truth:\n{row}"
+        row.contains("check=yes build=yes run=no package=yes"),
+        "FHIR package row must show package build truth and no run (faber run does not load an envelope):\n{row}"
     );
     assert!(
         row.contains("faber build --target fhir"),

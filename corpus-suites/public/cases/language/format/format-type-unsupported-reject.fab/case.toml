@@ -3,6 +3,8 @@ id = "corpus/format/format-type-unsupported-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "format/format-type-unsupported-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

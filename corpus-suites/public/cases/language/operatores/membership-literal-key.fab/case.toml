@@ -3,6 +3,8 @@ id = "corpus/operatores/membership-literal-key.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/membership-literal-key.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

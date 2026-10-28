@@ -142,7 +142,8 @@ fn field_modifier_codemod_counts_refused_files_and_never_writes_them() {
 
     let report = run_codemod(&[root]);
     let report_out = String::from_utf8_lossy(&report.stdout);
-    assert_eq!(report.status.code(), Some(1), "{report_out}");
+    // A refused file is a source that does not lex or parse: a data error.
+    assert_eq!(report.status.code(), Some(65), "{report_out}");
     assert!(
         report_out
             .lines()
@@ -157,7 +158,7 @@ fn field_modifier_codemod_counts_refused_files_and_never_writes_them() {
 
     let write = run_codemod(&["--write", root]);
     let write_out = String::from_utf8_lossy(&write.stdout);
-    assert_eq!(write.status.code(), Some(1), "{write_out}");
+    assert_eq!(write.status.code(), Some(65), "{write_out}");
     assert_eq!(
         write_out.lines().last(),
         Some("codemodded 1 of 2 files, 1 refused (nothing written)")

@@ -2352,7 +2352,7 @@ fn interface_type_from_generic_arg(
             };
             interface_type_from_type_expr(&ty, interner, type_params, nominal_kinds, ctx)
         }
-        radix_syntax::GenericArgExpr::Size(_) => None,
+        radix_syntax::GenericArgExpr::Size(_) | radix_syntax::GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -2363,7 +2363,7 @@ fn generic_arg_bare_name(arg: &radix_syntax::GenericArgExpr) -> Option<radix_syn
             TypeExprKind::Named(name, params) if params.is_empty() => Some(name.clone()),
             _ => None,
         },
-        radix_syntax::GenericArgExpr::Size(_) => None,
+        radix_syntax::GenericArgExpr::Size(_) | radix_syntax::GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -2648,6 +2648,9 @@ fn interface_index_snapshot(figura: &FiguraExpr, interner: &crate::lexer::Intern
             }
             radix_syntax::LiftExtent::Negative { .. } => None,
             radix_syntax::LiftExtent::Paren(inner) => interface_index_snapshot(inner, interner),
+            // A whole-shape lift lives only in a call's type-argument list,
+            // never in a signature, so there is no interface snapshot.
+            radix_syntax::LiftExtent::Shape(_) => None,
         },
         FiguraExpr::Infer => None,
     }

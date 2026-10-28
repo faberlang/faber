@@ -22,7 +22,7 @@
 //! | `LaneGrid` | generic 1-D over the element count of the source resource's call-site shape |
 //! | `Transpose` | `plan.workgroup_x` lanes over the input element count |
 //! | `TreeReduction` | `plan.partials` workgroups of `plan.workgroup_x` lanes |
-//! | `GridReduce` | two stages ([`LaunchStages::Staged`], via [`launch_stages_for_call`]): `p = min(ceil(n / workgroup), partials_cap)` workgroups, then one |
+//! | `GridReduce` | two stages ([`LaunchStages::Staged`], via [`launch_stages_for_call`]): `p = min(ceil(n / workgroup), partials_cap)` workgroups, then one; an empty ungrouped source (`n = 0`) is [`LaunchStages::Empty`], no launch |
 //! | every other plan | [`GeometryError`] `geometry_plan_not_covered` |
 
 use crate::abi::{
@@ -43,9 +43,16 @@ pub struct CallGeometry {
 
 /// The launches one call makes: one for every plan but a whole-grid
 /// reduction, which makes two back to back (stage 1 on `<entry>`, stage 2 on
-/// [`grid_reduce_combine_entry`]) through a dispatcher-owned partials scratch.
+/// [`grid_reduce_combine_entry`]) through a dispatcher-owned partials scratch,
+/// or none when its source is empty.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LaunchStages {
+    /// No launch: an ungrouped `GridReduce` whose reduced source has a zero
+    /// extent. There is nothing to fold, so the call's result is the
+    /// reduction's `coalesce` fallback, which the dispatcher stores itself
+    /// (operator ruling 2026-10-14: a zero-length reduction source returns
+    /// its fallback on every device, as on the host).
+    Empty,
     /// One launch.
     Single(CallGeometry),
     /// A `GridReduce` call: stage 1 then stage 2, in this order.
@@ -200,6 +207,16 @@ pub fn geometry_for_call(
 /// Per-resource element counts of a call, after the shape-count, rank and
 /// zero-extent checks every plan shares.
 fn element_counts(unit: &KernelUnit, shapes: &[Vec<u64>]) -> Result<Vec<u64>, GeometryError> {
+    element_counts_allowing_empty(unit, shapes, None)
+}
+
+/// [`element_counts`], except that the resource `empty` (when named) may have
+/// a zero extent: its count is then `0`.
+fn element_counts_allowing_empty(
+    unit: &KernelUnit,
+    shapes: &[Vec<u64>],
+    empty: Option<usize>,
+) -> Result<Vec<u64>, GeometryError> {
     if shapes.len() != unit.resources.len() {
         return Err(GeometryError::new(
             GEOMETRY_SHAPE_COUNT,
@@ -216,7 +233,11 @@ fn element_counts(unit: &KernelUnit, shapes: &[Vec<u64>]) -> Result<Vec<u64>, Ge
         {
             return Err(rank_mismatch(index, declared.len(), shape.len()));
         }
-        counts.push(element_count(index, shape)?);
+        counts.push(if empty == Some(index) && shape.contains(&0) {
+            0
+        } else {
+            element_count(index, shape)?
+        });
     }
     Ok(counts)
 }
@@ -225,8 +246,10 @@ fn element_counts(unit: &KernelUnit, shapes: &[Vec<u64>]) -> Result<Vec<u64>, Ge
 /// each plan but `GridReduce`, whose two stages are
 /// `p = min(ceil(n / workgroup), partials_cap)` workgroups of `workgroup`
 /// lanes, then one workgroup of `workgroup` lanes. `n` is the element count of
-/// the reduced source's call-site shape; a zero extent is refused as for every
-/// plan.
+/// the reduced source's call-site shape. A zero extent in the reduced source of
+/// an ungrouped reduction is [`LaunchStages::Empty`] (no launch); a zero
+/// extent anywhere else, or in a grouped reduction's source, is refused as for
+/// every plan.
 ///
 /// # Errors
 ///
@@ -279,6 +302,7 @@ pub fn launch_stages_for_call(
     let CollectionKernelPlan::GridReduce {
         source_resource,
         rank,
+        group_shape,
         workgroup,
         partials_cap,
         ..
@@ -286,7 +310,11 @@ pub fn launch_stages_for_call(
     else {
         return geometry_for_call(unit, shapes).map(LaunchStages::Single);
     };
-    let counts = element_counts(unit, shapes)?;
+    let counts = element_counts_allowing_empty(
+        unit,
+        shapes,
+        group_shape.is_none().then_some(*source_resource),
+    )?;
     let uncovered = |reason: &str| {
         GeometryError::new(
             GEOMETRY_SHAPE_NOT_COVERED,
@@ -304,6 +332,9 @@ pub fn launch_stages_for_call(
         ));
     }
     let n = counts[*source_resource];
+    if n == 0 {
+        return Ok(LaunchStages::Empty);
+    }
     if n > i32::MAX as u64 {
         return Err(GeometryError::new(
             GEOMETRY_SHAPE_NOT_COVERED,

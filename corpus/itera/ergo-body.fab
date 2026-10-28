@@ -2,7 +2,7 @@
 term = "itera"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "itera_stmt", "ergo_joint", "expression", "literal", "array_literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "The ergo joint (then) as an itera body: one consequent statement after the binder, no braces."
 syntax = "for … let <binder> then <statement>"

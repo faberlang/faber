@@ -3,6 +3,8 @@ id = "corpus/format/format-spec-not-literal-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "format/format-spec-not-literal-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

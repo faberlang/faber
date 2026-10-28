@@ -3,6 +3,8 @@ id = "corpus/ad/sermo-conversio.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/sermo-conversio.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

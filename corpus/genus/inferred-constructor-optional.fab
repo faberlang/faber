@@ -2,7 +2,7 @@
 term = "genus"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "concrete_type", "base_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "json_literal", "json_member", "json_value", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "Against an optional slot `T ∪ none`, the inferred constructor `_ { … }` builds T."
 syntax = "<type> ∪ none <name> ← _ { <field> = <value>, … }"

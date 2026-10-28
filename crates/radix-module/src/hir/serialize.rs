@@ -12,11 +12,11 @@ use radix_hir_fhir::{
     FunctionProvenanceTableWire, FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, KernelExtentConditionWire,
     KernelNumericPolicyWire, KernelPrimitiveWire, KernelRangeExprWire, KernelRequirementFailureWire,
     KernelRequirementWire, KernelRequirementsWire, KernelTargetRequirementWire, KernelTargetWire,
-    KernelTrappingStoreWire, KernelValueRangeWire, KernelWidthRequirementWire, LastUseWire, RadixBackwardWire,
-    RadixLaneEntryWire, RadixLaneWire, RegionRelationshipWire, ResolvedTensorEdgePolicyWire, ResolvedUseKeyWire,
-    ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity, TensorEdgePolicyCallWire,
-    TensorEdgePolicyFunctionRequirementsWire, TensorEdgePolicyProviderImplWire, TensorEdgePolicyRequirementWire,
-    TensorEdgePolicyTableWire, TensorShiftContextWire,
+    KernelTrappingStoreWire, KernelValueRangeWire, KernelWidthRequirementWire, LastUseWire, OrdoOrderComparisonWire,
+    RadixBackwardWire, RadixLaneEntryWire, RadixLaneWire, RegionRelationshipWire, ResolvedTensorEdgePolicyWire,
+    ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity,
+    TensorEdgePolicyCallWire, TensorEdgePolicyFunctionRequirementsWire, TensorEdgePolicyProviderImplWire,
+    TensorEdgePolicyRequirementWire, TensorEdgePolicyTableWire, TensorShiftContextWire,
 };
 use std::collections::BTreeMap;
 
@@ -88,6 +88,7 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
         capability_provenance: provenance_table_to_wire(&unit.provenance),
         provider_units: provider_units_wire(&unit.provider_units),
         shape_obligations: shape_obligations_wire(&unit.shape_obligations),
+        contract_roles: contract_roles_wire(&unit.types),
         kernel_requirements: kernel_requirements_wire(&unit.kernel_requirements),
         tensor_edge_policies: tensor_edge_policies_wire(&unit.tensor_edge_policies),
         display_tokens: DisplayTokensWire {
@@ -232,6 +233,13 @@ fn tensor_edge_policies_wire(table: &radix_hir::TensorEdgePolicyTable) -> Tensor
         })
         .collect();
     provider_impls.sort_by_key(|row| (row.policy_type.0, row.element_type.0, row.rank));
+    let mut ordo_order: Vec<_> = table
+        .ordo_order
+        .comparisons
+        .iter()
+        .map(|(lhs, rows)| OrdoOrderComparisonWire { lhs: *lhs, rows: rows.clone() })
+        .collect();
+    ordo_order.sort_by_key(|row| row.lhs.0);
 
     TensorEdgePolicyTableWire {
         calls,
@@ -242,6 +250,7 @@ fn tensor_edge_policies_wire(table: &radix_hir::TensorEdgePolicyTable) -> Tensor
         limes_contexts,
         function_requirements,
         provider_impls,
+        ordo_order,
     }
 }
 
@@ -406,12 +415,28 @@ fn kernel_requirement_failure_wire(
     }
 }
 
+fn contract_roles_wire(types: &radix_types::TypeTable) -> radix_hir_fhir::ContractRolesWire {
+    let sorted = |set: &handroll::FxHashSet<crate::hir::DefId>| {
+        let mut defs: Vec<_> = set.iter().copied().collect();
+        defs.sort_by_key(|def_id| def_id.0);
+        defs
+    };
+    radix_hir_fhir::ContractRolesWire {
+        ordering: types.ordering_contract,
+        ordering_bindings: sorted(&types.ordering_contract_bindings),
+        closing: types.closing_contract,
+        sinking: types.sinking_contract,
+        sinking_bindings: sorted(&types.sinking_contract_bindings),
+    }
+}
+
 fn shape_obligations_wire(
     obligations: &crate::semantic::ShapeObligationTable,
 ) -> radix_hir_fhir::ShapeObligationTableWire {
     use radix_hir_fhir::{
         CallSizeBindingsWire, FunctionSizeBindingsWire, RuntimeSizeBindingWire, ShapeCallObligationsWire,
         ShapeFunctionObligationsWire, ShapeObligationTableWire, ShapeRelationBoundaryWire, ShapeRelationWire,
+        ShapeStoreObligationsWire,
     };
 
     let map_relations = |relations: &[crate::semantic::ShapeRelation]| {
@@ -424,12 +449,8 @@ fn shape_obligations_wire(
                 boundary: match relation.boundary {
                     crate::semantic::ShapeRelationBoundary::Call => ShapeRelationBoundaryWire::Call,
                     crate::semantic::ShapeRelationBoundary::FunctionEntry => ShapeRelationBoundaryWire::FunctionEntry,
-                    // Store pins are not serialized; only calls/functions rows
-                    // reach this mapper, so the arm is unreachable today.
-                    crate::semantic::ShapeRelationBoundary::Store
-                    | crate::semantic::ShapeRelationBoundary::FunctionReturn => {
-                        ShapeRelationBoundaryWire::FunctionReturn
-                    }
+                    crate::semantic::ShapeRelationBoundary::FunctionReturn => ShapeRelationBoundaryWire::FunctionReturn,
+                    crate::semantic::ShapeRelationBoundary::Store => ShapeRelationBoundaryWire::Store,
                 },
             })
             .collect()
@@ -449,6 +470,15 @@ fn shape_obligations_wire(
         })
         .collect();
     functions.sort_by_key(|entry| entry.function.0);
+    let mut stores: Vec<_> = obligations
+        .stores
+        .iter()
+        .map(|(initializer, relations)| ShapeStoreObligationsWire {
+            initializer: *initializer,
+            relations: map_relations(relations),
+        })
+        .collect();
+    stores.sort_by_key(|entry| entry.initializer.0);
     let mut call_size_bindings: Vec<_> = obligations
         .call_size_bindings
         .iter()
@@ -481,7 +511,7 @@ fn shape_obligations_wire(
         })
         .collect();
     function_size_bindings.sort_by_key(|entry| entry.function.0);
-    ShapeObligationTableWire { calls, call_size_bindings, functions, function_size_bindings }
+    ShapeObligationTableWire { calls, call_size_bindings, functions, stores, function_size_bindings }
 }
 
 // ── Provider carriage (ARCH-U4 / schema v14) ───────────────────────────────
@@ -670,6 +700,7 @@ fn cli_exit_wire(e: &crate::cli::CliExit) -> CliExitWire {
 fn cli_option_wire(o: &crate::cli::CliOption) -> CliOptionWire {
     CliOptionWire {
         binding: o.binding.clone(),
+        binding_symbol: o.binding_symbol,
         ty: cli_type_wire(&o.ty),
         short: o.short.clone(),
         long: o.long.clone(),
@@ -683,6 +714,7 @@ fn cli_option_wire(o: &crate::cli::CliOption) -> CliOptionWire {
 fn cli_operand_wire(o: &crate::cli::CliOperand) -> CliOperandWire {
     CliOperandWire {
         binding: o.binding.clone(),
+        binding_symbol: o.binding_symbol,
         ty: cli_type_wire(&o.ty),
         is_rest: o.rest,
         description: o.description.clone(),

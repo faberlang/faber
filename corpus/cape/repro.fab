@@ -2,7 +2,7 @@
 term = "cape"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "type_annotation", "owned_type", "base_type", "return_clause", "si_stmt", "arm", "else_arm", "secus_clause", "cape_clause", "iace_stmt", "redde_stmt", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "Arm-attached catch on an if/else chain (need repro)."
 syntax = "if <condition> <block> catch <name> <block> else <block>"

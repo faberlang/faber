@@ -32,6 +32,7 @@ insere = "ฝัง"
 privata = "ส่วนตัว"
 protecta = "ป้องกัน"
 publica = "สาธารณะ"
+visibilitas = "การมองเห็น"
 sponte = "สมัครใจ"
 casu = "กรณี"
 ceterum = "อื่น"
@@ -889,6 +890,10 @@ help = "เขียนรูปร่างด้วยวงเล็บ width
 message = "`{form}` เป็นการเขียนชนิดตัวเลขที่เลิกใช้แล้ว"
 help = "เขียน `{bare}` แทน `{form}`; ตัวระบุความกว้างเป็นชนิดในตัวมันเอง"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "ช่วงต้องมีปลายทั้งสองด้าน"
+help = "เขียนปลายทั้งสอง เช่น 0‥8 หรือ 0…7 และใช้ ∞ หรือ -∞ เมื่อด้านหนึ่งไม่มีขอบเขต"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "ชนิด '{type}' ไม่ได้ประกาศบนพื้นผิวผู้อ่านนี้"
 help = "ใช้การสะกดชนิดที่ประกาศในภาษาของตัวอ่านนี้{?expected|: '|'}"
@@ -923,31 +928,35 @@ help = "ตรวจไวยากรณ์การนำเข้า"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "ฟิลด์การนำเข้าไม่รู้จัก"
-help = "ใช้ ex, visibilitas, nomen, ut หรือ omnia"
+help = "ใช้ {ex}, {visibilitas}, {nomen}, {ut} หรือ {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "ฟิลด์การนำเข้า `{field}` ไม่ได้ประกาศในพื้นผิว reader นี้"
+help = "ใช้ `{expected}` สำหรับ locale ของไฟล์นี้"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "ฟิลด์การนำเข้า `{field}` ซ้ำ"
 help = "แต่ละฟิลด์การนำเข้าปรากฏได้เพียงครั้งเดียว; ลบฟิลด์ที่ซ้ำออก"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "เรกคอร์ดการนำเข้าต้องมีแหล่งที่มา ex"
-help = "เพิ่ม ex = \"path\" ในเรกคอร์ดการนำเข้า"
+message = "เรกคอร์ดการนำเข้าต้องมีแหล่งที่มา {ex}"
+help = "เพิ่ม {ex} = \"path\" ในเรกคอร์ดการนำเข้า"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "การนำเข้า wildcard ไม่สามารถตั้งชื่อ binding ร่วมได้"
-help = "ใช้ omnia เพียงอย่างเดียว หรือใช้ nomen/ut สำหรับการนำเข้าที่มีชื่อ"
+help = "ใช้ {omnia} เพียงอย่างเดียว หรือใช้ {nomen}/{ut} สำหรับการนำเข้าที่มีชื่อ"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "visibility ของการนำเข้าไม่ถูกต้อง"
-help = "ใช้ publica"
+help = "ใช้ {publica}"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "`privata` ถูกนำออกจากการนำเข้าแล้ว; การนำเข้าไม่ re-export โดยค่าเริ่มต้น"
-help = "ลบเครื่องหมายออก หรือใช้ publica เพื่อ re-export"
+message = "`{privata}` ถูกนำออกจากการนำเข้าแล้ว; การนำเข้าไม่ re-export โดยค่าเริ่มต้น"
+help = "ลบเครื่องหมายออก หรือใช้ {publica} เพื่อ re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "ไม่สามารถอนุมานชื่อการนำเข้าจาก {path} ได้"
-help = "ระบุ nomen หรือ alias ที่ชัดเจนสำหรับ {path}"
+help = "ระบุ {nomen} หรือ alias ที่ชัดเจนสำหรับ {path}"
 
 [diagnostics.SEM001]
 message = "ตัวแปรไม่ได้กำหนด"
@@ -963,7 +972,7 @@ help = "ประกาศตัวแปรก่อนใช้{?suggestion|; 
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "ตัวระบุไม่รู้จัก"
-help = "เขียน `{spelling} <expr>` โดยไม่มีวงเล็บสำหรับคำสั่งส่งออก"
+help = "`{spelling}` เป็นคำสั่งส่งออก ไม่ใช่ฟังก์ชัน: นำเข้าฟังก์ชันคอนโซล (`{importa} {ex} \"norma:console\" {fixum} print` แล้วเขียน `print(...)`) หรือผูกค่าก่อน (`{sit} _ x ← …` แล้วเขียน `{spelling} x`)"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "ฟิลด์เรกคอร์ดไม่รู้จัก"
@@ -1149,6 +1158,10 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 message = "ชื่อค่า {name} ใช้ตำแหน่ง extent ในคำประกาศไม่ได้"
 help = "เขียน `size {name}` เพื่อระบุการยกในตำแหน่งจัดเก็บนี้ เช่น `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "ขนาดหรือรูปร่างในการเรียก generic ไม่รองรับ"
+help = "ใช้ค่าคงที่ ชื่อขนาด หรือค่าที่เขียนเป็น `size w`"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "การแยกโครงสร้าง array ต้องมี initializer"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1188,6 +1201,38 @@ help = "เขียนชนิด trapping ด้วยความกว้�
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "ความกว้าง trapping ต้องเป็นเครื่องหมายความกว้างแบบเปลือย"
 help = "ใช้เครื่องหมายความกว้างแบบเปลือย เช่น u8 หรือ i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "ช่วงต้องมีคำนโยบายการจัดเก็บ; ตัวบอกความกว้างเปล่าไม่รับช่วง"
+help = "เขียนคำนโยบายก่อน เช่น saturating<u32, 0‥8>, trapping<i32, -2‥3> หรือ wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "ปลายของช่วงต้องเป็นจำนวนเต็มลิเทอรัลหรือ ∞"
+help = "เขียนปลายทั้งสองเป็นจำนวนเต็มลิเทอรัล เช่น 0‥8; ปลายที่เป็นชื่อหรือ size ยังไม่รองรับ"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "นโยบายการจัดเก็บแบบมีช่วงรับความกว้างแล้วตามด้วยหนึ่งช่วง"
+help = "เขียนเป็น policy<W, lo‥hi> เช่น saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "ช่วงนี้ไม่มีค่าใดเลย"
+help = "ปลายล่างต้องน้อยกว่าปลายบนใน lo‥hi หรือไม่เกินปลายบนใน lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "ปลายของช่วงอยู่นอกความกว้าง"
+help = "ให้ปลายทั้งสองอยู่ในความกว้าง; ∞ ใช้เป็นปลายบนเท่านั้น และ -∞ ใช้เป็นปลายล่างเท่านั้น"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "ความกว้างแบบไม่มีเครื่องหมายมีปลายล่างติดลบไม่ได้"
+help = "เริ่มช่วงที่ 0 หรือใช้ความกว้างแบบมีเครื่องหมาย เช่น i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "นโยบายการจัดเก็บแบบมีช่วงต้องใช้ความกว้างจำนวนเต็มที่มีขอบเขต"
+help = "ใช้ความกว้างจำนวนเต็ม เช่น u8 หรือ i32; ความกว้างแบบ float, decimal และ inf ยังไม่รับช่วง"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "kernel ยังใช้นโยบายการจัดเก็บแบบมีช่วงไม่ได้ ({site}); kernel ไม่ใช้ช่วง"
+help = "ใช้ความกว้างปกติใน kernel แล้วใช้ช่วงฝั่งโฮสต์"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
@@ -1537,6 +1582,14 @@ help = "ใช้ความกว้างจำนวนเต็มไม่
 message = "extent ตัวกลางของเคอร์เนล {extent} เกินช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
 help = "เก็บค่าตัวกลางให้อยู่ในช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "รูปร่างหลัง `size` ในอาร์กิวเมนต์ชนิดของการเรียกรับได้เฉพาะมิติที่เป็นจำนวนธรรมชาติ"
+help = "เขียนแต่ละมิติเป็นจำนวนธรรมชาติ เช่น `size [2, 3]` และส่งมิติแบบสัญลักษณ์หรือขณะรันผ่านชื่อ `size`"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "รูปร่างในวงเล็บเหลี่ยมหลัง `size` ใช้ได้เฉพาะในอาร์กิวเมนต์ชนิดของการเรียก"
+help = "เขียนรูปร่างตรง ๆ เช่น `tensor<f32, [2, 3]>` หรือใช้ `size [2, 3]` ในการเรียก เช่น `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "ข้อผิดพลาดในการตรวจสอบ CLI"
 help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
@@ -1696,6 +1749,10 @@ help = "ประกาศเฉพาะชนิด; ใช้ map ({tabula}) 
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "เป้าหมายนี้ยังไม่รองรับชนิด ledger"
 help = "ใช้ MIR runner หรือ Faber source emitter หรือใช้ map ({tabula})"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "เป้าหมายนี้ยังไม่รองรับนโยบายการจัดเก็บแบบมีช่วง"
+help = "ใช้ MIR runner เป้าหมาย Rust หรือตัวปล่อยซอร์ส Faber จนกว่าเป้าหมายนี้จะใช้ช่วงได้"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "เป้าหมายนี้ไม่รองรับใบ {leaf}"
@@ -3233,6 +3290,14 @@ help = "เขียนเครื่องหมาย ณ จุดเรี�
 message = "เครื่องหมาย `axis` ถูกเขียนไว้ที่นี่ แต่พารามิเตอร์ไม่ได้ประกาศเป็น `axis`"
 help = "ลบเครื่องหมาย `axis` ออก หรือประกาศพารามิเตอร์เป็น `axis int`"
 
+[diagnostics.SEM057.issues.size_marker_required]
+message = "อาร์กิวเมนต์นี้เป็นอาร์กิวเมนต์ `size` และต้องเขียนด้วยเครื่องหมาย `size`"
+help = "เขียนเครื่องหมายตามที่ลายเซ็นประกาศพารามิเตอร์ไว้ เช่น `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "เครื่องหมาย `size` ถูกเขียนไว้ที่นี่ แต่ฟังก์ชันที่เรียกไม่ได้ประกาศพารามิเตอร์ `size`"
+help = "ลบเครื่องหมาย `size` ออก หรือประกาศพารามิเตอร์เป็น `size N`"
+
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "ไม่สามารถผูกค่าที่ไม่ได้ทำเครื่องหมายเข้าเป็น `own` ได้"
 help = "ผูกผ่าน `copy` เพื่อทำสำเนาต้นทาง"
@@ -3693,6 +3758,9 @@ applica = "ประยุกต์"
 productum = "ดอตโปรดักต์"
 transversum = "ครอสโปรดักต์"
 normalizata = "ทําให้เป็นบรรทัดฐาน"
+# Q-X1: the tensor rank and the Euclidean norm (tensor and vector) are named methods; `longitudo` is the element count.
+rank = "rank"
+norm = "norm"
 swizzle = "swizzle"
 coercere = "จํากัดค่า"
 inter = "ตัดกัน"

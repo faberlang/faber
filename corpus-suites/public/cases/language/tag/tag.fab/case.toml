@@ -3,6 +3,8 @@ id = "corpus/tag/tag.fab"
 group = "language"
 input_root = "corpus"
 input = "tag/tag.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

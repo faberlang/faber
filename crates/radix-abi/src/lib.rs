@@ -446,6 +446,43 @@ abi_enum_family! {
     }
 }
 
+// Tagged interface / union carrier: the primitive type tags.
+//
+// The compiler (`radix-mir-llvm` `type_tag.rs`) owns the whole tag namespace;
+// the host only compares tags, except that it renders a boxed primitive for
+// `nota`/`scribe`, so the primitive tags are shared here. `0` is reserved and
+// never a valid tag; a tag with bit 63 set is a nominal struct (low 32 bits:
+// the struct `DefId`).
+pub const TYPE_TAG_NUMERUS: u64 = 1;
+pub const TYPE_TAG_TEXTUS: u64 = 2;
+pub const TYPE_TAG_BIVALENS: u64 = 3;
+pub const TYPE_TAG_FRACTUS: u64 = 4;
+pub const TYPE_TAG_NOMINAL_FLAG: u64 = 1 << 63;
+// Need: `valor` and `ignotum` members, enum members (bit 62 plus the
+// enum `DefId`), and the sized numerics (`0x100..=0x1FF`, assigned by the
+// compiler: the host never reads them).
+pub const TYPE_TAG_VALOR: u64 = 5;
+pub const TYPE_TAG_IGNOTUM: u64 = 6;
+pub const TYPE_TAG_SIZED_BASE: u64 = 0x100;
+pub const TYPE_TAG_ENUM_FLAG: u64 = 1 << 62;
+
+// Type test over a `valor` handle (`__faber_rt_v1_valor_is`, need).
+// A class names the Valor variant a target type accepts. `LISTA` is a list
+// that did not come from a tensor and `TABULA` a table that did not come from a
+// genus; `GENUS` compares the origin tag recorded by `valor_set_origin`.
+pub const VALOR_CLASS_NIHIL: u32 = 1;
+pub const VALOR_CLASS_BIVALENS: u32 = 2;
+pub const VALOR_CLASS_NUMERUS: u32 = 3;
+pub const VALOR_CLASS_FRACTUS: u32 = 4;
+pub const VALOR_CLASS_TEXTUS: u32 = 5;
+pub const VALOR_CLASS_OCTETI: u32 = 6;
+pub const VALOR_CLASS_LISTA: u32 = 7;
+pub const VALOR_CLASS_TABULA: u32 = 8;
+pub const VALOR_CLASS_INSTANS: u32 = 9;
+pub const VALOR_CLASS_GENUS: u32 = 10;
+/// The origin tag a tensor's `valor` carries (the host records it itself).
+pub const VALOR_ORIGIN_TENSOR: u64 = 1;
+
 abi_enum_family! {
     INSTANS_PRECISION_ROWS: type FaberRtInstansPrecisionV1 = u32 {
         INSTANS_PRECISION_SECONDS = 0,

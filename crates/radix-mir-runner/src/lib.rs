@@ -67,6 +67,7 @@ use radix_mir::{
     ValidatedMir,
 };
 use radix_runtime_contract::display_tokens::DisplayTokens;
+use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{IndexExpr, NumericWidth, Primitive, RuntimeExtentId, Type, TypeId, TypeTable};
 use regex_program::RegexProgram;
 use std::cell::RefCell;
@@ -94,6 +95,12 @@ pub(crate) const RUNNER_CODE_CONVERSION: &str = "runner_conversion";
 
 /// Malformed input to the failable JSON parser follows its text alternate exit.
 pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
+
+/// A flat `lista` whose length does not fill the target tensor's shape
+/// (`ys ↦ tensor<E, [..]>`, `tensor.construct`). It is a recoverable
+/// conversion failure carrying the `expected` and `actual` element counts,
+/// like every other `↦` failure: `⊥`, `fac … cape` and `⇥` see it.
+pub(crate) const RUNNER_CONVERSION_LENGTH_MISMATCH: &str = "conversion_length_mismatch";
 /// A statement of a conversion's recovery region left the frame (its failure
 /// followed the alternate exit). The frame is already popped, so the
 /// conversion statement reports `FrameReturned` instead of writing a result.
@@ -228,6 +235,23 @@ impl RunnerError {
             issue: issue.to_owned(),
             span,
             code: RUNNER_CODE_INTERNAL,
+            args: Vec::new(),
+        }
+    }
+
+    /// Recoverable conversion failure with a stable named issue, for a failure
+    /// whose identity is a structured fact (the caller adds its `args`) rather
+    /// than a slug of the message.
+    pub(crate) fn conversion_with_issue(
+        span: Span,
+        message: impl Into<String>,
+        issue: &'static str,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            issue: issue.to_owned(),
+            span,
+            code: RUNNER_CODE_CONVERSION,
             args: Vec::new(),
         }
     }
@@ -631,6 +655,9 @@ pub struct RunnerRunOutcome {
     /// carried one. `None` for a vacuum return, a `ReturnError` (the trap
     /// carries the failure instead), or a run that failed before returning.
     pub return_value: Option<Value>,
+    /// The kernel calls captured by a traced run
+    /// ([`run_function_with_kernel_trace`]); `None` when tracing was off.
+    pub kernel_trace: Option<kernel_trace::KernelTrace>,
 }
 
 type RegexLiteralMap = FxHashMap<(Symbol, Option<Symbol>), Rc<RegexProgram>>;
@@ -765,6 +792,12 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     kernel_policy: RunnerKernelPolicy,
     /// Receives compute-stage calls under [`RunnerKernelPolicy::Dispatch`].
     kernel_dispatcher: Option<kernel_dispatch::ResidencyHook>,
+    /// The kernel calls captured so far, when the run is traced (the C3
+    /// comparator). `None` leaves every call path untouched.
+    kernel_trace: Option<kernel_trace::KernelTrace>,
+    /// How many traced kernel bodies are executing: a kernel called from a
+    /// kernel is part of the outer call and is not a record of its own.
+    kernel_trace_depth: usize,
     /// Next open-block id (see [`OpenBlock::id`]).
     next_block_id: u64,
     /// A delivered kernel error whose owner block is open in a caller frame;
@@ -845,6 +878,8 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             ascii_literals: RefCell::new(FxHashMap::default()),
             kernel_policy: RunnerKernelPolicy::Refuse,
             kernel_dispatcher: None,
+            kernel_trace: None,
+            kernel_trace_depth: 0,
             next_block_id: 1,
             carried_fault: None,
             next_conversation_id: 0,
@@ -1517,6 +1552,7 @@ pub fn run_function_with_kernel_dispatcher<H: Host + ?Sized>(
         false,
         RunnerKernelPolicy::Dispatch,
         Some(Rc::clone(dispatcher)),
+        false,
     )?
     .result
 }
@@ -1544,6 +1580,7 @@ pub fn run_function_with_kernel_dispatcher_and_stats<H: Host + ?Sized>(
         true,
         RunnerKernelPolicy::Dispatch,
         Some(Rc::clone(dispatcher)),
+        false,
     )
 }
 
@@ -1574,6 +1611,7 @@ pub fn run_function_with_limits_and_kernel_dispatcher<H: Host + ?Sized>(
         collect_stats,
         RunnerKernelPolicy::Dispatch,
         Some(Rc::clone(dispatcher)),
+        false,
     )
 }
 
@@ -1595,6 +1633,41 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
         collect_stats,
         kernel_policy,
         None,
+        false,
+    )
+}
+
+/// Run a specific MIR function with the kernel trace armed (the C3
+/// comparator): the outcome's [`RunnerRunOutcome::kernel_trace`] holds one
+/// record per source-level kernel call, in call order.
+///
+/// `kernel_policy` is [`RunnerKernelPolicy::Execute`] for the reference run
+/// or [`RunnerKernelPolicy::Dispatch`] (with `dispatcher`) for a device run.
+/// A call is recorded after it completes: a kernel that fails, or leaves
+/// through its error channel, is not recorded, and the records before it
+/// stay. A device-resident tensor is downloaded to be recorded, so tracing a
+/// device run changes its transfer counts; an ordinary run is untouched.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be started.
+pub fn run_function_with_kernel_trace<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    kernel_policy: RunnerKernelPolicy,
+    dispatcher: Option<&kernel_dispatch::ResidencyHook>,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_dispatching(
+        validated,
+        function_id,
+        host,
+        None,
+        None,
+        false,
+        kernel_policy,
+        dispatcher.map(Rc::clone),
+        true,
     )
 }
 
@@ -1608,6 +1681,7 @@ fn run_function_dispatching<H: Host + ?Sized>(
     collect_stats: bool,
     kernel_policy: RunnerKernelPolicy,
     dispatcher: Option<kernel_dispatch::ResidencyHook>,
+    trace_kernels: bool,
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
@@ -1633,6 +1707,9 @@ fn run_function_dispatching<H: Host + ?Sized>(
     runner.deadline = deadline;
     runner.kernel_policy = kernel_policy;
     runner.kernel_dispatcher = dispatcher;
+    if trace_kernels {
+        runner.kernel_trace = Some(Vec::new());
+    }
     if collect_stats {
         runner.stats = Some(stats::StatsCollector::new(program, context, interner));
     }
@@ -1661,6 +1738,7 @@ fn run_function_dispatching<H: Host + ?Sized>(
         stats,
         conversations,
         return_value,
+        kernel_trace: runner.kernel_trace.take(),
     })
 }
 
@@ -1713,7 +1791,13 @@ pub fn evaluate_function<H: Host + ?Sized>(
     runner.push_frame(function_id, MirBlockId(0));
     runner.run_until_depth(0);
     runner.close_all_frames();
-    if runner.steps_taken >= step_budget {
+    if runner
+        .errors
+        .iter()
+        .any(|error| error.issue == RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED)
+    {
+        // Completing on the last allowed block is valid; only an attempted
+        // visit beyond the budget records this issue.
         return Err(EvaluationFailure::StepLimit);
     }
     if !runner.errors.is_empty() {
@@ -2401,6 +2485,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                                 error.issue.as_str(),
                                 "runner_collection_push_capacity"
                                     | RUNNER_JSON_PARSE_FAILED
+                                    | RUNNER_CONVERSION_LENGTH_MISMATCH
                                     | "runner_tensor_shape_mismatch"
                                     | "runner_tensor_shape_invalid_extent"
                             ) =>
@@ -2628,6 +2713,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         };
         self.refuse_kernel_execution(func_id, span)?;
         let dispatched = self.dispatches_kernel(func_id, span)?;
+        let kernel_scope = self.kernel_trace_scope(func_id, span)?;
+        let traced = kernel_scope && self.kernel_trace_depth == 0;
         // BO-M-3/052: avoid cloning the entire MirFunction; collect param locals only.
         let param_modes = self
             .function_by_id(func_id, span)?
@@ -2653,10 +2740,29 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 ));
             }
         }
+        let trace_roles = traced.then(|| {
+            param_modes
+                .iter()
+                .map(|(_, mode)| {
+                    if *mode == MirParamMode::MutRef {
+                        kernel_trace::TraceRole::Output
+                    } else {
+                        kernel_trace::TraceRole::Input
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
         if dispatched {
             let mut arg_values = arg_values;
             let owner = self.launch_owner();
             let value = self.dispatch_kernel_call(func_id, &mut arg_values, span)?;
+            if let Some(roles) = &trace_roles {
+                let stages = self
+                    .kernel_dispatcher
+                    .as_ref()
+                    .and_then(kernel_trace::last_call_stages);
+                self.record_kernel_call(func_id, roles, &arg_values, &value, stages, span)?;
+            }
             // `mut` write-back through the existing param-mode path: the
             // dispatcher's final argument value lands in the caller's place.
             for (((_, mode), operand), arg) in param_modes.iter().zip(args).zip(arg_values) {
@@ -2694,6 +2800,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.return_value = None;
         self.return_error = None;
         self.push_frame(func_id, MirBlockId(0));
+        // The executed kernel's tensors are shared (`Rc`), so the arguments
+        // evaluated here still see the body's writes after it returns.
+        let trace_args = trace_roles.is_some().then(|| arg_values.clone());
         let callee_slots = self.prepared.slot_types.get(&func_id);
         let mut mut_writebacks: Vec<(usize, MirPlace, MirLocalId)> = Vec::new();
         if let Some(frame) = self.frames.last_mut() {
@@ -2745,9 +2854,15 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             }
             frame.mut_writebacks = mut_writebacks;
         }
+        if kernel_scope {
+            self.kernel_trace_depth += 1;
+        }
         stacker::maybe_grow(NATIVE_STACK_RED_ZONE, NATIVE_STACK_SEGMENT, || {
             self.run_until_depth(depth);
         });
+        if kernel_scope {
+            self.kernel_trace_depth -= 1;
+        }
         if let Some(error) = self.errors.pop() {
             while self.frames.len() > depth {
                 self.pop_frame();
@@ -2760,9 +2875,71 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         if let Some(error_value) = self.return_error.take() {
             return Ok(CallOutcome::Err(error_value));
         }
-        Ok(CallOutcome::Ok(
-            self.return_value.take().unwrap_or(Value::Unit),
-        ))
+        let returned = self.return_value.take().unwrap_or(Value::Unit);
+        if let (Some(roles), Some(args)) = (&trace_roles, &trace_args) {
+            self.record_kernel_call(func_id, roles, args, &returned, None, span)?;
+        }
+        Ok(CallOutcome::Ok(returned))
+    }
+
+    /// Whether a call to `function_id` is a compute-stage kernel call of a
+    /// traced run. Both routes key on the shader stage alone, so the reference
+    /// and the device capture the same calls.
+    fn kernel_trace_scope(
+        &self,
+        function_id: MirFunctionId,
+        span: Span,
+    ) -> Result<bool, RunnerError> {
+        if self.kernel_trace.is_none() {
+            return Ok(false);
+        }
+        Ok(self.function_by_id(function_id, span)?.shader_stage
+            == Some(MirKernelShaderStage::Compute))
+    }
+
+    /// Append the record of one completed kernel call: every tensor argument
+    /// (`arg<N>`, as written at the call site) and a returned tensor
+    /// (`return`).
+    fn record_kernel_call(
+        &mut self,
+        function_id: MirFunctionId,
+        roles: &[kernel_trace::TraceRole],
+        args: &[Value],
+        returned: &Value,
+        physical_stages: Option<u32>,
+        span: Span,
+    ) -> Result<(), RunnerError> {
+        let mut tensors = Vec::new();
+        for (position, (arg, role)) in args.iter().zip(roles).enumerate() {
+            if let Value::Tensor(tensor) = arg {
+                tensors.push(kernel_trace::traced_tensor(
+                    &format!("arg{position}"),
+                    *role,
+                    &tensor.borrow(),
+                )?);
+            }
+        }
+        if let Value::Tensor(tensor) = returned {
+            tensors.push(kernel_trace::traced_tensor(
+                "return",
+                kernel_trace::TraceRole::Return,
+                &tensor.borrow(),
+            )?);
+        }
+        let entry = radix_mir::host_partition::kernel_entry_name(
+            self.function_by_id(function_id, span)?,
+            self.interner,
+        );
+        if let Some(trace) = self.kernel_trace.as_mut() {
+            trace.push(kernel_trace::KernelTraceRecord {
+                index: trace.len() + 1,
+                function: function_id.0,
+                entry,
+                physical_stages,
+                tensors,
+            });
+        }
+        Ok(())
     }
 
     fn resolve_callee(
@@ -3454,7 +3631,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         {
                             let mut borrow = cell.borrow_mut();
                             let slot = borrow.get_mut(idx).ok_or_else(|| {
-                                RunnerError::internal(span, "array index out of bounds")
+                                RunnerError::internal(span, trap_text::LIST_INDEX_OUT_OF_BOUNDS)
                             })?;
                             *slot = assigned;
                         }
@@ -3465,7 +3642,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         {
                             let mut borrow = lanes.borrow_mut();
                             let slot = borrow.get_mut(idx).ok_or_else(|| {
-                                RunnerError::internal(span, "array index out of bounds")
+                                RunnerError::internal(span, trap_text::LIST_INDEX_OUT_OF_BOUNDS)
                             })?;
                             *slot = assigned;
                         }
@@ -4333,6 +4510,10 @@ mod tensor_fill_test;
 mod tensor_extent_test;
 
 #[cfg(test)]
+#[path = "step_budget_test.rs"]
+mod step_budget_test;
+
+#[cfg(test)]
 #[path = "kernel_lanes_test.rs"]
 mod kernel_lanes_test;
 
@@ -4487,8 +4668,16 @@ mod arg_extremum_test;
 mod queue_stack_test;
 
 #[cfg(test)]
+#[path = "tensor_from_flat_failure_test.rs"]
+mod tensor_from_flat_failure_test;
+
+#[cfg(test)]
 #[path = "set_none_key_test.rs"]
 mod set_none_key_test;
+
+#[cfg(test)]
+#[path = "tensor_count_test.rs"]
+mod tensor_count_test;
 
 #[cfg(test)]
 #[path = "stats_test.rs"]
@@ -4515,6 +4704,9 @@ mod exact_int_test;
 
 #[cfg(test)]
 mod store_boundary_test;
+
+#[cfg(test)]
+mod ranged_store_test;
 
 #[cfg(test)]
 #[path = "remainder_floor_test.rs"]

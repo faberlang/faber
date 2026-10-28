@@ -976,6 +976,36 @@ fn normalized_diagnostics_render_against_installed_pack_rows_without_prose_asser
 }
 
 #[test]
+fn scribe_callee_help_names_both_ways_out_in_every_installed_pack() {
+    // `print (a + b) * 2` cannot be fixed by dropping the parentheses, so the
+    // help must point at the imported console function and at the `let` binding.
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let pack = installed_pack(locale);
+        let diagnostic = semantic_diagnostic(
+            SemanticErrorKind::VariableUndefined,
+            vec![
+                diagnostic_arg("issue", "scribe_callee"),
+                diagnostic_arg("spelling", "print"),
+            ],
+        );
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} scribe_callee should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} scribe_callee row should exist"));
+        let help = rendered.help.unwrap_or_default();
+        assert!(
+            help.contains("norma:console"),
+            "{locale} help should name the console import: {help}"
+        );
+        assert!(help.contains("print(...)"), "{locale} help should show the call form: {help}");
+        assert!(
+            !help.contains("{"),
+            "{locale} help should leave no unfilled placeholder: {help}"
+        );
+    }
+}
+
+#[test]
 fn installed_latin_pack_has_structural_templates_for_catalog_codes() {
     let pack = latin_locale_pack();
     for diagnostic in [
@@ -2565,6 +2595,149 @@ fn installed_packs_render_parse001_annotation_label_spread_rows() {
                 rendered.message,
                 rendered.help
             );
+        }
+    }
+}
+
+/// The five braced import record field names are reader-pack keyword rows in
+/// every installed pack (`ex`, `visibilitas`, `nomen`, `ut`, `omnia`), the
+/// parser resolves them through the pack, and every PARSE050 row that names a
+/// field renders the pack's own words.
+#[test]
+fn installed_packs_own_the_import_record_field_words() {
+    const FIELDS: [&str; 5] = ["ex", "visibilitas", "nomen", "ut", "omnia"];
+    const EN: [&str; 5] = ["from", "visibility", "name", "as", "all"];
+    for locale in ["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let pack = installed_pack(locale);
+        let owned = owned_pack(locale);
+        let words: Vec<&str> = FIELDS
+            .iter()
+            .map(|key| {
+                owned
+                    .keywords
+                    .get(*key)
+                    .unwrap_or_else(|| panic!("{locale} must own the [keywords] row {key}"))
+                    .canonical
+                    .as_str()
+            })
+            .collect();
+        if locale == "en" {
+            assert_eq!(words, EN);
+        }
+        if locale == "la" {
+            assert_eq!(words, FIELDS);
+        }
+
+        let record = format!(
+            "{import} {{ {ex} = \"norma:text\", {visibilitas} = {publica}, {nomen} = text, {ut} = t }}\n",
+            import = owned.keywords["importa"].canonical,
+            ex = words[0],
+            visibilitas = words[1],
+            publica = owned.keywords["publica"].canonical,
+            nomen = words[2],
+            ut = words[3],
+        );
+        let accepted = parse(lex_with_locale_pack(&record, &pack));
+        assert!(accepted.errors.is_empty(), "{locale}: {record:?}: {:?}", accepted.errors);
+
+        // Every PARSE050 row that names a field renders the pack's own words.
+        for issue in [
+            "unknown_import_field",
+            "missing_import_source",
+            "mixed_wildcard_and_named_import",
+            "invalid_import_visibility",
+            "import_name_inference_failed",
+        ] {
+            let diagnostic = parse_diagnostic(
+                ParseErrorKind::ImportInvalid,
+                vec![diagnostic_arg("issue", issue), diagnostic_arg("path", "p")],
+            );
+            let rendered = pack
+                .render_diagnostic_text(&diagnostic)
+                .unwrap_or_else(|err| panic!("{locale} PARSE050.{issue} should render: {err:?}"))
+                .unwrap_or_else(|| panic!("{locale} PARSE050.{issue} row should exist"));
+            let text = format!("{} {}", rendered.message, rendered.help.unwrap_or_default());
+            if locale == "en" {
+                for latin in FIELDS.iter().chain(["publica", "privata"].iter()) {
+                    assert!(
+                        !text
+                            .split(|c: char| !c.is_alphanumeric())
+                            .any(|word| word == *latin),
+                        "en PARSE050.{issue} must not quote the Latin {latin}: {text}"
+                    );
+                }
+            }
+        }
+    }
+
+    // A Latin field word in an en record is refused by name; the en word is not.
+    let en = installed_pack("en");
+    let refused = parse(lex_with_locale_pack("import { ex = \"norma:text\" }\n", &en));
+    assert!(
+        refused.errors.iter().any(|error| {
+            error.kind == ParseErrorKind::ImportInvalid
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "wrong_locale_import_field")
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "expected" && arg.value == "from")
+        }),
+        "{:?}",
+        refused.errors
+    );
+    let diagnostic = Diagnostic::from_parse_error("parser.fab", "import { ex = \"norma:text\" }\n", &refused.errors[0]);
+    let rendered = en
+        .render_diagnostic_text(&diagnostic)
+        .expect("wrong_locale_import_field renders")
+        .expect("wrong_locale_import_field row");
+    assert_eq!(rendered.help.as_deref(), Some("use `from` for this file's reader locale"));
+}
+
+/// PARSE050 `import_privata_removed` names the removed marker and the
+/// re-export keyword through the pack's own `[keywords]` rows: en says
+/// `private`/`public`, la says `privata`/`publica`, and the packs that own
+/// the row name their own words. The parser passes no `keyword` argument,
+/// so the pack rows own the words.
+#[test]
+fn import_privata_removed_names_the_pack_marker_words() {
+    for locale in ["en", "la", "hi", "th-TH"] {
+        let pack = installed_pack(locale);
+        let owned = owned_pack(locale);
+        let marker = owned
+            .keywords
+            .get("privata")
+            .unwrap_or_else(|| panic!("{locale} must own the [keywords] row privata"))
+            .canonical
+            .clone();
+        let reexport = owned
+            .keywords
+            .get("publica")
+            .unwrap_or_else(|| panic!("{locale} must own the [keywords] row publica"))
+            .canonical
+            .clone();
+        let diagnostic = parse_diagnostic(
+            ParseErrorKind::ImportInvalid,
+            vec![diagnostic_arg("issue", "import_privata_removed")],
+        );
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} PARSE050.import_privata_removed should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} PARSE050.import_privata_removed row should exist"));
+        let text = format!("{} {}", rendered.message, rendered.help.unwrap_or_default());
+        assert!(text.contains(&marker), "{locale} must name the marker {marker}: {text}");
+        assert!(text.contains(&reexport), "{locale} must name {reexport}: {text}");
+        if locale == "en" {
+            for latin in ["publica", "privata"] {
+                assert!(
+                    !text
+                        .split(|c: char| !c.is_alphanumeric())
+                        .any(|word| word == latin),
+                    "en PARSE050.import_privata_removed must not quote the Latin {latin}: {text}"
+                );
+            }
         }
     }
 }

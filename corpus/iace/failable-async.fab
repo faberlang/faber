@@ -2,7 +2,7 @@
 term = "failable async function"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "figendum_decl", "type_annotation", "owned_type", "base_type", "comparison", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt", "callable_posture", "itera_stmt", "range_expr", "cede_stmt", "incipiet_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "An async function can declare its own ⇥ channel; failures leave at the await and can propagate through another async ⇥ function."
 syntax = "fn <name>(<params>) async → <type> ⇥ <error-type> <block>  |  await_const <type> <name> ← <async-call>"

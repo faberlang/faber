@@ -3,6 +3,8 @@ id = "corpus/typi/numerus-hole-error.fab"
 group = "language"
 input_root = "corpus"
 input = "typi/numerus-hole-error.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

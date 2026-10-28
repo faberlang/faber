@@ -3,6 +3,8 @@ id = "corpus/fragilis/fragilis.fab"
 group = "language"
 input_root = "corpus"
 input = "fragilis/fragilis.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

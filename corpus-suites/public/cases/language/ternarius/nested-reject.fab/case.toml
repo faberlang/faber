@@ -3,6 +3,8 @@ id = "corpus/ternarius/nested-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "ternarius/nested-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

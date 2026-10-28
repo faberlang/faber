@@ -122,6 +122,16 @@ mod field_modifier_write_test;
 #[cfg(test)]
 #[path = "fieldless_type_access_test.rs"]
 mod fieldless_type_access_test;
+mod flow_range;
+#[cfg(test)]
+mod flow_range_probe;
+mod flow_range_produce;
+#[cfg(test)]
+#[path = "flow_range_produce_test.rs"]
+mod flow_range_produce_test;
+#[cfg(test)]
+#[path = "flow_range_test.rs"]
+mod flow_range_test;
 #[cfg(test)]
 #[path = "loop_shape_test.rs"]
 mod loop_shape_test;
@@ -612,6 +622,11 @@ pub(crate) struct TypeChecker<'a> {
     /// `Type::Param`, so the active declaration row is needed to distinguish
     /// a caller-owned `magnitudo` witness from a caller-owned type parameter.
     pub current_generic_param_kinds: FxHashMap<Symbol, radix_syntax::GenericParamKind>,
+    /// Type parameters of the genus whose method is being checked. They stay
+    /// rigid inside the method body exactly like the method's own generics:
+    /// a callee signature that mentions one (`out.append(x)` over `list<T>`)
+    /// keeps `T` rather than instantiating a fresh inference variable.
+    pub current_genus_type_params: FxHashSet<Symbol>,
 
     /// `DefIds` of the active function's `magnitudo` (size) generic params.
     /// A size name in value position lowers as a `Path` on its `HirTypeParam`
@@ -756,6 +771,11 @@ pub(crate) struct TypeChecker<'a> {
     /// by `check_block_with_refinement`, removed at block exit; joins and the
     /// implicit fallthrough never carry them.
     pub(crate) field_facts: FxHashMap<(DefId, Vec<Symbol>), TypeId>,
+
+    /// Integer interval facts in force at the current point, with the mutation
+    /// versions of the sources their bounds name. Snapshotted,
+    /// restored and joined with the type facts at every branch edge.
+    range_flow: flow_range::RangeFlow,
 
     /// Conversation types of the `@ ad` routes this module can see, keyed
     /// by route (D6.11). Routes absent here type as bare `sermo`.
@@ -966,6 +986,7 @@ impl<'a> TypeChecker<'a> {
             ordo_members: FxHashMap::default(),
             type_params_by_def: FxHashMap::default(),
             current_generic_param_kinds: FxHashMap::default(),
+            current_genus_type_params: FxHashSet::default(),
             current_size_param_defs: FxHashSet::default(),
             current_size_param_by_name: FxHashMap::default(),
             current_return: None,
@@ -1001,6 +1022,7 @@ impl<'a> TypeChecker<'a> {
             assert_refinements: Vec::new(),
             flow_bases: FxHashMap::default(),
             field_facts: FxHashMap::default(),
+            range_flow: flow_range::RangeFlow::default(),
             ad_routes: FxHashMap::default(),
             current_member_owner: None,
             cross_package_structs: FxHashSet::default(),
@@ -1201,6 +1223,10 @@ mod optional_chain_call_test;
 mod axis_marker_test;
 
 #[cfg(test)]
+#[path = "explicit_size_marker_test.rs"]
+mod explicit_size_marker_test;
+
+#[cfg(test)]
 #[path = "axis_sugar_test.rs"]
 mod axis_sugar_test;
 
@@ -1275,6 +1301,10 @@ mod ascription_optional_slot_test;
 #[cfg(test)]
 #[path = "element_relaxation_test.rs"]
 mod element_relaxation_test;
+
+#[cfg(test)]
+#[path = "type_argument_invariance_test.rs"]
+mod type_argument_invariance_test;
 
 #[cfg(test)]
 #[path = "equality_exact_types_test.rs"]
@@ -1414,6 +1444,9 @@ mod compound_guard_narrowing_test;
 #[cfg(test)]
 #[path = "diverging_guard_narrowing_test.rs"]
 mod diverging_guard_narrowing_test;
+#[cfg(test)]
+#[path = "genus_optional_into_plain_test.rs"]
+mod genus_optional_into_plain_test;
 #[cfg(test)]
 #[path = "member_privacy_test.rs"]
 mod member_privacy_test;
@@ -1573,6 +1606,10 @@ mod tensor_minus_test;
 #[cfg(test)]
 #[path = "scalar_math_test.rs"]
 mod scalar_math_test;
+
+#[cfg(test)]
+#[path = "float_literal_receiver_test.rs"]
+mod float_literal_receiver_test;
 
 #[cfg(test)]
 #[path = "tensor_math_test.rs"]

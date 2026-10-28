@@ -23,7 +23,7 @@ use std::cmp::Ordering;
 /// Fraction digits of a stored `d64`.
 pub(crate) const STORED_SCALE: u32 = 8;
 
-const OVERFLOW: &str = "numerus overflow";
+const OVERFLOW: &str = radix_runtime_contract::trap::text::NUMERUS_OVERFLOW;
 const DIVISION: &str = "numerus division failed";
 
 /// `10^digits`, or `None` past the 128-bit carrier.

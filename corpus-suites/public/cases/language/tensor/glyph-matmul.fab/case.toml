@@ -3,6 +3,8 @@ id = "corpus/tensor/glyph-matmul.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/glyph-matmul.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

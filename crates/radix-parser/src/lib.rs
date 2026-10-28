@@ -1952,6 +1952,10 @@ mod annotation_locale_test;
 mod annotation_line_test;
 
 #[cfg(test)]
+#[path = "import_field_locale_test.rs"]
+mod import_field_locale_test;
+
+#[cfg(test)]
 #[path = "comma_law_test.rs"]
 mod comma_law_test;
 
@@ -2075,3 +2079,7 @@ mod expected_issue_test;
 #[cfg(test)]
 #[path = "emitted_issue_rows_test.rs"]
 mod emitted_issue_rows_test;
+
+#[cfg(test)]
+#[path = "range_argument_test.rs"]
+mod range_argument_test;

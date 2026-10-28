@@ -3,6 +3,8 @@ id = "corpus/operatores/tuple-record-sized-literal.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/tuple-record-sized-literal.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

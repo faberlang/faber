@@ -3,6 +3,8 @@ id = "corpus/adfirma/adfirma-message-particle-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "adfirma/adfirma-message-particle-reject.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

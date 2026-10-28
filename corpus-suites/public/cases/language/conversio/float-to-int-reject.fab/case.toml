@@ -3,6 +3,8 @@ id = "corpus/conversio/float-to-int-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/float-to-int-reject.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

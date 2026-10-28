@@ -3,6 +3,8 @@ id = "corpus/assertio/non-null-method-call.fab"
 group = "language"
 input_root = "corpus"
 input = "assertio/non-null-method-call.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

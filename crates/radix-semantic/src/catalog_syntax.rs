@@ -972,6 +972,7 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
             let form = arg_value(args, "form")?;
             Some(format!("`{form}` is a retired numeric type spelling"))
         }
+        "range_bound_required" => Some("a range needs both ends".to_owned()),
         _ => None,
     }
 }
@@ -1019,6 +1020,9 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
                 "write `{bare}`, not `{form}`; a width marker is its own type"
             ))
         }
+        "range_bound_required" => Some(
+            "write both ends, such as 0‥8 or 0…7, with ∞ or -∞ for no bound on a side".to_owned(),
+        ),
         _ => None,
     }
 }
@@ -1137,6 +1141,12 @@ fn invalid_import_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "unknown_import_field" => Some("unknown import field".to_owned()),
+        "wrong_locale_import_field" => {
+            let field = arg_value(args, "field")?;
+            Some(format!(
+                "import field `{field}` is not declared on this reader surface"
+            ))
+        }
         "duplicate_import_field" => {
             let field = arg_value(args, "field")?;
             Some(format!("duplicate import field `{field}`"))
@@ -1168,6 +1178,10 @@ fn invalid_import_help(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "unknown_import_field" => Some("use ex, visibilitas, nomen, ut, or omnia".to_owned()),
+        "wrong_locale_import_field" => {
+            let expected = arg_value(args, "expected")?;
+            Some(format!("use `{expected}` for this file's reader locale"))
+        }
         "duplicate_import_field" => {
             Some("each import field may appear once; remove the repeated field".to_owned())
         }

@@ -3,6 +3,8 @@ id = "corpus/intrinseca/fractus-approximata.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/fractus-approximata.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/membrum/membrum.fab"
 group = "language"
 input_root = "corpus"
 input = "membrum/membrum.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

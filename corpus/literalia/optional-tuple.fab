@@ -2,7 +2,7 @@
 term = "iuncta"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fixum_decl", "assignment", "expr_stmt", "si_stmt", "iuncta_expr", "call_expr", "call_suffix", "argument_list", "argument", "redde_stmt", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "literal"
 canonical = false
 summary = "A typed tuple stored into a `tuple<..> ∪ none` slot: declaration, assignment, argument, and return."
 syntax = "tuple<A, B> ∪ none <name> ← tuple<A, B> [<elements>]"

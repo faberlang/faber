@@ -3,6 +3,8 @@ id = "corpus/lista/methodi-functionales.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/methodi-functionales.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/lista/unknown-method-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/unknown-method-reject.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/scriptum/template-mixed-holes.fab"
 group = "language"
 input_root = "corpus"
 input = "scriptum/template-mixed-holes.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

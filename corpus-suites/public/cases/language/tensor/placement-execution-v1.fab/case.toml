@@ -3,6 +3,8 @@ id = "corpus/tensor/placement-execution-v1.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/placement-execution-v1.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

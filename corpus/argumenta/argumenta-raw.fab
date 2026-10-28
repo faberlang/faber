@@ -2,7 +2,7 @@
 term = "argumenta"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "entry_header", "expression", "nota_stmt"]
-category = "entry"
+category = "function"
 canonical = false
 summary = "A raw `main args` entry binds the arguments the program was given, never the program name."
 syntax = "main args <name> <block>"

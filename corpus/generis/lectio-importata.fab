@@ -2,7 +2,7 @@
 term = "class constant import"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "member_suffix", "incipit_stmt", "expression", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "An imported genus's class constant reads through the module and the type name: module.Tab.LIMIT."
 syntax = "<module>.<Type>.<field>"

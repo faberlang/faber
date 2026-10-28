@@ -3,6 +3,8 @@ id = "corpus/sparge/sparge.fab"
 group = "language"
 input_root = "corpus"
 input = "sparge/sparge.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

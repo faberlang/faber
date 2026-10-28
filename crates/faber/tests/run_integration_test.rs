@@ -92,8 +92,8 @@ fn targets_reports_faber_package_capability_for_fmir_targets() {
             .find(|line| line.starts_with(&prefix))
             .unwrap_or_else(|| panic!("missing {target} row:\n{stdout}"));
         assert!(
-            row.contains("check=yes build=yes run=yes package=yes"),
-            "Faber package FMIR target row must show package build/run truth:\n{row}"
+            row.contains("check=yes build=yes run=no package=yes"),
+            "Faber package FMIR target row must show package build truth and no run (faber run refuses built images):\n{row}"
         );
         assert!(
             row.contains("faber build --target"),
@@ -113,6 +113,55 @@ fn targets_reports_faber_package_capability_for_fmir_targets() {
         wgsl.contains("run=no package=no") && wgsl.contains("not GPU launch or package runtime"),
         "systems emit targets must remain non-package/non-runtime claims:\n{wgsl}"
     );
+}
+
+#[test]
+fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
+    let (stdout, stderr, ok) = run_faber(&["targets"]);
+    assert!(ok, "faber targets failed:\n{stderr}");
+
+    // `faber run` interprets source; the only target routes it reaches are the
+    // `--device metal|cuda` launches and the compiled `--target ts` build.
+    let runnable: Vec<&str> = stdout
+        .lines()
+        .filter(|line| line.contains(" run=yes "))
+        .filter_map(|line| line.split_whitespace().next())
+        .collect();
+    assert!(
+        runnable
+            .iter()
+            .all(|name| ["metal-text", "llvm-text", "ts"].contains(name)),
+        "only the device routes may report run=yes, got {runnable:?}:\n{stdout}"
+    );
+
+    for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
+        let prefix = format!("{name} ");
+        let row = stdout
+            .lines()
+            .find(|line| line.starts_with(&prefix))
+            .unwrap_or_else(|| panic!("missing {name} row:\n{stdout}"));
+        assert!(
+            row.contains(" run=no "),
+            "{name} is not run by `faber run`:\n{row}"
+        );
+        assert!(
+            !row.contains("build/run --target") && !row.contains("faber run --target"),
+            "{name} note must not advertise a `faber run` target:\n{row}"
+        );
+    }
+
+    // And the dispatch agrees: `faber run` takes no other `--target` for any of them.
+    for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
+        let (_, stderr, status) = run_faber_status(&["run", "--target", name, "."]);
+        assert!(
+            !status.success(),
+            "`faber run --target {name}` must be refused"
+        );
+        assert!(
+            stderr.contains("--target"),
+            "refusal must name the unexpected `--target` flag:\n{stderr}"
+        );
+    }
 }
 
 fn run_faber_status(args: &[&str]) -> (String, String, std::process::ExitStatus) {
@@ -3545,15 +3594,15 @@ fn run_auto_device_kernel_fault_runs_the_program_once() {
     );
 }
 
-/// The corpus-product device tensor fragments must print on the reference route
-/// exactly what their hand-computed `main.ref.json` reference says.
-fn assert_reference_route_matches_reference_fixture(package: &str) {
+/// The corpus-product device tensor fragments must print exactly what their
+/// hand-computed `main.ref.json` reference says, on every route.
+///
+/// `printed` is the program's stdout (no device receipt line) and `route`
+/// names the route in a failure message.
+fn assert_prints_reference_fixture(package: &str, route: &str, printed: &str) {
     let dir = repo_root()
         .join("corpus-product/tensor-fragment")
         .join(package);
-    let path = dir.display().to_string();
-    let (stdout, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
-    assert!(ok, "{package}: reference run failed:\n{stderr}");
     let fixture_text =
         fs::read_to_string(dir.join("src").join("main.ref.json")).expect("read main.ref.json");
     let fixture: serde_json::Value =
@@ -3565,7 +3614,7 @@ fn assert_reference_route_matches_reference_fixture(package: &str) {
         .iter()
         .map(|value| value.as_f64().expect("reference number"))
         .collect();
-    let got: Vec<f64> = stdout
+    let got: Vec<f64> = printed
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty())
@@ -3577,14 +3626,86 @@ fn assert_reference_route_matches_reference_fixture(package: &str) {
     assert_eq!(
         got.len(),
         want.len(),
-        "{package}: printed {got:?}, reference {want:?}\n{stdout}"
+        "{package}: {route} printed {got:?}, reference {want:?}\n{printed}"
     );
     for (index, (got, want)) in got.iter().zip(&want).enumerate() {
         assert!(
             (got - want).abs() <= tolerance,
-            "{package}: element {index}: reference route {got} vs main.ref.json {want}"
+            "{package}: element {index}: {route} {got} vs main.ref.json {want} (tolerance {tolerance})"
         );
     }
+}
+
+fn assert_reference_route_matches_reference_fixture(package: &str) {
+    let path = repo_root()
+        .join("corpus-product/tensor-fragment")
+        .join(package)
+        .display()
+        .to_string();
+    let (stdout, stderr, ok) = run_faber(&["run", "--device", "reference", &path]);
+    assert!(ok, "{package}: reference run failed:\n{stderr}");
+    assert_prints_reference_fixture(package, "reference route", &stdout);
+}
+
+/// `FABER_REQUIRE_METAL` makes a missing Metal device a failure instead of a
+/// skip, as `FABER_REQUIRE_CUDA` does for the CUDA hardware tests.
+#[cfg(target_os = "macos")]
+fn metal_required() -> bool {
+    std::env::var_os("FABER_REQUIRE_METAL").is_some()
+}
+
+/// The Metal device route must print what the hand-computed `main.ref.json`
+/// says, within its tolerance: the same values the reference route prints.
+/// Skips without a Metal device; fails when `FABER_REQUIRE_METAL` is set.
+#[cfg(target_os = "macos")]
+fn assert_metal_route_matches_reference_fixture(package: &str) {
+    let path = repo_root()
+        .join("corpus-product/tensor-fragment")
+        .join(package)
+        .display()
+        .to_string();
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "metal", &path]);
+    let Some((_, program)) = stdout
+        .split_once('\n')
+        .filter(|(receipt, _)| receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX))
+    else {
+        assert!(
+            !metal_required(),
+            "FABER_REQUIRE_METAL is set but {package} did not run on a Metal device:\n{stdout}\n{stderr}"
+        );
+        eprintln!("no Metal device: skipped");
+        return;
+    };
+    assert!(status.success(), "{package}: metal run failed:\n{stderr}");
+    assert_prints_reference_fixture(package, "metal route", program);
+}
+
+/// The CUDA device line every CUDA device session prints ahead of the program.
+const CUDA_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `cuda` on ";
+
+/// The CUDA device route must print what the hand-computed `main.ref.json`
+/// says, within its tolerance: the same values the reference route prints.
+/// Skips without a CUDA device; fails when `FABER_REQUIRE_CUDA` is set.
+fn assert_cuda_route_matches_reference_fixture(package: &str) {
+    let path = repo_root()
+        .join("corpus-product/tensor-fragment")
+        .join(package)
+        .display()
+        .to_string();
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cuda", &path]);
+    let Some((_, program)) = stdout
+        .split_once('\n')
+        .filter(|(receipt, _)| receipt.starts_with(CUDA_DEVICE_RECEIPT_PREFIX))
+    else {
+        assert!(
+            std::env::var_os("FABER_REQUIRE_CUDA").is_none(),
+            "FABER_REQUIRE_CUDA is set but {package} did not run on a CUDA device:\n{stdout}\n{stderr}"
+        );
+        eprintln!("no CUDA device: skipped");
+        return;
+    };
+    assert!(status.success(), "{package}: cuda run failed:\n{stderr}");
+    assert_prints_reference_fixture(package, "cuda route", program);
 }
 
 #[test]
@@ -3595,4 +3716,117 @@ fn tiny_linear_device_reference_route_prints_the_reference_fixture() {
 #[test]
 fn tiny_linear_device_relu_reference_route_prints_the_reference_fixture() {
     assert_reference_route_matches_reference_fixture("tiny-linear-device-relu");
+}
+
+#[test]
+fn tiny_linear_device_two_matmul_reference_route_prints_the_reference_fixture() {
+    assert_reference_route_matches_reference_fixture("tiny-linear-device-two-matmul");
+}
+
+/// Metal runs the matmul and the fused bias add as one kernel that stores
+/// `x·W + b` into the output parameter `y`; the bias must reach the output.
+#[cfg(target_os = "macos")]
+#[test]
+fn tiny_linear_device_metal_route_prints_the_reference_fixture() {
+    assert_metal_route_matches_reference_fixture("tiny-linear-device");
+}
+
+/// Metal's fused tail ends in the relu: four of the eight outputs are zeroed.
+#[cfg(target_os = "macos")]
+#[test]
+fn tiny_linear_device_relu_metal_route_prints_the_reference_fixture() {
+    assert_metal_route_matches_reference_fixture("tiny-linear-device-relu");
+}
+
+/// Two matmuls cannot be one recipe kernel, so Metal runs one kernel per matmul
+/// and the final one stores `(x·W)·V + b` into the output parameter `y`. The
+/// decomposed kernel used to bind the second matmul's result local instead, and
+/// `y` printed its zeros.
+#[cfg(target_os = "macos")]
+#[test]
+fn tiny_linear_device_two_matmul_metal_route_prints_the_reference_fixture() {
+    assert_metal_route_matches_reference_fixture("tiny-linear-device-two-matmul");
+}
+
+/// CUDA runs the matmul and the fused bias add as one NVVM kernel that stores
+/// `x·W + b` into the output parameter `y`. The out-parameter form used to
+/// store the raw accumulator, so CUDA printed `x·W`.
+#[test]
+fn tiny_linear_device_cuda_route_prints_the_reference_fixture() {
+    assert_cuda_route_matches_reference_fixture("tiny-linear-device");
+}
+
+/// CUDA's fused tail ends in the relu: four of the eight outputs are zeroed.
+#[test]
+fn tiny_linear_device_relu_cuda_route_prints_the_reference_fixture() {
+    assert_cuda_route_matches_reference_fixture("tiny-linear-device-relu");
+}
+
+/// Two matmuls run as one NVVM kernel per matmul; the final one stores
+/// `(x·W)·V + b` into the output parameter `y`.
+#[test]
+fn tiny_linear_device_two_matmul_cuda_route_prints_the_reference_fixture() {
+    assert_cuda_route_matches_reference_fixture("tiny-linear-device-two-matmul");
+}
+
+/// A whole-grid reduction with a `coalesce` fallback over an empty run-time
+/// sized tensor.
+const EMPTY_REDUCTION_PACKAGE: &str = r#"@ kernel
+@ public
+fn mx<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [4]> out) → void {
+    out[0] ← reduce via max from src at [i, j] thread lane let v { return v } coalesce 7.5
+}
+
+@ cli "empty-reduce"
+@ operand int rows
+@ operand int cols
+main args args {
+    let int rows ← args.rows
+    let int cols ← args.cols
+    const size R ← rows
+    const size C ← cols
+    mut tensor<f32, [R, C]> src ← tf32[R, C] {}
+    mut tensor<f32, [4]> out ← tf32[4] {}
+    mx(src, mut out)
+    print out[0]
+}
+"#;
+
+/// Operator ruling 2026-10-14: a zero-length reduction source returns its
+/// `coalesce` fallback on every device, as on the host. The device used to
+/// refuse the zero extent (`geometry_zero_extent`) on `--device cpu` and abort
+/// the process on `--device metal`; the dispatcher now decides at launch from
+/// the run-time extent and stores the fallback. Each device agrees with the
+/// reference, empty (a zero in either axis) and not. The Metal leg skips
+/// without a Metal device; `FABER_REQUIRE_METAL` makes that a failure.
+#[test]
+fn empty_grid_reduction_returns_its_coalesce_fallback_on_every_device() {
+    let package = write_basic_package("empty-grid-reduction", EMPTY_REDUCTION_PACKAGE);
+    let path = package.join("src").join("main.fab").display().to_string();
+    for (rows, cols, want) in [("0", "5", "7.5"), ("7", "0", "7.5"), ("7", "5", "0.0")] {
+        for device in ["reference", "cpu", "metal"] {
+            let (stdout, stderr, status) =
+                run_faber_status(&["run", "--device", device, &path, "--", rows, cols]);
+            let program = if device == "reference" {
+                stdout.as_str()
+            } else if let Some((receipt, program)) = stdout.split_once('\n')
+                && receipt.starts_with("device: selected backend `")
+            {
+                program
+            } else {
+                #[cfg(target_os = "macos")]
+                assert!(
+                    device != "metal" || !metal_required(),
+                    "FABER_REQUIRE_METAL is set but {rows}x{cols} did not run on a Metal device:\n{stdout}\n{stderr}"
+                );
+                eprintln!("no {device} device: skipped");
+                continue;
+            };
+            assert!(
+                status.success(),
+                "{device} {rows}x{cols} failed:\n{stdout}\n{stderr}"
+            );
+            assert_eq!(program.trim(), want, "{device} {rows}x{cols}");
+        }
+    }
 }

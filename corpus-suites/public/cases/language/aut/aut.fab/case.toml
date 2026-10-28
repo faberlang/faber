@@ -3,6 +3,8 @@ id = "corpus/aut/aut.fab"
 group = "language"
 input_root = "corpus"
 input = "aut/aut.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

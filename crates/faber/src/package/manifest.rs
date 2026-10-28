@@ -77,6 +77,10 @@ pub struct FaberManifest {
     /// Check-command settings (`[check]`): the complexity warning budget.
     #[serde(default)]
     pub check: ManifestCheck,
+
+    /// Format-command settings (`[format]`): the opt-in wrap width.
+    #[serde(default)]
+    pub format: ManifestFormat,
 }
 
 /// The `faber run --device` / `[device] device` value set.
@@ -114,6 +118,27 @@ impl DeviceChoice {
             "metal" => Some(Self::Metal),
             "cuda" => Some(Self::Cuda),
             _ => None,
+        }
+    }
+
+    /// The CLI spelling of the emit target whose device route this choice
+    /// launches under `faber run`, or `None` when the choice runs on the
+    /// interpreter alone. Keyed by spelling so the product crate names no
+    /// backend variant (open-core boundary).
+    ///
+    /// `faber run` takes no `--target` and executes no emitted artifact: it
+    /// interprets source. A device choice is the only way a target's route
+    /// is reached from it (`metal` launches the Metal route, `cuda` the
+    /// NVVM/PTX route owned by the LLVM target). `faber targets` derives its
+    /// `run` column from this match, so the report cannot claim a target
+    /// that `faber run` has no way to select; the match is exhaustive, so a
+    /// new choice must decide here.
+    #[must_use]
+    pub const fn run_target_spelling(self) -> Option<&'static str> {
+        match self {
+            Self::Auto | Self::Reference | Self::Cpu => None,
+            Self::Metal => Some("metal-text"),
+            Self::Cuda => Some("llvm-text"),
         }
     }
 
@@ -283,6 +308,21 @@ pub struct ManifestCheck {
     pub kernel_complexity_budget: Option<u32>,
 }
 
+/// `[format]` settings for `faber format` (product view only).
+///
+/// The `radix-program` compiler projection tolerates `[format]` as an unknown
+/// product table; only this view declares and validates its shape. There is
+/// no built-in width: with neither the flag nor this key, output is not
+/// wrapped. Layering: CLI `--width` beats `width` here.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ManifestFormat {
+    /// Wrap width in display columns for `faber format`; `None` means no
+    /// wrapping. Held as a raw value so a zero, negative or non-integer width
+    /// is refused with a diagnostic naming this key ([`manifest_format_width`]).
+    pub width: Option<toml::Value>,
+}
+
 macro_rules! product_path_default {
     ($name:ident, $value:literal) => {
         fn $name() -> String {
@@ -347,6 +387,56 @@ pub(crate) fn manifest_check_section(input: &Path) -> Option<ManifestCheck> {
         .ok()
         .flatten()
         .map(|(manifest, _)| manifest.check)
+}
+
+/// Map a manifest `[format] width` value to a wrap width. `None` when the key
+/// is absent: no wrapping. A value that is not a positive integer fails closed
+/// (never silently ignored).
+///
+/// # Errors
+/// Fails when the width is zero, negative, not an integer, or above `u32::MAX`.
+pub fn manifest_format_width(
+    format: &ManifestFormat,
+    path: &Path,
+) -> Result<Option<std::num::NonZeroU32>, Box<Diagnostic>> {
+    let Some(value) = format.width.as_ref() else {
+        return Ok(None);
+    };
+    let Some(width) = value
+        .as_integer()
+        .and_then(|width| u32::try_from(width).ok())
+        .and_then(std::num::NonZeroU32::new)
+    else {
+        return Err(Box::new(
+            crate::package_diagnostic_error(format!(
+                "faber.toml format.width must be a positive integer, found {value}"
+            ))
+            .with_file(path.display().to_string())
+            .with_arg("issue", "package_format_width_invalid")
+            .with_arg("key", "format.width")
+            .with_arg("width", value.to_string()),
+        ));
+    };
+    Ok(Some(width))
+}
+
+/// Resolve the effective `faber format` wrap width for an input path: CLI
+/// `--width N` > manifest `[format] width` > `None` (no wrapping; there is no
+/// built-in default). The same precedence as `--device`. An invalid manifest
+/// width fails closed even when the flag would win over it.
+///
+/// # Errors
+/// Fails when the discovered manifest cannot be read, or when its `[format]
+/// width` value is invalid ([`manifest_format_width`]).
+pub fn resolve_format_width(
+    cli: Option<std::num::NonZeroU32>,
+    input_path: &Path,
+) -> Result<Option<std::num::NonZeroU32>, Box<Diagnostic>> {
+    let Some((manifest, path)) = input_manifest(input_path)? else {
+        return Ok(cli);
+    };
+    let manifest_width = manifest_format_width(&manifest.format, &path)?;
+    Ok(cli.or(manifest_width))
 }
 
 /// Map a manifest `[device] device` value to a device choice (N1.1). `None`
@@ -676,6 +766,8 @@ pub(crate) fn validate_manifest(
     }
 
     manifest_device_cuda_libdevice(&manifest.device, path)?;
+
+    manifest_format_width(&manifest.format, path)?;
 
     if let Some(product) = &manifest.product {
         validate_product(product, path)?;

@@ -94,6 +94,71 @@ fn decode_accepts_def_sites_inside_parameter_default() {
 }
 
 #[test]
+fn decode_checks_cli_argument_defaults() {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let ty = types.intern(Type::Error);
+    artifact.types = types.snapshot();
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.cli_args = Some(HirParam {
+        def_id: DefId(USER_DEF_ID_BASE + 1),
+        name: Symbol(0),
+        ty,
+        mode: HirParamMode::Owned,
+        optional: false,
+        sponte: false,
+        default: Some(HirExpression {
+            id: HirId(1),
+            kind: HirExpressionKind::Path(DefId(999_999)),
+            ty: None,
+            span: Span::default(),
+        }),
+        span: Span::default(),
+    });
+
+    let err = crate::decode(&crate::encode(&artifact).expect("encode artifact"))
+        .expect_err("a CLI argument default's dangling definition must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+        ),
+        "CLI argument defaults must be checked as expressions: {err:?}"
+    );
+}
+
+#[test]
+fn decode_accepts_synthesized_backward_companion_identity() {
+    use crate::artifact::{RadixBackwardWire, RadixLaneEntryWire, RadixLaneWire};
+    let mut artifact = stub_artifact();
+    artifact.radix_lanes.push(RadixLaneEntryWire {
+        def_id: DefId(0),
+        lane: RadixLaneWire::Air,
+        backward: Some(RadixBackwardWire {
+            companion_name: Symbol(0),
+            companion_def_id: DefId(radix_types::COMPANION_DEF_ID_FLAG),
+            selected_params: None,
+        }),
+    });
+    decode(&encode(&artifact).expect("encode artifact"))
+        .expect("a companion identity is synthesized, not declared in the artifact");
+
+    let backward = artifact.radix_lanes[0].backward.as_mut().expect("backward");
+    backward.companion_def_id = DefId(999_999);
+    let err = decode(&encode(&artifact).expect("encode artifact"))
+        .expect_err("a companion identity outside the companion family must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+        ),
+        "{err:?}"
+    );
+}
+
+#[test]
 fn generic_applied_arg_preserves_index_kind() {
     let mut types = radix_types::TypeTable::new();
     let base = types.intern(radix_types::Type::Param(radix_lexer::Symbol(10)));
@@ -1278,12 +1343,14 @@ fn function_export_dangling_generic_param_name_fails_closed() {
                     }),
                 )],
                 unavailable: Vec::new(),
+                const_values: Vec::new(),
             },
         )],
         used_namespaces: Vec::new(),
         imported_nominal_types: Vec::new(),
         ambiguous_imported_nominal_types: Vec::new(),
         conversion_rows: Vec::new(),
+        module_bindings: Vec::new(),
     };
 
     let bytes = encode(&artifact).expect("encode artifact");
@@ -1331,12 +1398,14 @@ fn function_export_valid_generic_param_name_loads() {
                     }),
                 )],
                 unavailable: Vec::new(),
+                const_values: Vec::new(),
             },
         )],
         used_namespaces: Vec::new(),
         imported_nominal_types: Vec::new(),
         ambiguous_imported_nominal_types: Vec::new(),
         conversion_rows: Vec::new(),
+        module_bindings: Vec::new(),
     };
 
     let bytes = encode(&artifact).expect("encode artifact");

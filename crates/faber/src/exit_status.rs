@@ -10,7 +10,16 @@
 //! | 1 | [`FAILURE`] | a failure with no known class |
 //! | 64 | [`USAGE`] | bad command-line arguments |
 //! | 65 | [`DATA_ERROR`] | the source has error diagnostics |
+//! | 66 | [`NO_INPUT`] | an input file or path is missing or unreadable, or stdin cannot be read |
+//! | 69 | [`UNAVAILABLE`] | a feature, runner or target this binary was not built with |
+//! | 70 | [`SOFTWARE`] | an internal serialization or render failure |
+//! | 73 | [`CANT_CREATE`] | an output file or directory cannot be written |
 //! | 78 | [`CONFIG`] | a bad `faber.toml` manifest key, or a locale pack that fails to load |
+//!
+//! A status that reports an outcome rather than a failure keeps its documented
+//! meaning: `faber test` exits 1 when a case fails, `faber format --check`
+//! exits 1 on drift, and `faber update --check` exits 1 when an update is
+//! available and 2 when the lookup fails.
 //!
 //! These are the tool's own outcome statuses. What a compiled or interpreted
 //! Faber program exits with when it traps or calls `exitus` is the program's
@@ -26,6 +35,20 @@ pub const USAGE: i32 = 64;
 
 /// The source has error diagnostics (`EX_DATAERR`).
 pub const DATA_ERROR: i32 = 65;
+
+/// An input file or path is missing or unreadable, or stdin cannot be read
+/// (`EX_NOINPUT`).
+pub const NO_INPUT: i32 = 66;
+
+/// A feature, runner or target this binary was not built with
+/// (`EX_UNAVAILABLE`).
+pub const UNAVAILABLE: i32 = 69;
+
+/// An internal serialization or render failure (`EX_SOFTWARE`).
+pub const SOFTWARE: i32 = 70;
+
+/// An output file or directory cannot be written (`EX_CANTCREAT`).
+pub const CANT_CREATE: i32 = 73;
 
 /// A bad `faber.toml` manifest key or a locale pack that fails to load
 /// (`EX_CONFIG`).
@@ -44,6 +67,15 @@ pub const CLASS_CONFIG: &str = "config";
 /// [`CLASS_ARG`] value for a bad-argument failure.
 pub const CLASS_USAGE: &str = "usage";
 
+/// [`CLASS_ARG`] value for an output file or directory that cannot be written.
+pub const CLASS_CANT_CREATE: &str = "cant_create";
+
+/// [`CLASS_ARG`] value for a feature or target this binary was not built with.
+pub const CLASS_UNAVAILABLE: &str = "unavailable";
+
+/// [`CLASS_ARG`] value for an internal serialization or render failure.
+pub const CLASS_SOFTWARE: &str = "software";
+
 /// Build a `PKG001` diagnostic for a bad manifest key or a locale pack that
 /// fails to load.
 pub fn config_diagnostic_error(message: impl Into<String>) -> Diagnostic {
@@ -55,6 +87,24 @@ pub fn usage_diagnostic_error(message: impl Into<String>) -> Diagnostic {
     crate::package_diagnostic_error(message).with_arg(CLASS_ARG, CLASS_USAGE)
 }
 
+/// Build the diagnostic for a failed write of `path`: an output file, a
+/// generated workspace file or a directory that could not be created.
+///
+/// `Diagnostic::io_error` is the read-side diagnostic (its message says
+/// "cannot read"); a write failure carries its own message and the
+/// [`CANT_CREATE`] class.
+pub fn write_diagnostic_error(path: &std::path::Path, err: &std::io::Error) -> Diagnostic {
+    let mut diag = Diagnostic::io_error(path, err);
+    let artifact = diag
+        .args
+        .iter()
+        .find(|arg| arg.name == "artifact")
+        .map_or("file", |arg| arg.value.as_str())
+        .to_owned();
+    diag.message = format!("cannot write {artifact} '{}': {err}", path.display());
+    diag.with_arg(CLASS_ARG, CLASS_CANT_CREATE)
+}
+
 /// The exit status a failure diagnostic maps to.
 ///
 /// - A diagnostic tagged [`CLASS_ARG`] takes that class.
@@ -62,7 +112,10 @@ pub fn usage_diagnostic_error(message: impl Into<String>) -> Diagnostic {
 ///   compiler-side manifest reader tags nothing, it names the file.
 /// - A diagnostic from a compiler phase (lex through codegen) is
 ///   [`DATA_ERROR`]: the source is the input that failed.
-/// - Anything else (filesystem failures, tool failures) is [`FAILURE`].
+/// - A filesystem read failure (the `Io` phase, which `Diagnostic::io_error`
+///   and the stdin reader produce) is [`NO_INPUT`]; a write failure is tagged
+///   [`CLASS_CANT_CREATE`] by [`write_diagnostic_error`].
+/// - Anything else (tool failures) is [`FAILURE`].
 #[must_use]
 pub fn status_for_diagnostic(diag: &Diagnostic) -> i32 {
     classify(diag, true)
@@ -76,6 +129,16 @@ pub fn status_for_diagnostic(diag: &Diagnostic) -> i32 {
 pub fn status_for_run_diagnostic(diag: &Diagnostic) -> i32 {
     classify(diag, false)
 }
+
+/// Diagnostic `issue` values that say the requested target or feature is not
+/// compiled into this build: the compiler's `target_unavailable`, the package
+/// layer's `package_target_unavailable` and the build gate's
+/// `target_not_in_this_build`.
+const UNAVAILABLE_ISSUES: [&str; 3] = [
+    "target_unavailable",
+    "package_target_unavailable",
+    "target_not_in_this_build",
+];
 
 fn classify(diag: &Diagnostic, back_end_is_source: bool) -> i32 {
     // A run-time trap carries the class the shared trap table chose for it
@@ -92,7 +155,16 @@ fn classify(diag: &Diagnostic, back_end_is_source: bool) -> i32 {
     match tagged.map(|arg| arg.value.as_str()) {
         Some(CLASS_CONFIG) => return CONFIG,
         Some(CLASS_USAGE) => return USAGE,
+        Some(CLASS_CANT_CREATE) => return CANT_CREATE,
+        Some(CLASS_UNAVAILABLE) => return UNAVAILABLE,
+        Some(CLASS_SOFTWARE) => return SOFTWARE,
         _ => {}
+    }
+    if diag
+        .issue()
+        .is_some_and(|issue| UNAVAILABLE_ISSUES.contains(&issue))
+    {
+        return UNAVAILABLE;
     }
     if std::path::Path::new(&diag.file)
         .file_name()
@@ -101,7 +173,8 @@ fn classify(diag: &Diagnostic, back_end_is_source: bool) -> i32 {
         return CONFIG;
     }
     match diag.phase {
-        DiagnosticPhase::Io | DiagnosticPhase::Tool => FAILURE,
+        DiagnosticPhase::Io => NO_INPUT,
+        DiagnosticPhase::Tool => FAILURE,
         DiagnosticPhase::Mir | DiagnosticPhase::Codegen if !back_end_is_source => FAILURE,
         DiagnosticPhase::Lex
         | DiagnosticPhase::Parse
@@ -172,6 +245,26 @@ pub fn exit_usage() -> ! {
 /// Exit with [`DATA_ERROR`].
 pub fn exit_data_error() -> ! {
     std::process::exit(DATA_ERROR);
+}
+
+/// Exit with [`NO_INPUT`].
+pub fn exit_no_input() -> ! {
+    std::process::exit(NO_INPUT);
+}
+
+/// Exit with [`UNAVAILABLE`].
+pub fn exit_unavailable() -> ! {
+    std::process::exit(UNAVAILABLE);
+}
+
+/// Exit with [`SOFTWARE`].
+pub fn exit_software() -> ! {
+    std::process::exit(SOFTWARE);
+}
+
+/// Exit with [`CANT_CREATE`].
+pub fn exit_cant_create() -> ! {
+    std::process::exit(CANT_CREATE);
 }
 
 /// Exit with [`CONFIG`].

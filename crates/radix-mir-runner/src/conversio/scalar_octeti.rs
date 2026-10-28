@@ -28,13 +28,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let Some(width) = effective_width(self.types, source_ty) else {
             return Err(RunnerError::internal(
                 span,
-                "scalar bounded octeti conversio source has no width",
+                "scalar bounded list<b8> conversio source has no width",
             ));
         };
         let Some(width_bytes) = scalar_octeti_width_bytes(width) else {
             return Err(RunnerError::internal(
                 span,
-                "scalar bounded octeti conversio source width is not an endian width",
+                "scalar bounded list<b8> conversio source width is not an endian width",
             ));
         };
         let Some(endian) = hints::endian_hint(params, |param| {
@@ -42,7 +42,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }) else {
             return Err(RunnerError::internal(
                 span,
-                "scalar bounded octeti conversio needs a Be or Le hint",
+                "scalar bounded list<b8> conversio needs a Be or Le hint",
             ));
         };
         let bits = match value {
@@ -54,14 +54,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 _ => {
                     return Err(RunnerError::internal(
                         span,
-                        "scalar bounded octeti conversio float width is not F32 or F64",
+                        "scalar bounded list<b8> conversio float width is not F32 or F64",
                     ));
                 }
             },
             other => {
                 return Err(RunnerError::internal(
                     span,
-                    format!("scalar bounded octeti conversio met a non-numeric value: {other:?}"),
+                    format!("scalar bounded list<b8> conversio met a non-numeric value: {other:?}"),
                 ));
             }
         };
@@ -72,13 +72,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let IndexExpr::Literal(literal) = self.types.get_index(capacity) else {
             return Err(RunnerError::internal(
                 span,
-                "bounded octeti requires a literal capacity",
+                "bounded list<b8> requires a literal capacity",
             ));
         };
         if usize::try_from(*literal) != Ok(bytes.len()) {
             return Err(RunnerError::internal(
                 span,
-                "scalar bounded octeti conversio length is not the literal capacity",
+                "scalar bounded list<b8> conversio length is not the literal capacity",
             ));
         }
         Ok(Value::Octeti(bytes))

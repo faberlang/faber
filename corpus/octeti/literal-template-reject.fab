@@ -1,12 +1,12 @@
 +++
-term = "octeti"
+term = "list<b8>"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "A byte-list literal is not a callable template: applying it as |00|(id) rejects with SEM011:octeti_literal_template_application."
 syntax = "|00|(id)"
-related = ["octeti", "scriptum"]
+related = ["list<b8>", "scriptum"]
 locale = "en"
 no_expected = "rejects"
 diagnostic = "SEM011:octeti_literal_template_application"

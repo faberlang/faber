@@ -1,11 +1,11 @@
 +++
-term = "octeti"
+term = "list<b8>"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
 category = "conversion"
 summary = "Decline: bounded list<b8, N> cannot convert directly to unbounded textus."
 syntax = "list<b8, N> ↦ textus"
-related = ["↦", "octeti", "textus"]
+related = ["↦", "list<b8>", "textus"]
 locale = "en"
 +++
 

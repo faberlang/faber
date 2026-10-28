@@ -3,6 +3,8 @@ id = "corpus/sparsa/non-numeric-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "sparsa/non-numeric-reject.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

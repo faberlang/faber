@@ -102,7 +102,7 @@ fn empty_tensor_of_vectors_runs_as_the_typed_zero() {
 
 #[test]
 fn empty_tensor_with_size_generic_extent_runs() {
-    let source = "+++\nlocale = \"en\"\n+++\nfn zeros<size N>() → tensor<f32, [N]> {\n    return empty\n}\nmain {\n    print zeros<4>().shape()[0]\n}\n";
+    let source = "+++\nlocale = \"en\"\n+++\nfn zeros<size N>() → tensor<f32, [N]> {\n    return empty\n}\nmain {\n    print zeros<size 4>().shape()[0]\n}\n";
     assert_eq!(stdout(source), ["4"]);
 }
 

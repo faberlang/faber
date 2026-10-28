@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 506 | 510 | 99% |
-| go | 459 | 510 | 90% |
-| ts | 510 | 510 | 100% |
-| faber | 510 | 510 | 100% |
+| rust | 526 | 530 | 99% |
+| go | 475 | 530 | 90% |
+| ts | 530 | 530 | 100% |
+| faber | 530 | 530 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 440 | 512 | 86% |
-| wasm-text | 377 | 512 | 74% |
-| wasm | 376 | 512 | 73% |
-| metal-text | 5 | 512 | 1% |
-| wgsl-text | 5 | 512 | 1% |
-| sexp-struct | 462 | 512 | 90% |
-| sexp | 460 | 512 | 90% |
-| runner | 454 | 512 | 89% |
+| llvm-text | 463 | 533 | 87% |
+| wasm-text | 386 | 533 | 72% |
+| wasm | 385 | 533 | 72% |
+| metal-text | 5 | 533 | 1% |
+| wgsl-text | 5 | 533 | 1% |
+| sexp-struct | 473 | 533 | 89% |
+| sexp | 470 | 533 | 88% |
+| runner | 471 | 533 | 88% |
 
 ## Keywords — application lane
 
@@ -111,6 +111,7 @@ pages of the documentation site.
 | <a id="iuncta"></a>`iuncta` | ✓ | ✓ | ✓ | ✓ |
 | <a id="lege"></a>`lege` | ✓ | ✓ | ✓ | ✓ |
 | <a id="lineam"></a>`lineam` | ✓ | ✓ | ✓ | ✓ |
+| <a id="list-b8"></a>`list<b8>` | ✓ | ✓ | ✓ | ✓ |
 | <a id="lista"></a>`lista` | ✓ | ✓ | ✓ | ✓ |
 | <a id="mone"></a>`mone` | ✓ | ✓ | ✓ | ✓ |
 | <a id="mori"></a>`mori` | ✓ | ✓ | ✓ | ✓ |
@@ -119,7 +120,6 @@ pages of the documentation site.
 | <a id="numerus"></a>`numerus` | ✓ | ◐ | ✓ | ✓ |
 | <a id="numquam"></a>`numquam` | ✓ | ✓ | ✓ | ✓ |
 | <a id="objectum"></a>`objectum` | ✓ | ✓ | ✓ | ✓ |
-| <a id="octeti"></a>`octeti` | ✓ | ✓ | ✓ | ✓ |
 | <a id="omitte"></a>`omitte` | ✓ | ✓ | ✓ | ✓ |
 | <a id="omnia"></a>`omnia` | ✓ | ✓ | ✓ | ✓ |
 | <a id="operandus"></a>`operandus` | ✓ | ✓ | ✓ | ✓ |
@@ -195,12 +195,16 @@ pages of the documentation site.
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="modulus-u8"></a>`modulus<u8>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="non-est"></a>`non est` | ✓ | ✓ | ✓ | ✓ |
+| <a id="saturating-w-lo-hi"></a>`saturating<W, lo‥hi>` | ✓ | ✓ | ✓ | ✓ |
+| <a id="trapping-w-lo-hi"></a>`trapping<W, lo‥hi>` | ✓ | ✓ | ✓ | ✓ |
 | <a id="vel"></a>`vel` | ✓ | ✓ | ✓ | ✓ |
+| <a id="whole-width-range"></a>`whole-width range` | ✓ | ✕ | ✓ | ✓ |
+| <a id="wrapping-w-lo-hi"></a>`wrapping<W, lo‥hi>` | ✓ | ✕ | ✓ | ✓ |
 | <a id=""></a>`§` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`¬` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`·` | ✓ | ✕ | ✓ | ✓ |
 | <a id=""></a>`×` | ✓ | ○ | ✓ | ✓ |
-| <a id=""></a>`‥` | ✓ | ✓ | ✓ | ✓ |
+| <a id=""></a>`‥` | ✓ | ◐ | ✓ | ✓ |
 | <a id=""></a>`…` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`←` | ✓ | ✓ | ✓ | ✓ |
 | <a id=""></a>`→` | ✓ | ✓ | ✓ | ✓ |
@@ -257,7 +261,7 @@ pages of the documentation site.
 | <a id="ego"></a>`ego` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="elige"></a>`elige` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="errata"></a>`errata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="est"></a>`est` | ✕ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="est"></a>`est` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="ex"></a>`ex` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="exitus"></a>`exitus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="fac"></a>`fac` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -276,7 +280,7 @@ pages of the documentation site.
 | <a id="iace"></a>`iace` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ignotum"></a>`ignotum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="immutata"></a>`immutata` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
-| <a id="implendum"></a>`implendum` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="implendum"></a>`implendum` | ✓ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id="implet"></a>`implet` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="importa"></a>`importa` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ◐ |
 | <a id="in"></a>`in` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -288,6 +292,7 @@ pages of the documentation site.
 | <a id="iuncta"></a>`iuncta` | ✓ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="lege"></a>`lege` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
 | <a id="lineam"></a>`lineam` | ✓ | ✓ | ✓ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id="list-b8"></a>`list<b8>` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="lista"></a>`lista` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ◐ |
 | <a id="mone"></a>`mone` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="mori"></a>`mori` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
@@ -296,7 +301,6 @@ pages of the documentation site.
 | <a id="numerus"></a>`numerus` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id="numquam"></a>`numquam` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="objectum"></a>`objectum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id="octeti"></a>`octeti` | ✓ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="omitte"></a>`omitte` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✕ |
 | <a id="omnia"></a>`omnia` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="operandus"></a>`operandus` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -349,7 +353,7 @@ pages of the documentation site.
 | <a id="variandum"></a>`variandum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="verum"></a>`verum` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="vide"></a>`vide` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`∪` | ◐ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`∪` | ✓ | ✓ | ✓ | ✕ | ✕ | ◐ | ◐ | ✓ |
 
 ## Operators — systems lane
 
@@ -372,17 +376,21 @@ pages of the documentation site.
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="modulus-u8"></a>`modulus<u8>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="non-est"></a>`non est` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="saturating-w-lo-hi"></a>`saturating<W, lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
+| <a id="trapping-w-lo-hi"></a>`trapping<W, lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ◐ |
 | <a id="vel"></a>`vel` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="whole-width-range"></a>`whole-width range` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="wrapping-w-lo-hi"></a>`wrapping<W, lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
 | <a id=""></a>`§` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`¬` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`·` | ◐ | ✕ | ✕ | ○ | ○ | ✓ | ✓ | ✓ |
 | <a id=""></a>`×` | ✓ | ○ | ○ | ○ | ○ | ✓ | ✓ | ✓ |
-| <a id=""></a>`‥` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`‥` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`…` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`←` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`→` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`↤` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`↦` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
+| <a id=""></a>`↦` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ◐ |
 | <a id=""></a>`⇐` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⇒` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`⇥` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |

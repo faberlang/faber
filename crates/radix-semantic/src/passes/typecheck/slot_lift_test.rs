@@ -11,7 +11,7 @@ incipit {
 #[test]
 fn slot_lift_runtime_value_is_captured() {
     let result = analyze_source_la(&format!(
-        "{}    sit numerus a ← make<3, magnitudo w>()\n}}",
+        "{}    sit numerus a ← make<magnitudo 3, magnitudo w>()\n}}",
         prefix()
     ));
     assert!(result.is_ok(), "{:?}", result.diagnostics);
@@ -30,7 +30,10 @@ fn slot_lift_runtime_value_is_captured() {
 
 #[test]
 fn slot_lift_bare_value_name_has_did_you_mean() {
-    let result = analyze_source_la(&format!("{}    sit numerus a ← make<3, w>()\n}}", prefix()));
+    let result = analyze_source_la(&format!(
+        "{}    sit numerus a ← make<magnitudo 3, w>()\n}}",
+        prefix()
+    ));
     assert!(
         result.diagnostics.iter().any(|diag| diag
             .args
@@ -44,9 +47,9 @@ fn slot_lift_bare_value_name_has_did_you_mean() {
 #[test]
 fn slot_lift_literal_and_size_param_remain_valid() {
     let source = r#"functio make<magnitudo H, magnitudo W>() → numerus { redde 1 }
-functio forward<magnitudo W>() → numerus { redde make<3, W>() }
+functio forward<magnitudo W>() → numerus { redde make<magnitudo 3, magnitudo W>() }
 incipit {
-    sit numerus a ← make<3, 4>()
+    sit numerus a ← make<magnitudo 3, magnitudo 4>()
 }"#;
     let result = analyze_source_la(source);
     assert!(result.is_ok(), "{:?}", result.diagnostics);

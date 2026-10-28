@@ -3,6 +3,8 @@ id = "corpus/clausura/legacy-head.fab"
 group = "language"
 input_root = "corpus"
 input = "clausura/legacy-head.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

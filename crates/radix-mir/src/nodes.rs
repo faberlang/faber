@@ -1212,7 +1212,7 @@ impl MirLaneOp {
 
 /// The vector method a [`MirIntrinsic::VectorOp`] defers.
 ///
-/// Arity: `Length`, `Normalized`, `Negate`, `Not`, `Crea` and `Swizzle` take one
+/// Arity: `Count`, `Norm`, `Normalized`, `Negate`, `Not`, `Crea` and `Swizzle` take one
 /// operand (the receiver; `Crea` uses only its declared shape); `Select` takes
 /// three (mask, then, else); everything else takes two (receiver, peer).
 /// `Swizzle` carries resolved lane indices, never a symbol, so symbol remapping
@@ -1249,7 +1249,12 @@ pub enum MirVectorOp {
     Select,
     Dot,
     Cross,
-    Length,
+    /// Euclidean norm `sqrt(dot(v, v))` (`norm`), in the element type.
+    Norm,
+    /// Lane count (`longitudo`): the element count of the vector, an
+    /// integer constant once the width is literal (operator ruling
+    /// 2026-10-15, Q-X1).
+    Count,
     Normalized,
     Crea,
     /// Result lane `i` reads source lane `lanes[i]`.
@@ -1261,7 +1266,8 @@ impl MirVectorOp {
     #[must_use]
     pub fn arity(&self) -> usize {
         match self {
-            Self::Length
+            Self::Norm
+            | Self::Count
             | Self::Normalized
             | Self::Negate { .. }
             | Self::Not
@@ -1285,7 +1291,8 @@ impl MirVectorOp {
             Self::Select => "select",
             Self::Dot => "dot",
             Self::Cross => "cross",
-            Self::Length => "length",
+            Self::Norm => "norm",
+            Self::Count => "count",
             Self::Normalized => "normalized",
             Self::Crea => "crea",
             Self::Swizzle(_) => "swizzle",
@@ -1295,7 +1302,7 @@ impl MirVectorOp {
     /// `true` when the result is a vector rather than the element scalar.
     #[must_use]
     pub fn returns_vector(&self) -> bool {
-        !matches!(self, Self::Dot | Self::Length)
+        !matches!(self, Self::Dot | Self::Norm | Self::Count)
     }
 }
 

@@ -1,0 +1,31 @@
++++
+term = "‥"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A range needs its store-policy word: `u8<0‥8>` is refused, `saturating<u8, 0‥8>` is the spelling."
+syntax = "u8<0‥8> — rejected"
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_policy_word_required"
++++
+# =============================================================================
+# ‥ — a bare width marker takes no range
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A range refines a store policy, so the policy word comes first: `saturating`,
+#     `trapping` or `wrapping`. A bare width like `u8` names the default policy and
+#     has no second argument.
+#
+# Common mistakes:
+#   • Writing `u8<0‥8>` hoping the bare marker means trapping; write
+#     `trapping<u8, 0‥8>` instead.
+
+main {
+    let u8<0‥8> x ← 1
+    print x
+}

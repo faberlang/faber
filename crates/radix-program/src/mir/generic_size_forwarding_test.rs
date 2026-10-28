@@ -1,7 +1,7 @@
 //! GSF-1: symbolic size forwarding through package MIR.
 //!
 //! A generic caller (`forward<size T, size D>`) must pass its own symbolic
-//! size witnesses on to a generic callee (`sink<T, D>(x)`), and the linked
+//! size witnesses on to a generic callee (`sink<size T, size D>(x)`), and the linked
 //! package-MIR program must instantiate the callee at the caller's concrete
 //! dimensions with a concrete tensor signature and the declared return shape.
 //! The proof deliberately uses non-REF-01 dimensions (3, 5).
@@ -14,12 +14,12 @@ const GSF1_MAIN: &str = r"fn sink<size M, size N>(tensor<f32, [M, N]> x) → ten
 }
 
 fn forward<size T, size D>(tensor<f32, [T, D]> x) → tensor<f32, [T, D]> {
-    return sink<T, D>(x)
+    return sink<size T, size D>(x)
 }
 
 main {
     let tensor<f32, [3, 5]> t ← empty
-    let tensor<f32, [3, 5]> r ← forward<3, 5>(t)
+    let tensor<f32, [3, 5]> r ← forward<size 3, size 5>(t)
     let list<int, _> s ← r.shape()
     print s.length()
 }
@@ -129,9 +129,6 @@ fn package_mir_instantiates_forwarded_symbolic_size_callee() {
         },
     )
     .unwrap_or_else(|errors| {
-        panic!(
-            "symbolic size forwarding package must link and run, got {:?}",
-            errors
-        )
+        panic!("symbolic size forwarding package must link and run, got {errors:?}")
     });
 }

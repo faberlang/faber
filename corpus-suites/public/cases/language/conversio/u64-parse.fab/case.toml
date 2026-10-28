@@ -3,6 +3,8 @@ id = "corpus/conversio/u64-parse.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/u64-parse.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

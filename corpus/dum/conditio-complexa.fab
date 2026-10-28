@@ -2,7 +2,7 @@
 term = "dum"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "dum_stmt", "comparison", "et_expr", "aut_expr", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "While loops with compound et/aut conditions."
 syntax = "dum <condition> <block>"

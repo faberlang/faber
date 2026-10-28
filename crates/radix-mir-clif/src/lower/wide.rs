@@ -159,7 +159,7 @@ impl FunctionLower<'_, '_> {
             .ins()
             .icmp(IntCC::SignedGreaterThan, value, high);
         let outside = self.builder.ins().bor(below, above);
-        self.trap_if(outside, "numerus overflow")
+        self.trap_if(outside, trap_text::NUMERUS_OVERFLOW)
     }
 
     /// A wide value as the `i64` carrier, trapping when it does not fit; an
@@ -174,7 +174,7 @@ impl FunctionLower<'_, '_> {
         let low = self.builder.ins().ireduce(types::I64, value);
         let back = self.builder.ins().sextend(types::I128, low);
         let differs = self.builder.ins().icmp(IntCC::NotEqual, back, value);
-        self.trap_if(differs, "numerus overflow")?;
+        self.trap_if(differs, trap_text::NUMERUS_OVERFLOW)?;
         Ok(low)
     }
 
@@ -287,13 +287,13 @@ impl FunctionLower<'_, '_> {
             .icmp(IntCC::SignedGreaterThan, count, limit);
         let nonzero = self.builder.ins().icmp(IntCC::NotEqual, a, zero);
         let too_far = self.builder.ins().band(large, nonzero);
-        self.trap_if(too_far, "numerus overflow")?;
+        self.trap_if(too_far, trap_text::NUMERUS_OVERFLOW)?;
         let bounded = self.builder.ins().select(large, zero, count);
         let amount = self.builder.ins().ireduce(types::I64, bounded);
         let moved = self.builder.ins().ishl(a, amount);
         let back = self.builder.ins().sshr(moved, amount);
         let lost = self.builder.ins().icmp(IntCC::NotEqual, back, a);
-        self.trap_if(lost, "numerus overflow")?;
+        self.trap_if(lost, trap_text::NUMERUS_OVERFLOW)?;
         self.range_guard(moved)?;
         Ok(moved)
     }

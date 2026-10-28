@@ -228,7 +228,7 @@ fn ops_for(width: u64) -> Vec<MirVectorOp> {
     let mut ops: Vec<MirVectorOp> = BIN_OPS.into_iter().map(elementwise_op).collect();
     ops.extend([
         MirVectorOp::Dot,
-        MirVectorOp::Length,
+        MirVectorOp::Norm,
         MirVectorOp::Normalized,
         MirVectorOp::Crea,
         MirVectorOp::Swizzle((0..width as u8).rev().collect()),
@@ -291,7 +291,7 @@ fn lane_count_equals_the_width() {
         assert_eq!(binaries(&dot, MirBinOp::Add), w - 1);
         assert!(constructs(&dot).is_empty());
 
-        let mut length = function_for(&fixture, &MirVectorOp::Length);
+        let mut length = function_for(&fixture, &MirVectorOp::Norm);
         assert!(expand(&fixture, &mut length).is_empty());
         assert_eq!(binaries(&length, MirBinOp::Mul), w);
 
@@ -468,7 +468,7 @@ fn projected_and_constant_operands_are_unresolved() {
     projected.projections.push(MirProjection::VectorLane(0));
     let mut function = function_with(
         &fixture,
-        MirVectorOp::Length,
+        MirVectorOp::Norm,
         vec![MirOperand::Place(projected)],
         fixture.scalar,
     );
@@ -478,7 +478,7 @@ fn projected_and_constant_operands_are_unresolved() {
     );
     let mut constant = function_with(
         &fixture,
-        MirVectorOp::Length,
+        MirVectorOp::Norm,
         vec![MirOperand::Constant(MirConstant::Float(1.0))],
         fixture.scalar,
     );

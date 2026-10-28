@@ -8,10 +8,11 @@
       }
     },
     "rust": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "numerus overflow",
-      "reason": "The runner reports the shift-count trap as a clean nonzero exit with `error: numerus overflow`; the generated Rust executable raises the same trap by panicking (thread 'main' panicked at ...: numerus overflow, exit 101) instead of printing the trap diagnostic, so the rust lane's stderr is not the product error surface. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
+      "outcome": "pass",
+      "expect": {
+        "exit": 70,
+        "stderr_contains": "numerus overflow"
+      }
     },
     "clif": {
       "outcome": "pass",
@@ -31,6 +32,12 @@
       "phase": "build",
       "diagnostic_contains": "undefined: math",
       "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:math` module this proof imports, so the generated `main.go` calls `math.*` with no such package-level identifier and `go build` stops with `undefined: math`. Re-measure this row when the Go package emitter lowers that module binding."
+    },
+    "ts": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "error TS2552",
+      "reason": "The generated project fails `tsc` with error TS2552: a type the TypeScript backend emits for the imported Norma modules does not check, so no program is produced."
     }
   }
 }

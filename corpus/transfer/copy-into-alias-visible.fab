@@ -2,7 +2,7 @@
 term = "⇇"
 kind = "operator"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "assignment", "transfer", "expression", "ternary", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "Copy-into stores through storage: t ⇇ t + t doubles the values in place, so a ← alias bound before the copy-into sees them."
 syntax = "<tensor storage> ⇇ <tensor>"

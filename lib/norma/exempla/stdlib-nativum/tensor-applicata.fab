@@ -17,7 +17,7 @@ import from "norma:tensor" tensor
 
 main {
     let list<int> flat ← [1, 2, 3, 4]
-    let tensor<int, [2, 2]> grid ← tensor.construct<tensor<int, [2, 2]>>(flat)
+    let tensor<int, [2, 2]> grid ← tensor.construct<int>(flat)
     let tensor<int, [2, 2]> scaled ← tensor.apply(grid, int x ∴ x + 1)
     let int total ← tensor.sum(scaled)
     print total

@@ -19,6 +19,7 @@
 
 use crate::cli::FaberCliTarget;
 use clap::ValueEnum;
+use faber_cli::package::DeviceChoice;
 use radix::module::codegen::Target;
 use radix::services::{
     TargetCapabilities, TargetCommandSurface, target_capabilities_for_surface, target_leaves_label,
@@ -99,6 +100,31 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[(
     "device runtime support surface (faber runtime + package/device modules); compiled only under the device-runtime feature",
 )];
 
+/// Whether `faber run` reaches `target`.
+///
+/// `faber run` interprets source by default; the targets it reaches are the
+/// device routes selected by `--device` ([`DeviceChoice::run_target_spelling`],
+/// the same match that maps a device choice to its route) and the compiled
+/// targets `--target` builds and runs ([`RunTarget`]). A built FMIR image, a
+/// FHIR envelope, a native host executable and a Rust package are build
+/// outputs, never `faber run` inputs.
+fn faber_run_reaches(target: Target) -> bool {
+    let name = target.to_string();
+    DeviceChoice::value_variants()
+        .iter()
+        .any(|choice| choice.run_target_spelling() == Some(name.as_str()))
+        || run_target_names().contains(&name)
+}
+
+/// The spellings `faber run --target` accepts.
+fn run_target_names() -> Vec<String> {
+    crate::cli::RunTarget::value_variants()
+        .iter()
+        .filter_map(|target| target.to_possible_value())
+        .map(|value| value.get_name().to_owned())
+        .collect()
+}
+
 /// One rendered capability row.
 struct TargetRow {
     name: String,
@@ -142,6 +168,7 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Result<Vec<TargetRow>, Stri
             spec.target,
             target_capabilities_for_surface(TargetCommandSurface::Faber, spec.target),
         );
+        capabilities.run = faber_run_reaches(spec.target);
         if !available {
             // Capability truth: a row whose feature is not compiled claims no
             // build/run/package capability (mirrors radix's availability
@@ -185,7 +212,8 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Result<Vec<TargetRow>, Stri
 /// (`faber build --target fmir-*`), so radix's "delegated … radix emit
 /// rejects" note and zeroed build/run/package are replaced by the faber
 /// package surface truth (capability truth T1 — what faber can express, not a
-/// shipping promise).
+/// shipping promise). `run` is not decided here: [`target_rows`] sets it from
+/// [`faber_run_reaches`], and these rows claim `build`/`package` only.
 fn faber_surface_capabilities(
     target: Target,
     capabilities: TargetCapabilities,
@@ -194,16 +222,16 @@ fn faber_surface_capabilities(
         Target::MirFmir => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
-            note: "faber package MIR image target: `faber build --target fmir-text`",
+            note: "faber package MIR image target: `faber build --target fmir-text`; inspection image, `faber run` does not take it",
         },
         Target::MirFmirBinary => TargetCapabilities {
             check: true,
             build: true,
-            run: true,
+            run: false,
             package: true,
-            note: "faber package MIR image target: `faber build --target fmir`",
+            note: "faber package MIR image target: `faber build --target fmir`; `faber run` refuses the image, the hidden `faber __fmir-run` executes it",
         },
         _ => capabilities,
     }
@@ -296,7 +324,7 @@ pub(crate) fn cmd_targets() {
         Ok(table) => println!("{table}"),
         Err(message) => {
             eprintln!("error: {message}");
-            std::process::exit(1);
+            faber_cli::exit_status::exit_software();
         }
     }
 }

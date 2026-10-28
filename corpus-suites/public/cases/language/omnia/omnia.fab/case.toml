@@ -3,6 +3,8 @@ id = "corpus/omnia/omnia.fab"
 group = "language"
 input_root = "corpus"
 input = "omnia/omnia.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

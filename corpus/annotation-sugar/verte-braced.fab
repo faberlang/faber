@@ -2,7 +2,7 @@
 term = "verte"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "annotation", "braced_annotation", "annotation_name", "annotation_field_list", "annotation_field", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "tacet_stmt", "nota_stmt", "expression", "literal"]
-category = "codegen"
+category = "annotation"
 canonical = true
 summary = "Braced canonical @ verte rename mapping."
 syntax = "@ verte { target = rs, methodus = \"…\" }"

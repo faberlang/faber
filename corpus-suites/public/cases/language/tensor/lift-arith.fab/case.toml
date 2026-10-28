@@ -3,6 +3,8 @@ id = "corpus/tensor/lift-arith.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/lift-arith.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

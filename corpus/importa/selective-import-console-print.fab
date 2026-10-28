@@ -1,0 +1,42 @@
++++
+term = "importa"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "selective_import", "import_value_binding", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "package"
+canonical = false
+summary = "Importing norma:console's print gives a callable print(string): print(\"§\"(x)) formats in the caller's file and writes one line."
+syntax = "import from \"norma:console\" const print"
+related = ["importa", "fixum", "nota"]
+locale = "en"
++++
+# =============================================================================
+# importa — the console `print` function
+# =============================================================================
+#
+# What this teaches:
+#   • `print x` is the output statement and is never a call; `print(x)` is a
+#     call, so it needs a function named `print` in scope
+#   • `norma:console` exports `print(string)`: one line to standard output with
+#     a newline, the same route as `write_line`
+#   • Formatting stays in the caller's file: the argument is a string, so build
+#     it with a format string, `print("§"(x))`
+#   • The two forms share a file: `print(` at statement start is the imported
+#     call, `print` followed by anything else is the output statement
+#
+# Common mistakes:
+#   • calling `print(x)` with no import: `SEM001 scribe_callee`
+#   • `print (a + b) * 2` with the import in scope parses as `print(a + b) * 2`
+#
+# See also: importa, nota
+# =============================================================================
+
+import from "norma:console" const print
+
+main {
+    print("hello")
+    print("§"((8.0).cbrt()))
+    let int n ← 3
+    print("§"(n * 2))
+    print "keyword form"
+    print n
+}

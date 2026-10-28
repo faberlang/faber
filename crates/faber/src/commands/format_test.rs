@@ -1460,3 +1460,100 @@ fn run_faber_capture_stdout(args: &[&str], stdin: &str) -> (String, String, bool
         output.status.success(),
     )
 }
+
+// `faber format --width N` precedence and command wiring.
+
+const WIDTH_SOURCE: &str = "functio f(textus alpha, textus beta, textus gamma, textus delta) → textus {\n    redde alpha\n}\n";
+
+fn width_package(width_line: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("create scratch");
+    fs::write(
+        dir.path().join("faber.toml"),
+        format!(
+            "[package]\nname = \"w\"\nversion = \"0.1.0\"\nedition = \"1\"\n\n[paths]\nentry = \"main.fab\"\n\n[build]\nkind = \"bin\"\n\n[locale]\nlocale = \"la\"\n{width_line}"
+        ),
+    )
+    .expect("write manifest");
+    fs::write(dir.path().join("main.fab"), WIDTH_SOURCE).expect("write source");
+    dir
+}
+
+fn stdout_of(output: &std::process::Output) -> String {
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+fn max_line(text: &str) -> usize {
+    text.lines()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0)
+}
+
+#[test]
+fn format_width_precedence_flag_then_manifest_then_none() {
+    let with_key = width_package("\n[format]\nwidth = 50\n");
+    let path = with_key.path().join("main.fab");
+    let path_arg = path.to_str().expect("utf8 path");
+
+    // The manifest width applies without a flag.
+    let manifest = run_faber_capture(&["format", "--stdout", path_arg], None);
+    assert!(manifest.status.success(), "{manifest:?}");
+    let manifest_out = stdout_of(&manifest);
+    assert!(max_line(&manifest_out) <= 50, "{manifest_out}");
+    assert!(manifest_out.lines().count() > WIDTH_SOURCE.lines().count());
+
+    // The flag wins over the manifest, wider or narrower.
+    let wide = run_faber_capture(&["format", "--stdout", "--width", "500", path_arg], None);
+    assert_eq!(
+        stdout_of(&wide).lines().count(),
+        WIDTH_SOURCE.lines().count()
+    );
+    let narrow = run_faber_capture(&["format", "--stdout", "--width", "30", path_arg], None);
+    assert!(
+        stdout_of(&narrow).lines().count() > manifest_out.lines().count(),
+        "{narrow:?}"
+    );
+
+    // With neither, nothing wraps.
+    let without = width_package("");
+    let path = without.path().join("main.fab");
+    let plain = run_faber_capture(&["format", "--stdout", path.to_str().expect("utf8")], None);
+    assert!(plain.status.success(), "{plain:?}");
+    assert!(
+        stdout_of(&plain).contains(
+            "functio f(textus alpha, textus beta, textus gamma, textus delta) → textus {"
+        )
+    );
+}
+
+#[test]
+fn format_width_invalid_manifest_value_is_refused() {
+    let dir = width_package("\n[format]\nwidth = 0\n");
+    let path = dir.path().join("main.fab");
+    let output = run_faber_capture(&["format", "--stdout", path.to_str().expect("utf8")], None);
+    assert!(!output.status.success(), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("package_format_width_invalid"),
+        "{output:?}"
+    );
+}
+
+#[test]
+fn format_width_stdin_uses_only_the_flag() {
+    // Stdin has no package, so the source names its own locale.
+    let source = format!("+++\nlocale = \"la\"\n+++\n{WIDTH_SOURCE}");
+    let plain = run_faber_capture(&["format", "--stdin"], Some(&source));
+    assert!(plain.status.success(), "{plain:?}");
+    assert!(
+        stdout_of(&plain).contains(
+            "functio f(textus alpha, textus beta, textus gamma, textus delta) → textus {"
+        )
+    );
+    let wrapped = run_faber_capture(&["format", "--stdin", "--width", "40"], Some(&source));
+    assert!(wrapped.status.success(), "{wrapped:?}");
+    assert!(
+        max_line(&stdout_of(&wrapped)) <= 40,
+        "{}",
+        stdout_of(&wrapped)
+    );
+}

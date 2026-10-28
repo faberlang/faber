@@ -1156,7 +1156,15 @@ fn matmul_workgroup_matches(signature: &MirKernelSignature) -> bool {
 /// `right_batch·K·N` (right) element counts with the `batch·M·N` output —
 /// `batch == 1` is the ordinary rank-2 law. The count law is the batch
 /// derivation itself (`matmul_batch_from_signature`): a signature whose
-/// extents contradict the shapes yields no batch facts and no plan.
+/// extents contradict the shapes yields no batch facts and no plan, and a
+/// signature with no right operand has no first extra input to count.
+///
+/// Extra inputs after the right operand are the operands of the elementwise
+/// tail fused behind the matmul (`x.matmul(w) + b` carries `b`). They are
+/// data-flow buffers, not part of the recipe: a body with one recipe and a
+/// fused tail stays one whole-function kernel, so a kernel that stores into an
+/// explicit output parameter keeps that parameter as its output instead of
+/// decomposing into a matmul subchain that cannot name it.
 fn signature_matches_matmul(
     signature: &MirKernelSignature,
     dispatch_x: u64,
@@ -1170,7 +1178,6 @@ fn signature_matches_matmul(
         && signature.dispatch_size.x == dispatch_x
         && signature.dispatch_size.y == dispatch_y
         && signature.dispatch_size.z == 1
-        && signature.extra_inputs.len() == 1
 }
 
 /// The run-time-extent matmul signature must carry the runtime marker: an

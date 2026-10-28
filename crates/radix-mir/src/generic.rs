@@ -1318,6 +1318,7 @@ fn instantiate_type_id<W: InstantiateWalk>(
         | Type::ModularWord(_)
         | Type::Bits(_)
         | Type::SaturatingWord(_)
+        | Type::RangedInt { .. }
         | Type::PolicyFloat(_, _)
         | Type::SizedInstans(_)
         | Type::Struct(_)
@@ -1823,6 +1824,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::ModularWord(_)
         | Type::Bits(_)
         | Type::SaturatingWord(_)
+        | Type::RangedInt { .. }
         | Type::PolicyFloat(_, _)
         | Type::SizedInstans(_)
         | Type::Struct(_)

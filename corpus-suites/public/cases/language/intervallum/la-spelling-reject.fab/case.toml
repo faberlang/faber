@@ -3,6 +3,8 @@ id = "corpus/intervallum/la-spelling-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "intervallum/la-spelling-reject.fab"
+category = "locale"
+domain = "locales"
 
 
 [expect]

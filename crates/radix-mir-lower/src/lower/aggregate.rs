@@ -890,7 +890,10 @@ impl FunctionBuilder<'_> {
     fn takes_sized_member_type(&self, member_ty: TypeId) -> bool {
         match self.normalized_type(self.types.peel_access_marker(member_ty).1) {
             Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some() || width.is_decimal(),
-            Type::SizedNumeric(Primitive::Fractus, _) | Type::ModularWord(_) | Type::SaturatingWord(_) => true,
+            Type::SizedNumeric(Primitive::Fractus, _)
+            | Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::RangedInt { .. } => true,
             _ => false,
         }
     }

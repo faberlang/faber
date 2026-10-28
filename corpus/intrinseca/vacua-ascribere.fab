@@ -2,7 +2,7 @@
 term = "vacua"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "set"
 canonical = false
 summary = "Empty-collection marker with an empty-named binding (null-like shadowing)."
 syntax = "mut list<int> empty ← empty"

@@ -3,6 +3,8 @@ id = "corpus/tensor/runtime-shape-boundary.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/runtime-shape-boundary.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

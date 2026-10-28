@@ -3,6 +3,8 @@ id = "corpus/praeparabit/praeparabit.fab"
 group = "language"
 input_root = "corpus"
 input = "praeparabit/praeparabit.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

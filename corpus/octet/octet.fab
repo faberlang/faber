@@ -2,7 +2,7 @@
 term = "octet"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "conversio_expr", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "There is no byte type: eight raw bits are b8, an eight-bit number is u8, and a run of bytes is list<b8>."
 syntax = "b8 | u8 | list<b8>"

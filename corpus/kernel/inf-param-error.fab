@@ -2,7 +2,7 @@
 term = "inf"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "incipit_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "nota_stmt"]
-category = "gpu"
+category = "kernel"
 canonical = false
 summary = "`inf` is a host-only type: a kernel parameter of type `inf` is a named legality error."
 syntax = "@ kernel fn launch(inf lane) → void {} — rejected; narrow on the host first"

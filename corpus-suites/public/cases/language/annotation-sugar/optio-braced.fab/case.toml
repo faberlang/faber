@@ -3,6 +3,8 @@ id = "corpus/annotation-sugar/optio-braced.fab"
 group = "language"
 input_root = "corpus"
 input = "annotation-sugar/optio-braced.fab"
+category = "cli"
+domain = "program"
 
 
 [expect]

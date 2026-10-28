@@ -233,358 +233,364 @@ type_head ::= IDENTIFIER | 'modulus'
 # [111] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
 # [112] type_argument
-type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument ::= labeled_type_argument | range_argument | type_annotation | NATURAL | '[' figura_list? ']'
 # [113] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [114] width_type_sugar
+# [114] range_argument
+range_argument ::= range_bound range_glyph range_bound
+# [115] range_glyph
+range_glyph ::= '‥' | '…'
+# [116] range_bound
+range_bound ::= '-'? NATURAL | '-'? '∞' | 'magnitudo'? IDENTIFIER
+# [117] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [115] shape_suffix
+# [118] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [116] figura
+# [119] figura
 figura ::= spelled_lift | figura_product (('+' | '-') NATURAL)*
-# [117] spelled_lift
+# [120] spelled_lift
 spelled_lift ::= 'magnitudo' lift_extent
-# [118] lift_extent
-lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER
-# [119] figura_product
+# [121] lift_extent
+lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER | '[' figura_list? ']'
+# [122] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [120] figura_primary
+# [123] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [121] figura_list
+# [124] figura_list
 figura_list ::= figura (',' figura)*
-# [122] function_type
+# [125] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [123] type_list
+# [126] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [124] si_stmt
+# [127] si_stmt
 si_stmt ::= 'si' si_tail
-# [125] si_tail
+# [128] si_tail
 si_tail ::= expression arm ('sin' si_tail | secus_clause)?
-# [126] secus_clause
+# [129] secus_clause
 secus_clause ::= 'secus' else_arm
-# [127] arm
+# [130] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [128] else_arm
+# [131] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [129] dum_stmt
+# [132] dum_stmt
 dum_stmt ::= 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
-# [130] itera_stmt
+# [133] itera_stmt
 itera_stmt ::= 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('sit' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [131] itera_binding
+# [134] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [132] apud_clause
+# [135] apud_clause
 apud_clause ::= 'apud' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [133] elige_stmt
+# [136] elige_stmt
 elige_stmt ::= 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [134] casu_elige_clause
+# [137] casu_elige_clause
 casu_elige_clause ::= 'casu' expression (block_stmt | ergo_joint statement)
-# [135] ceterum_clause
+# [138] ceterum_clause
 ceterum_clause ::= 'ceterum' (block_stmt | ergo_joint statement)
-# [136] discerne_stmt
+# [139] discerne_stmt
 discerne_stmt ::= 'discerne' 'omnia'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [137] discriminants
+# [140] discriminants
 discriminants ::= subject_path ('et' subject_path)*
-# [138] subject_path
+# [141] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [139] casu_variant_clause
+# [142] casu_variant_clause
 casu_variant_clause ::= 'casu' patterns (block_stmt | ergo_joint statement)
-# [140] patterns
+# [143] patterns
 patterns ::= pattern ('et' pattern)*
-# [141] pattern
+# [144] pattern
 pattern ::= pattern_atom ('aut' pattern_atom)*
-# [142] pattern_atom
+# [145] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [143] negated_number
+# [146] negated_number
 negated_number ::= '-' NUMBER
-# [144] type_pattern
+# [147] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [145] ut_pattern
+# [148] ut_pattern
 ut_pattern ::= ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)
-# [146] pattern_binding
+# [149] pattern_binding
 pattern_binding ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [147] custodi_stmt
+# [150] custodi_stmt
 custodi_stmt ::= 'custodi' '{' si_guard_clause+ '}'
-# [148] si_guard_clause
+# [151] si_guard_clause
 si_guard_clause ::= 'si' expression (block_stmt | ergo_joint statement)
-# [149] ex_stmt
+# [152] ex_stmt
 ex_stmt ::= 'ex' expression ('sit' | 'varia') extract_fields
-# [150] extract_fields
+# [153] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [151] extract_field
+# [154] extract_field
 extract_field ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [152] ceteri_field
+# [155] ceteri_field
 ceteri_field ::= 'ceteri' IDENTIFIER
-# [153] redde_stmt
+# [156] redde_stmt
 redde_stmt ::= 'redde' expression?
-# [154] reddet_stmt
+# [157] reddet_stmt
 reddet_stmt ::= 'reddet' expression
-# [155] tacebit_stmt
+# [158] tacebit_stmt
 tacebit_stmt ::= 'tacebit' expression
-# [156] cede_stmt
+# [159] cede_stmt
 cede_stmt ::= 'cede' expression
-# [157] rumpe_stmt
+# [160] rumpe_stmt
 rumpe_stmt ::= 'rumpe'
-# [158] perge_stmt
+# [161] perge_stmt
 perge_stmt ::= 'perge'
-# [159] tacet_stmt
+# [162] tacet_stmt
 tacet_stmt ::= 'tacet'
-# [160] iace_stmt
+# [163] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [161] iace_expr
+# [164] iace_expr
 iace_expr ::= ('iace' | 'mori') expression
-# [162] iace_guarded_expr
+# [165] iace_guarded_expr
 iace_guarded_expr ::= ('iace' | 'mori') expression NO_NEWLINE 'si' expression
-# [163] cape_clause
+# [166] cape_clause
 cape_clause ::= 'cape' IDENTIFIER block_stmt
-# [164] adfirma_stmt
+# [167] adfirma_stmt
 adfirma_stmt ::= 'adfirma' expression ('mori' expression)?
-# [165] requirit_stmt
+# [168] requirit_stmt
 requirit_stmt ::= 'requirit' expression 'iace' expression
-# [166] reice_stmt
+# [169] reice_stmt
 reice_stmt ::= 'reice' expression 'iace' expression
-# [167] expression
+# [170] expression
 expression ::= assignment
-# [168] transfer
+# [171] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [169] sink_into
+# [172] sink_into
 sink_into ::= transfer ('⇜' ternary)?
-# [170] value_marker
+# [173] value_marker
 value_marker ::= 'own' | 'copy'
-# [171] assignment
+# [174] assignment
 assignment ::= sink_into ('←' 'copy'? assignment | '↤' assignment via_clause? inline_default?)?
-# [172] inc_dec_stmt
+# [175] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [173] place
+# [176] place
 place ::= call_expr
-# [174] ternary
+# [177] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [175] aut_expr
+# [178] aut_expr
 aut_expr ::= et_expr (('aut') et_expr)*
-# [176] et_expr
+# [179] et_expr
 et_expr ::= equality (('et') equality)*
-# [177] equality
+# [180] equality
 equality ::= comparison equality_tail*
-# [178] equality_tail
+# [181] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('est' | 'non' 'est') type_annotation
-# [179] comparison
+# [182] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [180] format_expr
+# [183] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [181] bitwise_or_expr
+# [184] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [182] bitwise_xor_expr
+# [185] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [183] bitwise_and_expr
+# [186] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [184] shift_expr
+# [187] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [185] range_expr
+# [188] range_expr
 range_expr ::= additive_expr range_tail?
-# [186] range_tail
+# [189] range_tail
 range_tail ::= ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
-# [187] additive_expr
+# [190] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [188] multiplicative_expr
+# [191] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [189] vel_expr
+# [192] vel_expr
 vel_expr ::= unary_expr ('vel' vel_rhs)*
-# [190] vel_rhs
+# [193] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [191] vel_range_tail
+# [194] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'ante' | 'usque') unary_expr ('per' unary_expr)?
-# [192] unary_expr
+# [195] unary_expr
 unary_expr ::= ('-' | '¬' | 'non' | '√' | '∛' | '∜') unary_expr | rounding_expr | finge_expr | cast_expr
-# [193] rounding_expr
+# [196] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [194] gradient_expr
+# [197] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [195] gradient_selection
+# [198] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [196] gradient_place
+# [199] gradient_place
 gradient_place ::= expression
-# [197] cast_expr
+# [200] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [198] conversio_expr
+# [201] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [199] interval_target
+# [202] interval_target
 interval_target ::= range_expr
-# [200] via_clause
+# [203] via_clause
 via_clause ::= 'via' IDENTIFIER
-# [201] inline_default
+# [204] inline_default
 inline_default ::= '⊥' unary_expr
-# [202] call_expr
+# [205] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [203] call_suffix
+# [206] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [204] member_suffix
+# [207] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [205] transpose_suffix
+# [208] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [206] optional_suffix
+# [209] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [207] non_null_suffix
+# [210] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [208] argument_list
+# [211] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [209] argument
+# [212] argument
 argument ::= template_argument | (call_marker | 'axis')? 'sparge'? expression
-# [210] call_marker
+# [213] call_marker
 call_marker ::= 'de' | 'varia' | 'own' | 'copy'
-# [211] template_argument
+# [214] template_argument
 template_argument ::= 'sparge'? IDENTIFIER ':' expression
-# [212] literal
+# [215] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
-# [213] regex_literal
+# [216] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
-# [214] primary
+# [217] primary
 primary ::= IDENTIFIER | literal | regex_literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
-# [215] ad_expr
+# [218] ad_expr
 ad_expr ::= 'ad' ASCII_STRING ad_opener?
-# [216] ad_opener
+# [219] ad_opener
 ad_opener ::= '(' expression ')'
-# [217] array_literal
+# [220] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [218] array_element_list
+# [221] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [219] array_element
+# [222] array_element
 array_element ::= argument | '_'
-# [220] iuncta_expr
+# [223] iuncta_expr
 iuncta_expr ::= 'iuncta' type_arguments '[' argument_list? ']'
-# [221] json_literal
+# [224] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [222] json_member
+# [225] json_member
 json_member ::= STRING ':' json_value
-# [223] typed_constructor
+# [226] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | type_annotation json_literal | hole_type json_literal | '{' field_list '}' construction_source? | type_annotation '[' array_element_list? ']'
-# [224] field_list
+# [227] field_list
 field_list ::= field_init (',' field_init)*
-# [225] field_init
+# [228] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [226] field_key
+# [229] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [227] construction_source
+# [230] construction_source
 construction_source ::= 'ex' call_expr
-# [228] json_value
+# [231] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [229] json_object
+# [232] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [230] json_array
+# [233] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [231] json_string
+# [234] json_string
 json_string ::= STRING
-# [232] json_number
+# [235] json_number
 json_number ::= NUMBER
-# [233] finge_expr
+# [236] finge_expr
 finge_expr ::= 'finge' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [234] qualified_ident
+# [237] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [235] praefixum_expr
+# [238] praefixum_expr
 praefixum_expr ::= 'praefixum' block_stmt
-# [236] scriptum_expr
+# [239] scriptum_expr
 scriptum_expr ::= 'scriptum' '(' STRING (',' expression)* ')'
-# [237] lege_expr
+# [240] lege_expr
 lege_expr ::= 'lege' 'lineam'?
-# [238] first_match_expr
+# [241] first_match_expr
 first_match_expr ::= 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
-# [239] reducta_expr
+# [242] reducta_expr
 reducta_expr ::= 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [240] reducta_op
+# [243] reducta_op
 reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
-# [241] reducta_group
+# [244] reducta_group
 reducta_group ::= 'pro' expression
-# [242] reducta_body
+# [245] reducta_body
 reducta_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
-# [243] reducta_identity
+# [246] reducta_identity
 reducta_identity ::= 'vel' expression
-# [244] scan_expr
+# [247] scan_expr
 scan_expr ::= 'scan' 'via' scan_op ('scan_total' ('scan_inclusive' | 'scan_exclusive'))? 'ex' expression apud_clause scan_group? scan_order_clause? filum_clause 'sit' IDENTIFIER block_stmt
-# [245] scan_op
+# [248] scan_op
 scan_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'omnia' | 'quilibet' | 'numeratio'
-# [246] scan_group
+# [249] scan_group
 scan_group ::= 'pro' expression
-# [247] scan_order_clause
+# [250] scan_order_clause
 scan_order_clause ::= 'scan_order' ('ascendens' | 'descendens')
-# [248] sort_expr
+# [251] sort_expr
 sort_expr ::= 'ordinata' 'via' sort_direction ('ex' | 'de') expression sort_body?
-# [249] sort_direction
+# [252] sort_direction
 sort_direction ::= 'ascendens' | 'descendens'
-# [250] sort_body
+# [253] sort_body
 sort_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
-# [251] filum_clause
+# [254] filum_clause
 filum_clause ::= 'filum' IDENTIFIER
-# [252] capta_expr
+# [255] capta_expr
 capta_expr ::= 'capta' block_stmt
-# [253] object_pattern
+# [256] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [254] pattern_property
+# [257] pattern_property
 pattern_property ::= 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
-# [255] array_pattern
+# [258] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [256] array_pattern_element
+# [259] array_pattern_element
 array_pattern_element ::= '_' | 'ceteri'? IDENTIFIER
-# [257] nota_stmt
+# [260] nota_stmt
 nota_stmt ::= ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
-# [258] entry_header
+# [261] entry_header
 entry_header ::= ('argumenta' IDENTIFIER)? ('exitus' expression)?
-# [259] incipit_stmt
+# [262] incipit_stmt
 incipit_stmt ::= 'incipit' entry_header block_stmt
-# [260] incipiet_stmt
+# [263] incipiet_stmt
 incipiet_stmt ::= 'incipiet' entry_header block_stmt
-# [261] probandum_decl
+# [264] probandum_decl
 probandum_decl ::= 'probandum' STRING proba_modifier* '{' probandum_body '}'
-# [262] probandum_body
+# [265] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [263] proba_stmt
+# [266] proba_stmt
 proba_stmt ::= 'proba' STRING proba_modifier* block_stmt
-# [264] proba_modifier
+# [267] proba_modifier
 proba_modifier ::= 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING | 'temporis' NATURAL | 'metior' | 'repete' NATURAL | 'fragilis' NATURAL | 'solum_in' STRING
-# [265] praepara_block
+# [268] praepara_block
 praepara_block ::= ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
-# [266] fac_stmt
+# [269] fac_stmt
 fac_stmt ::= 'fac' block_stmt cape_clause? ('dum' expression)?
-# [267] IDENTIFIER
+# [270] IDENTIFIER
 IDENTIFIER ::=
-# [268] NUMBER
+# [271] NUMBER
 NUMBER ::=
-# [269] NATURAL
+# [272] NATURAL
 NATURAL ::=
-# [270] STRING
+# [273] STRING
 STRING ::=
-# [271] ASCII_STRING
+# [274] ASCII_STRING
 ASCII_STRING ::=
-# [272] BACKTICK_STRING
+# [275] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [273] OCTETI_STRING
+# [276] OCTETI_STRING
 OCTETI_STRING ::=
-# [274] REGEX_TYPE_WORD
+# [277] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [275] REGEX_BODY
+# [278] REGEX_BODY
 REGEX_BODY ::=
-# [276] NEWLINE
+# [279] NEWLINE
 NEWLINE ::=
-# [277] WIDTH_MARKER
+# [280] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [278] LISTA_WIDTH_SUGAR
+# [281] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [279] TENSOR_WIDTH_SUGAR
+# [282] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [280] SPARSA_WIDTH_SUGAR
+# [283] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [281] VECTOR_WIDTH_SUGAR
+# [284] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [282] MATRIX_WIDTH_SUGAR
+# [285] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [283] FRONTMATTER_DELIMITER
+# [286] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [284] TOML_LINES
+# [287] TOML_LINES
 TOML_LINES ::=
-# [285] ANNOTATION_NAME
+# [288] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [286] ANNOTATION_FIELD_NAME
+# [289] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [287] NON_NEWLINE_TOKEN
+# [290] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [288] NO_NEWLINE
+# [291] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -727,6 +733,9 @@ NO_NEWLINE ::=
 | [`type_arguments`](#type-arguments) | `#type-arguments` | live |
 | [`type_argument`](#type-argument) | `#type-argument` | live |
 | [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live |
+| [`range_argument`](#range-argument) | `#range-argument` | live |
+| [`range_glyph`](#range-glyph) | `#range-glyph` | live |
+| [`range_bound`](#range-bound) | `#range-bound` | live |
 | [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live |
 | [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live |
 | [`figura`](#figura) | `#figura` | live |
@@ -1305,7 +1314,7 @@ The body joint keeps the existing closure law: `∴` followed by one expression,
 - Recoverable alternate-exit syntax: `⇥` declares the error-channel type. It can appear after `→ T` or alone on an effect-only failable function or closure. A closure body that uses an escaping `iace` must declare its own `⇥ E`; it cannot inherit the enclosing function's error channel. A local `fac { ... } cape err { ... }` may catch `iace` without an enclosing `⇥`. A failable function call (`→ T ⇥ E`) inside a `⇥`-declaring function propagates to the function's alternate exit without a `fac`/`cape` wrapper, mirroring how bare `↦` conversio and `iace` throws already behave; the call lowers to Rust `?`. A closure must still declare its own `⇥` to propagate a failable call — the enclosing function's error channel does not cross the closure boundary.
 - In a signature, `⇥` only ever names an error type (`→ T ⇥ E`). It never carries a value. The error type named after `⇥` is the payload; the value that actually travels is the compiler-owned carrier `erratum<T>` (en `error<T>`), a builtin generic genus with one field `payload: T`, in the same wrapper family as `promissum<T>` and `cursor<T>`. `⇥ T` means the channel carries `erratum<T>`, and `⇥ erratum<T>` is written only for a nested carrier (mechanical expansion, no special diagnostic). `cape` (en `catch`) binds the payload `T`, never the carrier, and a form that binds the carrier is not built. The catch-all channel is `ignotum` (en `unknown`), which accepts every error with no `@ conversio` row and needs the ordinary narrowing to read back, while `quilibet` (en `any`) is the reduction keyword and stays a non-canonical alias of the same primitive, never the catch-all spelling. An `@ conversio` row is written on the payload types and is one direct (source, destination) pair.
 - Parameter access markers live in the type position: `de`/`ref` (read), `in`/`mut` (mutate), `own` (consume), and `copy` (duplicate then own). The retired parameter-prefix slot is not part of the grammar; `ex`/`from` remains the import/iteration/extraction token identity.
-- Call-site access markers: an argument passed to a parameter declared `mut` / `own` / `copy` carries the same marker at the call (en `mut` `own` `copy`; la `in` `own` `copy`), as in `bump(mut a)`, `eat(own a)`, `dup(copy a)`; the read marker `ref` (la `de`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. The one exception is the `axis` marker: the built-in reductions and row operations (`t.sum(axis n)`, `t.mean(axis n)`, `rms_norm(axis n, ...)`, `laminatio(axis n, ...)`, `softmax(axis n)`, last axis only) require it, and a bare integer in that position is `SEM057 axis_marker_required`, an `axis` before any other argument is `axis_marker_unexpected`. `axis` is a second kind of marker beside those four: they say how a value is passed, this one says what a number means, and the kind is kept to this one word. A parameter declares it before its type (`axis int a`), the call echoes it (`t.mean(axis 1)`), and inside the callee the parameter is an ordinary `int`; `axis n` names the axis that is reduced over. The explicit form `reduce via sum from t at [i, j] per i` names the axis that is kept. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `own` and `copy` with the matching marker. Call-site `copy` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value (a `mut` tensor parameter may also be rebound whole by `←` on the host; inside a kernel use `⇇`), and an `own` or `copy` parameter is always writable by the callee (method call, field store, reassignment, element store; an `own` tensor parameter may be rebound whole). Only a whole local binding may be passed as `own`: a field or element, an unmarked parameter, a module constant, or an `itera` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`copy b.xs` is fine and does not kill `b`). After `eat(own a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`own`/`copy`) source keeps `use_after_move` at the later read; a fresh value (`eat(own make())`) is always fine.
+- Call-site access markers: an argument passed to a parameter declared `mut` / `own` / `copy` carries the same marker at the call (en `mut` `own` `copy`; la `in` `own` `copy`), as in `bump(mut a)`, `eat(own a)`, `dup(copy a)`; the read marker `ref` (la `de`) is optional and may be written explicitly. This applies to every call of a function with a source signature, top-level or in a class/genus, and to a method's arguments (`obj.run(mut src)`); the receiver carries no marker. Calls through function values and closures are checked against the modes in the function type. Built-in, intrinsic, and provider methods are exempt. The one exception is the `axis` marker: the built-in reductions and row operations (`t.sum(axis n)`, `t.mean(axis n)`, `rms_norm(axis n, ...)`, `laminatio(axis n, ...)`, `softmax(axis n)`, last axis only) require it, and a bare integer in that position is `SEM057 axis_marker_required`, an `axis` before any other argument is `axis_marker_unexpected`. `axis` is a second kind of marker beside those four: they say how a value is passed, this one says what a number means, and the kind is kept to two words: `axis` for a call's arguments and `size` (la `magnitudo`) for the explicit arguments of a call's generic list (`mk<int, size 4>(xs)`), which says an argument is a size and not a type. `size` follows the same echo rule as `axis`: a callee that declares a `size` parameter is called with the `size` marker, a bare natural, shape or size name in that list is `SEM057 size_marker_required`, and `size` on a callee that declares no `size` parameter is `size_marker_unexpected`. A parameter declares it before its type (`axis int a`), the call echoes it (`t.mean(axis 1)`), and inside the callee the parameter is an ordinary `int`; `axis n` names the axis that is reduced over. The explicit form `reduce via sum from t at [i, j] per i` names the axis that is kept. A missing marker is `SEM057 call_marker_missing`, a different marker is `call_marker_mismatch`, and a marker on a read-only parameter (other than `ref`) is `call_marker_on_read_only`. A temporary passed to a `mut` parameter is `SEM020 mut_argument_not_writable`; a fresh value is accepted for `own` and `copy` with the matching marker. Call-site `copy` is a plain echo of the parameter marker. Parameters take no `var`/`const`; the marker says what the callee may do. An unmarked or `ref` parameter is read-only, a `mut` parameter writes the caller's value (a `mut` tensor parameter may also be rebound whole by `←` on the host; inside a kernel use `⇇`), and an `own` or `copy` parameter is always writable by the callee (method call, field store, reassignment, element store; an `own` tensor parameter may be rebound whole). Only a whole local binding may be passed as `own`: a field or element, an unmarked parameter, a module constant, or an `itera` binder is `SEM057 own_argument_not_local_binding` / `own_argument_unmarked_parameter` / `own_argument_module_constant` / `own_argument_loop_binder` (`copy b.xs` is fine and does not kill `b`). After `eat(own a)` the name `a` is dead: a later use is `SEM050 use_after_own`, blamed on the call argument (an unmarked source gets a copy suggestion); `moved_in_loop` and `moved_name_captured_by_closure` cover loops and closures; an exclusive (`own`/`copy`) source keeps `use_after_move` at the later read; a fresh value (`eat(own make())`) is always fine.
 - Post-name marker: `sponte` (voluntary/optional provision)
 - `ceteri` marks rest parameter
 - Ordinary `functio` declarations and genus methods require bodies. Signature-only methods belong in `implendum`. The one exception is a top-level `functio` or a genus method marked `@ nondum`, which may omit its block (see `nondum_functio_decl`, `nondum_method_decl`).
@@ -1602,6 +1611,8 @@ importa ex "norma:consolum" fixum dic ut output
 
 A record import needs its `ex = "…"` source (`missing_import_source`), and `omnia` cannot be combined with `nomen` or `ut` (`mixed_wildcard_and_named_import`).
 
+The five record field names are reader-pack keywords like the rest of the surface: the `en` reader spells `ex`, `visibilitas`, `nomen`, `ut` and `omnia` as `from`, `visibility`, `name`, `as` and `all` (`import { from = "norma:text", name = text, as = t }`), and every other pack spells them with its own words. A field word from another locale is `PARSE050 wrong_locale_import_field`, not `unknown_import_field`.
+
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `publica` is the re-export marker. Missing named binding
 defaults to the
@@ -1621,7 +1632,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
-- A call-site argument list (`callTypeArgs`) admits the same size forms: a natural (`take<2, 2>(a)`), a bracketed shape, a spelled lift (`size n`) or a dimension term (`n + 1`, `d / 2`). A bare name or `_` is a type there; the callee decides whether it binds a type or a `magnitudo` parameter.
+- A call-site argument list (`callTypeArgs`) carries each explicit size argument behind the `size` marker (la `magnitudo`), the way the call echoes `axis` and `mut`/`own`/`copy`: `take<size 2, size 2>(a)`, `construct<int, size [4]>(xs)`, `f<size n>(x)`. The grammar still parses the bare forms (a natural, a bracketed shape, a dimension term such as `n + 1`) so the checker can name the missing marker: a bare natural, shape, dimension term or caller `size` name in a call list is `SEM057 size_marker_required`, and a `size` argument on a callee that declares no `size` parameter is `SEM057 size_marker_unexpected` (one past the declared `size` parameters is an arity miss, `wrong_number_of_type_arguments`). The list binds by marker: a `size` argument binds the next `size` parameter of the callee and an unmarked argument the next type parameter, the two cursors advancing independently, so `mk<int, size 4>(xs)` binds `fn mk<T, size N>` and a list of only `size` arguments (`construct<size [4]>(xs)`) leaves every type to inference. The operand decides the binding time: `size 4` and `size [2, 3]` are compile-time witnesses and a shape travels as one argument (`tensor.construct<int, size [4]>(xs)`, checked against its store as a scalar size is: `tensor<int, [5]>` is `SEM010 incompatible_tensor_index`); `size n` of an in-scope integer stays the run-time extent described above, checked at its store; `size D` of a caller `size` parameter forwards it. A shape inside a call list holds natural literals only: a `_` hole, a name, a run-time lift or a nested term in it is `size_shape_dimension_unsupported`, and `size [..]` outside a call's list is `size_shape_outside_call_args`. An unmarked name or `_` stays a type there; the callee decides which type parameter it binds.
 - Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
 - **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `via` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
@@ -1807,11 +1818,20 @@ results by storing into a `wrapping<W>` slot before dividing, shifting right or
 comparing. Within one policy
 family a store into a narrower width applies the slot's policy
 (`wrapping<u32>` into `wrapping<u8>` reduces); crossing policy families needs
-`↦`. A constant stored with `←` follows the slot's policy
+`↦` (superseded 2026-10-27 by ruling 51, ruled and not yet built: a value read
+from any cell is a number and the destination's policy applies to the exact
+value whatever the source's policy; `docs/design/numeric-model.md` section 8,
+*Store policy belongs to the destination*; until it is built the compiler still
+refuses a store from another policy). A constant stored with `←` follows the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
 (a `fixum T X = e` constant at module level, in a block or as a `genus` member, field
-default, enum member) must fit `W` whatever the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
+default, enum member) must fit `W` whatever the policy; a construction field
+written with `=` is the same fact (ruling 51, not yet built for named constants
+and construction fields). Under ruling 51 a compile-time-known value (a literal,
+a named constant or an expression made only of those) is checked
+at the store at compile time: a misfit into a trapping cell is a compile error and
+a `modulus<W>` or `saturatus<W>` cell applies its policy.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never
 applies a size policy.
@@ -1834,6 +1854,50 @@ propagates, and nothing clamps to the largest finite value. Only `trapping<F>`
 errors, and only when a non-finite value is stored or converted into it.
 `modulus<F>` (en `wrapping<F>`) is still rejected: a modular word takes an
 integer width. The trapping float cell is not available on device targets.
+
+**Ranged store policies.** A store policy takes a range as a
+second argument after the width: `saturatus<u32, 0‥8>` (en
+`saturating<u32, 0‥8>`) stores into `u32` and clamps into `[0, 8)`;
+`exactus<i32, -2‥3>` (en `trapping<i32, -2‥3>`) traps outside `[-2, 3)`;
+`modulus<u32, 0‥8>` (en `wrapping<u32, 0‥8>`) reduces modulo the range's
+length, offset by its low end, so `10` stored in `wrapping<u32, 0‥8>` is `2`.
+The range is its own type-argument slot (`range_argument`), told apart from a
+type or a `size` argument by the range glyph after its first bound.
+
+- **The width stays explicit.** The representation, the ABI and the kernel index
+  envelope are the width's; the range refines inside it and must fit it. Both
+  ends are always written (`0…` alone is `PARSE040 range_bound_required`).
+  `‥` is half-open (`0‥8` holds `0` through `7`) and `…` is inclusive (`0…7`).
+  `∞` and `-∞` mean no bound on that side (`saturating<i32, -∞‥8>`); `∞` stays
+  illegal as an integer value. Unsigned widths need a low end of at least 0;
+  signed widths take negative ends (`-2‥3`). A range the width cannot hold, an
+  empty range, a named or `size` end (not built: `ranged_policy_bound_not_constant`)
+  and a float, decimal or `inf` width are named `SEM008` refusals.
+- **The policy word is mandatory.** `u8<0‥8>` is
+  `SEM008 ranged_policy_word_required`; the edge behaviour is always visible.
+- **Each existing form is sugar for one explicit form.** `saturating<u8>` is
+  `saturating<u8, 0…255>`, a bare `u8` is `trapping<u8, 0…255>` and `inf` is
+  `trapping<inf, -∞…∞>`. A range that is the whole width is the plain form:
+  the two spellings are one type, and no existing program changes.
+- **Arithmetic stays unbounded; the store applies the range.** A value read from
+  a ranged cell computes as its width, so `cx + 1` is exact and
+  `saturating<u32, 0‥8>` mixes with any other `saturating<u32, ..>` value in
+  arithmetic. Only a store into a ranged cell (declaration, assignment, argument,
+  return, field, element, `↑` `↓`) applies the policy once; storing a value of
+  another range is a store. A constant stored with `←` follows the policy, and a
+  trapping cell's certain trap is a compile error. The policy families do not
+  mix implicitly: a plain integer reaches a `saturating` or `wrapping` ranged
+  cell through `↦`, which reduces or clamps and cannot fail, exactly as for the
+  unranged words; `↦` into a `trapping` ranged cell is a checked narrowing and is
+  failable. (Superseded 2026-10-27 by ruling 51, ruled and not yet built: a value
+  of any policy stores into a ranged cell and the destination range applies, so
+  `↦` is not needed there, though it stays legal.)
+- **Where it is built.** The MIR runner and the Rust target apply a range;
+  the Faber source emitter keeps the authored form (`faber format` prints a
+  range half-open); every other target and every kernel refuse the type by name
+  (`SEM010 ranged_policy_target_unsupported`, `SEM008 nucleum_ranged_policy_not_built`).
+  Float ranges, index containment, kernel facts and list length ranges are the
+  later parts of the series.
 **Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with
@@ -1929,7 +1993,9 @@ any integer type.
 different number families with no `↦` and compare the true mathematical values
 (`i64 ≺ f64` is exact even above 2⁵³; NaN compares false). `≈`/`≉` compute in
 the float operand's width. `≡`/`≢` stay structural and exact-type, so
-`1 ≡ 1.0` is rejected. A comparison stores nothing, so the family-crossing rule
+`1 ≡ 1.0` is rejected. (Ruling 51, 2026-10-27, ruled and not yet built: between
+integers of any width and policy `≡`/`≢` compare by exact value, as `≺` does;
+across number families they are unchanged.) A comparison stores nothing, so the family-crossing rule
 does not reach it.
 
 **Conversion.** `↦` is the checked, recoverable form (D1.11: `∷` states only
@@ -1999,14 +2065,17 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   may (the MIR runner has a configurable bit-length ceiling).
 - **Comparison and keys.** `≺ ≻ ≤ ≥ ≅ ≇` compare exact mathematical values
   against any integer width, `d64` or float (±∞ order beyond every integer);
-  `≡ ≢` stay exact-type (`inf ≡ i64` is rejected). An `inf` value is hashable
+  `≡ ≢` stay exact-type (`inf ≡ i64` is rejected; superseded for integers by
+  ruling 51, ruled and not yet built: they compare by exact value). An `inf` value is hashable
   and totally ordered, so it is a valid `tabula` key and `copia` element.
 - **Stores.** A store into an `inf` slot is total and emits no check. A store
   from an `inf` value into a bounded trapping slot is an implicit checked
   narrowing: it traps (`implicit_store_out_of_range`, never `⇥`), unless a
   constant is proven to fit. `inf` is in the trapping family, so a store into a
   `wrapping<W>` or `saturating<W>` slot needs `↦`, which reduces or clamps the
-  exact value and cannot fail. `saturating<u64> hi; hi ↑` at the bound still
+  exact value and cannot fail (superseded 2026-10-27 by ruling 51, ruled and not
+  yet built: an `inf` value is a number and a `wrapping<W>` or `saturating<W>`
+  slot reduces or clamps it with no `↦`; `↦` stays legal). `saturating<u64> hi; hi ↑` at the bound still
   traps; the clamp is written `((hi ↦ inf) + 1) ↦ saturating<u64>`.
 - **Conversion `↦`.** Any bounded integer, including a word, converts to `inf`
   and never fails. `inf ↦` a trapping width is a magnitude-checked narrowing and

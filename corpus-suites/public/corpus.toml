@@ -35,3 +35,17 @@ reason = "package source is not a single-file roundtrip input"
 [expectations.product.mir]
 outcome = "not-applicable"
 reason = "MIR text target is file-oriented; package coverage belongs to package targets"
+
+# Same partition as the full suite (scripta/check-corpus-suite keeps them equal).
+[domains]
+numerics = ["arithmetic", "comparison", "conversion", "bits"]
+text = ["text", "literal", "format", "regex"]
+collections = ["list", "map", "set", "sort", "reduction", "range"]
+tensors = ["tensor", "vector"]
+types = ["type", "variant", "class", "generic", "binding"]
+functions = ["function", "async"]
+control = ["branch", "loop", "jump", "logic", "error"]
+io = ["console", "endpoint"]
+gpu = ["kernel", "device"]
+program = ["package", "cli", "annotation", "testing", "comptime", "integration", "identifier"]
+locales = ["locale"]

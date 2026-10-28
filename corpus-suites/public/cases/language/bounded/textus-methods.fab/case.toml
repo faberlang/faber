@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/bounded/textus-methods.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/textus-methods.fab"
+category = "text"
+domain = "text"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

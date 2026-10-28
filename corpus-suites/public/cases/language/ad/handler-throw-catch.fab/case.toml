@@ -3,6 +3,8 @@ id = "corpus/ad/handler-throw-catch.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/handler-throw-catch.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

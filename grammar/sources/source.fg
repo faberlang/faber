@@ -1070,10 +1070,11 @@ contract_ref := IDENTIFIER ('<' type_annotation (',' type_annotation)* '>')?
 generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
 # A call-site list is unambiguously an argument list, so each member is a type or
-# a size. A size is a natural (`take<2, 2>(a)`), a bracketed shape, a spelled lift
-# (`size n`) or a dimension term (`n + 1`, `d / 2`): the `figura` forms a shape slot
-# takes. A bare name or `_` stays a type; whether the callee reads it as a type or
-# as a `magnitudo` argument is semantic, not grammatical.
+# a size. A size is written behind the `size` marker (`take<size 2, size 2>(a)`,
+# `construct<int, size [4]>(xs)`), a spelled lift. The bare forms also parse (a
+# natural, a bracketed shape, a dimension term such as `n + 1` or `d / 2`) so the
+# checker can name the missing marker (`size_marker_required`), as it does for
+# `axis`. A bare name or `_` stays a type.
 call_type_args  := '<' call_type_arg (',' call_type_arg)* '>'
 call_type_arg   := type_annotation | call_size_arg
 call_size_arg   := NATURAL dimension_tail? | IDENTIFIER dimension_tail | spelled_lift | '[' figura_list? ']'
@@ -1273,18 +1274,31 @@ type_head       := IDENTIFIER | 'modulus'
 # is its own type (`width_type_sugar`); only the policy words `modulus`,
 # `saturatus` and `exactus` wrap a marker (`modulus<u32>`).
 type_arguments  := '<' type_argument (',' type_argument)* '>'
-type_argument   := labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument   := labeled_type_argument | range_argument | type_annotation | NATURAL | '[' figura_list? ']'
 labeled_type_argument := IDENTIFIER ':' type_annotation
+# A range argument is the second argument of a store policy: the range refines
+# the explicit width inside which a store applies the policy
+# (`saturatus<u32, 0‥8>`, `exactus<i32, -2‥3>`, `modulus<u32, 0‥8>`). It is its
+# own slot, told apart from a type or a size by the range glyph after its first
+# bound. Both ends are always written: `0…` alone is a parse error
+# (`range_bound_required`). The half-open `‥` holds the low end up to, not
+# including, the high end; the inclusive `…` holds both. `∞` and `-∞` mean no
+# bound on that side. The policy word is mandatory: `u8<0‥8>` is
+# `ranged_policy_word_required`.
+range_argument  := range_bound range_glyph range_bound
+range_glyph     := '‥' | '…'
+range_bound     := '-'? NATURAL | '-'? '∞' | 'magnitudo'? IDENTIFIER
 width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
                 | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix?
                 | MATRIX_WIDTH_SUGAR shape_suffix
 shape_suffix    := '[' figura_list? ']'
 # A spelled lift marks a run-time extent: `magnitudo` (en `size`) then a name,
 # a natural, or a parenthesized figura term (`size (n - 1)`). The value is
-# checked at the store that observes it.
+# checked at the store that observes it. In a call's type-argument list the
+# marker also admits a whole bracketed shape (`size [4]`, `size [2, 3]`).
 figura          := spelled_lift | figura_product (('+' | '-') NATURAL)*
 spelled_lift    := 'magnitudo' lift_extent
-lift_extent     := NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER
+lift_extent     := NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER | '[' figura_list? ']'
 figura_product  := figura_primary ('/' NATURAL)*
 figura_primary  := '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
 figura_list     := figura (',' figura)*

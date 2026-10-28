@@ -113,13 +113,13 @@ fn session_timeout(int timeout_ms) → Client {
 fn split(string url) → Url {
     let int sep ← find_scheme_sep(url)
     if sep ≺ 0 then return Url { }
-    let string scheme ← ascii_lower(url.slice(0, sep))
+    let string scheme ← ascii_lower(url.slice(0, sep) ⊥ "")
     if not is_scheme(scheme) then return Url { }
-    let string rest ← url.slice(sep + 3, url.length())
+    let string rest ← url.slice(sep + 3, url.length()) ⊥ ""
     let int auth_end ← authority_end(rest)
     if auth_end ≺ 0 then return Url { }
-    let string authority ← rest.slice(0, auth_end)
-    let string remainder ← rest.slice(auth_end, rest.length())
+    let string authority ← rest.slice(0, auth_end) ⊥ ""
+    let string remainder ← rest.slice(auth_end, rest.length()) ⊥ ""
     let string hostport ← strip_userinfo(authority)
     let string host ← ascii_lower(host_of(hostport))
     if host.length() ≡ 0 then return Url { }
@@ -478,7 +478,7 @@ fn body_text(value raw) → string {
 fn find_scheme_sep(string url) → int {
     mut int i ← 0
     while i + 2 ≺ url.length() {
-        if url.slice(i, i + 3) ≡ "://" {
+        if (url.slice(i, i + 3) ⊥ "") ≡ "://" {
             return i
         }
         i ← i + 1
@@ -488,10 +488,10 @@ fn find_scheme_sep(string url) → int {
 
 fn is_scheme(string scheme) → bool {
     if scheme.length() ≡ 0 then return false
-    if not is_alpha(scheme.slice(0, 1)) then return false
+    if not is_alpha(scheme.slice(0, 1) ⊥ "") then return false
     mut int i ← 1
     while i ≺ scheme.length() {
-        let string c ← scheme.slice(i, i + 1)
+        let string c ← scheme.slice(i, i + 1) ⊥ ""
         if not is_alpha(c) and not is_digit(c) and c ≢ "+" and c ≢ "-" and c ≢ "." {
             return false
         }
@@ -505,7 +505,7 @@ fn authority_end(string rest) → int {
     mut int i ← 0
     mut bool v6 ← false
     while i ≺ rest.length() {
-        let string c ← rest.slice(i, i + 1)
+        let string c ← rest.slice(i, i + 1) ⊥ ""
         if c ≡ "[" {
             v6 ← true
         }
@@ -525,7 +525,7 @@ fn strip_userinfo(string authority) → string {
     mut int i ← 0
     mut bool v6 ← false
     while i ≺ authority.length() {
-        let string c ← authority.slice(i, i + 1)
+        let string c ← authority.slice(i, i + 1) ⊥ ""
         if c ≡ "[" {
             v6 ← true
         }
@@ -538,16 +538,16 @@ fn strip_userinfo(string authority) → string {
         i ← i + 1
     }
     if at ≺ 0 then return authority
-    return authority.slice(at + 1, authority.length())
+    return authority.slice(at + 1, authority.length()) ⊥ ""
 }
 
 fn host_of(string hostport) → string {
     if hostport.length() ≡ 0 then return ""
-    if hostport.slice(0, 1) ≡ "[" {
+    if (hostport.slice(0, 1) ⊥ "") ≡ "[" {
         mut int i ← 1
         while i ≺ hostport.length() {
-            if hostport.slice(i, i + 1) ≡ "]" {
-                return hostport.slice(1, i)
+            if (hostport.slice(i, i + 1) ⊥ "") ≡ "]" {
+                return hostport.slice(1, i) ⊥ ""
             }
             i ← i + 1
         }
@@ -555,8 +555,8 @@ fn host_of(string hostport) → string {
     }
     mut int i ← 0
     while i ≺ hostport.length() {
-        if hostport.slice(i, i + 1) ≡ ":" {
-            return hostport.slice(0, i)
+        if (hostport.slice(i, i + 1) ⊥ "") ≡ ":" {
+            return hostport.slice(0, i) ⊥ ""
         }
         i ← i + 1
     }
@@ -566,11 +566,11 @@ fn host_of(string hostport) → string {
 fn port_of(string hostport, string scheme) → int ∪ none {
     if hostport.length() ≡ 0 then return null
     mut string digits ← ""
-    if hostport.slice(0, 1) ≡ "[" {
+    if (hostport.slice(0, 1) ⊥ "") ≡ "[" {
         mut int i ← 1
         mut bool closed ← false
         while i ≺ hostport.length() {
-            if hostport.slice(i, i + 1) ≡ "]" {
+            if (hostport.slice(i, i + 1) ⊥ "") ≡ "]" {
                 closed ← true
                 i ← i + 1
                 break
@@ -581,14 +581,14 @@ fn port_of(string hostport, string scheme) → int ∪ none {
         if i ≡ hostport.length() {
             return default_port(scheme)
         }
-        if hostport.slice(i, i + 1) ≢ ":" then return null
-        digits ← hostport.slice(i + 1, hostport.length())
+        if (hostport.slice(i, i + 1) ⊥ "") ≢ ":" then return null
+        digits ← hostport.slice(i + 1, hostport.length()) ⊥ ""
     }
     else {
         mut int colon ← -1
         mut int i ← 0
         while i ≺ hostport.length() {
-            if hostport.slice(i, i + 1) ≡ ":" {
+            if (hostport.slice(i, i + 1) ⊥ "") ≡ ":" {
                 if colon ≥ 0 then return null
                 colon ← i
             }
@@ -597,12 +597,12 @@ fn port_of(string hostport, string scheme) → int ∪ none {
         if colon ≺ 0 {
             return default_port(scheme)
         }
-        digits ← hostport.slice(colon + 1, hostport.length())
+        digits ← hostport.slice(colon + 1, hostport.length()) ⊥ ""
     }
     if digits.length() ≡ 0 then return null
     mut int i ← 0
     while i ≺ digits.length() {
-        if not is_digit(digits.slice(i, i + 1)) then return null
+        if not is_digit(digits.slice(i, i + 1) ⊥ "") then return null
         i ← i + 1
     }
     do {
@@ -630,7 +630,7 @@ fn is_host(string host) → bool {
     if host.length() ≡ 0 then return false
     mut int i ← 0
     while i ≺ host.length() {
-        let string c ← host.slice(i, i + 1)
+        let string c ← host.slice(i, i + 1) ⊥ ""
         if c ≡ " " or c ≡ "/" or c ≡ "?" or c ≡ "#" or c ≡ "@" or c ≡ "[" or c ≡ "]" {
             return false
         }
@@ -642,7 +642,7 @@ fn is_host(string host) → bool {
 fn host_literal(string host) → string {
     mut int i ← 0
     while i ≺ host.length() {
-        if host.slice(i, i + 1) ≡ ":" {
+        if (host.slice(i, i + 1) ⊥ "") ≡ ":" {
             return "[§]"(host)
         }
         i ← i + 1
@@ -652,13 +652,13 @@ fn host_literal(string host) → string {
 
 fn remainder_path(string remainder) → string {
     if remainder.length() ≡ 0 then return "/"
-    let string first ← remainder.slice(0, 1)
+    let string first ← remainder.slice(0, 1) ⊥ ""
     if first ≡ "?" or first ≡ "#" then return "/"
     mut int i ← 0
     while i ≺ remainder.length() {
-        let string c ← remainder.slice(i, i + 1)
+        let string c ← remainder.slice(i, i + 1) ⊥ ""
         if c ≡ "?" or c ≡ "#" {
-            let string path ← remainder.slice(0, i)
+            let string path ← remainder.slice(0, i) ⊥ ""
             if path.length() ≡ 0 then return "/"
             return path
         }
@@ -670,7 +670,7 @@ fn remainder_path(string remainder) → string {
 fn remainder_query(string remainder) → string {
     mut int i ← 0
     while i ≺ remainder.length() {
-        let string c ← remainder.slice(i, i + 1)
+        let string c ← remainder.slice(i, i + 1) ⊥ ""
         if c ≡ "#" {
             return ""
         }
@@ -678,12 +678,12 @@ fn remainder_query(string remainder) → string {
             let int start ← i + 1
             mut int j ← start
             while j ≺ remainder.length() {
-                if remainder.slice(j, j + 1) ≡ "#" {
-                    return remainder.slice(start, j)
+                if (remainder.slice(j, j + 1) ⊥ "") ≡ "#" {
+                    return remainder.slice(start, j) ⊥ ""
                 }
                 j ← j + 1
             }
-            return remainder.slice(start, remainder.length())
+            return remainder.slice(start, remainder.length()) ⊥ ""
         }
         i ← i + 1
     }
@@ -694,7 +694,7 @@ fn ascii_lower(string s) → string {
     mut string out ← ""
     mut int i ← 0
     while i ≺ s.length() {
-        out ← out + lower_char(s.slice(i, i + 1))
+        out ← out + lower_char(s.slice(i, i + 1) ⊥ "")
         i ← i + 1
     }
     return out
@@ -705,8 +705,8 @@ fn lower_char(string c) → string {
     let string lower ← "abcdefghijklmnopqrstuvwxyz"
     mut int i ← 0
     while i ≺ 26 {
-        if upper.slice(i, i + 1) ≡ c {
-            return lower.slice(i, i + 1)
+        if (upper.slice(i, i + 1) ⊥ "") ≡ c {
+            return lower.slice(i, i + 1) ⊥ ""
         }
         i ← i + 1
     }

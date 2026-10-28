@@ -2,7 +2,7 @@
 term = "discerne multi subject"
 kind = "feature"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "subject_path", "casu_variant_clause", "patterns", "pattern", "pattern_atom", "type_pattern", "ut_pattern", "pattern_binding", "ceterum_clause", "redde_stmt", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "One discerne can match several scrutinees at once: the header lists subject paths joined by et, each arm lists one pattern per subject, and the first arm whose patterns all match runs."
 syntax = "discerne <a> et <b> { casu <pattern> et <pattern> { ... } ceterum { ... } }"

@@ -3,6 +3,8 @@ id = "corpus/decimal/increment-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/increment-reject.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

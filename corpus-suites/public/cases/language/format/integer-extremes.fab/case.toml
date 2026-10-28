@@ -3,6 +3,8 @@ id = "corpus/format/integer-extremes.fab"
 group = "language"
 input_root = "corpus"
 input = "format/integer-extremes.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

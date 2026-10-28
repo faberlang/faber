@@ -3,6 +3,8 @@ id = "corpus/vector/vector-index.fab"
 group = "language"
 input_root = "corpus"
 input = "vector/vector-index.fab"
+category = "vector"
+domain = "tensors"
 
 
 [expect]

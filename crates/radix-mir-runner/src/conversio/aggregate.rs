@@ -110,7 +110,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             return self.recover_or_fail(
                 recovery,
                 span,
-                "octeti to lista conversion requires lista<u8>",
+                "list<b8> to lista conversion requires lista<u8>",
             );
         }
         Ok(Value::Array(Rc::new(RefCell::new(

@@ -2,7 +2,7 @@
 term = "bits"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "A list<b8> bulk conversion names its byte order: via Le or via Be."
 syntax = "raw ↦ list<u16> — rejected without via Le|Be"

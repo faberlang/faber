@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "Bulk typed reinterpretation of list<b8> as a tensor whose extent is a run-time size read from a binding."
 syntax = "list<b8> ↦ tensor<E, [N, size n]> via Be|Le"
-related = ["↦", "octeti", "tensor", "float"]
+related = ["↦", "list<b8>", "tensor", "float"]
 locale = "en"
 +++
 # =============================================================================

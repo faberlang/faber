@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "genus_decl", "genus_member", "field_decl", "expression", "assignment", "place", "literal", "typed_constructor", "field_list", "field_init", "expr_stmt", "call_expr", "member_suffix", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "functio_method_decl", "type_arguments", "type_argument", "array_literal"]
-category = "type"
+category = "binding"
 summary = "D-6: a copy parameter receives a deep duplicate at entry; the caller's value is untouched."
 syntax = "fn take(copy list<int> items)"
 related = ["lista"]

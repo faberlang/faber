@@ -2,7 +2,7 @@
 term = "genus"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "typed_constructor", "finge_expr", "field_list", "field_init", "field_key", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "A composite prints its construction literal; a scalar prints its value."
 syntax = "print <composite value>"

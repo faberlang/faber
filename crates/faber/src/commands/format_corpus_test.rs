@@ -11,7 +11,7 @@
 
 #![cfg(feature = "hir-faber")]
 
-use super::format::{format_session, formatted_source_for_write};
+use super::format::{format_session, format_single_doc, formatted_source_for_write};
 use radix::module::driver::faber_format::test_gate::{
     assert_canonical_idempotent_with_session, lex_parse_with_pack,
 };
@@ -404,4 +404,160 @@ fn format_corpus_has_no_policy_pin_filenames() {
         leftover.is_empty(),
         "corpus-product/format must not keep policy pin filenames: {leftover:?}"
     );
+}
+
+// `faber format --width N`.
+
+fn width(columns: u32) -> Option<std::num::NonZeroU32> {
+    std::num::NonZeroU32::new(columns)
+}
+
+/// With no width the output is the pinned canonical bytes; a width wider than
+/// every line changes nothing either.
+#[test]
+fn format_width_unset_is_byte_identical_to_the_canonical_corpus() {
+    for fixture in fixture_sources() {
+        let stem = fixture_stem(&fixture);
+        let source = fs::read_to_string(&fixture).expect("read fixture source");
+        let expected = fs::read_to_string(corpus_dir().join(format!("{stem}.format.expected")))
+            .expect("read expectation");
+        let canonical = format_single_doc(&fixture, &source, None)
+            .unwrap_or_else(|status| panic!("{stem}: format failed with status {status}"));
+        assert_eq!(
+            canonical, expected,
+            "{stem}: no width must not change output"
+        );
+        let wide = format_single_doc(&fixture, &source, width(100_000))
+            .unwrap_or_else(|status| panic!("{stem}: wide format failed with status {status}"));
+        assert_eq!(
+            wide, expected,
+            "{stem}: a width wider than every line must not change output"
+        );
+    }
+}
+
+/// Wrapped output is the same program: it re-parses under its own locale,
+/// carries the same non-trivia tokens, and re-emits to the unwrapped canonical
+/// bytes. Widths 60 and 20 are typical; 1 wraps at every legal break and so
+/// proves every protected position.
+#[test]
+fn format_width_60_roundtrips_format_corpus() {
+    let mut failures = Vec::new();
+    let mut wrapped_any = false;
+    for columns in [60_u32, 20, 1] {
+        for fixture in fixture_sources() {
+            let stem = fixture_stem(&fixture);
+            let source = fs::read_to_string(&fixture).expect("read fixture source");
+            let (session, canonical_body, canonical) = match canonical_pipeline(&fixture, &source) {
+                Ok(result) => result,
+                Err(detail) => {
+                    failures.push(format!("{stem}: {detail}"));
+                    continue;
+                }
+            };
+            let wrapped = match format_single_doc(&fixture, &source, width(columns)) {
+                Ok(wrapped) => wrapped,
+                Err(status) => {
+                    failures.push(format!(
+                        "{stem}@{columns}: wrap refused with status {status}"
+                    ));
+                    continue;
+                }
+            };
+            wrapped_any |= wrapped != canonical;
+
+            let pack = session
+                .config
+                .locale_pack
+                .as_ref()
+                .expect("format corpus session locale pack");
+            let split = radix::module::driver::split_frontmatter(&wrapped).expect("frontmatter");
+            let wrapped_body = &wrapped[split.body_byte_offset as usize..];
+            if let Err(detail) = lex_parse_with_pack(wrapped_body, Some(pack)) {
+                failures.push(format!(
+                    "{stem}@{columns}: wrapped body must re-parse: {detail}"
+                ));
+            }
+            let name = fixture.display().to_string();
+            match (
+                surface_census(&name, &canonical_body, pack),
+                surface_census(&name, wrapped_body, pack),
+            ) {
+                (Ok(plain), Ok(wrapped)) if plain == wrapped => {}
+                (Ok(plain), Ok(wrapped)) => failures.push(format!(
+                    "{stem}@{columns}: token/declaration census changed by wrapping: {plain:?} vs {wrapped:?}"
+                )),
+                (Err(detail), _) | (_, Err(detail)) => {
+                    failures.push(format!("{stem}@{columns}: census: {detail}"));
+                }
+            }
+            match canonical_pipeline(&fixture, &wrapped) {
+                Ok((_, _, again)) if again == canonical => {}
+                Ok(_) => failures.push(format!(
+                    "{stem}@{columns}: wrapped output must re-emit to the canonical bytes"
+                )),
+                Err(detail) => failures.push(format!("{stem}@{columns} re-emit: {detail}")),
+            }
+            // Idempotent under the same width.
+            match format_single_doc(&fixture, &wrapped, width(columns)) {
+                Ok(again) if again == wrapped => {}
+                Ok(_) => failures.push(format!(
+                    "{stem}@{columns}: wrapped format is not idempotent"
+                )),
+                Err(status) => {
+                    failures.push(format!("{stem}@{columns}: second pass status {status}"))
+                }
+            }
+        }
+    }
+    assert!(
+        wrapped_any,
+        "no fixture wrapped at any width: the test proves nothing"
+    );
+    assert!(
+        failures.is_empty(),
+        "format width failures:\n{}",
+        failures.join("\n")
+    );
+}
+
+/// Wrapping a long fixture line brings it to the requested width.
+#[test]
+fn format_width_wraps_the_long_lines_fixture() {
+    let fixture = corpus_dir().join("long-lines.fab");
+    let source = fs::read_to_string(&fixture).expect("read fixture source");
+    let canonical = format_single_doc(&fixture, &source, None).expect("canonical");
+    let wrapped = format_single_doc(&fixture, &source, width(60)).expect("wrapped");
+    let over = |text: &str| {
+        text.lines()
+            .filter(|line| line.chars().count() > 60)
+            .count()
+    };
+    assert!(over(&canonical) >= 2, "fixture must have long lines");
+    assert_eq!(
+        over(&wrapped),
+        0,
+        "every breakable line fits 60 columns:\n{wrapped}"
+    );
+}
+
+/// Real exempla at the tightest width: every legal break is taken, and the
+/// result still re-emits to the canonical bytes (the refusal path would
+/// surface here as `Err`). The regex exemplum pins `regex /p/` staying
+/// together.
+#[test]
+fn format_width_1_wraps_real_exempla_without_changing_them() {
+    for relative in ["regex/literal.fab", "schema/schema.fab", "nota/gradus.fab"] {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../corpus")
+            .join(relative);
+        let source = fs::read_to_string(&path).expect("read exemplum");
+        let canonical = format_single_doc(&path, &source, None)
+            .unwrap_or_else(|status| panic!("{relative}: canonical status {status}"));
+        let wrapped = format_single_doc(&path, &source, width(1))
+            .unwrap_or_else(|status| panic!("{relative}: width 1 status {status}"));
+        let (_, _, again) = canonical_pipeline(&path, &wrapped)
+            .unwrap_or_else(|detail| panic!("{relative}: wrapped re-emit: {detail}"));
+        assert_eq!(again, canonical, "{relative}");
+    }
 }

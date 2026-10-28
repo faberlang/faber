@@ -3,6 +3,8 @@ id = "corpus/clausura/capture-field-write.fab"
 group = "language"
 input_root = "corpus"
 input = "clausura/capture-field-write.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

@@ -149,6 +149,43 @@ fn interface_unavailable_from_wire(gate: radix_hir_fhir::UnavailableWire) -> Int
 }
 
 #[cfg(feature = "hir-fhir")]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn interface_const_value_to_wire(value: &InterfaceConstValue) -> radix_hir_fhir::ConstValueWire {
+    use radix_hir_fhir::ConstValueWire;
+    match value {
+        InterfaceConstValue::Int(int) => ConstValueWire::Int {
+            high: (*int >> 64) as i64,
+            low: *int as u64,
+        },
+        InterfaceConstValue::Float(float) => ConstValueWire::Float(*float),
+        InterfaceConstValue::Bool(flag) => ConstValueWire::Bool(*flag),
+        InterfaceConstValue::Text(text) => ConstValueWire::Text(text.clone()),
+        InterfaceConstValue::List(items) => {
+            ConstValueWire::List(items.iter().map(interface_const_value_to_wire).collect())
+        }
+    }
+}
+
+#[cfg(feature = "hir-fhir")]
+fn interface_const_value_from_wire(value: radix_hir_fhir::ConstValueWire) -> InterfaceConstValue {
+    use radix_hir_fhir::ConstValueWire;
+    match value {
+        ConstValueWire::Int { high, low } => {
+            InterfaceConstValue::Int((i128::from(high) << 64) | i128::from(low))
+        }
+        ConstValueWire::Float(float) => InterfaceConstValue::Float(float),
+        ConstValueWire::Bool(flag) => InterfaceConstValue::Bool(flag),
+        ConstValueWire::Text(text) => InterfaceConstValue::Text(text),
+        ConstValueWire::List(items) => InterfaceConstValue::List(
+            items
+                .into_iter()
+                .map(interface_const_value_from_wire)
+                .collect(),
+        ),
+    }
+}
+
+#[cfg(feature = "hir-fhir")]
 fn interface_nominal_kind_from_wire(kind: radix_hir_fhir::NominalKind) -> InterfaceNominalKind {
     match kind {
         radix_hir_fhir::NominalKind::Struct => InterfaceNominalKind::Struct,
@@ -219,6 +256,9 @@ pub struct Scope {
     pub parent: Option<ScopeId>,
     pub kind: ScopeKind,
     pub symbols: FxHashMap<LexSymbol, ScopeEntry>,
+    /// Reader-pack type spellings displaced from `symbols` by a value binding of
+    /// the same name in this frame. They stay reachable from type syntax.
+    pub shadowed_types: FxHashMap<LexSymbol, ScopeEntry>,
     /// Prior nearest-name values for bindings introduced in this frame.
     pub shadow_deltas: Vec<(LexSymbol, Option<DefId>)>,
 }
@@ -231,6 +271,7 @@ impl Scope {
             parent,
             kind,
             symbols: FxHashMap::default(),
+            shadowed_types: FxHashMap::default(),
             shadow_deltas: Vec::new(),
         }
     }
@@ -3417,7 +3458,24 @@ impl Resolver {
     ) -> Result<(), LexSymbol> {
         let previous = self.lookup_shadow.get(&name).copied();
         let scope = &mut self.scopes[self.current_scope.0 as usize];
-        if let Some(existing) = scope.symbols.get(&name) {
+        if let Some(existing) = scope.symbols.get(&name).copied() {
+            // A value binding (function or module-level value) may shadow a
+            // reader-pack type spelling in the same frame: the pack words are
+            // contextual, not reserved (`fn tensor(...)` under any locale).
+            // The type spelling stays reachable from type syntax through
+            // `shadowed_types`; a user-declared type of the same name is still
+            // a duplicate.
+            if matches!(kind, SymbolKind::Function | SymbolKind::Local)
+                && existing.kind == SymbolKind::TypeAlias
+                && self.locale_pack_type_aliases.contains_key(&existing.def_id)
+            {
+                scope.shadowed_types.insert(name, existing);
+                scope.symbols.insert(name, ScopeEntry { def_id, kind });
+                scope.shadow_deltas.push((name, previous));
+                self.lookup_shadow.insert(name, def_id);
+                return Ok(());
+            }
+
             // A module import lives in the value namespace and may shadow a
             // reader-pack type spelling that occupies the same name in the
             // same scope frame (e.g. `importa ex "norma:json" json`
@@ -3932,6 +3990,9 @@ impl Resolver {
             {
                 return Some(entry.def_id);
             }
+            if let Some(entry) = scope.shadowed_types.get(&name) {
+                return Some(entry.def_id);
+            }
             scope_id = scope.parent;
         }
 
@@ -4141,6 +4202,7 @@ impl Resolver {
             .into_iter()
             .map(|(ns, iface)| {
                 let unavailable = iface.unavailable;
+                let const_values = iface.const_values;
                 let exports: FxHashMap<LexSymbol, ImportedFileExport> = iface
                     .exports
                     .into_iter()
@@ -4181,7 +4243,7 @@ impl Resolver {
                                         required: field.required,
                                         modifier: field.modifier,
                                         visibility: field.visibility,
-                                        init: None,
+                                        init: field.init,
                                     })
                                     .collect();
                                 let imported_methods = methods
@@ -4228,7 +4290,10 @@ impl Resolver {
                         strict_members: false,
                         identity: None,
                         const_members: FxHashSet::default(),
-                        const_values: FxHashMap::default(),
+                        const_values: const_values
+                            .into_iter()
+                            .map(|(member, value)| (member, interface_const_value_from_wire(value)))
+                            .collect(),
                         unavailable: unavailable
                             .into_iter()
                             .map(|(member, gates)| {
@@ -4261,7 +4326,7 @@ impl Resolver {
                 .map(|(kind, name)| (interface_nominal_kind_from_wire(kind), name))
                 .collect();
 
-        Self {
+        let mut resolver = Self {
             namespace_exports,
             file_interfaces,
             imported_nominal_types,
@@ -4269,7 +4334,21 @@ impl Resolver {
             conversion_rows,
             used_namespaces,
             ..Self::new()
+        };
+        // Module bindings are what a `module.NAME` read resolves through to
+        // reach the namespace's file interface. The names are not bound in any
+        // scope: no resolution runs against a restored resolver.
+        for (def_id, name) in snapshot.module_bindings {
+            resolver.register_unbound_symbol(Symbol {
+                def_id,
+                name,
+                kind: SymbolKind::Module,
+                ty: None,
+                mutable: false,
+                span: Span::default(),
+            });
         }
+        resolver
     }
 
     /// Produce a serializable snapshot of resolver import state for the HIR
@@ -4298,7 +4377,7 @@ impl Resolver {
             .file_interfaces
             .iter()
             .map(|(&ns, imported)| {
-                let exports = imported
+                let mut exports: Vec<_> = imported
                     .exports
                     .iter()
                     .map(|(&member, export)| {
@@ -4325,6 +4404,7 @@ impl Resolver {
                                         required: field.required,
                                         modifier: field.modifier,
                                         visibility: field.visibility,
+                                        init: field.init.clone(),
                                     })
                                     .collect(),
                                 methods: strukt
@@ -4348,6 +4428,8 @@ impl Resolver {
                         (member, snapshot)
                     })
                     .collect();
+                // The export map is a hash map; the wire order must not be.
+                exports.sort_by_key(|(member, _)| member.0);
                 let mut unavailable: Vec<_> = imported
                     .unavailable
                     .iter()
@@ -4362,11 +4444,18 @@ impl Resolver {
                     })
                     .collect();
                 unavailable.sort_by_key(|(member, _)| member.0);
+                let mut const_values: Vec<_> = imported
+                    .const_values
+                    .iter()
+                    .map(|(&member, value)| (member, interface_const_value_to_wire(value)))
+                    .collect();
+                const_values.sort_by_key(|(member, _)| member.0);
                 (
                     ns,
                     FileInterfaceSnapshot {
                         exports,
                         unavailable,
+                        const_values,
                     },
                 )
             })
@@ -4409,6 +4498,14 @@ impl Resolver {
             )
         });
 
+        let mut module_bindings: Vec<_> = self
+            .symbols
+            .values()
+            .filter(|symbol| symbol.kind == SymbolKind::Module)
+            .map(|symbol| (symbol.def_id, symbol.name))
+            .collect();
+        module_bindings.sort_by_key(|(def_id, _)| def_id.0);
+
         ResolverSnapshot {
             namespace_exports,
             file_interfaces,
@@ -4416,6 +4513,7 @@ impl Resolver {
             imported_nominal_types,
             ambiguous_imported_nominal_types,
             conversion_rows,
+            module_bindings,
         }
     }
 }

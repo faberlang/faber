@@ -385,6 +385,7 @@ pub fn generate_from_analyzed_with_options(
     radix_codegen_shared::reject_hir_errors(analysis.hir())?;
     radix_codegen_shared::reject_bits_type(analysis.types(), target)?;
     radix_codegen_shared::reject_ledger_type(analysis.types(), target)?;
+    radix_codegen_shared::reject_ranged_int_type(analysis.types(), target)?;
     reject_unsupported_leaves(analysis, target)?;
     if !target.is_available() {
         return Err(unavailable_target_error(target));
@@ -702,6 +703,53 @@ fn register_go_cross_file_defids(
 
 #[cfg(feature = "hir-go")]
 fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) -> Result<crate::Output, CodegenError> {
+    /// Imported functions that declare a `⇥` channel, keyed by (module path def,
+    /// member) with the declared error type. The file interface carries each
+    /// member's signature; the facts table only covers this unit's own functions.
+    fn go_imported_failable_members(
+        analysis: &dyn CodegenAnalysis,
+        hir: &HirModule,
+    ) -> handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId> {
+        use crate::hir::HirExpressionKind;
+        use crate::hir::visit::HirVisitor;
+        struct Reads<'u> {
+            analysis: &'u dyn CodegenAnalysis,
+            found: handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
+        }
+        impl Reads<'_> {
+            fn note(&mut self, object: &crate::hir::HirExpression, member: crate::lexer::Symbol) {
+                if let HirExpressionKind::Path(module) = &object.kind
+                    && let Some(namespace) = self.analysis.resolver().get_symbol(*module)
+                    && namespace.kind == crate::semantic::SymbolKind::Module
+                    && let Some(err) = self
+                        .analysis
+                        .resolver()
+                        .namespace_file_function_canonical(namespace.name, member)
+                        .and_then(|sig| sig.err)
+                {
+                    self.found.insert((*module, member), err);
+                }
+            }
+        }
+        impl HirVisitor for Reads<'_> {
+            fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
+                match &expr.kind {
+                    HirExpressionKind::Call(callee, ..) => {
+                        if let HirExpressionKind::Field(object, member) = &callee.kind {
+                            self.note(object, *member);
+                        }
+                    }
+                    HirExpressionKind::MethodCall(receiver, method, ..) => self.note(receiver, *method),
+                    _ => {}
+                }
+                crate::hir::visit::walk_expr(self, expr);
+            }
+        }
+        let mut reads = Reads { analysis, found: handroll::FxHashMap::default() };
+        crate::hir::visit::walk_program(&mut reads, hir);
+        reads.found
+    }
+
     let mut r#gen = go::GoCodegen::new(hir, analysis.types(), analysis.interner());
     r#gen.set_display_tokens(display_tokens_for_module(analysis));
     r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
@@ -709,18 +757,33 @@ fn generate_go_from_analyzed(analysis: &dyn CodegenAnalysis, hir: &HirModule) ->
     r#gen.set_library_registry(analysis.libraries());
     r#gen.set_imported_constants(go_imported_constants(analysis, hir));
     r#gen.set_imported_generators(go_imported_generators(analysis, hir));
+    r#gen.set_imported_failable_members(go_imported_failable_members(analysis, hir));
     register_go_cross_file_defids(&mut r#gen, hir, analysis.resolver(), analysis.libraries());
     let mut statics = handroll::FxHashMap::default();
+    let mut imported_structs = Vec::new();
     for (def_id, fields, _, _) in analysis.resolver().imported_file_structs() {
+        let mut instance_fields = Vec::with_capacity(fields.len());
         for field in fields {
-            if field.modifier == Some(radix_syntax::FieldModifier::Const)
-                && let Some(init) = field.init
-            {
-                statics.insert((def_id, field.name), init.clone());
+            if field.modifier == Some(radix_syntax::FieldModifier::Const) {
+                if let Some(init) = field.init {
+                    statics.insert((def_id, field.name), init);
+                }
+                continue;
             }
+            // The resolver rebuilt this default in the importer's symbol and
+            // type space; the declaring file's own expression indexes a
+            // different interner and must never be read here.
+            instance_fields.push(go::ImportedStructField {
+                name: field.name,
+                ty: field.ty,
+                sponte: field.optional,
+                init: field.init,
+            });
         }
+        imported_structs.push((def_id, instance_fields));
     }
     r#gen.set_imported_static_fields(statics);
+    r#gen.set_imported_structs(imported_structs);
     let output = r#gen.generate(hir, analysis.types(), analysis.interner())?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
 }
@@ -1202,8 +1265,7 @@ pub fn generate_go_cli(
 ) -> Result<crate::GoOutput, CodegenError> {
     #[cfg(feature = "hir-go")]
     {
-        radix_codegen_shared::reject_bits_type(types, Target::HirGo)?;
-        radix_codegen_shared::reject_ledger_type(types, Target::HirGo)?;
+        radix_codegen_shared::reject_unlowered_value_types(types, Target::HirGo)?;
         reject_leaf_routes_in_hir(hir, interner, Target::HirGo)?;
         let hir = hir.without_unavailable_declarations(interner);
         go::generate_go_cli(&hir, types, interner, cli_program, display_tokens)
@@ -1231,8 +1293,7 @@ pub fn generate_ts_cli(
     #[cfg(feature = "hir-ts")]
     {
         radix_codegen_shared::reject_hir_errors(hir)?;
-        radix_codegen_shared::reject_bits_type(types, Target::HirTypeScript)?;
-        radix_codegen_shared::reject_ledger_type(types, Target::HirTypeScript)?;
+        radix_codegen_shared::reject_unlowered_value_types(types, Target::HirTypeScript)?;
         reject_leaf_routes_in_hir(hir, interner, Target::HirTypeScript)?;
         let ir = cli_ir::to_cli_ir(cli_program);
         let hir = hir.without_unavailable_declarations(interner);
@@ -1262,8 +1323,7 @@ pub fn generate_python_cli(
     #[cfg(feature = "hir-python")]
     {
         radix_codegen_shared::reject_hir_errors(hir)?;
-        radix_codegen_shared::reject_bits_type(types, Target::HirPython)?;
-        radix_codegen_shared::reject_ledger_type(types, Target::HirPython)?;
+        radix_codegen_shared::reject_unlowered_value_types(types, Target::HirPython)?;
         reject_leaf_routes_in_hir(hir, interner, Target::HirPython)?;
         let ir = cli_ir::to_cli_ir(cli_program);
         let hir = hir.without_unavailable_declarations(interner);

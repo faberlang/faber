@@ -3,6 +3,8 @@ id = "corpus/json/literal-duplicate-key-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "json/literal-duplicate-key-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

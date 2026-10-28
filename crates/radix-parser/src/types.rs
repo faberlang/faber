@@ -21,8 +21,8 @@
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{KeywordOwner, Span, Symbol, TokenKind};
 use radix_syntax::{
-    FiguraExpr, FuncTypeExpr, GenericArgExpr, Ident, LiftExtent, TypeExpr, TypeExprKind,
-    TypeFormLevel, TypeMode,
+    FiguraExpr, FuncTypeExpr, GenericArgExpr, Ident, LiftExtent, RangeArgExpr, RangeBoundExpr,
+    RangeKind, TypeExpr, TypeExprKind, TypeFormLevel, TypeMode,
 };
 use std::collections::HashSet;
 
@@ -467,7 +467,16 @@ impl Parser {
         let mut params = Vec::new();
         let mut labels = HashSet::new();
         loop {
-            let param = if name_str == "iuncta" {
+            let param = if path.len() == 1
+                && name_str != "iuncta"
+                && name_str != "ratio"
+                && self.looks_like_range_arg()
+            {
+                // A range is its own argument slot (`saturating<u32, 0‥W>`):
+                // it never reads as a type or a size, so it is unambiguous
+                // beside both. Which heads take one is decided at lowering.
+                GenericArgExpr::Range(self.parse_range_arg()?)
+            } else if name_str == "iuncta" {
                 GenericArgExpr::Type(self.parse_iuncta_type_argument(&mut labels)?)
             } else if path.len() == 1 && name_str == "ratio" {
                 GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
@@ -894,6 +903,100 @@ impl Parser {
         Ok(ty)
     }
 
+    /// Number of tokens the range bound starting `offset` tokens ahead
+    /// occupies, or `None` when no bound starts there.
+    ///
+    /// A bound is a natural literal, `∞`, either one negated, or a name
+    /// (optionally spelled as a `size` lift).
+    fn range_bound_len(&self, offset: usize) -> Option<usize> {
+        let negative = matches!(self.peek_at(offset).kind, TokenKind::Minus);
+        let at = offset + usize::from(negative);
+        match &self.peek_at(at).kind {
+            TokenKind::Integer(_) => Some(at + 1 - offset),
+            TokenKind::Float(value) if value.is_infinite() => Some(at + 1 - offset),
+            TokenKind::Ident(_) if !negative => {
+                if self.keyword_ident_at(at) == Some(TokenKind::Magnitudo) {
+                    matches!(self.peek_at(at + 1).kind, TokenKind::Ident(_))
+                        .then_some(at + 2 - offset)
+                } else {
+                    Some(at + 1 - offset)
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether the next tokens spell a range argument, `lo‥hi` or `lo…hi`.
+    fn looks_like_range_arg(&self) -> bool {
+        self.range_bound_len(0).is_some_and(|len| {
+            matches!(
+                self.peek_at(len).kind,
+                TokenKind::DotDot | TokenKind::Ellipsis
+            )
+        })
+    }
+
+    /// Parse the range argument of a ranged store policy.
+    ///
+    /// GRAMMAR:
+    ///   range-argument := range-bound ('‥' | '…') range-bound
+    ///   range-bound    := ['-'] NATURAL | ['-'] '∞' | ['size'] IDENTIFIER
+    ///
+    /// Both ends are always written: `0…` alone is refused by name, and `∞` /
+    /// `-∞` write "no bound on this side".
+    fn parse_range_arg(&mut self) -> Result<RangeArgExpr, ParseError> {
+        let start = self.current_span();
+        let lo = self.parse_range_type_bound()?;
+        let kind = if self.eat(&TokenKind::Ellipsis) {
+            RangeKind::Inclusive
+        } else {
+            self.expect_issue(&TokenKind::DotDot, "range_operator_expected")?;
+            RangeKind::Exclusive
+        };
+        let hi = self.parse_range_type_bound()?;
+        Ok(RangeArgExpr {
+            lo,
+            hi,
+            kind,
+            span: start.merge(self.previous_span()),
+        })
+    }
+
+    fn parse_range_type_bound(&mut self) -> Result<RangeBoundExpr, ParseError> {
+        let start = self.current_span();
+        let negative = self.eat(&TokenKind::Minus);
+        match self.peek().kind.clone() {
+            TokenKind::Integer(value) => {
+                self.advance();
+                let value = i128::from(value);
+                Ok(RangeBoundExpr::Literal {
+                    value: if negative { -value } else { value },
+                    span: start.merge(self.previous_span()),
+                })
+            }
+            TokenKind::Float(value) if value.is_infinite() => {
+                self.advance();
+                Ok(RangeBoundExpr::Unbounded {
+                    negative,
+                    span: start.merge(self.previous_span()),
+                })
+            }
+            TokenKind::Ident(_) if !negative => {
+                let lifted = self.eat_keyword_ident(TokenKind::Magnitudo);
+                let name = self.parse_ident()?;
+                Ok(RangeBoundExpr::Name {
+                    name,
+                    lifted,
+                    span: start.merge(self.previous_span()),
+                })
+            }
+            _ => Err(
+                ParseError::structured(ParseErrorKind::TypeInvalid, self.current_span())
+                    .with_arg("issue", "range_bound_required"),
+            ),
+        }
+    }
+
     /// Parse one applied argument in generic-head position.
     ///
     /// Natural literals and shape tuples are compile-time size expressions.
@@ -987,24 +1090,31 @@ impl Parser {
             return Ok(FiguraExpr::Infer);
         }
 
-        if self.eat(&TokenKind::LBracket) {
-            let mut dims = Vec::new();
-            if !self.check(&TokenKind::RBracket) {
-                loop {
-                    let span = self.current_span();
-                    dims.push(self.nested(ParseErrorKind::TypeInvalid, span, |parser| {
-                        parser.parse_figura()
-                    })?);
-                    if !self.consume_item_separator(&TokenKind::RBracket, "figura_dimensions")? {
-                        break;
-                    }
-                }
-            }
-            self.expect_issue(&TokenKind::RBracket, "shape_dimensions_end")?;
-            return Ok(FiguraExpr::Tuple(dims));
+        if self.check(&TokenKind::LBracket) {
+            return Ok(FiguraExpr::Tuple(self.parse_figura_dimensions()?));
         }
 
         self.parse_figura_additive()
+    }
+
+    /// Parse the bracketed dimension list `[ figura (, figura)* ]` (empty
+    /// allowed); the caller has checked the opening `[`.
+    fn parse_figura_dimensions(&mut self) -> Result<Vec<FiguraExpr>, ParseError> {
+        self.advance();
+        let mut dims = Vec::new();
+        if !self.check(&TokenKind::RBracket) {
+            loop {
+                let span = self.current_span();
+                dims.push(self.nested(ParseErrorKind::TypeInvalid, span, |parser| {
+                    parser.parse_figura()
+                })?);
+                if !self.consume_item_separator(&TokenKind::RBracket, "figura_dimensions")? {
+                    break;
+                }
+            }
+        }
+        self.expect_issue(&TokenKind::RBracket, "shape_dimensions_end")?;
+        Ok(dims)
     }
 
     fn parse_figura_additive(&mut self) -> Result<FiguraExpr, ParseError> {
@@ -1040,8 +1150,12 @@ impl Parser {
     }
 
     /// Parse the primary payload of a spelled lift: an integer literal
-    /// (optionally negated), a name, or a parenthesized figura term.
+    /// (optionally negated), a name, a parenthesized figura term, or a
+    /// bracketed shape.
     fn parse_figura_lift_extent(&mut self) -> Result<LiftExtent, ParseError> {
+        if self.check(&TokenKind::LBracket) {
+            return Ok(LiftExtent::Shape(self.parse_figura_dimensions()?));
+        }
         if self.eat(&TokenKind::Minus) {
             let TokenKind::Integer(value) = self.peek().kind else {
                 return Err(self.invalid_type_error("figura_arithmetic_requires_natural_constant"));

@@ -267,6 +267,32 @@ pub(super) fn reject_catalog_arity(
 
 /// Type-check a promoted intrinsic method call when the receiver type matches.
 ///
+/// Whether `name` with `arg_count` arguments is a float intrinsic that returns
+/// its receiver's own float type (`SameAsReceiver`: `cbrt`, `sqrt`, `abs`,
+/// `sin`, ...), resolved through the reader pack exactly as
+/// [`check_intrinsic_method_call`] resolves it. Pure: a miss reports nothing.
+pub(super) fn is_float_same_as_receiver_method(
+    checker: &mut TypeChecker<'_>,
+    name: Symbol,
+    arg_count: usize,
+) -> bool {
+    let Some(interner) = checker.interner else {
+        return false;
+    };
+    let surface = interner.resolve(name).to_owned();
+    let probe = checker.fractus_type();
+    let probe = checker.types.get(probe);
+    let canonical = match checker.locale_pack {
+        Some(pack) if pack.metadata.id != "la" => receiver_families(probe)
+            .iter()
+            .find_map(|family| pack.intrinsic_canonical(*family, surface.as_str())),
+        _ => Some(surface.as_str()),
+    };
+    canonical
+        .and_then(|method| lookup_intrinsic_row(probe, method, arg_count))
+        .is_some_and(|entry| matches!(entry.return_kind, IntrinsicReturnKind::SameAsReceiver))
+}
+
 /// Lookup is pack-authoritative (db54b442): under any non-la reader pack, a
 /// localized surface spelling (e.g. en `contains`) is resolved through the
 /// pack's family-scoped surface→canonical cache to the unchanged canonical

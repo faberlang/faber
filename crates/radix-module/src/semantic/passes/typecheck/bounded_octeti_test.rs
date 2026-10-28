@@ -122,7 +122,7 @@ incipit {
         "bounded → unbounded must copy the valid prefix, got: {code}"
     );
     assert!(
-        code.contains("try_from_octeti") && code.contains("octeti to bounded octeti conversion failed"),
+        code.contains("try_from_octeti") && code.contains("list<b8> to bounded list<b8> conversion failed"),
         "unbounded → bounded must fail closed when len > N, got: {code}"
     );
 }

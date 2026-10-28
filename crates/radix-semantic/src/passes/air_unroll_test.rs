@@ -178,10 +178,10 @@ impl HirVisitor for FindSi {
 struct CollectIfEq(Vec<u64>);
 impl HirVisitor for CollectIfEq {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Si { cond, .. } = &expr.kind {
-            if let Some(value) = cond_lane_literal(cond) {
-                self.0.push(value);
-            }
+        if let HirExpressionKind::Si { cond, .. } = &expr.kind
+            && let Some(value) = cond_lane_literal(cond)
+        {
+            self.0.push(value);
         }
         walk_expr(self, expr);
     }
@@ -438,12 +438,11 @@ functio host_grid(tensor<f32, [2, 3]> x) → vacuum {
 struct CollectCoordLets(Vec<u64>);
 impl HirVisitor for CollectCoordLets {
     fn visit_stmt(&mut self, stmt: &HirStatement) {
-        if let HirStatementKind::Local(local) = &stmt.kind {
-            if let Some(init) = &local.init {
-                if let HirExpressionKind::Literal(HirLiteral::Int(value)) = init.kind {
-                    self.0.push(value);
-                }
-            }
+        if let HirStatementKind::Local(local) = &stmt.kind
+            && let Some(init) = &local.init
+            && let HirExpressionKind::Literal(HirLiteral::Int(value)) = init.kind
+        {
+            self.0.push(value);
         }
         walk_stmt(self, stmt);
     }
@@ -1067,10 +1066,10 @@ functio unbounded() → vacuum {
 struct GatherTys(Vec<crate::TypeId>);
 impl HirVisitor for GatherTys {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if matches!(expr.kind, HirExpressionKind::Index(..)) {
-            if let Some(ty) = expr.ty {
-                self.0.push(ty);
-            }
+        if matches!(expr.kind, HirExpressionKind::Index(..))
+            && let Some(ty) = expr.ty
+        {
+            self.0.push(ty);
         }
         walk_expr(self, expr);
     }
@@ -1475,12 +1474,11 @@ impl HirVisitor for CountSi {
 struct CountBinaryInits(usize);
 impl HirVisitor for CountBinaryInits {
     fn visit_stmt(&mut self, stmt: &HirStatement) {
-        if let HirStatementKind::Local(local) = &stmt.kind {
-            if let Some(init) = &local.init {
-                if matches!(init.kind, HirExpressionKind::Binary(..)) {
-                    self.0 += 1;
-                }
-            }
+        if let HirStatementKind::Local(local) = &stmt.kind
+            && let Some(init) = &local.init
+            && matches!(init.kind, HirExpressionKind::Binary(..))
+        {
+            self.0 += 1;
         }
         walk_stmt(self, stmt);
     }

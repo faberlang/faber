@@ -3,6 +3,8 @@ id = "corpus/tacebit/tacebit.fab"
 group = "language"
 input_root = "corpus"
 input = "tacebit/tacebit.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

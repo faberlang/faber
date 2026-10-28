@@ -3,6 +3,8 @@ id = "corpus/usque/usque.fab"
 group = "language"
 input_root = "corpus"
 input = "usque/usque.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "genus"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "array_literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "A tuple cell takes `_ [ … ]` or a bare `[ … ]`; a class cell takes a bare `{ field = value }`."
 syntax = "<type> <name> ← _ [ <value>, … ]  |  <type> <name> ← { <field> = <value>, … }"

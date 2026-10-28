@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "function_type", "type_list", "expression", "literal", "expr_stmt", "call_expr", "call_suffix", "member_suffix", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "array_literal", "assignment", "clausura_expr", "genus_decl", "genus_member", "field_decl"]
-category = "type"
+category = "binding"
 canonical = false
 summary = "A field projection passed to a mut parameter is rebound by the callee and the write lands back in the caller's field."
 syntax = "setseven(mut b.count)"

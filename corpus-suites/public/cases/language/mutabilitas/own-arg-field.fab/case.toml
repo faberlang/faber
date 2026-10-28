@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/own-arg-field.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/own-arg-field.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

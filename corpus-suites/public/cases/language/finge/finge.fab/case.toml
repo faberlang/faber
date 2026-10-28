@@ -3,6 +3,8 @@ id = "corpus/finge/finge.fab"
 group = "language"
 input_root = "corpus"
 input = "finge/finge.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/typi/inf-infinity-error.fab"
 group = "language"
 input_root = "corpus"
 input = "typi/inf-infinity-error.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

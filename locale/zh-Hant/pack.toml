@@ -32,6 +32,7 @@ insere = "嵌入"
 privata = "私有"
 protecta = "保護"
 publica = "公開"
+visibilitas = "可見性"
 sponte = "可選"
 casu = "分支"
 ceterum = "預設"
@@ -933,6 +934,10 @@ help = "使用 {sugar} 寬度糖括號寫入形狀"
 message = "`{form}` 是已廢棄的數值型別寫法"
 help = "寫 `{bare}`，不要寫 `{form}`；寬度標記本身就是型別"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "範圍需要兩個端點"
+help = "寫出兩個端點，例如 0‥8 或 0…7；某一側無界時用 ∞ 或 -∞"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "型別 '{type}' 未在此讀者語言介面上宣告"
 help = "使用此讀者語言中宣告的類型拼寫{?expected|：'|'}"
@@ -967,27 +972,31 @@ help = "檢查匯入語法"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "未知的匯入欄位"
-help = "使用 ex、visibilitas、nomen、ut 或 omnia"
+help = "使用 {ex}、{visibilitas}、{nomen}、{ut} 或 {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "匯入欄位 `{field}` 未在此讀取器表面宣告"
+help = "對此檔案的讀取器語系使用 `{expected}`"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "重複的匯入欄位 `{field}`"
 help = "每個匯入欄位只能出現一次；請移除重複的欄位"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "匯入記錄需要 ex 來源"
-help = "在匯入記錄加入 ex = \"path\""
+message = "匯入記錄需要 {ex} 來源"
+help = "在匯入記錄加入 {ex} = \"path\""
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "萬用字元匯入不可同時命名綁定"
-help = "單獨使用 omnia，或使用 nomen/ut 進行具名匯入"
+help = "單獨使用 {omnia}，或使用 {nomen}/{ut} 進行具名匯入"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "無效匯入可見性"
-help = "使用 privata 或 publica"
+help = "使用 {privata} 或 {publica}"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "無法從 {path} 推斷匯入名稱"
-help = "為 {path} 撰寫 nomen 或明確別名"
+help = "為 {path} 撰寫 {nomen} 或明確別名"
 
 [diagnostics.SEM001]
 message = "未定義變數"
@@ -1003,7 +1012,7 @@ help = "在使用前宣告變數{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "未知識別符"
-help = "若要輸出陳述式，請寫不帶括號的 `{spelling} <expr>`"
+help = "`{spelling}` 是輸出陳述式，不是函式：匯入主控台函式（`{importa} {ex} \"norma:console\" {fixum} print`，然後寫 `print(...)`），或先綁定該值（`{sit} _ x ← …`，然後寫 `{spelling} x`）"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "未知記錄欄位"
@@ -1181,6 +1190,10 @@ help = "修正用於降階的 AST 結構"
 message = "值名稱 {name} 不能佔據注記的 extent 位置"
 help = "在此儲存位置寫出 `size {name}` 以顯式提升，例如 `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "泛型呼叫的尺寸或形狀引數不受支援"
+help = "使用常數、尺寸名稱或寫出 `size w` 的值"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "陣列解構需要初始化器"
 help = "修正用於降階的 AST 結構"
@@ -1220,6 +1233,38 @@ help = "以單一寬度寫出 trapping 型別，例如 trapping<u8> 或 trapping
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping 寬度必須是裸寬度標記"
 help = "使用裸寬度標記，例如 u8 或 i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "範圍需要儲存策略詞；單獨的寬度標記不能帶範圍"
+help = "先寫策略詞，例如 saturating<u32, 0‥8>、trapping<i32, -2‥3> 或 wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "範圍端點必須是整數字面量或 ∞"
+help = "兩個端點都寫成整數字面量，例如 0‥8；具名端點或 size 端點尚未支援"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "帶範圍的儲存策略接受一個寬度，然後是一個範圍"
+help = "寫成 policy<W, lo‥hi>，例如 saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "該範圍不包含任何值"
+help = "lo‥hi 的低端必須小於高端；lo…hi 的低端不能大於高端"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "範圍端點超出了寬度"
+help = "兩個端點都要在寬度之內；∞ 只能作高端，-∞ 只能作低端"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "無號寬度的低端不能為負"
+help = "讓範圍從 0 開始，或使用有號寬度，例如 i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "帶範圍的儲存策略需要有界的整數寬度"
+help = "使用 u8 或 i32 這樣的整數寬度；浮點、十進位和 inf 寬度暫不支援範圍"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "kernel 中暫不支援帶範圍的儲存策略 ({site})；kernel 不套用範圍"
+help = "在 kernel 內使用普通寬度，在主機端套用範圍"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可呼叫項的註記姿態「{annotation_posture}」與書寫的姿態「{written_posture}」衝突"
@@ -1565,6 +1610,14 @@ help = "請使用不超過 32 位元的整數寬度"
 message = "核心中間範圍 {extent} 超出可攜式整數範圍"
 help = "讓中間值維持在可攜式整數範圍內"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "呼叫型別引數中 `size` 之後的形狀只接受自然數維度"
+help = "將每個維度寫成自然數，例如 `size [2, 3]`；符號維度或執行期維度請透過 `size` 名稱傳遞"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "`size` 之後的方括號形狀只允許出現在呼叫的型別引數中"
+help = "直接寫出形狀，例如 `tensor<f32, [2, 3]>`，或在呼叫中使用 `size [2, 3]`，例如 `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "CLI 驗證錯誤"
 help = "在產生可執行的 CLI 程式碼前，修正 CLI 註解契約"
@@ -1724,6 +1777,10 @@ help = "僅宣告該型別；在 ledger 操作可用之前請使用 map ({tabula
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "此目標暫不支援 ledger 型別"
 help = "請使用 MIR runner 或 Faber 原始碼發射器，或改用 map ({tabula})"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "此目標暫不支援帶範圍的儲存策略"
+help = "請使用 MIR runner、Rust 目標或 Faber 原始碼發射器，直到此目標支援範圍"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "此目標不支援 {leaf} 葉片"
@@ -3261,6 +3318,14 @@ help = "在呼叫處依簽章宣告寫出標記，例如 `f(axis 1)`"
 message = "此處寫了 `axis` 標記，但參數未宣告為 `axis`"
 help = "移除 `axis` 標記，或將參數宣告為 `axis int`"
 
+[diagnostics.SEM057.issues.size_marker_required]
+message = "此引數是 `size` 引數，必須以 `size` 標記寫出"
+help = "依簽章對參數的宣告寫出標記，例如 `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "此處寫了 `size` 標記，但被呼叫的函式未宣告任何 `size` 參數"
+help = "移除 `size` 標記，或將參數宣告為 `size N`"
+
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "無法將未標記的值繫結為 `own`"
 help = "透過 `copy` 繫結以複製來源"
@@ -3721,6 +3786,9 @@ applica = "套用"
 productum = "點積"
 transversum = "叉積"
 normalizata = "正規化"
+# Q-X1: the tensor rank and the Euclidean norm (tensor and vector) are named methods; `longitudo` is the element count.
+rank = "rank"
+norm = "norm"
 swizzle = "swizzle"
 coercere = "限幅"
 inter = "相交"

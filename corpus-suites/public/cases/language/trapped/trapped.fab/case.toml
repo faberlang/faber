@@ -3,6 +3,8 @@ id = "corpus/trapped/trapped.fab"
 group = "language"
 input_root = "corpus"
 input = "trapped/trapped.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

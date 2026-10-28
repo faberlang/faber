@@ -59,7 +59,7 @@ fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
             form: radix_syntax::TypeFormLevel::LONG,
             iuncta_label: None,
         }),
-        GenericArgExpr::Size(_) => None,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -523,6 +523,10 @@ impl Lowerer<'_> {
                 self.error("generic_size_argument_in_type_position");
                 self.types.intern(Type::Error)
             }
+            GenericArgExpr::Range(_) => {
+                self.error(crate::numeric_width::WidthLowerIssue::RANGED_ARITY);
+                self.types.intern(Type::Error)
+            }
         }
     }
 
@@ -550,6 +554,10 @@ impl Lowerer<'_> {
             }
             GenericArgExpr::Type(_) => {
                 self.error("generic_type_argument_in_size_position");
+                None
+            }
+            GenericArgExpr::Range(_) => {
+                self.error(crate::numeric_width::WidthLowerIssue::RANGED_ARITY);
                 None
             }
         }
@@ -618,6 +626,10 @@ impl Lowerer<'_> {
                 }
             }
             GenericArgExpr::Type(ty) => AppliedArg::Type(self.lower_nested_type(ty)),
+            GenericArgExpr::Range(_) => {
+                self.error(crate::numeric_width::WidthLowerIssue::RANGED_ARITY);
+                AppliedArg::Type(self.types.intern(Type::Error))
+            }
         }
     }
 
@@ -925,6 +937,12 @@ impl Lowerer<'_> {
         }
 
         if crate::numeric_width::is_standalone_width_name(name_str) {
+            if crate::numeric_width::has_range_arg(params) {
+                // The policy word is mandatory with a range (`u8<0‥8>` is
+                // refused), so the edge behaviour is always visible.
+                self.error(crate::numeric_width::WidthLowerIssue::RangedPolicyWordRequired.issue());
+                return Some(self.types.intern(Type::Error));
+            }
             let Some(type_params) = generic_type_exprs(params) else {
                 self.error("generic_size_argument_in_type_position");
                 return Some(self.types.intern(Type::Error));
@@ -1284,7 +1302,7 @@ fn generic_arg_is_ascii_format_hint(
             }
             _ => false,
         },
-        GenericArgExpr::Size(_) => false,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => false,
     }
 }
 
@@ -1299,20 +1317,53 @@ type WordLowering = fn(
 
 impl Lowerer<'_> {
     fn lower_modular_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
-        self.lower_word_type(params, crate::numeric_width::lower_modular_word)
+        self.lower_word_type(
+            params,
+            radix_types::IntPolicy::Wrapping,
+            crate::numeric_width::lower_modular_word,
+        )
     }
 
     fn lower_trapping_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
-        self.lower_word_type(params, crate::numeric_width::lower_trapping_word)
+        self.lower_word_type(
+            params,
+            radix_types::IntPolicy::Trapping,
+            crate::numeric_width::lower_trapping_word,
+        )
     }
 
     fn lower_saturating_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
-        self.lower_word_type(params, crate::numeric_width::lower_saturating_word)
+        self.lower_word_type(
+            params,
+            radix_types::IntPolicy::Saturating,
+            crate::numeric_width::lower_saturating_word,
+        )
     }
 
     /// Lower one sized word wrapper (`modulus`/`saturatus`/`exactus`) and
-    /// report its first width-lowering issue, if any.
-    fn lower_word_type(&mut self, params: &[GenericArgExpr], lower: WordLowering) -> TypeId {
+    /// report its first width-lowering issue, if any. A range after the width
+    /// (`saturating<u32, 0‥8>`) takes the ranged path.
+    fn lower_word_type(
+        &mut self,
+        params: &[GenericArgExpr],
+        policy: radix_types::IntPolicy,
+        lower: WordLowering,
+    ) -> TypeId {
+        let mut ranged_issue = None;
+        if let Some(ty) = crate::numeric_width::lower_ranged_word(
+            policy,
+            params,
+            self.interner,
+            self.types,
+            &mut |issue| {
+                ranged_issue.get_or_insert(issue);
+            },
+        ) {
+            if let Some(issue) = ranged_issue {
+                self.error(issue.issue());
+            }
+            return ty;
+        }
         let Some(type_params) = generic_type_exprs(params) else {
             self.error("generic_size_argument_in_type_position");
             return self.types.intern(Type::Error);
@@ -1691,6 +1742,7 @@ impl Lowerer<'_> {
             radix_syntax::LiftExtent::Name(ident) => FiguraExpr::Var(ident.clone()),
             radix_syntax::LiftExtent::Paren(term) => (**term).clone(),
             radix_syntax::LiftExtent::Negative { .. } => return Err(FIGURA_LIFT_PRIMARY_MSG),
+            radix_syntax::LiftExtent::Shape(_) => return Err(crate::figura::FIGURA_LIFT_SHAPE_MSG),
         };
         self.figura_lift_nesting += 1;
         let lowered = self.lower_figura_expr(&figura);

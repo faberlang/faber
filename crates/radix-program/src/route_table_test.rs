@@ -60,8 +60,10 @@ fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> &'a str {
         .args
         .iter()
         .find(|arg| arg.name == name)
-        .map(|arg| arg.value.as_str())
-        .unwrap_or_else(|| panic!("missing arg {name}: {:?}", diagnostic.args))
+        .map_or_else(
+            || panic!("missing arg {name}: {:?}", diagnostic.args),
+            |arg| arg.value.as_str(),
+        )
 }
 
 const CALLER: &str = "+++\nlocale = \"en\"\n+++\n\nimport from \"shop:serve\" serve\n\nmain {\n    print serve.marker()\n    let int n ← call 'orders:list' (3) ↦ int\n    print n\n}\n";
@@ -103,13 +105,11 @@ fn local_handler_is_in_file_interface_and_table() {
 fn duplicate_route_across_packages_names_both_definitions() {
     let dir = test_temp_dir("route-table-duplicate-packages");
     let main = format!(
-        "{}\n@ call 'orders:list'\nfn mine(int limit) → int {{\n    return limit\n}}\n",
-        CALLER
+        "{CALLER}\n@ call 'orders:list'\nfn mine(int limit) → int {{\n    return limit\n}}\n",
     );
     write_two_packages(&dir, &[("serve", SERVE_ORDERS)], &main);
-    let diagnostics = match analyze(&dir) {
-        Ok(_) => panic!("duplicate route across packages must fail"),
-        Err(diagnostics) => diagnostics,
+    let Err(diagnostics) = analyze(&dir) else {
+        panic!("duplicate route across packages must fail");
     };
     let diagnostic = duplicate(&diagnostics);
     assert_eq!(diagnostic.code, Some("SEM005"));
@@ -138,9 +138,8 @@ fn duplicate_route_across_local_modules_is_rejected() {
         "+++\nlocale = \"en\"\n+++\n\n@ call 'x:y'\nfn second() {\n}\n\n@ public\nfn marker() → int {\n    return 1\n}\n",
     )
     .expect("write sibling");
-    let diagnostics = match analyze(&dir) {
-        Ok(_) => panic!("duplicate route across modules must fail"),
-        Err(diagnostics) => diagnostics,
+    let Err(diagnostics) = analyze(&dir) else {
+        panic!("duplicate route across modules must fail");
     };
     assert_eq!(arg(duplicate(&diagnostics), "route"), "x:y");
 }

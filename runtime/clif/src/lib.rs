@@ -38,6 +38,7 @@ use std::sync::OnceLock;
 
 use radix_runtime_contract::display::{display_bivalens, display_fractus};
 use radix_runtime_contract::display_tokens::DisplayTokens;
+use radix_runtime_contract::trap::text::{self as trap_text, window_inside};
 use radix_runtime_contract::trap::{TrapKind, abort_exit_status, exit_status, trap_line};
 
 // The program's `incipit`, emitted into the linked object by the backend.
@@ -54,7 +55,7 @@ static CONTEXT: OnceLock<Context> = OnceLock::new();
 static TOKENS: OnceLock<DisplayTokens> = OnceLock::new();
 static OUT: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 
-/// The runtime's argument list for `argumenta`.
+/// The runtime's argument list for `argumenta`, excluding the host's `argv[0]`.
 ///
 /// Empty before [`__faber_clif_v1_main`] has run.
 pub fn arguments() -> &'static [String] {
@@ -76,14 +77,15 @@ fn capture_arguments(argument_count: i32, argument_values: *const *const c_char)
     if argument_values.is_null() {
         return Vec::new();
     }
-    (0..usize::try_from(argument_count).unwrap_or(0))
+    (1..usize::try_from(argument_count).unwrap_or(0))
         .filter_map(|index| {
             let pointer = unsafe { *argument_values.add(index) };
             if pointer.is_null() {
                 return None;
             }
             let bytes = unsafe { CStr::from_ptr(pointer) };
-            bytes.to_str().ok().map(str::to_owned)
+            // Match the LLVM host: invalid UTF-8 becomes replacement characters.
+            Some(bytes.to_string_lossy().into_owned())
         })
         .collect()
 }
@@ -680,7 +682,7 @@ pub unsafe extern "C" fn __faber_clif_v1_map_get(map: *const Map, key_tag: i32, 
     let map = unsafe { &*map };
     match map_find(map, key_tag, key) {
         Some(at) => map.entries[at].3,
-        None => unsafe { __faber_clif_v1_trap(c"key not found".as_ptr().cast(), 13) },
+        None => exact_trap(trap_text::MAP_MISSING_KEY),
     }
 }
 
@@ -997,8 +999,25 @@ pub unsafe extern "C" fn __faber_clif_v1_list_len(list: *const List) -> i64 {
     i64::try_from(unsafe { list_ref(list) }.items.len()).unwrap_or(i64::MAX)
 }
 
-fn index_out_of_bounds() -> ! {
-    unsafe { __faber_clif_v1_trap(c"array index out of bounds".as_ptr().cast(), 25) }
+/// End the run on a failed index read: a negative index is the negative index
+/// failure, any other is the collection's own out-of-bounds failure.
+fn index_trap(index: i64, out_of_bounds: &str) -> ! {
+    exact_trap(if index < 0 {
+        trap_text::NEGATIVE_INDEX
+    } else {
+        out_of_bounds
+    })
+}
+
+fn index_out_of_bounds(index: i64) -> ! {
+    index_trap(index, trap_text::LIST_INDEX_OUT_OF_BOUNDS)
+}
+
+/// End the run on a window with a negative bound.
+fn window_trap_if_negative(start: i64, end: i64) {
+    if start < 0 || end < 0 {
+        exact_trap(trap_text::NEGATIVE_INDEX);
+    }
 }
 
 /// Element bits at `index`; an index out of range ends the run.
@@ -1014,7 +1033,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_get(list: *const List, index: i64)
         .and_then(|at| list.items.get(at))
     {
         Some(&(_, bits)) => bits,
-        None => index_out_of_bounds(),
+        None => index_out_of_bounds(index),
     }
 }
 
@@ -1036,7 +1055,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_set(
         .and_then(|at| list.items.get_mut(at))
     {
         Some(slot) => *slot = (tag, bits),
-        None => index_out_of_bounds(),
+        None => index_out_of_bounds(index),
     }
 }
 
@@ -1541,7 +1560,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_index(handle: *const u8, index: i6
             let mut buffer = [0_u8; 4];
             text_new(found.encode_utf8(&mut buffer).as_bytes())
         }
-        None => unsafe { __faber_clif_v1_trap(c"text index out of bounds".as_ptr().cast(), 24) },
+        None => index_trap(index, trap_text::TEXT_INDEX_OUT_OF_BOUNDS),
     }
 }
 
@@ -2403,8 +2422,8 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(interval: *const L
     list_new_from(items)
 }
 
-/// A copy of the range of a text (in characters) an interval names; null when
-/// the range does not lie fully inside the text.
+/// A copy of the range of a text (in characters) an interval names; a range
+/// that does not lie fully inside the text ends the run.
 ///
 /// # Safety
 ///
@@ -2415,24 +2434,21 @@ pub unsafe extern "C" fn __faber_clif_v1_text_range(
     interval: *const List,
 ) -> *const u8 {
     let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    window_trap_if_negative(start, end);
     let text = text_str(unsafe { text_bytes(text) });
     let chars: Vec<char> = text.chars().collect();
-    let end = if inclusive {
-        end.checked_add(1)
-    } else {
-        Some(end)
-    };
-    match (usize::try_from(start), end.map(usize::try_from)) {
-        (Ok(start), Some(Ok(end))) if start <= end && end <= chars.len() => {
+    let (start, end) = (i128::from(start), i128::from(end) + i128::from(inclusive));
+    match window_inside(start, end, chars.len()) {
+        Some((start, end)) => {
             let window: String = chars[start..end].iter().collect();
             text_new(window.as_bytes())
         }
-        _ => std::ptr::null(),
+        None => exact_trap(&trap_text::text_window_outside(start, end, chars.len())),
     }
 }
 
-/// A copy of the range of a list an interval names; null when the range does
-/// not lie fully inside the list.
+/// A copy of the range of a list an interval names; a range that does not lie
+/// fully inside the list ends the run.
 ///
 /// # Safety
 ///
@@ -2443,17 +2459,12 @@ pub unsafe extern "C" fn __faber_clif_v1_list_range(
     interval: *const List,
 ) -> *mut List {
     let (start, end, inclusive) = unsafe { interval_parts(interval) };
+    window_trap_if_negative(start, end);
     let items = &unsafe { list_ref(list) }.items;
-    let end = if inclusive {
-        end.checked_add(1)
-    } else {
-        Some(end)
-    };
-    match (usize::try_from(start), end.map(usize::try_from)) {
-        (Ok(start), Some(Ok(end))) if start <= end && end <= items.len() => {
-            list_new_from(items[start..end].to_vec())
-        }
-        _ => std::ptr::null_mut(),
+    let (start, end) = (i128::from(start), i128::from(end) + i128::from(inclusive));
+    match window_inside(start, end, items.len()) {
+        Some((start, end)) => list_new_from(items[start..end].to_vec()),
+        None => exact_trap(&trap_text::list_window_outside(start, end, items.len())),
     }
 }
 
@@ -2700,187 +2711,5 @@ pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const 
 }
 
 #[cfg(test)]
-mod runtime_perf_tests {
-    use super::*;
-
-    #[test]
-    fn math_f64_code_6_is_the_real_cube_root() {
-        assert_eq!(__faber_clif_v1_math_f64(6, -8.0), -2.0);
-        assert_eq!(__faber_clif_v1_math_f64(6, 8.0), 2.0);
-        assert!(__faber_clif_v1_math_f64(6, -0.0).is_sign_negative());
-    }
-
-    #[test]
-    fn text_concat_and_integer_text_keep_exact_bytes() {
-        let left = text_new("héllo".as_bytes());
-        let right = text_new(" world".as_bytes());
-        let joined = unsafe { __faber_clif_v1_text_concat(left, right) };
-        assert_eq!(unsafe { text_bytes(joined) }, "héllo world".as_bytes());
-
-        for (value, expected) in [
-            (0, "0"),
-            (-1, "-1"),
-            (i64::MIN, "-9223372036854775808"),
-            (i64::MAX, "9223372036854775807"),
-        ] {
-            let text = __faber_clif_v1_text_from_i64(value);
-            assert_eq!(unsafe { text_bytes(text) }, expected.as_bytes());
-        }
-    }
-
-    #[test]
-    #[ignore = "timing oracle: run with --release -- --ignored --nocapture"]
-    fn indexed_map_insert_scaling_probe() {
-        use std::time::Instant;
-        for count in [256i64, 512, 1024, 2048] {
-            let before = Instant::now();
-            let mut entries = Vec::new();
-            for key in 0..count {
-                if entries
-                    .iter()
-                    .position(|&(tag, bits, _, _)| {
-                        tag == TAG_INT && element_equal(TAG_INT, bits, key)
-                    })
-                    .is_none()
-                {
-                    entries.push((TAG_INT, key, TAG_INT, key));
-                }
-            }
-            let before_us = before.elapsed().as_micros();
-
-            let after = Instant::now();
-            let map = __faber_clif_v1_map_new(0);
-            for key in 0..count {
-                unsafe { __faber_clif_v1_map_set(map, TAG_INT, key, TAG_INT, key) };
-            }
-            let after_us = after.elapsed().as_micros();
-            println!("map_insert_scaling n={count} scan_us={before_us} indexed_us={after_us}");
-        }
-    }
-
-    #[test]
-    fn indexed_map_preserves_order_equality_and_delete_probe_chains() {
-        let map = __faber_clif_v1_map_new(1);
-        for key in 0..512 {
-            unsafe { __faber_clif_v1_map_set(map, TAG_INT, key, TAG_INT, key * 10) };
-        }
-        for key in (0..512).step_by(3) {
-            assert_eq!(unsafe { __faber_clif_v1_map_remove(map, TAG_INT, key) }, 1);
-            assert_eq!(unsafe { __faber_clif_v1_map_has(map, TAG_INT, key) }, 0);
-            for probe in key.saturating_sub(2).max(0)..=(key + 2).min(511) {
-                assert_eq!(
-                    unsafe { __faber_clif_v1_map_has(map, TAG_INT, probe) },
-                    i8::from(probe % 3 != 0 || probe > key),
-                    "removed {key}, probing {probe}"
-                );
-            }
-        }
-        for key in 0..512 {
-            assert_eq!(
-                unsafe { __faber_clif_v1_map_has(map, TAG_INT, key) },
-                i8::from(key % 3 != 0)
-            );
-        }
-        let expected: Vec<i64> = (0..512).filter(|key| key % 3 != 0).collect();
-        assert_eq!(
-            unsafe { list_ref(__faber_clif_v1_map_keys(map)) }.items,
-            expected
-                .iter()
-                .map(|&key| (TAG_INT, key))
-                .collect::<Vec<_>>()
-        );
-
-        // Equal text at distinct addresses must share a bucket and replace.
-        let text_map = __faber_clif_v1_map_new(0);
-        let first = text_new(b"same key");
-        let second = text_new(b"same key");
-        for key in 0..12 {
-            let text = text_new(format!("key-{key}").as_bytes());
-            unsafe { __faber_clif_v1_map_set(text_map, TAG_TEXT, text as i64, TAG_INT, key) };
-        }
-        unsafe { __faber_clif_v1_map_set(text_map, TAG_TEXT, first as i64, TAG_INT, 1) };
-        unsafe { __faber_clif_v1_map_set(text_map, TAG_TEXT, second as i64, TAG_INT, 99) };
-        assert_eq!(unsafe { __faber_clif_v1_map_len(text_map) }, 13);
-        assert_eq!(
-            unsafe { __faber_clif_v1_map_get(text_map, TAG_TEXT, first as i64) },
-            99
-        );
-
-        // Deep/pointer-backed keys stay on the equality scan even after the
-        // scalar index has been built; distinct but equal list handles match.
-        let deep_map = __faber_clif_v1_map_new(0);
-        for key in 0..8 {
-            unsafe { __faber_clif_v1_map_set(deep_map, TAG_INT, key, TAG_INT, key) };
-        }
-        let left = list_new_from(vec![(TAG_INT, 41), (TAG_BOOL, 1)]);
-        let right = list_new_from(vec![(TAG_INT, 41), (TAG_BOOL, 1)]);
-        unsafe { __faber_clif_v1_map_set(deep_map, TAG_LIST, left as i64, TAG_INT, 77) };
-        assert_eq!(
-            unsafe { __faber_clif_v1_map_get(deep_map, TAG_LIST, right as i64) },
-            77
-        );
-
-        // Floats use the fallback so the existing EQ rules stay authoritative.
-        let float_map = __faber_clif_v1_map_new(0);
-        for value in 2..10 {
-            unsafe {
-                __faber_clif_v1_map_set(
-                    float_map,
-                    TAG_FLOAT,
-                    (value as f64).to_bits() as i64,
-                    TAG_INT,
-                    value,
-                )
-            };
-        }
-        unsafe {
-            __faber_clif_v1_map_set(float_map, TAG_FLOAT, 0.0f64.to_bits() as i64, TAG_INT, 5)
-        };
-        assert_eq!(
-            unsafe { __faber_clif_v1_map_has(float_map, TAG_FLOAT, (-0.0f64).to_bits() as i64) },
-            1
-        );
-        let nan = f64::NAN.to_bits() as i64;
-        unsafe { __faber_clif_v1_map_set(float_map, TAG_FLOAT, nan, TAG_INT, 6) };
-        assert_eq!(
-            unsafe { __faber_clif_v1_map_has(float_map, TAG_FLOAT, nan) },
-            0
-        );
-
-        let list = list_new_from(vec![(TAG_INT, 7), (TAG_INT, 8), (TAG_INT, 7), (TAG_INT, 9)]);
-        let set = unsafe { __faber_clif_v1_list_to_set(list) };
-        assert_eq!(unsafe { __faber_clif_v1_map_len(set) }, 3);
-        assert_eq!(
-            unsafe { list_ref(__faber_clif_v1_map_keys(set)) }.items,
-            vec![(TAG_INT, 7), (TAG_INT, 8), (TAG_INT, 9)]
-        );
-        assert_eq!(unsafe { __faber_clif_v1_map_has(set, TAG_INT, 8) }, 1);
-        assert_eq!(unsafe { __faber_clif_v1_map_remove(set, TAG_INT, 8) }, 1);
-        assert_eq!(unsafe { __faber_clif_v1_map_has(set, TAG_INT, 8) }, 0);
-        assert_eq!(unsafe { __faber_clif_v1_map_has(set, TAG_INT, 9) }, 1);
-
-        let ordered_other = list_new_from(vec![(TAG_INT, 9), (TAG_INT, 7)]);
-        let other_set = unsafe { __faber_clif_v1_list_to_set(ordered_other) };
-        assert_eq!(unsafe { __faber_clif_v1_set_subset(set, other_set, 0) }, 1);
-        assert_eq!(unsafe { __faber_clif_v1_set_subset(other_set, set, 0) }, 1);
-    }
-}
-
-#[cfg(test)]
-mod text_convert_tests {
-    use super::*;
-
-    #[test]
-    fn text_parse_bool_returns_one_zero_and_minus_one() {
-        // The installed words, not the Latin defaults: an installed token set
-        // must not make this test flaky.
-        let words = tokens();
-        let yes = text_new(words.true_.as_bytes());
-        let no = text_new(words.false_.as_bytes());
-        let unknown = text_new(b"neither word");
-
-        assert_eq!(unsafe { __faber_clif_v1_text_parse_bool(yes) }, 1);
-        assert_eq!(unsafe { __faber_clif_v1_text_parse_bool(no) }, 0);
-        assert_eq!(unsafe { __faber_clif_v1_text_parse_bool(unknown) }, -1);
-    }
-}
+#[path = "lib_test.rs"]
+mod lib_test;

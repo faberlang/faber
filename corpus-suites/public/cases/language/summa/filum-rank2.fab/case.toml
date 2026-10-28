@@ -3,6 +3,8 @@ id = "corpus/summa/filum-rank2.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/filum-rank2.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

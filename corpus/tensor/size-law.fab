@@ -2,7 +2,7 @@
 term = "size law"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "incipit_stmt", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "call_type_args", "call_type_arg", "argument_list", "argument", "member_suffix", "expression", "literal", "array_literal", "assignment", "place", "itera_stmt", "apud_clause", "nota_stmt", "spelled_lift"]
-category = "type"
+category = "tensor"
 canonical = false
 summary = "A size is the exact naturals: an int lifts into one at a spelled, checked store, and a size reads back as an int."
 syntax = "const size N ← n"
@@ -23,7 +23,7 @@ locale = "en"
 #   • `const size ROWS = 2` is the static form; it folds in extent positions
 #   • a size name sits in an extent position: `tf32[ROWS, N]`
 #   • a creator takes its extents as size parameters and the call lifts them
-#     with literals: `make<2, 3>()`
+#     with literals: `make<size 2, size 3>()`
 #
 # See also: tensor, size, generic, magnitudo
 # =============================================================================
@@ -52,7 +52,7 @@ main {
     print grid.shape().get(0)
     print grid.shape().get(1)
 
-    let tf32[_, _] made ← make<2, 3>()
+    let tf32[_, _] made ← make<size 2, size 3>()
     print made.shape().get(0)
     print made.shape().get(1)
     print made.flatten()

@@ -2383,7 +2383,14 @@ fn fold_bitwise(op: HirBinOp, a: i128, b: i128) -> Option<i128> {
         HirBinOp::BitOr => a | b,
         HirBinOp::BitXor => a ^ b,
         HirBinOp::Shl => {
-            if b < 0 || (a != 0 && b > 64) {
+            if b < 0 {
+                return None;
+            }
+            // The runtime returns zero before checking the upper shift bound.
+            if a == 0 {
+                return Some(0);
+            }
+            if b > 64 {
                 return None;
             }
             a.checked_mul(1_i128 << b)?
@@ -2542,3 +2549,7 @@ pub(crate) fn construct_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Error => "error placeholder",
     }
 }
+
+#[cfg(test)]
+#[path = "expr_test.rs"]
+mod tests;

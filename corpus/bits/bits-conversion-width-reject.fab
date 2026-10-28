@@ -2,7 +2,7 @@
 term = "bits"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "A scalar bits conversion keeps the width: b8 ↦ b16 is refused."
 syntax = "a ↦ b16 on a b8 — rejected"

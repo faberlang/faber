@@ -1022,6 +1022,16 @@ impl Lowerer<'_> {
                 radix_syntax::LiftExtent::Paren(term) => {
                     return self.construct_extent_expr(term, span);
                 }
+                radix_syntax::LiftExtent::Shape(_) => {
+                    self.error_with_args_at(
+                        vec![DiagnosticArg::new(
+                            "issue",
+                            "constructor_affine_extent_unsupported",
+                        )],
+                        span,
+                    );
+                    HirExpressionKind::Error
+                }
             },
             radix_syntax::FiguraExpr::Infer => {
                 self.error_with_args_at(
@@ -2401,18 +2411,34 @@ fn variant_path_symbols(variant: &[radix_syntax::Ident]) -> Vec<radix_lexer::Sym
 }
 
 fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> TypeId {
-    // GSF-1: a bare name spelling one of the caller's own size params is a
-    // forwarded magnitudo witness (`sink<T, D>(x)` inside
-    // `forward<magnitudo T, magnitudo D>`), not a type — the ordinary type
-    // path would report unknown_type_name at the symbolic argument.
-    if let Some(name) = call_arg_bare_name(arg) {
-        if call_arg_names_caller_size_param(lowerer, name) {
-            return lowerer.types.intern(crate::Type::Param(name));
-        }
-        if matches!(arg, GenericArgExpr::Type(_)) && call_arg_names_scalar_value(lowerer, name) {
-            lowerer.error("size_slot_bare_value_name");
-            return lowerer.types.intern(crate::Type::Error);
-        }
+    // The `size` marker is required on every explicit size argument, as the
+    // `axis` marker is on an axis argument: a natural, a bare shape, a
+    // dimension term, or the bare name of a caller size param says what it
+    // is only by position, so it is refused with the fix named.
+    if let Some(span) = call_arg_unmarked_size_span(lowerer, arg) {
+        lowerer.push_error(
+            crate::SemanticErrorKind::ModeMismatch,
+            vec![DiagnosticArg::new(
+                "issue",
+                crate::ISSUE_SIZE_MARKER_REQUIRED,
+            )],
+            span,
+        );
+        return lowerer.types.intern(crate::Type::Error);
+    }
+    if let GenericArgExpr::Size(radix_syntax::FiguraExpr::Lift(lift)) = arg
+        && let radix_syntax::LiftExtent::Shape(dims) = lift.as_ref()
+    {
+        return lower_call_shape_arg(lowerer, dims);
+    }
+    // A bare name spelling a scalar value is the invisible int to size
+    // crossing; the spelled `size n` lift is the did-you-mean.
+    if let Some(name) = call_arg_bare_name(arg)
+        && matches!(arg, GenericArgExpr::Type(_))
+        && call_arg_names_scalar_value(lowerer, name)
+    {
+        lowerer.error("size_slot_bare_value_name");
+        return lowerer.types.intern(crate::Type::Error);
     }
     let spelled_runtime_lift = match arg {
         GenericArgExpr::Size(radix_syntax::FiguraExpr::Lift(lift)) => match lift.as_ref() {
@@ -2425,17 +2451,18 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
         radix_types::AppliedArg::Type(id) => id,
         radix_types::AppliedArg::Size(id) => {
             match (lowerer.types.get_index(id).clone(), spelled_runtime_lift) {
-                (crate::IndexExpr::Literal(value), _) => {
-                    let symbol = lowerer.interner.intern(&value.to_string());
-                    lowerer.types.intern(crate::Type::Param(symbol))
-                }
+                (crate::IndexExpr::Literal(value), _) => call_size_arg(lowerer, &value.to_string()),
                 (crate::IndexExpr::Param(symbol), _) => {
-                    lowerer.types.intern(crate::Type::Param(symbol))
+                    let name = lowerer.interner.resolve(symbol).to_owned();
+                    call_size_arg(lowerer, &name)
                 }
                 (
                     crate::IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(_)),
                     Some(lift),
-                ) => lowerer.types.intern(crate::Type::Param(lift)),
+                ) => {
+                    let name = lowerer.interner.resolve(lift).to_owned();
+                    call_size_arg(lowerer, &name)
+                }
                 (
                     crate::IndexExpr::Runtime(_)
                     | crate::IndexExpr::Affine { .. }
@@ -2451,6 +2478,59 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
             }
         }
     }
+}
+
+/// One marked explicit size argument as the `Type::Param` it travels as: the
+/// size marker's spelling prefix, then the operand (a natural, a shape of
+/// naturals, or a name). A plain `Param` in the same list is a type.
+fn call_size_arg(lowerer: &mut Lowerer<'_>, operand: &str) -> TypeId {
+    let symbol = lowerer
+        .interner
+        .intern(&radix_types::spell_explicit_size(operand));
+    lowerer.types.intern(crate::Type::Param(symbol))
+}
+
+/// Span of an explicit call argument that is a size spelled without the
+/// `size` marker, or `None` when the argument is a type or carries the
+/// marker. A size can only be a natural, a bracketed shape, a dimension
+/// term, or the name of a caller `size` parameter; none of them is a type, so
+/// the callee does not need to be known to refuse the bare spelling.
+fn call_arg_unmarked_size_span(
+    lowerer: &Lowerer<'_>,
+    arg: &GenericArgExpr,
+) -> Option<radix_lexer::Span> {
+    match arg {
+        GenericArgExpr::Size(
+            radix_syntax::FiguraExpr::Lift(_) | radix_syntax::FiguraExpr::Infer,
+        ) => None,
+        GenericArgExpr::Size(_) => Some(lowerer.current_span),
+        GenericArgExpr::Range(_) => None,
+        GenericArgExpr::Type(ty) => {
+            let name = call_arg_bare_name(arg)?;
+            let is_natural =
+                radix_types::parse_natural_capacity(lowerer.interner.resolve(name)).is_some();
+            (is_natural || call_arg_names_caller_size_param(lowerer, name)).then_some(ty.span)
+        }
+        GenericArgExpr::Name(ident) => {
+            call_arg_names_caller_size_param(lowerer, ident.name).then_some(ident.span)
+        }
+    }
+}
+
+/// A whole compile-time shape after the marker (`size [4]`, `size [2, 3]`).
+/// It travels as one marked `Type::Param` (`magnitudo [2, 3]`), the same
+/// carrier a natural size uses. Every dimension must be a natural literal; a `_` hole,
+/// a name, a run-time lift or a nested term is refused by name.
+fn lower_call_shape_arg(lowerer: &mut Lowerer<'_>, dims: &[radix_syntax::FiguraExpr]) -> TypeId {
+    let mut naturals = Vec::with_capacity(dims.len());
+    for dim in dims {
+        let radix_syntax::FiguraExpr::Literal(value) = dim else {
+            lowerer.error("size_shape_dimension_unsupported");
+            return lowerer.types.intern(crate::Type::Error);
+        };
+        naturals.push(*value);
+    }
+    call_size_arg(lowerer, &radix_types::spell_natural_shape(&naturals))
 }
 
 /// Symbol of a bare-name call argument (`sink<T>(x)` parses the name as a
@@ -2620,7 +2700,7 @@ fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
             form: radix_syntax::TypeFormLevel::LONG,
             iuncta_label: None,
         }),
-        GenericArgExpr::Size(_) => None,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -2712,6 +2792,6 @@ fn conversio_hint_symbol(arg: &GenericArgExpr) -> Option<radix_lexer::Symbol> {
             TypeExprKind::Named(ident, _) => Some(ident.name),
             _ => None,
         },
-        GenericArgExpr::Size(_) => None,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => None,
     }
 }

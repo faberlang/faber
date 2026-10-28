@@ -32,6 +32,7 @@ insere = "嵌入"
 privata = "私有"
 protecta = "保护"
 publica = "公开"
+visibilitas = "可见性"
 sponte = "可选"
 casu = "情况"
 ceterum = "默认"
@@ -933,6 +934,10 @@ help = "用 {sugar} width sugar brackets 写 shape"
 message = "`{form}` 是已废弃的数值类型写法"
 help = "写 `{bare}`，不要写 `{form}`；宽度标记本身就是类型"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "范围需要两个端点"
+help = "写出两个端点，例如 0‥8 或 0…7；某一侧无界时用 ∞ 或 -∞"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "类型 '{type}' 未在此读者语言界面上声明"
 help = "使用此读者语言中声明的类型拼写{?expected|：'|'}"
@@ -967,27 +972,31 @@ help = "检查导入语法"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "未知导入字段"
-help = "使用 ex、visibilitas、nomen、ut 或 omnia"
+help = "使用 {ex}、{visibilitas}、{nomen}、{ut} 或 {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "导入字段 `{field}` 未在此读取器表面声明"
+help = "对该文件的读取器语言环境使用 `{expected}`"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "重复的导入字段 `{field}`"
 help = "每个导入字段只能出现一次；请移除重复的字段"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "import record 需要 ex source"
-help = "向 import record 添加 ex = \"path\""
+message = "import record 需要 {ex} source"
+help = "向 import record 添加 {ex} = \"path\""
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import 不能同时命名 binding"
-help = "单独使用 omnia，或用 nomen/ut 进行 named import"
+help = "单独使用 {omnia}，或用 {nomen}/{ut} 进行 named import"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "无效导入可见性"
-help = "使用 privata 或 publica"
+help = "使用 {privata} 或 {publica}"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "无法从 {path} 推断导入名"
-help = "为 {path} 写出 nomen 或显式 alias"
+help = "为 {path} 写出 {nomen} 或显式 alias"
 
 [diagnostics.SEM001]
 message = "未定义变量"
@@ -1003,7 +1012,7 @@ help = "先声明标识符再使用{?suggestion|；你是不是想用 |？}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "未知标识符"
-help = "若要输出语句，请写不带括号的 `{spelling} <expr>`"
+help = "`{spelling}` 是输出语句，不是函数：导入控制台函数（`{importa} {ex} \"norma:console\" {fixum} print`，然后写 `print(...)`），或先绑定该值（`{sit} _ x ← …`，然后写 `{spelling} x`）"
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "未知 record field"
@@ -1181,6 +1190,10 @@ help = "修正用于 lowering 的 AST construct"
 message = "值名称 {name} 不能占据注解的 extent 位置"
 help = "在此存储位置写出 `size {name}` 以显式提升，例如 `tf32[2, size {name}]`"
 
+[diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
+message = "泛型调用的大小或形状实参不受支持"
+help = "使用常量、大小名称或写出 `size w` 的值"
+
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring 需要 initializer"
 help = "修正用于 lowering 的 AST construct"
@@ -1220,6 +1233,38 @@ help = "为 trapping 类型写一个宽度，例如 trapping<u8> 或 trapping<i6
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping 宽度必须是单独的宽度标记"
 help = "使用单独的宽度标记，例如 u8 或 i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "范围需要存储策略词；单独的宽度标记不能带范围"
+help = "先写策略词，例如 saturating<u32, 0‥8>、trapping<i32, -2‥3> 或 wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "范围端点必须是整数字面量或 ∞"
+help = "两个端点都写成整数字面量，例如 0‥8；命名端点或 size 端点尚未支持"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "带范围的存储策略接受一个宽度，然后是一个范围"
+help = "写成 policy<W, lo‥hi>，例如 saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "该范围不包含任何值"
+help = "lo‥hi 的低端必须小于高端；lo…hi 的低端不能大于高端"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "范围端点超出了宽度"
+help = "两个端点都要在宽度之内；∞ 只能作高端，-∞ 只能作低端"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "无符号宽度的低端不能为负"
+help = "让范围从 0 开始，或使用有符号宽度，例如 i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "带范围的存储策略需要有界的整数宽度"
+help = "使用 u8 或 i32 这样的整数宽度；浮点、十进制和 inf 宽度暂不支持范围"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "kernel 中暂不支持带范围的存储策略 ({site})；kernel 不应用范围"
+help = "在 kernel 内使用普通宽度，在主机端应用范围"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可调用项的注解姿态“{annotation_posture}”与书写的姿态“{written_posture}”冲突"
@@ -1569,6 +1614,14 @@ help = "使用不超过 32 bits 的 integer width"
 message = "kernel intermediate extent {extent} 超出 portable integer range"
 help = "把 intermediate values 保持在 portable integer range 内"
 
+[diagnostics.SEM008.issues.size_shape_dimension_unsupported]
+message = "调用类型参数中 `size` 之后的 shape 只接受自然数维度"
+help = "把每个维度写成自然数，例如 `size [2, 3]`；符号维度或运行时维度请通过 `size` 名称传递"
+
+[diagnostics.SEM008.issues.size_shape_outside_call_args]
+message = "`size` 之后的方括号 shape 只允许出现在调用的类型参数中"
+help = "直接写出 shape，例如 `tensor<f32, [2, 3]>`，或在调用中使用 `size [2, 3]`，例如 `construct<f32, size [2, 3]>(data)`"
+
 [diagnostics.SEM009]
 message = "CLI validation 无效"
 help = "在 emit runnable CLI code 前修正 CLI annotation contract"
@@ -1728,6 +1781,10 @@ help = "仅声明该类型；在 ledger 操作可用之前请使用 map ({tabula
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "此目标暂不支持 ledger 类型"
 help = "请使用 MIR runner 或 Faber 源码发射器，或改用 map ({tabula})"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "此目标暂不支持带范围的存储策略"
+help = "请使用 MIR runner、Rust 目标或 Faber 源码发射器，直到此目标支持范围"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "此目标不支持 {leaf} 叶片"
@@ -3265,6 +3322,14 @@ help = "在调用处按 signature 声明写出 marker，例如 `f(axis 1)`"
 message = "此处写了 `axis` marker，但 parameter 未声明为 `axis`"
 help = "移除 `axis` marker，或把 parameter 声明为 `axis int`"
 
+[diagnostics.SEM057.issues.size_marker_required]
+message = "此 argument 是 `size` argument，必须用 `size` marker 写出"
+help = "按 signature 对 parameter 的声明写出 marker，例如 `f<int, size 4>(x)`"
+
+[diagnostics.SEM057.issues.size_marker_unexpected]
+message = "此处写了 `size` marker，但被调用的函数未声明任何 `size` parameter"
+help = "移除 `size` marker，或把 parameter 声明为 `size N`"
+
 [diagnostics.SEM057.issues.unmarked_into_own]
 message = "不能把 unmarked 值绑定到 `own`"
 help = "通过 `copy` 绑定以复制 source"
@@ -3725,6 +3790,9 @@ applica = "应用"
 productum = "点积"
 transversum = "叉积"
 normalizata = "归一化"
+# Q-X1: the tensor rank and the Euclidean norm (tensor and vector) are named methods; `longitudo` is the element count.
+rank = "rank"
+norm = "norm"
 swizzle = "swizzle"
 coercere = "限幅"
 inter = "相交"

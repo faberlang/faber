@@ -2,7 +2,7 @@
 term = "genus"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "json_literal", "json_member", "json_value", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "The inferred constructor `_ { \"key\": value }` builds the expected map; the same entries as the bare `{ … }` literal."
 syntax = "<map type> <name> ← _ { \"<key>\": <value>, … }"

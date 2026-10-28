@@ -2,7 +2,7 @@
 locale = "en"
 term = "itera-loop-shape-reject-map-put"
 kind = "reject"
-category = "control-flow"
+category = "loop"
 grammar = ["itera_stmt", "expression", "call_expr"]
 canonical = false
 summary = "A put inside a loop over that same map is refused at check time."

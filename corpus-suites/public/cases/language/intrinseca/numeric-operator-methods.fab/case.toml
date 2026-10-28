@@ -3,6 +3,8 @@ id = "corpus/intrinseca/numeric-operator-methods.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/numeric-operator-methods.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

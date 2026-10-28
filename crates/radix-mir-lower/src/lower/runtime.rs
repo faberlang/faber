@@ -98,6 +98,14 @@ pub(super) enum SyntheticHelperKey {
         return_ty: MirType,
         error_ty: MirType,
     },
+    /// A `lista ↦ tensor` count check run inside a handler: `TensorFromFlat`
+    /// over a flat list and its shape operand.
+    TensorFromFlat {
+        flat_ty: MirType,
+        shape_ty: MirType,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
     /// A checked list trim: `Slice` (the window) or `Take` (the prefix), with
     /// the receiver and index parameter types.
     CheckedTrim {
@@ -920,7 +928,7 @@ impl FunctionBuilder<'_> {
                 lowered_args.push(flat.clone());
                 continue;
             }
-            lowered_args.push(self.lower_call_arg_value(&arg.expr)?);
+            lowered_args.push(self.lower_collection_call_arg(op, index, &arg.expr)?);
         }
         // WHY: semantic expected-type unification can annotate a scalar
         // collection intrinsic with its nullable enclosing type at the call
@@ -988,15 +996,15 @@ impl FunctionBuilder<'_> {
             && method_name == "sectio"
             && args.len() == 2
             && self.device_role.is_none()
-            && self.is_lista_receiver(receiver)
+            && (self.is_lista_receiver(receiver) || self.is_textus_receiver(receiver))
             && let (Some(start_ty), Some(end_ty), Some(receiver_ty)) = (
                 self.expr_ty(&args[0].expr),
                 self.expr_ty(&args[1].expr),
-                self.checked_tensor_receiver_ty(receiver),
+                self.checked_window_receiver_ty(receiver),
             )
         {
-            // need: the list window reports out-of-range bounds on
-            // `⇥`, the same fault family as the `at` read. The bare runtime
+            // need / Q-B3: the list and text windows report out-of-range
+            // bounds on `⇥`, the same fault family as the `at` read. The bare runtime
             // op still trims, so it is only reached behind the guard.
             let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
             let helper =
@@ -1229,29 +1237,40 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         };
-        let Type::Param(symbol) = self.types.get(generic_arg) else {
-            self.errors.push(MirError::validation(
-                span,
-                format!("{method_name} generic dimension is not a magnitudo argument"),
-            ));
-            return None;
+        let size = match self.types.get(generic_arg) {
+            Type::Param(symbol) => self
+                .context
+                .interner
+                .and_then(|interner| radix_types::parse_explicit_size(interner.resolve(*symbol))),
+            _ => None,
         };
-        let spelling = self
+        let name = match size {
+            Some(radix_types::ExplicitSize::Natural(value)) => {
+                #[expect(
+                    clippy::cast_possible_wrap,
+                    reason = "Faber natural capacities are bounded before MIR lowering"
+                )]
+                return Some(MirOperand::Constant(MirConstant::Int(value as i64)));
+            }
+            Some(radix_types::ExplicitSize::Name(name)) => name,
+            Some(radix_types::ExplicitSize::Shape(_)) | None => {
+                self.errors.push(MirError::validation(
+                    span,
+                    format!("{method_name} generic dimension is not a magnitudo argument"),
+                ));
+                return None;
+            }
+        };
+        let symbol = self
             .context
             .interner
-            .map(|interner| interner.resolve(*symbol))
-            .unwrap_or_default();
-        if let Some(value) = radix_types::parse_natural_capacity(spelling) {
-            #[expect(
-                clippy::cast_possible_wrap,
-                reason = "Faber natural capacities are bounded before MIR lowering"
-            )]
-            return Some(MirOperand::Constant(MirConstant::Int(value as i64)));
-        }
-        let Some(shape) = (0..self.types.index_count()).find_map(|ordinal| {
-            #[expect(clippy::cast_possible_truncation, reason = "IndexId is a bounded arena index")]
-            let id = IndexId(ordinal as u32);
-            matches!(self.types.get_index(id), IndexExpr::Param(found) if *found == *symbol).then_some(id)
+            .and_then(|interner| interner.lookup(name));
+        let Some(shape) = symbol.and_then(|symbol| {
+            (0..self.types.index_count()).find_map(|ordinal| {
+                #[expect(clippy::cast_possible_truncation, reason = "IndexId is a bounded arena index")]
+                let id = IndexId(ordinal as u32);
+                matches!(self.types.get_index(id), IndexExpr::Param(found) if *found == symbol).then_some(id)
+            })
         }) else {
             self.errors.push(MirError::validation(
                 span,
@@ -1795,13 +1814,17 @@ impl FunctionBuilder<'_> {
         };
         let vector_ty = MirType::semantic(receiver_ty);
         let (op, peer_args): (MirVectorOp, &[HirCallArg]) = match method {
-            VectorMethodKind::Crea | VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => {
+            VectorMethodKind::Crea
+            | VectorMethodKind::Longitudo
+            | VectorMethodKind::Norm
+            | VectorMethodKind::Normalizata => {
                 if !args.is_empty() {
                     return None;
                 }
                 let op = match method {
                     VectorMethodKind::Crea => MirVectorOp::Crea,
-                    VectorMethodKind::Longitudo => MirVectorOp::Length,
+                    VectorMethodKind::Longitudo => MirVectorOp::Count,
+                    VectorMethodKind::Norm => MirVectorOp::Norm,
                     _ => MirVectorOp::Normalized,
                 };
                 (op, &[])
@@ -1854,6 +1877,8 @@ impl FunctionBuilder<'_> {
         }
         let result_ty = if op.returns_vector() {
             vector_ty
+        } else if matches!(op, MirVectorOp::Count) {
+            self.expr_ty(expr)?
         } else {
             MirType::semantic(element_ty)
         };
@@ -1923,7 +1948,9 @@ impl FunctionBuilder<'_> {
         // method path below (which rejects non-literal shapes and >4x4 before
         // it ever reads the method name). Fall through to the generic
         // method-intrinsic dispatch.
-        if matches!(method_name, "accipe" | "apud" | "ponde") {
+        // `longitudo` (the element count, Q-X1) takes the same generic route
+        // through the `Length` collection op.
+        if matches!(method_name, "accipe" | "apud" | "ponde" | "longitudo") {
             return None;
         }
         let receiver_ty = receiver.ty?;
@@ -3443,7 +3470,7 @@ impl FunctionBuilder<'_> {
             Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some() || width.is_decimal(),
             // A `wrapping` / `saturating` parameter takes the constant at its
             // own word type (ruling 12: a constant in a slot takes its type).
-            Type::ModularWord(_) | Type::SaturatingWord(_) => true,
+            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::RangedInt { .. } => true,
             _ => false,
         };
         Some(if sized {
@@ -4174,6 +4201,7 @@ impl FunctionBuilder<'_> {
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_) => true,
             // Option payloads render as a bare value (`display_option`
@@ -4209,6 +4237,7 @@ impl FunctionBuilder<'_> {
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)
             | Type::Array(_)
@@ -4615,18 +4644,30 @@ impl FunctionBuilder<'_> {
     /// conversion that would range-check.
     fn fold_word_store_constant(&self, source: &HirExpression, target: TypeId) -> Option<MirOperand> {
         let value = radix_semantic::passes::const_int_value(source)?;
-        let (width, saturating) = match self.normalized_type(target) {
-            Type::ModularWord(width) => (*width, false),
-            Type::SaturatingWord(width) => (*width, true),
+        // A ranged cell folds into its own range; a trapping one is judged by
+        // the checker (the constant fits or the store is refused), so it never
+        // reaches here.
+        let (width, saturating, lo, hi) = match self.normalized_type(target) {
+            Type::ModularWord(width) => {
+                let (lo, hi) = width.integer_range()?;
+                (*width, false, lo, hi)
+            }
+            Type::SaturatingWord(width) => {
+                let (lo, hi) = width.integer_range()?;
+                (*width, true, lo, hi)
+            }
+            Type::RangedInt { policy: radix_types::IntPolicy::Wrapping, width, lo, hi } => (*width, false, *lo, *hi),
+            Type::RangedInt { policy: radix_types::IntPolicy::Saturating, width, lo, hi } => (*width, true, *lo, *hi),
             _ => return None,
         };
-        let (lo, hi) = width.integer_range()?;
         let folded = if saturating {
             value.clamp(lo, hi)
         } else {
             lo + (value - lo).rem_euclid(hi - lo + 1)
         };
-        Some(MirOperand::Constant(if lo >= 0 {
+        // The constant is surfaced in the carrier of the width: unsigned
+        // widths hold `UInt`, signed widths `Int`.
+        Some(MirOperand::Constant(if width.integer_range()?.0 >= 0 {
             MirConstant::UInt(u64::try_from(folded).ok()?)
         } else {
             MirConstant::Int(i64::try_from(folded).ok()?)
@@ -4875,7 +4916,120 @@ impl FunctionBuilder<'_> {
         span: Span,
     ) -> Option<MirOperand> {
         let flat = self.lower_expr_value(source)?;
+        if self.tensor_from_flat_is_handled(target) {
+            let flat_ty = self.expr_ty(source)?;
+            return self.lower_handled_tensor_from_flat(flat, flat_ty, target, return_ty, span);
+        }
         self.lower_tensor_from_flat_conversio(flat, target, return_ty, span)
+    }
+
+    /// Whether a recovery-free `lista ↦ tensor` conversion runs inside a
+    /// `fac … cape` handler or a `capta` boundary, against a target whose
+    /// extents are all literal. Its count check is a recoverable failure (a
+    /// length that does not fill the shape is a failed conversion), and the
+    /// bare `TensorFromFlat` call has no error edge, so under a handler it goes
+    /// through a failable helper (see [`Self::lower_handled_tensor_from_flat`]).
+    /// A symbolic or run-time shape keeps the bare call: its operand reads
+    /// package-finalized shape sizes in the caller, which a helper would hide
+    /// from the finalizer. Device bodies keep the bare op.
+    fn tensor_from_flat_is_handled(&self, target: TypeId) -> bool {
+        self.device_role.is_none()
+            && (!self.handlers.is_empty() || !self.traps.is_empty())
+            && matches!(
+                resolve_lista_to_tensor_shape(target, self.types),
+                Some(ListaToTensorShape::Literal(_))
+            )
+    }
+
+    /// `TensorFromFlat` inside a handler: the same seam as a bounded append
+    /// (`is_bounded_append_under_handler`). The count check runs in a
+    /// `(flat, shape) ⇥ textus` helper, so its mismatch leaves the helper
+    /// frame as the `textus` error and the caller's `TryCall` routes it to the
+    /// enclosing `cape` block or `capta` boundary.
+    fn lower_handled_tensor_from_flat(
+        &mut self,
+        flat: MirOperand,
+        flat_ty: MirType,
+        target: TypeId,
+        return_ty: MirType,
+        span: Span,
+    ) -> Option<MirOperand> {
+        let shape = self.lower_lista_to_tensor_shape(flat.clone(), target, span)?;
+        let shape_ty = MirType::semantic(lista_numerus_type(self.types)?);
+        let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+        let helper = self.push_tensor_from_flat_helper(flat_ty, shape_ty, return_ty, textus, span);
+        self.lower_failable_call(MirCallee::Function(helper), vec![flat, shape], return_ty, textus, None, span)
+    }
+
+    /// The helper body, for `(flat, shape) ⇥ textus → tensor`: one
+    /// `TensorFromFlat` over a placeholder receiver, the form the bare
+    /// conversion builds.
+    fn push_tensor_from_flat_helper(
+        &mut self,
+        flat_ty: MirType,
+        shape_ty: MirType,
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> MirFunctionId {
+        let key = SyntheticHelperKey::TensorFromFlat { flat_ty, shape_ty, return_ty, error_ty };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return id;
+        }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            Some(error_ty),
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let mut locals = Vec::with_capacity(2);
+        for ty in [flat_ty, shape_ty] {
+            let local = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode: MirParamMode::Owned, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable: false, span });
+            locals.push(local);
+        }
+        let entry = nested.fresh_block(span);
+        nested.switch_to(entry);
+        let seed = nested.construct_temp(
+            MirAggregateKind::Tensor,
+            MirAggregateFields::Ordered(Vec::new()),
+            return_ty,
+            span,
+        );
+        let tensor = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),
+            vec![
+                seed,
+                MirOperand::Place(MirPlace::local(locals[0])),
+                MirOperand::Place(MirPlace::local(locals[1])),
+            ],
+            return_ty,
+            span,
+        );
+        nested.terminate_current(MirTerminatorKind::Return(Some(tensor)), span);
+        let id = Self::finish_synthetic_function(
+            &mut self.errors,
+            &mut self.synthetic_functions,
+            id,
+            nested,
+            return_ty,
+            error_ty,
+            span,
+        );
+        self.synthetic_helpers.insert(key, id);
+        id
     }
 
     /// `tensor<E, [N]> ↦ vector<E, N>`: flatten the tensor to its element
@@ -5736,6 +5890,24 @@ impl FunctionBuilder<'_> {
     /// Whether this method's receiver is a `lista` — a run-time `Array` or a
     /// fixed-capacity `BoundedArray` — and never a `textus`, whose `sectio`
     /// keeps trimming quietly.
+    /// The receiver type a checked window helper takes: a bounded cord has
+    /// already been widened to `textus` by the text-receiver copy above.
+    fn checked_window_receiver_ty(&mut self, receiver: &HirExpression) -> Option<MirType> {
+        if self.is_textus_receiver(receiver) {
+            return Some(MirType::semantic(self.types.primitive(Primitive::Textus)));
+        }
+        self.checked_tensor_receiver_ty(receiver)
+    }
+
+    fn is_textus_receiver(&self, receiver: &HirExpression) -> bool {
+        receiver.ty.is_some_and(|ty| {
+            matches!(
+                self.types.get(self.method_receiver_payload_id(ty)),
+                Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. } | Type::BoundedAscii { .. }
+            )
+        })
+    }
+
     fn is_lista_receiver(&self, receiver: &HirExpression) -> bool {
         receiver.ty.is_some_and(|ty| {
             matches!(
@@ -6005,7 +6177,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Record a completed synthetic MIR function into the lowering's function
-    /// arena, returning its id. Shared by the checked tensor and checked `at`
+    /// arena, returning its id. Shared by the checked `at`, trim, and tensor
     /// helper builders.
     ///
     /// Takes the two arenas rather than `&mut self`: `nested` borrows
@@ -6273,6 +6445,7 @@ enum VectorMethodKind {
     Cross,
     Swizzle,
     Longitudo,
+    Norm,
     Normalizata,
     Crea,
     Elementwise(MirLaneOp),
@@ -6284,6 +6457,7 @@ fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
         "transversum" => Some(VectorMethodKind::Cross),
         "swizzle" => Some(VectorMethodKind::Swizzle),
         "longitudo" => Some(VectorMethodKind::Longitudo),
+        "norm" => Some(VectorMethodKind::Norm),
         "normalizata" => Some(VectorMethodKind::Normalizata),
         "crea" => Some(VectorMethodKind::Crea),
         "addita" => Some(VectorMethodKind::Elementwise(MirLaneOp::Add)),

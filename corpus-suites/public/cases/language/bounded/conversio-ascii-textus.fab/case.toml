@@ -3,6 +3,8 @@ id = "corpus/bounded/conversio-ascii-textus.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/conversio-ascii-textus.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

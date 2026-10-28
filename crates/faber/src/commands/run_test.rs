@@ -22,6 +22,7 @@ fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
     RunArgs {
         path,
         library: crate::cli::LibraryHomeArgs::default(),
+        target: None,
         locale: None,
         diagnostics_locale: None,
         device,

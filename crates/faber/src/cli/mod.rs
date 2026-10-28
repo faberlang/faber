@@ -44,6 +44,16 @@ conversion use `faber convert --to <LOCALE>`. A local declaration must be inside
 a complete function or `main` unit; format does not accept fragments. Does not
 write unless `--write` is given: the default reports each file that would change
 and exits 1 when any would.
+
+Output is not wrapped: canonical lines keep no width limit. `--width N` (or the
+package manifest key `[format] width = N`) opts in to wrapping lines wider than
+N display columns, indentation included. `--width` wins over the manifest key,
+and with neither set nothing wraps. Wrapping only moves existing token
+boundaries onto a new line; it never splits a token, string or comment, and
+never breaks where a newline changes meaning (annotation sugar, schema
+columns, the `si` of a guarded `iace`/`mori`, the `ex` of copy-with-changes, a
+`redde` value, `scribe` and extraction lists). An unbreakable span wider than N
+overflows. `--stdin` has no package, so only the flag applies.
 ";
 
 const CONVERT_LONG_ABOUT: &str = "\
@@ -313,6 +323,13 @@ pub struct FormatArgs {
     /// result to stdout (incompatible with path arguments and the other modes)
     #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
+
+    /// Wrap lines wider than N display columns (indentation included) at
+    /// legal token boundaries. Wins over the manifest `[format] width`; with
+    /// neither set output is not wrapped. A token or protected span wider
+    /// than N overflows rather than breaking
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+    pub width: Option<u32>,
 }
 
 /// Arguments for `faber convert`.
@@ -440,9 +457,27 @@ pub struct CorpusArgs {
     #[arg(long, value_name = "PATH")]
     pub expected: Option<PathBuf>,
 
-    /// Only run suite cases whose id contains this substring
+    /// Only run suite cases whose id contains this substring. Selectors
+    /// --domain, --category, --case and --filter all add up: a case runs when
+    /// any one of them names it (union; nothing narrows or excludes)
     #[arg(long, value_name = "SUBSTRING")]
     pub filter: Option<String>,
+
+    /// Run every case in these domains (comma list; adds to the other selectors).
+    /// The suite's corpus.toml [domains] table defines them; a suite without one
+    /// rejects this flag
+    #[arg(long, value_name = "DOMAIN,...", value_delimiter = ',')]
+    pub domain: Vec<String>,
+
+    /// Run every case in these categories (comma list; adds to the other
+    /// selectors). A suite without a [domains] table rejects this flag
+    #[arg(long, value_name = "CATEGORY,...", value_delimiter = ',')]
+    pub category: Vec<String>,
+
+    /// Run these exact case ids (comma list; adds to the other selectors). An
+    /// unknown id is an error
+    #[arg(long = "case", value_name = "ID,...", value_delimiter = ',')]
+    pub case: Vec<String>,
 }
 
 /// Shared source-input grammar for phase inspection commands.
@@ -665,12 +700,22 @@ pub struct ReplArgs {
     pub args: Vec<String>,
 }
 
+/// Compiled targets `faber run --target` builds and then runs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum RunTarget {
+    /// Build the package as a Node project and run it with `node`.
+    #[value(name = "ts")]
+    Ts,
+}
+
 /// Arguments for `faber run`.
 ///
-/// `run` is interpreted execution, always: a single `.fab` file, package
-/// directory, `faber.toml`, or archive is routed through the runner — never
-/// compiled. Compiled source artifacts are built with `faber build`, never
-/// executed by faber; device packages keep a host-driver execution route.
+/// Without `--target`, `run` is interpreted execution: a single `.fab` file,
+/// package directory, `faber.toml`, or archive is routed through the runner —
+/// never compiled. With `--target`, `run` builds the package for that target
+/// and runs the result with the arguments after `--`, standard streams and
+/// exit code passed straight through. Device packages keep a host-driver
+/// execution route.
 #[derive(clap::Args, Debug)]
 pub struct RunArgs {
     /// Path to run (defaults to current directory)
@@ -679,6 +724,10 @@ pub struct RunArgs {
 
     #[command(flatten)]
     pub library: LibraryHomeArgs,
+
+    /// Build the package for a compiled target, then run the built program.
+    #[arg(long = "target", short = 't', value_enum, value_name = "TARGET")]
+    pub target: Option<RunTarget>,
 
     /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]

@@ -1,0 +1,66 @@
++++
+term = "size"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "spelled_lift", "lift_extent", "incipit_stmt", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "call_type_args", "call_type_arg", "call_size_arg", "argument_list", "argument", "member_suffix", "expression", "literal"]
+category = "conversion"
+canonical = false
+summary = "An explicit size in a generic call carries the size marker, and a whole shape is one size argument."
+syntax = "tensor.construct<int, size [2, 3]>(cells)"
+related = ["tensor", "size", "generic", "Figura"]
+locale = "en"
++++
+
+import from "norma:tensor" tensor
+
+# =============================================================================
+# size — explicit sizes in a generic call.
+# =============================================================================
+#
+# What this teaches:
+#   • The marker — an explicit size argument is written `size 4`, the way an
+#     `axis` argument is written `axis 1`. The call echoes what the signature
+#     declares: `fn make<T, size N>` is called as `make<int, size 4>(xs)`.
+#   • Binding by marker — a `size` argument binds the next `size` parameter and
+#     an unmarked argument the next type parameter, so a list may name both
+#     (`make<int, size 4>`), only the size (`make<size 4>`, the type is inferred
+#     from the arguments), or only the type (`make<int>`).
+#   • A whole shape — `size [2, 3]` is one size argument naming every dimension.
+#     It is the only way to give a shape where no store annotation supplies one,
+#     such as an argument position.
+#
+# Common mistakes:
+#   • Writing the size bare (`make<int, 4>(xs)`): SEM057 size_marker_required.
+#   • Writing `size` on a callee that has no `size` parameter: SEM057
+#     size_marker_unexpected.
+#   • Passing a shape that disagrees with the store (`tensor<int, [5]> t ←
+#     tensor.construct<int, size [4]>(xs)`): SEM010 incompatible_tensor_index.
+#
+# See also: size, tensor, generic, Figura
+# =============================================================================
+
+fn make<T, size N>(list<T> xs) → tensor<T, [N]> ⇥ string {
+    return xs ↦ tensor<T, [N]>
+}
+
+fn total(tensor<int, [4]> cells) → int {
+    return tensor.sum(cells)
+}
+
+main {
+    let list<int> data ← [5, 6, 7, 8]
+
+    # Mixed: the type, then the size.
+    let tensor<int, [4]> row ← make<int, size 4>(data)
+    print tensor.sum(row)
+
+    # Shape-only: the element type comes from the data.
+    let tensor<int, [4]> inferred ← make<size 4>(data)
+    print tensor.sum(inferred)
+
+    # A whole shape, as an argument: no annotation supplies it here.
+    print total(tensor.construct<int, size [4]>(data))
+
+    # A two-dimensional shape.
+    let tensor<int, [2, 2]> grid ← tensor.construct<int, size [2, 2]>(data)
+    print tensor.flatten(grid)
+}

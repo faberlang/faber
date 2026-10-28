@@ -3,6 +3,8 @@ id = "corpus/ratio/ratio.fab"
 group = "language"
 input_root = "corpus"
 input = "ratio/ratio.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

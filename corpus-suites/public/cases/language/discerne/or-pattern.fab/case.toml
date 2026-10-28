@@ -3,6 +3,8 @@ id = "corpus/discerne/or-pattern.fab"
 group = "language"
 input_root = "corpus"
 input = "discerne/or-pattern.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

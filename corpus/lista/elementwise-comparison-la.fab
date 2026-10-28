@@ -2,7 +2,7 @@
 term = "lista"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Ordering and value equality lift per element on numeric lists: lista<bool> from two lists or a list and a scalar."
 syntax = "<numeric-list> (≺ | ≻ | ≤ | ≥ | ≅ | ≇) <numeric-list> | <numeric-list> (≺ | ≻ | ≤ | ≥ | ≅ | ≇) <scalar> | <scalar> (≺ | ≻ | ≤ | ≥ | ≅ | ≇) <numeric-list>"

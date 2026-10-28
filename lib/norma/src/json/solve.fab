@@ -44,7 +44,7 @@ fn parse_value(string wire, int start) → cursor.ScanResult ⇥ string {
     if index ≥ wire.length() {
         throw "expected JSON value at end of input"
     }
-    let string c ← wire.slice(index, index + 1)
+    let string c ← wire.slice(index, index + 1) ⊥ ""
     if c ≡ "{" then return parse_object(wire, index)
     if c ≡ "[" then return parse_array(wire, index)
     if c ≡ «"» then return parse_string(wire, index)
@@ -60,10 +60,10 @@ fn parse_keyword(string wire, int start, string keyword, value payload) → curs
     if end ≻ wire.length() {
         throw "truncated JSON keyword at position §"(start)
     }
-    if wire.slice(start, end) ≢ keyword {
+    if (wire.slice(start, end) ⊥ "") ≢ keyword {
         throw "invalid JSON keyword at position §"(start)
     }
-    if end ≺ wire.length() and not lexer.is_terminator(wire.slice(end, end + 1)) {
+    if end ≺ wire.length() and not lexer.is_terminator(wire.slice(end, end + 1) ⊥ "") {
         throw "invalid character after JSON keyword at position §"(end)
     }
     return result(payload, end)
@@ -72,9 +72,9 @@ fn parse_keyword(string wire, int start, string keyword, value payload) → curs
 fn parse_object(string wire, int start) → cursor.ScanResult ⇥ string {
     mut map<string, value> fields ← empty
     mut int index ← lexer.skip_whitespace(wire, start + 1)
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "}" then return result(fields ↦ value, index + 1)
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "}" then return result(fields ↦ value, index + 1)
     while index ≺ wire.length() {
-        if wire.slice(index, index + 1) ≢ «"» {
+        if (wire.slice(index, index + 1) ⊥ "") ≢ «"» {
             throw "expected JSON object key at position §"(index)
         }
         let cursor.ScanResult key_scan ← parse_string(wire, index)
@@ -83,7 +83,7 @@ fn parse_object(string wire, int start) → cursor.ScanResult ⇥ string {
             throw "duplicate JSON object key: §"(key)
         }
         index ← lexer.skip_whitespace(wire, key_scan.index)
-        if index ≥ wire.length() or wire.slice(index, index + 1) ≢ ":" {
+        if index ≥ wire.length() or (wire.slice(index, index + 1) ⊥ "") ≢ ":" {
             throw "expected ':' after JSON object key at position §"(index)
         }
         let cursor.ScanResult value_scan ← parse_value(wire, index + 1)
@@ -92,7 +92,7 @@ fn parse_object(string wire, int start) → cursor.ScanResult ⇥ string {
         if index ≥ wire.length() {
             throw "unterminated JSON object"
         }
-        let string delimiter ← wire.slice(index, index + 1)
+        let string delimiter ← wire.slice(index, index + 1) ⊥ ""
         if delimiter ≡ "}" then return result(fields ↦ value, index + 1)
         if delimiter ≢ "," {
             throw "expected ',' or '}' at position §"(index)
@@ -105,7 +105,7 @@ fn parse_object(string wire, int start) → cursor.ScanResult ⇥ string {
 fn parse_array(string wire, int start) → cursor.ScanResult ⇥ string {
     mut list<value> items ← empty
     mut int index ← lexer.skip_whitespace(wire, start + 1)
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "]" then return result(items ↦ value, index + 1)
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "]" then return result(items ↦ value, index + 1)
     while index ≺ wire.length() {
         let cursor.ScanResult item ← parse_value(wire, index)
         items.append(item.payload)
@@ -113,7 +113,7 @@ fn parse_array(string wire, int start) → cursor.ScanResult ⇥ string {
         if index ≥ wire.length() {
             throw "unterminated JSON array"
         }
-        let string delimiter ← wire.slice(index, index + 1)
+        let string delimiter ← wire.slice(index, index + 1) ⊥ ""
         if delimiter ≡ "]" then return result(items ↦ value, index + 1)
         if delimiter ≢ "," {
             throw "expected ',' or ']' at position §"(index)
@@ -127,7 +127,7 @@ fn parse_string(string wire, int start) → cursor.ScanResult ⇥ string {
     mut string decoded ← ""
     mut int index ← start + 1
     while index ≺ wire.length() {
-        let string c ← wire.slice(index, index + 1)
+        let string c ← wire.slice(index, index + 1) ⊥ ""
         if c ≡ «"» then return result(decoded ↦ value, index + 1)
         if c ≢ "\\" {
             if lexer.is_control(c) {
@@ -140,7 +140,7 @@ fn parse_string(string wire, int start) → cursor.ScanResult ⇥ string {
             if index + 1 ≥ wire.length() {
                 throw "unterminated JSON escape"
             }
-            let string escaped ← wire.slice(index + 1, index + 2)
+            let string escaped ← wire.slice(index + 1, index + 2) ⊥ ""
             if escaped ≡ "u" {
                 let cursor.ScanResult unicode ← parse_unicode_escape(wire, index)
                 decoded ← decoded + (unicode.payload ↦ string)
@@ -167,7 +167,7 @@ fn parse_unicode_escape(string wire, int slash) → cursor.ScanResult ⇥ string
         if end + 6 ≻ wire.length() {
             throw "missing low surrogate at position §"(slash)
         }
-        if wire.slice(end, end + 2) ≢ "\\u" {
+        if (wire.slice(end, end + 2) ⊥ "") ≢ "\\u" {
             throw "missing low surrogate at position §"(slash)
         }
         let int second ← parse_hex_quad(wire, end + 2)
@@ -192,7 +192,7 @@ fn parse_hex_quad(string wire, int start) → int ⇥ string {
     mut int scalar ← 0
     mut int offset ← 0
     while offset ≺ 4 {
-        let int ∪ none digit ← lexer.hex_value(wire.slice(start + offset, start + offset + 1))
+        let int ∪ none digit ← lexer.hex_value(wire.slice(start + offset, start + offset + 1) ⊥ "")
         if digit is none {
             throw "invalid Unicode escape at position §"(start - 2)
         }
@@ -236,10 +236,10 @@ fn parse_number(string wire, int start) → cursor.ScanResult ⇥ string {
     let int integer_end ← scan_integer_part(wire, start)
     let int fraction_end ← scan_fraction_part(wire, integer_end)
     let int end ← scan_exponent_part(wire, fraction_end)
-    if end ≺ wire.length() and not lexer.is_terminator(wire.slice(end, end + 1)) {
+    if end ≺ wire.length() and not lexer.is_terminator(wire.slice(end, end + 1) ⊥ "") {
         throw "invalid character in JSON number at position §"(end)
     }
-    let string token ← wire.slice(start, end)
+    let string token ← wire.slice(start, end) ⊥ ""
     if end ≢ integer_end then return result((token ↦ float) ↦ value, end)
     return result(integer_value(token), end)
 }
@@ -257,16 +257,16 @@ fn integer_value(string token) → value ⇥ string {
 
 fn scan_integer_part(string wire, int start) → int ⇥ string {
     mut int index ← start
-    if wire.slice(index, index + 1) ≡ "-" {
+    if (wire.slice(index, index + 1) ⊥ "") ≡ "-" {
         index ← index + 1
         if index ≥ wire.length() {
             throw "truncated JSON number at position §"(start)
         }
     }
-    let string first ← wire.slice(index, index + 1)
+    let string first ← wire.slice(index, index + 1) ⊥ ""
     if first ≡ "0" {
         index ← index + 1
-        if index ≺ wire.length() and lexer.is_digit(wire.slice(index, index + 1)) {
+        if index ≺ wire.length() and lexer.is_digit(wire.slice(index, index + 1) ⊥ "") {
             throw "leading zero in JSON number at position §"(start)
         }
     }
@@ -274,7 +274,7 @@ fn scan_integer_part(string wire, int start) → int ⇥ string {
         if not lexer.is_digit(first) {
             throw "invalid JSON number at position §"(start)
         }
-        while index ≺ wire.length() and lexer.is_digit(wire.slice(index, index + 1)) {
+        while index ≺ wire.length() and lexer.is_digit(wire.slice(index, index + 1) ⊥ "") {
             index ← index + 1
         }
     }
@@ -282,9 +282,9 @@ fn scan_integer_part(string wire, int start) → int ⇥ string {
 }
 
 fn scan_fraction_part(string wire, int start) → int ⇥ string {
-    if start ≥ wire.length() or wire.slice(start, start + 1) ≢ "." then return start
+    if start ≥ wire.length() or (wire.slice(start, start + 1) ⊥ "") ≢ "." then return start
     let int digits_start ← start + 1
-    if digits_start ≥ wire.length() or not lexer.is_digit(wire.slice(digits_start, digits_start + 1)) {
+    if digits_start ≥ wire.length() or not lexer.is_digit(wire.slice(digits_start, digits_start + 1) ⊥ "") {
         throw "missing fraction digits at position §"(digits_start)
     }
     return scan_digits(wire, digits_start)
@@ -292,16 +292,16 @@ fn scan_fraction_part(string wire, int start) → int ⇥ string {
 
 fn scan_exponent_part(string wire, int start) → int ⇥ string {
     if start ≥ wire.length() then return start
-    let string marker ← wire.slice(start, start + 1)
+    let string marker ← wire.slice(start, start + 1) ⊥ ""
     if marker ≢ "e" and marker ≢ "E" then return start
     mut int digits_start ← start + 1
     if digits_start ≺ wire.length() {
-        let string sign ← wire.slice(digits_start, digits_start + 1)
+        let string sign ← wire.slice(digits_start, digits_start + 1) ⊥ ""
         if sign ≡ "+" or sign ≡ "-" {
             digits_start ← digits_start + 1
         }
     }
-    if digits_start ≥ wire.length() or not lexer.is_digit(wire.slice(digits_start, digits_start + 1)) {
+    if digits_start ≥ wire.length() or not lexer.is_digit(wire.slice(digits_start, digits_start + 1) ⊥ "") {
         throw "missing exponent digits at position §"(digits_start)
     }
     return scan_digits(wire, digits_start)
@@ -309,7 +309,7 @@ fn scan_exponent_part(string wire, int start) → int ⇥ string {
 
 fn scan_digits(string wire, int start) → int {
     mut int index ← start
-    while index ≺ wire.length() and lexer.is_digit(wire.slice(index, index + 1)) {
+    while index ≺ wire.length() and lexer.is_digit(wire.slice(index, index + 1) ⊥ "") {
         index ← index + 1
     }
     return index

@@ -2,7 +2,7 @@
 term = "ad"
 kind = "endpoint"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "ad_expr", "ad_opener", "conversio_expr", "inline_default", "expression", "literal", "adfirma_stmt", "equality_tail"]
-category = "conversio"
+category = "endpoint"
 canonical = false
 summary = "ad sermo materialization can recover from a failed typed extraction with a fallback."
 syntax = "ad 'runtime:echo' (payload) ↦ numerus ⊥ fallback"

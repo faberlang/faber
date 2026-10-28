@@ -3,6 +3,8 @@ id = "corpus/scalar/return-integer.fab"
 group = "language"
 input_root = "corpus"
 input = "scalar/return-integer.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

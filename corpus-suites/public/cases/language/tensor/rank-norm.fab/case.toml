@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/tensor/rank-norm.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/rank-norm.fab"
+category = "tensor"
+domain = "tensors"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

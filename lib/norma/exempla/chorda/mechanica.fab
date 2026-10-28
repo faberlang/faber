@@ -5,7 +5,7 @@ category = "stdlib"
 canonical = false
 summary = "Assertion-based tests for chorda UTF-8 mechanical trio: encode, decode, try_decode."
 syntax = "encode | decode | try_decode"
-related = ["chorda", "textus", "octeti", "stdlib-nativum"]
+related = ["chorda", "textus", "list<b8>", "stdlib-nativum"]
 locale = "en"
 +++
 

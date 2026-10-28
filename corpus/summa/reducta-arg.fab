@@ -2,7 +2,7 @@
 locale = "la"
 term = "reducta-arg"
 kind = "concept"
-category = "collection"
+category = "reduction"
 grammar = ["reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
 canonical = true
 +++

@@ -2,7 +2,7 @@
 term = "class constant store"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "assignment", "place", "expression", "literal", "member_suffix", "nota_stmt"]
-category = "type"
+category = "generic"
 summary = "A class constant is a compile-time fact and is never stored to."
 syntax = "Tab.LIMIT ← 9"
 related = ["fixum", "genus"]

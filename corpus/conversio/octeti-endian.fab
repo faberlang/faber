@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "Endian integer and float unpack from a list<b8> window."
 syntax = "list<b8>[lo‥hi] ↦ W via Be|Le"
-related = ["↦", "octeti", "int", "float"]
+related = ["↦", "list<b8>", "int", "float"]
 locale = "en"
 +++
 # =============================================================================

@@ -11,6 +11,8 @@ use std::time::{Duration, Instant};
 fn case(args: &[&str]) -> Case {
     Case {
         id: "c".to_owned(),
+        category: None,
+        domain: None,
         dir: PathBuf::from("/d"),
         input: PathBuf::from("/d/main.fab"),
         args: args.iter().map(|arg| (*arg).to_owned()).collect(),

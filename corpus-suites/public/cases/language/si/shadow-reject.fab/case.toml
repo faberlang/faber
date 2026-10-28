@@ -3,6 +3,8 @@ id = "corpus/si/shadow-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "si/shadow-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

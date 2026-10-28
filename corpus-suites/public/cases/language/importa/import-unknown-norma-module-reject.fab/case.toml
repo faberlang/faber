@@ -3,6 +3,8 @@ id = "corpus/importa/import-unknown-norma-module-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/import-unknown-norma-module-reject.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

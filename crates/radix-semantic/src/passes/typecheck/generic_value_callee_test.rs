@@ -46,7 +46,7 @@ fn issue_names(fixture: &AnalyzedFixture) -> Vec<String> {
 #[test]
 fn value_callee_result_in_argument_position() {
     let fixture = analyze_en(
-        r#"fn ap<T, U>((T) → U f, list<T> xs) → list<U> {
+        r"fn ap<T, U>((T) → U f, list<T> xs) → list<U> {
     mut list<U> out ← empty
     for from xs let x {
         out.append(f(x))
@@ -57,7 +57,7 @@ fn value_callee_result_in_argument_position() {
 main {
     print ap(int x ∴ x + 1, [4, 5])
 }
-"#,
+",
     );
     let issues = issue_names(&fixture);
     assert!(
@@ -74,7 +74,7 @@ main {
 #[test]
 fn generic_named_call_still_infers_from_arguments() {
     let fixture = analyze_en(
-        r#"fn id<T>(T x) → T {
+        r"fn id<T>(T x) → T {
     return x
 }
 
@@ -82,7 +82,7 @@ main {
     let int y ← id(3)
     print y
 }
-"#,
+",
     );
     assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
 }

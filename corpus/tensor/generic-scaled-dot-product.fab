@@ -2,7 +2,7 @@
 term = "tensor-shape-generic"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "tensor"
 canonical = false
 summary = "Shape-changing generic tensor function: scaled_dot_product over magnitudo B, D."
 syntax = "functio name<magnitudo B, magnitudo D>(tensor<f32, [B, D]> …) → tensor<f32, [B, D]>"
@@ -26,8 +26,9 @@ locale = "la"
 #
 # Common mistakes:
 #   • Spelling a concrete `_2x8` overload instead of `magnitudo` params.
-#   • Expecting explicit shape args at the call site (`sdpa<f32, 2, 8>(…)`)
-#     — that syntax is not available (PARSE030).
+#   • Writing an explicit size argument without its marker (`sdpa<f32, 2, 8>(…)`):
+#     a size argument carries `size`, as in `sdpa<f32, size 2, size 8>(…)`
+#     (SEM057 size_marker_required).
 #
 # See also: tensor, magnitudo, functio, matmul
 # =============================================================================

@@ -238,7 +238,7 @@ fn rms_norm_typechecks_with_axis_epsilon_and_gamma_peer() {
 fn rope_norm_typechecks_with_generic_dim_and_pos_argument() {
     accepts(
         r"functio rotate(tf32[2, 8] x, tf32[2, 4, 3] table) → tf32[2, 8] {
-    redde x.rope_norm<8>(5, table)
+    redde x.rope_norm<magnitudo 8>(5, table)
 }",
     );
 }

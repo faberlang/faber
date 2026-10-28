@@ -3,6 +3,8 @@ id = "corpus/decimal/d32-removed.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/d32-removed.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

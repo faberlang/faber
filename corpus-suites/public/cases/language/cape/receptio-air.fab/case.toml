@@ -3,6 +3,8 @@ id = "corpus/cape/receptio-air.fab"
 group = "language"
 input_root = "corpus"
 input = "cape/receptio-air.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

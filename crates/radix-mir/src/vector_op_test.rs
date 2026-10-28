@@ -21,7 +21,7 @@ fn ops() -> Vec<MirVectorOp> {
         },
         MirVectorOp::Dot,
         MirVectorOp::Cross,
-        MirVectorOp::Length,
+        MirVectorOp::Norm,
         MirVectorOp::Normalized,
         MirVectorOp::Crea,
         MirVectorOp::Swizzle(vec![2, 1, 0]),

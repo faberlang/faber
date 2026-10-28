@@ -139,6 +139,7 @@ fn minimal_test_artifact() -> HirArtifact {
             imported_nominal_types: Vec::new(),
             ambiguous_imported_nominal_types: Vec::new(),
             conversion_rows: Vec::new(),
+            module_bindings: Vec::new(),
         },
         libraries: LibraryRegistry::default(),
         function_facts: FunctionFactTableWire { entries: Vec::new(), entry: None },
@@ -148,6 +149,7 @@ fn minimal_test_artifact() -> HirArtifact {
         capability_provenance: radix_hir_fhir::FunctionProvenanceTableWire::default(),
         provider_units: BTreeMap::new(),
         shape_obligations: radix_hir_fhir::ShapeObligationTableWire::default(),
+        contract_roles: radix_hir_fhir::ContractRolesWire::default(),
         kernel_requirements: radix_hir_fhir::KernelRequirementsWire::default(),
         tensor_edge_policies: radix_hir_fhir::TensorEdgePolicyTableWire::default(),
         display_tokens: DisplayTokensWire {
@@ -1976,6 +1978,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
         capability_provenance: crate::hir::serialize::from_analyzed(unit, "x", "x").capability_provenance,
         provider_units: crate::hir::serialize::from_analyzed(unit, "x", "x").provider_units,
         shape_obligations: crate::hir::serialize::from_analyzed(unit, "x", "x").shape_obligations,
+        contract_roles: crate::hir::serialize::from_analyzed(unit, "x", "x").contract_roles,
         kernel_requirements: crate::hir::serialize::from_analyzed(unit, "x", "x").kernel_requirements,
         tensor_edge_policies: crate::hir::serialize::from_analyzed(unit, "x", "x").tensor_edge_policies,
         display_tokens: crate::hir::serialize::from_analyzed(unit, "x", "x").display_tokens,
@@ -2154,10 +2157,128 @@ fn runtime_tensor_shape_boundary_survives_fhir_round_trip_and_recovers() {
     let mut loaded_host = BufferHost::default();
     run_analyzed(&mut loaded, &mut loaded_host).expect("loaded runtime shape check recovers");
 
-    // Tensor length reports rank; the mismatch must prevent the second entry.
-    let expected = ["entered", "2", "shape mismatch"];
+    // Tensor length is the element count (2 x 2); the mismatch must prevent
+    // the second entry.
+    let expected = ["entered", "4", "shape mismatch"];
     assert_eq!(direct_host.stdout_lines, expected);
     assert_eq!(loaded_host.stdout_lines, expected);
+}
+
+#[test]
+fn cli_binding_symbols_survive_fhir_round_trip() {
+    use crate::driver::{Config, Session, analyze_source};
+
+    let path = format!("{}/../../corpus/cli/cli.fab", env!("CARGO_MANIFEST_DIR"));
+    let source = std::fs::read_to_string(&path).expect("cli fixture");
+    let session = Session::new(Config::default().with_dev_locale_root());
+    let direct = analyze_source(&session, &path, &source, AnalyzeRequest::default()).expect("fixture analyzes");
+    let program = direct
+        .cli_program
+        .as_ref()
+        .expect("direct unit carries a CLI program");
+    let bound = |program: &crate::cli::CliProgram| {
+        let mut symbols = Vec::new();
+        for (options, operands) in std::iter::once((&program.options, &program.operands))
+            .chain(std::iter::once((&program.global_options, &program.global_operands)))
+            .chain(
+                program
+                    .commands
+                    .iter()
+                    .map(|command| (&command.options, &command.operands)),
+            )
+        {
+            symbols.extend(
+                options
+                    .iter()
+                    .map(|option| (option.binding.clone(), option.binding_symbol)),
+            );
+            symbols.extend(
+                operands
+                    .iter()
+                    .map(|operand| (operand.binding.clone(), operand.binding_symbol)),
+            );
+        }
+        symbols
+    };
+    let expected = bound(program);
+    assert!(!expected.is_empty(), "fixture declares CLI options or operands");
+
+    let artifact = crate::hir::serialize::from_analyzed(&direct, "cli-symbols", "cli.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize CLI program");
+    let loaded = load_fhir(&bytes).expect("CLI binding symbols survive validated FHIR load");
+    assert_eq!(bound(loaded.cli_program.as_ref().expect("loaded CLI program")), expected);
+    for (binding, symbol) in expected {
+        assert_eq!(loaded.interner.resolve(symbol), binding);
+    }
+}
+
+#[test]
+fn contract_roles_survive_fhir_round_trip() {
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_latin_locale());
+    let mut unit = crate::driver::analyze_source(
+        &session,
+        "contract-roles.fab",
+        "functio echo(numerus value) → numerus { redde value }\nincipit { }\n",
+        AnalyzeRequest::default(),
+    )
+    .expect("analyze contract-role fixture");
+    let function_def = unit
+        .hir
+        .items
+        .iter()
+        .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
+        .expect("function item")
+        .def_id;
+    unit.types.ordering_contract = Some(function_def);
+    unit.types.ordering_contract_bindings.insert(function_def);
+    unit.types.closing_contract = Some(function_def);
+    unit.types.sinking_contract = Some(function_def);
+    unit.types.sinking_contract_bindings.insert(function_def);
+
+    let artifact = crate::hir::serialize::from_analyzed(&unit, "contract-roles", "contract-roles.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize contract roles");
+    let loaded = load_fhir(&bytes).expect("contract roles survive validated FHIR load");
+
+    assert_eq!(loaded.types.ordering_contract, Some(function_def));
+    assert!(
+        loaded
+            .types
+            .ordering_contract_bindings
+            .contains(&function_def)
+    );
+    assert_eq!(loaded.types.closing_contract, Some(function_def));
+    assert_eq!(loaded.types.sinking_contract, Some(function_def));
+    assert!(
+        loaded
+            .types
+            .sinking_contract_bindings
+            .contains(&function_def)
+    );
+}
+
+#[test]
+fn declaration_store_shape_pins_survive_fhir_round_trip() {
+    use crate::driver::{Config, Session, analyze_source};
+
+    let mut pinned = 0;
+    for name in [
+        "equality-whole",
+        "shape-bounded",
+        "runtime-extent-use",
+        "runtime-shape-boundary",
+    ] {
+        let path = format!("{}/../../corpus/tensor/{name}.fab", env!("CARGO_MANIFEST_DIR"));
+        let source = std::fs::read_to_string(&path).expect("tensor fixture");
+        let session = Session::new(Config::default().with_dev_locale_root());
+        let direct = analyze_source(&session, &path, &source, AnalyzeRequest::default()).expect("fixture analyzes");
+        pinned += direct.shape_obligations.stores.len();
+
+        let artifact = crate::hir::serialize::from_analyzed(&direct, "shape-store", name);
+        let bytes = postcard::to_allocvec(&artifact).expect("serialize shape obligations");
+        let loaded = load_fhir(&bytes).expect("shape obligations survive validated FHIR load");
+        assert_eq!(loaded.shape_obligations, direct.shape_obligations, "{name}");
+    }
+    assert!(pinned > 0, "no fixture exercised a declaration-store pin");
 }
 
 #[test]
@@ -2388,8 +2509,74 @@ fn output_code(output: &crate::Output) -> &str {
         crate::Output::TypeScript(o) => &o.code,
         crate::Output::Go(o) => &o.code,
         crate::Output::Swift(o) => &o.code,
+        crate::Output::Python(o) => &o.code,
         crate::Output::Faber(o) => &o.code,
         _ => unreachable!("unexpected output variant in round-trip test"),
+    }
+}
+
+/// Need: an `ordo` comparison orders by declared discriminant, and a
+/// loaded unit must carry the order rows that say so. Without them it lowered
+/// the comparison as a plain operator and gave wrong results on every target.
+#[test]
+fn ordo_order_rows_survive_the_fhir_round_trip() {
+    use crate::codegen::{Target, generate_from_analyzed};
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    // `done` is declared after `pending` but orders before it.
+    let source = concat!(
+        "+++\nlocale = \"en\"\n+++\n\n",
+        "enum Status {\n    pending = 10,\n    active,\n    done = -3\n}\n\n",
+        "main {\n    print Status.done ≺ Status.pending\n}\n",
+    );
+    let latin = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin);
+    let targets = [
+        #[cfg(feature = "hir-rust")]
+        Target::HirRust,
+        #[cfg(feature = "hir-ts")]
+        Target::HirTypeScript,
+        #[cfg(feature = "hir-go")]
+        Target::HirGo,
+        #[cfg(feature = "hir-swift")]
+        Target::HirSwift,
+        #[cfg(feature = "hir-python")]
+        Target::HirPython,
+    ];
+    assert!(!targets.is_empty(), "at least one HIR target feature must be enabled");
+
+    for target in targets {
+        let session = Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_dev_locale_root()
+                .with_target(target),
+        );
+        let direct = analyze_source(&session, "ordo-order.fab", source, AnalyzeRequest::default())
+            .expect("ordo comparison fixture analyzes");
+        let direct_rows = &direct.tensor_edge_policies.ordo_order;
+        assert_eq!(
+            direct_rows.comparisons.len(),
+            1,
+            "analysis records the order rows of the one comparison for {target:?}"
+        );
+
+        let artifact = from_analyzed(&direct, "ordo-order", "ordo-order.fab");
+        let bytes = postcard::to_allocvec(&artifact).expect("serialize ordo artifact");
+        let loaded = load_fhir(&bytes).expect("ordo artifact must load");
+
+        assert_eq!(
+            &loaded.tensor_edge_policies.ordo_order, direct_rows,
+            "the loaded unit must carry the direct unit's order rows for {target:?}"
+        );
+        let direct_output = generate_from_analyzed(target, &direct, &surface).expect("direct ordo codegen");
+        let loaded_output = generate_from_analyzed(target, &loaded, &surface).expect("loaded ordo codegen");
+        assert_eq!(
+            output_code(&direct_output),
+            output_code(&loaded_output),
+            "the loaded unit must compare ordo values by declared discriminant like the direct unit for {target:?}"
+        );
     }
 }
 

@@ -2,7 +2,7 @@
 term = "d32"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression"]
-category = "type"
+category = "arithmetic"
 canonical = false
 summary = "Decline: d32 was removed as a type (D11.7); bare d32 rejects with SEM002:removed_decimal_width_d32, whose help points to d64."
 syntax = "d32"

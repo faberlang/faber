@@ -127,11 +127,12 @@ pub fn require_target_compiled_in(target: Target) -> Result<(), Diagnostic> {
     }
 }
 
-/// Print the gate diagnostic for `target` to stderr and exit with status 1.
+/// Print the gate diagnostic for `target` to stderr and exit with
+/// [`UNAVAILABLE`](crate::exit_status::UNAVAILABLE).
 pub fn exit_target_not_in_this_build(target: Target) -> ! {
     let diag = target_not_in_this_build(target);
     eprintln!("{}", render_plain(&diag));
-    std::process::exit(1)
+    crate::exit_status::exit_unavailable()
 }
 
 #[cfg(test)]

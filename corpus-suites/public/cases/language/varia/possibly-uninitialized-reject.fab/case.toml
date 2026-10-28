@@ -3,6 +3,8 @@ id = "corpus/varia/possibly-uninitialized-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "varia/possibly-uninitialized-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

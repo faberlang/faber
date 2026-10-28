@@ -340,6 +340,15 @@ impl Target {
         matches!(self, Self::MirMetal | Self::MirWgsl)
     }
 
+    /// Whether this target applies a ranged store policy
+    /// (`saturating|trapping|wrapping<W, lo‥hi>`, need) at the store.
+    /// Every other target would read the cell as its bare width and silently
+    /// drop the range, so it is refused by name before an emitter runs.
+    #[must_use]
+    pub fn lowers_ranged_int(self) -> bool {
+        matches!(self, Self::HirFaber | Self::HirRust | Self::MirStepper)
+    }
+
     /// Feature that enables this target when it is feature-gated.
     #[must_use]
     pub fn required_feature(self) -> Option<&'static str> {

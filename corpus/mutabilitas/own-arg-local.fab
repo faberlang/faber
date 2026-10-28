@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "argument_list", "argument", "call_marker", "genus_decl", "genus_member", "assignment"]
-category = "type"
+category = "binding"
 summary = "An own argument is a whole local binding or a fresh value; copy duplicates a field and keeps the name alive; assigning a given-away name makes it live again."
 syntax = "eat(own a); dup(copy b.xs); a ← [5]"
 related = ["own", "copy"]

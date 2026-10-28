@@ -3,6 +3,8 @@ id = "corpus/clausura/error-channel.fab"
 group = "language"
 input_root = "corpus"
 input = "clausura/error-channel.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

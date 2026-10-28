@@ -6,7 +6,7 @@ category = "conversion"
 canonical = false
 summary = "Boundary bridge from list<b8> to lista<u8>."
 syntax = "list<b8> ↦ list<u8>"
-related = ["↦", "octeti", "lista", "numerus"]
+related = ["↦", "list<b8>", "lista", "numerus"]
 locale = "en"
 +++
 # =============================================================================
