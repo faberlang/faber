@@ -74,7 +74,7 @@ fn bounded_param_exported_signature_emits_real_rendered_diagnostic() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        "@ public\nfn probe(string<4> b) → void {\n    print b\n}\n",
+        "@ public\nfn probe(string<size 4> b) → void {\n    print b\n}\n",
     )
     .expect("write source");
 
