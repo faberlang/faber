@@ -2274,15 +2274,10 @@ fn device_role_for_function(function: &HirFunction) -> Option<MirDeviceRole> {
     }
 }
 
-/// Map HIR function flags to MIR shader stage identity.
+/// Map HIR stage flags to MIR shader-stage identity.
 ///
-/// `MirKernelShaderStage` carries execution-stage identity (Compute/
-/// Vertex/Fragment). Assigned during HIR→MIR lowering so that lowered
-/// `MirFunction`s carry the stage seam even before full body lowering
-/// lands. Conflicting annotations fail-closed to `None`.
-///
-/// Residual: body lowering through `MirProgram` + WGSL emit + backend impact
-/// is the next unit. Stage assignment is the identity seam, not the body path.
+/// `MirKernelShaderStage` distinguishes execution stages from composition
+/// roles. Conflicting annotations fail closed to `None`.
 pub fn shader_stage_for_function(function: &HirFunction) -> Option<MirKernelShaderStage> {
     if !annotations_exclusive(function) {
         return None;
