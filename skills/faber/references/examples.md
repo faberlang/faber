@@ -14,12 +14,14 @@ nothing to regenerate; the `faber` build embeds those files for `faber explain`.
 
 Count files and terms from the tree when you need them; do not cache those numbers in this skill.
 
-`faber explain` is keyed by the Latin identity of a keyword or by a glyph
-(`discerne`, which en spells `match`; `nota`, en `print`), plus a few listed
-English aliases. Only some English spellings resolve today (`match`, `switch`,
-`if`, `return`, `class`, `int`, `string`; not `fn`, `print`, `mut`, `ref`,
-`for`), and `let` opens the mutable-binding entry instead of the write-once
-one. When a lookup fails, take the Latin key from `faber explain --list`.
+`faber explain` lists and looks terms up by the active reader locale's spelling
+(`--locale <locale>`, else the current package's `faber.toml` `[locale]`, else
+`en`): `fn`, `match`, `print` in en; `functio`, `discerne`, `nota` in la. The
+spelling comes from the locale pack, so a renamed row renames the explain term
+with it. Corpus frontmatter still `explains` the Latin identity; that is the
+key the pack maps. Two entries that share one spelling in a pack are listed as
+`spelling` and `spelling (category)`. A miss on an identity names the spelling
+to ask for.
 
 Package fixtures and format goldens (`faber.toml` packages such as `regio/`,
 `contract-import/`, `proba-canary/`; `format/*.fab` with `*.format.expected`):
@@ -75,11 +77,8 @@ from the keyword's own directory.
 
 1. Search `corpus/` frontmatter for the file whose `explains` lists the keyword.
 2. Open that `.fab` file; files sharing its `term` are further examples.
-3. If the term is user-facing, try `faber explain <term>`. Explain terms are
-   Latin registry keys plus listed aliases (`functio` (en `fn`), `genus`
-   (en `class`), `class`, `scribe` (en `write`) resolve; `fn` and `print` do
-   not; `nota` (en `print`) has no entry, and the `scribe` entry points at
-   `nota/nota.fab`).
+3. If the term is user-facing, try `faber explain <term>` in the spelling of
+   the code locale you are reading (`faber explain fn` in en).
 4. For legacy spellings, check `corpus/legacy-redirects.toml`.
 5. For package-shaped proofs, search `corpus-product/`.
 
