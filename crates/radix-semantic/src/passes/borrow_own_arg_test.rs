@@ -38,11 +38,26 @@ const LOCAL: &str = "    mut list<int> a ← [1, 2, 3]\n";
 
 #[test]
 fn whole_local_fresh_and_exclusive_parameters_are_accepted() {
-    assert!(main_body(&format!("{LOCAL}    eat(own a)")).is_empty());
-    assert!(main_body("    eat(own [1, 2, 3])").is_empty());
-    assert!(main_body("    eat(own make())").is_empty());
-    assert!(func("fn f(own list<int> p) → void { eat(own p) }").is_empty());
-    assert!(func("fn f(copy list<int> p) → void { eat(own p) }").is_empty());
+    assert_eq!(
+        main_body(&format!("{LOCAL}    eat(own a)")),
+        [] as [std::string::String; 0]
+    );
+    assert_eq!(
+        main_body("    eat(own [1, 2, 3])"),
+        [] as [std::string::String; 0]
+    );
+    assert_eq!(
+        main_body("    eat(own make())"),
+        [] as [std::string::String; 0]
+    );
+    assert_eq!(
+        func("fn f(own list<int> p) → void { eat(own p) }"),
+        [] as [std::string::String; 0]
+    );
+    assert_eq!(
+        func("fn f(copy list<int> p) → void { eat(own p) }"),
+        [] as [std::string::String; 0]
+    );
 }
 
 #[test]
@@ -56,9 +71,9 @@ fn field_and_element_arguments_are_not_local_bindings() {
 #[test]
 fn copy_of_a_field_is_accepted_and_does_not_kill_the_name() {
     let body = "    let Box b ← Box { xs = [1] }\n    dup(copy b.xs)\n    dup(copy b.xs)\n    print b.xs.length()";
-    assert!(main_body(body).is_empty());
+    assert_eq!(main_body(body), [] as [std::string::String; 0]);
     let local = format!("{LOCAL}    dup(copy a)\n    print a.length()");
-    assert!(main_body(&local).is_empty());
+    assert_eq!(main_body(&local), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -86,7 +101,7 @@ fn loop_binder_cannot_be_given_away() {
 #[test]
 fn method_arguments_follow_the_same_rules() {
     let ok = format!("    let Sink s ← Sink {{}}\n{LOCAL}    s.take(own a)");
-    assert!(main_body(&ok).is_empty());
+    assert_eq!(main_body(&ok), [] as [std::string::String; 0]);
     let bad = "    let Sink s ← Sink {}\n    let Box b ← Box { xs = [1] }\n    s.take(own b.xs)";
     assert_eq!(main_body(bad), ["own_argument_not_local_binding"]);
 }
@@ -108,7 +123,7 @@ fn use_after_own_of_an_exclusive_source_is_use_after_move() {
 #[test]
 fn a_different_name_after_the_move_is_fine() {
     let body = format!("{LOCAL}    mut list<int> c ← [4]\n    eat(own a)\n    print c.length()");
-    assert!(main_body(&body).is_empty());
+    assert_eq!(main_body(&body), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -120,7 +135,7 @@ fn giving_the_same_name_away_twice_is_use_after_own() {
 #[test]
 fn assigning_the_name_again_makes_it_live() {
     let body = format!("{LOCAL}    eat(own a)\n    a ← [5]\n    print a.length()");
-    assert!(main_body(&body).is_empty());
+    assert_eq!(main_body(&body), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -128,7 +143,7 @@ fn branches_do_not_kill_each_other() {
     let sibling = format!(
         "{LOCAL}    if a.length() ≻ 1 {{\n        eat(own a)\n    }} else {{\n        print a.length()\n    }}"
     );
-    assert!(main_body(&sibling).is_empty());
+    assert_eq!(main_body(&sibling), [] as [std::string::String; 0]);
     let joined = format!(
         "{LOCAL}    if a.length() ≻ 1 {{\n        eat(own a)\n    }}\n    print a.length()"
     );
@@ -138,7 +153,7 @@ fn branches_do_not_kill_each_other() {
 #[test]
 fn a_diverging_branch_does_not_kill_the_name_after_the_join() {
     let f = "fn f(list<int> q) → void {\n    mut list<int> a ← [1]\n    if q.length() ≻ 1 {\n        eat(own a)\n        return\n    }\n    print a.length()\n}";
-    assert!(func(f).is_empty());
+    assert_eq!(func(f), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -155,7 +170,7 @@ fn moving_an_outer_binding_in_a_while_body_is_moved_in_loop() {
 #[test]
 fn a_value_created_in_the_loop_body_moves_once_per_iteration() {
     let body = "    mut bool c ← true\n    while c {\n        mut list<int> b ← [1]\n        eat(own b)\n        c ← false\n    }";
-    assert!(main_body(body).is_empty());
+    assert_eq!(main_body(body), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -163,11 +178,11 @@ fn a_loop_that_reassigns_or_leaves_after_the_move_is_fine() {
     let reassign = format!(
         "{LOCAL}    mut bool c ← true\n    while c {{\n        eat(own a)\n        a ← [2]\n        c ← false\n    }}"
     );
-    assert!(main_body(&reassign).is_empty());
+    assert_eq!(main_body(&reassign), [] as [std::string::String; 0]);
     let leaves = format!(
         "{LOCAL}    mut bool c ← true\n    while c {{\n        eat(own a)\n        break\n    }}"
     );
-    assert!(main_body(&leaves).is_empty());
+    assert_eq!(main_body(&leaves), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -189,7 +204,7 @@ fn a_return_inside_a_closure_does_not_leave_the_loop() {
 #[test]
 fn a_return_in_a_nested_loop_still_leaves_the_function() {
     let body = "fn f(own list<int> p, bool c, bool d) → void {\n    while c {\n        eat(own p)\n        while d {\n            return\n        }\n    }\n}";
-    assert!(func(body).is_empty());
+    assert_eq!(func(body), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -203,13 +218,13 @@ fn a_closure_called_after_its_captured_name_was_given_away_is_rejected() {
 fn a_closure_called_before_the_move_is_fine() {
     let body =
         format!("{LOCAL}    let () → int f ← () → int ∴ a.length()\n    print f()\n    eat(own a)");
-    assert!(main_body(&body).is_empty());
+    assert_eq!(main_body(&body), [] as [std::string::String; 0]);
 }
 
 #[test]
 fn bind_form_own_from_unmarked_behaves_as_before() {
     let dead = "    let list<int> a ← [1, 2, 3]\n    let list<int> b ← own a\n    print b.length()";
-    assert!(main_body(dead).is_empty());
+    assert_eq!(main_body(dead), [] as [std::string::String; 0]);
     let live = "    let list<int> a ← [1, 2, 3]\n    let list<int> b ← own a\n    print a.length()\n    print b.length()";
     assert_eq!(main_body(live), ["unmarked_into_own"]);
 }

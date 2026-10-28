@@ -23,7 +23,10 @@ fn analyze_en(source: &str) -> AnalyzedFixture {
 fn assert_accepts(source: &str) {
     let result = analyze_en(source);
     assert!(
-        !result.diagnostics.iter().any(|d| d.is_error()),
+        !result
+            .diagnostics
+            .iter()
+            .any(super::super::error::SemanticError::is_error),
         "expected no error, got: {:?}",
         result.diagnostics
     );
@@ -41,7 +44,7 @@ fn assert_rejects_naming(source: &str, param: &str) {
         found
             .args
             .iter()
-            .any(|a| a.name == "name" && a.value.to_string() == param),
+            .any(|a| a.name == "name" && a.value.clone() == param),
         "diagnostic does not name `{param}`: {found:?}"
     );
 }

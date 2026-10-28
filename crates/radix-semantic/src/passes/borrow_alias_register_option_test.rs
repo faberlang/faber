@@ -29,8 +29,7 @@ fn issues(body: &str) -> Vec<String> {
             err.args
                 .iter()
                 .find(|a| a.name == "issue")
-                .map(|a| a.value.to_string())
-                .unwrap_or_else(|| format!("{:?}", err.kind))
+                .map_or_else(|| format!("{:?}", err.kind), |a| a.value.clone())
         })
         .collect()
 }
