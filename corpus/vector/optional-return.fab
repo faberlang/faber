@@ -8,11 +8,11 @@ locale = "en"
 +++
 
 # =============================================================================
-# vector — a vector literal returned into `vector<f32, 3> ∪ none`.
+# vector — a vector literal returned into `vector<f32, size 3> ∪ none`.
 # =============================================================================
 #
 # What this teaches:
-#   • Optional vector return — `vector<f32, 3> ∪ none` accepts a vector literal or `null`
+#   • Optional vector return — `vector<f32, size 3> ∪ none` accepts a vector literal or `null`
 #   • Literal typing — the literal is the vector value; the return widens it into the option
 #
 # Common mistakes:
@@ -31,13 +31,13 @@ locale = "en"
 #   [0.0, 0.0, 0.0]
 #   none
 
-fn normal(int code) → vector<f32, 3> ∪ none {
-    if code ≡ 1 then return [-1.0, 0.0, 0.0] ↦ vector<f32, 3>
+fn normal(int code) → vector<f32, size 3> ∪ none {
+    if code ≡ 1 then return [-1.0, 0.0, 0.0] ↦ vector<f32, size 3>
     return null
 }
 
 main {
-    let vector<f32, 3> fallback ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> fallback ← [0.0, 0.0, 0.0] ↦ vector<f32, size 3>
     print normal(1) coalesce fallback
     print normal(2) coalesce fallback
     if normal(2) ≡ null {

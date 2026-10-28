@@ -748,3 +748,89 @@ fn callable_import_resolves_nominal_type_param_constraint() {
         crate::TypeParamConstraint::OneOf(vec![foo])
     );
 }
+
+#[test]
+fn sized_list_round_trips_through_the_snapshot() {
+    // Need: `list<i8, size 32>` keeps its capacity across the module boundary.
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let elem = types.sized_numeric(Primitive::Numerus, NumericWidth::I8);
+    let capacity = types.intern_index(IndexExpr::Literal(32));
+    let sized = types.bounded_array(elem, capacity);
+
+    let snapshot = snapshot_interface_type(sized, &types, &interner).expect("snapshot sized list");
+    assert_eq!(
+        snapshot,
+        InterfaceTypeSnapshot::BoundedArray(
+            Box::new(InterfaceTypeSnapshot::SizedNumeric(
+                Primitive::Numerus,
+                NumericWidth::I8
+            )),
+            InterfaceIndexSnapshot::Literal(32)
+        )
+    );
+
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
+        .expect("import sized list");
+    let Type::BoundedArray { element, capacity } = target_types.get(imported) else {
+        panic!(
+            "expected imported bounded array, got {:?}",
+            target_types.get(imported)
+        );
+    };
+    assert!(matches!(
+        target_types.get(*element),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I8)
+    ));
+    assert!(matches!(
+        target_types.get_index(*capacity),
+        IndexExpr::Literal(32)
+    ));
+}
+
+#[test]
+fn ranged_list_round_trips_through_the_snapshot() {
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let elem = types.sized_numeric(Primitive::Numerus, NumericWidth::I8);
+    for (min, max) in [(2_u64, Some(5_u64)), (1, None)] {
+        let ranged = types.ranged_array(elem, min, max);
+        assert!(matches!(types.get(ranged), Type::RangedArray { .. }));
+
+        let snapshot =
+            snapshot_interface_type(ranged, &types, &interner).expect("snapshot ranged list");
+        assert!(matches!(
+            &snapshot,
+            InterfaceTypeSnapshot::RangedArray { min: m, max: x, .. } if *m == min && *x == max
+        ));
+
+        let mut target_types = TypeTable::new();
+        let mut target_interner = Interner::new();
+        let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
+            .expect("import ranged list");
+        assert!(matches!(
+            target_types.get(imported),
+            Type::RangedArray { min: m, max: x, .. } if *m == min && *x == max
+        ));
+    }
+}
+
+#[test]
+fn bounded_byte_list_round_trips_as_bounded_octeti() {
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let capacity = types.intern_index(IndexExpr::Literal(16));
+    let octeti = types.bounded_octeti(capacity);
+
+    let snapshot = snapshot_interface_type(octeti, &types, &interner).expect("snapshot octeti");
+    let mut target_types = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
+        .expect("import octeti");
+    assert!(matches!(
+        target_types.get(imported),
+        Type::BoundedOcteti { .. }
+    ));
+}

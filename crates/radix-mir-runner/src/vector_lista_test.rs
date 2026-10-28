@@ -1,4 +1,4 @@
-//! Runner pin for `vector<T, N> ↦ lista<T>` register-carrier conversion.
+//! Runner pin for `vector<T, size N> ↦ lista<T>` register-carrier conversion.
 
 use super::*;
 use radix_lexer::{Interner, Span};
@@ -52,7 +52,7 @@ fn eval_vector_to_lista() -> Result<Value, RunnerError> {
 
 #[test]
 fn vector_to_lista_f32_copies_lanes_in_order() {
-    let result = eval_vector_to_lista().expect("vector<f32, 3> to lista<f32>");
+    let result = eval_vector_to_lista().expect("vector<f32, magnitudo 3> to lista<f32>");
     let Value::Array(items) = result else {
         panic!("expected lista, got {result:?}");
     };

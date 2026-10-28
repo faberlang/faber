@@ -84,7 +84,7 @@ functio product(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2
 fn matrix_applica_typechecks_matching_vector_width() {
     accepts(
         r"
-functio apply(matrix<f32, [2, 3]> m, vector<f32, 3> v) → vector<f32, 2> {
+functio apply(matrix<f32, [2, 3]> m, vector<f32, magnitudo 3> v) → vector<f32, magnitudo 2> {
     redde m.applica(v)
 }
 ",
@@ -95,7 +95,7 @@ functio apply(matrix<f32, [2, 3]> m, vector<f32, 3> v) → vector<f32, 2> {
 fn matrix_applica_rejects_vector_width_mismatch() {
     rejects_with_issue(
         r"
-functio apply(matrix<f32, [2, 2]> m, vector<f32, 3> v) → vector<f32, 2> {
+functio apply(matrix<f32, [2, 2]> m, vector<f32, magnitudo 3> v) → vector<f32, magnitudo 2> {
     redde m.applica(v)
 }
 ",
@@ -109,7 +109,7 @@ fn matrix_applica_typechecks_parametric_shape() {
     // vector of width C and returns a vector of width R.
     accepts(
         r"
-functio apply<magnitudo R, magnitudo C>(matrix<f32, [R, C]> m, vector<f32, C> v) → vector<f32, R> {
+functio apply<magnitudo R, magnitudo C>(matrix<f32, [R, C]> m, vector<f32, magnitudo C> v) → vector<f32, magnitudo R> {
     redde m.applica(v)
 }
 ",

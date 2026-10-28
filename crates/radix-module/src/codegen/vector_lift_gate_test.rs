@@ -11,8 +11,8 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const PRELUDE: &str = "sit vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-sit vector<f32, 3> b ← [3.0, 2.0, 1.0] ↦ vector<f32, 3>
+const PRELUDE: &str = "sit vector<f32, magnitudo 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
+sit vector<f32, magnitudo 3> b ← [3.0, 2.0, 1.0] ↦ vector<f32, magnitudo 3>
 sit matrix<f32, [2, 2]> m ← [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [2, 2]>
 sit matrix<f32, [2, 2]> n ← [[4.0, 3.0], [2.0, 1.0]] ↦ matrix<f32, [2, 2]>
 sit f32 s ← 2.0
@@ -44,21 +44,21 @@ fn rejected_with(target: Target, body: &str, issue: &str) -> bool {
 }
 
 const LIFTED: &[&str] = &[
-    "sit vector<f32, 3> r ← a * s",
-    "sit vector<f32, 3> r ← s * a",
-    "sit vector<f32, 3> r ← a / s",
-    "sit vector<f32, 3> r ← s - a",
-    "sit vector<f32, 3> r ← a + 1.0",
-    "sit vector<f32, 3> r ← -a",
-    "sit vector<f32, 3> r ← a ÷ s",
-    "sit vector<f32, 3> r ← a ÷ b",
-    "sit vector<f32, 3> r ← a ⤒ s",
-    "sit vector<f32, 3> r ← a ⤓ b",
-    "sit vector<bivalens, 3> r ← a ≺ b",
-    "sit vector<bivalens, 3> r ← a ≥ s",
-    "sit vector<bivalens, 3> r ← s ≻ a",
-    "sit vector<bivalens, 3> r ← a ≅ b",
-    "sit vector<bivalens, 3> r ← a ≇ s",
+    "sit vector<f32, magnitudo 3> r ← a * s",
+    "sit vector<f32, magnitudo 3> r ← s * a",
+    "sit vector<f32, magnitudo 3> r ← a / s",
+    "sit vector<f32, magnitudo 3> r ← s - a",
+    "sit vector<f32, magnitudo 3> r ← a + 1.0",
+    "sit vector<f32, magnitudo 3> r ← -a",
+    "sit vector<f32, magnitudo 3> r ← a ÷ s",
+    "sit vector<f32, magnitudo 3> r ← a ÷ b",
+    "sit vector<f32, magnitudo 3> r ← a ⤒ s",
+    "sit vector<f32, magnitudo 3> r ← a ⤓ b",
+    "sit vector<bivalens, magnitudo 3> r ← a ≺ b",
+    "sit vector<bivalens, magnitudo 3> r ← a ≥ s",
+    "sit vector<bivalens, magnitudo 3> r ← s ≻ a",
+    "sit vector<bivalens, magnitudo 3> r ← a ≅ b",
+    "sit vector<bivalens, magnitudo 3> r ← a ≇ s",
 ];
 
 const LIFTED_MATRIX: &[&str] = &[
@@ -82,10 +82,10 @@ const LIFTED_MATRIX: &[&str] = &[
 /// The logic and select forms over a bool register mask, with the masks
 /// taken as parameters so each form is the first one the gate meets.
 const MASKED: &[(&str, &str)] = &[
-    ("sit vector<bivalens, 3> r ← k et k", VECTOR_ISSUE),
-    ("sit vector<bivalens, 3> r ← k aut verum", VECTOR_ISSUE),
-    ("sit vector<bivalens, 3> r ← non k", VECTOR_ISSUE),
-    ("sit vector<f32, 3> r ← k ✓ a ✗ b", VECTOR_ISSUE),
+    ("sit vector<bivalens, magnitudo 3> r ← k et k", VECTOR_ISSUE),
+    ("sit vector<bivalens, magnitudo 3> r ← k aut verum", VECTOR_ISSUE),
+    ("sit vector<bivalens, magnitudo 3> r ← non k", VECTOR_ISSUE),
+    ("sit vector<f32, magnitudo 3> r ← k ✓ a ✗ b", VECTOR_ISSUE),
     ("sit matrix<bivalens, [2, 2]> r ← j et j", MATRIX_ISSUE),
     ("sit matrix<bivalens, [2, 2]> r ← j aut verum", MATRIX_ISSUE),
     ("sit matrix<bivalens, [2, 2]> r ← non j", MATRIX_ISSUE),
@@ -100,7 +100,7 @@ fn masked_issues(target: Target, body: &str) -> (Vec<String>, bool) {
             .with_dev_locale_root(),
     );
     let source = format!(
-        "functio masked(vector<bivalens, 3> k, vector<f32, 3> a, vector<f32, 3> b, matrix<bivalens, [2, 2]> j, matrix<f32, [2, 2]> m, matrix<f32, [2, 2]> n) {{\n{body}\n}}\nincipit {{\n}}\n"
+        "functio masked(vector<bivalens, magnitudo 3> k, vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b, matrix<bivalens, [2, 2]> j, matrix<f32, [2, 2]> m, matrix<f32, [2, 2]> n) {{\n{body}\n}}\nincipit {{\n}}\n"
     );
     let result = crate::driver::compile(&session, "<test>", &source, ModuleCompileRequest::default());
     let issues = result
@@ -247,7 +247,7 @@ fn faber_reemission_keeps_the_lifted_register_forms() {
 #[test]
 fn register_with_register_plus_keeps_its_rust_emitter() {
     for body in [
-        "sit vector<f32, 3> r ← a + b",
+        "sit vector<f32, magnitudo 3> r ← a + b",
         "sit matrix<f32, [2, 2]> r ← m + n",
         "sit matrix<f32, [2, 2]> r ← m ⊙ n",
     ] {

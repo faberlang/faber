@@ -21,7 +21,7 @@ locale = "en"
 #     radical binds tighter than the `+`
 #
 # Common mistakes:
-#   • applying a radical to a `vector<f32, N>`: it has no `.sqrt()`, so the
+#   • applying a radical to a `vector<f32, size N>`: it has no `.sqrt()`, so the
 #     glyph is refused there; use a `tensor` for elementwise math
 #
 # EXPECTED stdout:

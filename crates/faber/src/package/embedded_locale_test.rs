@@ -49,11 +49,11 @@ fn loader_loads_every_embedded_locale() {
 #[test]
 fn load_decompresses_only_the_requested_locale() {
     reset_decompressions();
-    let pack = load_embedded_locale_pack("vi").expect("load vi");
+    let pack = parse_embedded_locale_pack("vi").expect("load vi");
     assert_eq!(pack.metadata.id, "vi");
     assert_eq!(decompressions(), 1, "one locale in, one gzip decode");
 
-    let pack = load_embedded_locale_pack("zh-Hant").expect("load zh-Hant");
+    let pack = parse_embedded_locale_pack("zh-Hant").expect("load zh-Hant");
     assert_eq!(pack.metadata.id, "zh-Hant");
     assert_eq!(
         decompressions(),
@@ -65,7 +65,7 @@ fn load_decompresses_only_the_requested_locale() {
 #[test]
 fn unknown_locale_does_not_decompress() {
     reset_decompressions();
-    match load_embedded_locale_pack("zz") {
+    match parse_embedded_locale_pack("zz") {
         Err(EmbeddedLocaleError::UnknownLocale(locale)) => assert_eq!(locale, "zz"),
         other => panic!("expected UnknownLocale, got {other:?}"),
     }
@@ -88,4 +88,18 @@ fn loader_needs_no_share_tree_install_prefix_or_checkout() {
             .unwrap_or_else(|err| panic!("load {locale} from embedded bytes: {err}"));
         assert_eq!(pack.metadata.id, *locale);
     }
+}
+
+#[test]
+fn loader_parses_each_locale_once_per_process() {
+    reset_decompressions();
+    let first = load_embedded_locale_pack("hi").expect("first load hi");
+    let after_first = decompressions();
+    let second = load_embedded_locale_pack("hi").expect("second load hi");
+    assert_eq!(first, second);
+    assert_eq!(
+        decompressions(),
+        after_first,
+        "second load of a cached locale must not decompress again"
+    );
 }

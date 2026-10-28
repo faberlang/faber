@@ -108,7 +108,7 @@ fn a_depth_plane_style_vector_kernel_carries_no_fault_channel() {
     let source = r#"
 @ kernel
 @ public
-fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [H, W]> depth) → void {
+fn k<size H, size W>(tensor<vector<f32, size 4>, [H, W]> state, mut tensor<f32, [H, W]> depth) → void {
     for from state at [i, j] thread lane let c {
         depth[[i, j]] ← c[0]
     }
@@ -120,7 +120,7 @@ fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [H, W
 main args args {
     const size R ← args.rows
     const size C ← args.cols
-    mut tensor<vector<f32, 4>, [R, C]> state ← tensor<vector<f32, 4>, [R, C]> {}
+    mut tensor<vector<f32, size 4>, [R, C]> state ← tensor<vector<f32, size 4>, [R, C]> {}
     mut tensor<f32, [R, C]> depth ← tf32[R, C] {}
     k(state, mut depth)
 }
@@ -135,14 +135,14 @@ fn a_run_time_register_vector_index_gets_a_fault_site_without_a_tensor_count() {
     let source = r#"
 @ kernel
 @ public
-fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, i32 pick, mut tensor<f32, [H, W]> depth) → void {
+fn k<size H, size W>(tensor<vector<f32, size 4>, [H, W]> state, i32 pick, mut tensor<f32, [H, W]> depth) → void {
     for from state at [i, j] thread lane let c {
         depth[[i, j]] ← c[pick]
     }
 }
 
 main {
-    mut tensor<vector<f32, 4>, [2, 2]> state ← tensor<vector<f32, 4>, [2, 2]> {}
+    mut tensor<vector<f32, size 4>, [2, 2]> state ← tensor<vector<f32, size 4>, [2, 2]> {}
     mut tensor<f32, [2, 2]> depth ← tf32[2, 2] {}
     k(state, 1, mut depth)
 }
@@ -176,7 +176,7 @@ fn a_single_lane_run_time_vector_index_uses_the_same_fault_channel() {
 @ kernel
 @ public
 fn poke(i32 pick, mut tensor<f32, [1]> dst) → void {
-    let vector<f32, 4> value ← [0.0, 1.0, 2.0, 3.0] ↦ vector<f32, 4>
+    let vector<f32, size 4> value ← [0.0, 1.0, 2.0, 3.0] ↦ vector<f32, size 4>
     dst[0] ← value[pick]
 }
 
@@ -208,7 +208,7 @@ fn a_single_lane_run_time_vector_store_gets_a_fault_site() {
 @ kernel
 @ public
 fn poke(i32 pick, mut tensor<f32, [1]> dst) → void {
-    mut vector<f32, 4> value ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    mut vector<f32, size 4> value ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, size 4>
     value[pick] ← 9.0
     dst[0] ← value[0] + value[1] + value[2] + value[3]
 }
@@ -240,12 +240,12 @@ fn nested_vector_store_source(width: u8, tensor_index: &str, vector_index: &str)
         r#"
 @ kernel
 @ public
-fn poke(i32 row, i32 pick, mut tensor<vector<f32, {width}>, [3]> src) → void {{
+fn poke(i32 row, i32 pick, mut tensor<vector<f32, size {width}>, [3]> src) → void {{
     src[{tensor_index}][{vector_index}] ← 9.0
 }}
 
 main {{
-    mut tensor<vector<f32, {width}>, [3]> src ← tensor<vector<f32, {width}>, [3]> {{}}
+    mut tensor<vector<f32, size {width}>, [3]> src ← tensor<vector<f32, size {width}>, [3]> {{}}
     poke(0, 1, mut src)
 }}
 "#
@@ -572,14 +572,14 @@ fn a_runtime_vector_index_guards_its_width_and_records_the_fault_in_metal_text()
     let source = r#"
 @ kernel
 @ public
-fn k<size H, size W>(tensor<vector<f32, 4>, [H, W]> state, i32 pick, mut tensor<f32, [H, W]> depth) → void {
+fn k<size H, size W>(tensor<vector<f32, size 4>, [H, W]> state, i32 pick, mut tensor<f32, [H, W]> depth) → void {
     for from state at [i, j] thread lane let c {
         depth[[i, j]] ← c[pick]
     }
 }
 
 main {
-    mut tensor<vector<f32, 4>, [2, 2]> state ← tensor<vector<f32, 4>, [2, 2]> {}
+    mut tensor<vector<f32, size 4>, [2, 2]> state ← tensor<vector<f32, size 4>, [2, 2]> {}
     mut tensor<f32, [2, 2]> depth ← tf32[2, 2] {}
     k(state, 1, mut depth)
 }
@@ -622,7 +622,7 @@ fn a_run_time_vector_store_guards_its_width_in_metal_text() {
 @ kernel
 @ public
 fn poke(i32 pick, mut tensor<f32, [1]> dst) → void {
-    mut vector<f32, 4> value ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    mut vector<f32, size 4> value ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, size 4>
     value[pick] ← 9.0
     dst[0] ← value[0] + value[1] + value[2] + value[3]
 }

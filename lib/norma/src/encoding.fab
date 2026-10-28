@@ -272,12 +272,7 @@ fn decode_percent(string data, bool plus_space) → string ⇥ string {
             i ← i + 3
         }
         else {
-            let list<b8> raw ← c ↦ list<b8>
-            mut int k ← 0
-            while k ≺ raw.length() {
-                out.append((raw.get(k) coalesce (0 ∷ b8)) ↦ u8)
-                k ← k + 1
-            }
+            out.extend(c ↦ list<b8> ↦ list<u8>)
             i ← i + 1
         }
     }

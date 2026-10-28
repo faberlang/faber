@@ -98,7 +98,7 @@ fn ascii_hole_accepts_char_literal() {
     test_support::assert_accepts_la(
         r"incipit {
     sit ascii<_> c ← 'x'
-    sit ascii<1> d ← c
+    sit ascii<magnitudo 1> d ← c
     nota d
 }",
     );
@@ -109,7 +109,7 @@ fn ascii_hole_solved_to_one_widens_to_eight() {
     test_support::assert_accepts_la(
         r"incipit {
     sit ascii<_> c ← 'x'
-    sit ascii<8> d ← c
+    sit ascii<magnitudo 8> d ← c
     nota d
 }",
     );
@@ -119,7 +119,7 @@ fn ascii_hole_solved_to_one_widens_to_eight() {
 fn ascii_eight_accepts_char_literal() {
     test_support::assert_accepts_la(
         r"incipit {
-    sit ascii<8> c ← 'x'
+    sit ascii<magnitudo 8> c ← 'x'
     nota c
 }",
     );
@@ -174,7 +174,7 @@ fn harness_twins_unify_same_family() {
     let unified = checker.unify_assign_issue(src, dest, span, "expression_type_mismatch");
     assert!(
         checker.errors.is_empty(),
-        "textus<4> → textus<_> must unify: {:?}",
+        "textus<magnitudo 4> → textus<_> must unify: {:?}",
         checker.errors
     );
     let cap = match checker.types.get(unified) {
@@ -223,8 +223,8 @@ fn alias_uses_freshen_independently() {
 incipit {
     sit X a ← 'x'
     sit X b ← 'y'
-    sit ascii<1> c ← a
-    sit ascii<1> d ← b
+    sit ascii<magnitudo 1> c ← a
+    sit ascii<magnitudo 1> d ← b
     nota c
     nota d
 }",

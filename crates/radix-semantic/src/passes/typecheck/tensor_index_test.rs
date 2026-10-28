@@ -880,7 +880,7 @@ fn batched_matmul_argument_rank_above_receiver_rejects() {
 #[test]
 fn vector_bracket_index_yields_element_at_literal_width() {
     accepts(
-        r"functio lane(vector<f32, 3> v) → f32 {
+        r"functio lane(vector<f32, magnitudo 3> v) → f32 {
     redde v[2]
 }",
     );
@@ -889,12 +889,12 @@ fn vector_bracket_index_yields_element_at_literal_width() {
 #[test]
 fn vector_bracket_index_yields_element_at_parametric_width() {
     accepts(
-        r"functio lane<magnitudo N>(vector<f32, N> v) → f32 {
+        r"functio lane<magnitudo N>(vector<f32, magnitudo N> v) → f32 {
     redde v[0]
 }",
     );
     accepts(
-        r"functio lane<magnitudo N>(vector<f32, N> v, numerus i) → f32 {
+        r"functio lane<magnitudo N>(vector<f32, magnitudo N> v, numerus i) → f32 {
     redde v[i]
 }",
     );
@@ -903,7 +903,7 @@ fn vector_bracket_index_yields_element_at_parametric_width() {
 #[test]
 fn vector_bracket_index_requires_integer() {
     rejects_with_issue(
-        r"functio lane(vector<f32, 3> v, fractus i) → f32 {
+        r"functio lane(vector<f32, magnitudo 3> v, fractus i) → f32 {
     redde v[i]
 }",
         "array_index_must_be_numerus",
@@ -962,7 +962,7 @@ fn batched_masked_softmax_non_broadcast_mask_rejects() {
 fn vector_constant_lane_index_accepts_in_bounds() {
     accepts(
         r"incipit {
-  sit vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  sit vector<f32, magnitudo 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
   sit f32 a ← v[2]
   nota a
 }",
@@ -975,7 +975,7 @@ fn vector_constant_lane_index_rejects_provable_oob_and_negative() {
         rejects_with_issue(
             &format!(
                 r"incipit {{
-  sit vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  sit vector<f32, magnitudo 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
   nota v[{index}]
 }}"
             ),
@@ -987,7 +987,7 @@ fn vector_constant_lane_index_rejects_provable_oob_and_negative() {
 #[test]
 fn vector_runtime_lane_index_is_a_checked_lane_select() {
     accepts(
-        r"functio lane(vector<f32, 3> v, numerus i) → f32 {
+        r"functio lane(vector<f32, magnitudo 3> v, numerus i) → f32 {
   redde v[i]
 }",
     );

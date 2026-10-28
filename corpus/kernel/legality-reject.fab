@@ -74,6 +74,6 @@ fn launches_private() → f32 {
 @ kernel
 @ public
 fn names_its_lane(f32 x) → f32 {
-    let vector<u32, 3> gid ← global_invocation_id()
+    let vector<u32, size 3> gid ← global_invocation_id()
     return x
 }

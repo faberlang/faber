@@ -10,7 +10,7 @@ use radix_hir::HirItemKind;
 
 #[test]
 fn queue_and_stack_declarations_lower_to_distinct_kinds() {
-    let unit = analyze_ok("functio f(queue<numerus> q, stack<textus, 4> s) → vacuum {}");
+    let unit = analyze_ok("functio f(queue<numerus> q, stack<textus, magnitudo 4> s) → vacuum {}");
     let hir = unit.hir.as_ref().expect("HIR");
     let item = hir.items.first().expect("function item");
     let HirItemKind::Function(function) = &item.kind else {
@@ -62,25 +62,25 @@ functio stack_ops(varia stack<textus> s) → textus ∪ nihil {
 #[test]
 fn bounded_queue_and_stack_push_use_alternate_exit_but_pop_stays_nullable() {
     for source in [
-        r"functio queue_push(varia queue<numerus, 2> q) → vacuum {
-    varia queue<numerus, 2> values ← q
+        r"functio queue_push(varia queue<numerus, magnitudo 2> q) → vacuum {
+    varia queue<numerus, magnitudo 2> values ← q
     values.appende(1)
 }",
-        r#"functio stack_push(varia stack<textus, 2> s) → vacuum {
-    varia stack<textus, 2> values ← s
+        r#"functio stack_push(varia stack<textus, magnitudo 2> s) → vacuum {
+    varia stack<textus, magnitudo 2> values ← s
     values.appende("top")
 }"#,
     ] {
         assert_rejects_with_issue(source, "failable_call_requires_handler");
     }
     crate::test_support::assert_accepts(
-        r"functio queue_pop(varia queue<numerus, 2> q) → numerus ∪ nihil {
-    varia queue<numerus, 2> values ← q
+        r"functio queue_pop(varia queue<numerus, magnitudo 2> q) → numerus ∪ nihil {
+    varia queue<numerus, magnitudo 2> values ← q
     redde values.decapita()
 }
 
-functio stack_pop(varia stack<textus, 2> s) → textus ∪ nihil {
-    varia stack<textus, 2> values ← s
+functio stack_pop(varia stack<textus, magnitudo 2> s) → textus ∪ nihil {
+    varia stack<textus, magnitudo 2> values ← s
     redde values.detrahe()
 }",
     );
@@ -95,7 +95,7 @@ fn queue_and_stack_for_from_bind_elements_in_their_access_orders() {
     }
 }
 
-functio stack_iter(stack<textus, 2> s) → vacuum {
+functio stack_iter(stack<textus, magnitudo 2> s) → vacuum {
     itera ex s sit item {
         nota item
     }
@@ -106,11 +106,11 @@ functio stack_iter(stack<textus, 2> s) → vacuum {
 #[test]
 fn queue_and_stack_empty_pop_recover_with_coalesce_without_a_handler() {
     crate::test_support::assert_accepts(
-        r#"functio queue_recover(varia queue<numerus, 2> q) → numerus {
+        r#"functio queue_recover(varia queue<numerus, magnitudo 2> q) → numerus {
     redde q.decapita() vel 0
 }
 
-functio stack_recover(varia stack<textus, 2> s) → textus {
+functio stack_recover(varia stack<textus, magnitudo 2> s) → textus {
     redde s.detrahe() vel "empty"
 }"#,
     );
@@ -165,11 +165,11 @@ fn queue_stack_pair_multiply_and_divide_require_the_glyphs() {
             "queue_stack_divide_requires_glyph",
         ),
         (
-            "functio f(queue<numerus, 4> a, queue<numerus, 2> b) → queue<numerus, 2> { redde a * b }",
+            "functio f(queue<numerus, magnitudo 4> a, queue<numerus, magnitudo 2> b) → queue<numerus, magnitudo 2> { redde a * b }",
             "queue_stack_multiply_requires_glyph",
         ),
         (
-            "functio f(stack<numerus, 4> a, stack<numerus, 4> b) → stack<numerus, 4> { redde a / b }",
+            "functio f(stack<numerus, magnitudo 4> a, stack<numerus, magnitudo 4> b) → stack<numerus, magnitudo 4> { redde a / b }",
             "queue_stack_divide_requires_glyph",
         ),
     ] {
@@ -180,11 +180,11 @@ fn queue_stack_pair_multiply_and_divide_require_the_glyphs() {
 #[test]
 fn queue_stack_hadamard_keeps_kind_and_minimizes_bounded_capacity() {
     let unit = crate::test_support::analyze_ok(
-        r"functio queue_bounded(queue<numerus, 8> a, queue<numerus, 3> b) → queue<numerus, 3> {
+        r"functio queue_bounded(queue<numerus, magnitudo 8> a, queue<numerus, magnitudo 3> b) → queue<numerus, magnitudo 3> {
     redde a ⊙ b
 }
 
-functio stack_bounded(stack<numerus, 2> a, stack<numerus, 7> b) → stack<numerus, 2> {
+functio stack_bounded(stack<numerus, magnitudo 2> a, stack<numerus, magnitudo 7> b) → stack<numerus, magnitudo 2> {
     redde a ⊘ b
 }",
     );
@@ -230,11 +230,11 @@ fn queue_stack_hadamard_rejects_mixed_kinds_scalars_and_non_numeric_elements() {
 #[test]
 fn queue_stack_arithmetic_preserves_kind_and_minimizes_bounded_capacity() {
     let unit = crate::test_support::analyze_ok(
-        r"functio queue_bounded(queue<numerus, 8> a, queue<numerus, 3> b) → queue<numerus, 3> {
+        r"functio queue_bounded(queue<numerus, magnitudo 8> a, queue<numerus, magnitudo 3> b) → queue<numerus, magnitudo 3> {
     redde a + b
 }
 
-functio stack_bounded(stack<numerus, 2> a, stack<numerus, 7> b) → stack<numerus, 2> {
+functio stack_bounded(stack<numerus, magnitudo 2> a, stack<numerus, magnitudo 7> b) → stack<numerus, magnitudo 2> {
     redde a ⊙ b
 }",
     );

@@ -4,36 +4,44 @@ use crate::test_support;
 
 #[test]
 fn numerus_to_ascii_hex_accepts() {
-    test_support::assert_accepts_la("incipit { sit ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
+    test_support::assert_accepts_la(
+        "incipit { sit ascii<magnitudo 2> hex ← 255 ↦ ascii<magnitudo 2> via Hex }",
+    );
 }
 
 #[test]
 fn numerus_to_ascii_hex_pads() {
-    test_support::assert_accepts_la("incipit { sit ascii<8> hex ← 37 ↦ ascii<8> via Hex }");
+    test_support::assert_accepts_la(
+        "incipit { sit ascii<magnitudo 8> hex ← 37 ↦ ascii<magnitudo 8> via Hex }",
+    );
 }
 
 #[test]
 fn numerus_to_ascii_bin_accepts() {
-    test_support::assert_accepts_la("incipit { sit ascii<8> bits ← 255 ↦ ascii<8> via Bin }");
+    test_support::assert_accepts_la(
+        "incipit { sit ascii<magnitudo 8> bits ← 255 ↦ ascii<magnitudo 8> via Bin }",
+    );
 }
 
 #[test]
 fn numerus_to_ascii_oct_accepts() {
-    test_support::assert_accepts_la("incipit { sit ascii<3> oct ← 255 ↦ ascii<3> via Oct }");
+    test_support::assert_accepts_la(
+        "incipit { sit ascii<magnitudo 3> oct ← 255 ↦ ascii<magnitudo 3> via Oct }",
+    );
 }
 
 #[test]
 fn sized_unsigned_to_ascii_hex_accepts() {
     test_support::assert_accepts_la(
         "incipit { sit u8 n ← 255
-sit ascii<2> hex ← n ↦ ascii<2> via Hex }",
+sit ascii<magnitudo 2> hex ← n ↦ ascii<magnitudo 2> via Hex }",
     );
 }
 
 #[test]
 fn overflow_literal_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit _ hex ← 256 ↦ ascii<2> via Hex }",
+        "incipit { sit _ hex ← 256 ↦ ascii<magnitudo 2> via Hex }",
         "ascii_pack_width_overflow",
     );
 }
@@ -41,7 +49,7 @@ fn overflow_literal_rejects() {
 #[test]
 fn negative_literal_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit _ hex ← -1 ↦ ascii<2> via Hex }",
+        "incipit { sit _ hex ← -1 ↦ ascii<magnitudo 2> via Hex }",
         "ascii_pack_negative_source",
     );
 }
@@ -49,7 +57,7 @@ fn negative_literal_rejects() {
 #[test]
 fn float_source_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit { sit _ hex ← 1.5 ↦ ascii<2> via Hex }",
+        "incipit { sit _ hex ← 1.5 ↦ ascii<magnitudo 2> via Hex }",
         "unsupported_conversio",
     );
 }
@@ -90,6 +98,6 @@ fn runtime_source_hole_reports_unsolved_capacity() {
 #[test]
 fn runtime_source_overflow_is_not_a_type_error() {
     test_support::assert_accepts_la(
-        "functio pack(numerus n) → ascii<2> { redde n ↦ ascii<2> via Hex }",
+        "functio pack(numerus n) → ascii<magnitudo 2> { redde n ↦ ascii<magnitudo 2> via Hex }",
     );
 }

@@ -93,12 +93,12 @@ fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
     for source in [
         r#"incipit {
     sit textus raw ← "a"
-    sit textus<8> text ← raw ↦ textus<8>
+    sit textus<magnitudo 8> text ← raw ↦ textus<magnitudo 8>
     sit _ bad ← text[8]
     nota bad
 }"#,
         r"incipit {
-    sit ascii<8> text ← 'a'
+    sit ascii<magnitudo 8> text ← 'a'
     sit _ bad ← text[-1]
     nota bad
 }",

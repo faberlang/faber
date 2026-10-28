@@ -74,8 +74,8 @@ fn a_kernel_calling_an_imported_host_function_is_a_named_error() {
         error
             .args
             .iter()
-            .any(|arg| arg.name == "callee" && arg.value == "host_mul"),
-        "the diagnostic names the callee: {:?}",
+            .any(|arg| arg.name == "callee" && arg.value == "helper.host_mul"),
+        "the diagnostic names the qualified callee: {:?}",
         error.args
     );
     assert!(
@@ -84,6 +84,14 @@ fn a_kernel_calling_an_imported_host_function_is_a_named_error() {
             .iter()
             .any(|arg| arg.name == "issue" && arg.value == "nucleum_host_call"),
         "named issue: {:?}",
+        error.args
+    );
+    assert!(
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "reason" && arg.value == "not_a_kernel"),
+        "the imported contract says the callee is not a kernel: {:?}",
         error.args
     );
 }

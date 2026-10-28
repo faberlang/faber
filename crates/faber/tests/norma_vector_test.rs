@@ -3,9 +3,9 @@
 //! `lib/norma/src/vector.fab` exposes `add`/`subtract`/`multiply`/`divide`/
 //! `dot` over `<elem, size N>` and `cross` over a fixed width 3. On the
 //! interpreted `faber run` path the call-site witness binds `N` from the
-//! `vector<elem, N>` argument shape; package instantiation must defer the
+//! `vector<elem, size N>` argument shape; package instantiation must defer the
 //! not-yet-interned substituted type to the finalize pass, which interns
-//! `vector<elem, N>` and re-substitutes the site. Before that deferral every
+//! `vector<elem, size N>` and re-substitutes the site. Before that deferral every
 //! call failed validation with
 //! `PKG001:invalid_mir_instantiated_generic_type_is_missing_semantic_metadata`.
 
@@ -25,16 +25,16 @@ locale = "en"
 import from "norma:vector" vector
 
 main {
-    let vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    let vector<f32, 3> b ← [4.0, 5.0, 6.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
+    let vector<f32, size 3> b ← [4.0, 5.0, 6.0] ↦ vector<f32, size 3>
     print vector.add(a, b)
     print vector.subtract(b, a)
     print vector.multiply(a, b)
     print vector.divide(b, a)
     print vector.dot(a, b)
     print vector.cross(a, b)
-    let vector<int, 2> p ← [3, 4] ↦ vector<int, 2>
-    let vector<int, 2> q ← [1, 2] ↦ vector<int, 2>
+    let vector<int, size 2> p ← [3, 4] ↦ vector<int, size 2>
+    let vector<int, size 2> q ← [1, 2] ↦ vector<int, size 2>
     print vector.dot(p, q)
 }
 "#;

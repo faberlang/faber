@@ -101,6 +101,7 @@ axis = "अक्ष"
 lege = "पढ़ो"
 lineam = "पंक्ति"
 omnia = "सभी"
+machina = "उपकरण"
 scriptum = "लिखित"
 sparge = "फैलाओ"
 ut = "रूपमें"
@@ -199,7 +200,7 @@ instans = "क्षण"
 objectum = "वस्तु"
 quidlibet = "कुछभी"
 lista = "सूची"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "तालिका"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "बही"
@@ -725,6 +726,10 @@ help = "{replacement} उपयोग करें"
 message = "'{fac}' लूप में '{cape}' को '{dum}' से पहले आना चाहिए"
 help = "हैंडलर को शर्त से पहले लिखें: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "'{fac}' ब्लॉक एक ही संशोधक शब्द लेता है, '{omnia}' और '{machina}' साथ नहीं"
+help = "'{machina}' ब्लॉक के अंत में सभी दोष एक बार पहले ही सौंप देता है; '{omnia}' हटाएँ"
+
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "अब अल्पविराम '{discerne}' के विषयों को अलग नहीं करता"
 help = "विषयों को '{et}' से अलग करें"
@@ -799,7 +804,7 @@ help = "via के ठीक बाद संकेत का नाम लि�
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "रूपांतरण संकेत कोई प्रकार तर्क नहीं है"
-help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "रूपांतरण संकेत लक्ष्य के बाद कोणीय कोष्ठकों में नहीं आता"
@@ -1257,6 +1262,14 @@ help = "रेंज सूची पर लिखें, जैसे {lista}<i
 message = "सूची की गिनती `{magnitudo}` के बाद लिखी जाती है"
 help = "अधिकतम 4 तत्वों के लिए `{lista}<int, {magnitudo} 4>` लिखें, या रेंज के लिए `{lista}<int, {magnitudo} 1…8>`; केवल रेंज मान को सीमित करती है, गिनती को नहीं"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "क्षमता `{magnitudo}` के बाद लिखी जाती है"
+help = "इतनी अधिकतम क्षमता के लिए `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` या `{ascii}<{magnitudo} 8>` लिखें; केवल संख्या क्षमता नहीं है"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "सदिश की लेन गिनती `{magnitudo}` के बाद लिखी जाती है"
+help = "चार लेन के लिए `{vector}<f32, {magnitudo} 4>` लिखें; संक्षिप्त रूप `vf32[4]` अपरिवर्तित है"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -1283,11 +1296,11 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue को एक या दो type parameters चाहिए"
-help = "queue<T> या queue<T, N> का उपयोग करें"
+help = "queue<T> या queue<T, {magnitudo} N> का उपयोग करें"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack को एक या दो type parameters चाहिए"
-help = "stack<T> या stack<T, N> का उपयोग करें"
+help = "stack<T> या stack<T, {magnitudo} N> का उपयोग करें"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu के लिए pattern आवश्यक है"
@@ -1455,7 +1468,7 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type parameters स्वीकार नहीं कर सकता"
-help = "textus<N>, ascii<N>, और {lista}<b8, {magnitudo} N> shipped bounded forms हैं"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N>, और {lista}<b8, {magnitudo} N> shipped bounded forms हैं"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type namespace द्वारा export नहीं किया गया है"
@@ -1596,6 +1609,26 @@ help = "फ़्लोटिंग-पॉइंट कर्नेल मान
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "nucleum कर्नेल में चौड़ाई {width} का store trap कर सकता है"
 help = "सिद्ध करें कि store श्रेणी में है, या wrapping या saturating cell का उपयोग करें"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "'{fac} {machina}' क्षेत्र में दूसरा '{fac} {machina}' नहीं हो सकता"
+help = "एक ही डिवाइस क्षेत्र रखें और उससे सीधे kernel बुलाएँ"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' '{fac} {machina}' क्षेत्र से बाहर जाता है; क्षेत्र में अभी निकास शब्द नहीं है"
+help = "क्षेत्र समाप्त करके उसके बाद निर्णय लें, या निकास को ब्लॉक के बाहर ले जाएँ"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "'{fac} {machina}' क्षेत्र में सीधे lane लूप ('{construct}') अभी बना नहीं है"
+help = "समानांतर काम के लिए क्षेत्र से kernel बुलाएँ"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "'{fac} {machina}' क्षेत्र अभी tensor आवंटित नहीं कर सकता ({construct})"
+help = "tensor को क्षेत्र से पहले आवंटित करें और अंदर उपयोग करें"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{fac} {machina}' क्षेत्र में '{construct}' डिवाइस पर गणना किया मान पढ़ता है; डिवाइस-पक्ष लूप नियंत्रण अभी बना नहीं है"
+help = "शर्तें, सीमाएँ और स्केलर तर्क क्षेत्र से पहले ज्ञात मानों तक रखें, और डिवाइस परिणाम क्षेत्र के बाद पढ़ें"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "पूर्णांक चौड़ाई {width} समर्थित nucleum कर्नेल चौड़ाई से अधिक है"
@@ -2202,11 +2235,11 @@ message = "vector तत्व का प्रकार मेल नहीं 
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector के लिए तत्व प्रकार और चौड़ाई आवश्यक हैं; vector<T, N> का उपयोग करें"
+message = "vector के लिए तत्व प्रकार और चौड़ाई आवश्यक हैं; vector<T, आकार N> का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector के लिए चौड़ाई आवश्यक है; vector<T, 4> या vf32[4] का उपयोग करें"
+message = "vector के लिए चौड़ाई आवश्यक है; vector<T, आकार 4> या vf32[4] का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2448,6 +2481,10 @@ help = "स्पष्ट type argument सूची हटाएँ"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "numeric lista elements आवश्यक हैं"
 help = "इस lista intrinsic के लिए numeric elements का उपयोग करें"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` को सामान्य list रिसीवर चाहिए; bounded या length-ranged list अपनी जगह बढ़ नहीं सकती"
+help = "unbounded list में extend करें, या `append` से एक-एक element जोड़ें"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "कुंजी वाली `.क्रमबद्ध(कुंजी)` विधि हटा दी गई है; क्रमबद्ध करने वाले व्यंजक का उपयोग करें"
@@ -2808,6 +2845,10 @@ help = "chorda या स्पष्ट byte conversion helpers का उप�
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "{lista}<b8> से fractus में रूपांतरण निर्दिष्ट नहीं है (IEEE width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
+
+[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+message = "रिकॉर्ड tensor अपने bytes को रिकॉर्ड के little-endian लेआउट में पढ़ता है; `via Le` लिखें, `via Be` नहीं"
+help = "{lista}<b8> ↦ tensor<Record, [n]> via Le लिखें; रिकॉर्ड तत्व का एक ही byte क्रम होता है, जो उसके लेआउट से तय होता है"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3677,6 +3718,7 @@ argminima = "argmin"
 continet = "शामिल"
 cumulata = "संचयी"
 decapita = "पहला_हटाओ"
+extende = "पीछे_मिलाओ"
 filtrata = "छानो"
 immerge = "डुबो"
 inversa = "व्युत्क्रम"

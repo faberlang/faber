@@ -49,8 +49,35 @@ impl super::FaberCodegen<'_> {
         }
     }
 
-    /// A list count spelled after the `size` marker: `size 4` for the maximum
-    /// length. The `_` hole stays bare (its own need moves it).
+    /// A vector lane count in the long form `vector<T, size N>`. The `_` hole
+    /// stays bare, a run-time count already carries its own `size` lift, and
+    /// any other term takes the marker (parenthesized when it is not a single
+    /// literal or name).
+    pub(super) fn vector_width_to_faber(
+        &self,
+        width: IndexId,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        match self.types.get_index(width) {
+            IndexExpr::Infer(_) | IndexExpr::Unspecified => "_".to_owned(),
+            IndexExpr::Tuple(_) => self.format_figura(width, surface),
+            _ if self.index_has_runtime(width) => self.format_figura(width, surface),
+            IndexExpr::Literal(_) | IndexExpr::Param(_) => format!(
+                "{} {}",
+                surface.keyword(TokenKind::Magnitudo),
+                self.format_figura_term(width, surface)
+            ),
+            _ => format!(
+                "{} ({})",
+                surface.keyword(TokenKind::Magnitudo),
+                self.format_figura_term(width, surface)
+            ),
+        }
+    }
+
+    /// A bounded head's count spelled after the `size` marker: `size 4` for the
+    /// maximum length of a list, queue, stack or string. The `_` hole stays
+    /// bare (its own need moves it).
     pub(super) fn list_count_to_faber(
         &self,
         capacity: IndexId,

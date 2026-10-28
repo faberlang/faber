@@ -101,6 +101,7 @@ axis = "محور"
 lege = "اقرأ"
 lineam = "سطرا"
 omnia = "الكل"
+machina = "جهاز"
 scriptum = "حرر"
 sparge = "انشر"
 ut = "كـ"
@@ -199,7 +200,7 @@ instans = "لحظة"
 objectum = "كائن"
 quidlibet = "مهما"
 lista = "قائمة"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "جدول"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "دفتر"
@@ -725,6 +726,10 @@ help = "استخدم {replacement}"
 message = "يجب أن يأتي '{cape}' قبل '{dum}' في حلقة '{fac}'"
 help = "اكتب المعالج قبل الشرط: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "تقبل كتلة '{fac}' كلمة تعديل واحدة، لا '{omnia}' و'{machina}' معا"
+help = "'{machina}' يسلّم كل الأخطاء مرة واحدة عند نهاية الكتلة؛ احذف '{omnia}'"
+
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "لم تعد الفاصلة تفصل بين موضوعات '{discerne}'"
 help = "افصل بين الموضوعات بـ '{et}'"
@@ -799,7 +804,7 @@ help = "سمِّ التلميح مباشرة بعد via، مثل `x ↦ u32 via 
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "تلميح التحويل ليس معامل نوع"
-help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`، `ascii<8> via Hex`، `littera via Code`"
+help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`، `ascii<{magnitudo} 8> via Hex`، `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "تلميح التحويل لا يتبع الهدف بين قوسين زاويين"
@@ -1245,6 +1250,14 @@ help = "اكتب النطاق على القائمة، مثل {lista}<int, {magni
 message = "يُكتب عدد عناصر القائمة بعد `{magnitudo}`"
 help = "اكتب `{lista}<int, {magnitudo} 4>` لأربعة عناصر على الأكثر، أو `{lista}<int, {magnitudo} 1…8>` لنطاق؛ النطاق المجرد يحدّ قيمة لا عددًا"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "تُكتب السعة بعد `{magnitudo}`"
+help = "اكتب `{queue}<int, {magnitudo} 4>` أو `{stack}<int, {magnitudo} 4>` أو `{textus}<{magnitudo} 8>` أو `{ascii}<{magnitudo} 8>` لسعة بهذا القدر على الأكثر؛ الرقم المجرد ليس سعة"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "يُكتب عدد مسارات المتجه بعد `{magnitudo}`"
+help = "اكتب `{vector}<f32, {magnitudo} 4>` لأربعة مسارات؛ الصيغة المختصرة `vf32[4]` لا تتغير"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
 help = "أصلح بنية AST للتخفيض"
@@ -1271,11 +1284,11 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue يتطلب معامل نوع واحدا أو اثنين"
-help = "استخدم queue<T> أو queue<T, N>"
+help = "استخدم queue<T> أو queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack يتطلب معامل نوع واحدا أو اثنين"
-help = "استخدم stack<T> أو stack<T, N>"
+help = "استخدم stack<T> أو stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "{discerne} {casu} يتطلب نمطا"
@@ -1443,7 +1456,7 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type لا يقبل parameters"
-help = "textus<N> و ascii<N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
+help = "textus<{magnitudo} N> و ascii<{magnitudo} N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace لا يصدر qualified type"
@@ -1584,6 +1597,26 @@ help = "استخدم f32 لقيم النواة العائمة"
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "التخزين بعرض {width} قد يسبب فخا داخل نواة nucleum"
 help = "أثبت أن التخزين ضمن المدى أو استخدم خلية wrapping أو saturating"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "لا يجوز أن تحتوي منطقة '{fac} {machina}' على '{fac} {machina}' أخرى"
+help = "أبقِ منطقة جهاز واحدة واستدعِ kernel منها مباشرة"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' يغادر منطقة '{fac} {machina}'؛ لا توجد للمنطقة كلمة خروج بعد"
+help = "أنهِ المنطقة ثم قرر بعدها، أو انقل الخروج خارج الكتلة"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "حلقة lane ('{construct}') مباشرة في منطقة '{fac} {machina}' لم تُبنَ بعد"
+help = "استدعِ kernel من المنطقة للعمل المتوازي"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "لا تستطيع منطقة '{fac} {machina}' تخصيص tensor بعد ({construct})"
+help = "خصص الـ tensor قبل المنطقة واستخدمه داخلها"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' في منطقة '{fac} {machina}' يقرأ قيمة حُسبت على الجهاز؛ التحكم بالحلقات على الجهاز لم يُبنَ بعد"
+help = "اجعل الشروط والحدود والوسائط العددية من قيم معروفة قبل المنطقة، واقرأ نتائج الجهاز بعدها"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "عرض العدد الصحيح {width} يتجاوز عرض نواة nucleum المدعوم"
@@ -2190,11 +2223,11 @@ message = "عدم تطابق في vector element type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector يتطلب element type و width؛ استخدم vector<T, N>"
+message = "vector يتطلب element type و width؛ استخدم vector<T, حجم N>"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector يتطلب width؛ استخدم vector<T, 4> أو vf32[4]"
+message = "vector يتطلب width؛ استخدم vector<T, حجم 4> أو vf32[4]"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2436,6 +2469,10 @@ help = "أزل قائمة type argument الصريحة"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "numeric {lista} elements مطلوبة"
 help = "استخدم numeric elements لـ {lista} intrinsic هذا"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "يتطلب `extend` مستقبلًا من نوع list عادية؛ لا يمكن لقائمة محدودة أو محددة الطول أن تنمو في مكانها"
+help = "مدّد قائمة غير محدودة، أو ألحق عنصرًا واحدًا في كل مرة باستخدام `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "تمت إزالة الطريقة `.مرتب(مفتاح)` ذات المفتاح؛ استخدم تعبير الفرز"
@@ -2796,6 +2833,10 @@ help = "استخدم chorda أو explicit byte conversion helpers"
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "conversion من {lista}<b8> إلى {fractus} غير محدد (IEEE width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
 help = "استخدم chorda أو explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+message = "يقرأ tensor السجلات بياناته وفق تخطيط السجل little-endian؛ اكتب `via Le` وليس `via Be`"
+help = "اكتب {lista}<b8> ↦ tensor<Record, [n]> via Le؛ لعنصر السجل ترتيب بايتات واحد يحدده تخطيطه"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3809,6 +3850,7 @@ argminima = "فهرس_الأصغر"
 continet = "يحتوي"
 cumulata = "تراكمي"
 decapita = "احذف_الأول"
+extende = "ألحق_الكل"
 filtrata = "رشح"
 immerge = "اغمر"
 inversa = "معكوس"

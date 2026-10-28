@@ -7,8 +7,10 @@
 
 use flate2::read::GzDecoder;
 use radix::module::locale::{LocalePack, LocalePackLoadError};
+use std::collections::HashMap;
 use std::fmt;
 use std::io::Read;
+use std::sync::{Mutex, OnceLock, PoisonError};
 
 /// Locale ids with an embedded pack. Order matches the authoring tree.
 pub(crate) const EMBEDDED_LOCALE_IDS: &[&str] =
@@ -99,12 +101,32 @@ pub(crate) fn decompress_gzip(gzip: &[u8]) -> Result<Vec<u8>, std::io::Error> {
     Ok(out)
 }
 
-/// Decompress and parse the embedded pack for `locale`.
+/// Decompress and parse the embedded pack for `locale`, once per process.
 ///
 /// Only that locale's gzip blob is decoded. Other embedded packs stay
 /// compressed. The loader does not consult `share/`, an install prefix, or a
-/// sibling checkout.
+/// sibling checkout. A successful parse is cached per locale; failures are
+/// not cached.
 pub(crate) fn load_embedded_locale_pack(locale: &str) -> Result<LocalePack, EmbeddedLocaleError> {
+    static CACHE: OnceLock<Mutex<HashMap<String, LocalePack>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(Mutex::default);
+    if let Some(pack) = cache
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get(locale)
+    {
+        return Ok(pack.clone());
+    }
+    let pack = parse_embedded_locale_pack(locale)?;
+    cache
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .insert(locale.to_owned(), pack.clone());
+    Ok(pack)
+}
+
+/// Decompress and parse the embedded pack for `locale`, uncached.
+fn parse_embedded_locale_pack(locale: &str) -> Result<LocalePack, EmbeddedLocaleError> {
     let gzip = compressed_pack_bytes(locale)
         .ok_or_else(|| EmbeddedLocaleError::UnknownLocale(locale.to_owned()))?;
     let bytes = decompress_gzip(gzip).map_err(EmbeddedLocaleError::Decompress)?;

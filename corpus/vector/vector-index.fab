@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `v[k]` on a `vector<T, N>` is one lane of the register value, typed as
+#   • `v[k]` on a `vector<T, size N>` is one lane of the register value, typed as
 #     the element `T` (f32 and i32 alike), with `k` a constant below `N`.
 #   • After a null assertion the same form reads a lane: `hit![0]`.
 #   • A lane read is a value, so a sum over lanes needs no loop.
@@ -31,22 +31,22 @@ locale = "en"
 #   vector-index.expected
 # =============================================================================
 
-fn normal(int code) → vector<f32, 3> ∪ none {
-    if code ≡ 1 then return [-1.0, 0.0, 0.5] ↦ vector<f32, 3>
+fn normal(int code) → vector<f32, size 3> ∪ none {
+    if code ≡ 1 then return [-1.0, 0.0, 0.5] ↦ vector<f32, size 3>
     return null
 }
 
 main {
-    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    let vector<i32, 4> w ← [10, 20, 30, 40] ↦ vector<i32, 4>
+    let vector<f32, size 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
+    let vector<i32, size 4> w ← [10, 20, 30, 40] ↦ vector<i32, size 4>
     print v[1]
     let f32 a ← v[2]
     print a
     print w[3]
-    let vector<f32, 3> ∪ none hit ← normal(1)
+    let vector<f32, size 3> ∪ none hit ← normal(1)
     print hit![2]
     print v[0] + v[1] + v[2]
-    mut vector<f32, 3> u ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    mut vector<f32, size 3> u ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
     u[1] ← 9.0
     print u
 }

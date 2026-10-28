@@ -1954,10 +1954,16 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
     let lista = types.array(numerus);
     let octeti8 = types.bounded_octeti(n8);
 
-    assert!(!types.equals(ascii8, ascii), "ascii<8> ≠ ascii");
-    assert!(!types.equals(ascii8, ascii9), "ascii<8> ≠ ascii<9>");
-    assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<64>");
-    assert!(!types.equals(textus4, textus), "textus<4> ≠ textus");
+    assert!(!types.equals(ascii8, ascii), "ascii<magnitudo 8> ≠ ascii");
+    assert!(
+        !types.equals(ascii8, ascii9),
+        "ascii<magnitudo 8> ≠ ascii<magnitudo 9>"
+    );
+    assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<magnitudo 64>");
+    assert!(
+        !types.equals(textus4, textus),
+        "textus<magnitudo 4> ≠ textus"
+    );
     assert!(
         !types.equals(lista8, lista),
         "lista<numerus, magnitudo 8> ≠ lista<numerus>"
@@ -2044,14 +2050,20 @@ fn bounded_ascii_one_assigns_to_textus_like_bare_ascii() {
     assert!(types.is_assignable(ascii, textus), "bare ascii → textus");
     assert!(
         types.is_assignable(ascii1, textus),
-        "ascii<1> → textus (D17 payload widening)"
+        "ascii<magnitudo 1> → textus (D17 payload widening)"
     );
     assert!(
         !types.is_assignable(ascii8, textus),
-        "ascii<8> reaches textus via ↦ conversio, not implicit widening"
+        "ascii<magnitudo 8> reaches textus via ↦ conversio, not implicit widening"
     );
-    assert!(!types.is_assignable(textus, ascii1), "textus ↛ ascii<1>");
-    assert!(types.is_assignable(ascii1, ascii), "ascii<1> → ascii (D17)");
+    assert!(
+        !types.is_assignable(textus, ascii1),
+        "textus ↛ ascii<magnitudo 1>"
+    );
+    assert!(
+        types.is_assignable(ascii1, ascii),
+        "ascii<magnitudo 1> → ascii (D17)"
+    );
 }
 
 #[test]

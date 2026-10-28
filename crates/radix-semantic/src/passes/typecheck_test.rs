@@ -1362,7 +1362,7 @@ fn rejects_unknown_tensor_method_at_typecheck() {
 #[test]
 fn rejects_unknown_vector_method_at_typecheck() {
     test_support::assert_rejects_with_issue(
-        "functio probe(vector<f32, 2> x) → vector<f32, 2> { redde x.silu() }",
+        "functio probe(vector<f32, magnitudo 2> x) → vector<f32, magnitudo 2> { redde x.silu() }",
         "unknown_method",
     );
 }
@@ -2511,7 +2511,7 @@ fn typed_zero_accepts_every_register_and_tensor_spelling() {
         r"
 incipit {
     sit vf32[4] short_vector ← vf32[4] {}
-    sit vector<f32, 4> long_vector ← vector<f32, 4> {}
+    sit vector<f32, magnitudo 4> long_vector ← vector<f32, magnitudo 4> {}
     sit mf32[2, 2] short_matrix ← mf32[2, 2] {}
     sit matrix<f32, [2, 2]> long_matrix ← matrix<f32, [2, 2]> {}
     sit tf32[2, 3] short_tensor ← tf32[2, 3] {}

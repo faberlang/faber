@@ -3,7 +3,7 @@
 //! `faber targets` reports **capability truth** for the compiled build
 //! (DDPP1-U3): every row's `available` flag and build/run/package claims
 //! reflect what this faber binary was actually compiled with — capability
-//! truth, not a shipping promise (§SelectionPolicy).
+//! truth, not a shipping promise (§`SelectionPolicy`).
 //!
 //! Row-set policy (decision #6): emit-target rows always list with honest
 //! per-row availability; device/host-leaf/device-runtime capability rows are
@@ -39,7 +39,7 @@ struct FaberTargetRowSpec {
 /// The only literal rows left are documented overrides:
 ///
 /// - the fmir family's shared feature gate ([`faber_row_feature`]); and
-/// - MirWasm's compatibility alias row (`wasm`): the CLI keeps two live
+/// - `MirWasm`'s compatibility alias row (`wasm`): the CLI keeps two live
 ///   spellings — primary `wasm-text` and the `wasm` alias — so the report
 ///   carries both rows with identical capability truth (goal Open question 4
 ///   ruling: the double row may stay explicit).

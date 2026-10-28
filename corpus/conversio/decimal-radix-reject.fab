@@ -21,7 +21,7 @@ locale = "en"
 #     parse is refused by name (SEM016 decimal_radix_hint_rejected) instead of
 #     falling through to a generic type mismatch.
 #   • The same issue covers the reverse direction: a decimal source packed
-#     into `ascii<N> via Hex` is refused for the same reason.
+#     into `ascii<size N> via Hex` is refused for the same reason.
 #
 # How to make it legal:
 #   • an integer with a radix:   "ff" ↦ i32 via Hex
