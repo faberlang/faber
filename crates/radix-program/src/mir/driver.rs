@@ -366,6 +366,19 @@ fn prepare_package_mir<R>(
     {
         return Err(package.diagnostics);
     }
+    // The package may arrive in the neutral FHIR form: analyzed under the
+    // implicit portable target of a manifest, or loaded from artifacts. MIR
+    // lowering needs literals, so qualify it for a MIR target first (the
+    // runner when the analysis target is the neutral one). A package analyzed
+    // for a MIR target is unchanged by this.
+    let qualify_config = if radix_module::driver::keeps_authored_form(config.target) {
+        config
+            .clone()
+            .with_target(radix_module::codegen::Target::MirStepper)
+    } else {
+        config.clone()
+    };
+    crate::qualify::qualify_program(&mut package, &qualify_config)?;
     let cli_plan = plan_cli_package(&mut package, argumenta, cli_mode)?;
     let library_resolver = package.library_resolver.clone();
     let mut library_cache = library_cache_for_preparation(config, seams, analysis_library_cache);
