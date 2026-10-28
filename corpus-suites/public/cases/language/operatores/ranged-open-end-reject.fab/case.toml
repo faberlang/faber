@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/operatores/ranged-open-end-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/ranged-open-end-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "range_bound_required"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "range_bound_required"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "range_bound_required"

@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/ranged-trapping.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/ranged-trapping.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

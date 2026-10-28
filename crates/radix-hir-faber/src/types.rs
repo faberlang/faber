@@ -220,6 +220,13 @@ impl super::FaberCodegen<'_> {
                 width.faber_marker()
             ),
 
+            Type::RangedInt {
+                policy,
+                width,
+                lo,
+                hi,
+            } => Self::ranged_int_to_faber(*policy, *width, *lo, *hi, surface),
+
             Type::PolicyFloat(policy, width) => format!(
                 "{}<{}>",
                 surface.type_surface(policy_word_binding(*policy)),
@@ -540,6 +547,17 @@ impl super::FaberCodegen<'_> {
                     width.faber_marker()
                 ))
             }
+            Type::RangedInt {
+                policy,
+                width,
+                lo,
+                hi,
+            } => {
+                Self::expect_no_form_args(form)?;
+                Ok(Self::ranged_int_to_faber(
+                    *policy, *width, *lo, *hi, surface,
+                ))
+            }
             _ => Err(malformed_type_form(
                 "authored POLICY level is illegal for this constructor".to_owned(),
             )),
@@ -717,6 +735,17 @@ impl super::FaberCodegen<'_> {
                     "{}<{}>",
                     surface.type_surface(policy_word_binding(*policy)),
                     width.faber_marker()
+                ))
+            }
+            Type::RangedInt {
+                policy,
+                width,
+                lo,
+                hi,
+            } => {
+                Self::expect_no_form_args(form)?;
+                Ok(Self::ranged_int_to_faber(
+                    *policy, *width, *lo, *hi, surface,
                 ))
             }
             Type::BoundedTextus { capacity } => {
@@ -1149,6 +1178,32 @@ impl super::FaberCodegen<'_> {
             surface.type_surface(TypeBindingKind::Primitive(prim)),
             self.format_figura(capacity, surface)
         )
+    }
+
+    /// A ranged store policy spelled through the target surface:
+    /// `saturating<u32, 0‥8>`. The range prints half-open (`lo‥hi+1`), the
+    /// form the design writes; a range whose exclusive end would not fit a
+    /// literal (`…` up to `u64::MAX`) prints inclusive.
+    fn ranged_int_to_faber(
+        policy: radix_types::IntPolicy,
+        width: radix_types::NumericWidth,
+        lo: i128,
+        hi: i128,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        let word = match policy {
+            radix_types::IntPolicy::Trapping => surface.type_surface(TypeBindingKind::TrappingWord),
+            radix_types::IntPolicy::Wrapping => surface.contextual_keyword("modulus"),
+            radix_types::IntPolicy::Saturating => {
+                surface.type_surface(TypeBindingKind::SaturatingWord)
+            }
+        };
+        let range = if hi < i128::from(u64::MAX) {
+            format!("{lo}‥{}", hi + 1)
+        } else {
+            format!("{lo}…{hi}")
+        };
+        format!("{word}<{}, {range}>", width.faber_marker())
     }
 
     fn expect_no_form_args(form: &HirTypeForm) -> Result<(), CodegenError> {

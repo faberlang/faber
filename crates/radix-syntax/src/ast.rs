@@ -1812,6 +1812,49 @@ pub enum GenericArgExpr {
     Type(TypeExpr),
     Size(FiguraExpr),
     Name(Ident),
+    /// A range after the width of a store policy (`saturating<u32, 0‥8>`): the
+    /// refinement the store applies inside the explicit width. It is its own
+    /// slot, not a type or a size, so `0‥W` stays unambiguous beside both.
+    Range(RangeArgExpr),
+}
+
+/// The range argument of a ranged store policy (`lo‥hi` or `lo…hi`).
+///
+/// Both ends are always written. `∞` and `-∞` mean no bound on that side.
+#[derive(Debug, Clone)]
+pub struct RangeArgExpr {
+    pub lo: RangeBoundExpr,
+    pub hi: RangeBoundExpr,
+    pub kind: RangeKind,
+    pub span: Span,
+}
+
+/// One written end of a [`RangeArgExpr`].
+#[derive(Debug, Clone)]
+pub enum RangeBoundExpr {
+    /// Integer literal, optionally negated: `8`, `-2`.
+    Literal { value: i128, span: Span },
+    /// `∞` or `-∞`: no bound on this side.
+    Unbounded { negative: bool, span: Span },
+    /// A name (`W`), optionally spelled as a size lift (`size W`). A size
+    /// bound is not a compile-time integer, so the checker refuses it by name.
+    Name {
+        name: Ident,
+        lifted: bool,
+        span: Span,
+    },
+}
+
+impl RangeBoundExpr {
+    /// Source span of the written bound.
+    #[must_use]
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Literal { span, .. } | Self::Unbounded { span, .. } | Self::Name { span, .. } => {
+                *span
+            }
+        }
+    }
 }
 
 /// Authored compression level of one type-expr node.

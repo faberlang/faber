@@ -241,6 +241,21 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             Type::SaturatingWord(width) => {
                 self.convert_to_saturating_word(value, source_ty, *width, params, recovery, span)
             }
+            Type::RangedInt {
+                policy,
+                width,
+                lo,
+                hi,
+            } => self.convert_to_ranged_int(
+                value,
+                source_ty,
+                *policy,
+                *width,
+                (*lo, *hi),
+                params,
+                recovery,
+                span,
+            ),
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
                 let width = match &target {
                     Type::SizedNumeric(_, width) => *width,

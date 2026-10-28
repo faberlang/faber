@@ -576,6 +576,65 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         Ok(saturating_word_result(exact, width))
     }
 
+    /// `↦ policy<W, lo‥hi>`: a `wrapping` cell reduces the exact
+    /// source value into the range and a `saturating` cell clamps it, so neither
+    /// fails; a `trapping` cell is the checked narrowing into the width first,
+    /// then a range check, and an authored `⊥` recovers either failure.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn convert_to_ranged_int(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
+        policy: radix_types::IntPolicy,
+        width: NumericWidth,
+        range: (i128, i128),
+        params: &[Symbol],
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        use radix_types::IntPolicy;
+        let (lo, hi) = range;
+        if policy == IntPolicy::Trapping {
+            let converted =
+                match self.convert_to_numerus_from(value, source_ty, params, width, None, span) {
+                    Ok(converted) => converted,
+                    Err(error) if error.is_conversion_failure() => {
+                        return self.recover_or_fail(recovery, span, &error.message);
+                    }
+                    Err(error) => return Err(error),
+                };
+            return match crate::exact_int::int_value(&converted) {
+                Some(exact) if (lo..=hi).contains(&exact) => Ok(converted),
+                _ => self.recover_or_fail(
+                    recovery,
+                    span,
+                    "numerus to numerus conversion out of range",
+                ),
+            };
+        }
+        if let Value::Magnus(big) = &value {
+            return Ok(match policy {
+                IntPolicy::Wrapping => crate::store::ranged_big_wrap(big, width, lo, hi),
+                _ => crate::store::ranged_big_clamp(big, width, lo, hi),
+            });
+        }
+        if self.float_fails_rounding(&value, params) {
+            return self.recover_or_fail(
+                recovery,
+                span,
+                "fractus to numerus conversion out of range",
+            );
+        }
+        let exact = self.policy_word_source_value(value, source_ty, params, span)?;
+        Ok(crate::store::ranged_carrier(
+            match policy {
+                IntPolicy::Wrapping => crate::store::ranged_wrap(exact, lo, hi),
+                _ => exact.clamp(lo, hi),
+            },
+            width,
+        ))
+    }
+
     /// `↦ trapping<W>` and `↦ saturating<W>` (D1, D2, D3). The conversion is
     /// the one into the bare float of width `W`, with every row of it (`inf`
     /// beyond the finite range gives ±infinity, text parses, integers widen).

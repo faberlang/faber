@@ -547,7 +547,10 @@ fn portable_tensor_edge_type_identity(
                 .collect::<Option<Vec<_>>>()?,
         ),
         Type::Record(fields) => portable_tensor_edge_record_identity(types, interner, fields)?,
-        Type::BoundedArray { .. }
+        // A ranged cell has no portable tensor-edge identity (tensor edges
+        // over ranges are need 5 of the ranged-policy series).
+        Type::RangedInt { .. }
+        | Type::BoundedArray { .. }
         | Type::Queue(_)
         | Type::BoundedQueue { .. }
         | Type::Stack(_)
@@ -3606,7 +3609,10 @@ impl<'a> FunctionBuilder<'a> {
             // Every integer slot takes the node: at the cap the exact successor
             // (`i64::MAX + 1`) is a value the carrier holds, so only the store
             // check keeps it out of an `i64` slot (ruling 17).
-            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::Primitive(Primitive::Numerus) => true,
+            Type::ModularWord(_)
+            | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
+            | Type::Primitive(Primitive::Numerus) => true,
             // Deliberate: a store into `inf` is total (nothing to fit), so it
             // takes no store node; `integer_range()` is `None` for `inf`.
             Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some(),
@@ -3996,6 +4002,7 @@ impl<'a> FunctionBuilder<'a> {
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
                 | Type::ModularWord(NumericWidth::U64)
                 | Type::SaturatingWord(NumericWidth::U64)
+                | Type::RangedInt { width: NumericWidth::U64, .. }
                 // A raw-bits cell always holds the zero-extended unsigned
                 // pattern.
                 | Type::Bits(_) => return true,
@@ -4507,6 +4514,7 @@ impl<'a> FunctionBuilder<'a> {
                     | Type::SizedNumeric(Primitive::Numerus, _)
                     | Type::ModularWord(_)
                     | Type::SaturatingWord(_)
+                    | Type::RangedInt { .. }
             ) && !matches!(
                 this.normalized_type(semantic),
                 Type::SizedNumeric(_, width) if width.is_decimal()

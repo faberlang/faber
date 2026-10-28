@@ -129,6 +129,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
         Type::SizedNumeric(_, _)
         | Type::ModularWord(_)
         | Type::Bits(_)
+        | Type::RangedInt { .. }
         | Type::SaturatingWord(_) => Bucket::Physical,
         // MLC-4: `sparsa` with a scalar element and resolvable figura rank
         // resolves a sparse-marker `DeviceView` row.
@@ -181,8 +182,8 @@ fn intended_bucket(ty: &Type) -> Bucket {
     }
 }
 
-/// One representative `Type` per census row (52 rows: 15 Primitive-expanded
-/// variants + 37 other variants; `Alias` excluded). Nested ids are interned
+/// One representative `Type` per census row (53 rows: 15 Primitive-expanded
+/// variants + 38 other variants; `Alias` excluded). Nested ids are interned
 /// into `types` so the rows are resolvable.
 fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     let int64_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
@@ -211,6 +212,13 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::SizedNumeric(Primitive::Numerus, NumericWidth::I64));
     rows.push(Type::ModularWord(NumericWidth::U32));
     rows.push(Type::SaturatingWord(NumericWidth::I16));
+    // Need: a ranged cell lays out as its width.
+    rows.push(Type::RangedInt {
+        policy: radix_types::IntPolicy::Saturating,
+        width: NumericWidth::U32,
+        lo: 0,
+        hi: 7,
+    });
     rows.push(Type::Tensor(float64_ty, tensor_shape));
     rows.push(Type::Vector(float64_ty, vector_width));
     rows.push(Type::Matrix(float64_ty, matrix_shape));
@@ -296,14 +304,14 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     ));
     assert_eq!(
         rows.len(),
-        52,
-        "the census has 52 Primitive-expanded rows including the type-only policy marker"
+        53,
+        "the census has 53 Primitive-expanded rows including the type-only policy marker"
     );
     rows
 }
 
 #[test]
-fn pin_table_census_is_52_rows_across_the_four_buckets() {
+fn pin_table_census_is_53_rows_across_the_four_buckets() {
     let mut types = TypeTable::new();
     let rows = census_rows(&mut types);
 
@@ -320,8 +328,8 @@ fn pin_table_census_is_52_rows_across_the_four_buckets() {
         }
     }
     assert_eq!(
-        physical, 19,
-        "physical census rows (MLC-4: +1 sparsa; D11.1: +1 saturatus)"
+        physical, 20,
+        "physical census rows (MLC-4: +1 sparsa; D11.1: +1 saturatus; d5d00916: +1 ranged integer)"
     );
     assert_eq!(aggregate, 6, "opaque-aggregate census rows");
     assert_eq!(

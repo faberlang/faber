@@ -257,6 +257,7 @@ impl TypeChecker<'_> {
                 | Type::SizedNumeric(Primitive::Numerus, _)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::RangedInt { .. }
         )
     }
 
@@ -576,6 +577,15 @@ impl TypeChecker<'_> {
                 let literal_ty = self
                     .expected_numerus_literal_type(expected)
                     .unwrap_or_else(|| self.numerus_type());
+                // A literal takes a ranged cell's type only when it lies in the
+                // range; otherwise it is the cell's width, and the store that
+                // receives it applies the range.
+                let literal_ty = match self.types.ranged_int_parts(literal_ty) {
+                    Some((_, _, lo, hi)) if !(lo..=hi).contains(&i128::from(*value)) => {
+                        self.types.ranged_int_base_existing(literal_ty)
+                    }
+                    _ => literal_ty,
+                };
                 if let Type::ModularWord(width) = self.types.get(literal_ty) {
                     // Literal range follows the declared width: 0..=2^W-1
                     // (unsigned) or 0..=2^(W-1)-1 (signed; a negative literal
@@ -749,7 +759,8 @@ impl TypeChecker<'_> {
         match self.types.get(expected) {
             Type::Primitive(Primitive::Numerus)
             | Type::ModularWord(_)
-            | Type::SaturatingWord(_) => Some(expected),
+            | Type::SaturatingWord(_)
+            | Type::RangedInt { .. } => Some(expected),
             Type::SizedNumeric(Primitive::Numerus, width) if !width.is_decimal() => Some(expected),
             _ => None,
         }

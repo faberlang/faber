@@ -102,6 +102,8 @@ pub(super) struct IntSlot {
     pub(super) family: IntFamily,
     width: NumericWidth,
     range: IntRange,
+    /// The slot is a ranged cell (`policy<W, lo‥hi>`) narrower than its width.
+    pub(super) ranged: bool,
 }
 
 impl IntSlot {
@@ -112,6 +114,14 @@ impl IntSlot {
     /// Spelling used in diagnostics, `u8` or `saturating<u8>`.
     fn spelling(self) -> String {
         let width = format!("{:?}", self.width).to_lowercase();
+        if self.ranged {
+            let word = match self.family {
+                IntFamily::Modular => "wrapping",
+                IntFamily::Saturating => "saturating",
+                IntFamily::Plain | IntFamily::Policy(_) => "trapping",
+            };
+            return format!("{word}<{width}, {}…{}>", self.range.0, self.range.1);
+        }
         match self.family {
             IntFamily::Plain => width,
             IntFamily::Modular => format!("wrapping<{width}>"),
@@ -430,7 +440,9 @@ impl TypeChecker<'_> {
         if let Some((word, slot)) = expr.ty.and_then(|ty| self.store_int_slot(ty))
             && matches!(slot.family, IntFamily::Saturating | IntFamily::Modular)
         {
-            return Some(word);
+            // A ranged cell computes as its width: the word is the plain
+            // `saturating<W>` or `wrapping<W>` it refines, whatever the range.
+            return Some(self.types.ranged_int_base_existing(word));
         }
         match &expr.kind {
             HirExpressionKind::Binary(
@@ -463,7 +475,8 @@ impl TypeChecker<'_> {
             {
                 let element = self.collection_element_type(receiver.ty?)?;
                 let (word, slot) = self.store_int_slot(element)?;
-                matches!(slot.family, IntFamily::Saturating | IntFamily::Modular).then_some(word)
+                matches!(slot.family, IntFamily::Saturating | IntFamily::Modular)
+                    .then(|| self.types.ranged_int_base_existing(word))
             }
             _ => None,
         }
@@ -614,7 +627,9 @@ impl TypeChecker<'_> {
         let Some((word, slot)) = self.store_int_target(slot_ty) else {
             return;
         };
-        if slot.family == IntFamily::Modular {
+        // A ranged ring is not a power of two, so a per-step reduction at the
+        // width would not equal one reduction into the range: it stays exact.
+        if slot.family == IntFamily::Modular && !slot.ranged {
             self.mark_word_ring_node(expr, word);
         }
     }
@@ -990,13 +1005,16 @@ impl TypeChecker<'_> {
         // integer slot. A store into it is total (nothing to fit, ruling 38);
         // a store out of it is the checked narrowing of
         // `store_narrowing_target`, which answers it before this lookup.
-        let range = shape.width.integer_range()?;
+        let width_range = shape.width.integer_range()?;
+        let ranged_parts = self.types.ranged_int_parts(ty);
+        let range = ranged_parts.map_or(width_range, |(_, _, lo, hi)| (lo, hi));
         Some((
             ty,
             IntSlot {
                 family: shape.family,
                 width: shape.width,
                 range,
+                ranged: ranged_parts.is_some(),
             },
         ))
     }

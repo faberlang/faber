@@ -2087,6 +2087,9 @@ fn resolve_generic_arg(
         GenericArgExpr::Name(ident) => {
             resolve_named_generic_arg_ident(resolver, interner, ident, errors);
         }
+        // A range bound that is a name is refused when the type lowers
+        // (`ranged_policy_bound_not_constant`); nothing to resolve here.
+        GenericArgExpr::Range(_) => {}
     }
 }
 
@@ -2212,6 +2215,7 @@ fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
             radix_lexer::Span::default()
         }
         GenericArgExpr::Size(FiguraExpr::Var(ident)) | GenericArgExpr::Name(ident) => ident.span,
+        GenericArgExpr::Range(range) => range.span,
         GenericArgExpr::Size(FiguraExpr::Lift(extent)) => lift_extent_span(extent),
         GenericArgExpr::Size(
             FiguraExpr::Add(value, _)
@@ -2255,7 +2259,7 @@ fn generic_arg_named_shape(arg: &GenericArgExpr) -> Option<(&radix_syntax::Ident
             TypeExprKind::Named(ident, nested) => Some((ident, !nested.is_empty())),
             _ => None,
         },
-        GenericArgExpr::Size(_) => None,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -2324,7 +2328,7 @@ fn capacity_index_issue(
             radix_syntax::LiftExtent::Name(ident) => (ident, false),
             _ => return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
         },
-        GenericArgExpr::Size(FiguraExpr::Tuple(_)) => {
+        GenericArgExpr::Size(FiguraExpr::Tuple(_)) | GenericArgExpr::Range(_) => {
             return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
         }
         GenericArgExpr::Type(TypeExpr {
@@ -3904,7 +3908,7 @@ fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
             form: radix_syntax::TypeFormLevel::LONG,
             iuncta_label: None,
         }),
-        GenericArgExpr::Size(_) => None,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -3923,6 +3927,9 @@ fn lower_generic_type_arg(
         GenericArgExpr::Name(name) => lower_named_type(name, &[], resolver, interner, types),
         GenericArgExpr::Size(_) => Err(TypeLowerError::Issue(
             "generic_size_argument_in_type_position",
+        )),
+        GenericArgExpr::Range(_) => Err(TypeLowerError::Issue(
+            crate::numeric_width::WidthLowerIssue::RANGED_ARITY,
         )),
     }
 }
@@ -3989,6 +3996,9 @@ fn lower_generic_index_arg(
             lower_named_index_ident(ident, resolver, types)
         }
         GenericArgExpr::Type(_) => Err(TypeLowerError::Issue(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX)),
+        GenericArgExpr::Range(_) => Err(TypeLowerError::Issue(
+            crate::numeric_width::WidthLowerIssue::RANGED_ARITY,
+        )),
     }
 }
 
@@ -4035,6 +4045,9 @@ fn lower_applied_arg(
         GenericArgExpr::Type(ty) => {
             lower_type_expr(ty, resolver, interner, types).map(AppliedArg::Type)
         }
+        GenericArgExpr::Range(_) => Err(TypeLowerError::Issue(
+            crate::numeric_width::WidthLowerIssue::RANGED_ARITY,
+        )),
     }
 }
 
@@ -4048,6 +4061,21 @@ fn lower_named_type(
     let name_str = interner.resolve(name.name);
 
     if name_str == "saturatus" {
+        let mut ranged_issue = None;
+        if let Some(ty) = crate::numeric_width::lower_ranged_word(
+            radix_types::IntPolicy::Saturating,
+            params,
+            interner,
+            types,
+            &mut |issue| {
+                ranged_issue.get_or_insert(issue);
+            },
+        ) {
+            return match ranged_issue {
+                Some(issue) => Err(TypeLowerError::Issue(issue.issue())),
+                None => Ok(ty),
+            };
+        }
         let Some(type_params) = generic_type_exprs(params) else {
             return Err(TypeLowerError::Issue(
                 "generic_size_argument_in_type_position",
@@ -4069,6 +4097,21 @@ fn lower_named_type(
     }
 
     if name_str == "exactus" {
+        let mut ranged_issue = None;
+        if let Some(ty) = crate::numeric_width::lower_ranged_word(
+            radix_types::IntPolicy::Trapping,
+            params,
+            interner,
+            types,
+            &mut |issue| {
+                ranged_issue.get_or_insert(issue);
+            },
+        ) {
+            return match ranged_issue {
+                Some(issue) => Err(TypeLowerError::Issue(issue.issue())),
+                None => Ok(ty),
+            };
+        }
         let Some(type_params) = generic_type_exprs(params) else {
             return Err(TypeLowerError::Issue(
                 "generic_size_argument_in_type_position",
@@ -4090,6 +4133,21 @@ fn lower_named_type(
     }
 
     if name_str == "modulus" {
+        let mut ranged_issue = None;
+        if let Some(ty) = crate::numeric_width::lower_ranged_word(
+            radix_types::IntPolicy::Wrapping,
+            params,
+            interner,
+            types,
+            &mut |issue| {
+                ranged_issue.get_or_insert(issue);
+            },
+        ) {
+            return match ranged_issue {
+                Some(issue) => Err(TypeLowerError::Issue(issue.issue())),
+                None => Ok(ty),
+            };
+        }
         let Some(type_params) = generic_type_exprs(params) else {
             return Err(TypeLowerError::Issue(
                 "generic_size_argument_in_type_position",

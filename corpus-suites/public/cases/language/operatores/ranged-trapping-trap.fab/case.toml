@@ -1,0 +1,18 @@
+version = 1
+id = "corpus/operatores/ranged-trapping-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/ranged-trapping-trap.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stderr_contains = "does not fit in `trapping<i32, -2‥3>`"
+check_only = false

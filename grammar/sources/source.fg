@@ -1274,8 +1274,20 @@ type_head       := IDENTIFIER | 'modulus'
 # is its own type (`width_type_sugar`); only the policy words `modulus`,
 # `saturatus` and `exactus` wrap a marker (`modulus<u32>`).
 type_arguments  := '<' type_argument (',' type_argument)* '>'
-type_argument   := labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument   := labeled_type_argument | range_argument | type_annotation | NATURAL | '[' figura_list? ']'
 labeled_type_argument := IDENTIFIER ':' type_annotation
+# A range argument is the second argument of a store policy: the range refines
+# the explicit width inside which a store applies the policy
+# (`saturatus<u32, 0‥8>`, `exactus<i32, -2‥3>`, `modulus<u32, 0‥8>`). It is its
+# own slot, told apart from a type or a size by the range glyph after its first
+# bound. Both ends are always written: `0…` alone is a parse error
+# (`range_bound_required`). The half-open `‥` holds the low end up to, not
+# including, the high end; the inclusive `…` holds both. `∞` and `-∞` mean no
+# bound on that side. The policy word is mandatory: `u8<0‥8>` is
+# `ranged_policy_word_required`.
+range_argument  := range_bound range_glyph range_bound
+range_glyph     := '‥' | '…'
+range_bound     := '-'? NATURAL | '-'? '∞' | 'magnitudo'? IDENTIFIER
 width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
                 | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix?
                 | MATRIX_WIDTH_SUGAR shape_suffix

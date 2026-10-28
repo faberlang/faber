@@ -5,7 +5,7 @@
 //! centralized here so resolve, typecheck, conversio, and codegen share one
 //! source of truth.
 
-use crate::{FloatPolicy, InferVar, MarkerFamily, Primitive, Type, TypeId, TypeTable};
+use crate::{FloatPolicy, InferVar, IntPolicy, MarkerFamily, Primitive, Type, TypeId, TypeTable};
 use serde::{Deserialize, Serialize};
 
 /// Signed integer, unsigned integer, or float width marker.
@@ -123,6 +123,24 @@ pub enum WidthLowerIssue {
     TrappingWordShape,
     /// `exactus` marker is not an integer width or `d64`.
     TrappingWordUnsupported,
+    /// A range after a store policy's width has an end that is a name (a size
+    /// or a constant); only integer literals and `∞` fold at compile time.
+    RangedBoundNotConstant,
+    /// A range follows a bare width marker (`u8<0‥8>`): the policy word is
+    /// mandatory, so the edge behaviour is always visible.
+    RangedPolicyWordRequired,
+    /// A store policy takes the width and then at most one range.
+    RangedArity,
+    /// The range holds no value (`5‥5`, `5…3`).
+    RangedEmpty,
+    /// A bound lies outside the width the range refines (including `∞` as a
+    /// lower bound or `-∞` as an upper bound).
+    RangedOutsideWidth,
+    /// An unsigned width with a negative lower bound.
+    RangedUnsignedNegative,
+    /// A float, decimal or `inf` width with a range: ranged floats are not
+    /// built, and the unbounded integer has no width to refine.
+    RangedWidthUnsupported,
 }
 
 impl WidthLowerIssue {
@@ -139,6 +157,13 @@ impl WidthLowerIssue {
     pub const TRAPPING_WORD_WIDTH_REQUIRED: &str = "trapping_word_width_required";
     pub const TRAPPING_WORD_WIDTH_SHAPE: &str = "trapping_word_width_shape";
     pub const UNSUPPORTED_TRAPPING_WORD_WIDTH: &str = "unsupported_trapping_word_width";
+    pub const RANGED_BOUND_NOT_CONSTANT: &str = "ranged_policy_bound_not_constant";
+    pub const RANGED_POLICY_WORD_REQUIRED: &str = "ranged_policy_word_required";
+    pub const RANGED_ARITY: &str = "ranged_policy_arity";
+    pub const RANGED_EMPTY: &str = "ranged_policy_range_empty";
+    pub const RANGED_OUTSIDE_WIDTH: &str = "ranged_policy_range_outside_width";
+    pub const RANGED_UNSIGNED_NEGATIVE: &str = "ranged_policy_unsigned_negative_bound";
+    pub const RANGED_WIDTH_UNSUPPORTED: &str = "ranged_policy_width_unsupported";
 
     /// Diagnostic issue identity for this failure.
     #[must_use]
@@ -156,6 +181,13 @@ impl WidthLowerIssue {
             Self::TrappingWordRequired => Self::TRAPPING_WORD_WIDTH_REQUIRED,
             Self::TrappingWordShape => Self::TRAPPING_WORD_WIDTH_SHAPE,
             Self::TrappingWordUnsupported => Self::UNSUPPORTED_TRAPPING_WORD_WIDTH,
+            Self::RangedBoundNotConstant => Self::RANGED_BOUND_NOT_CONSTANT,
+            Self::RangedPolicyWordRequired => Self::RANGED_POLICY_WORD_REQUIRED,
+            Self::RangedArity => Self::RANGED_ARITY,
+            Self::RangedEmpty => Self::RANGED_EMPTY,
+            Self::RangedOutsideWidth => Self::RANGED_OUTSIDE_WIDTH,
+            Self::RangedUnsignedNegative => Self::RANGED_UNSIGNED_NEGATIVE,
+            Self::RangedWidthUnsupported => Self::RANGED_WIDTH_UNSUPPORTED,
         }
     }
 }
@@ -628,6 +660,144 @@ pub fn lower_saturating_word(
     }
 }
 
+/// One lowered end of a ranged store policy's range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeEnd {
+    /// An integer literal.
+    Value(i128),
+    /// `∞`: no bound on the upper side.
+    PosInf,
+    /// `-∞`: no bound on the lower side.
+    NegInf,
+}
+
+/// Resolve the range of a ranged integer cell against its width.
+///
+/// `inclusive` is `lo…hi`; the half-open `lo‥hi` holds `lo` through `hi - 1`.
+/// `∞` / `-∞` mean no bound on that side, so they resolve to the width's own
+/// end. The result is the inclusive pair a [`Type::RangedInt`] carries, always
+/// inside the width. Unsigned widths need `lo ≥ 0`; signed widths take
+/// negative bounds.
+///
+/// # Errors
+/// The named [`WidthLowerIssue`] for an empty range, a bound outside the
+/// width, a negative bound on an unsigned width, `∞` on the wrong side, or a
+/// float, decimal or `inf` width.
+pub fn resolve_ranged_int(
+    width: NumericWidth,
+    lo: RangeEnd,
+    hi: RangeEnd,
+    inclusive: bool,
+) -> Result<(i128, i128), WidthLowerIssue> {
+    if matches!(lo, RangeEnd::PosInf) || matches!(hi, RangeEnd::NegInf) {
+        return Err(WidthLowerIssue::RangedOutsideWidth);
+    }
+    if width.is_unbounded() {
+        return Err(WidthLowerIssue::RangedWidthUnsupported);
+    }
+    let Some((width_lo, width_hi)) = width.integer_range() else {
+        return Err(WidthLowerIssue::RangedWidthUnsupported);
+    };
+    let lo_value = match lo {
+        RangeEnd::Value(value) => value,
+        _ => width_lo,
+    };
+    let hi_value = match hi {
+        RangeEnd::Value(value) if inclusive => value,
+        RangeEnd::Value(value) => value - 1,
+        _ => width_hi,
+    };
+    if matches!(lo, RangeEnd::Value(_)) && width_lo == 0 && lo_value < 0 {
+        return Err(WidthLowerIssue::RangedUnsignedNegative);
+    }
+    if lo_value > hi_value {
+        return Err(WidthLowerIssue::RangedEmpty);
+    }
+    if lo_value < width_lo || hi_value > width_hi {
+        return Err(WidthLowerIssue::RangedOutsideWidth);
+    }
+    Ok((lo_value, hi_value))
+}
+
+/// Whether a generic-argument list carries a range argument.
+#[must_use]
+pub fn has_range_arg(params: &[radix_syntax::GenericArgExpr]) -> bool {
+    params
+        .iter()
+        .any(|param| matches!(param, radix_syntax::GenericArgExpr::Range(_)))
+}
+
+/// Lower a store policy with a range, `policy<W, lo‥hi>`.
+///
+/// `None` when `params` has no range argument, so the caller keeps the
+/// ordinary one-width path. Otherwise the width must be the first argument and
+/// the range the second; the range is checked against the width, and a range
+/// that is the whole width interns as the plain form it abbreviates.
+pub fn lower_ranged_word(
+    policy: IntPolicy,
+    params: &[radix_syntax::GenericArgExpr],
+    interner: &radix_lexer::Interner,
+    types: &mut TypeTable,
+    report: &mut dyn FnMut(WidthLowerIssue),
+) -> Option<TypeId> {
+    use radix_syntax::{GenericArgExpr, RangeBoundExpr, RangeKind};
+    if !has_range_arg(params) {
+        return None;
+    }
+    let mut fail = |issue: WidthLowerIssue, types: &mut TypeTable| {
+        report(issue);
+        types.intern(Type::Error)
+    };
+    let [width_arg, GenericArgExpr::Range(range)] = params else {
+        return Some(fail(WidthLowerIssue::RangedArity, types));
+    };
+    let shape_issue = match policy {
+        IntPolicy::Trapping => WidthLowerIssue::TrappingWordShape,
+        IntPolicy::Wrapping => WidthLowerIssue::ModularWordShape,
+        IntPolicy::Saturating => WidthLowerIssue::SaturatingWordShape,
+    };
+    let marker = match width_arg {
+        GenericArgExpr::Type(ty) => type_expr_width_marker(ty, interner),
+        GenericArgExpr::Name(ident) => Some(interner.resolve(ident.name)),
+        _ => None,
+    };
+    let Some(marker) = marker else {
+        return Some(fail(shape_issue, types));
+    };
+    let width = match NumericWidth::from_marker(marker, Primitive::Numerus) {
+        Ok(width) => width,
+        Err(WidthError::FloatOnNumerus) => {
+            return Some(fail(WidthLowerIssue::RangedWidthUnsupported, types));
+        }
+        Err(_) => return Some(fail(shape_issue, types)),
+    };
+    let end = |bound: &RangeBoundExpr| match bound {
+        RangeBoundExpr::Literal { value, .. } => Some(RangeEnd::Value(*value)),
+        RangeBoundExpr::Unbounded { negative: true, .. } => Some(RangeEnd::NegInf),
+        RangeBoundExpr::Unbounded {
+            negative: false, ..
+        } => Some(RangeEnd::PosInf),
+        RangeBoundExpr::Name { .. } => None,
+    };
+    let (Some(lo), Some(hi)) = (end(&range.lo), end(&range.hi)) else {
+        return Some(fail(WidthLowerIssue::RangedBoundNotConstant, types));
+    };
+    // `inf` has no width to refine; `trapping<inf, -∞…∞>` is bare `inf`.
+    if width.is_unbounded() {
+        if lo == RangeEnd::NegInf && hi == RangeEnd::PosInf {
+            return Some(types.sized_numeric(Primitive::Numerus, NumericWidth::Inf));
+        }
+        return Some(fail(WidthLowerIssue::RangedWidthUnsupported, types));
+    }
+    if width.is_decimal() {
+        return Some(fail(WidthLowerIssue::RangedWidthUnsupported, types));
+    }
+    match resolve_ranged_int(width, lo, hi, matches!(range.kind, RangeKind::Inclusive)) {
+        Ok((lo, hi)) => Some(types.ranged_int(policy, width, lo, hi)),
+        Err(issue) => Some(fail(issue, types)),
+    }
+}
+
 /// The policy-float cell of a float marker (`f16`, `bf16`, `f32`, `f64`);
 /// `None` when the marker is not a float width.
 fn policy_float_cell(policy: FloatPolicy, marker: &str, types: &mut TypeTable) -> Option<TypeId> {
@@ -737,6 +907,7 @@ pub fn effective_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
         Type::Primitive(Primitive::Fractus) => Some(NumericWidth::F64),
         Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, width) => Some(*width),
         Type::ModularWord(width) | Type::SaturatingWord(width) => Some(*width),
+        Type::RangedInt { width, .. } => Some(*width),
         Type::Alias(_, inner) => effective_width(types, *inner),
         _ => None,
     }
@@ -755,6 +926,11 @@ pub fn numerus_integer_width(types: &TypeTable, ty: TypeId) -> Option<NumericWid
         {
             Some(*width)
         }
+        Type::RangedInt {
+            policy: IntPolicy::Trapping,
+            width,
+            ..
+        } => Some(*width),
         Type::Alias(_, inner) => numerus_integer_width(types, *inner),
         _ => None,
     }
@@ -1014,6 +1190,16 @@ fn same_family_widths(
 /// Whether two numeric types are assignable via equality or widening.
 #[must_use]
 pub fn is_numeric_assignable(types: &TypeTable, from: TypeId, to: TypeId) -> bool {
+    // A ranged destination takes a value without a check only from a ranged
+    // cell of the same policy and width whose range it contains; every other
+    // value lands through a store that applies the range.
+    if let Some((policy, width, lo, hi)) = types.ranged_int_parts(to) {
+        return types.ranged_int_parts(from).is_some_and(
+            |(from_policy, from_width, from_lo, from_hi)| {
+                from_policy == policy && from_width == width && lo <= from_lo && from_hi <= hi
+            },
+        );
+    }
     same_family_widths(types, from, to)
         .is_some_and(|(a, b)| NumericWidth::is_widening_assignable(a, b))
 }
@@ -1027,7 +1213,11 @@ fn is_numeric_conversio_widening(types: &TypeTable, from: TypeId, to: TypeId) ->
 
 fn is_saturating_word(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
-        Type::SaturatingWord(_) => true,
+        Type::SaturatingWord(_)
+        | Type::RangedInt {
+            policy: IntPolicy::Saturating,
+            ..
+        } => true,
         Type::Alias(_, inner) => is_saturating_word(types, *inner),
         _ => false,
     }
@@ -1035,7 +1225,11 @@ fn is_saturating_word(types: &TypeTable, ty: TypeId) -> bool {
 
 fn is_modular_word(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
-        Type::ModularWord(_) => true,
+        Type::ModularWord(_)
+        | Type::RangedInt {
+            policy: IntPolicy::Wrapping,
+            ..
+        } => true,
         Type::Alias(_, inner) => is_modular_word(types, *inner),
         _ => false,
     }

@@ -1115,6 +1115,10 @@ help = "write the shape with {sugar} width sugar brackets"
 message = "`{form}` is a retired numeric type spelling"
 help = "write `{bare}`, not `{form}`; a width marker is its own type"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "ambitus utrumque finem requirit"
+help = "scribe utrumque finem, ut 0‥8 aut 0…7, cum ∞ aut -∞ pro nullo fine in latere"
+
 [diagnostics.PARSE040.issues.iuncta_arity_exceeded]
 message = "iuncta arity {count} exceeds maximum of 16; use a genus instead"
 help = "reduce the iuncta arity to 16 or fewer, or declare a genus for more fields"
@@ -1510,6 +1514,38 @@ help = "scribe exactus cum una latitudine, ut exactus<u8> aut exactus<i64>"
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "latitudo exacti signum latitudinis nudum esse debet"
 help = "utere signo latitudinis nudo, ut u8 aut i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "ambitus verbum modi condendi requirit; signum latitudinis nudum ambitum non accipit"
+help = "scribe verbum modi primum, ut saturatus<u32, 0‥8>, exactus<i32, -2‥3> aut modulus<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "finis ambitus numerus integer litteralis aut ∞ esse debet"
+help = "scribe utrumque finem ut numerum integrum litteralem, ut 0‥8; finis nominatus aut magnitudinis nondum paratur"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "modus condendi cum ambitu latitudinem et deinde unum ambitum accipit"
+help = "scribe modus<W, lo‥hi>, ut saturatus<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "ambitus nullum valorem tenet"
+help = "finis infimus infra summum in lo‥hi esse debet, aut non supra eum in lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "finis ambitus extra latitudinem iacet"
+help = "utrumque finem intra latitudinem serva; ∞ solum finis summus est et -∞ solum infimus"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "latitudo sine signo finem infimum negativum habere non potest"
+help = "ambitum a 0 incipe, aut latitudine cum signo utere, ut i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "modus condendi cum ambitu latitudinem integram finitam requirit"
+help = "latitudine integra utere, ut u8 aut i32; latitudines fractae, decimales et inf nondum ambitum accipiunt"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "nucleum modum condendi cum ambitu nondum adhibere potest ({site}); nucleum nullum ambitum applicat"
+help = "in nucleo latitudine nuda utere et ambitum in hospite applica"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
@@ -2162,6 +2198,10 @@ help = "typum tantum declara; tabula ({tabula}) utere donec operationes tabulae 
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "typus tabulae in hoc proposito nondum adhibetur"
 help = "exsecutore MIR aut emissore fontis Faber utere, aut tabula ({tabula}), donec hoc propositum tabulas ferat"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "modus condendi cum ambitu in hoc proposito nondum sustinetur"
+help = "exsecutore MIR, proposito Rust aut emissore fontis Faber utere, donec hoc propositum ambitus applicet"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "folium {leaf} in hoc proposito non adhibetur"

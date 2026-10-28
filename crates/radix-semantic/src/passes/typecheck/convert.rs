@@ -433,6 +433,43 @@ fn numeric_fact(ty: &Type) -> Option<NumericFact> {
                 width: Some(*width),
             })
         }
+        // A ranged cell is a value of its width in its policy's family; the
+        // range itself is judged where a value is stored into it.
+        Type::RangedInt { policy, width, .. } => {
+            let family = match policy {
+                radix_types::IntPolicy::Trapping => {
+                    if let Some(rank) = signed_width_rank(*width) {
+                        NumericFactFamily::SignedInt { rank }
+                    } else {
+                        NumericFactFamily::UnsignedInt {
+                            rank: unsigned_width_rank(*width)?,
+                        }
+                    }
+                }
+                radix_types::IntPolicy::Wrapping => {
+                    if let Some(rank) = signed_width_rank(*width) {
+                        NumericFactFamily::ModularSigned { rank }
+                    } else {
+                        NumericFactFamily::Modular {
+                            rank: unsigned_width_rank(*width)?,
+                        }
+                    }
+                }
+                radix_types::IntPolicy::Saturating => {
+                    if let Some(rank) = signed_width_rank(*width) {
+                        NumericFactFamily::SaturatingSigned { rank }
+                    } else {
+                        NumericFactFamily::SaturatingUnsigned {
+                            rank: unsigned_width_rank(*width)?,
+                        }
+                    }
+                }
+            };
+            Some(NumericFact {
+                family,
+                width: Some(*width),
+            })
+        }
         // N7e D3: a conversion into or out of a float cell is the conversion
         // of the bare float of its width, so the cell is that float here.
         Type::PolicyFloat(_, width) => Some(NumericFact {
@@ -3075,9 +3112,9 @@ impl TypeChecker<'_> {
 
     fn primitive_conversio_family(&self, ty: TypeId) -> PrimitiveConversioFamily {
         match self.types.get(self.resolve_inferred_type(ty)) {
-            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
-                PrimitiveConversioFamily::Numerus
-            }
+            Type::Primitive(Primitive::Numerus)
+            | Type::SizedNumeric(Primitive::Numerus, _)
+            | Type::RangedInt { .. } => PrimitiveConversioFamily::Numerus,
             Type::Primitive(Primitive::Fractus)
             | Type::SizedNumeric(Primitive::Fractus, _)
             | Type::PolicyFloat(_, _) => PrimitiveConversioFamily::Fractus,
@@ -3204,6 +3241,7 @@ impl TypeChecker<'_> {
                 | Type::Union(_)
                 | Type::Tuple(_)
                 | Type::ModularWord(_)
+                | Type::RangedInt { .. }
         )
     }
 
@@ -3218,7 +3256,12 @@ impl TypeChecker<'_> {
     fn is_policy_word(&self, ty: TypeId) -> bool {
         matches!(
             self.types.get(self.peel_alias_chain(ty)),
-            Type::ModularWord(_) | Type::SaturatingWord(_)
+            Type::ModularWord(_)
+                | Type::SaturatingWord(_)
+                | Type::RangedInt {
+                    policy: radix_types::IntPolicy::Wrapping | radix_types::IntPolicy::Saturating,
+                    ..
+                }
         )
     }
 
@@ -3247,6 +3290,10 @@ impl TypeChecker<'_> {
         matches!(
             self.types.get(self.peel_alias_chain(ty)),
             Type::SaturatingWord(_)
+                | Type::RangedInt {
+                    policy: radix_types::IntPolicy::Saturating,
+                    ..
+                }
         )
     }
 
@@ -3256,7 +3303,8 @@ impl TypeChecker<'_> {
         match self.types.get(self.peel_alias_chain(ty)) {
             Type::Primitive(Primitive::Numerus)
             | Type::ModularWord(_)
-            | Type::SaturatingWord(_) => true,
+            | Type::SaturatingWord(_)
+            | Type::RangedInt { .. } => true,
             Type::SizedNumeric(Primitive::Numerus, width) => !width.is_decimal(),
             _ => false,
         }
@@ -3568,10 +3616,24 @@ impl TypeChecker<'_> {
             return static_integer_magnitude(source)
                 .is_none_or(|value| value.abs() > D64_INTEGER_PART_MAX);
         }
-        let Some(target_width) = self.trapping_integer_width(target_ty, &to) else {
+        // A trapping ranged target checks the range, not just the width: only
+        // a literal inside it, or a ranged cell it contains, cannot fail.
+        let ranged_target = match self.types.ranged_int_parts(target_ty) {
+            Some((radix_types::IntPolicy::Trapping, width, lo, hi)) => Some((width, (lo, hi))),
+            _ => None,
+        };
+        let Some(target_width) = ranged_target
+            .map(|(width, _)| width)
+            .or_else(|| self.trapping_integer_width(target_ty, &to))
+        else {
             return false;
         };
-        let target_range = integer_width_range(target_width);
+        let target_range = ranged_target
+            .map(|(_, range)| range)
+            .or_else(|| integer_width_range(target_width));
+        if ranged_target.is_some() && self.types.is_assignable(source_ty, target_ty) {
+            return false;
+        }
         match from.family {
             NumericFactFamily::Float { .. } => {
                 let Some(value) = static_float_magnitude(source) else {
@@ -3592,7 +3654,8 @@ impl TypeChecker<'_> {
             }
             NumericFactFamily::Decimal => {
                 // d64 integer parts fit i64.
-                !matches!(to.family, NumericFactFamily::SignedInt { rank: t } if t >= 3)
+                ranged_target.is_some()
+                    || !matches!(to.family, NumericFactFamily::SignedInt { rank: t } if t >= 3)
             }
             // `inf` into a bounded trapping integer is the magnitude-checked
             // narrowing: failable unless a constant proves it fits.
@@ -3603,7 +3666,7 @@ impl TypeChecker<'_> {
             | NumericFactFamily::ModularSigned { .. }
             | NumericFactFamily::SaturatingSigned { .. }
             | NumericFactFamily::SaturatingUnsigned { .. } => {
-                if from.family.integer_flows_into(to.family) {
+                if ranged_target.is_none() && from.family.integer_flows_into(to.family) {
                     return false;
                 }
                 let fits = static_integer_magnitude(source)
@@ -3972,7 +4035,10 @@ impl TypeChecker<'_> {
             .or_else(|| json_object_source.then(|| self.json_type()));
         let source_ty = if matches!(
             self.types.get(effective_target),
-            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::PolicyFloat(_, _)
+            Type::ModularWord(_)
+                | Type::SaturatingWord(_)
+                | Type::PolicyFloat(_, _)
+                | Type::RangedInt { .. }
         ) {
             // WHY: modular ascription shapes integer literals so the ordinary
             // literal checker enforces the u32 range. Non-literal numerus
@@ -4006,6 +4072,7 @@ impl TypeChecker<'_> {
             }
             Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedNumeric(..)
             | Type::Primitive(Primitive::Numerus | Primitive::Fractus) => {
@@ -4094,6 +4161,20 @@ impl TypeChecker<'_> {
         ) else {
             return;
         };
+
+        // A ranged target is stated by ascription only when the range is a
+        // proven fact: a literal inside it, or a ranged cell it contains.
+        // Every other value lands in it through a store or an authored `↦`.
+        if let Some((_, _, lo, hi)) = self.types.ranged_int_parts(target_ty) {
+            let holds = match static_integer_magnitude(source) {
+                Some(value) => (lo..=hi).contains(&value),
+                None => self.types.is_assignable(source_ty, target_ty),
+            };
+            if !holds {
+                self.invalid_conversion(ISSUE_NUMERIC_ASCRIPTION_REQUIRES_CONVERSION, span);
+            }
+            return;
+        }
 
         // A folded integer literal is a fact when the target width holds the
         // value; int↔float and int→decimal stay conversions (decimal law:

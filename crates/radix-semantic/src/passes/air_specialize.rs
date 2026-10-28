@@ -528,6 +528,7 @@ fn contains_unresolved_type(
         | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
+        | Type::RangedInt { .. }
         | Type::PolicyFloat(_, _)
         | Type::TensorEdgePolicy(_)
         | Type::SizedInstans(_)
