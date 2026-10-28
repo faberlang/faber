@@ -187,7 +187,7 @@ import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_f
 # [088] ex_field
 ex_field ::= 'ออก' '=' STRING
 # [089] visibilitas_field
-visibilitas_field ::= 'visibilitas' '=' publica
+visibilitas_field ::= 'การมองเห็น' '=' publica
 # [090] nomen_field
 nomen_field ::= 'ชื่อ' '=' IDENTIFIER
 # [091] ut_field
@@ -702,7 +702,7 @@ NO_NEWLINE ::=
 | [`import_field_list`](#import-field-list) | `#import-field-list` | live |
 | [`import_field`](#import-field) | `#import-field` | live |
 | [`ex_field`](#ex-field) | `#ออก-field` | live |
-| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live |
+| [`visibilitas_field`](#visibilitas-field) | `#การมองเห็น-field` | live |
 | [`nomen_field`](#nomen-field) | `#ชื่อ-field` | live |
 | [`ut_field`](#ut-field) | `#ในชื่อ-field` | live |
 | [`omnia_field`](#omnia-field) | `#ทั้งหมด-field` | live |
@@ -1063,7 +1063,7 @@ productions. It is not a second keyword authority.
 | Boolean | `จริง` | true |
 | Conversion | `ผ่านทาง` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 | Diagnostics | `ดู` | debug |
-| Declarations | `visibilitas` | visibility field |
+| Declarations | `การมองเห็น` | visibility field |
 
 ## Comma Separator Table {#comma-separator-law}
 
@@ -1601,6 +1601,8 @@ importa ex "norma:consolum" fixum dic ut output
 ```
 
 A record import needs its `ออก = "…"` source (`missing_import_source`), and `ทั้งหมด` cannot be combined with `ชื่อ` or `ในชื่อ` (`mixed_wildcard_and_named_import`).
+
+The five record field names are reader-pack keywords like the rest of the surface: the `en` reader spells `ออก`, `การมองเห็น`, `ชื่อ`, `ในชื่อ` and `ทั้งหมด` as `from`, `visibility`, `name`, `as` and `all` (`import { from = "norma:text", name = text, as = t }`), and every other pack spells them with its own words. A field word from another locale is `PARSE050 wrong_locale_import_field`, not `unknown_import_field`.
 
 The `privata` import marker was removed (VM-U3); an import without a marker
 does not re-export, and `สาธารณะ` is the re-export marker. Missing named binding

@@ -307,7 +307,7 @@ import from "hono" Hono
 import from "norma:console" console
 # binds `text`; no marker means no re-export
 import from "norma:text"
-import { ex = "norma:json/solve", ut = solve_mod }
+import { from = "norma:json/solve", as = solve_mod }
 # kernel manifest glob (script mode only), not wildcard import
 import from "faber:*" faber
 import from "lodash" * as _
@@ -317,6 +317,11 @@ import from "./types" public User
 import from "norma:console" const write_partial as output
 import from "norma:fs" const write_file as out_file, write_bytes as out_bytes
 ```
+
+The record form's five field names are reader-pack words like every other keyword: en `from`, `visibility`
+(value `public`), `name`, `as`, `all` (la `ex`, `visibilitas`, `nomen`, `ut`, `omnia`; the other packs follow their
+own keyword rows). A field word from another locale is `PARSE050 wrong_locale_import_field`, so the Latin `ex = …`
+in an en file fails and names `from`; an English word in a la record is `unknown_import_field`.
 
 The `private` import marker (la `privata`) was removed (`PARSE050 import_privata_removed`): an import without a marker
 does not re-export and `public` is the only marker. Norma module names are the English source names

@@ -32,6 +32,7 @@ insere = "अंतःस्थापित"
 privata = "निजी"
 protecta = "संरक्षित"
 publica = "सार्वजनिक"
+visibilitas = "दृश्यता"
 sponte = "स्वेच्छा"
 casu = "स्थिति"
 ceterum = "अन्यतम"
@@ -923,31 +924,35 @@ help = "import syntax जांचें"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "अज्ञात import field"
-help = "ex, visibilitas, nomen, ut, या omnia उपयोग करें"
+help = "{ex}, {visibilitas}, {nomen}, {ut}, या {omnia} उपयोग करें"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "import field `{field}` इस reader surface पर घोषित नहीं है"
+help = "इस फ़ाइल की reader locale के लिए `{expected}` का उपयोग करें"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "डुप्लिकेट import field `{field}`"
 help = "हर import field केवल एक बार आ सकता है; दोहराया गया field हटाएँ"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "import record के लिए ex source आवश्यक है"
-help = "import record में ex = \"path\" जोड़ें"
+message = "import record के लिए {ex} source आवश्यक है"
+help = "import record में {ex} = \"path\" जोड़ें"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import में binding का नाम भी नहीं दे सकते"
-help = "अकेले omnia उपयोग करें, या named import के लिए nomen/ut उपयोग करें"
+help = "अकेले {omnia} उपयोग करें, या named import के लिए {nomen}/{ut} उपयोग करें"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "अमान्य import visibility"
-help = "publica उपयोग करें"
+help = "{publica} उपयोग करें"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "import से `privata` हटा दिया गया; import डिफ़ॉल्ट रूप से re-export नहीं करते"
-help = "मार्कर हटाएँ, या re-export के लिए publica उपयोग करें"
+message = "import से `{privata}` हटा दिया गया; import डिफ़ॉल्ट रूप से re-export नहीं करते"
+help = "मार्कर हटाएँ, या re-export के लिए {publica} उपयोग करें"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "{path} से import नाम का अनुमान नहीं लगा सके"
-help = "{path} के लिए nomen या स्पष्ट alias लिखें"
+help = "{path} के लिए {nomen} या स्पष्ट alias लिखें"
 
 [diagnostics.SEM001]
 message = "अपरिभाषित चर"

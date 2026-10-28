@@ -1137,6 +1137,12 @@ fn invalid_import_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "unknown_import_field" => Some("unknown import field".to_owned()),
+        "wrong_locale_import_field" => {
+            let field = arg_value(args, "field")?;
+            Some(format!(
+                "import field `{field}` is not declared on this reader surface"
+            ))
+        }
         "duplicate_import_field" => {
             let field = arg_value(args, "field")?;
             Some(format!("duplicate import field `{field}`"))
@@ -1168,6 +1174,10 @@ fn invalid_import_help(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "unknown_import_field" => Some("use ex, visibilitas, nomen, ut, or omnia".to_owned()),
+        "wrong_locale_import_field" => {
+            let expected = arg_value(args, "expected")?;
+            Some(format!("use `{expected}` for this file's reader locale"))
+        }
         "duplicate_import_field" => {
             Some("each import field may appear once; remove the repeated field".to_owned())
         }

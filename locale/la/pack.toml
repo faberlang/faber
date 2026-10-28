@@ -34,6 +34,7 @@ optiones = "optiones"
 privata = "privata"
 protecta = "protecta"
 publica = "publica"
+visibilitas = "visibilitas"
 sponte = "sponte"
 casu = "casu"
 ceterum = "ceterum"
@@ -1156,31 +1157,35 @@ help = "check import syntax"
 
 [diagnostics.PARSE050.issues.unknown_import_field]
 message = "unknown import field"
-help = "use ex, visibilitas, nomen, ut, or omnia"
+help = "use {ex}, {visibilitas}, {nomen}, {ut}, or {omnia}"
+
+[diagnostics.PARSE050.issues.wrong_locale_import_field]
+message = "campus importationis `{field}` non est declaratus in hac superficie lectoris"
+help = "utere `{expected}` pro lingua lectoris huius fasciculi"
 
 [diagnostics.PARSE050.issues.duplicate_import_field]
 message = "duplicate import field `{field}`"
 help = "each import field may appear once; remove the repeated field"
 
 [diagnostics.PARSE050.issues.missing_import_source]
-message = "import record requires an ex source"
-help = "add ex = \"path\" to the import record"
+message = "import record requires an {ex} source"
+help = "add {ex} = \"path\" to the import record"
 
 [diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
 message = "wildcard import cannot also name a binding"
-help = "use omnia by itself, or use nomen/ut for a named import"
+help = "use {omnia} by itself, or use {nomen}/{ut} for a named import"
 
 [diagnostics.PARSE050.issues.invalid_import_visibility]
 message = "invalid import visibility"
-help = "use publica"
+help = "use {publica}"
 
 [diagnostics.PARSE050.issues.import_privata_removed]
-message = "`privata` on imports was removed; imports do not re-export by default"
-help = "drop the marker, or use publica to re-export"
+message = "`{privata}` on imports was removed; imports do not re-export by default"
+help = "drop the marker, or use {publica} to re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "could not infer import name from {path}"
-help = "spell nomen or an explicit alias for {path}"
+help = "spell {nomen} or an explicit alias for {path}"
 
 [diagnostics.PARSE050.issues.import_target_unknown]
 message = "`{target}` is not a target name"
