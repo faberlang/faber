@@ -101,6 +101,7 @@ axis = "trục"
 lege = "đọc"
 lineam = "dòng"
 omnia = "tất_cả"
+machina = "thiết_bị"
 scriptum = "văn_bản_hóa"
 sparge = "rải"
 ut = "như"
@@ -724,6 +725,10 @@ help = "dùng {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "'{cape}' phải đứng trước '{dum}' trong vòng lặp '{fac}'"
 help = "viết trình xử lý trước điều kiện: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "khối '{fac}' chỉ nhận một từ bổ nghĩa, không dùng '{omnia}' cùng '{machina}'"
+help = "'{machina}' đã giao mọi lỗi một lần ở cuối khối; bỏ '{omnia}'"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "dấu phẩy không còn ngăn cách các đối tượng của '{discerne}'"
@@ -1584,6 +1589,26 @@ help = "dùng f32 cho các giá trị kernel dấu phẩy động"
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "việc ghi với độ rộng {width} có thể gây lỗi trong kernel nucleum"
 help = "chứng minh việc ghi nằm trong phạm vi hoặc dùng cell bao hoặc bão hòa"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "vùng '{fac} {machina}' không được chứa vùng '{fac} {machina}' khác"
+help = "giữ một vùng thiết bị và gọi kernel trực tiếp từ đó"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' rời vùng '{fac} {machina}'; vùng chưa có từ thoát"
+help = "kết thúc vùng rồi quyết định sau đó, hoặc chuyển lối thoát ra ngoài khối"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "vòng lặp lane ('{construct}') ngay trong vùng '{fac} {machina}' chưa được xây dựng"
+help = "gọi một kernel từ vùng cho công việc song song"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "vùng '{fac} {machina}' chưa thể cấp phát tensor ({construct})"
+help = "cấp phát tensor trước vùng rồi dùng bên trong"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' trong vùng '{fac} {machina}' đọc giá trị tính trên thiết bị; điều khiển vòng lặp trên thiết bị chưa được xây dựng"
+help = "giữ điều kiện, cận và đối số vô hướng ở các giá trị biết trước vùng, và đọc kết quả thiết bị sau vùng"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "độ rộng số nguyên {width} vượt quá độ rộng kernel nucleum được hỗ trợ"

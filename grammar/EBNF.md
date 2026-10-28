@@ -99,7 +99,7 @@ compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_bl
 # [044] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
 # [045] fac_block
-fac_block ::= 'fac' block_stmt cape_clause?
+fac_block ::= 'fac' fac_modifier? block_stmt cape_clause?
 # [046] clausura_legacy_expr
 clausura_legacy_expr ::= 'clausura' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 # [047] clausura_params
@@ -547,50 +547,52 @@ proba_modifier ::= 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 't
 # [268] praepara_block
 praepara_block ::= ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
 # [269] fac_stmt
-fac_stmt ::= 'fac' block_stmt cape_clause? ('dum' expression)?
-# [270] IDENTIFIER
+fac_stmt ::= 'fac' fac_modifier? block_stmt cape_clause? ('dum' expression)?
+# [270] fac_modifier
+fac_modifier ::= 'omnia' | 'machina'
+# [271] IDENTIFIER
 IDENTIFIER ::=
-# [271] NUMBER
+# [272] NUMBER
 NUMBER ::=
-# [272] NATURAL
+# [273] NATURAL
 NATURAL ::=
-# [273] STRING
+# [274] STRING
 STRING ::=
-# [274] ASCII_STRING
+# [275] ASCII_STRING
 ASCII_STRING ::=
-# [275] BACKTICK_STRING
+# [276] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [276] OCTETI_STRING
+# [277] OCTETI_STRING
 OCTETI_STRING ::=
-# [277] REGEX_TYPE_WORD
+# [278] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [278] REGEX_BODY
+# [279] REGEX_BODY
 REGEX_BODY ::=
-# [279] NEWLINE
+# [280] NEWLINE
 NEWLINE ::=
-# [280] WIDTH_MARKER
+# [281] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [281] LISTA_WIDTH_SUGAR
+# [282] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [282] TENSOR_WIDTH_SUGAR
+# [283] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [283] SPARSA_WIDTH_SUGAR
+# [284] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [284] VECTOR_WIDTH_SUGAR
+# [285] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [285] MATRIX_WIDTH_SUGAR
+# [286] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [286] FRONTMATTER_DELIMITER
+# [287] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [287] TOML_LINES
+# [288] TOML_LINES
 TOML_LINES ::=
-# [288] ANNOTATION_NAME
+# [289] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [289] ANNOTATION_FIELD_NAME
+# [290] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [290] NON_NEWLINE_TOKEN
+# [291] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [291] NO_NEWLINE
+# [292] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -889,6 +891,7 @@ NO_NEWLINE ::=
 | [`proba_modifier`](#proba-modifier) | `#proba-modifier` | live |
 | [`praepara_block`](#praepara-block) | `#praepara-block` | live |
 | [`fac_stmt`](#fac-stmt) | `#fac-stmt` | live |
+| [`fac_modifier`](#fac-modifier) | `#fac-modifier` | live |
 
 ## Lexicon Appendix {#lexicon}
 
@@ -995,6 +998,7 @@ productions. It is not a second keyword authority.
 | Annotation | `lane` | `@ radix` compiler-lane directive |
 | Builtin | `lege` | read |
 | Builtin | `lineam` | line |
+| Control | `machina` | device region modifier after `fac` (en `device`); contextual |
 | Declarations | `magnitudo` | size/index generic parameter |
 | Expression | `maxima` | maximum reduction operator (en `max`) |
 | Testing | `metior` | benchmark |
@@ -3259,6 +3263,9 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `fac { ... }` is the explicit `do` block and executes its body once.
 - `fac { ... } dum condition` is the post-test loop form; postfix `dum` attaches only to `fac`, not arbitrary preceding blocks.
 - `cape` is an attachment shared by several structured forms, not a semantic mode owned by `fac`. A plain `fac` is often used when an otherwise unattached block needs a local handler: `fac { ... } cape err { ... }`.
+- The modifier slot directly after `fac` holds `omnia` (en `do all`) or `machina` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- `fac omnia { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `cape` once, at the block's exit (or, with a `dum` tail, at each back edge).
+- `fac machina { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `fac omnia` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `dum` / `itera ab` loops are unchanged. Captures are classified by writes (a captured `in` scalar or genus is device state). The block's own `cape` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `dum` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `fac machina` (`fac_machina_nested`), a `redde` / `rumpe` / `perge` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `filum` loop or `reducta` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `fac omnia`, so every device route is unchanged.
 
 ---
 
@@ -3270,7 +3277,6 @@ typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `fac omnia { … } cape e { … }` (en `do all`) | admitted (FLD K1); `fac omnia` is `PARSE001` |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |

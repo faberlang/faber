@@ -101,6 +101,7 @@ axis = "軸"
 lege = "讀取"
 lineam = "行"
 omnia = "全部"
+machina = "裝置"
 scriptum = "格式文字"
 sparge = "展開"
 ut = "作為"
@@ -768,6 +769,10 @@ help = "使用 {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "在 '{fac}' 迴圈中，'{cape}' 必須位於 '{dum}' 之前"
 help = "將處理器寫在條件之前：{fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "'{fac}' 區塊只接受一個修飾詞，不能同時使用 '{omnia}' 和 '{machina}'"
+help = "'{machina}' 已在區塊結束時統一交付所有故障；去掉 '{omnia}'"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "逗號不再用於分隔 '{discerne}' 的主體"
@@ -1624,6 +1629,26 @@ help = "浮點核心值請使用 f32"
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "寬度為 {width} 的儲存可能在 nucleum 核心中觸發陷阱"
 help = "證明儲存範圍有效，或使用環繞或飽和儲存格"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "'{fac} {machina}' 區域不能包含另一個 '{fac} {machina}'"
+help = "只保留一個裝置區域，並直接從中呼叫 kernel"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' 會離開 '{fac} {machina}' 區域；區域尚無退出詞"
+help = "先結束區域再於其後決定，或把退出移到區塊外"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "在 '{fac} {machina}' 區域中直接寫 lane 迴圈 ('{construct}') 尚未實作"
+help = "從區域中呼叫 kernel 來完成平行工作"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "'{fac} {machina}' 區域暫不能配置 tensor ({construct})"
+help = "在區域之前配置 tensor，再於區域內使用"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{fac} {machina}' 區域中的 '{construct}' 讀取了裝置上計算的值；裝置端迴圈控制尚未實作"
+help = "條件、邊界和純量引數只用區域之前已知的值，並在區域之後讀取裝置結果"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "整數寬度 {width} 超出 nucleum 核心支援的寬度"

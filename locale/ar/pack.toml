@@ -101,6 +101,7 @@ axis = "محور"
 lege = "اقرأ"
 lineam = "سطرا"
 omnia = "الكل"
+machina = "جهاز"
 scriptum = "حرر"
 sparge = "انشر"
 ut = "كـ"
@@ -724,6 +725,10 @@ help = "استخدم {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "يجب أن يأتي '{cape}' قبل '{dum}' في حلقة '{fac}'"
 help = "اكتب المعالج قبل الشرط: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "تقبل كتلة '{fac}' كلمة تعديل واحدة، لا '{omnia}' و'{machina}' معا"
+help = "'{machina}' يسلّم كل الأخطاء مرة واحدة عند نهاية الكتلة؛ احذف '{omnia}'"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "لم تعد الفاصلة تفصل بين موضوعات '{discerne}'"
@@ -1584,6 +1589,26 @@ help = "استخدم f32 لقيم النواة العائمة"
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "التخزين بعرض {width} قد يسبب فخا داخل نواة nucleum"
 help = "أثبت أن التخزين ضمن المدى أو استخدم خلية wrapping أو saturating"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "لا يجوز أن تحتوي منطقة '{fac} {machina}' على '{fac} {machina}' أخرى"
+help = "أبقِ منطقة جهاز واحدة واستدعِ kernel منها مباشرة"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' يغادر منطقة '{fac} {machina}'؛ لا توجد للمنطقة كلمة خروج بعد"
+help = "أنهِ المنطقة ثم قرر بعدها، أو انقل الخروج خارج الكتلة"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "حلقة lane ('{construct}') مباشرة في منطقة '{fac} {machina}' لم تُبنَ بعد"
+help = "استدعِ kernel من المنطقة للعمل المتوازي"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "لا تستطيع منطقة '{fac} {machina}' تخصيص tensor بعد ({construct})"
+help = "خصص الـ tensor قبل المنطقة واستخدمه داخلها"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' في منطقة '{fac} {machina}' يقرأ قيمة حُسبت على الجهاز؛ التحكم بالحلقات على الجهاز لم يُبنَ بعد"
+help = "اجعل الشروط والحدود والوسائط العددية من قيم معروفة قبل المنطقة، واقرأ نتائج الجهاز بعدها"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "عرض العدد الصحيح {width} يتجاوز عرض نواة nucleum المدعوم"

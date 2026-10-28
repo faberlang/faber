@@ -94,6 +94,7 @@ axis = "axis"
 lege = "lege"
 lineam = "lineam"
 omnia = "omnia"
+machina = "machina"
 praefixum = "praefixum"
 insere = "insere"
 scriptum = "scriptum"
@@ -889,6 +890,10 @@ help = "use {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "'{cape}' must come before '{dum}' in a '{fac}' loop"
 help = "write the handler before the condition: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "blocus '{fac}' unum modificatorem capit, non '{omnia}' et '{machina}' simul"
+help = "'{machina}' omnes errores semel in exitu blocui iam tradit; '{omnia}' omitte"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "comma iam non separat subiecta '{discerne}'"
@@ -1813,6 +1818,26 @@ help = "parametrum omitte et coordinatam iterationis per `{apud}` in ansa `{filu
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "corpus nuclei tractatorem localem ('{construct}') ponere non potest"
 help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "regio '{fac} {machina}' aliam '{fac} {machina}' continere non potest"
+help = "unam regionem machinae serva et nuclea ex ea directe voca"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' regionem '{fac} {machina}' relinquit; regio verbum exitus nondum habet"
+help = "regionem fini et post eam decerne, vel exitum extra blocum move"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "ansa lineae ('{construct}') directe in regione '{fac} {machina}' nondum efficitur"
+help = "nucleum ex regione voca ad opus parallelum"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "regio '{fac} {machina}' tensorem nondum assignare potest ({construct})"
+help = "tensorem ante regionem assigna et intus utere"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' in regione '{fac} {machina}' valorem in machina computatum legit; imperium ansae in machina nondum efficitur"
+help = "condiciones, limites et argumenta scalaria ad valores ante regionem notos restringe, et eventus machinae post eam lege"
 
 [diagnostics.SEM008.issues.nucleum_saturating_float_not_built]
 message = "nucleum fractum saturatum nondum adhibere potest ({site}); nucleorum structio fractorum saturatorum nondum efficitur"

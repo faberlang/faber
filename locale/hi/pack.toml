@@ -101,6 +101,7 @@ axis = "अक्ष"
 lege = "पढ़ो"
 lineam = "पंक्ति"
 omnia = "सभी"
+machina = "उपकरण"
 scriptum = "लिखित"
 sparge = "फैलाओ"
 ut = "रूपमें"
@@ -724,6 +725,10 @@ help = "{replacement} उपयोग करें"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "'{fac}' लूप में '{cape}' को '{dum}' से पहले आना चाहिए"
 help = "हैंडलर को शर्त से पहले लिखें: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "'{fac}' ब्लॉक एक ही संशोधक शब्द लेता है, '{omnia}' और '{machina}' साथ नहीं"
+help = "'{machina}' ब्लॉक के अंत में सभी दोष एक बार पहले ही सौंप देता है; '{omnia}' हटाएँ"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "अब अल्पविराम '{discerne}' के विषयों को अलग नहीं करता"
@@ -1596,6 +1601,26 @@ help = "फ़्लोटिंग-पॉइंट कर्नेल मान
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "nucleum कर्नेल में चौड़ाई {width} का store trap कर सकता है"
 help = "सिद्ध करें कि store श्रेणी में है, या wrapping या saturating cell का उपयोग करें"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "'{fac} {machina}' क्षेत्र में दूसरा '{fac} {machina}' नहीं हो सकता"
+help = "एक ही डिवाइस क्षेत्र रखें और उससे सीधे kernel बुलाएँ"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' '{fac} {machina}' क्षेत्र से बाहर जाता है; क्षेत्र में अभी निकास शब्द नहीं है"
+help = "क्षेत्र समाप्त करके उसके बाद निर्णय लें, या निकास को ब्लॉक के बाहर ले जाएँ"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "'{fac} {machina}' क्षेत्र में सीधे lane लूप ('{construct}') अभी बना नहीं है"
+help = "समानांतर काम के लिए क्षेत्र से kernel बुलाएँ"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "'{fac} {machina}' क्षेत्र अभी tensor आवंटित नहीं कर सकता ({construct})"
+help = "tensor को क्षेत्र से पहले आवंटित करें और अंदर उपयोग करें"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{fac} {machina}' क्षेत्र में '{construct}' डिवाइस पर गणना किया मान पढ़ता है; डिवाइस-पक्ष लूप नियंत्रण अभी बना नहीं है"
+help = "शर्तें, सीमाएँ और स्केलर तर्क क्षेत्र से पहले ज्ञात मानों तक रखें, और डिवाइस परिणाम क्षेत्र के बाद पढ़ें"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "पूर्णांक चौड़ाई {width} समर्थित nucleum कर्नेल चौड़ाई से अधिक है"

@@ -2173,6 +2173,9 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `fac { ... }` is the explicit `do` block and executes its body once.
 - `fac { ... } dum condition` is the post-test loop form; postfix `dum` attaches only to `fac`, not arbitrary preceding blocks.
 - `cape` is an attachment shared by several structured forms, not a semantic mode owned by `fac`. A plain `fac` is often used when an otherwise unattached block needs a local handler: `fac { ... } cape err { ... }`.
+- The modifier slot directly after `fac` holds `omnia` (en `do all`) or `machina` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- `fac omnia { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `cape` once, at the block's exit (or, with a `dum` tail, at each back edge).
+- `fac machina { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `fac omnia` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `dum` / `itera ab` loops are unchanged. Captures are classified by writes (a captured `in` scalar or genus is device state). The block's own `cape` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `dum` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `fac machina` (`fac_machina_nested`), a `redde` / `rumpe` / `perge` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `filum` loop or `reducta` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `fac omnia`, so every device route is unchanged.
 
 ---
 
@@ -2184,7 +2187,6 @@ typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `fac omnia { … } cape e { … }` (en `do all`) | admitted (FLD K1); `fac omnia` is `PARSE001` |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `discerne` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |

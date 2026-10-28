@@ -565,6 +565,7 @@ fn map_kernel_requirements(
                     .collect(),
             })
             .collect(),
+        regions: Vec::new(),
     }
 }
 

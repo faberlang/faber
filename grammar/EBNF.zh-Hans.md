@@ -99,7 +99,7 @@ compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_bl
 # [044] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
 # [045] fac_block
-fac_block ::= '执行' block_stmt cape_clause?
+fac_block ::= '执行' fac_modifier? block_stmt cape_clause?
 # [046] clausura_legacy_expr
 clausura_legacy_expr ::= '闭包' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 # [047] clausura_params
@@ -547,50 +547,52 @@ proba_modifier ::= '预期失败' | '跳过' STRING | '预期' STRING | '仅' | 
 # [268] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
 # [269] fac_stmt
-fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [270] IDENTIFIER
+fac_stmt ::= '执行' fac_modifier? block_stmt cape_clause? ('当' expression)?
+# [270] fac_modifier
+fac_modifier ::= '全部' | '设备'
+# [271] IDENTIFIER
 IDENTIFIER ::=
-# [271] NUMBER
+# [272] NUMBER
 NUMBER ::=
-# [272] NATURAL
+# [273] NATURAL
 NATURAL ::=
-# [273] STRING
+# [274] STRING
 STRING ::=
-# [274] ASCII_STRING
+# [275] ASCII_STRING
 ASCII_STRING ::=
-# [275] BACKTICK_STRING
+# [276] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [276] OCTETI_STRING
+# [277] OCTETI_STRING
 OCTETI_STRING ::=
-# [277] REGEX_TYPE_WORD
+# [278] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [278] REGEX_BODY
+# [279] REGEX_BODY
 REGEX_BODY ::=
-# [279] NEWLINE
+# [280] NEWLINE
 NEWLINE ::=
-# [280] WIDTH_MARKER
+# [281] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [281] LISTA_WIDTH_SUGAR
+# [282] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [282] TENSOR_WIDTH_SUGAR
+# [283] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [283] SPARSA_WIDTH_SUGAR
+# [284] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [284] VECTOR_WIDTH_SUGAR
+# [285] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [285] MATRIX_WIDTH_SUGAR
+# [286] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [286] FRONTMATTER_DELIMITER
+# [287] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [287] TOML_LINES
+# [288] TOML_LINES
 TOML_LINES ::=
-# [288] ANNOTATION_NAME
+# [289] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [289] ANNOTATION_FIELD_NAME
+# [290] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [290] NON_NEWLINE_TOKEN
+# [291] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [291] NO_NEWLINE
+# [292] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -889,6 +891,7 @@ NO_NEWLINE ::=
 | [`proba_modifier`](#proba-modifier) | `#测试-modifier` | live |
 | [`praepara_block`](#praepara-block) | `#备置-block` | live |
 | [`fac_stmt`](#fac-stmt) | `#执行-stmt` | live |
+| [`fac_modifier`](#fac-modifier) | `#执行-modifier` | live |
 
 ## Lexicon Appendix {#lexicon}
 
@@ -995,6 +998,7 @@ productions. It is not a second keyword authority.
 | Annotation | `车道` | `@ radix` compiler-lane directive |
 | Builtin | `读取` | read |
 | Builtin | `行` | line |
+| Control | `设备` | device region modifier after `执行` (en `device`); contextual |
 | Declarations | `维度` | size/index generic parameter |
 | Expression | `最大` | maximum reduction operator (en `max`) |
 | Testing | `计量` | benchmark |
@@ -3259,6 +3263,9 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `执行 { ... }` is the explicit `do` block and executes its body once.
 - `执行 { ... } 当 condition` is the post-test loop form; postfix `当` attaches only to `执行`, not arbitrary preceding blocks.
 - `捕获` is an attachment shared by several structured forms, not a semantic mode owned by `执行`. A plain `执行` is often used when an otherwise unattached block needs a local handler: `执行 { ... } 捕获 err { ... }`.
+- The modifier slot directly after `执行` holds `全部` (en `do all`) or `设备` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- `执行 全部 { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `捕获` once, at the block's exit (or, with a `当` tail, at each back edge).
+- `执行 设备 { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `执行 全部` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `当` / `遍历 范围` loops are unchanged. Captures are classified by writes (a captured `传入` scalar or genus is device state). The block's own `捕获` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `当` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `执行 设备` (`fac_machina_nested`), a `返回` / `中断` / `继续` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `线程` loop or `归约` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `执行 全部`, so every device route is unchanged.
 
 ---
 
@@ -3270,7 +3277,6 @@ typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `执行 全部 { … } 捕获 e { … }` (en `do all`) | admitted (FLD K1); `执行 全部` is `PARSE001` |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `匹配` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |

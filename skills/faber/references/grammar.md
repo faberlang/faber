@@ -552,7 +552,8 @@ Grounded in `EBNF.md` and probes against the built binary.
 - Collection reads: `xs[i]` out of range dies, `xs.get(i)` gives `none`, `xs.at(i)` reports on the error channel (`do { } catch err { }`, la `fac { } cape err { }`, or `⊥ default`); text indexes by Unicode character; an out-of-range range index dies (`corpus/lista/reads-three-ways.fab`).
 - Value-side markers: `mut b ← copy a` duplicates, `mut b ← own a` takes over, an unmarked `b ← c` shares; read-only is deep, so a `let` (or `ref`, or unmarked-parameter) container or class into a `mut` cell is `SEM065 const_shared_into_var`; `ref`/`mut` may hold `T ∪ none` for a reference type, never a scalar (`corpus/mutabilitas/ref-optional-cursor.fab`) (`corpus/mutabilitas/copy-bind-deep.fab`, `const-share-into-var-reject.fab`). A method that changes the shape of the collection a loop walks is `SEM011 loop_collection_shape_change`; a bracket store that grows a map in its own loop traps `map changed size during iteration`.
 - Retired: `sum from …`, `max from …`, and `min from …` (la `summa ex …`, `maxima ex …`, and `minima ex …`) report `PARSE010`; use `reduce via <op> from …` (la `reducta via <op> ex …`).
-- Admitted but **not** accepted by the parser today: `do all` (la `fac omnia`), `for … thread` (la `itera … filum`),
+- `do device { … } catch e { … }` (la `fac machina`) is a checked device region: kernel launches, entry-known loops and guards, and no host effect, host call, allocation, direct lane loop, nested region or crossing `return`/`break` (named `SEM008` rows); `do all device` is `PARSE020`. V0 lowers it exactly as `do all` (`corpus/kernel/region.fab`, `region-reject.fab`, `docs/design/device-region.md`).
+- Admitted but **not** accepted by the parser today: `for … thread` (la `itera … filum`),
   superscript powers (`x²`), run-time capacities/extents, `trapping`/`saturating` float
   cells. See "Admitted, Not Shipped" in `grammar/EBNF.md`.
 

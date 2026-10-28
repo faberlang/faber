@@ -30,6 +30,23 @@ pub const DEVICE_TARGETS: [Target; 3] = Target::DEVICE_TARGETS;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct KernelRequirementsReport {
     pub kernels: Vec<KernelRequirement>,
+    /// One row per `fac machina` (en `do device`) region of the module's host
+    /// code. A local fact: the module artifact and the FHIR wire read
+    /// `kernels` only.
+    pub regions: Vec<DeviceRegionRequirement>,
+}
+
+/// A `fac machina` region's requirement rows and the facts `faber check
+/// --device` prints for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceRegionRequirement {
+    /// The block's source span (the report names it `do device`).
+    pub span: Span,
+    pub target_reports: Vec<KernelTargetRequirement>,
+    pub facts: super::device_region::RegionFacts,
+    /// Host syncs the block performs. Zero for every region that checks: a
+    /// device read at the top of the block is refused by name.
+    pub host_syncs: u32,
 }
 
 /// One kernel's inferred requirements and admission verdict for every device
@@ -189,8 +206,18 @@ pub const ISSUE_TRAPPING_STORE: &str = "nucleum_trapping_store";
 pub fn language_errors(report: &KernelRequirementsReport) -> Vec<SemanticError> {
     let mut errors = Vec::new();
     let mut seen: FxHashSet<(&'static str, u32, u32)> = FxHashSet::default();
-    for kernel in &report.kernels {
-        let Some(row) = kernel.target_reports.first() else {
+    let rows = report
+        .kernels
+        .iter()
+        .map(|kernel| kernel.target_reports.first())
+        .chain(
+            report
+                .regions
+                .iter()
+                .map(|region| region.target_reports.first()),
+        );
+    for row in rows {
+        let Some(row) = row else {
             continue;
         };
         for failure in &row.failures {
@@ -463,7 +490,24 @@ pub fn check(
         recursive_kernels,
         &callback_defs,
     );
-    KernelRequirementsReport { kernels }
+    let mut regions = Vec::new();
+    super::device_region::for_each_region(hir, &mut |body, depth, outer| {
+        // A nested region is refused by the legality pass; the outer row
+        // already covers its statements.
+        if depth == 0 {
+            regions.push(analyze_region(
+                body,
+                outer,
+                &facts,
+                &const_values,
+                resolver,
+                types,
+                interner,
+                tensor_edge_policies,
+            ));
+        }
+    });
+    KernelRequirementsReport { kernels, regions }
 }
 
 /// Whether a kernel declaration carries the `publica` launch marker.
@@ -471,6 +515,21 @@ fn is_public_kernel(annotations: &[HirAnnotation], interner: &Interner) -> bool 
     annotations
         .iter()
         .any(|annotation| interner.resolve(annotation.family) == "publica")
+}
+
+/// The folded integer value of an imported `module.CONST` member, when the
+/// exporter folded it.
+fn imported_int_const(resolver: &Resolver, object: &HirExpression, member: Symbol) -> Option<i128> {
+    let HirExpressionKind::Path(module) = &object.kind else {
+        return None;
+    };
+    let namespace = resolver
+        .get_symbol(*module)
+        .filter(|namespace| namespace.kind == SymbolKind::Module)?;
+    match resolver.namespace_file_const_value_canonical(namespace.name, member)? {
+        crate::file_interface::InterfaceConstValue::Int(value) => Some(*value),
+        _ => None,
+    }
 }
 
 /// Exact integer value of a call argument used to seed an inlined private
@@ -850,40 +909,101 @@ fn analyze_kernel(
     KernelRequirement {
         def_id,
         name: interner.resolve(function.name).to_owned(),
-        target_reports: DEVICE_TARGETS
-            .iter()
-            .copied()
-            .map(|target| {
-                let mut target_failures = failures.clone();
-                if recursive {
-                    target_failures.push(KernelRequirementFailure::RecursiveCall);
+        target_reports: target_rows(&failures, &widths, &conditions, &trapping_stores, recursive),
+    }
+}
+
+/// One requirement row per device target from the facts a body produced.
+fn target_rows(
+    failures: &[KernelRequirementFailure],
+    widths: &[KernelWidthRequirement],
+    conditions: &[KernelExtentCondition],
+    trapping_stores: &[KernelTrappingStore],
+    recursive: bool,
+) -> Vec<KernelTargetRequirement> {
+    DEVICE_TARGETS
+        .iter()
+        .copied()
+        .map(|target| {
+            let mut target_failures = failures.to_vec();
+            if recursive {
+                target_failures.push(KernelRequirementFailure::RecursiveCall);
+            }
+            for requirement in widths {
+                if requirement.policy == KernelNumericPolicy::Saturating {
+                    target_failures.push(KernelRequirementFailure::SaturatingLoweringDeferred {
+                        span: requirement.span,
+                        width: requirement.width,
+                    });
                 }
-                for requirement in &widths {
-                    if requirement.policy == KernelNumericPolicy::Saturating {
-                        target_failures.push(
-                            KernelRequirementFailure::SaturatingLoweringDeferred {
-                                span: requirement.span,
-                                width: requirement.width,
-                            },
-                        );
-                    }
-                    if !supports_width(target, requirement) {
-                        target_failures.push(width_failure(requirement));
-                    }
+                if !supports_width(target, requirement) {
+                    target_failures.push(width_failure(requirement));
                 }
-                let failures = dedupe(target_failures);
-                KernelTargetRequirement {
-                    target,
-                    admitted: failures.is_empty(),
-                    recursive,
-                    callees: Vec::new(),
-                    widths: widths.clone(),
-                    extent_conditions: conditions.clone(),
-                    trapping_stores: trapping_stores.clone(),
-                    failures,
-                }
-            })
-            .collect(),
+            }
+            let failures = dedupe(target_failures);
+            KernelTargetRequirement {
+                target,
+                admitted: failures.is_empty(),
+                recursive,
+                callees: Vec::new(),
+                widths: widths.to_vec(),
+                extent_conditions: conditions.to_vec(),
+                trapping_stores: trapping_stores.to_vec(),
+                failures,
+            }
+        })
+        .collect()
+}
+
+/// Requirements of one `fac machina` region: the same body facts a kernel
+/// body gets, over the block's statements, with no parameters.
+fn analyze_region(
+    region: &super::device_region::RegionBody<'_>,
+    outer: &super::device_region::OuterNames,
+    facts: &TypeFacts,
+    const_values: &FxHashMap<DefId, i128>,
+    resolver: &Resolver,
+    types: &TypeTable,
+    interner: &Interner,
+    tensor_edge_policies: &TensorEdgePolicyTable,
+) -> DeviceRegionRequirement {
+    let mut base = BodyFacts {
+        types,
+        facts,
+        interner,
+        tensor_edge_policies,
+        const_values,
+        resolver,
+        ranges: FxHashMap::default(),
+        parameter_types: FxHashMap::default(),
+        parameter_aliases: FxHashMap::default(),
+        range_only_bindings: FxHashSet::default(),
+        coordinate_ranges: FxHashMap::default(),
+        expression_vectors: FxHashMap::default(),
+        has_signed_coordinate_input: false,
+        failures: Vec::new(),
+        conditions: Vec::new(),
+        trapping_stores: Vec::new(),
+        widths: Vec::new(),
+        return_type: None,
+    };
+    let region_facts = super::device_region::region_facts(resolver, types, outer, interner, region);
+    base.bind_captured_size_values(&region_facts.captured);
+    for statement in region.statements {
+        base.visit_statement_stateful(statement);
+    }
+    if let Some(tail) = region.tail {
+        base.evaluate(tail);
+    }
+    let widths = dedupe(base.widths);
+    let conditions = dedupe(base.conditions);
+    let trapping_stores = dedupe(base.trapping_stores);
+    let failures = dedupe(base.failures);
+    DeviceRegionRequirement {
+        span: region.span,
+        target_reports: target_rows(&failures, &widths, &conditions, &trapping_stores, false),
+        facts: region_facts,
+        host_syncs: 0,
     }
 }
 
@@ -2481,6 +2601,16 @@ impl BodyFacts<'_> {
             HirExpressionKind::Path(def_id) => self.path_range(*def_id, expr.ty),
             HirExpressionKind::Literal(_) => crate::passes::const_int_value(expr)
                 .map_or_else(AbstractRange::unknown, AbstractRange::exact),
+            HirExpressionKind::Field(object, member) => {
+                imported_int_const(self.resolver, object, *member).map_or_else(
+                    || {
+                        expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                            AbstractRange::from_type(ty, self.types)
+                        })
+                    },
+                    AbstractRange::exact,
+                )
+            }
             HirExpressionKind::Unary(op, operand) => unary_range(*op, self.peek_range(operand)),
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 binary_range(*op, self.peek_range(lhs), self.peek_range(rhs))
@@ -2679,6 +2809,31 @@ impl BodyFacts<'_> {
                     maximum: extent,
                 })),
             );
+        }
+    }
+
+    /// A captured `size` binding that a captured tensor's shape names reads as
+    /// that axis's symbolic extent, as a `size` type parameter does in a
+    /// kernel (the launch contract owns its value).
+    fn bind_captured_size_values(&mut self, captured: &[(DefId, TypeId)]) {
+        for (_, ty) in captured {
+            for axis in shape_dimensions(*ty, self.types) {
+                let IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(binding)) =
+                    self.types.get_index(axis)
+                else {
+                    continue;
+                };
+                let extent = KernelRangeExpr::Shape(axis);
+                self.ranges.insert(
+                    *binding,
+                    AbstractRange(Some(KernelValueRange {
+                        minimum: extent.clone(),
+                        maximum: extent,
+                    })),
+                );
+                // The binding is a launch-time extent, not an i64 cell.
+                self.range_only_bindings.insert(*binding);
+            }
         }
     }
 
@@ -3207,6 +3362,24 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
             }
         }
         HirBinOp::Mod => {
+            // A non-negative numerator over a symbolic extent divisor (a
+            // captured `size` binding, a tensor axis) is bounded by the
+            // extent: a floored remainder by `d > 0` lies in `[0, d - 1]`.
+            // A zero divisor is a separate failure; it never yields a value.
+            if (constant(&rhs.minimum).is_none() || constant(&rhs.maximum).is_none())
+                && symbolic_bounds(&lhs.minimum)
+                    .minimum
+                    .is_some_and(|m| m >= 0)
+                && symbolic_bounds(&rhs.minimum)
+                    .minimum
+                    .is_some_and(|m| m >= 0)
+                && contains_shape(&rhs)
+            {
+                return AbstractRange(Some(KernelValueRange {
+                    minimum: KernelRangeExpr::Constant(0),
+                    maximum: subtract(rhs.maximum, KernelRangeExpr::Constant(1)),
+                }));
+            }
             let Some(divisor_min) = constant(&rhs.minimum) else {
                 return AbstractRange::unknown();
             };
