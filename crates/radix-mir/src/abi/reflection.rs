@@ -53,6 +53,7 @@ impl MirKernelReflection {
             )?,
             fault_sites: fault_sites_for_signature(signature),
             lane_range_binding: None,
+            slab_origin_bindings: Vec::new(),
         })
     }
 
@@ -173,6 +174,7 @@ impl MirKernelReflection {
             resources,
             fault_sites: Vec::new(),
             lane_range_binding: None,
+            slab_origin_bindings: Vec::new(),
             bound_resources: Vec::new(),
             vertex_inputs,
             varyings: Vec::new(),
@@ -207,6 +209,7 @@ impl MirKernelReflection {
             resources,
             fault_sites: Vec::new(),
             lane_range_binding: None,
+            slab_origin_bindings: Vec::new(),
             bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,
@@ -241,6 +244,7 @@ impl MirKernelReflection {
             resources,
             fault_sites: Vec::new(),
             lane_range_binding: None,
+            slab_origin_bindings: Vec::new(),
             bound_resources: Vec::new(),
             vertex_inputs: Vec::new(),
             varyings,
