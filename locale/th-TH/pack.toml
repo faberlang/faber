@@ -2809,6 +2809,10 @@ help = "ใช้ chorda หรือ helper การแปลงไบต์�
 message = "การแปลงจาก {lista}<b8> เป็น fractus ไม่ได้ระบุไว้ (ความกว้าง IEEE และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
 
+[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+message = "tensor ของเรคคอร์ดอ่านไบต์ตามเลย์เอาต์ little-endian ของเรคคอร์ด; เขียน `via Le` ไม่ใช่ `via Be`"
+help = "เขียน {lista}<b8> ↦ tensor<Record, [n]> via Le; สมาชิกเรคคอร์ดมีลำดับไบต์เดียวที่เลย์เอาต์กำหนด"
+
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
 help = "use littera ↦ u32 via Code or numerus ↦ littera via Code; without Code a number converts to its digits"
