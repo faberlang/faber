@@ -5,7 +5,9 @@ input_root = "corpus"
 input = "keyword-as-ident/read-unshadowed.fab"
 category = "identifier"
 domain = "program"
+stdin = "stdin.txt"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

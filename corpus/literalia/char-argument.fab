@@ -1,0 +1,58 @@
++++
+term = "char"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "si_stmt", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "equality", "equality_tail", "aut_expr"]
+category = "literal"
+summary = "A char literal is a call argument, a return value and a class field, and prints as its letter."
+syntax = "'<letter>'"
+related = ["char", "littera", "ascii"]
+locale = "en"
++++
+# =============================================================================
+# char — A char literal is a call argument, a return value and a class field, and prints as its letter.
+# =============================================================================
+#
+# What this teaches:
+#   • A one-letter literal `'x'` is a `char` wherever a `char` is
+#     expected: a call argument, a return value, a `let` field and a `mut`
+#     field
+#   • A `char` compares by value: `c ≡ 'e'` is true for the same letter
+#   • A `char` prints as its letter
+#
+# Common mistakes:
+#   • Writing `"x"` where a `char` is wanted: that is a `string` and does
+#     not fit a `char` slot
+#   • Expecting a `char` to hold more than one letter: it is one Unicode
+#     scalar value
+#
+# See also: char, conversio/littera, ascii
+# =============================================================================
+
+class Cell {
+    let char glyph
+    mut char alt
+}
+
+fn echo(char c) → char {
+    return c
+}
+
+fn dash() → char {
+    return '-'
+}
+
+fn is_vowel(char c) → bool {
+    return c ≡ 'a' or c ≡ 'e' or c ≡ 'i' or c ≡ 'o' or c ≡ 'u'
+}
+
+main {
+    print echo('x')
+    print dash()
+    mut Cell cell ← Cell { glyph = 'q', alt = '?' }
+    print cell.glyph
+    print cell.alt
+    cell.alt ← echo('z')
+    print cell.alt
+    print is_vowel('e')
+    print is_vowel('z')
+}

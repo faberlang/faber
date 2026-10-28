@@ -1,0 +1,37 @@
++++
+term = "main"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "entry_header", "assignment", "expr_stmt"]
+category = "package"
+summary = "`main exit 3 { … }` runs its body and then ends the process with exit code 3, with no `@ cli`."
+syntax = "main exit <int> { … }"
+related = ["main", "incipit", "exit"]
+locale = "en"
++++
+# =============================================================================
+# main — `main exit 3 { … }` runs its body and then ends the process with exit code 3, with no `@ cli`.
+# =============================================================================
+#
+# What this teaches:
+#   • `main exit N` names the process exit code the program ends with: the
+#     body runs normally and its output is kept
+#   • The exit code is part of the entry, so no `@ cli` annotation or
+#     command-line surface is needed
+#   • A plain `main` ends with exit code 0
+#
+# Common mistakes:
+#   • Expecting `exit 3` to stop the body early: it names the code the
+#     program ends with after the body ran
+#   • Expecting a non-zero code to be an error report: it is only the
+#     status the process returns
+#
+# See also: incipit, salve-munde, exitus
+# =============================================================================
+
+main exit 3 {
+    print "start"
+    mut int n ← 1
+    n ← n + 1
+    print n
+    print "done"
+}

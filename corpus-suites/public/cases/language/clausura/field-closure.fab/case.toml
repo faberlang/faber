@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/clausura/field-closure.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/field-closure.fab"
+category = "function"
+domain = "functions"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

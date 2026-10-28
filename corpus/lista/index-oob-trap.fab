@@ -1,0 +1,39 @@
++++
+term = "[]"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "array_literal", "type_arguments", "type_argument", "assignment", "expr_stmt", "member_suffix"]
+category = "list"
+summary = "A list read past the end aborts the run: stdout before it is printed, the run exits non-zero."
+syntax = "<list>[<index>]"
+related = ["lista", "reads-three-ways", "range-index-oob"]
+locale = "en"
++++
+# =============================================================================
+# [] — A list read past the end aborts the run: stdout before it is printed, the run exits non-zero.
+# =============================================================================
+#
+# What this teaches:
+#   • `xs[i]` is the read where the programmer knows the element is there:
+#     in range it reads normally
+#   • An index past the end is a run-time trap, not a compile error: the
+#     run ends where the index is evaluated
+#   • The line printed before the trap is kept; the line after it never
+#     runs
+#
+# Common mistakes:
+#   • Expecting `xs[i]` to give `none` out of range: `xs.get(i)` does that
+#   • Expecting the trap to be recoverable with `do … catch`: use
+#     `xs.at(i)` for a read that reports on the error channel
+#
+# See also: lista, reads-three-ways, range-index-oob
+# =============================================================================
+
+main {
+    let list<int> xs ← [10, 20, 30]
+    mut int i ← 1
+    print xs[i]
+    i ← i + 5
+    print "before"
+    print xs[i]
+    print "after"
+}

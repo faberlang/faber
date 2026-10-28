@@ -7,8 +7,6 @@ summary = "Bounded list<b8, N> converts to an unbounded list<u8> prefix."
 syntax = "list<b8, N> ↦ list<u8>"
 related = ["↦", "list<b8>", "lista", "u8"]
 locale = "en"
-no_expected = "awaiting-ruling"
-ruling = "6a13d711"
 +++
 # =============================================================================
 # bounded list<b8, N> to list<u8> — compile-admitted byte-list bridge

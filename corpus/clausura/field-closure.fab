@@ -1,0 +1,49 @@
++++
+term = "∴"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "genus_decl", "genus_member", "field_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "assignment", "expr_stmt", "clausura_expr", "function_type"]
+category = "function"
+summary = "A closure held in a class field is called through the field, and a field closure can capture an outer binding."
+syntax = "<object>.<field>(<args>)"
+related = ["∴", "clausura", "genus", "function-types"]
+locale = "en"
++++
+# =============================================================================
+# ∴ — A closure held in a class field is called through the field, and a field closure can capture an outer binding.
+# =============================================================================
+#
+# What this teaches:
+#   • A field may have a function type: `let (int) → int apply` holds a
+#     closure, and `box.apply(3)` calls it
+#   • The closure in the field keeps the outer binding it captured: it
+#     reads `offset` as it is when the call runs
+#   • A `mut` field can be given another closure, and the next call uses
+#     the new one
+#
+# Common mistakes:
+#   • Expecting the field call to pass the object as `self`: a closure in
+#     a field is a plain function value
+#   • Declaring a field closure with `=`: a closure is a run-time value,
+#     so it is set in the construction literal
+#
+# See also: clausura, shared-capture, function-types
+# =============================================================================
+
+class Box {
+    let (int) → int apply
+    mut (int) → int fallback
+}
+
+main {
+    mut int offset ← 10
+    mut Box box ← Box {
+        apply = int x → int ∴ x + offset,
+        fallback = int x → int ∴ x * 2
+    }
+    print box.apply(3)
+    offset ← 20
+    print box.apply(3)
+    print box.fallback(4)
+    box.fallback ← int x → int ∴ x - 1
+    print box.fallback(4)
+}

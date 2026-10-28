@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/clausura/capture-self.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/capture-self.fab"
+category = "function"
+domain = "functions"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

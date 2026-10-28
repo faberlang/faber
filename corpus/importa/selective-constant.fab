@@ -1,0 +1,38 @@
++++
+term = "import"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "importa_decl", "importa_sugar", "selective_import", "import_value_binding", "additive_expr"]
+category = "package"
+summary = "A selective import binds one exported constant by name, and a rename binds it under another."
+syntax = "import from <path> const <NAME> [as <alias>]"
+related = ["import", "importa", "constantia", "imported-constant"]
+locale = "en"
++++
+# =============================================================================
+# import — A selective import binds one exported constant by name, and a rename binds it under another.
+# =============================================================================
+#
+# What this teaches:
+#   • `import from "./constantia" const BASE` binds the exported constant
+#     `BASE` of the sibling module as a local name, with no module prefix
+#   • `const BASE as origin` binds it under another name, so the local
+#     name can differ from the exported one
+#   • The imported constant is an ordinary value: it prints and takes part
+#     in arithmetic
+#
+# Common mistakes:
+#   • Importing a constant the sibling module does not export with `@
+#     public`: the import names a member that is not there
+#   • Expecting the import to copy the module's `main`: only the named
+#     member crosses
+#
+# See also: importa, constantia, imported-constant, selective-import
+# =============================================================================
+
+import from "./constantia" const BASE, BASE as origin
+
+main {
+    print BASE
+    print origin
+    print BASE * 2 + origin
+}

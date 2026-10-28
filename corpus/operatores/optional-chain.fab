@@ -2,7 +2,7 @@
 term = "?."
 explains = ["?[", "?.", "?("]
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "array_literal", "optional_suffix", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "array_literal", "optional_suffix", "typus_decl", "clausura_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "expression", "literal", "nota_stmt"]
 category = "type"
 canonical = true
 summary = "Null-safe member, index, and call access."
@@ -30,11 +30,13 @@ locale = "en"
 #   optionalSuffix :← '?.' IDENTIFIER | '?[' expr ']' | '?(' argumentList ')'
 #
 # EXPECTED OUTPUT:
-#   Roma, Italia, none, none, a, none
+#   Roma, Italia, none, none, a, none, hi!, none
 #
 # BACKEND:
-#   Cross-ref optionalis/optionalis.fab for genus-heavy tour.
-#   Optional call ?( — syntax in frontmatter; Rust e2e defers to driver optional-chain tests.
+#   Cross-ref optionalis/optionalis.fab for genus-heavy tour and
+#   optionalis/chain-call.fab for the optional call `?(` and `?.method()`.
+
+type Op = (string) → string
 
 class Locus {
     mut string urbs
@@ -56,4 +58,8 @@ main {
     let list<string, 3> litterae ← ["a", "b", "c"]
     print litterae?[0]
     print litterae?[10]
+    let Op ∪ none loud ← string s → string ∴ s + "!"
+    let Op ∪ none quiet ← null
+    print loud?("hi")
+    print quiet?("hi")
 }

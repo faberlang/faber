@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/operatores/store-sites-trap-element.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/store-sites-trap-element.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout = "stdout.expected"
+stderr_contains = "300 does not fit in `u8` (collection element)"
+check_only = false
