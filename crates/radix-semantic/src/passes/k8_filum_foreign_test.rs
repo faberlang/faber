@@ -33,7 +33,7 @@ fn rejected(source: &str, reason: &str) {
 /// imported names.
 fn kernel(helpers: &str, statement: &str) -> String {
     format!(
-        r#"{helpers}
+        r"{helpers}
 @ nucleum
 @ publica
 functio k(in {GRID} out, de {GRID} src) → vacuum {{
@@ -41,7 +41,7 @@ functio k(in {GRID} out, de {GRID} src) → vacuum {{
         {statement}
     }}
 }}
-"#
+"
     )
 }
 

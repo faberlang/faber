@@ -160,7 +160,10 @@ fn bad(tensor<f32, [8]> x, int j) → f32 {
 
     let pick = target_row(&fixture, "pick", Target::MirWgsl);
     assert!(pick.admitted, "{:?}", pick.failures);
-    assert!(pick.failures.is_empty());
+    assert_eq!(
+        pick.failures,
+        [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
+    );
 
     let bad = target_row(&fixture, "bad", Target::MirWgsl);
     assert!(
