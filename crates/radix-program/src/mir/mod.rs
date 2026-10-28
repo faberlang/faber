@@ -38,6 +38,7 @@ pub(crate) mod diag;
 mod diag_test;
 pub(crate) mod driver;
 pub(crate) mod image;
+mod kernel_import_calls;
 pub(crate) mod link;
 pub(crate) mod lower;
 pub(crate) mod manifest;
@@ -737,6 +738,14 @@ mod sibling_generic_device_entry_tests;
 
 #[path = "generic_device_link_test.rs"]
 mod generic_device_link_tests;
+
+#[cfg(test)]
+#[path = "generic_kernel_backward_test.rs"]
+mod generic_kernel_backward_tests;
+
+#[cfg(test)]
+#[path = "kernel_import_calls_test.rs"]
+mod kernel_import_calls_tests;
 
 #[cfg(test)]
 #[path = "consumer_device_composition_test.rs"]
