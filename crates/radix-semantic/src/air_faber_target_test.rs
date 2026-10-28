@@ -65,7 +65,10 @@ fn has_decline(result: &SemanticResult, causa: &str) -> bool {
 fn faber_target_keeps_the_authored_loop() {
     let result = analyze(ADMIT, Target::HirFaber);
     assert!(
-        !result.diagnostics.iter().any(super::error::SemanticError::is_error),
+        !result
+            .diagnostics
+            .iter()
+            .any(super::error::SemanticError::is_error),
         "admitted AIR loop must analyze clean: {:?}",
         result.diagnostics
     );
