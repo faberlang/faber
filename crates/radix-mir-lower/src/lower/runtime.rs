@@ -5019,23 +5019,15 @@ impl FunctionBuilder<'_> {
             span,
         );
         nested.terminate_current(MirTerminatorKind::Return(Some(tensor)), span);
-        let blocks = nested.finish_blocks();
-        self.errors.extend(nested.errors);
-        self.synthetic_functions.push(MirFunction {
+        let id = Self::finish_synthetic_function(
+            &mut self.errors,
+            &mut self.synthetic_functions,
             id,
-            source: None,
-            name: None,
-            params: nested.params,
-            locals: nested.locals,
-            temps: nested.temps,
-            blocks,
+            nested,
             return_ty,
-            error_ty: Some(error_ty),
-            is_async: false,
-            is_generator: false,
-            shader_stage: None,
+            error_ty,
             span,
-        });
+        );
         self.synthetic_helpers.insert(key, id);
         id
     }
@@ -6185,7 +6177,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Record a completed synthetic MIR function into the lowering's function
-    /// arena, returning its id. Shared by the checked tensor and checked `at`
+    /// arena, returning its id. Shared by the checked `at`, trim, and tensor
     /// helper builders.
     ///
     /// Takes the two arenas rather than `&mut self`: `nested` borrows
