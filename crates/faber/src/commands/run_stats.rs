@@ -179,7 +179,7 @@ impl DeviceSpanSyncMetadata {
 
 /// An avoidable sync: the dispatcher classified entry `entry`'s syncs of
 /// `kind` as `avoidable` (`unbounded-read`, `fusable-with-previous`,
-/// `first-fallback`, `fault-combine-per-launch`), with `detail` (the missing
+/// `first-fallback`), with `detail` (the missing
 /// read set, the entry it fuses into, the fallback reason) and the runtime's
 /// counters for them.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]

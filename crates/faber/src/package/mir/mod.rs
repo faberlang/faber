@@ -408,10 +408,10 @@ pub struct SpanAvoidable {
     /// The launched entry.
     pub entry: String,
     /// The sync kind the class describes (`own-write-gather`,
-    /// `partials-all-gather`, `first-broadcast`, `fault-combine`).
+    /// `partials-all-gather`, `first-broadcast`).
     pub kind: &'static str,
-    /// The class: `unbounded-read`, `fusable-with-previous`, `first-fallback`
-    /// or `fault-combine-per-launch`.
+    /// The class: `unbounded-read`, `fusable-with-previous` or
+    /// `first-fallback`.
     pub avoidable: &'static str,
     /// The class's data: the missing read set, the entry a reduction would
     /// fuse into, or the fallback reason.

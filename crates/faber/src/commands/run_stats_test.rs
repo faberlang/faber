@@ -756,9 +756,9 @@ fn device_span_stats_carry_the_sync_audit_schema() {
         // Classified, never synced: no row.
         SpanAvoidable {
             entry: "k1".to_owned(),
-            kind: "fault-combine",
-            avoidable: "fault-combine-per-launch",
-            detail: None,
+            kind: "first-broadcast",
+            avoidable: "first-fallback",
+            detail: Some("recipe".to_owned()),
         },
     ];
     let metadata = run_stats::DeviceSpanMetadata::from_stats(&span).with_avoidable(&classes);
