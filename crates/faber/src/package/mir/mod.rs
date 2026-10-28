@@ -719,8 +719,7 @@ pub struct DeviceRunPhases {
 impl DeviceRunPhases {
     /// The public phase receipt for this run.
     fn into_receipt(&self) -> DeviceRunReceipt {
-        let dispatcher = self.dispatcher.clone();
-        let runtime = dispatcher.runtime;
+        let runtime = self.dispatcher.runtime.clone();
         let gpu_timing = if runtime.timed_launch_count == 0 {
             DeviceGpuTiming::Unavailable
         } else if runtime.untimed_launch_count == 0 {
@@ -735,12 +734,12 @@ impl DeviceRunPhases {
             module_compile_ns: self.module_compile_ns,
             execution_ns: self.execution_ns,
             runtime,
-            uploads: dispatcher.transfers.uploads,
-            downloads: dispatcher.transfers.downloads,
-            uploaded_bytes: dispatcher.transfers.uploaded_bytes,
-            downloaded_bytes: dispatcher.transfers.downloaded_bytes,
-            host_encode_ns: dispatcher.host_encode_ns,
-            host_blocked_ns: dispatcher.host_blocked_ns,
+            uploads: self.dispatcher.transfers.uploads,
+            downloads: self.dispatcher.transfers.downloads,
+            uploaded_bytes: self.dispatcher.transfers.uploaded_bytes,
+            downloaded_bytes: self.dispatcher.transfers.downloaded_bytes,
+            host_encode_ns: self.dispatcher.host_encode_ns,
+            host_blocked_ns: self.dispatcher.host_blocked_ns,
             gpu_timing,
         }
     }
