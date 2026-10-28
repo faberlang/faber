@@ -1175,9 +1175,11 @@ pub(super) fn check_tensor_bracket_slot_list_index(
                 }
             }
 
-            let static_step = step.as_deref().map_or(Some(1), static_numerus_literal);
-            let literal_window = static_numerus_literal(start)
-                .zip(static_numerus_literal(end))
+            let static_step = step
+                .as_deref()
+                .map_or(Some(1), static_signed_numerus_literal);
+            let literal_window = static_signed_numerus_literal(start)
+                .zip(static_signed_numerus_literal(end))
                 .zip(static_step);
             if let (Some(bound), Some(((start_value, end_value), step_value))) =
                 (static_bounds.get(axis).copied(), literal_window)
@@ -1188,29 +1190,34 @@ pub(super) fn check_tensor_bracket_slot_list_index(
                     Some(end_value)
                 };
                 if let Some(end_eff) = end_eff {
-                    let out_of_range = start_value > end_eff || end_eff > bound || step_value == 0;
+                    let out_of_range = start_value < 0
+                        || end_eff < 0
+                        || start_value > end_eff
+                        || u128::try_from(end_eff).map_or(true, |end| end > u128::from(bound))
+                        || step_value <= 0;
                     if out_of_range {
                         static_oob.push((
-                            vec![
-                                i128::from(start_value),
-                                i128::from(end_eff.saturating_sub(1)),
-                            ],
+                            vec![start_value, end_eff.saturating_sub(1)],
                             bound,
                             axis,
                         ));
                     }
-                    if step_value > 0 && start_value <= end_eff {
-                        let extent = (end_eff - start_value).div_ceil(step_value);
-                        kept_extents.push(checker.types.intern_index(IndexExpr::Literal(extent)));
+                    if step_value > 0
+                        && start_value <= end_eff
+                        && let Some(distance) = end_eff.checked_sub(start_value)
+                    {
+                        let extent = distance / step_value + i128::from(distance % step_value != 0);
+                        if let Ok(extent) = u64::try_from(extent) {
+                            kept_extents
+                                .push(checker.types.intern_index(IndexExpr::Literal(extent)));
+                        } else {
+                            all_kept_extents_static = false;
+                        }
                     } else {
                         all_kept_extents_static = false;
                     }
                 } else {
-                    static_oob.push((
-                        vec![i128::from(start_value), i128::from(end_value)],
-                        bound,
-                        axis,
-                    ));
+                    static_oob.push((vec![start_value, end_value], bound, axis));
                     all_kept_extents_static = false;
                 }
             } else {
