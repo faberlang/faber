@@ -18,6 +18,13 @@ fn temp_dir(label: &str) -> PathBuf {
     dir
 }
 
+fn resolve_route_selection(
+    args: &RunArgs,
+    input_path: &Path,
+) -> Result<DeviceSelection, Box<radix::module::diagnostics::Diagnostic>> {
+    resolve_route_options(args, input_path).map(|(selection, _)| selection)
+}
+
 fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
     RunArgs {
         path,
@@ -404,8 +411,8 @@ fn run_threads_passes_on_the_cpu_route() {
     let mut args = run_args(dir.clone(), Some(DeviceChoice::Cpu));
     args.threads = Some(2);
     assert_eq!(
-        resolve_route_selection(&args, &dir).expect("threads with cpu passes"),
-        DeviceSelection::Cpu
+        resolve_route_options(&args, &dir).expect("route options resolve"),
+        (DeviceSelection::Cpu, std::num::NonZeroU32::new(2))
     );
 }
 
@@ -445,7 +452,7 @@ fn run_partitions_pass_on_the_cpu_route_and_shape_the_device() {
         DeviceSelection::Cpu
     );
     // No manifest key here, so the resolved count is the flag's.
-    let shape = cpu_device_shape(&args, args.threads);
+    let shape = cpu_device_shape(&args, std::num::NonZeroU32::new(6));
     assert_eq!(shape.workers, std::num::NonZeroU32::new(6));
     assert_eq!(shape.partitions.get(), 3);
 }
