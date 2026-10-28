@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/lista/ranged-length-range-empty-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/ranged-length-range-empty-reject.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "ranged_list_range_empty"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "ranged_list_range_empty"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "ranged_list_range_empty"

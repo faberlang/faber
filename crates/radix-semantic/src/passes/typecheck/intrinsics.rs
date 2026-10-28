@@ -92,6 +92,7 @@ impl IntrinsicTypeContext {
         match checker.types.get(resolved) {
             Type::Array(inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::Queue(inner)
             | Type::BoundedQueue { element: inner, .. }
             | Type::Stack(inner)
@@ -443,12 +444,21 @@ pub(super) fn check_intrinsic_method_call(
         && matches!(
             resolved,
             Type::BoundedArray { .. }
+                // A length range with an upper end reports a push past it on
+                // `⇥`; `lo…∞` has no upper end and stays infallible.
+                | Type::RangedArray { max: Some(_), .. }
                 | Type::BoundedQueue { .. }
                 | Type::BoundedStack { .. }
                 | Type::BoundedTextus { .. }
                 | Type::BoundedAscii { .. }
                 | Type::BoundedOcteti { .. }
         );
+    // A length range's low end is at least one, so `decapita` / `detrahe`
+    // (the removals) would drop a list at its minimum below it. Like the push
+    // past the maximum, the method form reports that on `⇥ textus`.
+    let ranged_removal = matches!(entry.faber_name, "decapita" | "detrahe")
+        && matches!(resolved, Type::RangedArray { .. });
+    let bounded_appende = bounded_appende || ranged_removal;
     let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
 
     // The extrema twins are elementwise clamp methods on numeric lists. Keep
@@ -1137,6 +1147,16 @@ fn resolve_return_type(
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
             };
+            // A list whose length range starts at one or more is never empty:
+            // `primus` / `ultimus` / `decapita` / `detrahe` return `T`, not
+            // `T ∪ none` (the removals report a violated minimum on `⇥`).
+            let non_empty = entry.reads_list_end()
+                && ctx
+                    .receiver_ty
+                    .is_some_and(|ty| matches!(checker.types.get(ty), Type::RangedArray { .. }));
+            if non_empty {
+                return inner;
+            }
             optional_of(checker, inner)
         }
         IntrinsicReturnKind::OptionNumerus => {

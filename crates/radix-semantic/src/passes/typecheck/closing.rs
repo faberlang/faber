@@ -325,6 +325,7 @@ fn child_types(ty: &Type, out: &mut Vec<TypeId>) {
         | Type::Cursor(inner)
         | Type::Promissum(inner) => out.push(*inner),
         Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => out.push(*element),
         Type::Map(key, value)

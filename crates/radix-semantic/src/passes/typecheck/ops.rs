@@ -1047,6 +1047,7 @@ impl TypeChecker<'_> {
             Type::Infer(_) => true,
             Type::Array(inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::Set(inner)
             | Type::Tensor(inner, _)
             | Type::Sparsa(inner, _)
@@ -2193,8 +2194,8 @@ impl TypeChecker<'_> {
                 }
             }
             (
-                Type::Array(..) | Type::BoundedArray { .. },
-                Type::Array(..) | Type::BoundedArray { .. },
+                Type::Array(..) | Type::BoundedArray { .. } | Type::RangedArray { .. },
+                Type::Array(..) | Type::BoundedArray { .. } | Type::RangedArray { .. },
             ) => self
                 .check_lista_hadamard(op, lhs_resolved, rhs_resolved, lhs.span)
                 .unwrap_or(self.error_type),
@@ -2648,9 +2649,10 @@ impl TypeChecker<'_> {
         let payload = self.resolve_inferred_type(payload);
         let shape = self.types.get(payload).clone();
         let probed = match &shape {
-            Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
-                Some(*elem)
-            }
+            Type::Array(elem)
+            | Type::Set(elem)
+            | Type::BoundedArray { element: elem, .. }
+            | Type::RangedArray { element: elem, .. } => Some(*elem),
             Type::Map(key, _) | Type::Ledger(key, _) => Some(*key),
             _ => None,
         };
@@ -2663,7 +2665,10 @@ impl TypeChecker<'_> {
             return;
         }
         match shape {
-            Type::Array(elem) | Type::Set(elem) | Type::BoundedArray { element: elem, .. } => {
+            Type::Array(elem)
+            | Type::Set(elem)
+            | Type::BoundedArray { element: elem, .. }
+            | Type::RangedArray { element: elem, .. } => {
                 self.unify_assign_issue(lhs_ty, elem, lhs_span, MEMBERSHIP_OPERAND_TYPE_MISMATCH);
             }
             Type::Map(key, _) | Type::Ledger(key, _) => {

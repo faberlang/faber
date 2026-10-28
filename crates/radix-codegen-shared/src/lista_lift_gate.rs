@@ -78,7 +78,9 @@ fn lista_element(types: &TypeTable, ty: Option<TypeId>) -> Option<TypeId> {
         ty = *inner;
     }
     match types.get(ty) {
-        Type::Array(element) | Type::BoundedArray { element, .. } => Some(*element),
+        Type::Array(element)
+        | Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. } => Some(*element),
         _ => None,
     }
 }

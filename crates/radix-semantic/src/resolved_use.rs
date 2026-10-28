@@ -350,6 +350,7 @@ impl UseVisitor<'_> {
             | Type::Option(inner)
             | Type::Ref(_, inner) => vec![inner],
             Type::BoundedArray { element, .. }
+            | Type::RangedArray { element, .. }
             | Type::BoundedQueue { element, .. }
             | Type::BoundedStack { element, .. } => vec![element],
             Type::BoundedTextus { .. }

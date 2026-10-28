@@ -597,7 +597,9 @@ impl TypeChecker<'_> {
         };
         let object_ty = self.types.peel_access_marker(object_ty).1;
         let element = match self.types.get(object_ty) {
-            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
+            Type::Array(element)
+            | Type::BoundedArray { element, .. }
+            | Type::RangedArray { element, .. } => *element,
             _ => return false,
         };
         !self.is_shareable_payload(element)

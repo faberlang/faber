@@ -96,7 +96,7 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bo
     if matches!(target, Target::HirRust)
         && matches!(
             resolved(types, object_ty),
-            Type::Array(_) | Type::BoundedArray { .. }
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
         )
     {
         return false;
@@ -108,7 +108,7 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bo
         }
         // A bounded list `lista<T, N>` is the same window over the same
         // carrier: its capacity bounds construction, never a range.
-        Type::BoundedArray { .. } => true,
+        Type::BoundedArray { .. } | Type::RangedArray { .. } => true,
         _ => false,
     }
 }

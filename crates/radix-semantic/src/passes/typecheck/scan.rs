@@ -227,6 +227,7 @@ fn scan_group_components<'a>(
         checker.types.get(group_ty),
         Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Tuple(_)
             | Type::Tensor(..)
             | Type::Matrix(..)

@@ -1997,6 +1997,13 @@ fn resolve_type_expr(
                     CollectionKind::Lista | CollectionKind::Queue | CollectionKind::Stack => {
                         match params.as_slice() {
                             [elem] => resolve_generic_arg(resolver, interner, elem, errors),
+                            // A length range, `lista<T, lo‥hi>`, is not a capacity: its
+                            // ends fold when the type lowers.
+                            [elem, GenericArgExpr::Range(_)]
+                                if collection == CollectionKind::Lista =>
+                            {
+                                resolve_generic_arg(resolver, interner, elem, errors);
+                            }
                             [elem, capacity] => {
                                 resolve_generic_arg(resolver, interner, elem, errors);
                                 validate_capacity_index_param(resolver, interner, capacity, errors);
@@ -3858,6 +3865,17 @@ fn lower_lista_type(
         [elem] => {
             let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
             Ok(types.array(elem))
+        }
+        [elem, GenericArgExpr::Range(range)] => {
+            let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
+            let mut issue = None;
+            let ty = radix_types::lower_ranged_list(elem, range, types, &mut |found| {
+                issue.get_or_insert(found);
+            });
+            match issue {
+                Some(issue) => Err(TypeLowerError::Issue(issue.issue())),
+                None => Ok(ty),
+            }
         }
         [elem, capacity] => {
             let elem = lower_generic_type_arg(elem, resolver, interner, types)?;

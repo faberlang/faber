@@ -1284,7 +1284,8 @@ labeled_type_argument := IDENTIFIER ':' type_annotation
 # (`range_bound_required`). The half-open `‥` holds the low end up to, not
 # including, the high end; the inclusive `…` holds both. `∞` and `-∞` mean no
 # bound on that side. The policy word is mandatory: `u8<0‥8>` is
-# `ranged_policy_word_required`.
+# `ranged_policy_word_required`. The same slot is the second argument of `lista`
+# (`lista<T, 1…∞>`): a list length range, trapping only, with no policy word.
 range_argument  := range_bound range_glyph range_bound
 range_glyph     := '‥' | '…'
 range_bound     := '-'? NATURAL | '-'? '∞' | 'magnitudo'? IDENTIFIER

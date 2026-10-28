@@ -582,6 +582,7 @@ impl TypeTable {
                 | Type::Ref(_, inner)
                 | Type::Alias(_, inner) => child(*inner, seen),
                 Type::BoundedArray { element, .. }
+                | Type::RangedArray { element, .. }
                 | Type::BoundedQueue { element, .. }
                 | Type::BoundedStack { element, .. }
                 | Type::Tensor(element, _)
@@ -874,6 +875,7 @@ impl TypeTable {
             Type::Alias(_, inner) => self.is_aliasing_container(*inner),
             Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)
@@ -946,6 +948,21 @@ impl TypeTable {
             return self.bounded_octeti(capacity);
         }
         self.intern(Type::BoundedArray { element, capacity })
+    }
+
+    /// Allocate a `lista<T, lo…hi>` length range. The range is
+    /// inclusive and `max` is `None` for no upper end. A range that is
+    /// `0…∞` *is* [`Type::Array`] and `0…N` *is* the bounded list, so the
+    /// sugar forms keep one identity (rule 2 of the ranged-policy design).
+    pub fn ranged_array(&mut self, element: TypeId, min: u64, max: Option<u64>) -> TypeId {
+        match (min, max) {
+            (0, None) => self.array(element),
+            (0, Some(max)) => {
+                let capacity = self.intern_index(IndexExpr::Literal(max));
+                self.bounded_array(element, capacity)
+            }
+            _ => self.intern(Type::RangedArray { element, min, max }),
+        }
     }
 
     /// Allocate an unbounded `queue<T>` collection.
@@ -1422,6 +1439,18 @@ impl TypeTable {
                 },
             ) => self.equals(*ae, *be) && self.index_equals(*ac, *bc),
             (
+                Type::RangedArray {
+                    element: ae,
+                    min: a_min,
+                    max: a_max,
+                },
+                Type::RangedArray {
+                    element: be,
+                    min: b_min,
+                    max: b_max,
+                },
+            ) => self.equals(*ae, *be) && a_min == b_min && a_max == b_max,
+            (
                 Type::BoundedQueue {
                     element: ae,
                     capacity: ac,
@@ -1890,6 +1919,18 @@ impl TypeTable {
                 },
             ) => self.equals(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
             (
+                Type::RangedArray {
+                    element: from_elem,
+                    min: from_min,
+                    max: from_max,
+                },
+                Type::RangedArray {
+                    element: to_elem,
+                    min: to_min,
+                    max: to_max,
+                },
+            ) => self.equals(*from_elem, *to_elem) && from_min == to_min && from_max == to_max,
+            (
                 Type::BoundedQueue {
                     element: from_elem,
                     capacity: from_cap,
@@ -1998,6 +2039,18 @@ pub enum Type {
     BoundedArray {
         element: TypeId,
         capacity: IndexId,
+    },
+
+    /// `lista<T, lo‥hi>` / `lista<T, lo…hi>` length range (need, 5/5):
+    /// the list's length stays inside `[min, max]` after every store. `max` is
+    /// `None` for an unbounded top end (`lista<T, 1…∞>`). `lista<T>` is the
+    /// range `0…∞` and `lista<T, N>` is `0…N`, so those two are interned as
+    /// [`Type::Array`] and [`Type::BoundedArray`], never as this variant: it
+    /// names only a range that is neither (see [`TypeTable::ranged_array`]).
+    RangedArray {
+        element: TypeId,
+        min: u64,
+        max: Option<u64>,
     },
 
     /// `queue<T>` FIFO collection.
@@ -2216,6 +2269,11 @@ impl Hash for Type {
             | Self::BoundedStack { element, capacity } => {
                 element.hash(state);
                 capacity.hash(state);
+            }
+            Self::RangedArray { element, min, max } => {
+                element.hash(state);
+                min.hash(state);
+                max.hash(state);
             }
             Self::Queue(element) | Self::Stack(element) => element.hash(state),
             Self::BoundedTextus { capacity }
@@ -2891,6 +2949,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::BoundedStack { element, capacity } => {
             type_in_bounds(element) && index_in_bounds(capacity)
         }
+        Type::RangedArray { element, .. } => type_in_bounds(element),
         Type::BoundedTextus { capacity }
         | Type::BoundedAscii { capacity }
         | Type::BoundedOcteti { capacity } => index_in_bounds(capacity),

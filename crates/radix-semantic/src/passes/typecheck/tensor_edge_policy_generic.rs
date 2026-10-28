@@ -509,6 +509,7 @@ fn type_contains_param(
         | Type::Ref(_, inner)
         | Type::Alias(_, inner) => contains(*inner, seen),
         Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. }
         | Type::Tensor(element, _)

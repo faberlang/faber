@@ -106,6 +106,9 @@ mod list_window_gate_test;
 #[path = "lista_lift_gate_test.rs"]
 mod lista_lift_gate_test;
 #[cfg(test)]
+#[path = "ranged_list_gate_test.rs"]
+mod ranged_list_gate_test;
+#[cfg(test)]
 #[path = "tensor_lift_gate_test.rs"]
 mod tensor_lift_gate_test;
 
@@ -386,6 +389,7 @@ pub fn generate_from_analyzed_with_options(
     radix_codegen_shared::reject_bits_type(analysis.types(), target)?;
     radix_codegen_shared::reject_ledger_type(analysis.types(), target)?;
     radix_codegen_shared::reject_ranged_int_type(analysis.types(), target)?;
+    radix_codegen_shared::reject_ranged_list_type(analysis.types(), target)?;
     reject_unsupported_leaves(analysis, target)?;
     if !target.is_available() {
         return Err(unavailable_target_error(target));

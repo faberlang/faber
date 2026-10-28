@@ -653,8 +653,23 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::RANGED_UNSIGNED_NEGATIVE => {
             Some("start the range at 0, or use a signed width such as i32".to_owned())
         }
+        WidthLowerIssue::RANGED_LIST_BOUND_NOT_CONSTANT => Some(
+            "write both ends as integer literals, such as list<int, 1‥8>; a named or size end is not built yet".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_LIST_EMPTY => Some(
+            "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_LIST_BOUND_NEGATIVE => {
+            Some("a length is a count: start the range at 0 or above".to_owned())
+        }
+        WidthLowerIssue::RANGED_LIST_POLICY_WORD => Some(
+            "write the range on the list, such as list<int, 1…8>; it always traps, and saturating, trapping and wrapping take a number width".to_owned(),
+        ),
         WidthLowerIssue::RANGED_WIDTH_UNSUPPORTED => Some(
             "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet".to_owned(),
+        ),
+        "ranged_list_length_out_of_range" => Some(
+            "give the literal a length inside the range, or build the list with `↦` and recover with `⊥`".to_owned(),
         ),
         "policy_float_family_mismatch" => Some(
             "convert the other operand to the same float cell with `↦`; a trapping or saturating float never mixes with a bare float, another cell, or another width implicitly".to_owned(),

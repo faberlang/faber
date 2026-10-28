@@ -1505,6 +1505,11 @@ pub(super) fn import_semantic_type_with_nominal(
             let capacity = import_index_expr_with_nominal(source, target, capacity, nominal);
             target.bounded_array(element, capacity)
         }
+        Type::RangedArray { element, min, max } => {
+            let element =
+                import_semantic_type_with_nominal(source, target, element, imported, nominal);
+            target.ranged_array(element, min, max)
+        }
         Type::BoundedQueue { element, capacity } => {
             let element =
                 import_semantic_type_with_nominal(source, target, element, imported, nominal);

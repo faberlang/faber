@@ -707,6 +707,11 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
             canonical_type_shape(analysis, *element, active),
             crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
         ),
+        Type::RangedArray { element, min, max } => format!(
+            "ranged-array<{},{min},{}>",
+            canonical_type_shape(analysis, *element, active),
+            max.map_or_else(|| "inf".to_owned(), |max| max.to_string())
+        ),
         Type::Queue(element) => format!("queue<{}>", canonical_type_shape(analysis, *element, active)),
         Type::BoundedQueue { element, capacity } => format!(
             "bounded-queue<{},{}>",

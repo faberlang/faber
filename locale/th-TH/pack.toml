@@ -1234,6 +1234,22 @@ help = "ใช้ความกว้างจำนวนเต็ม เช�
 message = "kernel ยังใช้นโยบายการจัดเก็บแบบมีช่วงไม่ได้ ({site}); kernel ไม่ใช้ช่วง"
 help = "ใช้ความกว้างปกติใน kernel แล้วใช้ช่วงฝั่งโฮสต์"
 
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "ปลายของช่วงความยาวรายการต้องเป็นจำนวนเต็มลิเทอรัลที่ไม่ติดลบหรือ ∞"
+help = "เขียนปลายทั้งสองเป็นจำนวนเต็มลิเทอรัล เช่น list<int, 1‥8>; ปลายที่เป็นชื่อหรือ size ยังไม่รองรับ"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "ช่วงความยาวรายการนี้ไม่มีความยาวใดเลย"
+help = "ปลายล่างต้องน้อยกว่าปลายบนใน lo‥hi หรือไม่เกินปลายบนใน lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "ปลายของช่วงความยาวรายการติดลบไม่ได้"
+help = "ความยาวคือจำนวนนับ: เริ่มช่วงที่ 0 หรือมากกว่า"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "ช่วงความยาวรายการไม่รับคำนโยบายการจัดเก็บ"
+help = "เขียนช่วงบนรายการ เช่น list<int, 1…8>; ช่วงนี้จะ trap เสมอ ส่วน saturating, trapping และ wrapping รับความกว้างของตัวเลข"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1754,6 +1770,10 @@ help = "ใช้ MIR runner หรือ Faber source emitter หรือใ�
 message = "เป้าหมายนี้ยังไม่รองรับนโยบายการจัดเก็บแบบมีช่วง"
 help = "ใช้ MIR runner เป้าหมาย Rust หรือตัวปล่อยซอร์ส Faber จนกว่าเป้าหมายนี้จะใช้ช่วงได้"
 
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "เป้าหมายนี้ยังไม่รองรับช่วงความยาวรายการ"
+help = "ใช้ MIR runner เป้าหมาย Rust หรือตัวปล่อยซอร์ส Faber จนกว่าเป้าหมายนี้จะใช้ช่วงรายการได้"
+
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "เป้าหมายนี้ไม่รองรับใบ {leaf}"
 help = "ใช้ rust หรือ MIR runner หรือลบการเรียก {route}"
@@ -2197,6 +2217,10 @@ help = "เพิ่ม method {method} ที่มีลายเซ็นต�
 [diagnostics.SEM011]
 message = "ชนิดตัวถูกดำเนินการไม่ถูกต้อง"
 help = "ใช้ชนิดตัวถูกดำเนินการที่เข้ากันได้"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "ความยาวของรายการนี้อยู่นอกช่วงความยาวรายการ"
+help = "ให้ลิเทอรัลมีความยาวอยู่ในช่วง หรือสร้างรายการด้วย ↦ แล้วกู้ด้วย ⊥"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "สัญลักษณ์การปัดเศษยังใช้กับค่า tensor ไม่ได้"

@@ -65,7 +65,7 @@ pub(super) fn check_lockstep_expr(
             .1;
         let (element, literal_length) = match checker.types.get(dispatch_ty) {
             Type::Array(inner) => (*inner, None),
-            Type::BoundedArray { element, .. } => {
+            Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
                 // Exact static length only when the expression is an array
                 // literal: unannotated literals are exact witnesses of their
                 // element count, while a `lista<T, N>` binding keeps a

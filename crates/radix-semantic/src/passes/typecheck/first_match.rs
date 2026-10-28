@@ -39,6 +39,7 @@ pub(super) fn check_first_match_expr(
     let elem_ty = match checker.types.get(dispatch_ty) {
         Type::Array(inner)
         | Type::BoundedArray { element: inner, .. }
+        | Type::RangedArray { element: inner, .. }
         | Type::Tensor(inner, _)
         | Type::Matrix(inner, _) => checker.resolve_inferred_type(*inner),
         _ => {

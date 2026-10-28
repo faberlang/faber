@@ -80,5 +80,9 @@ mod nary_range_test;
 mod inf_type_test;
 
 #[cfg(test)]
+#[path = "ranged_list_test.rs"]
+mod ranged_list_test;
+
+#[cfg(test)]
 #[path = "ranged_policy_test.rs"]
 mod ranged_policy_test;

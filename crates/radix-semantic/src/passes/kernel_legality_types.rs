@@ -73,6 +73,8 @@ impl Walk<'_> {
             Type::Atomic(_) => Some(FAMILY_ATOMIC),
             Type::SizedInstans(_) => Some("instans"),
             Type::Interface(_) => Some("pactum"),
+            // A length range has no device carrier: a kernel names the family.
+            Type::RangedArray { .. } => Some("lista"),
             Type::BoundedArray { element, .. }
             | Type::BoundedQueue { element, .. }
             | Type::BoundedStack { element, .. }

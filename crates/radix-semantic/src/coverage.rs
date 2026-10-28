@@ -402,6 +402,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         | Type::Option(element)
         | Type::Ref(_, element)
         | Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => vec![*element],
         Type::PromissumFailable(first, alternate) | Type::AsyncCursor(first, alternate) => {

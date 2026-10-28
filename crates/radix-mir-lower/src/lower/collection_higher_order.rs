@@ -109,7 +109,10 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection reduce receiver"));
             return None;
         };
-        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
+        if !matches!(
+            self.normalized_type(receiver_ty),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+        ) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection reduce before array MIR lowering",
@@ -139,7 +142,10 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection cumulata receiver"));
             return None;
         };
-        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
+        if !matches!(
+            self.normalized_type(receiver_ty),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+        ) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection cumulata before array MIR lowering",
@@ -170,7 +176,10 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection predicate receiver"));
             return None;
         };
-        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
+        if !matches!(
+            self.normalized_type(receiver_ty),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+        ) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection predicate before array MIR lowering",
@@ -294,7 +303,7 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let set_element = match self.normalized_type(receiver_ty) {
-            Type::Array(_) | Type::BoundedArray { .. } => None,
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => None,
             Type::Set(item) => Some(*item),
             _ => {
                 self.errors.push(MirError::unsupported(
@@ -529,7 +538,10 @@ impl FunctionBuilder<'_> {
         // WHY: a local bound by `← copy` (or `own`/`ref`/`mut`) carries its
         // access marker on the type; the carrier is the payload under it.
         let receiver_ty = self.method_receiver_payload_id(receiver.ty?);
-        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
+        if !matches!(
+            self.normalized_type(receiver_ty),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+        ) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "ordina key receiver before array MIR lowering",
@@ -594,7 +606,7 @@ impl FunctionBuilder<'_> {
             payload = *inner;
         }
         let (is_set, is_map) = match self.normalized_type(payload) {
-            Type::Array(_) | Type::BoundedArray { .. } => (false, false),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => (false, false),
             Type::Set(_) => (true, false),
             Type::Map(_, _) | Type::Ledger(_, _) => (false, true),
             _ => {
@@ -783,9 +795,9 @@ impl FunctionBuilder<'_> {
         // index. A matrix source needs `apud [i, j]` coordinates at
         // typecheck, which this lowering declines above (multi-axis).
         let (elem_ty, shape) = match self.normalized_type(source_ty).clone() {
-            Type::Array(inner) | Type::BoundedArray { element: inner, .. } => {
-                (MirType::semantic(inner), FirstMatchSource::Array)
-            }
+            Type::Array(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. } => (MirType::semantic(inner), FirstMatchSource::Array),
             Type::Tensor(inner, dims) => {
                 let literal = radix_types::i64s_from_literal_index(dims, self.types);
                 let rank_one = match &literal {
@@ -1202,9 +1214,10 @@ impl FunctionBuilder<'_> {
 
     pub(super) fn collection_element_ty(&self, ty: TypeId) -> Option<MirType> {
         match self.normalized_type(ty) {
-            Type::Array(item) | Type::BoundedArray { element: item, .. } | Type::Set(item) => {
-                Some(MirType::semantic(*item))
-            }
+            Type::Array(item)
+            | Type::BoundedArray { element: item, .. }
+            | Type::RangedArray { element: item, .. }
+            | Type::Set(item) => Some(MirType::semantic(*item)),
             _ => None,
         }
     }

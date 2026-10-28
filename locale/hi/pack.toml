@@ -1234,6 +1234,22 @@ help = "u8 या i32 जैसी पूर्णांक चौड़ाई �
 message = "kernel अभी रेंज वाली स्टोर नीति इस्तेमाल नहीं कर सकता ({site}); kernel रेंज लागू नहीं करता"
 help = "kernel के भीतर सामान्य चौड़ाई इस्तेमाल करें और रेंज होस्ट पर लगाएँ"
 
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "सूची की लंबाई की रेंज का सिरा अऋणात्मक पूर्णांक लिटरल या ∞ होना चाहिए"
+help = "दोनों सिरे पूर्णांक लिटरल के रूप में लिखें, जैसे list<int, 1‥8>; नामित या size सिरा अभी उपलब्ध नहीं है"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "सूची की लंबाई की रेंज में कोई लंबाई नहीं है"
+help = "lo‥hi में निचला सिरा ऊपरी सिरे से छोटा होना चाहिए, और lo…hi में उससे बड़ा नहीं"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "सूची की लंबाई की रेंज का सिरा ऋणात्मक नहीं हो सकता"
+help = "लंबाई एक गिनती है: रेंज 0 या उससे ऊपर से शुरू करें"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "सूची की लंबाई की रेंज कोई स्टोर नीति शब्द नहीं लेती"
+help = "रेंज सूची पर लिखें, जैसे list<int, 1…8>; यह हमेशा ट्रैप करती है, और saturating, trapping तथा wrapping संख्या की चौड़ाई लेते हैं"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -1754,6 +1770,10 @@ help = "MIR runner या Faber source emitter उपयोग करें, य
 message = "यह लक्ष्य रेंज वाली स्टोर नीति अभी समर्थित नहीं करता"
 help = "जब तक यह लक्ष्य रेंज लागू नहीं करता, MIR runner, Rust लक्ष्य या Faber स्रोत उत्सर्जक इस्तेमाल करें"
 
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "यह लक्ष्य सूची की लंबाई की रेंज अभी समर्थित नहीं करता"
+help = "जब तक यह लक्ष्य सूची रेंज लागू नहीं करता, MIR runner, Rust लक्ष्य या Faber स्रोत उत्सर्जक इस्तेमाल करें"
+
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "इस लक्ष्य पर {leaf} पत्ती समर्थित नहीं है"
 help = "rust या MIR runner उपयोग करें, या {route} कॉल हटाएँ"
@@ -2197,6 +2217,10 @@ help = "contract द्वारा घोषित signature वाली {meth
 [diagnostics.SEM011]
 message = "ऑपरेंड प्रकार अमान्य हैं"
 help = "संगत ऑपरेंड प्रकारों का उपयोग करें"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "इस सूची की लंबाई सूची-लंबाई रेंज से बाहर है"
+help = "लिटरल को रेंज के भीतर की लंबाई दें, या सूची को ↦ से बनाएँ और ⊥ से सँभालें"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "rounding glyph अभी tensor मानों पर लागू नहीं होते"

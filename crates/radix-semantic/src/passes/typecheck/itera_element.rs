@@ -75,6 +75,7 @@ impl TypeChecker<'_> {
             | Type::Stack(inner)
             | Type::BoundedStack { element: inner, .. }
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::Tensor(inner, _)
             | Type::Matrix(inner, _)
             | Type::Vector(inner, _)
@@ -127,6 +128,7 @@ fn is_iterable_kind(kind: &Type) -> bool {
         kind,
         Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)

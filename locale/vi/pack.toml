@@ -1222,6 +1222,22 @@ help = "dùng chiều rộng số nguyên như u8 hoặc i32; chiều rộng flo
 message = "kernel chưa dùng được chính sách lưu có phạm vi ({site}); kernel không áp dụng phạm vi"
 help = "dùng chiều rộng thường trong kernel và áp dụng phạm vi ở phía host"
 
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "đầu mút của phạm vi độ dài danh sách phải là số nguyên literal không âm hoặc ∞"
+help = "viết cả hai đầu mút là số nguyên literal, ví dụ list<int, 1‥8>; đầu mút có tên hoặc theo size chưa được hỗ trợ"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "phạm vi độ dài danh sách không chứa độ dài nào"
+help = "đầu thấp phải nhỏ hơn đầu cao với lo‥hi, hoặc không lớn hơn với lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "đầu mút của phạm vi độ dài danh sách không thể âm"
+help = "độ dài là một số đếm: bắt đầu phạm vi từ 0 trở lên"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "phạm vi độ dài danh sách không nhận từ chính sách lưu"
+help = "viết phạm vi trên danh sách, ví dụ list<int, 1…8>; nó luôn bẫy lỗi, còn saturating, trapping và wrapping nhận chiều rộng số"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1742,6 +1758,10 @@ help = "dùng MIR runner hoặc bộ phát nguồn Faber, hoặc dùng map ({tab
 message = "đích này chưa hỗ trợ chính sách lưu có phạm vi"
 help = "dùng MIR runner, đích Rust hoặc bộ phát nguồn Faber cho đến khi đích này áp dụng phạm vi"
 
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "đích này chưa hỗ trợ phạm vi độ dài danh sách"
+help = "dùng MIR runner, đích Rust hoặc bộ phát nguồn Faber cho đến khi đích này áp dụng phạm vi danh sách"
+
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "lá {leaf} không được hỗ trợ trên đích này"
 help = "dùng rust hoặc MIR runner, hoặc bỏ lời gọi {route}"
@@ -2185,6 +2205,10 @@ help = "thêm phương thức {method} với chữ ký mà {contract} khai báo,
 [diagnostics.SEM011]
 message = "kiểu toán hạng không hợp lệ"
 help = "dùng các kiểu toán hạng tương thích"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "độ dài của danh sách này nằm ngoài phạm vi độ dài danh sách"
+help = "cho literal độ dài nằm trong phạm vi, hoặc dựng danh sách bằng ↦ và phục hồi bằng ⊥"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "các ký hiệu làm tròn chưa áp dụng được cho giá trị tensor"

@@ -211,7 +211,7 @@ instans = "instans"
 objectum = "objectum"
 quidlibet = "quidlibet"
 lista = "lista"
-# Proposed bounded forms (not shipped): lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, N>, lista<T, lo‥hi>, textus<N>, ascii<N>.
 tabula = "tabula"
 # tabulae (ledger, an insertion-ordered map) is one letter from tabula (map) on purpose:
 # "two shades of the same thing" (Roman account books were tabulae). Not a typo;
@@ -1489,7 +1489,7 @@ help = "use _ for a monomorphic hole or a concrete union type"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "{lista} requires one type parameter"
-help = "use {lista}<T>; lista<T, N> is proposed, not yet shipped"
+help = "use {lista}<T>, {lista}<T, N> or {lista}<T, lo‥hi>"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula requires two type parameters"
@@ -1546,6 +1546,22 @@ help = "latitudine integra utere, ut u8 aut i32; latitudines fractae, decimales 
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "nucleum modum condendi cum ambitu nondum adhibere potest ({site}); nucleum nullum ambitum applicat"
 help = "in nucleo latitudine nuda utere et ambitum in hospite applica"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "finis ambitus longitudinis listae numerus integer non negativus litteralis aut ∞ esse debet"
+help = "scribe utrumque finem ut numerum integrum litteralem, ut list<int, 1‥8>; finis nominatus aut magnitudinis nondum paratur"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "ambitus longitudinis listae nullam longitudinem tenet"
+help = "finis infimus infra summum in lo‥hi esse debet, aut non supra eum in lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "finis ambitus longitudinis listae negativus esse non potest"
+help = "longitudo numerus est: ambitum a 0 aut supra incipe"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "ambitus longitudinis listae verbum modi condendi non accipit"
+help = "scribe ambitum in lista, ut list<int, 1…8>; semper trahit, et saturatus, exactus et modulus latitudinem numeri accipiunt"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
@@ -1821,7 +1837,7 @@ help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as 
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
-help = "textus<N>, ascii<N>, and {lista}<b8, N> are proposed bounded forms, not yet shipped"
+help = "textus<N>, ascii<N>, and {lista}<b8, N> are bounded forms, spelled with their own type words"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -2202,6 +2218,10 @@ help = "exsecutore MIR aut emissore fontis Faber utere, aut tabula ({tabula}), d
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "modus condendi cum ambitu in hoc proposito nondum sustinetur"
 help = "exsecutore MIR, proposito Rust aut emissore fontis Faber utere, donec hoc propositum ambitus applicet"
+
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "ambitus longitudinis listae in hoc proposito nondum sustinetur"
+help = "exsecutore MIR, proposito Rust aut emissore fontis Faber utere, donec hoc propositum ambitus listarum applicet"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "folium {leaf} in hoc proposito non adhibetur"
@@ -2782,6 +2802,10 @@ help = "rotunda quemque elementum per ambitum vel methodum rotundandi scalarem; 
 [diagnostics.SEM011.issues.generic_type_arg_bound]
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"
 help = "declare `{implet} {contract}` on the type, or call with a type that does"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "longitudo huius listae extra ambitum longitudinis iacet"
+help = "da litterali longitudinem intra ambitum, aut listam per ↦ aedifica et per ⊥ recipe"
 
 [diagnostics.SEM011.issues.ordering_operands_differ]
 message = "ordered operands have different types"

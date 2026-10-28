@@ -931,7 +931,8 @@ fn wrapped_element(ty: TypeId, types: &TypeTable) -> Option<TypeId> {
         | Type::Tensor(elem, _)
         | Type::Sparsa(elem, _)
         | Type::Array(elem)
-        | Type::BoundedArray { element: elem, .. } => Some(*elem),
+        | Type::BoundedArray { element: elem, .. }
+        | Type::RangedArray { element: elem, .. } => Some(*elem),
         _ => None,
     }
 }
@@ -983,7 +984,8 @@ fn dynamic_display_type(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
         | Type::Queue(elem)
         | Type::Stack(elem)
         | Type::Array(elem)
-        | Type::BoundedArray { element: elem, .. } => dynamic_display_type(*elem, types, depth + 1),
+        | Type::BoundedArray { element: elem, .. }
+        | Type::RangedArray { element: elem, .. } => dynamic_display_type(*elem, types, depth + 1),
         _ => false,
     }
 }
@@ -1006,7 +1008,8 @@ fn holds_littera(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
         | Type::Tensor(elem, _)
         | Type::Sparsa(elem, _)
         | Type::Array(elem)
-        | Type::BoundedArray { element: elem, .. } => holds_littera(*elem, types, depth + 1),
+        | Type::BoundedArray { element: elem, .. }
+        | Type::RangedArray { element: elem, .. } => holds_littera(*elem, types, depth + 1),
         _ => false,
     }
 }
@@ -1029,7 +1032,8 @@ fn holds_interval(ty: TypeId, types: &TypeTable, depth: u8) -> bool {
         | Type::Tensor(elem, _)
         | Type::Sparsa(elem, _)
         | Type::Array(elem)
-        | Type::BoundedArray { element: elem, .. } => holds_interval(*elem, types, depth + 1),
+        | Type::BoundedArray { element: elem, .. }
+        | Type::RangedArray { element: elem, .. } => holds_interval(*elem, types, depth + 1),
         _ => false,
     }
 }

@@ -1594,6 +1594,7 @@ impl TypeChecker<'_> {
                 ty,
                 Type::Array(_)
                     | Type::BoundedArray { .. }
+                    | Type::RangedArray { .. }
                     | Type::Queue(_)
                     | Type::BoundedQueue { .. }
                     | Type::Stack(_)
@@ -1632,9 +1633,17 @@ impl TypeChecker<'_> {
         // single collection member, as for a list literal (opt-lit).
         let resolved = self.vacua_collection_member(resolved).unwrap_or(resolved);
 
+        // A length range never admits the empty list: its low end is at
+        // least one (`list<T, 0…N>` is the bounded list), so `empty` in such a
+        // slot is a statically known length outside the range.
+        if matches!(self.types.get(resolved), Type::RangedArray { .. }) {
+            return self.check_ranged_literal_length(resolved, 0, span);
+        }
+
         let shape = match self.types.get(resolved) {
             Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)

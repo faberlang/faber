@@ -1896,8 +1896,22 @@ type or a `size` argument by the range glyph after its first bound.
   the Faber source emitter keeps the authored form (`faber format` prints a
   range half-open); every other target and every kernel refuse the type by name
   (`SEM010 ranged_policy_target_unsupported`, `SEM008 nucleum_ranged_policy_not_built`).
-  Float ranges, index containment, kernel facts and list length ranges are the
-  later parts of the series.
+  Float ranges, index containment and kernel facts are the later parts of the
+  series.
+
+**List length ranges.** The same range slot is the second
+argument of `lista`: `lista<numerus, 4‥8>` (en `list<int, 4‥8>`) holds four to
+seven elements and `lista<numerus, 1…∞>` is never empty. A list range is
+trapping only and takes no policy word: `saturatus<lista<T>, …>` and the other
+policy words around a list are `SEM008 ranged_list_policy_word`. `lista<T>` is
+`0…∞` and `lista<T, N>` is `0…N`, one type each. A push past the maximum and a
+removal below the minimum report on `⇥`, a `↦` into a range checks the length
+and takes `⊥`, and `primus` / `ultimus` of a range with a floor of one return
+`T`. Both ends are integer literals or `∞` (`ranged_list_bound_not_constant`),
+non-negative (`ranged_list_bound_negative`) and the range holds a length
+(`ranged_list_range_empty`); a literal outside it is
+`SEM011 ranged_list_length_out_of_range`; a target that does not lower it is
+`SEM010 ranged_list_target_unsupported`.
 **Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with

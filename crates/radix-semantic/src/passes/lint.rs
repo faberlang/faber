@@ -822,6 +822,12 @@ impl HirVisitor for LintContext<'_> {
                 self.visit_expr(target);
                 self.visit_expr(value);
             }
+            // `sink ⇜ item` writes through the sink: a mutation of its place.
+            HirExpressionKind::SinkInto { sink, item } => {
+                self.mark_place_mutated(sink);
+                self.visit_expr(sink);
+                self.visit_expr(item);
+            }
             HirExpressionKind::Literal(HirLiteral::String(symbol)) => {
                 self.check_guillemet_quote(*symbol, expr.span);
                 walk_expr(self, expr);

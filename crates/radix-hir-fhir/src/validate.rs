@@ -882,6 +882,22 @@ fn generic_alias_body_matches(
             radix_types::Type::Ref(witness_mutability, witness_child),
         ) => body_mutability == witness_mutability && recurse(*body_child, *witness_child),
         (
+            radix_types::Type::RangedArray {
+                element: body_child,
+                min: body_min,
+                max: body_max,
+            },
+            radix_types::Type::RangedArray {
+                element: witness_child,
+                min: witness_min,
+                max: witness_max,
+            },
+        ) => {
+            body_min == witness_min
+                && body_max == witness_max
+                && recurse(*body_child, *witness_child)
+        }
+        (
             radix_types::Type::BoundedArray {
                 element: body_child,
                 capacity: body_capacity,
@@ -1192,7 +1208,8 @@ fn validate_type_form(
                         return Err(type_presentation_issue("array_level", site));
                     }
                 }
-                radix_types::Type::BoundedArray { element, .. } => {
+                radix_types::Type::BoundedArray { element, .. }
+                | radix_types::Type::RangedArray { element, .. } => {
                     if level.0 != 0 || form.args.len() != 1 {
                         return Err(type_presentation_issue("bounded_array_shape", site));
                     }
@@ -4056,6 +4073,9 @@ pub(crate) fn validate_referential_integrity(
                     checks.check_symbol(sym)?;
                     checks.check_type(tid)?;
                 }
+            }
+            radix_types::Type::RangedArray { element, .. } => {
+                checks.check_type(*element)?;
             }
             radix_types::Type::Tensor(t, i)
             | radix_types::Type::Vector(t, i)

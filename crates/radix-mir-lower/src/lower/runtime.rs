@@ -98,6 +98,17 @@ pub(super) enum SyntheticHelperKey {
         return_ty: MirType,
         error_ty: MirType,
     },
+    /// A length-ranged list push or removal: `Append` past the
+    /// maximum or `RemoveFirst` / `RemoveLast` below the minimum, checked
+    /// against `limit` before the op runs.
+    RangedList {
+        op: MirCollectionOp,
+        receiver_ty: MirType,
+        item_ty: Option<MirType>,
+        limit: u64,
+        return_ty: MirType,
+        error_ty: MirType,
+    },
     /// A `lista ↦ tensor` count check run inside a handler: `TensorFromFlat`
     /// over a flat list and its shape operand.
     TensorFromFlat {
@@ -1039,6 +1050,32 @@ impl FunctionBuilder<'_> {
                 expr.span,
             );
         }
+        if matches!(
+            op,
+            MirCollectionOp::Append | MirCollectionOp::RemoveFirst | MirCollectionOp::RemoveLast
+        ) && let Some(limit) = self.ranged_list_limit(receiver, op)
+            && let Some(receiver_ty) = self.checked_tensor_receiver_ty(receiver)
+        {
+            // A length-ranged list push (past the maximum) or removal (below
+            // the minimum) reports on `⇥`, like the `at` read: the checked
+            // helper always runs, so the handler, `⊥` default, `⇥` channel or
+            // trap sees the failure and a failed op leaves the list untouched.
+            let item_ty = if op == MirCollectionOp::Append {
+                Some(self.expr_ty(&args[0].expr)?)
+            } else {
+                None
+            };
+            let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+            let helper = self.push_ranged_list_helper(op, receiver_ty, item_ty, limit, call_ty, textus, expr.span);
+            return self.lower_failable_call(
+                MirCallee::Function(helper),
+                lowered_args,
+                call_ty,
+                textus,
+                None,
+                expr.span,
+            );
+        }
         if op == MirCollectionOp::Append
             && self.is_bounded_append_under_handler(receiver)
             && let (Some(item_ty), Some(receiver_ty)) =
@@ -1340,7 +1377,10 @@ impl FunctionBuilder<'_> {
     ) -> Option<Option<MirOperand>> {
         let ty = operand.ty?;
         let payload = self.types.peel_access_marker(ty).1;
-        if !matches!(self.normalized_type(payload), Type::Array(_) | Type::BoundedArray { .. }) {
+        if !matches!(
+            self.normalized_type(payload),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+        ) {
             return None;
         }
         let lowered = (|| {
@@ -1623,7 +1663,7 @@ impl FunctionBuilder<'_> {
             .get(self.method_receiver_payload_id(sink_ty))
             .clone();
         match payload {
-            Type::Array(_) | Type::Set(_) => {
+            Type::Array(_) | Type::Set(_) | Type::RangedArray { max: None, .. } => {
                 let receiver = self.lower_expr_value(sink)?;
                 let item = self.lower_expr_value(item)?;
                 return Some(self.runtime_call_value(
@@ -1632,6 +1672,31 @@ impl FunctionBuilder<'_> {
                     vacuum,
                     span,
                 ));
+            }
+            Type::RangedArray { max: Some(max), .. } => {
+                // A push past the maximum of a length range dies on `⇜`, like a
+                // bounded list: the checked helper runs inside the die trap.
+                let receiver_ty = MirType::semantic(self.method_receiver_payload_id(sink_ty));
+                let item_ty = self.expr_ty(item)?;
+                let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+                let helper = self.push_ranged_list_helper(
+                    MirCollectionOp::Append,
+                    receiver_ty,
+                    Some(item_ty),
+                    max,
+                    vacuum,
+                    textus,
+                    span,
+                );
+                let receiver = self.lower_expr_value(sink)?;
+                let item = self.lower_expr_value(item)?;
+                return self.lower_dying_failable_call(
+                    MirCallee::Function(helper),
+                    vec![receiver, item],
+                    vacuum,
+                    textus,
+                    span,
+                );
             }
             Type::BoundedArray { .. } => {
                 let receiver_ty = MirType::semantic(self.method_receiver_payload_id(sink_ty));
@@ -4194,7 +4259,7 @@ impl FunctionBuilder<'_> {
             // both render through the same Debug-shape opaque carrier, so the
             // grouping predicate must admit the literal shape too. Otherwise
             // `nota 1, [2]` splits into one diagnostic call per argument.
-            | Type::BoundedArray { .. }
+            | Type::BoundedArray { .. } | Type::RangedArray { .. }
             | Type::Map(_, _)
             | Type::Set(_)
             | Type::SizedNumeric(_, _)
@@ -4242,6 +4307,7 @@ impl FunctionBuilder<'_> {
             | Type::SizedInstans(_)
             | Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Map(_, _)
             | Type::Set(_) => self.runtime_call_value(
                 MirIntrinsic::FormatString { template: self.context.diagnostic_format_templates[0] },
@@ -5589,6 +5655,145 @@ impl FunctionBuilder<'_> {
             )
     }
 
+    /// The length range a push or removal method call is checked against:
+    /// `(limit, is_push)` for `appende` / `immerge` on a range with an upper
+    /// end (the maximum) and for `decapita` / `detrahe` on any range (the
+    /// minimum). A `lo…∞` push has no limit. Device bodies keep the bare op.
+    fn ranged_list_limit(&self, receiver: &HirExpression, op: MirCollectionOp) -> Option<u64> {
+        if self.device_role.is_some() {
+            return None;
+        }
+        let Type::RangedArray { min, max, .. } = self
+            .types
+            .get(self.method_receiver_payload_id(receiver.ty?))
+        else {
+            return None;
+        };
+        match op {
+            MirCollectionOp::Append => *max,
+            MirCollectionOp::RemoveFirst | MirCollectionOp::RemoveLast => Some(*min),
+            _ => None,
+        }
+    }
+
+    /// The checked helper of a length-ranged list push or removal, for
+    /// `(in receiver[, item]) ⇥ textus`:
+    ///
+    /// ```text
+    /// entry: len = Length(recv)
+    ///        push: len >= max ? fail : ok          removal: len <= min ? fail : ok
+    /// ok:    return Append(recv, item)  /  return RemoveFirst|RemoveLast(recv)
+    /// fail:  ReturnError("list length range: push past the maximum" /
+    ///                    "list length range: removal below the minimum")
+    /// ```
+    ///
+    /// Only a checked op reaches the runtime, so a failed push or removal
+    /// leaves the list untouched.
+    #[expect(clippy::too_many_arguments, reason = "one helper-key field per argument")]
+    fn push_ranged_list_helper(
+        &mut self,
+        op: MirCollectionOp,
+        receiver_ty: MirType,
+        item_ty: Option<MirType>,
+        limit: u64,
+        return_ty: MirType,
+        error_ty: MirType,
+        span: Span,
+    ) -> MirFunctionId {
+        let key = SyntheticHelperKey::RangedList { op, receiver_ty, item_ty, limit, return_ty, error_ty };
+        if let Some(&id) = self.synthetic_helpers.get(&key) {
+            return id;
+        }
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "MirFunctionId is u32 by design; synthetic function count is bounded by u32::MAX"
+        )]
+        let id = MirFunctionId(self.parent_function_id.0 + 1 + self.synthetic_functions.len() as u32);
+        let mut nested = FunctionBuilder::for_function(
+            self.types,
+            Some(error_ty),
+            Self::clone_context(&self.context),
+            id,
+            self.device_role,
+            None,
+        );
+        let mut locals = Vec::with_capacity(2);
+        let params = std::iter::once((receiver_ty, MirParamMode::MutRef))
+            .chain(item_ty.map(|item_ty| (item_ty, MirParamMode::Owned)));
+        for (ty, mode) in params {
+            let local = nested.next_local_id();
+            nested
+                .params
+                .push(MirParam { local, name: None, ty, mode, span });
+            nested
+                .locals
+                .push(MirLocalDecl { id: local, name: None, ty, mutable: false, span });
+            locals.push(local);
+        }
+        let operands: Vec<MirOperand> = locals
+            .iter()
+            .map(|local| MirOperand::Place(MirPlace::local(*local)))
+            .collect();
+        let is_push = op == MirCollectionOp::Append;
+        let limit_operand = MirOperand::Constant(MirConstant::Int(i64::try_from(limit).unwrap_or(i64::MAX)));
+
+        let entry = nested.fresh_block(span);
+        let ok = nested.fresh_block(span);
+        let fail = nested.fresh_block(span);
+        nested.switch_to(entry);
+        let length = nested.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![operands[0].clone()],
+            numerus,
+            span,
+        );
+        let violated = nested.binary_temp(
+            if is_push { MirBinOp::GtEq } else { MirBinOp::LtEq },
+            length,
+            limit_operand,
+            bivalens,
+            span,
+        );
+        nested.terminate_current(
+            MirTerminatorKind::Branch { condition: violated, then_block: fail, else_block: ok },
+            span,
+        );
+
+        nested.switch_to(ok);
+        if is_push {
+            nested.runtime_call_to_place(None, MirIntrinsic::Collection(op), operands, return_ty, span);
+            nested.terminate_current(MirTerminatorKind::Return(None), span);
+        } else {
+            let removed = nested.runtime_call_value(MirIntrinsic::Collection(op), operands, return_ty, span);
+            nested.terminate_current(MirTerminatorKind::Return(Some(removed)), span);
+        }
+
+        nested.switch_to(fail);
+        let message = if is_push {
+            nested.context.diagnostic_ranged_push_past_maximum
+        } else {
+            nested.context.diagnostic_ranged_remove_below_minimum
+        };
+        nested.terminate_current(
+            MirTerminatorKind::ReturnError(MirOperand::Constant(MirConstant::String(message))),
+            span,
+        );
+
+        let id = Self::finish_synthetic_function(
+            &mut self.errors,
+            &mut self.synthetic_functions,
+            id,
+            nested,
+            return_ty,
+            error_ty,
+            span,
+        );
+        self.synthetic_helpers.insert(key, id);
+        id
+    }
+
     /// The helper body, for `(in receiver, item) ⇥ textus`: one `Append`.
     /// Its capacity failure leaves the helper frame as the `textus` error, so
     /// the caller's `TryCall` routes it to the enclosing handler.
@@ -5912,7 +6117,7 @@ impl FunctionBuilder<'_> {
         receiver.ty.is_some_and(|ty| {
             matches!(
                 self.types.get(self.method_receiver_payload_id(ty)),
-                Type::Array(_) | Type::BoundedArray { .. }
+                Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
             )
         })
     }

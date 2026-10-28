@@ -2536,6 +2536,7 @@ impl super::FaberCodegen<'_> {
                         ty,
                         Type::Array(_)
                             | Type::BoundedArray { .. }
+                            | Type::RangedArray { .. }
                             | Type::Queue(_)
                             | Type::BoundedQueue { .. }
                             | Type::Stack(_)

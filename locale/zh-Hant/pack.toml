@@ -1266,6 +1266,22 @@ help = "使用 u8 或 i32 這樣的整數寬度；浮點、十進位和 inf 寬�
 message = "kernel 中暫不支援帶範圍的儲存策略 ({site})；kernel 不套用範圍"
 help = "在 kernel 內使用普通寬度，在主機端套用範圍"
 
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "列表長度範圍的端點必須是非負整數字面量或 ∞"
+help = "兩個端點都寫成整數字面量，例如 list<int, 1‥8>；具名端點或 size 端點尚未支援"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "該列表長度範圍不包含任何長度"
+help = "lo‥hi 的低端必須小於高端；lo…hi 的低端不能大於高端"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "列表長度範圍的端點不能為負"
+help = "長度是計數：讓範圍從 0 或更大開始"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "列表長度範圍不接受儲存策略詞"
+help = "把範圍寫在列表上，例如 list<int, 1…8>；它總是陷阱，saturating、trapping 和 wrapping 只接受數字寬度"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可呼叫項的註記姿態「{annotation_posture}」與書寫的姿態「{written_posture}」衝突"
 help = "修正用於降階的 AST 結構"
@@ -1782,6 +1798,10 @@ help = "請使用 MIR runner 或 Faber 原始碼發射器，或改用 map ({tabu
 message = "此目標暫不支援帶範圍的儲存策略"
 help = "請使用 MIR runner、Rust 目標或 Faber 原始碼發射器，直到此目標支援範圍"
 
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "此目標暫不支援列表長度範圍"
+help = "請使用 MIR runner、Rust 目標或 Faber 原始碼發射器，直到此目標支援列表範圍"
+
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "此目標不支援 {leaf} 葉片"
 help = "請使用 rust 或 MIR runner，或移除 {route} 呼叫"
@@ -2225,6 +2245,10 @@ help = "新增簽章符合契約宣告的 {method} 方法，或移除 {implet}"
 [diagnostics.SEM011]
 message = "運算元型別無效"
 help = "使用相容的運算元型別"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "該列表的長度超出列表長度範圍"
+help = "讓字面量的長度落在範圍內，或用 ↦ 建構列表並用 ⊥ 恢復"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "取整符號暫不適用於張量值"

@@ -141,6 +141,20 @@ pub enum WidthLowerIssue {
     /// A float, decimal or `inf` width with a range: ranged floats are not
     /// built, and the unbounded integer has no width to refine.
     RangedWidthUnsupported,
+    /// A list length range (`list<T, lo‥hi>`) has an end that is a name or a
+    /// size; only integer literals and `∞` fold at compile time.
+    RangedListBoundNotConstant,
+    /// A list length range holds no length (`4‥4`, `5…3`, `∞‥∞`).
+    RangedListEmpty,
+    /// A list length range with a negative end: a length is a count.
+    RangedListBoundNegative,
+    /// A store policy word with a range around a list
+    /// (`saturating<list<T>, 0‥3>`, `wrapping<list<T>, 0‥3>`,
+    /// `trapping<list<T>, 1…3>`): a list length range is spelled
+    /// `list<T, lo‥hi>` and always traps, so no policy word wraps a list. The
+    /// one-argument shapes (`wrapping<list<T>>`) keep their own width-shape
+    /// issues.
+    RangedListPolicyWord,
 }
 
 impl WidthLowerIssue {
@@ -164,6 +178,10 @@ impl WidthLowerIssue {
     pub const RANGED_OUTSIDE_WIDTH: &str = "ranged_policy_range_outside_width";
     pub const RANGED_UNSIGNED_NEGATIVE: &str = "ranged_policy_unsigned_negative_bound";
     pub const RANGED_WIDTH_UNSUPPORTED: &str = "ranged_policy_width_unsupported";
+    pub const RANGED_LIST_BOUND_NOT_CONSTANT: &str = "ranged_list_bound_not_constant";
+    pub const RANGED_LIST_EMPTY: &str = "ranged_list_range_empty";
+    pub const RANGED_LIST_BOUND_NEGATIVE: &str = "ranged_list_bound_negative";
+    pub const RANGED_LIST_POLICY_WORD: &str = "ranged_list_policy_word";
 
     /// Diagnostic issue identity for this failure.
     #[must_use]
@@ -188,6 +206,10 @@ impl WidthLowerIssue {
             Self::RangedOutsideWidth => Self::RANGED_OUTSIDE_WIDTH,
             Self::RangedUnsignedNegative => Self::RANGED_UNSIGNED_NEGATIVE,
             Self::RangedWidthUnsupported => Self::RANGED_WIDTH_UNSUPPORTED,
+            Self::RangedListBoundNotConstant => Self::RANGED_LIST_BOUND_NOT_CONSTANT,
+            Self::RangedListEmpty => Self::RANGED_LIST_EMPTY,
+            Self::RangedListBoundNegative => Self::RANGED_LIST_BOUND_NEGATIVE,
+            Self::RangedListPolicyWord => Self::RANGED_LIST_POLICY_WORD,
         }
     }
 }
@@ -762,7 +784,16 @@ pub fn lower_ranged_word(
         _ => None,
     };
     let Some(marker) = marker else {
-        return Some(fail(shape_issue, types));
+        let names_list =
+            matches!(width_arg, GenericArgExpr::Type(ty) if type_expr_names_list(ty, interner));
+        return Some(fail(
+            if names_list {
+                WidthLowerIssue::RangedListPolicyWord
+            } else {
+                shape_issue
+            },
+            types,
+        ));
     };
     let width = match NumericWidth::from_marker(marker, Primitive::Numerus) {
         Ok(width) => width,
@@ -834,6 +865,95 @@ pub fn lower_trapping_word(
             }),
         Err(_) => {
             report(WidthLowerIssue::TrappingWordUnsupported);
+            types.intern(Type::Error)
+        }
+    }
+}
+
+/// Whether a type expression is a `lista<…>` application: a list takes the
+/// trapping length range only, never a store policy word around it.
+fn type_expr_names_list(ty: &radix_syntax::TypeExpr, interner: &radix_lexer::Interner) -> bool {
+    matches!(
+        &ty.kind,
+        radix_syntax::TypeExprKind::Named(ident, _)
+            if crate::CollectionKind::from_name(interner.resolve(ident.name))
+                == Some(crate::CollectionKind::Lista)
+    )
+}
+
+/// Resolve the length range of `list<T, lo‥hi>` (need, 5/5).
+///
+/// `inclusive` is `lo…hi`; the half-open `lo‥hi` holds `lo` through `hi - 1`.
+/// `∞` is a high end that means no upper bound; `-∞` as a low end means no
+/// lower bound (zero). The result is the inclusive `(min, max)` pair a
+/// [`Type::RangedArray`] carries, `max` being `None` for no upper end.
+///
+/// # Errors
+/// The named [`WidthLowerIssue`] for a negative end, `∞` as a low end (no list
+/// is that long), `-∞` as a high end, or an empty range.
+pub fn resolve_ranged_list(
+    lo: RangeEnd,
+    hi: RangeEnd,
+    inclusive: bool,
+) -> Result<(u64, Option<u64>), WidthLowerIssue> {
+    let min = match lo {
+        RangeEnd::Value(value) if value < 0 => {
+            return Err(WidthLowerIssue::RangedListBoundNegative);
+        }
+        RangeEnd::Value(value) => {
+            u64::try_from(value).map_err(|_| WidthLowerIssue::RangedListEmpty)?
+        }
+        RangeEnd::NegInf => 0,
+        RangeEnd::PosInf => return Err(WidthLowerIssue::RangedListEmpty),
+    };
+    let max = match hi {
+        RangeEnd::Value(value) if value < 0 => {
+            return Err(WidthLowerIssue::RangedListBoundNegative);
+        }
+        RangeEnd::Value(value) => {
+            let top = if inclusive { value } else { value - 1 };
+            if top < 0 {
+                return Err(WidthLowerIssue::RangedListEmpty);
+            }
+            Some(u64::try_from(top).map_err(|_| WidthLowerIssue::RangedListEmpty)?)
+        }
+        RangeEnd::PosInf => None,
+        RangeEnd::NegInf => return Err(WidthLowerIssue::RangedListBoundNegative),
+    };
+    if max.is_some_and(|max| min > max) {
+        return Err(WidthLowerIssue::RangedListEmpty);
+    }
+    Ok((min, max))
+}
+
+/// Lower the length range of a list, `list<T, lo‥hi>`.
+///
+/// A list length range is always a trapping range, so it takes no policy
+/// word. The ends fold at compile time (integer literals and `∞`); the sugar
+/// forms keep one identity (`0…∞` is `lista<T>`, `0…N` is `lista<T, N>`).
+pub fn lower_ranged_list(
+    element: TypeId,
+    range: &radix_syntax::RangeArgExpr,
+    types: &mut TypeTable,
+    report: &mut dyn FnMut(WidthLowerIssue),
+) -> TypeId {
+    use radix_syntax::{RangeBoundExpr, RangeKind};
+    let end = |bound: &RangeBoundExpr| match bound {
+        RangeBoundExpr::Literal { value, .. } => Some(RangeEnd::Value(*value)),
+        RangeBoundExpr::Unbounded { negative: true, .. } => Some(RangeEnd::NegInf),
+        RangeBoundExpr::Unbounded {
+            negative: false, ..
+        } => Some(RangeEnd::PosInf),
+        RangeBoundExpr::Name { .. } => None,
+    };
+    let (Some(lo), Some(hi)) = (end(&range.lo), end(&range.hi)) else {
+        report(WidthLowerIssue::RangedListBoundNotConstant);
+        return types.intern(Type::Error);
+    };
+    match resolve_ranged_list(lo, hi, matches!(range.kind, RangeKind::Inclusive)) {
+        Ok((min, max)) => types.ranged_array(element, min, max),
+        Err(issue) => {
+            report(issue);
             types.intern(Type::Error)
         }
     }
@@ -1034,9 +1154,9 @@ pub const DECIMAL_TENSOR_MEDIA_MSG: &str =
 #[must_use]
 pub fn is_integer_index_vector(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
-        Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
-            is_integer_index_scalar(types, *elem)
-        }
+        Type::Array(elem)
+        | Type::BoundedArray { element: elem, .. }
+        | Type::RangedArray { element: elem, .. } => is_integer_index_scalar(types, *elem),
         Type::Alias(_, inner) => is_integer_index_vector(types, *inner),
         _ => false,
     }

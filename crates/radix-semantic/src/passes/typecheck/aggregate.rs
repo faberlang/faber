@@ -22,6 +22,13 @@ use super::store::StoreSite;
 use super::*;
 use radix_hir::HirStoreKind;
 
+/// The shape an expected list slot hands an array literal: the element type,
+/// the bounded-list capacity, and the length-range type when the slot is one.
+type ExpectedListShape = (TypeId, Option<radix_types::IndexId>, Option<TypeId>);
+
+/// A statically known list length outside its `list<T, lo‥hi>` range.
+pub(super) const ISSUE_RANGED_LIST_LENGTH_OUT_OF_RANGE: &str = "ranged_list_length_out_of_range";
+
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";
 pub(super) const ISSUE_SHAPE_HOLE_REQUIRES_SHAPE_ARGUMENT: &str =
     "tensor_shape_hole_requires_shape_argument";
@@ -482,10 +489,16 @@ impl TypeChecker<'_> {
                 Type::Array(b_inner)
                 | Type::BoundedArray {
                     element: b_inner, ..
+                }
+                | Type::RangedArray {
+                    element: b_inner, ..
                 },
             )
             | (
                 Type::BoundedArray {
+                    element: a_inner, ..
+                }
+                | Type::RangedArray {
                     element: a_inner, ..
                 },
                 Type::Array(b_inner),
@@ -530,17 +543,17 @@ impl TypeChecker<'_> {
     /// the slot itself, or the single list member of an optional / union slot
     /// (`list<T> ∪ none` hands the literal `list<T>`; several list members
     /// supply none, like the single-numeric-member rule of a store).
-    fn expected_list_shape(
-        &self,
-        expected: TypeId,
-    ) -> Option<(TypeId, Option<radix_types::IndexId>)> {
+    fn expected_list_shape(&self, expected: TypeId) -> Option<ExpectedListShape> {
         let payload = self
             .types
             .peel_access_marker(self.resolve_inferred_type(expected))
             .1;
         match self.types.get(payload) {
-            Type::Array(inner) => Some((*inner, None)),
-            Type::BoundedArray { element, capacity } => Some((*element, Some(*capacity))),
+            Type::Array(inner) => Some((*inner, None, None)),
+            Type::BoundedArray { element, capacity } => Some((*element, Some(*capacity), None)),
+            // A length range: the literal is checked against
+            // the range where the list is built.
+            Type::RangedArray { element, .. } => Some((*element, None, Some(payload))),
             Type::Option(inner) => self.expected_list_shape(*inner),
             Type::Union(members) => {
                 let mut shapes = members.iter().filter_map(|m| self.expected_list_shape(*m));
@@ -549,6 +562,27 @@ impl TypeChecker<'_> {
             }
             _ => None,
         }
+    }
+
+    /// A literal of `length` elements against the length range of `ranged`: the
+    /// range type itself when the length fits, else the named refusal. A
+    /// statically known length outside the range is a compile-time diagnostic
+    /// (the store ruling: a known value has its check at compile time).
+    pub(super) fn check_ranged_literal_length(
+        &mut self,
+        ranged: TypeId,
+        length: usize,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let Type::RangedArray { min, max, .. } = *self.types.get(ranged) else {
+            return ranged;
+        };
+        let length = length as u64;
+        if length >= min && max.is_none_or(|max| length <= max) {
+            return ranged;
+        }
+        self.invalid_operand_types(ISSUE_RANGED_LIST_LENGTH_OUT_OF_RANGE, span);
+        self.error_type
     }
 
     /// Checks an array literal and returns its list type.
@@ -561,7 +595,7 @@ impl TypeChecker<'_> {
     pub fn check_array(
         &mut self,
         elements: &mut [HirArrayElement],
-        _span: radix_lexer::Span,
+        span: radix_lexer::Span,
         expected: Option<TypeId>,
     ) -> TypeId {
         if let Some(span) = elements.iter().find_map(|element| match element {
@@ -574,8 +608,14 @@ impl TypeChecker<'_> {
         let expected_is_open =
             expected.is_some_and(|ty| self.is_infer(self.resolve_inferred_type(ty)));
         let expected_shape = expected.and_then(|ty| self.expected_list_shape(ty));
-        let expected_elem = expected_shape.map_or_else(|| self.fresh_infer(), |(elem, _)| elem);
-        let expected_capacity = expected_shape.and_then(|(_, capacity)| capacity);
+        let expected_elem = expected_shape.map_or_else(|| self.fresh_infer(), |(elem, _, _)| elem);
+        let expected_capacity = expected_shape.and_then(|(_, capacity, _)| capacity);
+        let expected_ranged = expected_shape.and_then(|(_, _, ranged)| ranged);
+        // A literal's length is static only when nothing is spread into it.
+        let literal_length = elements
+            .iter()
+            .all(|element| matches!(element, HirArrayElement::Expr(_)))
+            .then_some(elements.len());
         let has_expected_element = expected_shape.is_some();
         let literal_capacity =
             (expected.is_none() || expected_is_open || expected_capacity.is_some())
@@ -643,7 +683,8 @@ impl TypeChecker<'_> {
                 let spread_element =
                     if let Type::Array(inner) = self.types.get(self.resolve_inferred_type(ty)) {
                         *inner
-                    } else if let Type::BoundedArray { element, .. } =
+                    } else if let Type::BoundedArray { element, .. }
+                    | Type::RangedArray { element, .. } =
                         self.types.get(self.resolve_inferred_type(ty))
                     {
                         *element
@@ -689,6 +730,10 @@ impl TypeChecker<'_> {
                     joined
                 }
             });
+        }
+
+        if let (Some(ranged), Some(length)) = (expected_ranged, literal_length) {
+            return self.check_ranged_literal_length(ranged, length, span);
         }
 
         let elem_ty = element_ty.unwrap_or(expected_elem);

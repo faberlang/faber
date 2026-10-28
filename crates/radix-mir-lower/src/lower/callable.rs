@@ -463,6 +463,8 @@ impl FunctionBuilder<'_> {
             diagnostic_at_out_of_range: context.diagnostic_at_out_of_range,
             diagnostic_slice_out_of_range: context.diagnostic_slice_out_of_range,
             diagnostic_take_out_of_range: context.diagnostic_take_out_of_range,
+            diagnostic_ranged_push_past_maximum: context.diagnostic_ranged_push_past_maximum,
+            diagnostic_ranged_remove_below_minimum: context.diagnostic_ranged_remove_below_minimum,
             fault_delivery: context.fault_delivery,
             function_errors: Arc::clone(&context.function_errors),
             function_params: Arc::clone(&context.function_params),

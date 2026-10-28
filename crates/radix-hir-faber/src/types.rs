@@ -357,6 +357,12 @@ impl super::FaberCodegen<'_> {
                 self.type_to_faber(*element, names, surface),
                 self.format_figura(*capacity, surface)
             ),
+            Type::RangedArray { element, min, max } => format!(
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                self.type_to_faber(*element, names, surface),
+                Self::list_range_to_faber(*min, *max)
+            ),
             Type::BoundedQueue { element, capacity } => format!(
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
@@ -921,6 +927,14 @@ impl super::FaberCodegen<'_> {
                     self.format_figura(*capacity, surface)
                 ))
             }
+            Type::RangedArray { min, max, .. } => {
+                let elem = self.single_type_form_child(form, names, surface)?;
+                Ok(format!(
+                    "{}<{elem}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    Self::list_range_to_faber(*min, *max)
+                ))
+            }
             Type::BoundedQueue { capacity, .. } => {
                 let elem = self.single_type_form_child(form, names, surface)?;
                 Ok(format!(
@@ -1204,6 +1218,17 @@ impl super::FaberCodegen<'_> {
             format!("{lo}…{hi}")
         };
         format!("{word}<{}, {range}>", width.faber_marker())
+    }
+
+    /// A list length range spelled as the type argument `lo‥hi+1` (half open,
+    /// the form the design writes) or `lo…∞` for no upper end. A top end whose
+    /// exclusive bound would not fit a literal prints inclusive.
+    fn list_range_to_faber(min: u64, max: Option<u64>) -> String {
+        match max {
+            None => format!("{min}…∞"),
+            Some(max) if max < u64::MAX => format!("{min}‥{}", max + 1),
+            Some(max) => format!("{min}…{max}"),
+        }
     }
 
     fn expect_no_form_args(form: &HirTypeForm) -> Result<(), CodegenError> {

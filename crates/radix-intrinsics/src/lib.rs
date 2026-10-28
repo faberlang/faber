@@ -186,7 +186,9 @@ pub fn lookup_namespace_method_by_name(
 #[must_use]
 pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
     match ty {
-        Type::Array(_) | Type::BoundedArray { .. } => &[IntrinsicReceiver::Lista],
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => {
+            &[IntrinsicReceiver::Lista]
+        }
         Type::Queue(_) | Type::BoundedQueue { .. } => &[IntrinsicReceiver::Queue],
         Type::Stack(_) | Type::BoundedStack { .. } => &[IntrinsicReceiver::Stack],
         // WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. Routing it to

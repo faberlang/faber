@@ -4416,7 +4416,9 @@ impl FunctionBuilder<'_> {
             // `de` binds the index, not a lane, so it is a plain index loop
             // over the runtime length: the same shape as an unbounded lista,
             // independent of any literal capacity.
-            Type::BoundedArray { element, .. } if matches!(mode, HirIteraMode::De) => {
+            Type::BoundedArray { element, .. } | Type::RangedArray { element, .. }
+                if matches!(mode, HirIteraMode::De) =>
+            {
                 CollectionIteraKind::Array(*element)
             }
             Type::BoundedArray { element, capacity } => {
@@ -4453,7 +4455,7 @@ impl FunctionBuilder<'_> {
                     None => CollectionIteraKind::Unsupported,
                 }
             }
-            Type::Array(item) => CollectionIteraKind::Array(*item),
+            Type::Array(item) | Type::RangedArray { element: item, .. } => CollectionIteraKind::Array(*item),
             // D10.4/D19.4: byte iteration binds the same u8 as octeti[i].
             // Retain the byte carrier rather than fabricating a list type.
             Type::Primitive(Primitive::Octeti) if matches!(mode, HirIteraMode::Ex) => {
@@ -5034,7 +5036,9 @@ impl FunctionBuilder<'_> {
                 _ => source_ty,
             };
             let element = match self.types.get(semantic) {
-                Type::Array(inner) | Type::BoundedArray { element: inner, .. } => *inner,
+                Type::Array(inner)
+                | Type::BoundedArray { element: inner, .. }
+                | Type::RangedArray { element: inner, .. } => *inner,
                 _ => {
                     self.errors.push(MirError::unsupported(
                         source.span,

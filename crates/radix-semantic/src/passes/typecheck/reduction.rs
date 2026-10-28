@@ -672,6 +672,7 @@ fn check_group_keys(
         checker.types.get(group_ty),
         Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Tuple(_)
             | Type::Tensor(..)
             | Type::Matrix(..)

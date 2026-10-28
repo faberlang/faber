@@ -546,6 +546,7 @@ fn contains_unresolved_type(
         | Type::Atomic(inner)
         | Type::Intervallum(inner, _)
         | Type::Option(inner) => contains_unresolved_type(*inner, types, seen),
+        Type::RangedArray { element, .. } => contains_unresolved_type(*element, types, seen),
         Type::BoundedArray { element, capacity }
         | Type::BoundedQueue { element, capacity }
         | Type::BoundedStack { element, capacity } => {
@@ -777,6 +778,11 @@ fn substitute_type(
         Type::Option(inner) => {
             Type::Option(substitute_type(inner, type_map, index_map, types, interner))
         }
+        Type::RangedArray { element, min, max } => Type::RangedArray {
+            element: substitute_type(element, type_map, index_map, types, interner),
+            min,
+            max,
+        },
         Type::BoundedArray { element, capacity } => Type::BoundedArray {
             element: substitute_type(element, type_map, index_map, types, interner),
             capacity: substitute_index(capacity, index_map, types),

@@ -1,0 +1,28 @@
++++
+term = "list<T, lo‥hi>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "empty is refused for a range whose minimum is one or more."
+syntax = "let list<int, 1…∞> xs ← empty — rejected"
+related = ["list<T, lo‥hi>", "‥", "…"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM011:ranged_list_length_out_of_range"
++++
+# =============================================================================
+# list<T, lo‥hi> — empty has length zero
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A range that never holds zero elements cannot start from empty.
+#
+# Common mistakes:
+#   • Writing empty to mean a list to fill later; use a range from 0, or list<int>.
+
+main {
+    let list<int, 1…∞> xs ← empty
+    print xs
+}

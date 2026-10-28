@@ -1,0 +1,28 @@
++++
+term = "list<T, lo‥hi>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A store policy word around a list is refused: a list range always traps."
+syntax = "saturating<list<int>, 1…3> — rejected"
+related = ["list<T, lo‥hi>", "‥", "…"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_list_policy_word"
++++
+# =============================================================================
+# list<T, lo‥hi> — a policy word around a list
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A list length range is spelled on the list, list<int, 1…3>, and always traps; saturating, trapping and wrapping take a number width.
+#
+# Common mistakes:
+#   • Choosing a clamping or wrapping length; a list cannot grow or shrink silently.
+
+main {
+    let saturating<list<int>, 1…3> xs ← [1]
+    print xs
+}

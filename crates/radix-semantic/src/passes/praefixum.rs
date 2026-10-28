@@ -479,6 +479,7 @@ fn type_param_in(
         | Type::Matrix(inner, _)
         | Type::Sparsa(inner, _) => vec![*inner],
         Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => vec![*element],
         Type::Map(key, value)

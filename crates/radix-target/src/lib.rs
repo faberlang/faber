@@ -349,6 +349,15 @@ impl Target {
         matches!(self, Self::HirFaber | Self::HirRust | Self::MirStepper)
     }
 
+    /// Whether this target applies a list length range (`list<T, lo‥hi>`,
+    /// need) where the list grows, shrinks and is built. Every other
+    /// target would read the cell as a plain list and silently drop the
+    /// range, so it is refused by name before an emitter runs.
+    #[must_use]
+    pub fn lowers_ranged_list(self) -> bool {
+        matches!(self, Self::HirFaber | Self::HirRust | Self::MirStepper)
+    }
+
     /// Feature that enables this target when it is feature-gated.
     #[must_use]
     pub fn required_feature(self) -> Option<&'static str> {

@@ -535,6 +535,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::Union(_)
             | Type::Intersection(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::BoundedQueue { .. }
             | Type::BoundedStack { .. }
             | Type::BoundedTextus { .. }

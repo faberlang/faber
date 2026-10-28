@@ -332,7 +332,10 @@ fn is_struct(ty: &Type) -> bool {
 }
 
 fn is_list(ty: &Type) -> bool {
-    matches!(ty, Type::Array(_) | Type::BoundedArray { .. })
+    matches!(
+        ty,
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+    )
 }
 
 fn is_tensor(ty: &Type) -> bool {

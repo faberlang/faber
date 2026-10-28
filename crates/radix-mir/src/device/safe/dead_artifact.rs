@@ -88,6 +88,6 @@ pub(super) fn dead_fold_artifact_slots(
 pub(super) fn is_fold_artifact_type(types: &TypeTable, ty: MirType) -> bool {
     matches!(
         types.get(ty.semantic_id()),
-        Type::Array(_) | Type::BoundedArray { .. } | Type::Tensor(_, _)
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } | Type::Tensor(_, _)
     )
 }

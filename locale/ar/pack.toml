@@ -1222,6 +1222,22 @@ help = "استخدم عرض عدد صحيح مثل u8 أو i32؛ عروض float 
 message = "لا يستطيع kernel استخدام سياسة تخزين ذات نطاق بعد ({site}); لا يطبّق kernel النطاقات"
 help = "استخدم العرض العادي داخل kernel وطبّق النطاق على المضيف"
 
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "يجب أن يكون طرف نطاق طول القائمة عددًا صحيحًا حرفيًا غير سالب أو ∞"
+help = "اكتب الطرفين كعددين صحيحين حرفيين، مثل list<int, 1‥8>؛ الطرف المسمّى أو طرف size غير مدعوم بعد"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "نطاق طول القائمة لا يحوي أي طول"
+help = "يجب أن يكون الطرف الأدنى أصغر من الأعلى في lo‥hi، أو غير أكبر منه في lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "لا يمكن أن يكون طرف نطاق طول القائمة سالبًا"
+help = "الطول عدد: ابدأ النطاق من 0 أو أكثر"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "نطاق طول القائمة لا يقبل كلمة سياسة تخزين"
+help = "اكتب النطاق على القائمة، مثل list<int, 1…8>؛ فهو يوقف البرنامج دائمًا، وكلمات saturating وtrapping وwrapping تأخذ عرضًا عدديًا"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
 help = "أصلح بنية AST للتخفيض"
@@ -1742,6 +1758,10 @@ help = "استخدم مشغّل MIR أو مُصدِر مصدر Faber أو {tabul
 message = "هذا الهدف لا يدعم سياسة التخزين ذات النطاق بعد"
 help = "استخدم MIR runner أو هدف Rust أو مُصدِر مصدر Faber إلى أن يطبّق هذا الهدف النطاقات"
 
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "هذا الهدف لا يدعم نطاق طول القائمة بعد"
+help = "استخدم MIR runner أو هدف Rust أو مُصدِر مصدر Faber إلى أن يطبّق هذا الهدف نطاقات القوائم"
+
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "ورقة {leaf} غير مدعومة في هذا الهدف"
 help = "استخدم rust أو مشغّل MIR، أو احذف استدعاء {route}"
@@ -2185,6 +2205,10 @@ help = "أضف method {method} بالتوقيع الذي يعلنه {contract}،
 [diagnostics.SEM011]
 message = "أنواع operands غير صالحة"
 help = "استخدم أنواع operands متوافقة"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "طول هذه القائمة خارج نطاق طول القائمة"
+help = "أعطِ الحرفي طولًا داخل النطاق، أو ابنِ القائمة بـ ↦ وتعافَ بـ ⊥"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "رموز التقريب لا تنطبق على قيم المصفوفات بعد"
