@@ -354,7 +354,7 @@ Sized numerics are **bare markers**: `i8`…`i64`, `u8`…`u64`, `f16`, `bf16`, 
 Collections and buffers:
 
 - `list<T>`, `map<K,V>`, `set<T>`, `queue<T>`, `stack<T>` (la `lista`, `tabula`, `copia`)
-- bounded capacity forms take a `NATURAL` (or `_` to infer); a list writes its count after `size` (`list<T, size N>`, bare `list<T, N>` is retired), the others still write it bare: `list<T, size N>`, `queue<T, N>`, `stack<T, N>`,
+- bounded capacity forms take a `NATURAL` (or `_` to infer); a list writes its count after `size` (`list<T, size N>`, bare `list<T, N>` is retired), the others still write it bare: `queue<T, N>`, `stack<T, N>`,
   `string<N>`, `ascii<N>`; capacities are compile-time values today (run-time capacities and
   extents are admitted, not shipped)
 - `promise<T>`, `iterator<T>` (la `promissum`, `cursor`)

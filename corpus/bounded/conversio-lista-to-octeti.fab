@@ -3,13 +3,13 @@ term = "↦"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
-summary = "Compile-admitted bounded list<u8, N> to bounded list<b8, M> route."
-syntax = "list<u8, N> ↦ list<b8, M>"
+summary = "Compile-admitted bounded list<u8, size N> to bounded list<b8, size M> route."
+syntax = "list<u8, size N> ↦ list<b8, size M>"
 related = ["↦", "lista", "list<b8>", "u8"]
 locale = "en"
 +++
 # =============================================================================
-# bounded list<u8, N> to list<b8, M> — compile-admitted byte carrier route
+# bounded list<u8, size N> to list<b8, size M> — compile-admitted byte carrier route
 # =============================================================================
 #
 # What this teaches:
@@ -23,7 +23,7 @@ locale = "en"
 
 main {
     let list<u8> base ← [1, 2]
-    let list<u8, 8> raw ← base ↦ list<u8, 8>
-    let list<b8, 8> out ← raw ↦ list<b8, 8>
+    let list<u8, size 8> raw ← base ↦ list<u8, size 8>
+    let list<b8, size 8> out ← raw ↦ list<b8, size 8>
     print out
 }

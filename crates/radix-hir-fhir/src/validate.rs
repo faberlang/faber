@@ -1280,7 +1280,7 @@ fn validate_type_form(
                     }
                 }
                 radix_types::Type::BoundedOcteti { .. } => {
-                    // The authored `list<b8, N>`: the bounded byte buffer is
+                    // The authored `list<b8, size N>`: the bounded byte buffer is
                     // authored as a list head over one raw-byte (`b8`) element
                     // argument; the capacity lives in the root witness, as for
                     // every bounded list.
