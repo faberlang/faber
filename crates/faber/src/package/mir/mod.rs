@@ -765,7 +765,7 @@ fn session_dispatcher(
     lowered: &radix::module::mir::LoweredMirUnit<'_>,
     validated: &radix::module::mir::ValidatedMir<'_>,
 ) -> Result<SessionDispatcher, Vec<Diagnostic>> {
-    use super::device::{SessionKernelDispatcher, device_image_for_lowered};
+    use super::device::{SessionKernelDispatcher, device_image_for_lowered_with};
     use super::host_factory::host_error_diagnostic;
     use std::time::Instant;
 
@@ -779,7 +779,7 @@ fn session_dispatcher(
         None
     };
     let (mut image, omitted, image_timing) =
-        device_image_for_lowered(lowered, backend, cuda_libdevice.as_deref())?;
+        device_image_for_lowered_with(lowered, backend, cuda_libdevice.as_deref(), true)?;
     let image_build_ns = image_start.elapsed().as_nanos() as u64;
     if image.kernels.is_empty() {
         let reasons = omitted
@@ -846,12 +846,15 @@ fn session_dispatcher(
         .collect();
     let lane_ranges = std::mem::take(&mut image.lane_ranges);
     let write_maps = std::mem::take(&mut image.write_maps);
+    let fusions = std::mem::take(&mut image.fusions);
     let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher_start = Instant::now();
-    let dispatcher = SessionKernelDispatcher::new(
+    let fused_entries = fusions.iter().map(|fused| fused.entry.clone()).collect();
+    let dispatcher = SessionKernelDispatcher::with_fused_entries(
         session,
         image.artifact,
         units,
+        fused_entries,
         validated.validation().types.as_table(),
     )
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
@@ -885,6 +888,7 @@ fn session_dispatcher(
         .borrow_mut()
         .set_empty_reductions(empty_reductions);
     dispatcher.borrow_mut().set_write_maps(write_maps);
+    dispatcher.borrow_mut().set_reduce_fusions(fusions);
     if backend == super::device::DeviceImageBackend::MetalSpanned {
         dispatcher.borrow_mut().set_span(lane_ranges);
     }
