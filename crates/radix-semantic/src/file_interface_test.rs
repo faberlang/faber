@@ -775,7 +775,10 @@ fn sized_list_round_trips_through_the_snapshot() {
     let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
         .expect("import sized list");
     let Type::BoundedArray { element, capacity } = target_types.get(imported) else {
-        panic!("expected imported bounded array, got {:?}", target_types.get(imported));
+        panic!(
+            "expected imported bounded array, got {:?}",
+            target_types.get(imported)
+        );
     };
     assert!(matches!(
         target_types.get(*element),
