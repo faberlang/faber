@@ -152,8 +152,8 @@ main {
 /// The `forma`-shadowing guard (fd0c939) excludes the `h1b.gelu()` false
 /// positive: an ordinary method call on a local is NOT rewritten into a
 /// synthetic-path namespace call when the method name happens to match an
-/// imported module's export. The guard's three conditions (def.0 >= 1_000_000
-/// AND SymbolKind::Local AND local-name in the imports) make `h1b` ineligible
+/// imported module's export. The guard's three conditions (def.0 >= `1_000_000`
+/// AND `SymbolKind::Local` AND local-name in the imports) make `h1b` ineligible
 /// (its name does not shadow an import binding), so the call runs as the local
 /// genus method. Without the guard, the method-name sweep rewrites `h1b.gelu()`
 /// → `nn.gelu(h1b)` and the package MIR fails — this test would fail.
@@ -912,7 +912,7 @@ fn package_mir_rewrites_gradient_call_and_selected_arguments() {
 }
 
 /// The `forma`-shadowing shape: a receiver def in the HIR-generated range
-/// (>= 1_000_000) whose binding name (recovered from the HIR def→name map)
+/// (`>= 1_000_000`) whose binding name (recovered from the HIR def→name map)
 /// appears in the unit's imports resolves to the registered synthetic
 /// namespace target — the rewrite fires.
 #[test]
@@ -1069,7 +1069,7 @@ fn package_mir_return_channel_mismatch_without_conversion_fails_closed() {
             .map(|diagnostic| {
                 (
                     diagnostic.code,
-                    diagnostic.issue().map(|issue| issue.to_owned()),
+                    diagnostic.issue().map(str::to_owned),
                 )
             })
             .collect::<Vec<_>>()

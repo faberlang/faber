@@ -53,8 +53,10 @@ fn linked_function_id(lowered: &LoweredMirUnit<'_>, name: &str) -> MirFunctionId
                 .name
                 .is_some_and(|symbol| lowered.interner.resolve(symbol) == name)
         })
-        .map(|function| function.id)
-        .unwrap_or_else(|| panic!("linked function {name} must survive into the merged program"))
+        .map_or_else(
+            || panic!("linked function {name} must survive into the merged program"),
+            |function| function.id,
+        )
 }
 
 #[test]
@@ -82,7 +84,7 @@ fn package_link_rewrites_every_range_product_source_and_the_body() {
             );
         },
     )
-    .unwrap_or_else(|errors| panic!("range-product package MIR must link, got {:?}", errors));
+    .unwrap_or_else(|errors| panic!("range-product package MIR must link, got {errors:?}"));
 }
 
 #[test]

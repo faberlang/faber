@@ -249,7 +249,7 @@ fn praefixum_imports_library_printing_callee_names_the_library_hop() {
         chain,
         vec!["probe".to_owned(), "console.write_line".to_owned()]
     );
-    assert!(!effect.is_empty());
+    assert_ne!(effect, "");
 }
 
 #[test]
