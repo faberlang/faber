@@ -484,10 +484,23 @@ fn template_pieces_split_on_holes_before_decoding() {
 }
 
 #[test]
-fn the_arena_name_is_not_a_helper_prefix() {
+fn a_prefixed_local_does_not_count_as_a_parameter_use() {
+    let code = emitted("fn keep(int value) {\n    let int p_value ← 1\n}\nmain {\n    keep(2)\n}");
+    assert!(code.contains("    (void)p_value;\n"), "{code}");
+}
+
+#[test]
+fn identifier_checks_match_c_tokens_not_substrings_or_literals() {
     assert!(crate::mentions_arena("f(faber_a, 1)"));
     assert!(crate::mentions_arena("g(faber_a)"));
     assert!(!crate::mentions_arena("faber_add(x, y) faber_alloc"));
+    assert!(!crate::mentions_arena("l_faber_a"));
+    assert!(!crate::mentions_arena(r#"printf("faber_a")"#));
+    assert!(!crate::mentions_name(
+        r#"printf("p_value"); /* p_value */ // p_value"#,
+        "p_value"
+    ));
+    assert!(crate::mentions_name("(p_value)", "p_value"));
 }
 
 #[test]
