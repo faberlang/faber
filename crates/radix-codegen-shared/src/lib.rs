@@ -41,6 +41,7 @@ pub mod breakable;
 pub mod cli_ir;
 pub mod conversio_arm;
 pub mod decimal;
+pub mod entry_exit;
 pub mod frame;
 pub mod hints;
 pub mod hygiene;
