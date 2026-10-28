@@ -267,3 +267,42 @@ fn a_kernel_and_the_air_lane_need_a_finite_upper_size() {
         "diagnostics: {air:?}"
     );
 }
+
+// Vector lane counts: the long form takes `size`, as a list does.
+
+#[test]
+fn a_bare_vector_lane_count_is_retired_by_name() {
+    for source in [
+        "main { let vector<f32, 4> v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, size 4>\n print v }",
+        "fn take<size N>(vector<f32, N> v) → int { return 0 }\nmain { print 1 }",
+        "fn take<size N>(vector<f32, N + 1> v) → int { return 0 }\nmain { print 1 }",
+        "fn take(vector<int, 2> v) → int { return 0 }\nmain { print 1 }",
+    ] {
+        refused(source, "vector_width_needs_size");
+    }
+}
+
+#[test]
+fn a_sized_vector_lane_count_and_the_unchanged_forms_check() {
+    assert_accepts(
+        r"
+fn take<size N>(vector<f32, size N> v, vf32[N] w) → int { return 0 }
+fn grow<size N>(vector<f32, size (N + 1)> v) → int { return 0 }
+fn four(vector<f32, size 4> a, vf32[4] b, vector<f32, [4]> c, vector<f32, _> d) → int { return 0 }
+main {
+    let vector<f32, size 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
+    print v
+}
+",
+    );
+}
+
+#[test]
+fn size_n_and_the_shorthand_are_one_vector_type() {
+    assert_accepts(
+        r"
+fn pass(vector<f32, size 4> a) → vf32[4] { return a }
+main { print 1 }
+",
+    );
+}

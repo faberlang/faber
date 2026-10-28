@@ -26,7 +26,7 @@ pub enum IntrinsicReceiver {
     Matrix,
     /// Sparse `sparsa<T, Figura>` container (numeric-only in v1).
     Sparsa,
-    /// Register-class `vector<T, N>` (numeric elements).
+    /// Register-class `vector<T, size N>` (numeric elements).
     Vector,
     /// Numeric `intervallum<T>` interval.
     Intervallum,

@@ -825,7 +825,7 @@ fn vector_element_tensor_resolves_device_view_with_vector_element() {
 
     let layout = table
         .layout_for_type(MirType::semantic(tensor))
-        .expect("tensor<vector<f32, 4>> layout fact");
+        .expect("tensor<vector<f32, size 4>> layout fact");
     let MirLayoutKind::DeviceView(view) = layout.kind else {
         panic!("expected DeviceView, got {:?}", layout.kind);
     };
@@ -848,7 +848,7 @@ fn vector_element_tensor_width2_is_admitted() {
     let table = MirLayoutTable::from_types(&types);
     let layout = table
         .layout_for_type(MirType::semantic(tensor))
-        .expect("tensor<vector<f32, 2>> layout fact");
+        .expect("tensor<vector<f32, size 2>> layout fact");
     assert!(matches!(
         layout.kind,
         MirLayoutKind::DeviceView(MirDeviceViewLayout {

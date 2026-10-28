@@ -4488,7 +4488,7 @@ impl FunctionBuilder<'_> {
                 expr.span,
             ));
         }
-        // `tensor<E, [N]> ↦ vector<E, N>`: the tensor flattens to its element
+        // `tensor<E, [N]> ↦ vector<E, size N>`: the tensor flattens to its element
         // lista and lane `k` reads slot `k`. A tensor source is not a literal,
         // so it never reaches the `lista` literal arm below.
         if recovery.is_none()
@@ -5099,7 +5099,7 @@ impl FunctionBuilder<'_> {
         id
     }
 
-    /// `tensor<E, [N]> ↦ vector<E, N>`: flatten the tensor to its element
+    /// `tensor<E, [N]> ↦ vector<E, size N>`: flatten the tensor to its element
     /// lista, then build lane `k` from slot `k` of that lista in order.
     fn lower_tensor_to_vector_conversio(
         &mut self,

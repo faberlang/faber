@@ -565,8 +565,8 @@ fn limes_callback_gets_shift_and_symbolic_extent_range_facts() {
     let fixture = analyze_en(
         r"
 interface EdgePolicy<C> { fn remap(C coord) → C }
-class ZeroGhost implements EdgePolicy<vector<int, 1>> {
-    fn remap(vector<int, 1> coord) → vector<int, 1> {
+class ZeroGhost implements EdgePolicy<vector<int, size 1>> {
+    fn remap(vector<int, size 1> coord) → vector<int, size 1> {
         return coord
     }
 }
@@ -1325,13 +1325,13 @@ fn constant_arguments_seed_a_private_kernel_callee() {
     let fixture = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 8)
 }
 ",
@@ -1344,13 +1344,13 @@ fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
     let dynamic = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
     return helper(clock, base)
 }
 ",
@@ -1374,13 +1374,13 @@ fn imported_const_call_argument_seeds_a_private_kernel_callee() {
 import from "./params" params
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_WHOLE)
 }
 "#,
@@ -1397,13 +1397,13 @@ fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
 import from "./params" params
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_WHOLE)
 }
 "#,
@@ -1429,13 +1429,13 @@ fn module_const_call_argument_seeds_a_private_kernel_callee() {
 const i32 K = 4
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, K + 4)
 }
 ",
@@ -1453,19 +1453,19 @@ fn disagreeing_call_sites_merge_into_one_admitted_row() {
 import from "./params" params
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller_whole(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_whole(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_WHOLE)
 }
 
 @ kernel
 @ public
-fn caller_frac(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_frac(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_FRAC)
 }
 "#,
@@ -1645,19 +1645,19 @@ fn distinct_constant_tuples_merge_into_one_admitted_callee_row() {
     let fixture = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller_om(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_om(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 8)
 }
 
 @ kernel
 @ public
-fn caller_al(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_al(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 11)
 }
 ",
@@ -1675,19 +1675,19 @@ fn mixed_constant_and_dynamic_call_sites_keep_the_conservative_row_when_merging(
     let fixture = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller_const(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_const(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 8)
 }
 
 @ kernel
 @ public
-fn caller_dynamic(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+fn caller_dynamic(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
     return helper(clock, base)
 }
 ",

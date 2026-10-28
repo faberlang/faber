@@ -1245,6 +1245,10 @@ help = "اكتب النطاق على القائمة، مثل {lista}<int, {magni
 message = "يُكتب عدد عناصر القائمة بعد `{magnitudo}`"
 help = "اكتب `{lista}<int, {magnitudo} 4>` لأربعة عناصر على الأكثر، أو `{lista}<int, {magnitudo} 1…8>` لنطاق؛ النطاق المجرد يحدّ قيمة لا عددًا"
 
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "يُكتب عدد مسارات المتجه بعد `{magnitudo}`"
+help = "اكتب `{vector}<f32, {magnitudo} 4>` لأربعة مسارات؛ الصيغة المختصرة `vf32[4]` لا تتغير"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
 help = "أصلح بنية AST للتخفيض"
@@ -2190,11 +2194,11 @@ message = "عدم تطابق في vector element type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector يتطلب element type و width؛ استخدم vector<T, N>"
+message = "vector يتطلب element type و width؛ استخدم vector<T, حجم N>"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector يتطلب width؛ استخدم vector<T, 4> أو vf32[4]"
+message = "vector يتطلب width؛ استخدم vector<T, حجم 4> أو vf32[4]"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]

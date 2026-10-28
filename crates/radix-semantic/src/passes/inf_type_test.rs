@@ -231,7 +231,7 @@ fn fractus_inf_is_a_retired_wrapper() {
 fn a_tensor_family_element_cannot_be_inf() {
     for (ty, what) in [
         ("tensor<inf, [2]>", "tensor"),
-        ("vector<inf, 4>", "vector"),
+        ("vector<inf, magnitudo 4>", "vector"),
         ("matrix<inf, [2, 2]>", "matrix"),
         ("sparsa<inf, [2]>", "sparsa"),
     ] {

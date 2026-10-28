@@ -623,7 +623,7 @@ fn opaque_effect_before_the_loop_still_poisons_the_function() {
 fn vector_component_of_the_element_binder_is_a_value_read() {
     accepted(
         r"
-functio k(de tensor<vector<f32, 4>, [4]> state, varia tensor<f32, [4]> depth) → vacuum {
+functio k(de tensor<vector<f32, magnitudo 4>, [4]> state, varia tensor<f32, [4]> depth) → vacuum {
     itera ex state apud [i] filum lane sit c {
         depth[i] ← c[0]
     }
@@ -637,9 +637,9 @@ incipit {
 fn lane_store_on_a_lane_local_vector_is_accepted() {
     accepted(
         r"
-functio k(de tensor<vector<f32, 4>, [4]> state, varia tensor<vector<f32, 4>, [4]> out) → vacuum {
+functio k(de tensor<vector<f32, magnitudo 4>, [4]> state, varia tensor<vector<f32, magnitudo 4>, [4]> out) → vacuum {
     itera ex state apud [i] filum lane sit c {
-        varia vector<f32, 4> s ← exemplum c
+        varia vector<f32, magnitudo 4> s ← exemplum c
         s[1] ← 0.0
         out[i] ← s
     }
@@ -653,8 +653,8 @@ incipit {
 fn lane_store_on_an_outer_vector_local_is_outer_local_mutation() {
     rejected(
         r"
-functio k(de tensor<vector<f32, 4>, [4]> state, varia tensor<f32, [4]> out) → vacuum {
-    varia vector<f32, 4> acc ← exemplum state[0]
+functio k(de tensor<vector<f32, magnitudo 4>, [4]> state, varia tensor<f32, [4]> out) → vacuum {
+    varia vector<f32, magnitudo 4> acc ← exemplum state[0]
     itera ex state apud [i] filum lane sit c {
         acc[0] ← c[0]
         out[i] ← acc[0]
@@ -670,7 +670,7 @@ incipit {
 fn vector_tensor_written_in_place_still_rejects_neighbour_reads() {
     rejected(
         r"
-functio k(varia tensor<vector<f32, 4>, [4]> state) → vacuum {
+functio k(varia tensor<vector<f32, magnitudo 4>, [4]> state) → vacuum {
     itera ex state apud [i] filum lane sit c {
         state[i] ← state[i + 1]
     }

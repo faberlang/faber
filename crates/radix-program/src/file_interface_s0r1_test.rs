@@ -20,7 +20,7 @@ use radix_module::syntax::GenericParamKind;
 use std::collections::BTreeMap;
 
 const PROVIDER: &str = r"@ publica
-typus Vector<magnitudo N> = vector<f32, N>
+typus Vector<magnitudo N> = vector<f32, magnitudo N>
 
 @ publica
 typus Wrapper<T> = lista<T>

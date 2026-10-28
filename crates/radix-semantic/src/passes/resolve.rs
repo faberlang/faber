@@ -1901,6 +1901,22 @@ fn resolve_est_type_target(
     resolve_type_expr(resolver, interner, ty, errors);
 }
 
+/// The long form `vector<T, size N>` writes its lane count bare. The count takes the
+/// `size` marker (`vector<T, size N>`); the `_` hole and a bracketed extent
+/// (`vf32[4]`, `vector<T, [4]>`) are unchanged, because the brackets already
+/// mark an extent.
+fn vector_width_is_bare_count(figura: &radix_syntax::FiguraExpr) -> bool {
+    use radix_syntax::FiguraExpr;
+    matches!(
+        figura,
+        FiguraExpr::Literal(_)
+            | FiguraExpr::Var(_)
+            | FiguraExpr::Add(..)
+            | FiguraExpr::Subtract(..)
+            | FiguraExpr::Divide(..)
+    )
+}
+
 fn est_value_rhs_error(span: radix_lexer::Span) -> SemanticError {
     SemanticError::structured(SemanticErrorKind::OperandTypesInvalid, span)
         .with_arg("issue", ISSUE_EST_VALUE_RHS)
@@ -1914,8 +1930,17 @@ fn resolve_type_expr(
 ) {
     match &ty.kind {
         TypeExprKind::Infer | TypeExprKind::FieldListHole | TypeExprKind::UnionHole => {}
+        TypeExprKind::Vector(elem, figura) => {
+            resolve_type_expr(resolver, interner, elem, errors);
+            if vector_width_is_bare_count(figura) {
+                errors.push(lowering_error(
+                    crate::numeric_width::WidthLowerIssue::VECTOR_WIDTH_NEEDS_SIZE,
+                    ty.span,
+                ));
+            }
+            resolve_figura_expr(resolver, interner, figura, errors);
+        }
         TypeExprKind::Tensor(elem, figura)
-        | TypeExprKind::Vector(elem, figura)
         | TypeExprKind::Matrix(elem, figura)
         | TypeExprKind::Sparsa(elem, figura) => {
             resolve_type_expr(resolver, interner, elem, errors);

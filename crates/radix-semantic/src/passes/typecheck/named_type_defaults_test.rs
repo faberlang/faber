@@ -54,7 +54,7 @@ functio full(Pair<numerus, textus> value) → numerus {
 }
 
 genus Sized<magnitudo N = 4> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
 functio sized_default(Sized value) → numerus {

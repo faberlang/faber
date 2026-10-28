@@ -209,20 +209,20 @@ fn host_kernel_lowering_reduces_a_wave_speed_shaped_thread_max_to_the_sequential
     // device-resident clock tensor.
     let source = r"
 @ kernel
-fn speed_of(f32 scale, vector<f32, 4> s) → f32 {
+fn speed_of(f32 scale, vector<f32, size 4> s) → f32 {
     return (s[1] + s[2]) * scale
 }
 @ kernel
 @ public
-fn wave_speed<size H, size W>(f32 scale, tensor<vector<f32, 4>, [H, W]> state, mut tensor<f32, [4]> clock) → void {
+fn wave_speed<size H, size W>(f32 scale, tensor<vector<f32, size 4>, [H, W]> state, mut tensor<f32, [4]> clock) → void {
     clock[[1]] ← reduce via max from state at [i, j] thread lane let s { return speed_of(scale, s) } coalesce 0.0
 }
 main {
-    let tensor<vector<f32, 4>, []> cell_seed ← empty
-    let vector<f32, 4> low ← [0.0, 1.0, 1.0, 0.0] ↦ vector<f32, 4>
-    mut tensor<vector<f32, 4>, [5, 5]> state ← cell_seed.create(low, [5, 5])
-    state[[3, 2]] ← [0.0, 2.0, 5.0, 0.0] ↦ vector<f32, 4>
-    state[[0, 4]] ← [0.0, 1.0, 3.0, 0.0] ↦ vector<f32, 4>
+    let tensor<vector<f32, size 4>, []> cell_seed ← empty
+    let vector<f32, size 4> low ← [0.0, 1.0, 1.0, 0.0] ↦ vector<f32, size 4>
+    mut tensor<vector<f32, size 4>, [5, 5]> state ← cell_seed.create(low, [5, 5])
+    state[[3, 2]] ← [0.0, 2.0, 5.0, 0.0] ↦ vector<f32, size 4>
+    state[[0, 4]] ← [0.0, 1.0, 3.0, 0.0] ↦ vector<f32, size 4>
     mut tf32[4] clock ← tf32[4] {}
     wave_speed(0.5, state, clock)
     print clock[[1]]

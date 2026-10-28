@@ -359,7 +359,7 @@ Collections and buffers:
   extents are admitted, not shipped)
 - `promise<T>`, `iterator<T>` (la `promissum`, `cursor`)
 - `tensor<T, Figura>`, `sparsa<T, Figura>` — shaped buffers
-- `vector<T, N>`, `matrix<T, [R, C]>` — register-class, not buffer aliases
+- `vector<T, size N>`, `matrix<T, [R, C]>` — register-class, not buffer aliases. The vector long form writes its lane count after `size` (la `magnitudo`), as a list does; a bare `vector<T, 4>` or `vector<T, N>` is `SEM008 vector_width_needs_size` (clean break, no alias). The `vf32[4]` shorthand, `vector<T, [4]>` and the `_` hole are unchanged: the brackets already mark an extent
 - `atomic<T>` — storage-sensitive atomic cell; `T` is `i32` or `u32` only (`SEM008 atomic_element`), access through `load`/`store`/`exchange`/`compare_exchange`
 - `record<Label: T, …>` (la `ratio`) — labeled record type; every element needs a unique label, fields are accessed by label only (no positional or bracket access). Record identity ignores field order and compares field types exactly (no width subtyping); a record is not a class. `record<*>` (la `ratio<*>`) is the whole-field-list hole, legal only as the sole `record` argument: `record<g: f32, *>` is `PARSE001 ratio_field_list_hole_not_sole` and `record<_>` is `ratio_type_arg_label_required`. A bare `{ field = value }` with no typed cell is `record<*>`, each field taking its default type, while `_ { … }` still needs a cell. A record is immutable (no field assignment), prints like a genus value without the name (`{ g = 1.0, w = 2 }`, written order), and `↦` converts a record to and from a genus with the same fields. `faber explain record` for construction forms; see `corpus/ratio/ratio.fab`.
 
@@ -380,7 +380,7 @@ Type forms:
 - inferred constructor: `_ { x = 1 }` builds the cell's class, `_ [1, "a"]` its tuple or list; a bare `{ x = 1 }` or `[1, "a"]` takes the cell's type (sugar for `_ shape`); with no typed cell it is `SEM016 inferred_constructor_no_expected_type` (`corpus/genus/inferred-constructor*.fab`, `inferred-literals.fab`)
 - labeled tuple forms: `tuple` (la `iuncta`) type arguments, construction, and member access
 - width / shape sugar (type position only, identical to the long form): `lu32` = `list<u32>`, `tf32[2, 3]` =
-  `tensor<f32, [2, 3]>`, `sf32` = `sparsa<f32, _>`, `vf32[4]` = `vector<f32, 4>`, `mf32[4, 4]` =
+  `tensor<f32, [2, 3]>`, `sf32` = `sparsa<f32, _>`, `vf32[4]` = `vector<f32, size 4>`, `mf32[4, 4]` =
   `matrix<f32, [4, 4]>` (matrix needs both extents); `inf` takes no prefix (`linf` is an identifier)
 - `list<∪>` / `map<K, ∪>` infer a heterogeneous union element; `list<_>` the single inhabitant
 - inline intersection `A ∩ B` (nominal; binds tighter than `∪`); `class G implements A ∩ B` is the same as `implements A, B`

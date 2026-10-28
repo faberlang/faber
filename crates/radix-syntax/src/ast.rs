@@ -1991,7 +1991,7 @@ pub enum TypeExprKind {
     Tensor(Box<TypeExpr>, FiguraExpr),
     /// Indexed sparse tensor: `sparsa<T, Figura>`.
     Sparsa(Box<TypeExpr>, FiguraExpr),
-    /// Register-class vector: `vector<T, N>`.
+    /// Register-class vector: `vector<T, size N>`.
     Vector(Box<TypeExpr>, FiguraExpr),
     /// Register-class matrix: `matrix<T, [R, C]>`.
     Matrix(Box<TypeExpr>, FiguraExpr),

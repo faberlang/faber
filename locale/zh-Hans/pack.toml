@@ -1289,6 +1289,10 @@ help = "把范围写在列表上，例如 {lista}<int, {magnitudo} 1…8>；它�
 message = "列表的元素个数写在 `{magnitudo}` 之后"
 help = "写 `{lista}<int, {magnitudo} 4>` 表示最多 4 个元素，或 `{lista}<int, {magnitudo} 1…8>` 表示一个范围；裸范围限定的是值，不是个数"
 
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "向量的通道数写在 `{magnitudo}` 之后"
+help = "写 `{vector}<f32, {magnitudo} 4>` 表示四个通道；简写 `vf32[4]` 不变"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可调用项的注解姿态“{annotation_posture}”与书写的姿态“{written_posture}”冲突"
 help = "修正用于 lowering 的 AST construct"
@@ -2234,11 +2238,11 @@ message = "vector element 类型不匹配"
 help = "使表达式类型与期望类型一致"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector 需要 element type 和 width；请使用 vector<T, N>"
+message = "vector 需要 element type 和 width；请使用 vector<T, 维度 N>"
 help = "使表达式类型与期望类型一致"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector 需要 width；请使用 vector<T, 4> 或 vf32[4]"
+message = "vector 需要 width；请使用 vector<T, 维度 4> 或 vf32[4]"
 help = "使表达式类型与期望类型一致"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]

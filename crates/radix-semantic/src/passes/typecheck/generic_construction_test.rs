@@ -205,10 +205,10 @@ fn applied_generic_class_construction_with_size_argument_typechecks() {
     // type before the initializer is checked (S0-G1 done_when 1).
     test_support::assert_accepts_la(
         r"genus Gen<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
-functio facere(vector<f32, 3> lanes) → Gen<3> {
+functio facere(vector<f32, magnitudo 3> lanes) → Gen<3> {
     redde Gen<3> { lanes = lanes }
 }",
     );
@@ -221,10 +221,10 @@ fn bare_generic_class_construction_adopts_contextual_size_witness() {
     // done_when 3) — never a silent wrong-arity acceptance.
     test_support::assert_accepts_la(
         r"genus Gen<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
-functio facere(vector<f32, 3> lanes) → Gen<3> {
+functio facere(vector<f32, magnitudo 3> lanes) → Gen<3> {
     redde Gen { lanes = lanes }
 }",
     );
@@ -237,10 +237,10 @@ fn applied_generic_class_construction_rejects_wrong_width_initializer() {
     // done_when 2).
     test_support::assert_rejects_with_issue_la(
         r"genus Gen<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
-functio facere(vector<f32, 4> wide) → Gen<3> {
+functio facere(vector<f32, magnitudo 4> wide) → Gen<3> {
     redde Gen<3> { lanes = wide }
 }",
         "field_initializer_type_mismatch",
@@ -253,10 +253,10 @@ fn applied_generic_class_construction_rejects_kind_mismatch() {
     // identity at the applied head.
     test_support::assert_rejects_with_issue_la(
         r"genus Gen<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
-functio facere(vector<f32, 3> lanes) → Gen<3> {
+functio facere(vector<f32, magnitudo 3> lanes) → Gen<3> {
     redde Gen<textus> { lanes = lanes }
 }",
         "generic_argument_kind_mismatch",
@@ -269,10 +269,10 @@ fn applied_generic_class_construction_rejects_wrong_arity() {
     // identity at the applied head.
     test_support::assert_rejects_with_issue_la(
         r"genus Gen<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
-functio facere(vector<f32, 3> lanes) → Gen<3> {
+functio facere(vector<f32, magnitudo 3> lanes) → Gen<3> {
     redde Gen<3, 4> { lanes = lanes }
 }",
         "generic_argument_arity_mismatch",
@@ -353,11 +353,11 @@ functio facere() → Eventum {
 fn applied_generic_field_read_substitutes_size_witness() {
     test_support::assert_accepts_la(
         r"genus Capsa<magnitudo N> {
-    varia vector<f32, N> minima
+    varia vector<f32, magnitudo N> minima
 }
 
-functio minimum(Capsa<3> capsam) → vector<f32, 3> {
-    sit vector<f32, 3> lo ← capsam.minima
+functio minimum(Capsa<3> capsam) → vector<f32, magnitudo 3> {
+    sit vector<f32, magnitudo 3> lo ← capsam.minima
     redde lo
 }",
     );
@@ -367,10 +367,10 @@ functio minimum(Capsa<3> capsam) → vector<f32, 3> {
 fn applied_generic_field_store_substitutes_size_witness() {
     test_support::assert_accepts_la(
         r"genus Capsa<magnitudo N> {
-    varia vector<f32, N> minima
+    varia vector<f32, magnitudo N> minima
 }
 
-functio scribe(Capsa<3> capsam, vector<f32, 3> valor) → vector<f32, 3> {
+functio scribe(Capsa<3> capsam, vector<f32, magnitudo 3> valor) → vector<f32, magnitudo 3> {
     varia Capsa<3> c ← capsam
     c.minima ← valor
     redde c.minima

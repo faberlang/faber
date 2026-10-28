@@ -409,7 +409,7 @@ Limits (probed): narrowing applies to a visible immutable binding. A field place
 
 **Pass the structured value a call site already holds; exploding it into a positional scalar fan-out discards structure the code just built.**
 
-non-preferred · Evidence: a positional fan-out discards the structure the caller just built; the repaired shape takes four `vector<f32, 3>` corners and a `Color` instead of 18 positional scalars
+non-preferred · Evidence: a positional fan-out discards the structure the caller just built; the repaired shape takes four `vector<f32, size 3>` corners and a `Color` instead of 18 positional scalars
 
 ```fab
 # ✗ scalar fan-out — the quad and color just built are flattened away

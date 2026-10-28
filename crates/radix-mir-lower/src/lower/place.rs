@@ -340,7 +340,7 @@ impl FunctionBuilder<'_> {
     }
 
     /// Whether `ty`, under access markers, aliases, and one optional layer
-    /// (the base of `v![k]`), is a `vector<T, N>`.
+    /// (the base of `v![k]`), is a `vector<T, size N>`.
     fn is_vector_lane_base(&self, ty: TypeId) -> bool {
         let mut ty = self.types.peel_access_marker(ty).1;
         if let Some(inner) = self.types.nullable_inner(ty) {

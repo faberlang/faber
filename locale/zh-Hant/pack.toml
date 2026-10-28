@@ -1289,6 +1289,10 @@ help = "把範圍寫在列表上，例如 {lista}<int, {magnitudo} 1…8>；它�
 message = "列表的元素個數寫在 `{magnitudo}` 之後"
 help = "寫 `{lista}<int, {magnitudo} 4>` 表示最多 4 個元素，或 `{lista}<int, {magnitudo} 1…8>` 表示一個範圍；裸範圍限定的是值，不是個數"
 
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "向量的通道數寫在 `{magnitudo}` 之後"
+help = "寫 `{vector}<f32, {magnitudo} 4>` 表示四個通道；簡寫 `vf32[4]` 不變"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可呼叫項的註記姿態「{annotation_posture}」與書寫的姿態「{written_posture}」衝突"
 help = "修正用於降階的 AST 結構"
@@ -2230,11 +2234,11 @@ message = "向量元素型別不相符"
 help = "使運算式型別符合預期型別"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector 需要元素型別與寬度；使用 vector<T, N>"
+message = "vector 需要元素型別與寬度；使用 vector<T, 尺寸 N>"
 help = "使運算式型別符合預期型別"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector 需要寬度；使用 vector<T, 4> 或 vf32[4]"
+message = "vector 需要寬度；使用 vector<T, 尺寸 4> 或 vf32[4]"
 help = "使運算式型別符合預期型別"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]

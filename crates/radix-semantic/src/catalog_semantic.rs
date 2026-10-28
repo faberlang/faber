@@ -671,6 +671,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::LIST_COUNT_NEEDS_SIZE => Some(
             "write list<int, size 4> for at most 4 elements, or list<int, size 1…8> for a range; a bare range bounds a value, not a count".to_owned(),
         ),
+        WidthLowerIssue::VECTOR_WIDTH_NEEDS_SIZE => Some(
+            "write vector<f32, size 4> for four lanes; the shorthand vf32[4] is unchanged".to_owned(),
+        ),
         "ranged_list_length_out_of_range" => Some(
             "give the literal a length inside the range, or build the list with `↦` and recover with `⊥`".to_owned(),
         ),
@@ -767,7 +770,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
                 .to_owned(),
         ),
         "constructor_register_extent_requires_literal" => Some(
-            "a vector width or matrix extent in a constructor must be a literal, as in vector<f32, 4>"
+            "a vector width or matrix extent in a constructor must be a literal, as in vector<f32, size 4>"
                 .to_owned(),
         ),
         "constructor_affine_extent_unsupported" => Some(
