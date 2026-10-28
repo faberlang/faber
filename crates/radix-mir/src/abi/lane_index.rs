@@ -309,6 +309,25 @@ impl<'a> LaneIndexProof<'a> {
         Some(proof)
     }
 
+    /// The proof state of a whole-grid reduction's term or group-key helper.
+    /// The helper has no lane and no grid guard, so only a literal or
+    /// sequential-counter coordinate is proven; every other tensor index is
+    /// unproven and needs the kernel's device bounds compare.
+    #[must_use]
+    pub fn for_helper(function: &'a MirFunction, validation: &'a MirValidationContext<'a>) -> Self {
+        let mut proof = Self {
+            function,
+            validation,
+            defs: collect_writes(function),
+            aliases: ParameterAliases::new(function),
+            lane: None,
+            guard_factors: Vec::new(),
+            counters: BTreeMap::new(),
+        };
+        proof.counters = counter::bounded_counters(&proof);
+        proof
+    }
+
     /// `total` of the entry guard `lane >= total`.
     fn guard_total(&self, condition: &MirOperand) -> Option<Sym> {
         let key = operand_key(condition)?;
