@@ -151,6 +151,9 @@ pub enum IntrinsicMirKind {
     Atomic(MirAtomicOp),
     HigherOrderAll,
     HigherOrderAny,
+    /// `reperta` (en `find`): the first element, in list order, whose
+    /// predicate holds, as `T ∪ nihil`. Stops at the first match like `quilibet`.
+    HigherOrderFind,
     HigherOrderFiltrata,
     HigherOrderMap,
     HigherOrderReduce,
@@ -397,6 +400,18 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         &[IntrinsicParamKind::Predicate],
         ArrayInner,
         HigherOrderFiltrata
+    ),
+    // `reperta` (en `find`): predicate search. Its own name and one signature;
+    // `primus` (the unconditional first element) is unchanged. The result is
+    // `T ∪ nihil` even for a bounded list of minimum size one: a match is not
+    // guaranteed.
+    intrinsic!(
+        Lista,
+        "reperta",
+        1,
+        &[IntrinsicParamKind::Predicate],
+        OptionInner,
+        HigherOrderFind
     ),
     intrinsic!(Lista, "inversa", 0, &[], ArrayInner, collection Reverse),
     intrinsic!(Lista, "inverte", 0, &[], Vacuum, collection ReverseInPlace),

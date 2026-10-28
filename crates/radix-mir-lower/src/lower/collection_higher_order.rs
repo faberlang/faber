@@ -1,4 +1,4 @@
-//! Higher-order collection method lowering (`omnia`, `quilibet`, `filtrata`,
+//! Higher-order collection method lowering (`omnia`, `quilibet`, `reperta`, `filtrata`,
 //! `mappata`, `reducta`, `cumulata`, keyed `ordina`/`ordinata`).
 //!
 //! Collection transforms lower into explicit MIR loops over array receivers.
@@ -61,6 +61,22 @@ impl FunctionBuilder<'_> {
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let predicate = self.lower_closure_function(closure, bivalens)?;
         self.lower_collection_predicate(receiver, predicate, TransformKind::Any, expr)
+    }
+
+    /// `reperta` (en `find`) — left-to-right search over a `lista`.
+    ///
+    /// The result starts `nihil`; the first element whose predicate holds
+    /// settles the fold early as `Some(element)`. Evaluation order and the
+    /// early stop are exactly `quilibet`'s.
+    pub(super) fn lower_reperta(
+        &mut self,
+        receiver: &HirExpression,
+        closure: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let predicate = self.lower_closure_function(closure, bivalens)?;
+        self.lower_collection_predicate(receiver, predicate, TransformKind::Find, expr)
     }
 
     pub fn lower_mappata(
@@ -188,12 +204,12 @@ impl FunctionBuilder<'_> {
         let result = self.next_local_id();
         self.locals
             .push(MirLocalDecl { id: result, name: None, ty: result_ty, mutable: true, span: expr.span });
-        self.assign(
-            MirPlace::local(result),
-            MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::All))),
-            result_ty,
-            expr.span,
-        );
+        let initial = if matches!(kind, TransformKind::Find) {
+            self.assign_temp(MirValueKind::Option(MirOptionOp::None), result_ty, expr.span)
+        } else {
+            MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::All)))
+        };
+        self.assign(MirPlace::local(result), initial, result_ty, expr.span);
 
         let index = self.next_local_id();
         self.locals
@@ -240,14 +256,15 @@ impl FunctionBuilder<'_> {
         item_place
             .projections
             .push(MirProjection::Index(MirOperand::Place(MirPlace::local(index))));
-        let predicate = self.call_callback_callee(callback, vec![MirOperand::Place(item_place)], bivalens, expr.span);
+        let item = MirOperand::Place(item_place);
+        let predicate = self.call_callback_callee(callback, vec![item.clone()], bivalens, expr.span);
         if !self.current_is_open() {
             return None;
         }
 
         let (then_block, else_block) = match kind {
             TransformKind::All => (increment_id, decisive_id),
-            TransformKind::Any => (decisive_id, increment_id),
+            TransformKind::Any | TransformKind::Find => (decisive_id, increment_id),
             TransformKind::Filter | TransformKind::Map => {
                 return None;
             }
@@ -258,12 +275,12 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(decisive_id);
-        self.assign(
-            MirPlace::local(result),
-            MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::Any))),
-            result_ty,
-            expr.span,
-        );
+        let decisive_value = if matches!(kind, TransformKind::Find) {
+            self.assign_temp(MirValueKind::Option(MirOptionOp::Some(item)), result_ty, expr.span)
+        } else {
+            MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::Any)))
+        };
+        self.assign(MirPlace::local(result), decisive_value, result_ty, expr.span);
         self.terminate_current(MirTerminatorKind::Goto(after_id), expr.span);
 
         self.switch_to(increment_id);
@@ -411,7 +428,7 @@ impl FunctionBuilder<'_> {
         let callback_return = match kind {
             TransformKind::Filter => bivalens,
             TransformKind::Map => result_element_ty,
-            TransformKind::All | TransformKind::Any => {
+            TransformKind::All | TransformKind::Any | TransformKind::Find => {
                 self.errors
                     .push(MirError::unsupported(span, "predicate fold lowered as a collection transform"));
                 return None;
@@ -446,7 +463,7 @@ impl FunctionBuilder<'_> {
                     span,
                 );
             }
-            TransformKind::All | TransformKind::Any => {
+            TransformKind::All | TransformKind::Any | TransformKind::Find => {
                 self.errors
                     .push(MirError::unsupported(span, "predicate fold lowered as a collection transform"));
                 return None;
@@ -981,6 +998,7 @@ impl FunctionBuilder<'_> {
 enum TransformKind {
     All,
     Any,
+    Find,
     Filter,
     Map,
 }

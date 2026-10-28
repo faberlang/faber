@@ -1,0 +1,62 @@
++++
+term = "reperta"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "comparison", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "List predicate search: find returns the first element whose predicate holds, or none; it visits elements in order and stops at the first match, like any."
+syntax = "<lista>.find(<predicate>)"
+related = ["quilibet", "omnia", "filtrata", "primus", "inventa"]
+locale = "en"
++++
+# =============================================================================
+# reperta — list predicate search (en `find`).
+# =============================================================================
+#
+# What this teaches:
+#   • `xs.find(int x ∴ x ≻ 10)` returns `int ∪ none`: the first element, in
+#     list order, for which the closure is true; `none` when nothing matches
+#     or the list is empty.
+#   • The predicate runs once per element, left to right, and stops at the
+#     first match, exactly as `xs.any(…)` does: no element after the match is
+#     visited.
+#   • `find` on a list and `find` on a regex (see regex/find.fab) are
+#     different methods; the receiver type picks between them.
+#
+# Common mistakes:
+#   • Expecting `find` to return the index; it returns the element.
+#   • Reading the result without handling `none`: even a list that is never
+#     empty may have no match.
+#   • Reaching for `reduce via first`: that form is for tensors and matrices
+#     and runs the predicate on every element.
+#
+# See also: any, all, filter, first
+# =============================================================================
+
+fn watch(int x) → bool {
+    print "visit §"(x)
+    return x ≻ 10
+}
+
+main {
+    let list<int> xs ← [3, 12, 7, 15]
+
+    # First match in list order, not the largest or the last.
+    let int ∪ none hit ← xs.find(int x ∴ x ≻ 10)
+    print hit
+
+    # No match: none.
+    let int ∪ none miss ← xs.find(int x ∴ x ≻ 100)
+    print miss
+
+    # An empty list never matches.
+    let list<int> empty_values ← empty
+    print empty_values.find(int x ∴ x ≻ 0)
+
+    # The result is an ordinary option: a default through `coalesce`.
+    print xs.find(int x ∴ x ≻ 100) coalesce -1
+
+    # Evaluation order is any's: visit 3, visit 12, then stop.
+    print xs.any(int x ∴ watch(x))
+    let int ∪ none seen ← xs.find(int x ∴ watch(x))
+    print seen
+}

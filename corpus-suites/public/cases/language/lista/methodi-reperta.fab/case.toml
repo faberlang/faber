@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/lista/methodi-reperta.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/methodi-reperta.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
