@@ -154,6 +154,37 @@ kind = "bin"
     src.join("main.fab")
 }
 
+const COMPTIME_UTIL: &str = "+++\nlocale = \"en\"\n+++\n\n@ public\nconst int BASE = 5\n\n@ public\nfn seven() \u{2192} int { return 7 }\n";
+const COMPTIME_MAIN: &str = "+++\nlocale = \"en\"\n+++\n\nimport from \"./util\" util\n\nconst int A = comptime {\n    return util.BASE + 1\n}\n\nconst int B = comptime {\n    return util.seven()\n}\n\nmain {\n    print A\n    print B\n}\n";
+
+/// Two-module package whose entry holds `comptime` initializers that read the
+/// sibling's constant and call its function: the sites that only a linked
+/// package can evaluate.
+fn write_comptime_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "fhir-comptime"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("util.fab"), COMPTIME_UTIL).expect("write util.fab");
+    fs::write(src.join("main.fab"), COMPTIME_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
 /// Package whose entry imports a const data member from a lock-resolved
 /// library fixture (`constlib:vals`), proving library const members link and
 /// execute through package MIR (U1 `done_when` 2). The library lives under a
@@ -1009,6 +1040,123 @@ fn loaded_package_fmir_run_parity_matches_direct() {
         loaded_host.stdout_lines, direct_lines,
         "loaded FHIR package FMIR run must match direct run"
     );
+}
+
+/// `comptime` sites left in the loaded modules of an adapted package.
+fn unevaluated_sites(program: &AnalyzedProgram) -> usize {
+    program
+        .nodes
+        .values()
+        .map(|node| {
+            radix::module::semantic::passes::praefixum::evaluation_order(
+                &node.analysis.hir,
+                &node.analysis.types,
+            )
+            .map_or(0, |sites| sites.len())
+        })
+        .sum()
+}
+
+/// A package envelope of the neutral form, as a neutral writer produces it:
+/// each module analyzed once for no build target, then assembled.
+fn write_neutral_comptime_envelope(dir: &Path, entry: &Path) -> PathBuf {
+    use radix::module::hir::package::{
+        LocalLinkWire, PackageIdentityWire, PackageUnitInput, build_package_with_nucleum,
+        encode_package_msgpack,
+    };
+
+    let session = radix::module::driver::Session::new(
+        Config::default()
+            .with_dev_locale_root()
+            .with_target(Target::HirFhir),
+    );
+    let util_path = entry.with_file_name("util.fab");
+    let analyze = |path: &Path| {
+        let source = fs::read_to_string(path).expect("read source");
+        let unit = radix::program::analyze_prepared_program_path(&session, path, &source)
+            .expect("analyze for the neutral target");
+        (unit, source)
+    };
+    let (util, util_source) = analyze(&util_path);
+    let (main, main_source) = analyze(entry);
+    let hash = |text: &str| {
+        let mut hasher = handroll::Sha256::new();
+        hasher.update(text.as_bytes());
+        hasher.finalize_hex()
+    };
+    let inputs = vec![
+        PackageUnitInput {
+            relative_path: "src/main.fab".to_owned(),
+            module_segments: vec!["main".to_owned()],
+            is_entry: true,
+            export_names: Vec::new(),
+            local_links: vec![LocalLinkWire {
+                binding: "util".to_owned(),
+                target: "src/util.fab".to_owned(),
+            }],
+            library_imports: Vec::new(),
+            content_hash: hash(&main_source),
+            analysis: &main,
+        },
+        PackageUnitInput {
+            relative_path: "src/util.fab".to_owned(),
+            module_segments: vec!["util".to_owned()],
+            is_entry: false,
+            export_names: vec!["BASE".to_owned(), "seven".to_owned()],
+            local_links: Vec::new(),
+            library_imports: Vec::new(),
+            content_hash: hash(&util_source),
+            analysis: &util,
+        },
+    ];
+    let identity = PackageIdentityWire {
+        name: "fhir-comptime".to_owned(),
+        version: "1.0.0".to_owned(),
+        edition: "2026".to_owned(),
+    };
+    let (package, _nucleum) =
+        build_package_with_nucleum(identity, "src/main.fab", None, inputs, Vec::new())
+            .expect("assemble the neutral package");
+    let path = dir.join("neutral.fhirpkg");
+    fs::write(
+        &path,
+        encode_package_msgpack(&package).expect("encode package"),
+    )
+    .expect("write package");
+    path
+}
+
+#[test]
+fn loaded_package_evaluates_cross_module_comptime_after_load() {
+    let dir = test_temp_dir("fhir-comptime");
+    let entry = write_comptime_package(&dir);
+    let config = Config::default();
+
+    let mut direct_host = BufferHost::default();
+    run_mir_with_faber_seams(&config, &entry, &mut direct_host).expect("direct FMIR run");
+    assert_eq!(direct_host.stdout_lines, ["6", "7"]);
+
+    // The neutral envelope carries the `comptime` bodies that reach the
+    // sibling unevaluated: no single module could evaluate them at write time.
+    let package_path = write_neutral_comptime_envelope(&dir, &entry);
+    let loaded = load_package_fhir(&package_path).expect("load FHIR package");
+    let mut adapted = loaded_package_to_analyzed(loaded, &dir).expect("adapt loaded package");
+    assert_eq!(
+        unevaluated_sites(&adapted),
+        2,
+        "the artifact must not carry evaluated sites"
+    );
+
+    // Qualification links the package and evaluates them.
+    radix::program::qualify::qualify_program(&mut adapted, &config)
+        .expect("qualify loaded package");
+    assert_eq!(unevaluated_sites(&adapted), 0);
+
+    // The loaded package runs to the direct result.
+    let loaded = load_package_fhir(&package_path).expect("reload FHIR package");
+    let mut loaded_host = BufferHost::default();
+    run_loaded_package_fhir(&config, loaded, &dir, &mut loaded_host).expect("loaded FMIR run");
+    assert_eq!(loaded_host.stdout_lines, direct_host.stdout_lines);
 }
 
 #[test]

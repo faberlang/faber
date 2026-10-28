@@ -50,8 +50,6 @@ use crate::library::{
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
 use crate::paths::normalize_path;
-#[cfg(feature = "runner")]
-use crate::praefixum_imports::PackageImportEffects;
 use crate::source_files::{is_proba_source_path, load_package_source, package_source_files};
 use crate::test_source_filter::TestSourceFilter;
 use crate::{LibraryImportBinding, PackageFile};
@@ -635,7 +633,7 @@ fn analyze_package_spec_with_deadline(
             .get(&file.path)
             .map(PackageKernelTemplateAdmissions::from_export_surface)
             .unwrap_or_default();
-        let mut analysis = match analyze_source_with_kernel_template_admissions(
+        let analyzed = analyze_source_with_kernel_template_admissions(
             &file_session,
             &file.path.display().to_string(),
             &analysis_source,
@@ -650,7 +648,23 @@ fn analyze_package_spec_with_deadline(
                 },
             },
             &kernel_template_admissions,
-        ) {
+        )
+        .and_then(|mut unit| {
+            // Importers read this module's exported constants while they are
+            // analyzed, so under the neutral target (a manifest's implicit
+            // portable default) its `comptime` constants still evaluate here;
+            // folding and the import binding stay with the consumer.
+            if file_session.config.target == radix_module::codegen::Target::HirFhir {
+                radix_module::driver::evaluate_praefixum_for_importers(
+                    &mut unit,
+                    &file_session.config,
+                    &file.path.display().to_string(),
+                    &analysis_source,
+                )?;
+            }
+            Ok(unit)
+        });
+        let mut analysis = match analyzed {
             Ok(mut analysis) => {
                 radix_module::driver::adjust_diagnostic_lines_for_body(
                     &mut analysis.diagnostics,
@@ -775,27 +789,19 @@ fn analyze_package_spec_with_deadline(
                     expanded_library_imports: file.expanded_library_imports.clone(),
                 },
             );
-            let mut effects = PackageImportEffects::new(&nodes, &imports, module_id.clone());
-            let deferred = radix_module::driver::evaluate_deferred(
-                &mut analysis,
-                &file.path.display().to_string(),
-                &analysis_source,
-                &mut effects,
-                &mut |scratch, synthetic, span| {
-                    crate::mir::praefixum_link::run_deferred_site(
-                        &spec,
-                        &imports,
-                        &nodes,
-                        &module_id,
-                        scratch,
-                        &file.path,
-                        synthetic,
-                        span,
-                        &file_session.config,
-                        library_resolver,
-                        &mut library_cache,
-                    )
+            let deferred = crate::mir::praefixum_link::evaluate_deferred_module(
+                &crate::mir::praefixum_link::DeferredLink {
+                    spec: &spec,
+                    imports: &imports,
+                    nodes: &nodes,
+                    config: &file_session.config,
+                    library_resolver,
                 },
+                &module_id,
+                &mut analysis,
+                &file.path,
+                &analysis_source,
+                &mut library_cache,
             );
             if let Err(mut deferred_diagnostics) = deferred {
                 nodes.remove(&module_id);
@@ -923,7 +929,7 @@ fn analyze_package_spec_with_deadline(
 /// either defers all its sites or none, so one remaining site means every
 /// site of the unit is still for [`evaluate_deferred`](radix_module::driver::evaluate_deferred).
 #[cfg(feature = "runner")]
-fn holds_deferred_praefixum(analysis: &AnalyzedModule) -> bool {
+pub(crate) fn holds_deferred_praefixum(analysis: &AnalyzedModule) -> bool {
     radix_module::semantic::passes::praefixum::evaluation_order(&analysis.hir, &analysis.types)
         .is_ok_and(|sites| !sites.is_empty())
 }

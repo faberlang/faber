@@ -27,6 +27,63 @@ use radix_module::file_interface::FileInterface;
 use radix_module::lexer::Span;
 use radix_module::semantic::{SemanticError, SemanticErrorKind};
 
+/// The package facts a deferred evaluation links against: the analyzed nodes
+/// of the module's import closure and the build configuration.
+pub(crate) struct DeferredLink<'a> {
+    pub(crate) spec: &'a PackageSpec,
+    pub(crate) imports: &'a ModuleGraph,
+    pub(crate) nodes: &'a BTreeMap<ModuleId, AnalyzedProgramNode>,
+    pub(crate) config: &'a Config,
+    pub(crate) library_resolver: &'a LibraryResolver,
+}
+
+/// Evaluate every deferred `comptime` site of `module` over the linked import
+/// closure and install the values into `analysis`.
+///
+/// `nodes` must already hold `module` (its node is the template the import
+/// effects resolve against) and the evaluated nodes of every module it
+/// imports. `source` is the text the site spans index into; a loaded unit has
+/// none and passes an empty string.
+///
+/// # Errors
+///
+/// The diagnostics of every site that failed; the unit must not reach codegen.
+pub(crate) fn evaluate_deferred_module(
+    link: &DeferredLink<'_>,
+    module: &ModuleId,
+    analysis: &mut AnalyzedModule,
+    anchor_path: &Path,
+    source: &str,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<(), Vec<Diagnostic>> {
+    let mut effects = crate::praefixum_imports::PackageImportEffects::new(
+        link.nodes,
+        link.imports,
+        module.clone(),
+    );
+    radix_module::driver::evaluate_deferred(
+        analysis,
+        &anchor_path.display().to_string(),
+        source,
+        &mut effects,
+        &mut |scratch, synthetic, span| {
+            run_deferred_site(
+                link.spec,
+                link.imports,
+                link.nodes,
+                module,
+                scratch,
+                anchor_path,
+                synthetic,
+                span,
+                link.config,
+                link.library_resolver,
+                library_cache,
+            )
+        },
+    )
+}
+
 /// Evaluate one deferred site on a clone of `module`'s local import closure.
 ///
 /// `scratch` is the module clone `evaluate_deferred` built for this site: it

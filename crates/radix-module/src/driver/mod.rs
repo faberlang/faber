@@ -32,6 +32,7 @@ mod file_frontmatter;
 mod frontmatter;
 mod insere;
 mod praefixum;
+mod qualify;
 mod session;
 #[cfg(feature = "mir-core")]
 mod shader_contract;
@@ -47,6 +48,7 @@ pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
 pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
 #[cfg(feature = "runner")]
 pub use praefixum::{evaluate_deferred, run_linked_function};
+pub use qualify::{evaluate_praefixum_for_importers, keeps_authored_form, qualify_for_target};
 pub use radix_types::KernelLowering;
 pub use session::{Config, Session, SessionMemos, WarnPolicy};
 pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
@@ -313,8 +315,9 @@ pub fn compile(session: &Session, name: &str, source: &str, request: ModuleCompi
 
 /// Compile an already-analyzed module to output.
 ///
-/// This is the analysis-to-output tail of [`compile`]: the warn policy, the
-/// CLI-program handoff, and backend generation, run over an [`AnalyzedModule`]
+/// This is the analysis-to-output tail of [`compile`]: the warn policy, target
+/// qualification ([`qualify_for_target`]), the CLI-program handoff, and backend
+/// generation, run over an [`AnalyzedModule`]
 /// from [`analyze_source`] (or loaded from an artifact). The result is
 /// identical to [`compile`] on the same analyzed facts, so callers that
 /// analyzed through a different route hand the module here instead of
@@ -331,6 +334,14 @@ pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: A
     // downstream path assembles a CompileResult from analysis.diagnostics.
     apply_warn_policy(&mut analysis.diagnostics, &session.config.warn_policy);
     if analysis.diagnostics.iter().any(Diagnostic::is_error) {
+        return CompileResult { output: None, diagnostics: analysis.diagnostics };
+    }
+
+    // A unit that arrives here without passing through `analyze_source` (loaded
+    // from a FHIR artifact) is target-neutral until it is qualified; one that
+    // did is unchanged by a second pass.
+    if let Err(qualify_errors) = qualify::qualify_for_target(&mut analysis, &session.config, name, source) {
+        analysis.diagnostics.extend(qualify_errors);
         return CompileResult { output: None, diagnostics: analysis.diagnostics };
     }
 
@@ -4070,13 +4081,11 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
         analyzed_unit_from_semantic(interner, cli_program, semantic_result, display_tokens, name, &mut diagnostics)
             .map_err(|()| diagnostics)?;
     unit.embedded_inputs = insere.inputs;
-    // D8.5: evaluate `praefixum` statics on the MIR runner so every backend
-    // receives literals. Faber re-emission keeps the authored body.
-    if session.config.target != Target::HirFaber
-        && let Err(praefixum_errors) =
-            praefixum::evaluate(&mut unit, name, body, session.config.defer_imported_praefixum)
-    {
-        unit.diagnostics.extend(praefixum_errors);
+    // Target qualification (D8.5): the build target's import binding, float
+    // folds and `praefixum` evaluation, so every backend receives literals.
+    // Faber re-emission and the FHIR artifact keep the authored form.
+    if let Err(qualify_errors) = qualify::qualify_for_target(&mut unit, &session.config, name, body) {
+        unit.diagnostics.extend(qualify_errors);
         return Err(unit.diagnostics);
     }
     if !rust_omit.is_empty() {

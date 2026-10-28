@@ -595,28 +595,18 @@ impl TypeChecker<'_> {
             self.import_receivers.insert(import_item.def_id);
             self.trusted_imports.insert(import_item.def_id);
         }
-        let (Some(word), Some(interner)) = (import.target, self.interner) else {
-            return;
-        };
-        let word = interner.resolve(word);
-        let bound = radix_target::Target::from_import_word(word);
-        if bound.is_some_and(|bound| bound == self.target) {
+        // A FHIR artifact is written for no build target, so analysis for it
+        // never binds the program; the consumer's qualification does.
+        if self.target == radix_target::Target::HirFhir {
             return;
         }
-        let specifier = interner.resolve(import.path).to_owned();
-        self.errors.push(
-            SemanticError::structured(SemanticErrorKind::UnavailableDeclaration, span)
-                .with_arg("issue", "import_target_bound")
-                .with_arg("target", word.to_owned())
-                .with_arg("specifier", specifier)
-                .with_arg(
-                    "build",
-                    if self.target == radix_target::Target::MirStepper {
-                        "runner".to_owned()
-                    } else {
-                        self.target.as_str().to_owned()
-                    },
-                ),
-        );
+        let Some(interner) = self.interner else {
+            return;
+        };
+        if let Some(error) =
+            crate::passes::import_target::mismatch(import, span, interner, self.target)
+        {
+            self.errors.push(error);
+        }
     }
 }

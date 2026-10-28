@@ -82,6 +82,7 @@ pub mod modules;
 pub mod nucleum;
 pub mod paths;
 pub mod praefixum_imports;
+pub mod qualify;
 pub mod route_table;
 #[cfg(feature = "hir-rust")]
 pub mod rust_target;
