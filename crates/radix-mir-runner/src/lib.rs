@@ -4364,6 +4364,10 @@ mod tensor_fill_test;
 mod tensor_extent_test;
 
 #[cfg(test)]
+#[path = "step_budget_test.rs"]
+mod step_budget_test;
+
+#[cfg(test)]
 #[path = "kernel_lanes_test.rs"]
 mod kernel_lanes_test;
 
