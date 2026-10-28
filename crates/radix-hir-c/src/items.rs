@@ -334,55 +334,9 @@ impl Emitter<'_> {
         let mut pointees = Vec::with_capacity(function.params.len());
         let mut omissions = Vec::with_capacity(function.params.len());
         for param in &function.params {
-            // A `ref`/`mut` scalar parameter is a pointer to the caller's cell.
-            let pointee = crate::ty::classify_ref(self.types, param.ty)?;
-            let class = match pointee {
-                Some(class) => class,
-                None => classify(self.types, param.ty)?,
-            };
-            // A bare `optional` slot is the optional of its declared type: a
-            // call that omits it passes none. `optional coalesce <expr>` is
-            // the declared type alone, because the call site fills the
-            // default (the runner does this in `lower_direct_call_args`).
-            let class = match (param.optional, param.default.is_some()) {
-                (true, false) => {
-                    // The C storage is the optional of the declared type; the
-                    // HIR type stays the payload, so a body read narrows only
-                    // where the typechecker proved it present.
-                    match Inner::from_ty(class) {
-                        Some(inner) => Ty::Opt(inner),
-                        None => {
-                            return Err(unsupported(
-                                "optional parameter of a sized integer or optional",
-                            ));
-                        }
-                    }
-                }
-                _ => class,
-            };
-            omissions.push(match (param.optional, &param.default) {
-                (true, Some(default)) => Omission::Default(default.clone()),
-                (true, None) => Omission::Omitted,
-                (false, _) => Omission::Required,
-            });
-            self.need_class(class);
-            // `ref` / `mut` on a list or genus passes the caller's pointer,
-            // which is what an unmarked one passes too. A scalar pointer is
-            // the same idea for a cell. `ref string` is the identity pointer a
-            // plain string already is; `mut string` would need a pointer to the
-            // caller's pointer, which this subset does not emit.
-            let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
-            match param.mode {
-                HirParamMode::Owned | HirParamMode::Ex => {}
-                HirParamMode::De if shared || pointee.is_some() || class == Ty::Text => {}
-                HirParamMode::In if shared || pointee.is_some() => {}
-                HirParamMode::De | HirParamMode::In | HirParamMode::Axis => {
-                    return Err(unsupported(
-                        "parameter access marker on a scalar, own, or axis",
-                    ));
-                }
-            }
-            pointees.push(pointee.is_some());
+            let (class, pointee, omission) = self.signature_parameter(param)?;
+            omissions.push(omission);
+            pointees.push(pointee);
             params.push(class);
         }
         let Some(ret_ty) = function.ret_ty else {
@@ -416,6 +370,62 @@ impl Emitter<'_> {
             },
         );
         Ok(())
+    }
+
+    /// Classify one signature parameter and its omission and access mode.
+    fn signature_parameter(
+        &mut self,
+        param: &radix_hir::HirParam,
+    ) -> Result<(Ty, bool, Omission), CodegenError> {
+        // A `ref`/`mut` scalar parameter is a pointer to the caller's cell.
+        let pointee = crate::ty::classify_ref(self.types, param.ty)?;
+        let class = match pointee {
+            Some(class) => class,
+            None => classify(self.types, param.ty)?,
+        };
+        // A bare `optional` slot is the optional of its declared type: a
+        // call that omits it passes none. `optional coalesce <expr>` is
+        // the declared type alone, because the call site fills the
+        // default (the runner does this in `lower_direct_call_args`).
+        let class = match (param.optional, param.default.is_some()) {
+            (true, false) => {
+                // The C storage is the optional of the declared type; the
+                // HIR type stays the payload, so a body read narrows only
+                // where the typechecker proved it present.
+                match Inner::from_ty(class) {
+                    Some(inner) => Ty::Opt(inner),
+                    None => {
+                        return Err(unsupported(
+                            "optional parameter of a sized integer or optional",
+                        ));
+                    }
+                }
+            }
+            _ => class,
+        };
+        let omission = match (param.optional, &param.default) {
+            (true, Some(default)) => Omission::Default(default.clone()),
+            (true, None) => Omission::Omitted,
+            (false, _) => Omission::Required,
+        };
+        self.need_class(class);
+        // `ref` / `mut` on a list or genus passes the caller's pointer,
+        // which is what an unmarked one passes too. A scalar pointer is
+        // the same idea for a cell. `ref string` is the identity pointer a
+        // plain string already is; `mut string` would need a pointer to the
+        // caller's pointer, which this subset does not emit.
+        let shared = matches!(class, Ty::List(_) | Ty::Genus(_));
+        match param.mode {
+            HirParamMode::Owned | HirParamMode::Ex => {}
+            HirParamMode::De if shared || pointee.is_some() || class == Ty::Text => {}
+            HirParamMode::In if shared || pointee.is_some() => {}
+            HirParamMode::De | HirParamMode::In | HirParamMode::Axis => {
+                return Err(unsupported(
+                    "parameter access marker on a scalar, own, or axis",
+                ));
+            }
+        }
+        Ok((class, pointee.is_some(), omission))
     }
 
     /// `<ret> f_name(<params>)`, without storage class or terminator.
@@ -472,51 +482,8 @@ impl Emitter<'_> {
         self.loops = 0;
         self.current = Some(def_id);
         self.returns = ret.map_or(Returns::Void, Returns::Value);
-        let mut params = Vec::with_capacity(function.params.len() + 2);
-        let mut param_names = Vec::with_capacity(function.params.len());
-        if self.arena {
-            params.push("faber_arena *faber_a".to_owned());
-        }
-        // `self` lowers to a path to the genus's own definition.
-        if let Some(genus) = receiver {
-            params.push(self.declare(Ty::Genus(genus), "faber_self", true)?);
-            // A method body that never names `self` still declares the
-            // receiver, so mark it used below like any other parameter.
-            param_names.push("faber_self".to_owned());
-            self.locals.insert(
-                genus,
-                Local {
-                    name: "faber_self".to_owned(),
-                    ty: Ty::Genus(genus),
-                    constant: None,
-                },
-            );
-        }
-        for (index, (param, ty)) in function.params.iter().zip(param_types).enumerate() {
-            let Some(kind) = self.names.binding_kind(param.def_id) else {
-                return Err(unsupported("parameter the name catalog does not classify"));
-            };
-            let raw = self.names.resolve_symbol(param.name);
-            let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
-            self.need_class(ty);
-            // A `ref`/`mut` scalar parameter is a pointer; the body read and
-            // store go through it (`Emitter::path`/`Emitter::assign`).
-            if pointees.get(index).copied().unwrap_or(false) {
-                self.ref_params.insert(param.def_id);
-                params.push(format!("{} *{c_name}", self.c_type(ty)?));
-            } else {
-                params.push(self.declare(ty, &c_name, true)?);
-            }
-            param_names.push(c_name.clone());
-            self.locals.insert(
-                param.def_id,
-                Local {
-                    name: c_name,
-                    ty,
-                    constant: None,
-                },
-            );
-        }
+        let (mut params, param_names) =
+            self.definition_parameters(function, &param_types, &pointees, receiver)?;
         if err.is_some() {
             params.push("faber_chan *faber_e".to_owned());
         }
@@ -575,6 +542,67 @@ impl Emitter<'_> {
             params.join(", ")
         };
         Ok(format!("{ret_text}{space}{name}({params}) {{\n{body}}}\n"))
+    }
+
+    /// Declare the arena, receiver, and named parameters for a definition.
+    fn definition_parameters(
+        &mut self,
+        function: &HirFunction,
+        param_types: &[Ty],
+        pointees: &[bool],
+        receiver: Option<DefId>,
+    ) -> Result<(Vec<String>, Vec<String>), CodegenError> {
+        let mut params = Vec::with_capacity(function.params.len() + 2);
+        let mut param_names = Vec::with_capacity(function.params.len());
+        if self.arena {
+            params.push("faber_arena *faber_a".to_owned());
+        }
+        // `self` lowers to a path to the genus's own definition.
+        if let Some(genus) = receiver {
+            params.push(self.declare(Ty::Genus(genus), "faber_self", true)?);
+            // A method body that never names `self` still declares the
+            // receiver, so mark it used below like any other parameter.
+            param_names.push("faber_self".to_owned());
+            self.locals.insert(
+                genus,
+                Local {
+                    name: "faber_self".to_owned(),
+                    ty: Ty::Genus(genus),
+                    constant: None,
+                },
+            );
+        }
+        for (index, (param, ty)) in function
+            .params
+            .iter()
+            .zip(param_types.iter().copied())
+            .enumerate()
+        {
+            let Some(kind) = self.names.binding_kind(param.def_id) else {
+                return Err(unsupported("parameter the name catalog does not classify"));
+            };
+            let raw = self.names.resolve_symbol(param.name);
+            let c_name = self.scope.claim(&prefixed_binding_name(kind, raw));
+            self.need_class(ty);
+            // A `ref`/`mut` scalar parameter is a pointer; the body read and
+            // store go through it (`Emitter::path`/`Emitter::assign`).
+            if pointees.get(index).copied().unwrap_or(false) {
+                self.ref_params.insert(param.def_id);
+                params.push(format!("{} *{c_name}", self.c_type(ty)?));
+            } else {
+                params.push(self.declare(ty, &c_name, true)?);
+            }
+            param_names.push(c_name.clone());
+            self.locals.insert(
+                param.def_id,
+                Local {
+                    name: c_name,
+                    ty,
+                    constant: None,
+                },
+            );
+        }
+        Ok((params, param_names))
     }
 }
 
