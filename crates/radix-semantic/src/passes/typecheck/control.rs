@@ -1315,9 +1315,34 @@ impl TypeChecker<'_> {
     /// survives: its subject cannot be written. A binding that is not visible
     /// any more counts as mutable, which only over-kills.
     pub(crate) fn kill_mutable_source_ranges(&mut self) {
+        // A list bounding a fact may be the very object a `mut` name writes
+        // (`let xs ← ys`, an unmarked parameter beside a `mut` one, a field or
+        // element read), so every list source is killed, `let` or not. Only the
+        // sources some fact names matter, so the type is read for those.
+        let lists: Vec<DefId> = self
+            .range_flow
+            .live_length_sources()
+            .into_iter()
+            .filter(|source| self.is_list_source(*source))
+            .collect();
         let shadow = &self.binding_shadow;
-        self.range_flow
-            .kill_mutable_sources(|def_id| shadow.get(&def_id).is_none_or(|info| info.mutable));
+        self.range_flow.kill_mutable_sources(
+            |def_id| shadow.get(&def_id).is_none_or(|info| info.mutable),
+            |def_id| lists.contains(&def_id),
+        );
+    }
+
+    /// Whether `def_id` is a list binding (a reference collection) rather than
+    /// a text, whose value is never written in place.
+    fn is_list_source(&self, def_id: DefId) -> bool {
+        let Some(binding) = self.lookup_binding(def_id) else {
+            return true;
+        };
+        let peeled = self
+            .types
+            .peel_access_marker(self.resolve_inferred_type(binding.ty))
+            .1;
+        !self.is_text_family(peeled)
     }
 
     /// Loop-entry policy for interval facts: a body that can write a mutable

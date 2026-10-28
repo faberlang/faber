@@ -336,7 +336,7 @@ fn a_stale_length_never_survives_a_kill_even_across_a_restore_join() {
     flow.assume(x, &IntRange::from_hi(flow.live_length(s), true));
     let incoming = flow.snapshot();
     // One edge mutates `s` (kill), the other does not.
-    flow.kill_mutable_sources(|_| true);
+    flow.kill_mutable_sources(|_| true, |_| false);
     let mutated = flow.snapshot();
     flow.restore(&incoming);
     let untouched = flow.snapshot();
@@ -515,8 +515,22 @@ fn a_captured_immutable_endpoint_survives_calls() {
 }
 
 #[test]
-fn an_immutable_list_keeps_its_length_bound_across_calls() {
+fn an_immutable_list_loses_its_length_bound_across_calls() {
+    // Was `..._keeps_...`: that trusted an immutable list's length, but `sit
+    // xs ← ys` and an unmarked parameter beside a `varia` one name the same
+    // list a write can shrink.
     let source = "functio g(numerus a) → numerus { redde a }\nfunctio f(lista<numerus> s, numerus x) → numerus {\n    varia numerus n ← 0\n    si x ≺ s.longitudo() {\n        n ← g(1)\n        n ← x\n    }\n    redde n\n}";
+    let seen = reads(source, "x");
+    assert!(
+        !is_live_length_bound(seen.last().expect("a read")),
+        "{seen:?}"
+    );
+}
+
+#[test]
+fn an_immutable_text_keeps_its_length_bound_across_calls() {
+    // A text value is never written in place: no other name changes its length.
+    let source = "functio g(numerus a) → numerus { redde a }\nfunctio f(textus s, numerus x) → numerus {\n    varia numerus n ← 0\n    si x ≺ s.longitudo() {\n        n ← g(1)\n        n ← x\n    }\n    redde n\n}";
     let seen = reads(source, "x");
     assert!(
         is_live_length_bound(seen.last().expect("a read")),

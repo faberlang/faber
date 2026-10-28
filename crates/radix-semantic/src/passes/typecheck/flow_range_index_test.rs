@@ -161,6 +161,112 @@ fn a_closure_body_does_not_inherit_facts_about_a_mutable_list() {
     );
 }
 
+// ── aliased lists ─────────────────────────────────────────────────────────
+//
+// `sit xs ← ys` shares the list: a write through `ys` changes `xs.longitudo()`
+// although `xs` itself is immutable. A fact bounded by a list's live length
+// therefore dies at every call and store, whether the list binding is
+// `varia` or not. Each fixture reads `xs[i]` after a write through another
+// name and must keep its check.
+
+#[test]
+fn a_let_alias_of_a_mutable_list_keeps_its_check_across_a_write() {
+    let source = list_fn(
+        "varia lista<numerus> ys",
+        "    sit lista<numerus> xs ← ys
+    itera ab 0‥xs.longitudo() sit i {
+        ys.detrahe()
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_let_alias_of_a_mutable_list_keeps_its_check_across_a_call() {
+    let source = list_fn(
+        "varia lista<numerus> ys",
+        "    sit lista<numerus> xs ← ys
+    itera ab 0‥xs.longitudo() sit i {
+        n ← g(i)
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_shared_parameter_keeps_its_check_beside_a_mutable_one() {
+    // `f(a, a)` binds both parameters to one list.
+    let source = list_fn(
+        "lista<numerus> xs, varia lista<numerus> ys",
+        "    itera ab 0‥xs.longitudo() sit i {
+        ys.detrahe()
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_list_read_from_a_field_keeps_its_check_across_a_write() {
+    let source = "genus Capsa { varia lista<numerus> res }
+         functio f(varia Capsa b) → numerus {
+    varia numerus n ← 0
+             sit lista<numerus> xs ← b.res
+             itera ab 0‥xs.longitudo() sit i {
+        b.res.detrahe()
+        n ← xs[i]
+    }
+    redde n
+}";
+    assert_eq!(proofs(source), vec![false]);
+}
+
+#[test]
+fn a_list_read_from_another_collection_keeps_its_check_across_a_write() {
+    let source = list_fn(
+        "varia lista<numerus> ys",
+        "    varia lista<lista<numerus>> outer ← vacua
+    outer.appende(ys)
+    sit lista<numerus> xs ← outer[0]
+    itera ab 0‥xs.longitudo() sit i {
+        ys.detrahe()
+        n ← xs[i]
+    }",
+    );
+    // `outer[0]` has no named list source and is not proven; neither is `xs[i]`.
+    assert_eq!(proofs(&source), vec![false, false]);
+}
+
+#[test]
+fn a_list_written_by_a_captured_closure_keeps_its_check() {
+    let source = list_fn(
+        "varia lista<numerus> ys",
+        "    sit lista<numerus> xs ← ys
+    sit _ shrink ← numerus k ∴ ys.appende(k)
+    itera ab 0‥xs.longitudo() sit i {
+        shrink(i)
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_text_length_survives_a_call() {
+    // A text value is never written in place, so no other name changes the
+    // length of a `sit` or parameter text.
+    let source = list_fn(
+        "textus t",
+        "    itera ab 0‥t.longitudo() sit i {
+        n ← g(i)
+        sit textus c ← t[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![true]);
+}
+
 // ── tensors (kernel bodies) ───────────────────────────────────────────────
 
 const KERNEL: &str = "@ nucleum\nfunctio k<magnitudo N, magnitudo M>(tensor<f32, [N, M]> src, tensor<f32, [N, M]> other, tensor<f32, [M, N]> flipped, varia tensor<f32, [N, M]> dst, i32 shift, i32 free) → vacuum {\n    itera ex src apud [i, j] filum f sit v {\n";
