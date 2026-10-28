@@ -7447,6 +7447,9 @@ fn apply_math_function(function: MirMathFunction, value: f64) -> f64 {
 #[cfg(test)]
 #[path = "runtime_index_test.rs"]
 mod runtime_index_test;
+#[cfg(test)]
+#[path = "runtime_test.rs"]
+mod runtime_test;
 
 /// Operation label of one elementwise list operator in runner diagnostics.
 fn lista_label(op: MirLiftOp) -> &'static str {
