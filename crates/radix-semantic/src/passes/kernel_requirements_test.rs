@@ -189,7 +189,10 @@ fn wrapping_sum(wrapping<i32> left, wrapping<i32> right) → wrapping<i32> {
     for target in [Target::MirMetal, Target::MirWgsl] {
         let report = target_row(&fixture, "wrapping_sum", target);
         assert!(report.admitted, "{target:?}: {:?}", report.failures);
-        assert!(report.trapping_stores.is_empty());
+        assert_eq!(
+            report.trapping_stores,
+            [] as [crate::passes::kernel_requirements::KernelTrappingStore; 0]
+        );
         assert!(report.widths.iter().any(|width| {
             width.policy == crate::passes::kernel_requirements::KernelNumericPolicy::Wrapping
                 && width.width == crate::NumericWidth::I32
@@ -826,7 +829,10 @@ main {}
     );
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     assert!(report.admitted, "{:?}", report.failures);
-    assert!(report.trapping_stores.is_empty());
+    assert_eq!(
+        report.trapping_stores,
+        [] as [crate::passes::kernel_requirements::KernelTrappingStore; 0]
+    );
 }
 
 #[test]
@@ -1142,7 +1148,10 @@ fn bad(i32 x) → i32 {
     );
     let sample = target_row(&fixture, "sample", Target::MirMetal);
     assert!(sample.admitted, "{:?}", sample.failures);
-    assert!(sample.failures.is_empty());
+    assert_eq!(
+        sample.failures,
+        [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
+    );
     let bad = target_row(&fixture, "bad", Target::MirMetal);
     assert!(bad.failures.iter().any(|failure| matches!(
         failure,
@@ -1582,7 +1591,10 @@ fn merge_seeded_target_report_intersects_failures_and_unions_requirements() {
     };
     let merged_clean = merge_seeded_target_report(&conservative, &[clean.clone(), clean]);
     assert!(merged_clean.admitted);
-    assert!(merged_clean.failures.is_empty());
+    assert_eq!(
+        merged_clean.failures,
+        [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
+    );
 
     assert_eq!(
         merge_seeded_target_report(&conservative, &[]),

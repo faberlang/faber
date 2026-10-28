@@ -21,20 +21,20 @@ fn rejects(result: &crate::SemanticResult) {
 #[test]
 fn declaration_form_list_with_nihil_elements_checks() {
     accepts(&compile(
-        r#"incipit {
+        r"incipit {
   sit lista<numerus ∪ nihil> xs ← [nulla, 1, 2, nulla]
   nota xs
-}"#,
+}",
     ));
 }
 
 #[test]
 fn ascribed_list_with_nihil_elements_checks() {
     accepts(&compile(
-        r#"incipit {
+        r"incipit {
   sit lista<numerus ∪ nihil> xs ← [nulla, 1, 2, nulla] ∷ lista<numerus ∪ nihil>
   nota xs
-}"#,
+}",
     ));
 }
 
@@ -51,10 +51,10 @@ fn ascribed_map_with_nihil_value_checks() {
 #[test]
 fn ascribed_nested_list_with_nihil_elements_checks() {
     accepts(&compile(
-        r#"incipit {
+        r"incipit {
   sit lista<lista<numerus ∪ nihil>> n ← [[nulla, 1], [2]] ∷ lista<lista<numerus ∪ nihil>>
   nota n
-}"#,
+}",
     ));
 }
 

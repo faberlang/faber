@@ -9,7 +9,7 @@ use radix_types::NumericWidth;
 #[test]
 fn ungrouped_inclusive_and_identity_exclusive_scans_keep_source_shape() {
     assert_accepts_la(
-        r#"
+        r"
 @ nucleum
 functio summa(tensor<f32, [4]> xs) → tensor<f32, [4]> {
     redde scan via summa ex xs apud [i] filum lane sit value { redde value }
@@ -26,19 +26,19 @@ functio omnia(tensor<bivalens, [4]> xs) → tensor<bivalens, [4]> {
 functio numeratio(tensor<bivalens, [4]> xs) → tensor<i32, [4]> {
     redde scan via numeratio total exclusive ex xs apud [i] filum lane sit value { redde value }
 }
-"#,
+",
     );
 }
 
 #[test]
 fn grouped_scan_carries_a_sized_finite_integer_key_domain() {
     let grouped = compile_and_get_result_la(
-        r#"
+        r"
 @ nucleum
 functio per_key(tensor<f32, [4]> xs, tensor<u8, [4]> keys) → tensor<f32, [4]> {
     redde scan via summa ex xs apud [i] pro keys[i] filum lane sit value { redde value }
 }
-"#,
+",
     );
     assert!(
         grouped.success(),
@@ -54,12 +54,12 @@ functio per_key(tensor<f32, [4]> xs, tensor<u8, [4]> keys) → tensor<f32, [4]> 
 #[test]
 fn group_domain_uses_coordinate_arithmetic_and_preserves_widened_bounds() {
     let modulo = compile_and_get_result_la(
-        r#"
+        r"
 @ nucleum
 functio modulo(tensor<f32, [8]> xs) → tensor<f32, [8]> {
     redde scan via summa ex xs apud [i] pro i % 4 filum lane sit value { redde value }
 }
-"#,
+",
     );
     assert!(
         modulo.success(),
@@ -72,12 +72,12 @@ functio modulo(tensor<f32, [8]> xs) → tensor<f32, [8]> {
     );
 
     let widened = compile_and_get_result_la(
-        r#"
+        r"
 @ nucleum
 functio widened(tensor<i32, [4]> xs, tensor<i32, [4]> keys) → tensor<i32, [4]> {
     redde scan via summa ex xs apud [i] pro keys[i] + 1 filum lane sit value { redde value }
 }
-"#,
+",
     );
     assert!(
         widened.success(),

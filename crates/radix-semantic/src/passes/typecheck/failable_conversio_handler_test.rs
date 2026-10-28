@@ -239,7 +239,7 @@ fn float_into_policy_word_types_the_catch_binding_as_textus() {
         assert_accepts_la(&program("sit textus s ← err\n        nota s"));
         let rejected = analyze_source_la(&program("sit numerus n ← err\n        nota n"));
         assert!(
-            rejected.diagnostics.iter().any(|err| err.is_error()),
+            rejected.diagnostics.iter().any(crate::error::SemanticError::is_error),
             "{word}: catch binding must be textus, got {:?}",
             rejected.diagnostics
         );
