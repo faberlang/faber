@@ -74,6 +74,7 @@ tempfile = "3"
 
 [features]
 default = ["full-targets", "hir-c"]
+prebuilt-llvm-runtime = []
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "mir-clif", "runner"]
 hir-faber = ["radix/hir-faber", "dep:radix-hir-faber"]
 hir-c = ["radix/hir-c"]

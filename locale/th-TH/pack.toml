@@ -4165,11 +4165,11 @@ help = "llvm-host สร้างแบบเนทีฟบน macOS และ 
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host ต้องใช้ชุดเครื่องมือ LLVM ที่สอดคล้องกัน (llvm-as และ clang รุ่นเดียวกัน): {reason}"
-help = "ติดตั้ง LLVM ให้ llvm-as และ clang อยู่ใน PATH หรือตั้ง LLVM_HOME เป็นคำนำหน้าการติดตั้ง LLVM"
+help = "ติดตั้ง LLVM ให้ llvm-as และ clang อยู่ใน PATH"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "ไม่พบอาร์ไคฟ์รันไทม์ faber-host-llvm ({cause}): {detail}"
-help = "ตรวจสอบว่าติดตั้ง cargo และอยู่ใน PATH (หรือตั้ง CARGO) และมีซอร์สรันไทม์อยู่ แล้วสร้างใหม่"
+help = "ตรวจสอบว่าติดตั้ง cargo และอยู่ใน PATH และมีซอร์สรันไทม์อยู่ แล้วสร้างใหม่"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "อาร์ไคฟ์รันไทม์ faber-host-llvm ไม่ผ่านการตรวจสอบเอกลักษณ์: {detail}"

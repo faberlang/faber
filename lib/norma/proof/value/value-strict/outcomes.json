@@ -23,6 +23,12 @@
       "phase": "build",
       "diagnostic_contains": "missing variant field metadata",
       "reason": "The TypeScript backend loses the variant field metadata of an imported definition in this program, so code generation stops before any file is written."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "code generation failed: unsupported-mir-shape:try_call destination type",
+      "reason": "MIR code generation fails before any LLVM is emitted: unsupported-mir-shape:try_call destination type."
     }
   }
 }

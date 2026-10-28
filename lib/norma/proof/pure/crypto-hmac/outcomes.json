@@ -23,6 +23,12 @@
       "phase": "build",
       "diagnostic_contains": "ts_trap_expression_unsupported",
       "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "code generation failed: unsupported-mir-shape:duplicate of this value shape (copy marker)",
+      "reason": "MIR code generation fails before any LLVM is emitted: unsupported-mir-shape:duplicate of this value shape (copy marker)."
     }
   }
 }

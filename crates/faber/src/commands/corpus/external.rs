@@ -52,6 +52,9 @@ pub(super) fn execute(
     if matches!(mode, "external" | "emit") && recipe.emit.is_none() {
         super::fail_config(&format!("[targets.{target}] requires emit"));
     }
+    if recipe.product && recipe.emit.is_none() {
+        super::fail_config(&format!("[targets.{target}] product requires emit"));
+    }
     if mode == "external" && (recipe.extension.is_none() || recipe.run.is_empty()) {
         super::fail_config(&format!("[targets.{target}] requires extension and run"));
     }
@@ -484,7 +487,8 @@ fn run_case(
     // A package-directory input has no single source file to emit: `faber build`
     // emits and links the package in one step and prints the artifact path, so the
     // file-shaped emit and the recipe build are both replaced by that command.
-    let package_build = case.input.is_dir() && matches!(mode, "external" | "build");
+    let package_build =
+        (case.input.is_dir() || recipe.product) && matches!(mode, "external" | "build");
     // What the package build produced decides which recipe steps still apply: a
     // linked artifact replaces them, an emitted source file or a module set goes
     // through the same recipe build (and run) as a single-file emit.

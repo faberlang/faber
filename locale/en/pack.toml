@@ -6009,11 +6009,11 @@ help = "llvm-host builds natively on aarch64 or x86_64 macOS and Linux only; bui
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host needs a coherent LLVM toolchain (llvm-as and clang of one version): {reason}"
-help = "install LLVM so that llvm-as and clang are on PATH, or set LLVM_HOME to an LLVM install prefix"
+help = "install LLVM so that llvm-as and clang are on PATH"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "the faber-host-llvm runtime archive is unavailable ({cause}): {detail}"
-help = "make sure cargo is installed and on PATH (or set CARGO) and that the runtime sources are present, then build again"
+help = "make sure cargo is installed and on PATH and that the runtime sources are present, then build again"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "the faber-host-llvm runtime archive failed identity verification: {detail}"

@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "the fs leaf is not supported on the ts target",
       "reason": "The Node port of the fs leaf (`solum:*`) has not landed, and TypeScript declares a leaf whole or not at all, so the emitter refuses any program that reaches a `solum` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the fs leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no fs leaf yet: its leaf gate refuses a program that reaches a fs route by name, before any LLVM is emitted."
     }
   }
 }

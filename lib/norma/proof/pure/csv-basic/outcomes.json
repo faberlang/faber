@@ -11,6 +11,12 @@
       "phase": "build",
       "diagnostic_contains": "ts_trap_expression_unsupported",
       "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "mir_llvm_display_unsupported:mir_llvm_display_unsupported: no host display for this value",
+      "reason": "The MIR-to-LLVM emitter stops at emission and does not lower this yet: mir_llvm_display_unsupported:mir_llvm_display_unsupported: no host display for this value."
     }
   }
 }

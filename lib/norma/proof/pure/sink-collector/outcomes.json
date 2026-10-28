@@ -11,6 +11,12 @@
       "phase": "build",
       "diagnostic_contains": "error TS2355",
       "reason": "The generated project fails `tsc` with error TS2355: a type the TypeScript backend emits for the imported Norma modules does not check, so no program is produced."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "faber_external_product_norma_module_sink_func_flush",
+      "reason": "The linked program references `faber_external_product_norma_module_sink_func_flush`, which neither the emitted modules nor the runtime archive define, so the clang link fails."
     }
   }
 }

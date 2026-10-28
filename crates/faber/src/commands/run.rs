@@ -1,6 +1,6 @@
 #![cfg(feature = "runner")]
 
-//! `faber run` — interpreted execution, always.
+//! `faber run` — interpreted execution unless `--target` builds and runs.
 //!
 //! `faber run <path>` interprets a single `.fab` file, package directory,
 //! `faber.toml` manifest, or archive through the runner — mode is never
@@ -66,6 +66,20 @@ pub(super) fn cmd_run(args: RunArgs) {
         #[cfg(not(feature = "hir-go"))]
         Some(crate::cli::RunTarget::Go) => {
             eprintln!("error: this faber build has no Go target; rebuild with feature `hir-go`");
+            exit_status::exit_usage();
+        }
+        #[cfg(feature = "mir-llvm")]
+        Some(crate::cli::RunTarget::LlvmHost) => package::cmd_run_llvm_host(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+        ),
+        #[cfg(not(feature = "mir-llvm"))]
+        Some(crate::cli::RunTarget::LlvmHost) => {
+            eprintln!(
+                "error: this faber build has no LLVM target; rebuild with feature `mir-llvm`"
+            );
             exit_status::exit_usage();
         }
         None => {}

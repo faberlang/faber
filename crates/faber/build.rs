@@ -11,6 +11,10 @@
 //! so an installed binary can materialize a path-dependency root, and the
 //! Norma library (`lib/norma` source, locale packs and manifests) so an
 //! installed binary resolves `norma:*` without a checkout.
+//!
+//! With the `prebuilt-llvm-runtime` feature (release builds) it also builds
+//! the `llvm-host` runtime archive for the target triple and embeds it, so a
+//! release `faber` links native programs without a Rust toolchain.
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -37,6 +41,63 @@ fn main() {
 
     embed_reference(&manifest_dir.join("../../corpus"), &out_dir);
     embed_runtime(&manifest_dir.join("../.."), &out_dir);
+    embed_llvm_runtime_archive(&manifest_dir.join("../.."), &out_dir);
+}
+
+/// Write `llvm_runtime_prebuilt.rs`: `PREBUILT_LLVM_RUNTIME`, the target triple
+/// and bytes of the `runtime/llvm` static archive when the
+/// `prebuilt-llvm-runtime` feature is on, else `None`. The archive is built
+/// here, once per release build, with the same `cargo` that runs this script
+/// (`--locked`, release, its own target directory under `OUT_DIR`).
+fn embed_llvm_runtime_archive(repo_root: &Path, out_dir: &Path) {
+    let generated = out_dir.join("llvm_runtime_prebuilt.rs");
+    if env::var_os("CARGO_FEATURE_PREBUILT_LLVM_RUNTIME").is_none() {
+        fs::write(
+            &generated,
+            "pub(crate) static PREBUILT_LLVM_RUNTIME: Option<(&str, &[u8])> = None;\n",
+        )
+        .unwrap_or_else(|err| panic!("write {}: {err}", generated.display()));
+        return;
+    }
+    let repo_root = repo_root.canonicalize().unwrap_or_else(|err| {
+        panic!("repository root {}: {err}", repo_root.display());
+    });
+    let target = env::var("TARGET").expect("TARGET");
+    let manifest = repo_root.join("runtime/llvm/Cargo.toml");
+    let target_dir = out_dir.join("llvm-runtime-target");
+    let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let status = std::process::Command::new(cargo)
+        .args(["build", "--release", "--locked", "--manifest-path"])
+        .arg(&manifest)
+        .arg("--target-dir")
+        .arg(&target_dir)
+        .args(["--target", &target])
+        // The outer build's flags and jobserver belong to the outer build.
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("RUSTFLAGS")
+        .status()
+        .unwrap_or_else(|err| panic!("run cargo for the llvm-host runtime archive: {err}"));
+    assert!(
+        status.success(),
+        "building the llvm-host runtime archive for {target} failed"
+    );
+    let archive = target_dir
+        .join(&target)
+        .join("release")
+        .join("libfaber_host_llvm.a");
+    assert!(
+        archive.is_file(),
+        "the llvm-host runtime archive is missing at {}",
+        archive.display()
+    );
+    fs::write(
+        &generated,
+        format!(
+            "pub(crate) static PREBUILT_LLVM_RUNTIME: Option<(&str, &[u8])> = Some(({target:?}, include_bytes!({:?})));\n",
+            archive.to_str().expect("utf-8 archive path")
+        ),
+    )
+    .unwrap_or_else(|err| panic!("write {}: {err}", generated.display()));
 }
 
 /// Repository-relative roots whose files the binary carries. A root absent

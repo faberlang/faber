@@ -4153,11 +4153,11 @@ help = "llvm-host 仅在 aarch64 或 x86_64 的 macOS 和 Linux 上原生构建�
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host 需要一致的 LLVM 工具链（同一版本的 llvm-as 与 clang）：{reason}"
-help = "请安装 LLVM，使 llvm-as 和 clang 位于 PATH 中，或将 LLVM_HOME 设为 LLVM 安装前缀"
+help = "请安装 LLVM，使 llvm-as 和 clang 位于 PATH 中"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "faber-host-llvm 运行时归档不可用（{cause}）：{detail}"
-help = "请确认已安装 cargo 且位于 PATH 中（或设置 CARGO），并且运行时源码存在，然后重新构建"
+help = "请确认已安装 cargo 且位于 PATH 中，并且运行时源码存在，然后重新构建"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "faber-host-llvm 运行时归档未通过身份校验：{detail}"

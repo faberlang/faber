@@ -5408,11 +5408,11 @@ help = "llvm-host nativum tantum in aarch64 vel x86_64 macOS et Linux aedificat;
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host instrumenta LLVM cohaerentia (llvm-as et clang eiusdem versionis) requirit: {reason}"
-help = "LLVM ita instrue ut llvm-as et clang in PATH sint, aut LLVM_HOME ad praefixum LLVM pone"
+help = "LLVM ita instrue ut llvm-as et clang in PATH sint"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "archivum runtime faber-host-llvm praesto non est ({cause}): {detail}"
-help = "cura ut cargo instructum sit et in PATH (aut CARGO positum) et fontes runtime adsint, deinde iterum aedifica"
+help = "cura ut cargo instructum sit et in PATH et fontes runtime adsint, deinde iterum aedifica"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "archivum runtime faber-host-llvm identitatis verificationem non superavit: {detail}"

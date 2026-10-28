@@ -157,15 +157,26 @@ pub(crate) fn exit_code_of(status: ExitStatus) -> i32 {
     status.code().unwrap_or(1)
 }
 
+/// Whether `pack` has a reader-pack row for the package refusal `diag`.
+fn pack_has_row(diag: &Diagnostic, pack: Option<&radix::module::locale::LocalePack>) -> bool {
+    let (Some(pack), Some(issue)) = (pack, diag.issue()) else {
+        return false;
+    };
+    pack.diagnostics
+        .get(crate::PACKAGE_DIAGNOSTIC_CODE)
+        .is_some_and(|package| package.issues.contains_key(issue))
+}
+
 /// Print the failure of a built-program build or run and terminate. A package
-/// diagnostic has no message template, so its own message is the report; any
-/// other diagnostic renders as usual.
+/// diagnostic with a reader-pack row renders through the row; one without has
+/// no message template, so its own message is the report (the tool's output
+/// and the failing path are in it). Any other diagnostic renders as usual.
 pub(crate) fn report_and_exit(
     diagnostics: &[Diagnostic],
     locale_pack: Option<&radix::module::locale::LocalePack>,
 ) -> ! {
     for diag in diagnostics {
-        if diag.code == Some(crate::PACKAGE_DIAGNOSTIC_CODE) {
+        if diag.code == Some(crate::PACKAGE_DIAGNOSTIC_CODE) && !pack_has_row(diag, locale_pack) {
             eprintln!("error: {}", diag.message);
         } else {
             crate::postprocess::print_diagnostics(

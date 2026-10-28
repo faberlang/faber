@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "invalid map key type K (missing comparable constraint)",
       "reason": "The Go emitter does not constrain a generic map key type parameter with `comparable` (`invalid map key type K`), so a carried generic Norma map module does not compile; the emitter unit is open."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "faber_external_product_norma_module_sorted_map_func_has",
+      "reason": "The linked program references `faber_external_product_norma_module_sorted_map_func_has`, which neither the emitted modules nor the runtime archive define, so the clang link fails."
     }
   }
 }

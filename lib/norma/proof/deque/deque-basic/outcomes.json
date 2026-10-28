@@ -23,6 +23,12 @@
       "phase": "build",
       "diagnostic_contains": "error TS2345",
       "reason": "The generated project fails `tsc` with error TS2345: a type the TypeScript backend emits for the imported Norma modules does not check, so no program is produced."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "faber_external_product_norma_module_deque_func_pop_back",
+      "reason": "The linked program references `faber_external_product_norma_module_deque_func_pop_back`, which neither the emitted modules nor the runtime archive define, so the clang link fails."
     }
   }
 }
