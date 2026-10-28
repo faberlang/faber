@@ -55,6 +55,8 @@ mod run_stats;
 #[cfg(all(feature = "runner", test))]
 #[path = "run_stats_test.rs"]
 mod run_stats_test;
+#[cfg(all(feature = "runner", feature = "device-runtime", test))]
+mod span_a2_hw_test;
 pub(crate) mod targets;
 #[cfg(feature = "runner")]
 mod test;

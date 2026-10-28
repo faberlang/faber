@@ -4172,3 +4172,9 @@ help = "'⇇' 現在會將右側的值複製到左側現有的 tensor 儲存區�
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking 合約必須在一個型別參數上準確宣告 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
 help = "宣告 `{implendum} Sink<T>`，並包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "核心 `{kernel}` 在 {device} 裝置上串行執行"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "核心 `{kernel}`：其跨 {partitions} 個分區的 {kind} 是可以避免的：{avoidable}（{reason}）"

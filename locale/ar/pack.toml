@@ -4320,3 +4320,9 @@ help = "ينسخ '⇇' الآن قيم الطرف الأيمن إلى تخزين
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "يجب أن يعرّف عقد الإرسال بالضبط `sink(T) → vacuum ⇥ E` و`flush() → vacuum ⇥ E` باستخدام معامل نوع واحد"
 help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum ⇥ E` و`{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "النواة `{kernel}` تعمل بشكل متسلسل على جهاز {device}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "النواة `{kernel}`: يمكن تجنّب {kind} عبر الأقسام الـ {partitions}: {avoidable} ({reason})"
