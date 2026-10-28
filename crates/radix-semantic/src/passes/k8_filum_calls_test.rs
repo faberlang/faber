@@ -634,6 +634,39 @@ incipit {
 }
 
 #[test]
+fn lane_store_on_a_lane_local_vector_is_accepted() {
+    accepted(
+        r"
+functio k(de tensor<vector<f32, 4>, [4]> state, varia tensor<vector<f32, 4>, [4]> out) → vacuum {
+    itera ex state apud [i] filum lane sit c {
+        varia vector<f32, 4> s ← exemplum c
+        s[1] ← 0.0
+        out[i] ← s
+    }
+}
+incipit {
+}",
+    );
+}
+
+#[test]
+fn lane_store_on_an_outer_vector_local_is_outer_local_mutation() {
+    rejected(
+        r"
+functio k(de tensor<vector<f32, 4>, [4]> state, varia tensor<f32, [4]> out) → vacuum {
+    varia vector<f32, 4> acc ← exemplum state[0]
+    itera ex state apud [i] filum lane sit c {
+        acc[0] ← c[0]
+        out[i] ← acc[0]
+    }
+}
+incipit {
+}",
+        "outer_local_mutation",
+    );
+}
+
+#[test]
 fn vector_tensor_written_in_place_still_rejects_neighbour_reads() {
     rejected(
         r"

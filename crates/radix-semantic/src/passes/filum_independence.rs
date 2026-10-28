@@ -876,6 +876,14 @@ impl BodyProof<'_> {
 
     fn write(&mut self, target: &HirExpression) {
         match &target.kind {
+            // A lane store on a register-class value (`s[1] ← x` on a vector)
+            // rewrites the value it indexes: the same rules as storing that
+            // value whole, so a lane's own local is free and an outer one is
+            // `outer_local_mutation`.
+            HirExpressionKind::Index(object, index) if is_register_value(object.ty, self.types) => {
+                self.write(object);
+                self.visit_expr(index);
+            }
             HirExpressionKind::Index(object, index) => {
                 self.access(object, Some(index), true, target.span);
                 self.receiver(object);
