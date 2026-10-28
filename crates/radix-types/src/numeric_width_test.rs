@@ -326,7 +326,7 @@ fn width_lowering_failures_report_typed_issues() {
         })
         .is_some()
     );
-    assert!(reported.is_empty());
+    assert_eq!(reported, [] as [WidthLowerIssue; 0]);
 }
 
 #[test]
