@@ -1,0 +1,63 @@
++++
+term = "implendum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "implendum_decl", "implendum_method_decl", "genus_decl", "genus_member", "genus_field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "sit_decl", "fixum_decl", "assignment", "incipit_stmt", "itera_stmt", "itera_binding", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "A mutating method called through an interface value changes the held value."
+syntax = "<interface value>.<mutating method>()"
+aliases = ["interface mutation"]
+related = ["implendum", "genus", "implet"]
+locale = "en"
++++
+# =============================================================================
+# implendum — A mutating method through an interface value
+# =============================================================================
+#
+# What this teaches:
+#   • Calling a mutating method on an interface-typed binding
+#     changes the value that binding holds, exactly as a direct call would
+#   • Dispatch picks the held class's method, so each class mutates its own
+#     fields
+#
+# See also: implendum, implet
+# =============================================================================
+
+interface Grower {
+    fn grow() → void
+    fn get() → int
+}
+
+class Circ implements Grower {
+    mut int r = 1
+
+    fn grow() → void {
+        self.r ← self.r + 1
+    }
+
+    fn get() → int {
+        return self.r
+    }
+}
+
+class Sq implements Grower {
+    mut int s = 10
+
+    fn grow() → void {
+        self.s ← self.s + 5
+    }
+
+    fn get() → int {
+        return self.s
+    }
+}
+
+main {
+    mut Grower g ← Circ {}
+    g.grow()
+    g.grow()
+    print g.get()
+    mut Grower h ← Sq {}
+    h.grow()
+    print h.get()
+}
