@@ -145,6 +145,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
             Bucket::Physical
         }
         Type::Array(_)
+        | Type::RangedArray { .. }
         | Type::Map(_, _)
         | Type::Ledger(_, _)
         | Type::Set(_)

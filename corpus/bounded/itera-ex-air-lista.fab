@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "list"
 canonical = false
 summary = "AIR-lane itera ex over a proven-full bounded lista unrolls guard-free; runtime-length values decline not_concrete."
-syntax = "@ radix lane \"air\"; itera ex lista<T, N>"
+syntax = "@ radix lane \"air\"; itera ex lista<T, magnitudo N>"
 related = ["lista", "ex", "itera", "radix"]
 locale = "en"
 no_expected = "rejects"
@@ -17,7 +17,7 @@ diagnostic = "SEM059:itera_loop"
 # =============================================================================
 #
 # What this teaches:
-#   • a full literal lista<T, N> proves len == N for Route A
+#   • a full literal lista<T, magnitudo N> proves len == N for Route A
 #   • inference-chained immutable values preserve that fullness fact
 #   • runtime-length bounded listas decline SEM059.itera_loop with
 #     causa=not_concrete; spare slots are never read
@@ -28,13 +28,13 @@ diagnostic = "SEM059:itera_loop"
 
 @ radix lane "air"
 fn bounded_full() → void {
-    let list<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ list<f32, 4> ⊥ [0.0, 0.0, 0.0, 0.0]
+    let list<f32, size 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ list<f32, size 4> ⊥ [0.0, 0.0, 0.0, 0.0]
     for from xs let value { }
 }
 
 @ radix lane "air"
 fn bounded_partial() → void {
     let list<f32> raw ← [1.0, 2.0, 3.0]
-    let list<f32, 4> xs ← raw ↦ list<f32, 4> ⊥ [0.0, 0.0, 0.0, 0.0]
+    let list<f32, size 4> xs ← raw ↦ list<f32, size 4> ⊥ [0.0, 0.0, 0.0, 0.0]
     for from xs let value { }
 }

@@ -105,7 +105,7 @@ note = "D19.4: binds the textus[i] element row (ascii<1>); wasm/sexp decline asc
 [[cells]]
 id = "itera.ex.bounded-lista"
 family = "itera"
-cell = "ex × bounded lista<T,N>"
+cell = "ex × bounded lista<T,magnitudo N>"
 status = "direct"
 exemplum = "bounded/itera-ex-bounded-lista.fab"
 expected = false
@@ -593,11 +593,11 @@ note = "textus_literal_too_long pinned; batch 1 (bc40c951)"
 [[cells]]
 id = "bconv.lista-to-tensor"
 family = "bounded-conversio"
-cell = "lista<T,N> ↦ tensor<T,[N]>"
+cell = "lista<T,magnitudo N> ↦ tensor<T,[N]>"
 status = "direct"
 exemplum = "bounded/conversio-lista-to-tensor.fab"
 expected = true
-note = "batch 1 (bc40c951): runner-proven (list<f32,8> ↦ tf32[8]; shape/sum/lanes pinned)"
+note = "batch 1 (bc40c951): runner-proven (list<f32,size 8> ↦ tf32[8]; shape/sum/lanes pinned)"
 
 [[cells]]
 id = "bconv.octeti-to-textus"
@@ -661,7 +661,7 @@ note = "batch 4: frontend decline pinned as SEM016:unsupported_conversio"
 [[cells]]
 id = "bconv.lista-to-bounded-textus"
 family = "bounded-conversio"
-cell = "lista<T,N> ↦ textus<M>"
+cell = "lista<T,magnitudo N> ↦ textus<M>"
 status = "direct"
 exemplum = "bounded/conversio-lista-to-bounded-textus.fab"
 expected = false
@@ -670,7 +670,7 @@ note = "batch 4: check-admitted route; runner lacks bounded textus carrier (Unsu
 [[cells]]
 id = "bconv.lista-to-bounded-lista"
 family = "bounded-conversio"
-cell = "lista<T,N> ↦ lista<T,M>"
+cell = "lista<T,magnitudo N> ↦ lista<T,magnitudo M>"
 status = "direct"
 exemplum = "bounded/conversio-lista-to-bounded-lista.fab"
 expected = true
@@ -679,7 +679,7 @@ note = "batch 4: check-admitted shrink route; runner lacks runtime BoundedArray 
 [[cells]]
 id = "bconv.lista-to-octeti"
 family = "bounded-conversio"
-cell = "lista<T,N> ↦ octeti<M>"
+cell = "lista<T,magnitudo N> ↦ octeti<M>"
 status = "direct"
 exemplum = "bounded/conversio-lista-to-octeti.fab"
 expected = true

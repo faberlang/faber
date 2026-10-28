@@ -56,7 +56,7 @@ fn classificata(int n) → string {
 }
 
 main {
-    let list<Nauta, 3> nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
+    let list<Nauta, size 3> nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
     let (Nauta) → string titulus ← Nauta n → string ∴ do {
         let string navis ← n?.navis coalesce "nulla navis"
         return "§ :: § :: §"(n.nomen, navis, classificata(n.gradus))

@@ -1273,7 +1273,7 @@ type_head       := IDENTIFIER | 'modulus'
 # is its own type (`width_type_sugar`); only the policy words `modulus`,
 # `saturatus` and `exactus` wrap a marker (`modulus<u32>`).
 type_arguments  := '<' type_argument (',' type_argument)* '>'
-type_argument   := labeled_type_argument | range_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument   := labeled_type_argument | range_argument | sized_range_argument | type_annotation | NATURAL | '[' figura_list? ']'
 labeled_type_argument := IDENTIFIER ':' type_annotation
 # A range argument is the second argument of a store policy: the range refines
 # the explicit width inside which a store applies the policy
@@ -1283,8 +1283,13 @@ labeled_type_argument := IDENTIFIER ':' type_annotation
 # (`range_bound_required`). The half-open `‥` holds the low end up to, not
 # including, the high end; the inclusive `…` holds both. `∞` and `-∞` mean no
 # bound on that side. The policy word is mandatory: `u8<0‥8>` is
-# `ranged_policy_word_required`.
+# `ranged_policy_word_required`. The same slot is the second argument of `lista`
+# (`lista<T, magnitudo 1…∞>`): a list size range, trapping only, with no policy
+# word; there the range follows the `magnitudo` marker (`sized_range_argument`),
+# because a bare range bounds a value and a list's bound is a count. A bare
+# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`.
 range_argument  := range_bound range_glyph range_bound
+sized_range_argument := 'magnitudo' range_argument
 range_glyph     := '‥' | '…'
 range_bound     := '-'? NATURAL | '-'? '∞' | 'magnitudo'? IDENTIFIER
 width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
@@ -1360,7 +1365,7 @@ negated_number := '-' NUMBER
 # Type arguments name a generic member type (`casu lista<numerus>`). `discerne`
 # matches a closed set only (a union's members, an enum's variants), so a type
 # pattern that is not a member of the scrutinee's closed set — a length-shaped
-# collection (`lista<T, 4>`) or a numeric width (`u32` over `numerus`) — parses
+# collection (`lista<T, magnitudo 4>`) or a numeric width (`u32` over `numerus`) — parses
 # but is rejected (`SEM010 discerne_pattern_not_in_closed_set`).
 type_pattern := IDENTIFIER type_arguments? ut_pattern?
 ut_pattern  := ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)

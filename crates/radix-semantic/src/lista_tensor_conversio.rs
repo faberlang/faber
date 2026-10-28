@@ -131,7 +131,7 @@ pub fn validate_lista_to_tensor_source(
         (Type::Array(source_elem), Type::Tensor(target_elem, _)) => {
             validate_flat_source(*source_elem, *target_elem, types)
         }
-        // Route C (AEU-5): bounded `lista<T, N>` snapshots into a padded
+        // Route C (AEU-5): bounded `lista<T, magnitudo N>` snapshots into a padded
         // `tensor<T, [N]>`. Numeric `T` only; the capacity must equal the
         // rank-1 literal dim so every padded slot is a real fill value.
         (Type::BoundedArray { element, capacity }, Type::Tensor(target_elem, shape)) => {
@@ -167,7 +167,7 @@ fn validate_flat_source(
 ) -> Result<(), ListaToTensorError> {
     if matches!(
         normalized_type(source_elem, types),
-        Type::Array(_) | Type::BoundedArray { .. }
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
     ) {
         return Err(ListaToTensorError::NestedLista);
     }

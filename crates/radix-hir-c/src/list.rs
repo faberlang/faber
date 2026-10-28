@@ -27,7 +27,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// The capacity of a bounded list type (`list<int, 8>`), peeling aliases.
+    /// The capacity of a bounded list type (`list<int, size 8>`), peeling aliases.
     /// `None` for an unbounded list, or a capacity not known at compile time.
     fn list_capacity(&self, ty: radix_types::TypeId) -> Option<u64> {
         match self.types.get(ty) {
@@ -42,7 +42,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// Whether a type is a bounded list (`list<T, N>`), peeling aliases.
+    /// Whether a type is a bounded list (`list<T, size N>`), peeling aliases.
     pub(crate) fn is_bounded_type(&self, ty: radix_types::TypeId) -> bool {
         match self.types.get(ty) {
             radix_types::Type::Alias(_, inner) => self.is_bounded_type(*inner),

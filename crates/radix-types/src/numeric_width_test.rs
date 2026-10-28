@@ -780,3 +780,92 @@ mod ranged_int {
         );
     }
 }
+
+mod ranged_list {
+    use crate::numeric_width::{RangeEnd, WidthLowerIssue, resolve_ranged_list};
+    use crate::{Primitive, Type, TypeTable};
+
+    fn lengths(lo: i128, hi: i128, inclusive: bool) -> Result<(u64, Option<u64>), WidthLowerIssue> {
+        resolve_ranged_list(RangeEnd::Value(lo), RangeEnd::Value(hi), inclusive)
+    }
+
+    #[test]
+    fn a_half_open_range_stops_one_short_and_an_inclusive_one_holds_the_end() {
+        assert_eq!(lengths(4, 8, false), Ok((4, Some(7))));
+        assert_eq!(lengths(4, 8, true), Ok((4, Some(8))));
+        assert_eq!(lengths(2, 2, true), Ok((2, Some(2))));
+    }
+
+    #[test]
+    fn infinity_is_no_upper_bound() {
+        assert_eq!(
+            resolve_ranged_list(RangeEnd::Value(1), RangeEnd::PosInf, true),
+            Ok((1, None))
+        );
+        assert_eq!(
+            resolve_ranged_list(RangeEnd::NegInf, RangeEnd::Value(5), false),
+            Ok((0, Some(4)))
+        );
+    }
+
+    #[test]
+    fn a_range_that_holds_no_length_is_refused() {
+        assert_eq!(lengths(4, 4, false), Err(WidthLowerIssue::RangedListEmpty));
+        assert_eq!(lengths(5, 3, true), Err(WidthLowerIssue::RangedListEmpty));
+        assert_eq!(
+            resolve_ranged_list(RangeEnd::PosInf, RangeEnd::PosInf, false),
+            Err(WidthLowerIssue::RangedListEmpty)
+        );
+        assert_eq!(lengths(0, 0, false), Err(WidthLowerIssue::RangedListEmpty));
+    }
+
+    #[test]
+    fn a_negative_end_is_refused() {
+        assert_eq!(
+            lengths(-1, 3, false),
+            Err(WidthLowerIssue::RangedListBoundNegative)
+        );
+        assert_eq!(
+            lengths(1, -3, false),
+            Err(WidthLowerIssue::RangedListBoundNegative)
+        );
+        assert_eq!(
+            resolve_ranged_list(RangeEnd::Value(1), RangeEnd::NegInf, false),
+            Err(WidthLowerIssue::RangedListBoundNegative)
+        );
+    }
+
+    #[test]
+    fn the_sugar_forms_keep_one_identity() {
+        let mut types = TypeTable::new();
+        let int = types.primitive(Primitive::Numerus);
+        // `list<T>` is `0…∞`; `list<T, size N>` is `0…N`.
+        assert_eq!(types.ranged_array(int, 0, None), types.array(int));
+        let capacity = types.intern_index(crate::IndexExpr::Literal(6));
+        let bounded = types.bounded_array(int, capacity);
+        // Index ids are not interned, so identity is structural equality.
+        let ranged = types.ranged_array(int, 0, Some(6));
+        assert!(types.equals(ranged, bounded));
+        assert!(types.is_assignable(ranged, bounded));
+    }
+
+    #[test]
+    fn a_range_with_a_floor_is_its_own_interned_type() {
+        let mut types = TypeTable::new();
+        let int = types.primitive(Primitive::Numerus);
+        let a = types.ranged_array(int, 1, None);
+        let b = types.ranged_array(int, 1, None);
+        let c = types.ranged_array(int, 2, None);
+        assert_eq!(a, b, "interning is structural");
+        assert_ne!(a, c);
+        assert!(matches!(
+            types.get(a),
+            Type::RangedArray {
+                min: 1,
+                max: None,
+                ..
+            }
+        ));
+        assert!(!types.is_assignable(a, c), "ranges are invariant");
+    }
+}

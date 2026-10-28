@@ -11,10 +11,11 @@ use super::kernel_legality::{
     Env, ISSUE_ASYNC, ISSUE_HOST_CALL, ISSUE_HOST_EFFECT, ISSUE_HOST_TYPE,
     ISSUE_POSITIONAL_LANE_PARAM, ISSUE_PRIVATE_HOST_CALL, ISSUE_RANGED_INT_NOT_BUILT,
     ISSUE_RAW_LANE_ID, ISSUE_RAW_LANE_ID_PARAM, ISSUE_RECOVERY, ISSUE_SATURATING_FLOAT_NOT_BUILT,
-    ISSUE_TYPED_ERROR_CHANNEL, ISSUE_WORKGROUP, Sink,
+    ISSUE_TYPED_ERROR_CHANNEL, ISSUE_UNBOUNDED_LIST_SIZE, ISSUE_WORKGROUP, Sink,
 };
 use super::kernel_legality_types::{
-    FAMILY_ATOMIC, FAMILY_RANGED_INT, FAMILY_SATURATING_FLOAT, host_only_family,
+    FAMILY_ATOMIC, FAMILY_RANGED_INT, FAMILY_SATURATING_FLOAT, FAMILY_UNBOUNDED_LIST_SIZE,
+    host_only_family,
 };
 use crate::{
     NumericWidth, Primitive, ResolvedTensorEdgePolicy, SymbolKind, Type, TypeId, WarningKind,
@@ -203,6 +204,9 @@ impl KernelWalk<'_, '_> {
         } else if family == FAMILY_SATURATING_FLOAT {
             self.sink
                 .report(ISSUE_SATURATING_FLOAT_NOT_BUILT, span, &[("site", site)]);
+        } else if family == FAMILY_UNBOUNDED_LIST_SIZE {
+            self.sink
+                .report(ISSUE_UNBOUNDED_LIST_SIZE, span, &[("site", site)]);
         } else if family == FAMILY_RANGED_INT {
             self.sink
                 .report(ISSUE_RANGED_INT_NOT_BUILT, span, &[("site", site)]);

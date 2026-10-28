@@ -34,6 +34,11 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format_faber_type(*element, types, interner, resolve_def),
             format_figura(*capacity, types, interner)
         ),
+        Type::RangedArray { element, min, max } => format!(
+            "lista<{}, {min}…{}>",
+            format_faber_type(*element, types, interner, resolve_def),
+            max.map_or_else(|| "∞".to_owned(), |max| max.to_string())
+        ),
         Type::Queue(elem) => format!(
             "queue<{}>",
             format_faber_type(*elem, types, interner, resolve_def)

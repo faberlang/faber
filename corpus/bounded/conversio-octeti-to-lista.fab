@@ -3,13 +3,13 @@ term = "↦"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
-summary = "Bounded list<b8, N> converts to an unbounded list<u8> prefix."
-syntax = "list<b8, N> ↦ list<u8>"
+summary = "Bounded list<b8, size N> converts to an unbounded list<u8> prefix."
+syntax = "list<b8, size N> ↦ list<u8>"
 related = ["↦", "list<b8>", "lista", "u8"]
 locale = "en"
 +++
 # =============================================================================
-# bounded list<b8, N> to list<u8> — compile-admitted byte-list bridge
+# bounded list<b8, size N> to list<u8> — compile-admitted byte-list bridge
 # =============================================================================
 #
 # What this teaches:
@@ -21,7 +21,7 @@ locale = "en"
 #     `list<u8>`.
 
 main {
-    let list<b8, 8> raw ← |61 62| ↦ list<b8, 8>
+    let list<b8, size 8> raw ← |61 62| ↦ list<b8, size 8>
     let list<u8> out ← raw ↦ list<u8>
     print out
 }

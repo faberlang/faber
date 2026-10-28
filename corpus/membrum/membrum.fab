@@ -80,7 +80,7 @@ main {
 
     # --- Bracket accessus on lista ---
 
-    let list<int, 3> numeri ← [1, 2, 3]
+    let list<int, size 3> numeri ← [1, 2, 3]
     print numeri[0]
     print numeri[2]
 

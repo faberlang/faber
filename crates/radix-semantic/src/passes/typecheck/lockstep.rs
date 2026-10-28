@@ -8,7 +8,7 @@
 //! - The optional `apud [i]` clause stays ONE shared coordinate; it does not
 //!   grow with N (`at [i, j]` on a list zip is declined).
 //! - Every source must be a `lista` (`list<T>` or literal-capacity
-//!   `lista<T, N>`); map, tensor, queue, stack, text, and cursor surfaces
+//!   `lista<T, magnitudo N>`); map, tensor, queue, stack, text, and cursor surfaces
 //!   stay single-source until separately proven.
 //! - Equal length: statically known lengths (literal-capacity witnesses)
 //!   must already be equal here; dynamic `list<T>` lengths are guarded at
@@ -65,10 +65,10 @@ pub(super) fn check_lockstep_expr(
             .1;
         let (element, literal_length) = match checker.types.get(dispatch_ty) {
             Type::Array(inner) => (*inner, None),
-            Type::BoundedArray { element, .. } => {
+            Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
                 // Exact static length only when the expression is an array
                 // literal: unannotated literals are exact witnesses of their
-                // element count, while a `lista<T, N>` binding keeps a
+                // element count, while a `lista<T, magnitudo N>` binding keeps a
                 // runtime `len <= N` carrier (the same exact-bound lattice
                 // the elementwise lista operators consult).
                 let literal = match &source.kind {

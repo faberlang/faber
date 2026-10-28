@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/lista/size-unbounded-kernel-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/size-unbounded-kernel-reject.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "nucleum_unbounded_list_size"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "nucleum_unbounded_list_size"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "nucleum_unbounded_list_size"

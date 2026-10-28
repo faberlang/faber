@@ -1441,6 +1441,18 @@ impl Lowerer<'_> {
                 let elem = self.lower_generic_type_arg(elem);
                 self.types.array(elem)
             }
+            [elem, GenericArgExpr::Range(range)] => {
+                // A length range, `list<T, size lo‥hi>`: always the trapping range.
+                let elem = self.lower_generic_type_arg(elem);
+                let mut issue = None;
+                let ty = radix_types::lower_ranged_list(elem, range, self.types, &mut |found| {
+                    issue.get_or_insert(found);
+                });
+                if let Some(issue) = issue {
+                    self.error(issue.issue());
+                }
+                ty
+            }
             [elem, capacity] => {
                 let elem = self.lower_generic_type_arg(elem);
                 let Some(capacity) = self.lower_generic_index_arg(capacity) else {

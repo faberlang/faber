@@ -356,6 +356,8 @@ impl<'a> LoweringContextMaps<'a> {
             diagnostic_at_out_of_range: diagnostics.at_out_of_range,
             diagnostic_slice_out_of_range: diagnostics.slice_out_of_range,
             diagnostic_take_out_of_range: diagnostics.take_out_of_range,
+            diagnostic_ranged_push_past_maximum: diagnostics.ranged_push_past_maximum,
+            diagnostic_ranged_remove_below_minimum: diagnostics.ranged_remove_below_minimum,
             fault_delivery: self.frozen.fault_delivery,
             function_errors: Arc::clone(&self.frozen.function_errors),
             function_async: Arc::clone(&self.frozen.function_async),

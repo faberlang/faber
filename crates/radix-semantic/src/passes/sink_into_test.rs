@@ -208,7 +208,7 @@ fn rule8_a_set_receiver_sinks_its_element_without_a_contract_declaration() {
 fn rule8_a_bounded_list_receiver_sinks_its_element_without_a_contract_declaration() {
     assert_accepts(
         r#"main {
-    mut list<string, 4> xs ← []
+    mut list<string, size 4> xs ← []
     xs ⇜ "x"
 }"#,
     );

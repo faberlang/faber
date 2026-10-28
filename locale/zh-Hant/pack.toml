@@ -199,7 +199,7 @@ instans = "執行個體"
 objectum = "物件"
 quidlibet = "任意值"
 lista = "列表"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
 tabula = "表格"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "帳本"
@@ -847,7 +847,7 @@ help = "將提示寫成目標之後的 via 子句：`u32 via Le`、`ascii<8> via
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "轉換提示不跟在角括號裡的目標之後"
-help = "將提示寫成目標之後的 via 子句：`{lista}<b8, 16> via Le`"
+help = "將提示寫成目標之後的 via 子句：`{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要運算式"
@@ -1207,7 +1207,7 @@ help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "lista 需要一個型別參數"
-help = "使用 {lista}<T>；lista<T, N> 是已交付的有界形式"
+help = "使用 {lista}<T>；{lista}<T, {magnitudo} N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula 需要兩個型別參數"
@@ -1264,6 +1264,30 @@ help = "使用 u8 或 i32 這樣的整數寬度；浮點、十進位和 inf 寬�
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "kernel 中暫不支援帶範圍的儲存策略 ({site})；kernel 不套用範圍"
 help = "在 kernel 內使用普通寬度，在主機端套用範圍"
+
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "kernel 不能使用沒有大小上限的列表 ({site})；kernel 會展開直到上限的每個槽位"
+help = "給列表一個有限的常數大小，例如 {lista}<int, {magnitudo} 1…8>"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "列表長度範圍的端點必須是非負整數字面量或 ∞"
+help = "兩個端點都寫成整數字面量，例如 {lista}<int, {magnitudo} 1‥8>；具名端點或 size 端點尚未支援"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "該列表長度範圍不包含任何長度"
+help = "lo‥hi 的低端必須小於高端；lo…hi 的低端不能大於高端"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "列表長度範圍的端點不能為負"
+help = "長度是計數：讓範圍從 0 或更大開始"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "列表長度範圍不接受儲存策略詞"
+help = "把範圍寫在列表上，例如 {lista}<int, {magnitudo} 1…8>；它總是陷阱，saturating、trapping 和 wrapping 只接受數字寬度"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "列表的元素個數寫在 `{magnitudo}` 之後"
+help = "寫 `{lista}<int, {magnitudo} 4>` 表示最多 4 個元素，或 `{lista}<int, {magnitudo} 1…8>` 表示一個範圍；裸範圍限定的是值，不是個數"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可呼叫項的註記姿態「{annotation_posture}」與書寫的姿態「{written_posture}」衝突"
@@ -1463,7 +1487,7 @@ help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "基本型別不能接受參數"
-help = "textus<N>、ascii<N> 和 {lista}<b8, N> 是已交付的有界形式"
+help = "textus<N>、ascii<N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "命名空間未匯出限定型別"
@@ -1780,6 +1804,10 @@ help = "請使用 MIR runner 或 Faber 原始碼發射器，或改用 map ({tabu
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "此目標暫不支援帶範圍的儲存策略"
 help = "請使用 MIR runner、Rust 目標或 Faber 原始碼發射器，直到此目標支援範圍"
+
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "此目標暫不支援列表長度範圍"
+help = "請使用 MIR runner、Rust 目標或 Faber 原始碼發射器，直到此目標支援列表範圍"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "此目標不支援 {leaf} 葉片"
@@ -2224,6 +2252,10 @@ help = "新增簽章符合契約宣告的 {method} 方法，或移除 {implet}"
 [diagnostics.SEM011]
 message = "運算元型別無效"
 help = "使用相容的運算元型別"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "該列表的長度超出列表長度範圍"
+help = "讓字面量的長度落在範圍內，或用 ↦ 建構列表並用 ⊥ 恢復"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "取整符號暫不適用於張量值"
@@ -2815,7 +2847,7 @@ help = "via 之後使用 Hex、Bin、Oct、Be、Le 或 Code 其中之一；Floor
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "此轉換目標不接受轉換提示"
-help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "浮點或十進位未指明捨入方式時不會轉換為整數"
@@ -3372,6 +3404,10 @@ help = "讓 `@ radix lane \"air\"` 函式維持在接受的純函式子集內"
 [diagnostics.SEM059.issues.async_function]
 message = "@ radix lane \"{lane}\" 拒絕此函式主體：非同步函式不在 v1 AIR 子集內"
 help = "讓 v1 AIR 子集保持純粹：不可變區域變數、純表達式、AIR lane 呼叫，以及張量算術內建函式"
+
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "@ radix lane \"{lane}\" 拒絕沒有大小上限的列表：反向 AD 會展開直到上限的每個槽位"
+help = "給列表一個有限的常數大小，例如 {lista}<int, {magnitudo} 1…8>，或把列表移出該 lane"
 
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" 拒絕此函式主體：指派變更不在 v1 AIR 子集內"

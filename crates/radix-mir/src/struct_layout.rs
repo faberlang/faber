@@ -221,7 +221,7 @@ fn field_spec(
         Type::Applied(_, _) | Type::Param(_) => return Err(StructLayoutRefusal::Generic),
         Type::Tuple(_) => return Err(StructLayoutRefusal::Tuple),
         Type::Record(_) => return Err(StructLayoutRefusal::Record),
-        Type::Array(_) => return Err(StructLayoutRefusal::List),
+        Type::Array(_) | Type::RangedArray { .. } => return Err(StructLayoutRefusal::List),
         Type::BoundedArray { element, capacity } => {
             return bounded_array_spec(ctx, name, *element, *capacity);
         }

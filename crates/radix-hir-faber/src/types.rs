@@ -14,7 +14,7 @@ use radix_hir::{
     DefId, HirRangeArgument, HirRangeBound, HirTypeForm, HirTypeFormArg, HirTypeFormHead,
     HirTypeSite,
 };
-use radix_lexer::{Interner, Symbol};
+use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::TypeFormLevel;
 use radix_types::{
     BitsWidth, CollectionKind, IndexExpr, IndexId, MarkerFamily, Primitive, SemanticMutability,
@@ -358,7 +358,13 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
+            ),
+            Type::RangedArray { element, min, max } => format!(
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                self.type_to_faber(*element, names, surface),
+                Self::list_range_to_faber(*min, *max, surface)
             ),
             Type::BoundedQueue { element, capacity } => format!(
                 "{}<{}, {}>",
@@ -382,7 +388,7 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                 BitsWidth::B8.faber_marker(),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
             ),
         }
     }
@@ -697,6 +703,34 @@ impl super::FaberCodegen<'_> {
         let ty = self.types.get(form.ty);
         match ty {
             Type::Error => Ok("<error>".to_owned()),
+            // A list length range keeps its authored spelling:
+            // the glyph, the bounds as written and the `size` marker. The
+            // resolved witness may be any list shape (`size 0…8` is a bounded
+            // list, `size 0…∞` the plain one), so the authored range wins.
+            Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::BoundedOcteti { .. }
+            | Type::RangedArray { .. }
+                if form
+                    .args
+                    .iter()
+                    .any(|arg| matches!(arg, HirTypeFormArg::Range(_))) =>
+            {
+                let [HirTypeFormArg::Type(child), HirTypeFormArg::Range(range)] =
+                    form.args.as_slice()
+                else {
+                    return Err(malformed_type_form(
+                        "a list size range form requires an element and one range".to_owned(),
+                    ));
+                };
+                Ok(format!(
+                    "{}<{}, {} {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    self.type_form_to_faber(child, names, surface)?,
+                    surface.keyword(TokenKind::Magnitudo),
+                    self.range_argument_to_faber(range)
+                ))
+            }
             Type::Primitive(Primitive::Octeti) => {
                 Self::expect_no_form_args(form)?;
                 Ok(format!(
@@ -795,7 +829,7 @@ impl super::FaberCodegen<'_> {
                 Ok(self.bounded_primitive_head(Primitive::Ascii, *capacity, surface))
             }
             Type::BoundedOcteti { capacity } => {
-                // Ruling d477c76d spells the bounded byte buffer `lista<b8, N>`,
+                // Ruling d477c76d spells the bounded byte buffer `lista<b8, magnitudo N>`,
                 // so the live authored form carries the `b8` type child; the
                 // retired `octeti<N>`/`bytes<N>` word carried none. Both
                 // re-emit as the list form.
@@ -808,7 +842,7 @@ impl super::FaberCodegen<'_> {
                     "{}<{}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                     element,
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
                 ))
             }
             // An authored empty-arg array form witnesses the retired
@@ -956,7 +990,15 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
+                ))
+            }
+            Type::RangedArray { min, max, .. } => {
+                let elem = self.single_type_form_child(form, names, surface)?;
+                Ok(format!(
+                    "{}<{elem}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    Self::list_range_to_faber(*min, *max, surface)
                 ))
             }
             Type::BoundedQueue { capacity, .. } => {
@@ -1297,6 +1339,16 @@ impl super::FaberCodegen<'_> {
             format!("{lo}…{hi}")
         };
         format!("{word}<{}, {range}>", width.faber_marker())
+    }
+
+    /// A list length range spelled after the `size` marker, inclusive:
+    /// `size 1…8`, or `size 1…∞` for no upper end.
+    fn list_range_to_faber(min: u64, max: Option<u64>, surface: &impl KeywordSurface) -> String {
+        let size = surface.keyword(TokenKind::Magnitudo);
+        match max {
+            None => format!("{size} {min}…∞"),
+            Some(max) => format!("{size} {min}…{max}"),
+        }
     }
 
     fn expect_no_form_args(form: &HirTypeForm) -> Result<(), CodegenError> {

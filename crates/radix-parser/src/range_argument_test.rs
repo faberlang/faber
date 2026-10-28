@@ -95,7 +95,7 @@ fn a_range_missing_its_low_end_is_a_parse_error() {
 
 #[test]
 fn a_range_does_not_displace_the_size_argument_of_other_heads() {
-    // `list<int, 4>` style arguments stay types and sizes; only `lo‥hi` is a
+    // `list<int, size 4>` style arguments stay types and sizes; only `lo‥hi` is a
     // range slot.
     let result = parse_ok("sit lista<numerus> xs ← [1, 2]\n");
     let program = result.program.as_ref().expect("program");
@@ -110,4 +110,59 @@ fn a_range_does_not_displace_the_size_argument_of_other_heads() {
         args.iter()
             .all(|arg| !matches!(arg, GenericArgExpr::Range(_)))
     );
+}
+
+fn list_args(source: &str) -> Vec<GenericArgExpr> {
+    let result = parse_ok(source);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(decl) = &program.statements[0].kind else {
+        panic!("expected a binding");
+    };
+    let ty = decl.ty.as_ref().expect("annotation");
+    let TypeExprKind::Named(_, args) = &ty.kind else {
+        panic!("expected a named type: {:?}", ty.kind);
+    };
+    args.clone()
+}
+
+#[test]
+fn a_range_after_size_is_a_sized_range_on_a_list() {
+    for (source, kind) in [
+        (
+            "sit lista<numerus, magnitudo 1…8> xs ← [1]\n",
+            RangeKind::Inclusive,
+        ),
+        (
+            "sit lista<numerus, magnitudo 1‥8> xs ← [1]\n",
+            RangeKind::Exclusive,
+        ),
+    ] {
+        let args = list_args(source);
+        let GenericArgExpr::Range(range) = &args[1] else {
+            panic!("expected a range slot: {:?}", args[1]);
+        };
+        assert!(range.sized, "the size marker covers the range");
+        assert_eq!(literal(&range.lo), 1);
+        assert_eq!(literal(&range.hi), 8);
+        assert!(matches!(
+            (range.kind, kind),
+            (RangeKind::Inclusive, RangeKind::Inclusive)
+                | (RangeKind::Exclusive, RangeKind::Exclusive)
+        ));
+    }
+}
+
+#[test]
+fn a_bare_range_on_a_list_is_not_sized() {
+    let args = list_args("sit lista<numerus, 1…8> xs ← [1]\n");
+    let GenericArgExpr::Range(range) = &args[1] else {
+        panic!("expected a range slot: {:?}", args[1]);
+    };
+    assert!(!range.sized);
+}
+
+#[test]
+fn size_before_a_single_count_is_a_lift_not_a_range() {
+    let args = list_args("sit lista<numerus, magnitudo 4> xs ← [1]\n");
+    assert!(matches!(args[1], GenericArgExpr::Size(_)), "{:?}", args[1]);
 }

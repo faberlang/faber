@@ -298,7 +298,9 @@ impl TypeChecker<'_> {
         // or octeti is one named issue.
         if self.is_range_index(idx_ty) {
             match &resolved_kind {
-                Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                Type::Array(elem)
+                | Type::BoundedArray { element: elem, .. }
+                | Type::RangedArray { element: elem, .. } => {
                     if !self.is_textus_index_type(idx_ty) {
                         self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index_span);
                     }
@@ -324,9 +326,9 @@ impl TypeChecker<'_> {
             return elem;
         }
         let kind = match resolved_kind {
-            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
-                Some((Some(elem), None, None))
-            }
+            Type::Array(elem)
+            | Type::BoundedArray { element: elem, .. }
+            | Type::RangedArray { element: elem, .. } => Some((Some(elem), None, None)),
             Type::Map(key, value) | Type::Ledger(key, value) => {
                 Some((None, Some(key), Some(value)))
             }
@@ -625,6 +627,7 @@ impl TypeChecker<'_> {
                 | Type::BoundedAscii { .. }
                 | Type::Array(_)
                 | Type::BoundedArray { .. }
+                | Type::RangedArray { .. }
         );
         if is_length && sequence_receiver {
             self.undefined_member("length_is_method", span);
@@ -1259,7 +1262,7 @@ impl TypeChecker<'_> {
         if self.is_range_index(idx_ty)
             && matches!(
                 self.types.get(resolved),
-                Type::Array(_) | Type::BoundedArray { .. }
+                Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
             )
         {
             self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index.span);

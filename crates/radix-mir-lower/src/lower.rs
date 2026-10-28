@@ -550,7 +550,7 @@ fn portable_tensor_edge_type_identity(
         // A ranged cell has no portable tensor-edge identity (tensor edges
         // over ranges are need 5 of the ranged-policy series).
         Type::RangedInt { .. }
-        | Type::BoundedArray { .. }
+        | Type::BoundedArray { .. } | Type::RangedArray { .. }
         | Type::Queue(_)
         | Type::BoundedQueue { .. }
         | Type::Stack(_)
@@ -748,6 +748,8 @@ pub fn lower_analyzed_unit(
         at_out_of_range: interner.intern("at: index out of range or key missing"),
         slice_out_of_range: interner.intern("slice_out_of_range § § §"),
         take_out_of_range: interner.intern("take_out_of_range § §"),
+        ranged_push_past_maximum: interner.intern("list length range: push past the maximum"),
+        ranged_remove_below_minimum: interner.intern("list length range: removal below the minimum"),
     };
     let kernel_lowering = options.kernel_lowering;
     let mut lowerer = MirLowerer {
@@ -1576,6 +1578,10 @@ struct DiagnosticSymbols {
     /// The list `take` trim's (la `prima`) fault payload template: the fault
     /// kind plus count and list length as data.
     take_out_of_range: Symbol,
+    /// A push past the maximum of a list length range.
+    ranged_push_past_maximum: Symbol,
+    /// A removal below the minimum of a list length range.
+    ranged_remove_below_minimum: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -2554,6 +2560,8 @@ pub struct FunctionBuilderContext<'a> {
     diagnostic_slice_out_of_range: Symbol,
     /// The list `take` fault payload template.
     diagnostic_take_out_of_range: Symbol,
+    diagnostic_ranged_push_past_maximum: Symbol,
+    diagnostic_ranged_remove_below_minimum: Symbol,
     /// A `⇥` kernel exists in the unit: handled blocks emit the device
     /// fault-delivery markers (U9-5).
     fault_delivery: bool,
@@ -2659,6 +2667,8 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_at_out_of_range: Symbol(0),
             diagnostic_slice_out_of_range: Symbol(0),
             diagnostic_take_out_of_range: Symbol(0),
+            diagnostic_ranged_push_past_maximum: Symbol(0),
+            diagnostic_ranged_remove_below_minimum: Symbol(0),
             fault_delivery: false,
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
@@ -4189,9 +4199,12 @@ impl<'a> FunctionBuilder<'a> {
         // 2026-10-04 comparisons ruling); both sides are always evaluated, so
         // it precedes the short-circuit.
         if matches!(op, HirBinOp::And | HirBinOp::Or)
-            && expr
-                .ty
-                .is_some_and(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
+            && expr.ty.is_some_and(|ty| {
+                matches!(
+                    self.normalized_type(ty),
+                    Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+                )
+            })
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
@@ -4239,10 +4252,12 @@ impl<'a> FunctionBuilder<'a> {
         if matches!(
             op,
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq | HirBinOp::ApproxEq | HirBinOp::ApproxNotEq
-        ) && expr
-            .ty
-            .is_some_and(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
-        {
+        ) && expr.ty.is_some_and(|ty| {
+            matches!(
+                self.normalized_type(ty),
+                Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+            )
+        }) {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
         if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq)
@@ -5488,6 +5503,7 @@ impl<'a> FunctionBuilder<'a> {
                 self.normalized_type(ty),
                 Type::Array(_)
                     | Type::BoundedArray { .. }
+                    | Type::RangedArray { .. }
                     | Type::Queue(_)
                     | Type::BoundedQueue { .. }
                     | Type::Stack(_)

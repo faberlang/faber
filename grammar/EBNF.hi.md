@@ -233,362 +233,364 @@ type_head ::= IDENTIFIER | 'मॉड्यूल'
 # [111] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
 # [112] type_argument
-type_argument ::= labeled_type_argument | range_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument ::= labeled_type_argument | range_argument | sized_range_argument | type_annotation | NATURAL | '[' figura_list? ']'
 # [113] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
 # [114] range_argument
 range_argument ::= range_bound range_glyph range_bound
-# [115] range_glyph
+# [115] sized_range_argument
+sized_range_argument ::= 'आकार' range_argument
+# [116] range_glyph
 range_glyph ::= '‥' | '…'
-# [116] range_bound
+# [117] range_bound
 range_bound ::= '-'? NATURAL | '-'? '∞' | 'आकार'? IDENTIFIER
-# [117] width_type_sugar
+# [118] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [118] shape_suffix
+# [119] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [119] figura
+# [120] figura
 figura ::= spelled_lift | figura_product (('+' | '-') NATURAL)*
-# [120] spelled_lift
+# [121] spelled_lift
 spelled_lift ::= 'आकार' lift_extent
-# [121] lift_extent
+# [122] lift_extent
 lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER | '[' figura_list? ']'
-# [122] figura_product
+# [123] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [123] figura_primary
+# [124] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [124] figura_list
+# [125] figura_list
 figura_list ::= figura (',' figura)*
-# [125] function_type
+# [126] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [126] type_list
+# [127] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [127] si_stmt
+# [128] si_stmt
 si_stmt ::= 'यदि' si_tail
-# [128] si_tail
+# [129] si_tail
 si_tail ::= expression arm ('अन्यथायदि' si_tail | secus_clause)?
-# [129] secus_clause
+# [130] secus_clause
 secus_clause ::= 'अन्यथा' else_arm
-# [130] arm
+# [131] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [131] else_arm
+# [132] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [132] dum_stmt
+# [133] dum_stmt
 dum_stmt ::= 'जबतक' expression (block_stmt | ergo_joint statement) cape_clause?
-# [133] itera_stmt
+# [134] itera_stmt
 itera_stmt ::= 'दोहराओ' ('सेवन' expression (',' expression)* | 'से' expression | 'सीमा' expression (',' expression)*) apud_clause? filum_clause? ('बैठा' | 'चर') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [134] itera_binding
+# [135] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [135] apud_clause
+# [136] apud_clause
 apud_clause ::= 'पर' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [136] elige_stmt
+# [137] elige_stmt
 elige_stmt ::= 'चुनो' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [137] casu_elige_clause
+# [138] casu_elige_clause
 casu_elige_clause ::= 'स्थिति' expression (block_stmt | ergo_joint statement)
-# [138] ceterum_clause
+# [139] ceterum_clause
 ceterum_clause ::= 'अन्यतम' (block_stmt | ergo_joint statement)
-# [139] discerne_stmt
+# [140] discerne_stmt
 discerne_stmt ::= 'मिलाओ' 'सभी'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [140] discriminants
+# [141] discriminants
 discriminants ::= subject_path ('और' subject_path)*
-# [141] subject_path
+# [142] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [142] casu_variant_clause
+# [143] casu_variant_clause
 casu_variant_clause ::= 'स्थिति' patterns (block_stmt | ergo_joint statement)
-# [143] patterns
+# [144] patterns
 patterns ::= pattern ('और' pattern)*
-# [144] pattern
+# [145] pattern
 pattern ::= pattern_atom ('या' pattern_atom)*
-# [145] pattern_atom
+# [146] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [146] negated_number
+# [147] negated_number
 negated_number ::= '-' NUMBER
-# [147] type_pattern
+# [148] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [148] ut_pattern
+# [149] ut_pattern
 ut_pattern ::= ('रूपमें' IDENTIFIER) | (('बैठा' | 'चर') pattern_binding (',' pattern_binding)*)
-# [149] pattern_binding
+# [150] pattern_binding
 pattern_binding ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [150] custodi_stmt
+# [151] custodi_stmt
 custodi_stmt ::= 'रक्षक' '{' si_guard_clause+ '}'
-# [151] si_guard_clause
+# [152] si_guard_clause
 si_guard_clause ::= 'यदि' expression (block_stmt | ergo_joint statement)
-# [152] ex_stmt
+# [153] ex_stmt
 ex_stmt ::= 'सेवन' expression ('बैठा' | 'चर') extract_fields
-# [153] extract_fields
+# [154] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [154] extract_field
+# [155] extract_field
 extract_field ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [155] ceteri_field
+# [156] ceteri_field
 ceteri_field ::= 'बाकी' IDENTIFIER
-# [156] redde_stmt
+# [157] redde_stmt
 redde_stmt ::= 'लौटाओ' expression?
-# [157] reddet_stmt
+# [158] reddet_stmt
 reddet_stmt ::= 'रुको_लौटाओ' expression
-# [158] tacebit_stmt
+# [159] tacebit_stmt
 tacebit_stmt ::= 'रुको' expression
-# [159] cede_stmt
+# [160] cede_stmt
 cede_stmt ::= 'आगेबढ़ो' expression
-# [160] rumpe_stmt
+# [161] rumpe_stmt
 rumpe_stmt ::= 'तोड़ो'
-# [161] perge_stmt
+# [162] perge_stmt
 perge_stmt ::= 'जारी'
-# [162] tacet_stmt
+# [163] tacet_stmt
 tacet_stmt ::= 'मौन'
-# [163] iace_stmt
+# [164] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [164] iace_expr
+# [165] iace_expr
 iace_expr ::= ('इधरफेंको' | 'मरोजाओ') expression
-# [165] iace_guarded_expr
+# [166] iace_guarded_expr
 iace_guarded_expr ::= ('इधरफेंको' | 'मरोजाओ') expression NO_NEWLINE 'यदि' expression
-# [166] cape_clause
+# [167] cape_clause
 cape_clause ::= 'पकड़ो' IDENTIFIER block_stmt
-# [167] adfirma_stmt
+# [168] adfirma_stmt
 adfirma_stmt ::= 'पुष्टि' expression ('मरोजाओ' expression)?
-# [168] requirit_stmt
+# [169] requirit_stmt
 requirit_stmt ::= 'आवश्यक' expression 'इधरफेंको' expression
-# [169] reice_stmt
+# [170] reice_stmt
 reice_stmt ::= 'अस्वीकार' expression 'इधरफेंको' expression
-# [170] expression
+# [171] expression
 expression ::= assignment
-# [171] transfer
+# [172] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [172] sink_into
+# [173] sink_into
 sink_into ::= transfer ('⇜' ternary)?
-# [173] value_marker
+# [174] value_marker
 value_marker ::= 'स्वामित्व' | 'प्रतिलिपि'
-# [174] assignment
+# [175] assignment
 assignment ::= sink_into ('←' 'प्रतिलिपि'? assignment | '↤' assignment via_clause? inline_default?)?
-# [175] inc_dec_stmt
+# [176] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [176] place
+# [177] place
 place ::= call_expr
-# [177] ternary
+# [178] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [178] aut_expr
+# [179] aut_expr
 aut_expr ::= et_expr (('या') et_expr)*
-# [179] et_expr
+# [180] et_expr
 et_expr ::= equality (('और') equality)*
-# [180] equality
+# [181] equality
 equality ::= comparison equality_tail*
-# [181] equality_tail
+# [182] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('है' | 'नहीं' 'है') type_annotation
-# [182] comparison
+# [183] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [183] format_expr
+# [184] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [184] bitwise_or_expr
+# [185] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [185] bitwise_xor_expr
+# [186] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [186] bitwise_and_expr
+# [187] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [187] shift_expr
+# [188] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [188] range_expr
+# [189] range_expr
 range_expr ::= additive_expr range_tail?
-# [189] range_tail
+# [190] range_tail
 range_tail ::= ('‥' | '…' | 'पहले' | 'तक') additive_expr ('प्रति' additive_expr)?
-# [190] additive_expr
+# [191] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [191] multiplicative_expr
+# [192] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [192] vel_expr
+# [193] vel_expr
 vel_expr ::= unary_expr ('डिफ़ॉल्ट' vel_rhs)*
-# [193] vel_rhs
+# [194] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [194] vel_range_tail
+# [195] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'पहले' | 'तक') unary_expr ('प्रति' unary_expr)?
-# [195] unary_expr
+# [196] unary_expr
 unary_expr ::= ('-' | '¬' | 'नहीं' | '√' | '∛' | '∜') unary_expr | rounding_expr | finge_expr | cast_expr
-# [196] rounding_expr
+# [197] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [197] gradient_expr
+# [198] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [198] gradient_selection
+# [199] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [199] gradient_place
+# [200] gradient_place
 gradient_place ::= expression
-# [200] cast_expr
+# [201] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [201] conversio_expr
+# [202] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [202] interval_target
+# [203] interval_target
 interval_target ::= range_expr
-# [203] via_clause
+# [204] via_clause
 via_clause ::= 'द्वारा' IDENTIFIER
-# [204] inline_default
+# [205] inline_default
 inline_default ::= '⊥' unary_expr
-# [205] call_expr
+# [206] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [206] call_suffix
+# [207] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [207] member_suffix
+# [208] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [208] transpose_suffix
+# [209] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [209] optional_suffix
+# [210] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [210] non_null_suffix
+# [211] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [211] argument_list
+# [212] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [212] argument
+# [213] argument
 argument ::= template_argument | (call_marker | 'अक्ष')? 'फैलाओ'? expression
-# [213] call_marker
+# [214] call_marker
 call_marker ::= 'से' | 'चर' | 'स्वामित्व' | 'प्रतिलिपि'
-# [214] template_argument
+# [215] template_argument
 template_argument ::= 'फैलाओ'? IDENTIFIER ':' expression
-# [215] literal
+# [216] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'अभाव' | '∞' | 'nan'
-# [216] regex_literal
+# [217] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
-# [217] primary
+# [218] primary
 primary ::= IDENTIFIER | literal | regex_literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
-# [218] ad_expr
+# [219] ad_expr
 ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
-# [219] ad_opener
+# [220] ad_opener
 ad_opener ::= '(' expression ')'
-# [220] array_literal
+# [221] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [221] array_element_list
+# [222] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [222] array_element
+# [223] array_element
 array_element ::= argument | '_'
-# [223] iuncta_expr
+# [224] iuncta_expr
 iuncta_expr ::= 'टपल' type_arguments '[' argument_list? ']'
-# [224] json_literal
+# [225] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [225] json_member
+# [226] json_member
 json_member ::= STRING ':' json_value
-# [226] typed_constructor
+# [227] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | type_annotation json_literal | hole_type json_literal | '{' field_list '}' construction_source? | type_annotation '[' array_element_list? ']'
-# [227] field_list
+# [228] field_list
 field_list ::= field_init (',' field_init)*
-# [228] field_init
+# [229] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [229] field_key
+# [230] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [230] construction_source
+# [231] construction_source
 construction_source ::= 'सेवन' call_expr
-# [231] json_value
+# [232] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [232] json_object
+# [233] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [233] json_array
+# [234] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [234] json_string
+# [235] json_string
 json_string ::= STRING
-# [235] json_number
+# [236] json_number
 json_number ::= NUMBER
-# [236] finge_expr
+# [237] finge_expr
 finge_expr ::= 'गढ़ो' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [237] qualified_ident
+# [238] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [238] praefixum_expr
+# [239] praefixum_expr
 praefixum_expr ::= 'उपसर्ग' block_stmt
-# [239] scriptum_expr
+# [240] scriptum_expr
 scriptum_expr ::= 'लिखित' '(' STRING (',' expression)* ')'
-# [240] lege_expr
+# [241] lege_expr
 lege_expr ::= 'पढ़ो' 'पंक्ति'?
-# [241] reducta_expr
+# [242] reducta_expr
 reducta_expr ::= 'समेटो' 'द्वारा' reducta_op 'सेवन' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [242] reducta_op
+# [243] reducta_op
 reducta_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'argmax' | 'argmin' | 'सभी' | 'कोई' | 'गिनती' | 'पहला'
-# [243] reducta_group
+# [244] reducta_group
 reducta_group ::= 'अनुसार' expression
-# [244] reducta_body
+# [245] reducta_body
 reducta_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
-# [245] reducta_identity
+# [246] reducta_identity
 reducta_identity ::= 'डिफ़ॉल्ट' expression
-# [246] scan_expr
+# [247] scan_expr
 scan_expr ::= 'scan' 'द्वारा' scan_op ('total' ('inclusive' | 'exclusive'))? 'सेवन' expression apud_clause scan_group? scan_order_clause? filum_clause 'बैठा' IDENTIFIER block_stmt
-# [247] scan_op
+# [248] scan_op
 scan_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'सभी' | 'कोई' | 'गिनती'
-# [248] scan_group
+# [249] scan_group
 scan_group ::= 'अनुसार' expression
-# [249] scan_order_clause
+# [250] scan_order_clause
 scan_order_clause ::= 'order' ('आरोही' | 'अवरोही')
-# [250] sort_expr
+# [251] sort_expr
 sort_expr ::= 'क्रमबद्ध_करो' 'द्वारा' sort_direction ('सेवन' | 'से') expression sort_body?
-# [251] sort_direction
+# [252] sort_direction
 sort_direction ::= 'आरोही' | 'अवरोही'
-# [252] sort_body
+# [253] sort_body
 sort_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
-# [253] filum_clause
+# [254] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
-# [254] capta_expr
+# [255] capta_expr
 capta_expr ::= 'जाल' block_stmt
-# [255] object_pattern
+# [256] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [256] pattern_property
+# [257] pattern_property
 pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [257] array_pattern
+# [258] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [258] array_pattern_element
+# [259] array_pattern_element
 array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
-# [259] nota_stmt
+# [260] nota_stmt
 nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
-# [260] entry_header
+# [261] entry_header
 entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
-# [261] incipit_stmt
+# [262] incipit_stmt
 incipit_stmt ::= 'आरंभ' entry_header block_stmt
-# [262] incipiet_stmt
+# [263] incipiet_stmt
 incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
-# [263] probandum_decl
+# [264] probandum_decl
 probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
-# [264] probandum_body
+# [265] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [265] proba_stmt
+# [266] proba_stmt
 proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
-# [266] proba_modifier
+# [267] proba_modifier
 proba_modifier ::= 'अपेक्षित_विफलता' | 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NATURAL | 'मापो' | 'पुनरावृत्ति' NATURAL | 'नाज़ुक' NATURAL | 'केवलमें' STRING
-# [267] praepara_block
+# [268] praepara_block
 praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सभी'? block_stmt
-# [268] fac_stmt
+# [269] fac_stmt
 fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [269] IDENTIFIER
+# [270] IDENTIFIER
 IDENTIFIER ::=
-# [270] NUMBER
+# [271] NUMBER
 NUMBER ::=
-# [271] NATURAL
+# [272] NATURAL
 NATURAL ::=
-# [272] STRING
+# [273] STRING
 STRING ::=
-# [273] ASCII_STRING
+# [274] ASCII_STRING
 ASCII_STRING ::=
-# [274] BACKTICK_STRING
+# [275] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [275] OCTETI_STRING
+# [276] OCTETI_STRING
 OCTETI_STRING ::=
-# [276] REGEX_TYPE_WORD
+# [277] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [277] REGEX_BODY
+# [278] REGEX_BODY
 REGEX_BODY ::=
-# [278] NEWLINE
+# [279] NEWLINE
 NEWLINE ::=
-# [279] WIDTH_MARKER
+# [280] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [280] LISTA_WIDTH_SUGAR
+# [281] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [281] TENSOR_WIDTH_SUGAR
+# [282] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [282] SPARSA_WIDTH_SUGAR
+# [283] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [283] VECTOR_WIDTH_SUGAR
+# [284] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [284] MATRIX_WIDTH_SUGAR
+# [285] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [285] FRONTMATTER_DELIMITER
+# [286] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [286] TOML_LINES
+# [287] TOML_LINES
 TOML_LINES ::=
-# [287] ANNOTATION_NAME
+# [288] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [288] ANNOTATION_FIELD_NAME
+# [289] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [289] NON_NEWLINE_TOKEN
+# [290] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [290] NO_NEWLINE
+# [291] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -732,6 +734,7 @@ NO_NEWLINE ::=
 | [`type_argument`](#type-argument) | `#type-argument` | live |
 | [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live |
 | [`range_argument`](#range-argument) | `#range-argument` | live |
+| [`sized_range_argument`](#sized-range-argument) | `#sized-range-argument` | live |
 | [`range_glyph`](#range-glyph) | `#range-glyph` | live |
 | [`range_bound`](#range-bound) | `#range-bound` | live |
 | [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live |
@@ -1629,7 +1632,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - A call-site argument list (`callTypeArgs`) carries each explicit size argument behind the `size` marker (la `आकार`), the way the call echoes `अक्ष` and `mut`/`स्वामित्व`/`प्रतिलिपि`: `take<size 2, size 2>(a)`, `construct<int, size [4]>(xs)`, `f<size n>(x)`. The grammar still parses the bare forms (a natural, a bracketed shape, a dimension term such as `n + 1`) so the checker can name the missing marker: a bare natural, shape, dimension term or caller `size` name in a call list is `SEM057 size_marker_required`, and a `size` argument on a callee that declares no `size` parameter is `SEM057 size_marker_unexpected` (one past the declared `size` parameters is an arity miss, `wrong_number_of_type_arguments`). The list binds by marker: a `size` argument binds the next `size` parameter of the callee and an unmarked argument the next type parameter, the two cursors advancing independently, so `mk<int, size 4>(xs)` binds `fn mk<T, size N>` and a list of only `size` arguments (`construct<size [4]>(xs)`) leaves every type to inference. The operand decides the binding time: `size 4` and `size [2, 3]` are compile-time witnesses and a shape travels as one argument (`tensor.construct<int, size [4]>(xs)`, checked against its store as a scalar size is: `tensor<int, [5]>` is `SEM010 incompatible_tensor_index`); `size n` of an in-scope integer stays the run-time extent described above, checked at its store; `size D` of a caller `size` parameter forwards it. A shape inside a call list holds natural literals only: a `_` hole, a name, a run-time lift or a nested term in it is `size_shape_dimension_unsupported`, and `size [..]` outside a call's list is `size_shape_outside_call_args`. An unmarked name or `_` stays a type there; the callee decides which type parameter it binds.
-- Applied `NATURAL` arguments are `आकार` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
+- Applied `NATURAL` arguments are `आकार` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, आकार N>` (the `आकार` marker is required on a list), `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
 - **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `द्वारा` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
@@ -1644,7 +1647,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Member-by-label (`i.gx`) requires that label to be present on the receiver's `टपल` annotation.
 - `टपल` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`टपल<f32, textus ∪ nihil>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`टपल<loss: _, T>`).
 - `ratio` type arguments require a label for every element, labels are unique, `_` is admitted as a monomorphic element hole, and `∪` is rejected in an element slot. A `ratio` has no positional or bracket access, and it has no structural equivalence with another ratio or a genus; fields are accessed by label only.
-- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is the shipped bounded form; see Generic Collections.
+- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, आकार N>` is the shipped bounded form; see Generic Collections.
 - `से`/`में`/`स्वामित्व`/`प्रतिलिपि` mark ownership on the type they prefix: one union member, or a standalone `∪` hole. There is no grouping parenthesis in type position — `(` opens a function type and nothing else, so `(A ∪ B)` is a parse error (`PARSE001`); write the marker on the member (`से A ∪ B`).
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
@@ -1892,8 +1895,26 @@ type or a `size` argument by the range glyph after its first bound.
   the Faber source emitter keeps the authored form (`faber format` prints a
   range half-open); every other target and every kernel refuse the type by name
   (`SEM010 ranged_policy_target_unsupported`, `SEM008 nucleum_ranged_policy_not_built`).
-  Float ranges, index containment, kernel facts and list length ranges are the
-  later parts of the series.
+  Float ranges, index containment and kernel facts are the later parts of the
+  series.
+
+**List size ranges.** After the `आकार` marker (en
+`size`) the same range slot is the second argument of `lista`:
+`lista<numerus, आकार 4‥8>` (en `list<int, size 4‥8>`) holds four to seven
+elements and `lista<numerus, आकार 1…∞>` is never empty. The marker says the
+range bounds a count: a bare range bounds a value (`exactus<u8, 0…255>`), and
+`lista<T, 4>` or `lista<T, 4‥8>` is retired by name
+(`SEM008 list_count_needs_size`). A list range is
+trapping only and takes no policy word: `saturatus<lista<T>, …>` and the other
+policy words around a list are `SEM008 ranged_list_policy_word`. `lista<T>` is
+`आकार 0…∞` and `lista<T, आकार N>` is `आकार 0…N`, one type each. A push past the maximum and a
+removal below the minimum report on `⇥`, a `↦` into a range checks the length
+and takes `⊥`, and `primus` / `ultimus` of a range with a floor of one return
+`T`. Both ends are integer literals or `∞` (`ranged_list_bound_not_constant`),
+non-negative (`ranged_list_bound_negative`) and the range holds a length
+(`ranged_list_range_empty`); a literal outside it is
+`SEM011 ranged_list_length_out_of_range`; a target that does not lower it is
+`SEM010 ranged_list_target_unsupported`.
 **Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with
@@ -2137,7 +2158,7 @@ matrix and the numeric model; this file states only the language.
 | Faber          | Meaning  |
 | -------------- | -------- |
 | `lista<T>`     | array    |
-| `lista<T, N>`  | shipped; bounded array; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `lista<T, आकार N>`  | shipped; bounded array; `N` is a `आकार` / `NATURAL` capacity, not a width marker (a bare `lista<T, N>` is `SEM008 list_count_needs_size`). `lista<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `queue<T>`     | shipped; unbounded FIFO queue |
 | `queue<T, N>`  | shipped; bounded FIFO queue; `N` is a `आकार` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `stack<T>`     | shipped; unbounded LIFO stack |
@@ -2380,7 +2401,7 @@ A negative number pattern is written with a leading minus (`स्थिति -
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
 patterns (`स्थिति u32` over a `numerus`) and length-shaped patterns (`स्थिति
-lista<numerus, 4>` over a `lista<numerus>`; bounded `textus` and `ascii`; tensor figures). Ask an integer's width or range with an `है` test,
+lista<numerus, आकार 4>` over a `lista<numerus>`; bounded `textus` and `ascii`; tensor figures). Ask an integer's width or range with an `है` test,
 and ask a length with `.longitudo()` in a `यदि`.
 
 There are no range patterns (`स्थिति 1‥5`). Test the range with `यदि` inside the
@@ -2602,10 +2623,10 @@ The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code
 - `"ff" ↦ i32 द्वारा Hex` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
 - `lista<b8>[lo‥hi] ↦ W द्वारा Be` / `… ↦ W द्वारा Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). A `lista<b8>` itself has no endian; `lista<b8> ↦ u32` without `द्वारा Be` / `द्वारा Le` stays rejected. A short window fails (no pad).
 - `lista<b8>[lo‥hi] ↦ f32 द्वारा Be|Le` / `… ↦ f64 द्वारा Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `द्वारा Be` / `द्वारा Le` mandatory).
-- `lista<b8> ↦ tensor<E, [d1, …, dk]> द्वारा Le` / `… द्वारा Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `आकार n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `द्वारा Le` / `द्वारा Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`पकड़ो`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse `tensor ↦ lista<b8> द्वारा Be|Le` is not available. `lista<f32> द्वारा Le` stays rejected (`SEM016` `unsupported_conversio`); the tensor row is the only bulk endian decode. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> द्वारा Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> द्वारा Be` prints `[258, 772]` where `द्वारा Le` prints `[513, 1027]`.
+- `lista<b8> ↦ tensor<E, [d1, …, dk]> द्वारा Le` / `… द्वारा Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, आकार N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `आकार n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `द्वारा Le` / `द्वारा Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`पकड़ो`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse `tensor ↦ lista<b8> द्वारा Be|Le` is not available. `lista<f32> द्वारा Le` stays rejected (`SEM016` `unsupported_conversio`); the tensor row is the only bulk endian decode. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> द्वारा Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> द्वारा Be` prints `[258, 772]` where `द्वारा Le` prints `[513, 1027]`.
 - `lista<bN> ↦ lista<E>` / `lista<E> ↦ lista<bN>` — bulk conversion between a raw-bits list and a numeric list (a `द्वारा Le` / `द्वारा Be` clause exactly when the bit width changes, and never when it stays the same). A same-width conversion (`lista<b8> ↦ lista<u8>`, `lista<b16> ↦ lista<u16>`, the signed twins, and back) takes no clause at any width, and a clause written on one is `SEM016` `bits_via_clause_not_allowed`. A width change (`lista<b8> ↦ lista<u16>`, `lista<u16> ↦ lista<b8>`, `lista<b8> ↦ lista<b16>`, `lista<b8> ↦ lista<f32>`) requires the clause (`SEM016` `bits_via_clause_required`): each source element is written as width/8 bytes in the byte order of the clause and the byte stream is regrouped at the target width, so `lista<b8> ↦ lista<u16> द्वारा Le` of `[1, 2, 3, 4]` is `[513, 1027]` and `द्वारा Be` is `[258, 772]`. A byte total that is not a whole number of target elements is a recoverable run-time error (`bits list length mismatch`). Shipped on the checker and the MIR runner; every emitter refuses the width-changing form by name. The `lista<b8> ↦ tensor<E, [shape]>` row above follows the same rule (no clause on an 8-bit element).
 - `द्वारा Bits` — **retired**. A bit pattern is a `bN` value (`b8`, `b16`, `b32`, `b64`), and the one rule is: from a number, `↦` converts the value; from bits, `↦` to a same-width type reads those bits as that type. A float to its pattern is `x ↦ b32` (b16 for f16 and bf16, b64 for f64); a pattern to a float is `p ↦ f32`; a number that holds a pattern says so in one step, `u16 ↦ b16 ↦ f16`. `n ↦ f32` on a `u32` stays the value conversion. Every `द्वारा Bits` spelling is `SEM016` (`conversio_via_bits_retired`), whose help names the `↦ bN` replacement.
-- `W ↦ lista<b8, N> द्वारा Be` / `… ↦ lista<b8, N> द्वारा Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, N>` whose `N` equals the source element's byte width. The `द्वारा Le` / `द्वारा Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, N>`. Register targets take the clause today: `v ↦ lista<b8, 16> द्वारा Le`, `corpus[0‥16] ↦ vector<u32, 4> द्वारा Be`.
+- `W ↦ lista<b8, आकार N> द्वारा Be` / `… ↦ lista<b8, आकार N> द्वारा Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, आकार N>` whose `N` equals the source element's byte width. The `द्वारा Le` / `द्वारा Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, आकार 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, आकार N>`. Register targets take the clause today: `v ↦ lista<b8, आकार 16> द्वारा Le`, `corpus[0‥16] ↦ vector<u32, 4> द्वारा Be`.
 - `'A' ↦ u32 द्वारा Code` — shipped; the code point as a `u32` (`u32` holds every code point, as Rust's `char as u32`); the source must be `littera`. `65 ↦ littera द्वारा Code` — shipped; builds the character for that code point, failing above U+10FFFF and on a surrogate. `Code` is a `द्वारा` hint like `Hex`/`Le`; any other hint on these targets, or a source/target type other than `littera`/`u32`, is `SEM016` (`code_hint_pair_mismatch`).
 - `n ↦ textus` / `n ↦ ascii` / `n ↦ littera` — a number's digits (D10.6): `7 ↦ textus` = `"7"`, `7 ↦ ascii` = `"7"`, `7 ↦ littera` = `'7'`; `littera` fails outside 0–9 (`42 ↦ littera` fails, two letters).
 - `littera ↦ numerus` — parses the digit, failing otherwise (as `"22" ↦ numerus` parses).

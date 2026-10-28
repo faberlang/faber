@@ -342,6 +342,7 @@ mod capability_tests;
 #[cfg(test)]
 #[path = "capped_store_test.rs"]
 mod capped_store_tests;
+
 #[cfg(test)]
 #[path = "commune_stepper_test.rs"]
 mod commune_stepper_tests;
@@ -441,6 +442,9 @@ mod ordo_conversio_tests;
 #[cfg(test)]
 #[path = "potentia_test.rs"]
 mod potentia_tests;
+#[cfg(test)]
+#[path = "ranged_list_test.rs"]
+mod ranged_list_tests;
 #[cfg(test)]
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;

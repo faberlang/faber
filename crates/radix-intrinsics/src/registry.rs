@@ -250,6 +250,19 @@ impl MethodIntrinsic {
     pub fn generic_arity(&self) -> usize {
         self.generic.len()
     }
+
+    /// Whether this row reads or removes an end of a list: `primus`,
+    /// `ultimus`, `decapita`, `detrahe`. On a list length range whose
+    /// minimum is one or more (`list<T, size 1…∞>`, need) the list is
+    /// never empty, so these return `T` instead of `T ∪ none`; the removals
+    /// report a violated minimum on `⇥`.
+    #[must_use]
+    pub fn reads_list_end(&self) -> bool {
+        matches!(
+            self.faber_name,
+            "primus" | "ultimus" | "decapita" | "detrahe"
+        )
+    }
 }
 
 /// One catalog row with every policy field at its macro default. Arms of

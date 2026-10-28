@@ -61,7 +61,7 @@ incipit {
         sit tensor<f32, [magnitudo n]> decoded ← decode(proto, raw)
         nota decoded[[0]]
         nota decoded[[2]]
-        sit lista<numerus, 1> dims ← proto.magnitudines()
+        sit lista<numerus, magnitudo 1> dims ← proto.magnitudines()
         nota dims
     }
     cape err {

@@ -199,7 +199,7 @@ instans = "क्षण"
 objectum = "वस्तु"
 quidlibet = "कुछभी"
 lista = "सूची"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
 tabula = "तालिका"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "बही"
@@ -803,7 +803,7 @@ help = "संकेत को लक्ष्य के बाद via उपव
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "रूपांतरण संकेत लक्ष्य के बाद कोणीय कोष्ठकों में नहीं आता"
-help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `{lista}<b8, 16> via Le`"
+help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "अभिव्यक्ति अपेक्षित है"
@@ -1175,7 +1175,7 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "lista के लिए एक type parameter आवश्यक है"
-help = "{lista}<T> का उपयोग करें; lista<T, N> shipped bounded form है"
+help = "{lista}<T> का उपयोग करें; {lista}<T, {magnitudo} N> shipped bounded form है"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula के लिए दो type parameters आवश्यक हैं"
@@ -1232,6 +1232,30 @@ help = "u8 या i32 जैसी पूर्णांक चौड़ाई �
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "kernel अभी रेंज वाली स्टोर नीति इस्तेमाल नहीं कर सकता ({site}); kernel रेंज लागू नहीं करता"
 help = "kernel के भीतर सामान्य चौड़ाई इस्तेमाल करें और रेंज होस्ट पर लगाएँ"
+
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "kernel बिना ऊपरी आकार वाली सूची इस्तेमाल नहीं कर सकता ({site}); वह अधिकतम तक हर स्लॉट को खोलता है"
+help = "सूची को सीमित स्थिर आकार दें, जैसे {lista}<int, {magnitudo} 1…8>"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "सूची की लंबाई की रेंज का सिरा अऋणात्मक पूर्णांक लिटरल या ∞ होना चाहिए"
+help = "दोनों सिरे पूर्णांक लिटरल के रूप में लिखें, जैसे {lista}<int, {magnitudo} 1‥8>; नामित या size सिरा अभी उपलब्ध नहीं है"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "सूची की लंबाई की रेंज में कोई लंबाई नहीं है"
+help = "lo‥hi में निचला सिरा ऊपरी सिरे से छोटा होना चाहिए, और lo…hi में उससे बड़ा नहीं"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "सूची की लंबाई की रेंज का सिरा ऋणात्मक नहीं हो सकता"
+help = "लंबाई एक गिनती है: रेंज 0 या उससे ऊपर से शुरू करें"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "सूची की लंबाई की रेंज कोई स्टोर नीति शब्द नहीं लेती"
+help = "रेंज सूची पर लिखें, जैसे {lista}<int, {magnitudo} 1…8>; यह हमेशा ट्रैप करती है, और saturating, trapping तथा wrapping संख्या की चौड़ाई लेते हैं"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "सूची की गिनती `{magnitudo}` के बाद लिखी जाती है"
+help = "अधिकतम 4 तत्वों के लिए `{lista}<int, {magnitudo} 4>` लिखें, या रेंज के लिए `{lista}<int, {magnitudo} 1…8>`; केवल रेंज मान को सीमित करती है, गिनती को नहीं"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
@@ -1431,7 +1455,7 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type parameters स्वीकार नहीं कर सकता"
-help = "textus<N>, ascii<N>, और {lista}<b8, N> shipped bounded forms हैं"
+help = "textus<N>, ascii<N>, और {lista}<b8, {magnitudo} N> shipped bounded forms हैं"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type namespace द्वारा export नहीं किया गया है"
@@ -1752,6 +1776,10 @@ help = "MIR runner या Faber source emitter उपयोग करें, य
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "यह लक्ष्य रेंज वाली स्टोर नीति अभी समर्थित नहीं करता"
 help = "जब तक यह लक्ष्य रेंज लागू नहीं करता, MIR runner, Rust लक्ष्य या Faber स्रोत उत्सर्जक इस्तेमाल करें"
+
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "यह लक्ष्य सूची की लंबाई की रेंज अभी समर्थित नहीं करता"
+help = "जब तक यह लक्ष्य सूची रेंज लागू नहीं करता, MIR runner, Rust लक्ष्य या Faber स्रोत उत्सर्जक इस्तेमाल करें"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "इस लक्ष्य पर {leaf} पत्ती समर्थित नहीं है"
@@ -2196,6 +2224,10 @@ help = "contract द्वारा घोषित signature वाली {meth
 [diagnostics.SEM011]
 message = "ऑपरेंड प्रकार अमान्य हैं"
 help = "संगत ऑपरेंड प्रकारों का उपयोग करें"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "इस सूची की लंबाई सूची-लंबाई रेंज से बाहर है"
+help = "लिटरल को रेंज के भीतर की लंबाई दें, या सूची को ↦ से बनाएँ और ⊥ से सँभालें"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "rounding glyph अभी tensor मानों पर लागू नहीं होते"
@@ -2787,7 +2819,7 @@ help = "via के बाद Hex, Bin, Oct, Be, Le, या Code में से
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "यह रूपांतरण लक्ष्य कोई रूपांतरण संकेत नहीं लेता"
-help = "via उपवाक्य हटाएं; केवल numeric, ascii, littera, vector, और {lista}<b8, N> लक्ष्य संकेत लेते हैं"
+help = "via उपवाक्य हटाएं; केवल numeric, ascii, littera, vector, और {lista}<b8, {magnitudo} N> लक्ष्य संकेत लेते हैं"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "float या decimal rounding का नाम दिए बिना integer में convert नहीं होता"
@@ -3344,6 +3376,10 @@ help = "`@ radix lane \"air\"` functions को स्वीकृत pure subse
 [diagnostics.SEM059.issues.async_function]
 message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: async functions v1 AIR subset के बाहर हैं"
 help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "@ radix lane \"{lane}\" बिना ऊपरी आकार वाली सूची अस्वीकार करता है: रिवर्स AD अधिकतम तक हर स्लॉट को खोलता है"
+help = "सूची को सीमित स्थिर आकार दें, जैसे {lista}<int, {magnitudo} 1…8>, या सूची को लेन से बाहर ले जाएँ"
 
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: assignment v1 AIR subset के बाहर mutation है"

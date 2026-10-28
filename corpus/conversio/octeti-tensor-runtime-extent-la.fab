@@ -51,7 +51,7 @@ incipit {
     sit lista<b8> short_raw ← |00 00 80 3f 00 00 00 40|
 
     sit tensor<f32, [2, magnitudo n]> grid ← raw ↦ tensor<f32, [2, magnitudo n]> via Le
-    sit lista<numerus, 2> dims ← grid.magnitudines()
+    sit lista<numerus, magnitudo 2> dims ← grid.magnitudines()
 
     nota grid[[0, 0]]
     nota grid[[1, 2]]

@@ -1,0 +1,29 @@
++++
+term = "list<T, size lo‥hi>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A name as a range end is refused: ends are integer literals or ∞."
+syntax = "list<int, size 1‥n> — rejected"
+related = ["list<T, size lo‥hi>", "‥", "…"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_list_bound_not_constant"
++++
+# =============================================================================
+# list<T, size lo‥hi> — a named end
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • Both ends fold at compile time, so only integer literals and ∞ are admitted.
+#
+# Common mistakes:
+#   • Writing a constant's name as an end; write its value.
+
+main {
+    let int n ← 3
+    let list<int, size 1‥n> xs ← [1]
+    print xs
+}

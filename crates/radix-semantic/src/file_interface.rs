@@ -1002,6 +1002,7 @@ fn snapshot_interface_type_inner(
         | Type::InferUnion(_)
         | Type::MarkerHole { .. }
         | Type::BoundedArray { .. }
+        | Type::RangedArray { .. }
         | Type::BoundedTextus { .. }
         | Type::BoundedAscii { .. }
         | Type::BoundedOcteti { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),

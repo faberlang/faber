@@ -90,7 +90,7 @@ fn every_element_width_is_accepted_with_a_matching_literal() {
 #[test]
 fn bounded_octeti_source_is_accepted() {
     assert_accepts_la(
-        "functio w(lista<b8, 8> b) → tensor<f32, [2]> ⇥ textus { redde b ↦ tensor<f32, [2]> via Le }",
+        "functio w(lista<b8, magnitudo 8> b) → tensor<f32, [2]> ⇥ textus { redde b ↦ tensor<f32, [2]> via Le }",
     );
 }
 

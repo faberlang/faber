@@ -730,7 +730,10 @@ pub struct FunctionProvenanceTableWire {
 /// Version 58 adds authored ranged-policy arguments to `HirTypeFormArg`, so
 /// formatters and loaded HIR preserve the range glyph, infinity endpoints, and
 /// inclusive/exclusive spelling; schema-v57 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 58;
+/// Version 59 adds `Type::RangedArray` (a list length range,
+/// `list<T, size lo‥hi>`, need) to the type table; schema-v58
+/// artifacts fail closed because the serialized `Type` enum gained a variant.
+pub const SCHEMA_VERSION: u32 = 59;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

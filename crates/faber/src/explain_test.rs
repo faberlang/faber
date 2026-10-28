@@ -71,9 +71,10 @@ fn all_entries_validate() {
     // redirect (the retired static member word): 197 + 14 = 211; 212 = 198 + 14
     // (the sink-into `⇜` exemplum adds one explained term); 216 = 202 + 14
     // (the ranged store policies add `saturating<W, lo‥hi>`,
-    // `trapping<W, lo‥hi>`, `wrapping<W, lo‥hi>` and `whole-width range`). See
-    // reference_test for history.
-    assert_eq!(registry.entries().len(), 216);
+    // `trapping<W, lo‥hi>`, `wrapping<W, lo‥hi>` and `whole-width range`);
+    // 217 = 203 + 14 (the list size range exemplum adds `list<T, size lo‥hi>`).
+    // See reference_test for history.
+    assert_eq!(registry.entries().len(), 217);
 
     for entry in registry.entries() {
         assert!(!entry.term.is_empty());

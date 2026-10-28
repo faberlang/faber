@@ -39,7 +39,7 @@ pub fn is_coordinate_bracket_receiver(types: &TypeTable, ty: TypeId) -> bool {
 #[must_use]
 pub fn is_bracket_index_list_type(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
-        Type::Array(_) | Type::BoundedArray { .. } => true,
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => true,
         Type::Alias(_, inner) => is_bracket_index_list_type(types, *inner),
         _ => false,
     }

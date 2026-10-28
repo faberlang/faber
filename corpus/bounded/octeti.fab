@@ -4,33 +4,33 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "conversio_expr", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
 category = "text"
 canonical = false
-summary = "Bounded list<b8, N>: byte capacity N; longitudo is len; appende overflow is an alternate exit."
-syntax = "list<b8, N>"
+summary = "Bounded list<b8, size N>: byte capacity N; longitudo is len; appende overflow is an alternate exit."
+syntax = "list<b8, size N>"
 related = ["longitudo", "appende", "accipe", "sectio", "vacua"]
 locale = "en"
 +++
 # =============================================================================
-# list<b8, N> — bounded byte buffer (BB-8R)
+# list<b8, size N> — bounded byte buffer (BB-8R)
 # =============================================================================
 #
-# Surface: list<b8, 8> (la: lista<b8, 8>)
+# Surface: list<b8, size 8> (la: lista<b8, magnitudo 8>)
 #
 # What this teaches:
-#   • `list<b8, N>` is a distinct type from unbounded `list<b8>`.
+#   • `list<b8, size N>` is a distinct type from unbounded `list<b8>`.
 #   • `longitudo` / `vacua` observe runtime `len`, not capacity `N`.
 #   • Unbounded → bounded copies the prefix through `↦` and fails closed when `len > N`.
 #
 # Common mistakes:
 #   • Reading spare `len..N` slots — they are unreadable.
-#   • Implicit assignment from `list<b8>` to `list<b8, N>` — conversion is explicit.
+#   • Implicit assignment from `list<b8>` to `list<b8, size N>` — conversion is explicit.
 #
-# See also: lista<numerus, N>, textus<N>, ascii<N>
+# See also: lista<numerus, magnitudo N>, textus<N>, ascii<N>
 # =============================================================================
 
 main {
     let list<b8> raw ← |61 62|
-    let list<b8, 8> a ← raw ↦ list<b8, 8>
-    let list<b8, 8> b ← raw ↦ list<b8, 8>
+    let list<b8, size 8> a ← raw ↦ list<b8, size 8>
+    let list<b8, size 8> b ← raw ↦ list<b8, size 8>
     let int n ← a.length()
     let bool vacant ← a.is_empty()
     print n

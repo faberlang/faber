@@ -214,6 +214,7 @@ fn is_value_subject(ty: TypeId, types: &TypeTable) -> bool {
         | Type::BoundedOcteti { .. }
         | Type::Array(_)
         | Type::BoundedArray { .. }
+        | Type::RangedArray { .. }
         | Type::Queue(_)
         | Type::BoundedQueue { .. }
         | Type::Stack(_)

@@ -213,6 +213,7 @@ pub fn index_projection_result_ty(
         // is the `VectorLane` projection).
         Type::Array(inner)
         | Type::BoundedArray { element: inner, .. }
+        | Type::RangedArray { element: inner, .. }
         | Type::Tensor(inner, _)
         | Type::Vector(inner, _) => Ok(MirType::semantic(*inner)),
         Type::Map(_, value) | Type::Ledger(_, value) => Ok(MirType::semantic(*value)),

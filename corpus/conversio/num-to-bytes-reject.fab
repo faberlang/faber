@@ -7,7 +7,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Rejected route: a bare number has no byte layout without a width and an endianness."
-syntax = "<number> ↦ list<b8> — rejected; write a sized n ↦ list<b8, N> via Be|Le"
+syntax = "<number> ↦ list<b8> — rejected; write a sized n ↦ list<b8, size N> via Be|Le"
 related = ["↦", "via", "list", "Be", "Le"]
 locale = "en"
 +++
@@ -20,15 +20,15 @@ locale = "en"
 #     number-to-bytes conversion leaves both the width and the endianness
 #     unstated, so the checker refuses it (SEM016 numeric_to_octeti_unspecified).
 #   • Choose the width and byte order first: a sized numeric scalar writes
-#     into a fixed-width carrier with `n ↦ list<b8, N> via Be` (or `via Le`),
+#     into a fixed-width carrier with `n ↦ list<b8, size N> via Be` (or `via Le`),
 #     where N is the source's exact byte width.
 #   • The bit pattern works too, once the source is a sized slot:
 #     `n ↦ b64` gives the bits and `bits ↦ list<b8>` gives their octets.
 #
 # How to make it legal:
 #   • let i64 n ← 300
-#     let list<b8, 8> raw ← n ↦ list<b8, 8> via Be      (big endian)
-#   • let list<b8, 8> raw ← n ↦ list<b8, 8> via Le      (little endian)
+#     let list<b8, size 8> raw ← n ↦ list<b8, size 8> via Be      (big endian)
+#   • let list<b8, size 8> raw ← n ↦ list<b8, size 8> via Le      (little endian)
 #
 # Common mistakes:
 #   • assuming a default width — a number has no implicit byte layout.

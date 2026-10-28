@@ -7647,7 +7647,7 @@ fn lista_elementwise_dynamic_pair_lowers_to_array_mir_op() {
 #[test]
 fn lista_elementwise_literal_bounds_take_the_runtime_op() {
     let dump = dump_source(
-        r"functio addita(lista<numerus, 3> a, lista<numerus, 3> b) → lista<numerus, 3> {
+        r"functio addita(lista<numerus, magnitudo 3> a, lista<numerus, magnitudo 3> b) → lista<numerus, magnitudo 3> {
     redde a + b
 }",
     );
@@ -7978,7 +7978,7 @@ fn bounded_append_inside_fac_cape_lowers_through_a_failable_helper() {
     let dump = dump_source(
         r"
 functio exemplo() → vacuum {
-    varia lista<numerus, 2> xs ← [1, 2]
+    varia lista<numerus, magnitudo 2> xs ← [1, 2]
     fac { xs.appende(3) } cape err { nota err }
 }
 ",

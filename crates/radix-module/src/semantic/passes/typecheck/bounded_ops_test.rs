@@ -1,5 +1,5 @@
 //! BB-8R pins: shared ops, prefix equality, and overflow alternate exit
-//! across `lista<T, N>`, `textus<N>`, `ascii<N>`, and `octeti<N>`.
+//! across `lista<T, magnitudo N>`, `textus<N>`, `ascii<N>`, and `octeti<N>`.
 
 use super::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 
@@ -11,10 +11,10 @@ const FAILABLE_ISSUE: &str = "failable_call_requires_handler";
 fn bounded_ops_longitudo_and_vacua_are_len_not_capacity() {
     assert_accepts_la(
         r"functio probe(
-    lista<numerus, 8> xs,
+    lista<numerus, magnitudo 8> xs,
     textus<8> t,
     ascii<8> a,
-    lista<b8, 8> o
+    lista<b8, magnitudo 8> o
 ) → vacuum {
     sit numerus n_xs ← xs.longitudo()
     sit bivalens e_xs ← xs.vacua()
@@ -48,10 +48,10 @@ fn bounded_ops_accipe_and_sectio_typecheck() {
     // `⇥ textus`; textus/ascii `sectio` keep trimming and need no handler.
     assert_accepts_la(
         r"functio probe(
-    lista<numerus, 8> xs,
+    lista<numerus, magnitudo 8> xs,
     textus<8> t,
     ascii<8> a,
-    lista<b8, 8> o
+    lista<b8, magnitudo 8> o
 ) → vacuum ⇥ textus {
     sit numerus ∪ nihil got ← xs.accipe(0)
     sit lista<numerus> slice ← xs.sectio(0, 2)
@@ -72,7 +72,7 @@ incipit {
     // The ruling's SEM011 pin: the same list `sectio` in a helper without
     // an error channel is rejected.
     assert_rejects_with_issue_la(
-        r"functio probe(lista<numerus, 8> xs) → vacuum {
+        r"functio probe(lista<numerus, magnitudo 8> xs) → vacuum {
     nota xs.sectio(0, 2)
 }
 
@@ -88,7 +88,7 @@ fn bounded_ops_appende_requires_alternate_exit() {
     assert_rejects_with_issue_la(
         // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
         r"functio grow() → vacuum {
-    varia lista<numerus, 8> xs ← vacua
+    varia lista<numerus, magnitudo 8> xs ← vacua
     xs.appende(1)
 }",
         FAILABLE_ISSUE,
@@ -119,7 +119,7 @@ incipit {
     assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
     varia lista<b8> raw ← |61|
-    varia lista<b8, 8> o ← raw ↦ lista<b8, 8>
+    varia lista<b8, magnitudo 8> o ← raw ↦ lista<b8, magnitudo 8>
     o.appende(0x62 ∷ u8)
 }
 
@@ -135,7 +135,7 @@ incipit {
 fn bounded_ops_appende_propagates_on_textus_channel() {
     assert_accepts_la(
         r#"functio grow_lista() → vacuum ⇥ textus {
-    varia lista<numerus, 8> xs ← vacua
+    varia lista<numerus, magnitudo 8> xs ← vacua
     xs.appende(1)
 }
 
@@ -152,7 +152,7 @@ functio grow_ascii() → vacuum ⇥ textus {
 
 functio grow_octeti() → vacuum ⇥ textus {
     varia lista<b8> raw ← |61|
-    varia lista<b8, 8> o ← raw ↦ lista<b8, 8>
+    varia lista<b8, magnitudo 8> o ← raw ↦ lista<b8, magnitudo 8>
     o.appende(0x62 ∷ u8)
 }
 
@@ -170,8 +170,8 @@ fn bounded_ops_equality_ignores_spare_slots() {
     assert_accepts_la(
         r"incipit {
     sit lista<numerus> raw ← [1, 2]
-    sit lista<numerus, 8> a ← raw ↦ lista<numerus, 8>
-    sit lista<numerus, 8> b ← raw ↦ lista<numerus, 8>
+    sit lista<numerus, magnitudo 8> a ← raw ↦ lista<numerus, magnitudo 8>
+    sit lista<numerus, magnitudo 8> b ← raw ↦ lista<numerus, magnitudo 8>
     si a ≡ b { nota 1 }
 }",
     );
@@ -193,8 +193,8 @@ fn bounded_ops_equality_ignores_spare_slots() {
     assert_accepts_la(
         r"incipit {
     sit lista<b8> raw ← |61 62|
-    sit lista<b8, 8> a ← raw ↦ lista<b8, 8>
-    sit lista<b8, 8> b ← raw ↦ lista<b8, 8>
+    sit lista<b8, magnitudo 8> a ← raw ↦ lista<b8, magnitudo 8>
+    sit lista<b8, magnitudo 8> b ← raw ↦ lista<b8, magnitudo 8>
     si a ≡ b { nota 1 }
 }",
     );
@@ -203,7 +203,7 @@ fn bounded_ops_equality_ignores_spare_slots() {
 #[test]
 fn bounded_ops_equality_stays_same_n() {
     assert_rejects_with_issue_la(
-        r"functio same(lista<numerus, 8> a, lista<numerus, 4> b) → bivalens {
+        r"functio same(lista<numerus, magnitudo 8> a, lista<numerus, magnitudo 4> b) → bivalens {
     redde a ≡ b
 }
 
@@ -233,7 +233,7 @@ incipit {
         EXACT_EQ_ISSUE,
     );
     assert_rejects_with_issue_la(
-        r"functio same(lista<b8, 8> a, lista<b8, 4> b) → bivalens {
+        r"functio same(lista<b8, magnitudo 8> a, lista<b8, magnitudo 4> b) → bivalens {
     redde a ≡ b
 }
 

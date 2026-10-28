@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Sized numeric scalar to a fixed-width byte string with an endian hint."
-syntax = "<W> ↦ list<b8, N> via Be|Le"
+syntax = "<W> ↦ list<b8, size N> via Be|Le"
 related = ["↦", "list", "int", "float"]
 locale = "en"
 +++
@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Write form — `n ↦ list<b8, 2> via Le` and `… ↦ list<b8, 2> via Be`.
+#   • Write form — `n ↦ list<b8, size 2> via Le` and `… ↦ list<b8, size 2> via Be`.
 #   • Exact width — `N` is the source element's byte width (2 for u16, 4 for
 #     f32, and so on); a different `N` is rejected.
 #   • Convert hints — `Be` / `Le` are `via` hints, like `Hex` / `Bin` / `Oct`.
@@ -22,14 +22,14 @@ locale = "en"
 #     byte order, bit for bit.
 #
 # Common mistakes:
-#   • Omitting Be/Le — `n ↦ list<b8, 2>` stays rejected (endian unspecified).
-#   • Using a wrong width — a u16 does not write into `list<b8, 4>`.
+#   • Omitting Be/Le — `n ↦ list<b8, size 2>` stays rejected (endian unspecified).
+#   • Using a wrong width — a u16 does not write into `list<b8, size 4>`.
 #
 # See also: ↦, list<b8>, int, float
 # =============================================================================
 
 
-# conversio — sized scalar ↦ list<b8, N> via Be|Le
+# conversio — sized scalar ↦ list<b8, size N> via Be|Le
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' listType 'via' endian
@@ -45,12 +45,12 @@ locale = "en"
 #   The runner and Rust both write the value in the byte order of the hint
 #   (to_le_bytes / to_be_bytes) into an exact-width carrier. The checker accepts
 #   the row as infallible. Go declines it by name; the other emitters refuse
-#   bounded list<b8, N>.
+#   bounded list<b8, size N>.
 
 main {
     let u16 n ← 258
-    let list<b8, 2> le ← n ↦ list<b8, 2> via Le
-    let list<b8, 2> be ← n ↦ list<b8, 2> via Be
+    let list<b8, size 2> le ← n ↦ list<b8, size 2> via Le
+    let list<b8, size 2> be ← n ↦ list<b8, size 2> via Be
     let list<b8> le_raw ← le ↦ list<b8>
     let list<b8> be_raw ← be ↦ list<b8>
     print le_raw[0] ↦ u8
@@ -58,7 +58,7 @@ main {
     print le_raw ↦ u16 via Le
     print be_raw ↦ u16 via Be
     let f32 x ← 1.5
-    let list<b8, 4> fb ← x ↦ list<b8, 4> via Le
+    let list<b8, size 4> fb ← x ↦ list<b8, size 4> via Le
     let list<b8> fb_raw ← fb ↦ list<b8>
     print fb_raw ↦ f32 via Le
 }

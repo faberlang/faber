@@ -61,9 +61,9 @@ fn embedded_registry_loads_canonical_and_legacy_entries() {
         registry.entries().len(),
         pack.term_count() + pack.legacy_redirects().len()
     );
-    // 202 explained terms (including `⇜` and the four ranged store policy
-    // terms) plus 14 legacy redirects (`generis` is retired).
-    assert_eq!(registry.entries().len(), 216);
+    // 203 explained terms (including `⇜`, the four ranged store policy terms
+    // and the list size range) plus 14 legacy redirects (`generis` is retired).
+    assert_eq!(registry.entries().len(), 217);
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
 }

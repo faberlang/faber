@@ -199,7 +199,7 @@ instans = "thời_điểm"
 objectum = "đối_tượng"
 quidlibet = "bất_kỳ"
 lista = "danh_sách"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
 tabula = "bảng"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "sổ_cái"
@@ -803,7 +803,7 @@ help = "viết hint thành mệnh đề via sau đích: `u32 via Le`, `ascii<8> 
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "hint chuyển đổi không đi theo sau đích trong ngoặc nhọn"
-help = "viết hint thành mệnh đề via sau đích: `{lista}<b8, 16> via Le`"
+help = "viết hint thành mệnh đề via sau đích: `{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "cần biểu thức"
@@ -1163,7 +1163,7 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "lista yêu cầu một tham số kiểu"
-help = "dùng {lista}<T>; lista<T, N> là dạng bounded đã phát hành"
+help = "dùng {lista}<T>; {lista}<T, {magnitudo} N> là dạng bounded đã phát hành"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula yêu cầu hai tham số kiểu"
@@ -1220,6 +1220,30 @@ help = "dùng chiều rộng số nguyên như u8 hoặc i32; chiều rộng flo
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "kernel chưa dùng được chính sách lưu có phạm vi ({site}); kernel không áp dụng phạm vi"
 help = "dùng chiều rộng thường trong kernel và áp dụng phạm vi ở phía host"
+
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "kernel không dùng được danh sách không có kích thước tối đa ({site}); kernel trải phẳng mọi ô cho đến mức tối đa"
+help = "cho danh sách một kích thước hữu hạn cố định, ví dụ {lista}<int, {magnitudo} 1…8>"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "đầu mút của phạm vi độ dài danh sách phải là số nguyên literal không âm hoặc ∞"
+help = "viết cả hai đầu mút là số nguyên literal, ví dụ {lista}<int, {magnitudo} 1‥8>; đầu mút có tên hoặc theo size chưa được hỗ trợ"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "phạm vi độ dài danh sách không chứa độ dài nào"
+help = "đầu thấp phải nhỏ hơn đầu cao với lo‥hi, hoặc không lớn hơn với lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "đầu mút của phạm vi độ dài danh sách không thể âm"
+help = "độ dài là một số đếm: bắt đầu phạm vi từ 0 trở lên"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "phạm vi độ dài danh sách không nhận từ chính sách lưu"
+help = "viết phạm vi trên danh sách, ví dụ {lista}<int, {magnitudo} 1…8>; nó luôn bẫy lỗi, còn saturating, trapping và wrapping nhận chiều rộng số"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "số phần tử của danh sách được viết sau `{magnitudo}`"
+help = "viết `{lista}<int, {magnitudo} 4>` cho tối đa 4 phần tử, hoặc `{lista}<int, {magnitudo} 1…8>` cho một phạm vi; phạm vi trần giới hạn một giá trị, không phải số lượng"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
@@ -1419,7 +1443,7 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "kiểu nguyên thủy không thể nhận tham số"
-help = "textus<N>, ascii<N> và {lista}<b8, N> là dạng bounded đã phát hành"
+help = "textus<N>, ascii<N> và {lista}<b8, {magnitudo} N> là dạng bounded đã phát hành"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "kiểu đủ điều kiện không được namespace xuất ra"
@@ -1740,6 +1764,10 @@ help = "dùng MIR runner hoặc bộ phát nguồn Faber, hoặc dùng map ({tab
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "đích này chưa hỗ trợ chính sách lưu có phạm vi"
 help = "dùng MIR runner, đích Rust hoặc bộ phát nguồn Faber cho đến khi đích này áp dụng phạm vi"
+
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "đích này chưa hỗ trợ phạm vi độ dài danh sách"
+help = "dùng MIR runner, đích Rust hoặc bộ phát nguồn Faber cho đến khi đích này áp dụng phạm vi danh sách"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "lá {leaf} không được hỗ trợ trên đích này"
@@ -2184,6 +2212,10 @@ help = "thêm phương thức {method} với chữ ký mà {contract} khai báo,
 [diagnostics.SEM011]
 message = "kiểu toán hạng không hợp lệ"
 help = "dùng các kiểu toán hạng tương thích"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "độ dài của danh sách này nằm ngoài phạm vi độ dài danh sách"
+help = "cho literal độ dài nằm trong phạm vi, hoặc dựng danh sách bằng ↦ và phục hồi bằng ⊥"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "các ký hiệu làm tròn chưa áp dụng được cho giá trị tensor"
@@ -2775,7 +2807,7 @@ help = "dùng một trong Hex, Bin, Oct, Be, Le hoặc Code sau via; Floor, Ceil
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "đích chuyển đổi này không nhận hint chuyển đổi"
-help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "fractus hoặc thập phân không chuyển đổi sang số nguyên mà không nêu tên phép làm tròn"
@@ -3332,6 +3364,10 @@ help = "giữ các hàm `@ radix lane \"air\"` trong tập con thuần được 
 [diagnostics.SEM059.issues.async_function]
 message = "@ radix lane \"{lane}\" từ chối thân hàm này: hàm bất đồng bộ nằm ngoài tập con AIR v1"
 help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "@ radix lane \"{lane}\" từ chối danh sách không có kích thước tối đa: reverse AD trải phẳng mọi ô cho đến mức tối đa"
+help = "cho danh sách một kích thước hữu hạn cố định, ví dụ {lista}<int, {magnitudo} 1…8>, hoặc chuyển danh sách ra khỏi lane"
 
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" từ chối thân hàm này: phép gán là thay đổi nằm ngoài tập con AIR v1"

@@ -408,6 +408,7 @@ fn normalize_type_form(form: &mut radix_hir::HirTypeForm, expected: TypeId, type
         | Type::Atomic(inner)
         | Type::Intervallum(inner, _)
         | Type::BoundedArray { element: inner, .. }
+        | Type::RangedArray { element: inner, .. }
         | Type::BoundedQueue { element: inner, .. }
         | Type::BoundedStack { element: inner, .. }
         | Type::Vector(inner, _)

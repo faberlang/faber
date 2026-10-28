@@ -229,7 +229,7 @@ impl ConversioTypeFamily {
             Type::Primitive(Primitive::Valor) => Some(Self::Valor),
             Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => Some(Self::Instans),
             Type::ModularWord(_) => Some(Self::Modulus),
-            Type::Array(_) | Type::BoundedArray { .. } => Some(Self::Lista),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => Some(Self::Lista),
             Type::Map(_, _) => Some(Self::Tabula),
             Type::Set(_) => Some(Self::Copia),
             Type::Intervallum(..) => Some(Self::Intervallum),

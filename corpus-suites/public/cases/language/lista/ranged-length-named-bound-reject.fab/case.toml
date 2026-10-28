@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/lista/ranged-length-named-bound-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/ranged-length-named-bound-reject.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "ranged_list_bound_not_constant"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "ranged_list_bound_not_constant"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "ranged_list_bound_not_constant"

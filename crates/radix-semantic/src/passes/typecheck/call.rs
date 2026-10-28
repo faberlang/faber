@@ -2508,7 +2508,9 @@ impl TypeChecker<'_> {
                     .and_then(|bound| item_of(&bound.args))
             }
             Type::Array(elem) | Type::Set(elem) => Some(self.resolve_inferred_type(elem)),
-            Type::BoundedArray { element, .. } => Some(self.resolve_inferred_type(element)),
+            Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
+                Some(self.resolve_inferred_type(element))
+            }
             _ => None,
         }
     }

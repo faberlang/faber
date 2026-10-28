@@ -570,8 +570,10 @@ fn resolve_bounded_source(source: &str) -> (TypeTable, Result<(), Vec<crate::Sem
 
 #[test]
 fn resolve_test_proposed_bounded_lista_typechecks() {
-    let (_types, resolved) = resolve_bounded_source("typus X = lista<numerus, 8>");
-    resolved.unwrap_or_else(|errors| panic!("lista<numerus, 8> must resolve, got {errors:?}"));
+    let (_types, resolved) = resolve_bounded_source("typus X = lista<numerus, magnitudo 8>");
+    resolved.unwrap_or_else(|errors| {
+        panic!("lista<numerus, magnitudo 8> must resolve, got {errors:?}")
+    });
 }
 
 #[test]
@@ -579,7 +581,7 @@ fn resolve_test_proposed_bounded_cords_typecheck() {
     for source in [
         "typus X = textus<8>",
         "typus X = ascii<8>",
-        "typus X = lista<b8, 8>",
+        "typus X = lista<b8, magnitudo 8>",
     ] {
         let (_types, resolved) = resolve_bounded_source(source);
         resolved.unwrap_or_else(|errors| panic!("{source} must resolve, got {errors:?}"));

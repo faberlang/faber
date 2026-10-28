@@ -44,6 +44,6 @@ main {
     let Persona ∪ none p ← Persona { nomen = "Marcus", urbs = "Roma" }
     print p!.nomen
     print p!.urbs
-    let list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, size 3> litterae ← ["a", "b", "c"]
     print litterae![0]
 }

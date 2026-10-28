@@ -49,6 +49,25 @@ impl super::FaberCodegen<'_> {
         }
     }
 
+    /// A list count spelled after the `size` marker: `size 4` for the maximum
+    /// length. The `_` hole stays bare (its own need moves it).
+    pub(super) fn list_count_to_faber(
+        &self,
+        capacity: IndexId,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        match self.types.get_index(capacity) {
+            IndexExpr::Infer(_) | IndexExpr::Unspecified => "_".to_owned(),
+            // A runtime count already carries its own `size` lift.
+            _ if self.index_has_runtime(capacity) => self.format_figura(capacity, surface),
+            _ => format!(
+                "{} {}",
+                surface.keyword(TokenKind::Magnitudo),
+                self.format_figura_term(capacity, surface)
+            ),
+        }
+    }
+
     /// Whether an extent term reads a runtime value anywhere in its
     /// affine/divide chain.
     fn index_has_runtime(&self, index_id: IndexId) -> bool {

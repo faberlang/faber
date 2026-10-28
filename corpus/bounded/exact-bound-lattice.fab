@@ -4,8 +4,8 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "additive_expr", "expression", "conversio_expr", "assignment", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "list"
 canonical = false
-summary = "The exact-bound lista lattice: dynamic list<T>, literal-solving list<T, _>, explicit list<T, N>, and conversion-only widening."
-syntax = "list<T> | list<T, _> | list<T, N>"
+summary = "The exact-bound lista lattice: dynamic list<T>, literal-solving list<T, _>, explicit list<T, size N>, and conversion-only widening."
+syntax = "list<T> | list<T, _> | list<T, size N>"
 related = ["lista", "+", "↦", "↤"]
 locale = "en"
 +++
@@ -18,17 +18,17 @@ locale = "en"
 #     equal-length check at runtime for values whose lengths are not static.
 #   • `list<T, _>` is a capacity hole; a literal witness solves `_` to the
 #     literal's exact element count.
-#   • `list<T, N>` is an explicit checked capacity; the literal must contain
+#   • `list<T, size N>` is an explicit checked capacity; the literal must contain
 #     exactly N elements.
 #   • Widening is conversion-only: `↦` converts an expression and `↤` converts
 #     on assignment. A bare `←` never widens a dynamic list into a bounded one.
 #
 # Common mistakes:
-#   • reading `list<T, N>` as a promise that the current runtime length is N;
+#   • reading `list<T, size N>` as a promise that the current runtime length is N;
 #     N is capacity, while `length()` remains the current length
 #   • expecting `list<T, _>` to infer from a dynamic expression; only an
 #     elementwise literal witness solves the hole
-#   • treating `list<T, N>` as an implicit widening target; write `↦` or `↤`
+#   • treating `list<T, size N>` as an implicit widening target; write `↦` or `↤`
 #
 # The unequal literal pair lives in exact-bound-lattice-decline.fab. Its two
 # literal witnesses carry different exact bounds, so the elementwise operator
@@ -44,15 +44,15 @@ main {
     let list<int> dynamic_left ← [1, 2, 3]
     let list<int> dynamic_right ← [10, 20, 30]
     let list<int> dynamic_sum ← dynamic_pair(dynamic_left, dynamic_right)
-    let list<int, 3> inferred ← [4, 5, 6]
-    let list<int, 3> explicit ← [7, 8, 9]
+    let list<int, size 3> inferred ← [4, 5, 6]
+    let list<int, size 3> explicit ← [7, 8, 9]
 
     # Both widening spellings are checked here. The dead branch keeps the
     # runnable output on the current list-literal runner path while the
     # conversion-only source contract remains executable compiler input.
     if false {
-        let list<int, 4> widened_expression ← dynamic_left ↦ list<int, 4>
-        mut list<int, 4> widened_assignment ← [0, 0, 0, 0]
+        let list<int, size 4> widened_expression ← dynamic_left ↦ list<int, size 4>
+        mut list<int, size 4> widened_assignment ← [0, 0, 0, 0]
         widened_assignment ↤ dynamic_left
         print widened_expression
         print widened_assignment

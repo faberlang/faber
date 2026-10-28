@@ -1,4 +1,4 @@
-//! Runner coverage for bounded `list<b8, N>` carriers: the store-time capacity
+//! Runner coverage for bounded `list<b8, size N>` carriers: the store-time capacity
 //! check, `⊥` recovery, and the bridge back to unbounded `list<b8>`.
 
 use crate::codegen::Target;
@@ -15,14 +15,14 @@ fn run(body: &str) -> Result<Vec<String>, RunSourceError> {
 #[test]
 fn bounded_octeti_const_within_bound_reports_length_and_emptiness() {
     let lines =
-        run("let list<b8> raw ← |61 62|\nlet list<b8, 8> a ← raw ↦ list<b8, 8>\nprint a.length()\nprint a.is_empty()")
+        run("let list<b8> raw ← |61 62|\nlet list<b8, size 8> a ← raw ↦ list<b8, size 8>\nprint a.length()\nprint a.is_empty()")
             .expect("runs");
     assert_eq!(lines, ["2", "false"]);
 }
 
 #[test]
 fn bounded_octeti_store_over_the_bound_traps_with_the_rust_text() {
-    let error = run("let list<b8> raw ← |61 62 63|\nlet list<b8, 2> a ← raw ↦ list<b8, 2>\nprint a.length()")
+    let error = run("let list<b8> raw ← |61 62 63|\nlet list<b8, size 2> a ← raw ↦ list<b8, size 2>\nprint a.length()")
         .expect_err("overflow must fail");
     assert!(
         format!("{error:?}").contains("list<b8> to bounded list<b8> conversion failed"),
@@ -33,7 +33,7 @@ fn bounded_octeti_store_over_the_bound_traps_with_the_rust_text() {
 #[test]
 fn bounded_octeti_recovery_supplies_the_fallback_on_overflow() {
     let lines = run(
-        "let list<b8> raw ← |61 62 63|\nlet list<b8, 2> a ← raw ↦ list<b8, 2> ⊥ (|7a| ↦ list<b8, 2>)\nprint a.length()",
+        "let list<b8> raw ← |61 62 63|\nlet list<b8, size 2> a ← raw ↦ list<b8, size 2> ⊥ (|7a| ↦ list<b8, size 2>)\nprint a.length()",
     )
     .expect("runs");
     assert_eq!(lines, ["1"]);
@@ -42,18 +42,18 @@ fn bounded_octeti_recovery_supplies_the_fallback_on_overflow() {
 #[test]
 fn bounded_octeti_widens_back_to_unbounded_bytes() {
     let lines = run(
-        "let list<b8> raw ← |61 62|\nlet list<b8, 2> a ← raw ↦ list<b8, 2>\nlet list<b8> back ← a ↦ list<b8>\nprint back.length()\nprint a.length()",
+        "let list<b8> raw ← |61 62|\nlet list<b8, size 2> a ← raw ↦ list<b8, size 2>\nlet list<b8> back ← a ↦ list<b8>\nprint back.length()\nprint a.length()",
     )
     .expect("runs");
     assert_eq!(lines, ["2", "2"]);
 }
 
-/// `W ↦ list<b8, N> via Le|Be` writes the scalar's own bytes; `list<b8> ↦ W via
+/// `W ↦ list<b8, size N> via Le|Be` writes the scalar's own bytes; `list<b8> ↦ W via
 /// Le|Be` reads them back. The width equals the capacity, so this is a pure
 /// bit round trip.
 fn scalar_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
     format!(
-        "let {ty} n ← {value}\nlet list<b8, {width}> o ← n ↦ list<b8, {width}> via {hint}\nlet list<b8> raw ← o ↦ list<b8>\nlet {ty} back ← raw ↦ {ty} via {hint}\nprint back"
+        "let {ty} n ← {value}\nlet list<b8, size {width}> o ← n ↦ list<b8, size {width}> via {hint}\nlet list<b8> raw ← o ↦ list<b8>\nlet {ty} back ← raw ↦ {ty} via {hint}\nprint back"
     )
 }
 
@@ -72,7 +72,7 @@ fn scalar_to_bounded_octeti_u16_be_round_trips() {
 #[test]
 fn scalar_to_bounded_octeti_byte_order_follows_the_hint() {
     let lines = run(
-        "let u16 n ← 258\nlet list<b8, 2> be ← n ↦ list<b8, 2> via Be\nlet u8 be_first ← (be ↦ list<b8>)[0] ↦ u8\nlet list<b8, 2> le ← n ↦ list<b8, 2> via Le\nlet u8 le_first ← (le ↦ list<b8>)[0] ↦ u8\nprint be_first\nprint le_first",
+        "let u16 n ← 258\nlet list<b8, size 2> be ← n ↦ list<b8, size 2> via Be\nlet u8 be_first ← (be ↦ list<b8>)[0] ↦ u8\nlet list<b8, size 2> le ← n ↦ list<b8, size 2> via Le\nlet u8 le_first ← (le ↦ list<b8>)[0] ↦ u8\nprint be_first\nprint le_first",
     )
     .expect("runs");
     assert_eq!(lines, ["1", "2"]);
@@ -98,12 +98,12 @@ fn scalar_to_bounded_octeti_all_widths_round_trip_le_and_be() {
     }
 }
 
-/// `list<b8, N> ↦ W via Le|Be` reads directly from the bounded carrier; no
+/// `list<b8, size N> ↦ W via Le|Be` reads directly from the bounded carrier; no
 /// widening to unbounded `list<b8>` first. The capacity equals the scalar width,
 /// so this is a pure bit round trip.
 fn direct_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
     format!(
-        "let {ty} n ← {value}\nlet list<b8, {width}> o ← n ↦ list<b8, {width}> via {hint}\nlet {ty} back ← o ↦ {ty} via {hint}\nprint back"
+        "let {ty} n ← {value}\nlet list<b8, size {width}> o ← n ↦ list<b8, size {width}> via {hint}\nlet {ty} back ← o ↦ {ty} via {hint}\nprint back"
     )
 }
 
@@ -142,7 +142,7 @@ fn bounded_octeti_endian_read_all_widths_round_trip_le_and_be() {
 #[test]
 fn bounded_octeti_endian_read_follows_the_hint() {
     let lines = run(
-        "let list<b8> raw ← |01 02|\nlet list<b8, 2> b ← raw ↦ list<b8, 2>\nprint b ↦ u16 via Be\nprint b ↦ u16 via Le",
+        "let list<b8> raw ← |01 02|\nlet list<b8, size 2> b ← raw ↦ list<b8, size 2>\nprint b ↦ u16 via Be\nprint b ↦ u16 via Le",
     )
     .expect("runs");
     assert_eq!(lines, ["258", "513"]);
@@ -152,7 +152,7 @@ fn bounded_octeti_endian_read_follows_the_hint() {
 /// window feeds the same `↦ T via Le|Be` conversion as an unbounded carrier.
 fn window_round_trip_body(ty: &str, width: usize, value: &str, hint: &str) -> String {
     format!(
-        "let {ty} n ← {value}\nlet list<b8, {width}> o ← n ↦ list<b8, {width}> via {hint}\nlet {ty} back ← o[0‥{width}] ↦ {ty} via {hint}\nprint back"
+        "let {ty} n ← {value}\nlet list<b8, size {width}> o ← n ↦ list<b8, size {width}> via {hint}\nlet {ty} back ← o[0‥{width}] ↦ {ty} via {hint}\nprint back"
     )
 }
 
@@ -184,16 +184,18 @@ fn bounded_octeti_window_all_widths_round_trip() {
 
 #[test]
 fn bounded_octeti_window_inner_slice() {
-    let lines =
-        run("let list<b8> raw ← |00 01 02 00|\nlet list<b8, 4> o ← raw ↦ list<b8, 4>\nprint o[1‥3] ↦ u16 via Be")
-            .expect("runs");
+    let lines = run(
+        "let list<b8> raw ← |00 01 02 00|\nlet list<b8, size 4> o ← raw ↦ list<b8, size 4>\nprint o[1‥3] ↦ u16 via Be",
+    )
+    .expect("runs");
     assert_eq!(lines, ["258"]);
 }
 
 #[test]
 fn bounded_octeti_scalar_index_still_reads_a_byte() {
-    let lines =
-        run("let list<b8> raw ← |07 08|\nlet list<b8, 2> o ← raw ↦ list<b8, 2>\nlet u8 first ← o[1]\nprint first")
-            .expect("runs");
+    let lines = run(
+        "let list<b8> raw ← |07 08|\nlet list<b8, size 2> o ← raw ↦ list<b8, size 2>\nlet u8 first ← o[1]\nprint first",
+    )
+    .expect("runs");
     assert_eq!(lines, ["8"]);
 }

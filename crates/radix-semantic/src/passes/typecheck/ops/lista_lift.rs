@@ -458,7 +458,7 @@ impl TypeChecker<'_> {
         let resolved = self.value_carrier_type(ty);
         let (_, payload) = self.types.peel_access_marker(resolved);
         match self.types.get(payload).clone() {
-            Type::Array(_) | Type::BoundedArray { .. } => Some("list"),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => Some("list"),
             Type::Queue(_) | Type::BoundedQueue { .. } => Some("queue"),
             Type::Stack(_) | Type::BoundedStack { .. } => Some("stack"),
             Type::Set(_) => Some("set"),

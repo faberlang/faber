@@ -81,13 +81,13 @@ pub(super) fn dead_fold_artifact_slots(
 
 /// Whether a slot type is a fold-artifact slot shape (`Array`/`Tensor` —
 /// the static-shape fold's shape-list and vacua-seed types; a static-rank
-/// shape list is the bounded `lista<numerus, R>`). Only these
+/// shape list is the bounded `lista<numerus, magnitudo R>`). Only these
 /// types may be dead-skipped at the gate, mirroring the emitters' S5-U2c
 /// skip surface; they are structurally non-scalar, satisfying the narrowed
 /// "non-scalar only" dead-skip rule (radix-mir-metal 78e4440e7).
 pub(super) fn is_fold_artifact_type(types: &TypeTable, ty: MirType) -> bool {
     matches!(
         types.get(ty.semantic_id()),
-        Type::Array(_) | Type::BoundedArray { .. } | Type::Tensor(_, _)
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } | Type::Tensor(_, _)
     )
 }

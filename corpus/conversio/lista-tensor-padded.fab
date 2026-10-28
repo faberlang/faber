@@ -4,7 +4,7 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "shape_suffix", "type_arguments", "type_argument", "expression", "conversio_expr", "assignment", "itera_stmt", "member_suffix", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "Route C: numeric list<T, N> ↦ tensor<T, [N]> pads spare slots with a real fill (zero default, ⊥ names another); the padded loop unrolls via Route T; non-neutral exits need a caller-built 0/1 len-mask."
+summary = "Route C: numeric list<T, size N> ↦ tensor<T, [N]> pads spare slots with a real fill (zero default, ⊥ names another); the padded loop unrolls via Route T; non-neutral exits need a caller-built 0/1 len-mask."
 syntax = "xs ↦ tensor<T, [N]> [⊥ fill]"
 related = ["lista", "tensor", "itera", "ex"]
 locale = "en"
@@ -16,7 +16,7 @@ no_expected = "declaration-only"
 # =============================================================================
 #
 # What this teaches:
-#   • `list<T, N> ↦ tensor<T, [N]>` snapshots the live prefix 0..len and pads
+#   • `list<T, size N> ↦ tensor<T, [N]>` snapshots the live prefix 0..len and pads
 #     slots len..N with a real fill value — the default fill is the numeric
 #     zero of T; a `⊥` default names a different fill (element-typed)
 #   • the fill is a real value written at the conversion site, never a read of
@@ -28,7 +28,7 @@ no_expected = "declaration-only"
 #     (3F rule: in-region mask construction never admits)
 #
 # Common mistakes:
-#   • Padding a non-numeric list<text, N> — Route C is numeric T only.
+#   • Padding a non-numeric list<text, size N> — Route C is numeric T only.
 #   • Padding from an unbounded list<T> — the bound must be in the type.
 #   • Relying on zero fill for a product exit — the fill 0 zeroes the product;
 #     pass a 0/1 len-mask operand instead.
@@ -40,7 +40,7 @@ no_expected = "declaration-only"
 # the padded TensorFromFlat fill contract and the mask-required decline.
 
 # Zero-fill additive exit: maskless (0 is the additive neutral).
-fn sumPadded(list<float, 8> xs) → float {
+fn sumPadded(list<float, size 8> xs) → float {
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
     mut float total ← 0.0
     for from t let x {
@@ -50,7 +50,7 @@ fn sumPadded(list<float, 8> xs) → float {
 }
 
 # A ⊥ default names a different dead-slot fill (element-typed).
-fn sumFilled(list<float, 8> xs) → float {
+fn sumFilled(list<float, size 8> xs) → float {
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]> ⊥ 1.0
     mut float total ← 0.0
     for from t let x {
@@ -61,7 +61,7 @@ fn sumFilled(list<float, 8> xs) → float {
 
 # Non-neutral product exit: the caller builds the 0/1 len-mask outside the
 # region and passes it as an operand at the conversion site.
-fn productMasked(list<float, 8> xs, tensor<float, [8]> lenMask) → float {
+fn productMasked(list<float, size 8> xs, tensor<float, [8]> lenMask) → float {
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
     mut float total ← 1.0
     for from t let x {

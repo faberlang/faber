@@ -86,8 +86,8 @@ fn vector_u32x4_to_lista_accepts() {
 #[test]
 fn vector_u32x4_to_octeti_16_le_accepts() {
     assert_accepts_la(
-        "functio out(vector<u32, 4> v) → lista<b8, 16> {
-    redde v ↦ lista<b8, 16> via Le
+        "functio out(vector<u32, 4> v) → lista<b8, magnitudo 16> {
+    redde v ↦ lista<b8, magnitudo 16> via Le
 }",
     );
 }
@@ -95,8 +95,8 @@ fn vector_u32x4_to_octeti_16_le_accepts() {
 #[test]
 fn vector_u32x4_to_octeti_16_be_accepts() {
     assert_accepts_la(
-        "functio out(vector<u32, 4> v) → lista<b8, 16> {
-    redde v ↦ lista<b8, 16> via Be
+        "functio out(vector<u32, 4> v) → lista<b8, magnitudo 16> {
+    redde v ↦ lista<b8, magnitudo 16> via Be
 }",
     );
 }
@@ -104,8 +104,8 @@ fn vector_u32x4_to_octeti_16_be_accepts() {
 #[test]
 fn vector_to_octeti_without_endian_rejects() {
     assert_rejects_with_issue_la(
-        "functio out(vector<u32, 4> v) → lista<b8, 16> {
-    redde v ↦ lista<b8, 16>
+        "functio out(vector<u32, 4> v) → lista<b8, magnitudo 16> {
+    redde v ↦ lista<b8, magnitudo 16>
 }",
         "vector_to_octeti_unspecified",
     );
@@ -114,8 +114,8 @@ fn vector_to_octeti_without_endian_rejects() {
 #[test]
 fn vector_to_octeti_wrong_capacity_rejects() {
     assert_rejects_with_issue_la(
-        "functio out(vector<u32, 4> v) → lista<b8, 8> {
-    redde v ↦ lista<b8, 8> via Le
+        "functio out(vector<u32, 4> v) → lista<b8, magnitudo 8> {
+    redde v ↦ lista<b8, magnitudo 8> via Le
 }",
         "register_window_width_mismatch",
     );
@@ -171,12 +171,12 @@ fn vector_bridge_bivalens_out_of_set_rejects() {
     );
 }
 
-// --- bounded lista<T, N> ↦ vector<T, N> (non-literal) ----------------------
+// --- bounded lista<T, magnitudo N> ↦ vector<T, N> (non-literal) ----------------------
 
 #[test]
 fn bounded_lista_u32x4_to_vector_accepts() {
     assert_accepts_la(
-        "functio mat(lista<u32, 4> xs) → vector<u32, 4> {
+        "functio mat(lista<u32, magnitudo 4> xs) → vector<u32, 4> {
     redde xs ↦ vector<u32, 4>
 }",
     );
@@ -185,7 +185,7 @@ fn bounded_lista_u32x4_to_vector_accepts() {
 #[test]
 fn bounded_lista_element_mismatch_to_vector_rejects() {
     assert_rejects_with_issue_la(
-        "functio mat(lista<u16, 4> xs) → vector<u32, 4> {
+        "functio mat(lista<u16, magnitudo 4> xs) → vector<u32, 4> {
     redde xs ↦ vector<u32, 4>
 }",
         "lista_to_vector_element_mismatch",
@@ -195,7 +195,7 @@ fn bounded_lista_element_mismatch_to_vector_rejects() {
 #[test]
 fn bounded_lista_capacity_mismatch_to_vector_rejects() {
     assert_rejects_with_issue_la(
-        "functio mat(lista<u32, 8> xs) → vector<u32, 4> {
+        "functio mat(lista<u32, magnitudo 8> xs) → vector<u32, 4> {
     redde xs ↦ vector<u32, 4>
 }",
         "lista_to_vector_literal_width",

@@ -92,6 +92,7 @@ impl FunctionBuilder<'_> {
         match self.normalized_type(type_id) {
             Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Queue(_)
             | Type::BoundedQueue { .. }
             | Type::Stack(_)
@@ -208,6 +209,7 @@ impl FunctionBuilder<'_> {
                 self.normalized_type(ty),
                 Type::Array(_)
                     | Type::BoundedArray { .. }
+                    | Type::RangedArray { .. }
                     | Type::Queue(_)
                     | Type::BoundedQueue { .. }
                     | Type::Stack(_)

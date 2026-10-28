@@ -1,0 +1,26 @@
++++
+term = "list<T, size lo‥hi>"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "conversio_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A sink-into past the maximum of a length range aborts and names the range."
+syntax = "xs ⇜ item — aborts when xs is already at the maximum"
+related = ["list<T, size lo‥hi>", "⇜"]
+locale = "en"
++++
+# =============================================================================
+# list<T, size lo‥hi> — ⇜ past the maximum aborts
+# =============================================================================
+# This exemplum intentionally aborts. `xs` holds lengths 1 and 2, so the
+# second `⇜` fits and the third dies with
+# "list length range: push past the maximum"; the method form `append` reports
+# the same failure on the error channel instead.
+
+main {
+    mut list<int, size 1…2> xs ← [1]
+    xs ⇜ 2
+    print xs
+    xs ⇜ 3
+    print xs
+}

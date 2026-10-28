@@ -346,7 +346,7 @@ pub(super) enum CollectionIteraKind {
         literal: Option<Vec<i64>>,
         matrix: bool,
     },
-    // Route B (AEU-4): runtime-len `lista<T, N>` splits on the carrier `len`
+    // Route B (AEU-4): runtime-len `lista<T, magnitudo N>` splits on the carrier `len`
     // into N+1 guard-free unrolled arms; the literal capacity is carried so
     // the split stays base-lane MIR (never AIR).
     BoundedArray(TypeId, i64),
@@ -4464,7 +4464,7 @@ impl FunctionBuilder<'_> {
                     CollectionIteraKind::Unsupported
                 }
             }
-            // Route B (AEU-4): runtime-len `lista<T, N>` lowers in the base
+            // Route B (AEU-4): runtime-len `lista<T, magnitudo N>` lowers in the base
             // lane to a static split on the carrier `len` with N+1
             // guard-free arms (total N(N+1)/2 lanes). The N <= 10
             // code-size cap keeps the split bounded; non-literal capacities
@@ -4472,7 +4472,9 @@ impl FunctionBuilder<'_> {
             // `de` binds the index, not a lane, so it is a plain index loop
             // over the runtime length: the same shape as an unbounded lista,
             // independent of any literal capacity.
-            Type::BoundedArray { element, .. } if matches!(mode, HirIteraMode::De) => {
+            Type::BoundedArray { element, .. } | Type::RangedArray { element, .. }
+                if matches!(mode, HirIteraMode::De) =>
+            {
                 CollectionIteraKind::Array(*element)
             }
             Type::BoundedArray { element, capacity } => {
@@ -4509,7 +4511,7 @@ impl FunctionBuilder<'_> {
                     None => CollectionIteraKind::Unsupported,
                 }
             }
-            Type::Array(item) => CollectionIteraKind::Array(*item),
+            Type::Array(item) | Type::RangedArray { element: item, .. } => CollectionIteraKind::Array(*item),
             // D10.4/D19.4: byte iteration binds the same u8 as octeti[i].
             // Retain the byte carrier rather than fabricating a list type.
             Type::Primitive(Primitive::Octeti) if matches!(mode, HirIteraMode::Ex) => {
@@ -5090,7 +5092,9 @@ impl FunctionBuilder<'_> {
                 _ => source_ty,
             };
             let element = match self.types.get(semantic) {
-                Type::Array(inner) | Type::BoundedArray { element: inner, .. } => *inner,
+                Type::Array(inner)
+                | Type::BoundedArray { element: inner, .. }
+                | Type::RangedArray { element: inner, .. } => *inner,
                 _ => {
                     self.errors.push(MirError::unsupported(
                         source.span,
@@ -5509,7 +5513,7 @@ impl FunctionBuilder<'_> {
         Some(())
     }
 
-    /// Route B (AEU-4): lower `itera ex` over a runtime-len `lista<T, N>` to
+    /// Route B (AEU-4): lower `itera ex` over a runtime-len `lista<T, magnitudo N>` to
     /// a base-lane static split — a switch on the carrier `len` with N+1
     /// literal arms, arm k being a guard-free unroll of k lanes over 0..k.
     ///

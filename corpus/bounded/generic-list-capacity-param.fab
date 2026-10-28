@@ -4,43 +4,43 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "functio_decl", "generic_params", "type_param_list", "generic_param", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "list"
 canonical = false
-summary = "A generic function with a list<T, N> parameter binds T and the capacity N from the bounded list passed at the call; each distinct capacity is its own instance."
-syntax = "fn first<T, size N>(list<T, N> xs) → T"
+summary = "A generic function with a list<T, size N> parameter binds T and the capacity N from the bounded list passed at the call; each distinct capacity is its own instance."
+syntax = "fn first<T, size N>(list<T, size N> xs) → T"
 related = ["lista", "generic", "size"]
 locale = "en"
 +++
 # =============================================================================
-# Generic list capacity parameter — `list<T, N>` binds T and N at the call.
+# Generic list capacity parameter — `list<T, size N>` binds T and N at the call.
 # =============================================================================
 #
 # What this teaches:
 #   • `<T, size N>` declares a type parameter and a size parameter; a
-#     `list<T, N>` parameter is witnessed by the argument's element type and
+#     `list<T, size N>` parameter is witnessed by the argument's element type and
 #     its exact capacity, so `first(numbers)` needs no explicit type arguments.
-#   • Bounded lists with different capacities or element types (`list<int, 3>`,
-#     `list<string, 2>`, `list<int, 2>`) instantiate separate copies of the
+#   • Bounded lists with different capacities or element types (`list<int, size 3>`,
+#     `list<string, size 2>`, `list<int, size 2>`) instantiate separate copies of the
 #     same function.
 #   • N is the capacity, not a promise about the current length: `length()`
 #     still reports the live element count.
 #
 # Common mistakes:
-#   • passing a dynamic `list<int>` where `list<int, N>` is declared; widening
+#   • passing a dynamic `list<int>` where `list<int, size N>` is declared; widening
 #     is conversion-only (`↦`), see exact-bound-lattice.fab
 # =============================================================================
 
-fn first<T, size N>(list<T, N> xs) → T {
+fn first<T, size N>(list<T, size N> xs) → T {
     return xs[0]
 }
 
-fn count<T, size N>(list<T, N> xs) → int {
+fn count<T, size N>(list<T, size N> xs) → int {
     return xs.length()
 }
 
 main {
-    let list<int, 3> numbers ← [4, 5, 6]
-    let list<string, 2> words ← ["alpha", "beta"]
-    let list<int, 3> triple ← [7, 8, 9]
-    let list<int, 2> pair ← [1, 2]
+    let list<int, size 3> numbers ← [4, 5, 6]
+    let list<string, size 2> words ← ["alpha", "beta"]
+    let list<int, size 3> triple ← [7, 8, 9]
+    let list<int, size 2> pair ← [1, 2]
 
     print first(numbers)
     print first(words)

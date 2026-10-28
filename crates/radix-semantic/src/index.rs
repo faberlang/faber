@@ -28,6 +28,10 @@ pub(crate) fn substitute_alias_params(
             let element = substitute_alias_params(types, element, vars);
             types.bounded_array(element, capacity)
         }
+        Type::RangedArray { element, min, max } => {
+            let element = substitute_alias_params(types, element, vars);
+            types.ranged_array(element, min, max)
+        }
         Type::Queue(inner) => {
             let inner = substitute_alias_params(types, inner, vars);
             types.queue(inner)
@@ -197,6 +201,10 @@ pub fn freshen_bounded_capacity_holes(types: &mut TypeTable, ty: TypeId) -> Type
             let element = freshen_bounded_capacity_holes(types, element);
             let capacity = freshen_index_infer(types, capacity);
             types.bounded_array(element, capacity)
+        }
+        Type::RangedArray { element, min, max } => {
+            let element = freshen_bounded_capacity_holes(types, element);
+            types.ranged_array(element, min, max)
         }
         Type::Alias(def, inner) => {
             let inner = freshen_bounded_capacity_holes(types, inner);

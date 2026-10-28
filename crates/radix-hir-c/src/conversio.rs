@@ -6,7 +6,7 @@
 //! not a finite integer after rounding) go through a `faber_try_*` call that
 //! says why it failed: with `⊥` the recovery value takes its place; without,
 //! the program ends with the runner's text for that failure. `list<T> ↦
-//! list<T, N>` copies into a fixed-capacity list and fails when the source is
+//! list<T, size N>` copies into a fixed-capacity list and fails when the source is
 //! longer, the runner's rule.
 
 use crate::Emitter;
@@ -705,7 +705,7 @@ impl Emitter<'_> {
         .with_effect(value.effect)
     }
 
-    /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
+    /// A bounded-list target (`list<T, size N>`), peeling aliases: its element type
     /// and its literal capacity. `None` for any other target.
     fn bounded_list_target(&self, ty: TypeId) -> Option<(TypeId, u64)> {
         match self.types.get(ty) {
@@ -718,7 +718,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// `list<T> ↦ list<T, N>`: a fixed copy of capacity N, or a failure the
+    /// `list<T> ↦ list<T, size N>`: a fixed copy of capacity N, or a failure the
     /// `⊥` recovery takes (`lista to bounded lista conversion failed`).
     fn bounded_list(
         &mut self,

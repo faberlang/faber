@@ -1809,6 +1809,10 @@ pub struct RangeArgExpr {
     pub lo: RangeBoundExpr,
     pub hi: RangeBoundExpr,
     pub kind: RangeKind,
+    /// The range was written after the `size` marker (`list<T, size 1…8>`):
+    /// it bounds a count, not a value. A bare range bounds a value
+    /// (`trapping<u8, 0…255>`), so a list refuses it by name.
+    pub sized: bool,
     pub span: Span,
 }
 

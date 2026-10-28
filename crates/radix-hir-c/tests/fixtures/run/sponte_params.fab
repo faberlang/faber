@@ -37,7 +37,7 @@ main {
     print greet("Marcus")
     print first(null)
     print first("Roma")
-    let list<string, 3> letters ← ["a", "b", "c"]
+    let list<string, size 3> letters ← ["a", "b", "c"]
     print letters![0]
     print letters![2]
     let Locus ∪ none held ← Locus { urbs = "Roma" }

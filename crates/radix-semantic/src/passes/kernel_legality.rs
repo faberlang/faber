@@ -38,6 +38,9 @@ pub const ISSUE_SATURATING_FLOAT_NOT_BUILT: &str = "nucleum_saturating_float_not
 /// A kernel names a ranged integer cell: the language admits it on the host,
 /// but a kernel applies no range yet (need, series 4/5).
 pub const ISSUE_RANGED_INT_NOT_BUILT: &str = "nucleum_ranged_policy_not_built";
+/// A kernel names a list with no upper size (`list<T, size 1…∞>`): a kernel
+/// unrolls every slot up to the maximum, so it needs a finite constant one.
+pub const ISSUE_UNBOUNDED_LIST_SIZE: &str = "nucleum_unbounded_list_size";
 /// A kernel uses compiler-internal workgroup state (atomics, barriers).
 pub const ISSUE_WORKGROUP: &str = "nucleum_workgroup";
 /// A kernel calls something that is not a kernel or an approved intrinsic.

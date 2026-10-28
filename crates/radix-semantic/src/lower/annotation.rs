@@ -871,6 +871,7 @@ impl Lowerer<'_> {
             | Type::Queue(inner)
             | Type::Stack(inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::BoundedQueue { element: inner, .. }
             | Type::BoundedStack { element: inner, .. }
             | Type::Option(inner)

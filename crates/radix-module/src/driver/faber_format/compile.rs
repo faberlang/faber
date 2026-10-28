@@ -639,7 +639,7 @@ fn emitted_level(analysis: &AnalyzedModule, form: &HirTypeForm, level: TypeFormL
 
 fn type_form_signature(analysis: &AnalyzedModule, form: &HirTypeForm) -> String {
     // WHY: ruling d477c76d retires `octeti` / `octeti<N>`; `lista<b8>` is the
-    // only spelling (bounded: `lista<b8, N>`). The authored retired word and
+    // only spelling (bounded: `lista<b8, magnitudo N>`). The authored retired word and
     // its canonical `list<b8>` spelling lower to the same type, so both share
     // one fingerprint regardless of head level or authored arguments.
     match analysis.types.get(form.ty) {
@@ -722,6 +722,11 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
             "bounded-array<{},{}>",
             canonical_type_shape(analysis, *element, active),
             crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
+        ),
+        Type::RangedArray { element, min, max } => format!(
+            "ranged-array<{},{min},{}>",
+            canonical_type_shape(analysis, *element, active),
+            max.map_or_else(|| "inf".to_owned(), |max| max.to_string())
         ),
         Type::Queue(element) => format!("queue<{}>", canonical_type_shape(analysis, *element, active)),
         Type::BoundedQueue { element, capacity } => format!(

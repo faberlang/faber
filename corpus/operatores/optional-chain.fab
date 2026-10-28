@@ -53,7 +53,7 @@ main {
     let Civis brutus ← Civis { nomen = "Brutus" }
     print brutus?.locus?.urbs
     print brutus?.locus?.regio
-    let list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, size 3> litterae ← ["a", "b", "c"]
     print litterae?[0]
     print litterae?[10]
 }

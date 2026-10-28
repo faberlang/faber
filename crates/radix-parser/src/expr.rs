@@ -1563,7 +1563,7 @@ impl Parser {
     /// spellings are retired and get a specific diagnostic pointing at the
     /// clause: the hint as a further type argument of the scalar head
     /// (`ascii<N, Hex>`, `littera<Code>`) and the hint as a bracketed tail
-    /// after the target (`lista<b8, 16><Le>`). The wrapped numeric spelling
+    /// after the target (`lista<b8, magnitudo 16><Le>`). The wrapped numeric spelling
     /// (`int<u32, Bits>`) is rejected earlier, in type position, as a whole.
     ///
     /// WHY: only the scalar heads that ever took a hint are checked, so a
@@ -1818,7 +1818,7 @@ impl Parser {
 
     /// Long-form built-in type word followed by `<`: `tensor<..>`,
     /// `vector<..>`, `matrix<..>`, and `list<..>` (claimed only to refuse
-    /// `list<T, N> {}` by name). Only a claim candidate; the caller parses
+    /// `list<T, size N> {}` by name). Only a claim candidate; the caller parses
     /// the type speculatively and keeps `<` as the ASCII comparison when the
     /// type does not parse (`vector < n`).
     fn long_form_constructor_head(&self) -> bool {
@@ -2314,7 +2314,7 @@ impl Parser {
                 Some(ty) => ty,
                 None => self.parse_type()?,
             };
-            // `list<T, N> {}` is not claimed: only tensor, vector and matrix
+            // `list<T, size N> {}` is not claimed: only tensor, vector and matrix
             // types have a typed zero. A collection head followed by `[` is
             // the stated bracket constructor instead, with the element list
             // as its `verte` target.

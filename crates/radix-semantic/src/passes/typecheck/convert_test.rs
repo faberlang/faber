@@ -235,7 +235,7 @@ fn textus_to_lista_of_bits_stays_accepted() {
 #[test]
 fn bounded_lista_to_bounded_textus_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit lista<numerus> base ← [1, 2]\n  sit lista<numerus, 8> raw ← base ↦ lista<numerus, 8>\n  sit textus<8> out ← raw ↦ textus<8>\n}",
+        "incipit {\n  sit lista<numerus> base ← [1, 2]\n  sit lista<numerus, magnitudo 8> raw ← base ↦ lista<numerus, magnitudo 8>\n  sit textus<8> out ← raw ↦ textus<8>\n}",
         "lista_to_textus_unsupported",
     );
 }
@@ -836,7 +836,7 @@ fn lista_source_ascription_to_tensor_rejects() {
     // not on literal syntax: a typed lista identifier is a definite
     // cross-family source (bounded lista included).
     test_support::assert_rejects_with_issue_la(
-        r"functio selecta(lista<fractus, 4> src) → tensor<fractus, [4]> {
+        r"functio selecta(lista<fractus, magnitudo 4> src) → tensor<fractus, [4]> {
   redde src ∷ tensor<fractus, [4]>
 }",
         "array_ascription_to_tensor",

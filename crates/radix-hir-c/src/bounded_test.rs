@@ -23,7 +23,7 @@ fn an_ascription_to_list_makes_it_growable() {
 #[test]
 fn an_empty_bounded_list_has_its_capacity() {
     let code =
-        emitted("main {\n    mut list<int, 8> xs ← empty\n    xs.append(1)\n    print xs\n}");
+        emitted("main {\n    mut list<int, size 8> xs ← empty\n    xs.append(1)\n    print xs\n}");
     assert!(
         code.contains("faber_list_i64_new_fixed(faber_a, 8)"),
         "{code}"

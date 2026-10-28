@@ -439,6 +439,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
             | Type::Alias(_, t)
             | Type::Ref(_, t) => vec![*t],
             Type::BoundedArray { element, .. }
+            | Type::RangedArray { element, .. }
             | Type::BoundedQueue { element, .. }
             | Type::BoundedStack { element, .. } => vec![*element],
             Type::Map(k, v) | Type::PromissumFailable(k, v) | Type::AsyncCursor(k, v) => {

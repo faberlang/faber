@@ -76,11 +76,11 @@ pub use numeric_width::{
     is_code_point_hint, is_conversio_radix_hint, is_decimal_index_scalar, is_integer_index_scalar,
     is_integer_index_vector, is_numeric_assignable, is_numeric_width_type_sugar,
     is_tensor_element_type, is_tensor_float_element, is_tensor_numeric_element,
-    lista_sugar_width_marker, lower_modular_word, lower_ranged_word, lower_saturating_word,
-    lower_standalone_width_type, lower_trapping_word, matrix_sugar_width_marker,
-    resolve_ranged_int, sparsa_sugar_width_marker, standalone_width_type,
-    tensor_element_conversio_allowed, tensor_media_width, tensor_method_requires_numeric_element,
-    tensor_sugar_width_marker, vector_sugar_width_marker,
+    lista_sugar_width_marker, lower_modular_word, lower_ranged_list, lower_ranged_word,
+    lower_saturating_word, lower_standalone_width_type, lower_trapping_word,
+    matrix_sugar_width_marker, resolve_ranged_int, resolve_ranged_list, sparsa_sugar_width_marker,
+    standalone_width_type, tensor_element_conversio_allowed, tensor_media_width,
+    tensor_method_requires_numeric_element, tensor_sugar_width_marker, vector_sugar_width_marker,
 };
 pub use schema::{SchemaColumnDef, SchemaDef};
 pub use schema_subset::{

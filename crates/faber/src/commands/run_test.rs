@@ -856,7 +856,7 @@ locale = "en"
 @ public
 class Block {
     let f16 scale
-    let list<int, 2> values
+    let list<int, size 2> values
 }
 
 @ public
@@ -867,7 +867,7 @@ fn read_blocks(tensor<Block, [2]> blocks, mut tensor<f32, [2]> out) → void {
 }
 
 main {
-    let list<Block> rows ← [Block { scale = 1.5 ↦ f16, values = [3, 4] ↦ list<int, 2> }, Block { scale = 2.5 ↦ f16, values = [5, 6] ↦ list<int, 2> }]
+    let list<Block> rows ← [Block { scale = 1.5 ↦ f16, values = [3, 4] ↦ list<int, size 2> }, Block { scale = 2.5 ↦ f16, values = [5, 6] ↦ list<int, size 2> }]
     mut tensor<Block, [2]> blocks ← rows ↦ tensor<Block, [2]>
     mut tensor<f32, [2]> out ← tf32[2] {}
     read_blocks(blocks, mut out)

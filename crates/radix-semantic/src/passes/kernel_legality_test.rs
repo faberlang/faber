@@ -118,7 +118,7 @@ fn a_bounded_kernel_local_collection_is_legal() {
 @ nucleum
 @ publica
 functio scratch(f32 x) → f32 {
-    sit lista<f32, 4> s ← [x, x, x, x]
+    sit lista<f32, magnitudo 4> s ← [x, x, x, x]
     redde s[0]
 }
 ",

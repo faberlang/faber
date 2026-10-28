@@ -366,7 +366,7 @@ fn float_to_numerus_runtime_conversion_is_a_check() {
     assert_eq!(run(&mut runner, &recovering, 3.7).unwrap(), Value::UInt(3));
 }
 
-/// Run `lista<numerus> ↦ lista<numerus, capacity>` over `items`, with an
+/// Run `lista<numerus> ↦ lista<numerus, magnitudo capacity>` over `items`, with an
 /// optional `⊥` recovery constant.
 fn run_bounded_lista_conversio(
     capacity: u64,
