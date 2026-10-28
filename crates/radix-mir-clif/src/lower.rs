@@ -35,6 +35,7 @@ use crate::abi::{self, AbiTy, RuntimeSymbol};
 
 mod closure;
 mod convert;
+mod entry_shims;
 mod lift;
 mod wide;
 pub(crate) use convert::{byte_element, member_tests, numeric_conversion, sequence_conversion};
@@ -648,85 +649,8 @@ pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
             break;
         }
     }
-    define_entry_shims(&mut state, entry)?;
+    entry_shims::define_entry_shims(&mut state, entry)?;
     state.module.finish().emit().map_err(cranelift_error)
-}
-
-/// `faber_clif_incipit` (tokens, then the program entry) and the C `main`.
-fn define_entry_shims(state: &mut ModuleState<'_>, entry: Option<FuncId>) -> Lowered<()> {
-    let tokens = state.input.tokens.clone();
-    let token_data: Vec<DataId> = tokens
-        .iter()
-        .map(|token| state.string_data(token.as_bytes()))
-        .collect::<Lowered<_>>()?;
-    let set_tokens = state.runtime_id(&abi::SET_DISPLAY_TOKENS)?;
-    let main_target = state.runtime_id(&abi::MAIN)?;
-
-    // faber_clif_incipit()
-    let incipit_signature = state.module.make_signature();
-    let incipit_id = state
-        .module
-        .declare_function(abi::PROGRAM_INCIPIT, Linkage::Export, &incipit_signature)
-        .map_err(cranelift_error)?;
-    let mut context = state.module.make_context();
-    context.func.signature = incipit_signature;
-    let mut builder_context = FunctionBuilderContext::new();
-    {
-        let mut builder = FunctionBuilder::new(&mut context.func, &mut builder_context);
-        let block = builder.create_block();
-        builder.switch_to_block(block);
-        let mut args = Vec::new();
-        for (data, token) in token_data.iter().zip(&tokens) {
-            let global = state.module.declare_data_in_func(*data, builder.func);
-            args.push(builder.ins().symbol_value(state.pointer, global));
-            let length = i64::try_from(token.len()).unwrap_or(0);
-            args.push(builder.ins().iconst(types::I64, length));
-        }
-        let set_ref = state.module.declare_func_in_func(set_tokens, builder.func);
-        builder.ins().call(set_ref, &args);
-        if let Some(entry) = entry {
-            let entry_ref = state.module.declare_func_in_func(entry, builder.func);
-            builder.ins().call(entry_ref, &[]);
-        }
-        builder.ins().return_(&[]);
-        builder.seal_all_blocks();
-        builder.finalize(state.module.isa().frontend_config());
-    }
-    state
-        .module
-        .define_function(incipit_id, &mut context)
-        .map_err(cranelift_error)?;
-
-    // main(argc, argv) -> __faber_clif_v1_main(argc, argv)
-    let mut main_signature = state.module.make_signature();
-    main_signature.params.push(AbiParam::new(types::I32));
-    main_signature.params.push(AbiParam::new(state.pointer));
-    main_signature.returns.push(AbiParam::new(types::I32));
-    let main_id = state
-        .module
-        .declare_function("main", Linkage::Export, &main_signature)
-        .map_err(cranelift_error)?;
-    let mut context = state.module.make_context();
-    context.func.signature = main_signature;
-    let mut builder_context = FunctionBuilderContext::new();
-    {
-        let mut builder = FunctionBuilder::new(&mut context.func, &mut builder_context);
-        let block = builder.create_block();
-        builder.append_block_params_for_function_params(block);
-        builder.switch_to_block(block);
-        let count = builder.block_params(block)[0];
-        let values = builder.block_params(block)[1];
-        let target = state.module.declare_func_in_func(main_target, builder.func);
-        let call = builder.ins().call(target, &[count, values]);
-        let result = builder.inst_results(call)[0];
-        builder.ins().return_(&[result]);
-        builder.seal_all_blocks();
-        builder.finalize(state.module.isa().frontend_config());
-    }
-    state
-        .module
-        .define_function(main_id, &mut context)
-        .map_err(cranelift_error)
 }
 
 /// The policy family of an integer store slot.

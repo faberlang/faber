@@ -1124,6 +1124,70 @@ fn corpus_loader_accepts_rejects_and_known_fail_why() {
     );
 }
 
+#[cfg(feature = "hir-go")]
+#[test]
+fn corpus_external_target_pins_a_wrong_exit_status() {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    let case = temp.path().join("cases/ignored-exit");
+    fs::create_dir_all(&case).expect("create case directory");
+    fs::copy(smoke_case(), case.join("main.fab")).expect("copy Faber source");
+    let suite = |run: &str| {
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[targets.go]\nemit = \"go\"\nextension = \"go\"\nrun = [\"sh\", \"-c\", \"{run}\"]\n"
+        )
+    };
+    fs::write(temp.path().join("corpus.toml"), suite("exit 0")).expect("write suite manifest");
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.go]\noutcome = \"known-fail\"\nphase = \"run\"\nfailure_kind = \"exit-mismatch\"\n\n[targets.go.expect]\nexit = 3\n",
+    )
+    .expect("write case manifest");
+
+    // The program should end with 3 and ends with 0: the pin holds.
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "go"])
+        .arg(temp.path())
+        .output()
+        .expect("run suite with pinned wrong exit");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(records(&output.stdout)[0]["status"], "expected-fail");
+
+    // The program now ends with 3: the pin is stale.
+    fs::write(temp.path().join("corpus.toml"), suite("exit 3")).expect("fix the exit");
+    let unexpected = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "go"])
+        .arg(temp.path())
+        .output()
+        .expect("run suite after the exit is fixed");
+    assert!(!unexpected.status.success());
+    assert_eq!(
+        records(&unexpected.stdout)[0]["reason"],
+        "unexpected exit match; update target expectation"
+    );
+
+    // The pin names a nonzero expected exit: without one it is refused.
+    fs::write(
+        case.join("case.toml"),
+        "version = 1\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.go]\noutcome = \"known-fail\"\nphase = \"run\"\nfailure_kind = \"exit-mismatch\"\n",
+    )
+    .expect("write case manifest without an exit");
+    let refused = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "go"])
+        .arg(temp.path())
+        .output()
+        .expect("run suite with an exit-mismatch pin that names no exit");
+    assert!(!refused.status.success());
+    assert!(
+        String::from_utf8_lossy(&refused.stdout).contains("exit-mismatch oracle"),
+        "{}",
+        String::from_utf8_lossy(&refused.stdout)
+    );
+}
+
 #[test]
 fn corpus_rejects_pins_the_target_cannot_judge_instead_of_panicking() {
     let known_fail = |target: &str, phase: &str, kind: &str| {

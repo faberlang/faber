@@ -5,7 +5,8 @@
 //! pattern), so this archive never defines `main` and links cleanly as an
 //! rlib. The runtime captures argv, installs the program's output tokens,
 //! runs the program's `faber_clif_incipit`, flushes, and exits with the
-//! runner's codes (D5: 0 normally, 1 on an uncaught failure or a trap).
+//! runner's codes (D5: the entry's own exit status, 0 unless `main exit` names
+//! one, and 1 on an uncaught failure or a trap).
 //! Display goes through `radix-runtime-contract`, the same helpers the MIR
 //! runner uses, so scalar output cannot drift from the oracle.
 //!
@@ -43,7 +44,7 @@ use radix_runtime_contract::trap::{TrapKind, abort_exit_status, exit_status, tra
 
 // The program's `incipit`, emitted into the linked object by the backend.
 unsafe extern "C" {
-    fn faber_clif_incipit();
+    fn faber_clif_incipit() -> i32;
 }
 
 /// Process-global runtime state, written once by [`__faber_clif_v1_main`].
@@ -126,9 +127,11 @@ pub extern "C" fn __faber_clif_v1_main(
     let _ = CONTEXT.set(Context {
         arguments: capture_arguments(argument_count, argument_values),
     });
-    unsafe { faber_clif_incipit() };
+    // The entry hands back the process exit status (`main exit <expr>`), 0
+    // when it returns nothing.
+    let status = unsafe { faber_clif_incipit() };
     flush();
-    0
+    status
 }
 
 /// Install the program's output tokens: true, false, none, tuple.

@@ -160,6 +160,14 @@ impl<'a> MirNames<'a> {
             .max_by_key(|function| function.id.0)
     }
 
+    /// Whether the process ends with the entry's returned value: an entry
+    /// that returns a `numerus` hands it back as the exit status (`main exit
+    /// <expr>`), while a vacuum entry ends the process normally.
+    #[must_use]
+    pub fn entry_returns_exit_status(&self, entry: &MirFunction) -> bool {
+        self.is_numerus_ty(entry.return_ty)
+    }
+
     #[must_use]
     pub fn entry_function(&self) -> Option<&'a MirFunction> {
         let incipit = self.explicit_entry_function();
