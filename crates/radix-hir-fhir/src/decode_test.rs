@@ -193,12 +193,14 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
                     },
                 )],
                 unavailable: Vec::new(),
+                const_values: Vec::new(),
             },
         )],
         used_namespaces: vec![Symbol(0)],
         imported_nominal_types: vec![((NominalKind::Struct, Symbol(1)), struct_ty)],
         ambiguous_imported_nominal_types: Vec::new(),
         conversion_rows: Vec::new(),
+        module_bindings: Vec::new(),
     };
     let bytes = encode(&artifact).expect("encode artifact");
     let decoded = decode(&bytes).expect("imported nominal def in type table must load");
@@ -259,12 +261,14 @@ fn decode_rejects_imported_method_with_dangling_signature_type() {
                     },
                 )],
                 unavailable: Vec::new(),
+                const_values: Vec::new(),
             },
         )],
         used_namespaces: vec![Symbol(0)],
         imported_nominal_types: vec![((NominalKind::Struct, Symbol(1)), owner_ty)],
         ambiguous_imported_nominal_types: Vec::new(),
         conversion_rows: Vec::new(),
+        module_bindings: Vec::new(),
     };
 
     let bytes = encode(&artifact).expect("encode malformed imported method artifact");
@@ -314,6 +318,7 @@ fn decode_round_trips_registry_conversion_rows() {
                 builtin: true,
             },
         ],
+        module_bindings: Vec::new(),
     };
 
     let bytes = encode(&artifact).expect("encode artifact");
@@ -360,6 +365,7 @@ fn decode_rejects_registry_row_with_dangling_fn_def() {
             span: Span::default(),
             builtin: false,
         }],
+        module_bindings: Vec::new(),
     };
 
     let bytes = encode(&artifact).expect("encode artifact");
@@ -396,6 +402,7 @@ fn decode_rejects_nominal_def_with_no_def_site() {
         imported_nominal_types: Vec::new(),
         ambiguous_imported_nominal_types: Vec::new(),
         conversion_rows: Vec::new(),
+        module_bindings: Vec::new(),
     };
     let bytes = encode(&artifact).expect("encode artifact");
     match decode(&bytes) {

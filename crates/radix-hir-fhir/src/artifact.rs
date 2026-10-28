@@ -86,6 +86,27 @@ pub struct FileInterfaceSnapshot {
     /// `@ nondum` gates of exported free functions, keyed by the
     /// consumer-visible member spelling. Members absent here are available.
     pub unavailable: Vec<(Symbol, Vec<UnavailableWire>)>,
+    /// Folded compile-time values of exported constants, keyed by the
+    /// consumer-visible member spelling (schema v52). A constant absent here
+    /// did not fold and stays non-constant for a consumer.
+    pub const_values: Vec<(Symbol, ConstValueWire)>,
+}
+
+/// Serializable folded constant value of a file-interface export.
+///
+/// Mirrors the semantic `InterfaceConstValue`. An integer is two 64-bit
+/// halves because the full `i128` fold domain has no `MessagePack` encoding.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ConstValueWire {
+    /// Two's-complement `i128` as `(high, low)` halves.
+    Int {
+        high: i64,
+        low: u64,
+    },
+    Float(f64),
+    Bool(bool),
+    Text(String),
+    List(Vec<ConstValueWire>),
 }
 
 /// Serializable `@ nondum [target] ["reason"]` gate (schema v40).
@@ -131,6 +152,11 @@ pub struct StructFieldSnapshot {
     pub modifier: Option<radix_syntax::FieldModifier>,
     /// Genus member visibility (D5.3).
     pub visibility: radix_syntax::MemberVisibility,
+    /// Compile-time initializer of the field (schema v52), already in this
+    /// artifact's type and text arenas. A class `const` read and a construction
+    /// literal that omits a defaulted field read it. Its `HirId`s are not part
+    /// of the unit's HIR and carry no meaning.
+    pub init: Option<radix_hir::HirExpression>,
 }
 
 /// Serializable imported method identity and callable contract for a struct.
@@ -201,6 +227,11 @@ pub struct ResolverSnapshot {
     /// `(source → destination)`. The loader rebuilds the resolver's row table
     /// from these; builtin and user rows share the one shape.
     pub conversion_rows: Vec<ConversionRowSnapshot>,
+
+    /// Namespace bindings the unit's `module.NAME` reads resolve through
+    /// (schema v52): the module definition and its local binding name, which
+    /// keys the file interface. Sorted by definition id.
+    pub module_bindings: Vec<(DefId, Symbol)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +283,9 @@ pub enum CliDefaultWire {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CliOptionWire {
     pub binding: String,
+    /// Interned binding symbol: the record field key CLI argument records use
+    /// (schema v54).
+    pub binding_symbol: Symbol,
     pub ty: CliTypeWire,
     pub short: Option<String>,
     pub long: Option<String>,
@@ -266,6 +300,9 @@ pub struct CliOptionWire {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CliOperandWire {
     pub binding: String,
+    /// Interned binding symbol: the record field key CLI argument records use
+    /// (schema v54).
+    pub binding_symbol: Symbol,
     pub ty: CliTypeWire,
     #[serde(rename = "rest")]
     pub is_rest: bool,
@@ -292,8 +329,8 @@ pub struct CliCommandWire {
 ///
 /// Mirrors `radix::cli::CliProgram` but lives in the foundation crate so
 /// serde derives and wire-format placement are owned by `radix-hir`.
-/// Fields that are diagnostic-only (spans, `binding_symbol` references) are
-/// excluded from the wire shape.
+/// Spans are diagnostic-only and excluded from the wire shape; option and
+/// operand `binding_symbol`s are not (they key the CLI argument records).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CliProgramWire {
     pub name: String,
@@ -651,7 +688,35 @@ pub struct FunctionProvenanceTableWire {
 /// Version 50 adds `Type::RangedInt` (a ranged store policy,
 /// `saturating|trapping|wrapping<W, lo‥hi>`) to the type table; schema-v49
 /// artifacts fail closed because the serialized `Type` enum gained a variant.
-pub const SCHEMA_VERSION: u32 = 50;
+/// Version 51 adds the authored raw-bits widths to the serialized type table
+/// (`TypeTableSnapshot::authored_bits`): the arena cannot tell an authored `b8`
+/// from the seeded `octeti` byte list, so a loaded unit reported no authored
+/// `b8` and backend bits gates saw a different type than the direct unit;
+/// schema-v50 artifacts fail closed.
+/// Version 52 adds `FileInterfaceSnapshot::const_values`, the folded values of
+/// imported constants (`ConstValueWire`): a loaded unit re-spelled an imported
+/// constant where the direct unit folded its value, so MIR could not resolve
+/// the projection base. The value is reached through the module binding, so
+/// `ResolverSnapshot::module_bindings` carries each namespace binding's
+/// definition and name too, and `StructFieldSnapshot::init` the initializers
+/// of imported genus fields (a class `const` read folds through one);
+/// schema-v51 artifacts fail closed.
+/// Version 53 adds `ShapeObligationTableWire::stores` and
+/// `ShapeRelationBoundaryWire::Store`: the declaration-store shape pins the
+/// semantic table keeps. The wire dropped them, so code generation from a
+/// loaded unit lowered no runtime shape check where the direct unit lowered
+/// one; schema-v52 artifacts fail closed.
+/// Version 54 adds `CliOptionWire::binding_symbol` and
+/// `CliOperandWire::binding_symbol`. Lowering keys the CLI argument record by
+/// them, and the loader substituted `Symbol(0)`, so a loaded CLI program built
+/// records whose fields did not match the record type in the type table;
+/// schema-v53 artifacts fail closed.
+/// Version 55 adds `HirArtifact::contract_roles`: the ordering, closing and
+/// sinking contract identities (and their import bindings) the type table
+/// records. A loaded unit carried none, so a backend treated an imported
+/// `Orderable` as an ordinary trait and resolved it to
+/// `__faber_unresolved_def`; schema-v54 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 55;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -659,6 +724,9 @@ pub enum ShapeRelationBoundaryWire {
     Call,
     FunctionEntry,
     FunctionReturn,
+    /// A declaration store pinning opaque initializer axes to the
+    /// annotation's size terms (schema v53).
+    Store,
 }
 
 /// One runtime equality in the semantic type-index arena.
@@ -674,6 +742,31 @@ pub struct ShapeRelationWire {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ShapeCallObligationsWire {
     pub call: radix_hir::HirId,
+    pub relations: Vec<ShapeRelationWire>,
+}
+
+/// The `@ radix contract` roles the type table records for a unit (schema v55).
+///
+/// Backends recognize norma's `Orderable`, `Closable` and `Sink` by these
+/// identities and emit no trait, import or impl for them. Imported contracts
+/// are not declared in the unit's HIR, so the identities cannot be re-derived
+/// from a loaded artifact.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContractRolesWire {
+    pub ordering: Option<DefId>,
+    /// Selective import bindings that name the ordering contract, sorted.
+    pub ordering_bindings: Vec<DefId>,
+    pub closing: Option<DefId>,
+    pub sinking: Option<DefId>,
+    /// Selective import bindings that name the sinking contract, sorted.
+    pub sinking_bindings: Vec<DefId>,
+}
+
+/// Declaration-store obligations retained for portable shape checks, keyed by
+/// the initializer expression.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShapeStoreObligationsWire {
+    pub initializer: radix_hir::HirId,
     pub relations: Vec<ShapeRelationWire>,
 }
 
@@ -712,6 +805,9 @@ pub struct ShapeObligationTableWire {
     pub calls: Vec<ShapeCallObligationsWire>,
     pub call_size_bindings: Vec<CallSizeBindingsWire>,
     pub functions: Vec<ShapeFunctionObligationsWire>,
+    /// Declaration-store pins (schema v53); before it the wire dropped them
+    /// and a loaded unit lowered no runtime shape check at the store.
+    pub stores: Vec<ShapeStoreObligationsWire>,
     pub function_size_bindings: Vec<FunctionSizeBindingsWire>,
 }
 
@@ -1106,6 +1202,9 @@ pub struct HirArtifact {
 
     /// Runtime shape boundary equalities (schema v31).
     pub shape_obligations: ShapeObligationTableWire,
+
+    /// Compiler-owned contract identities (schema v55).
+    pub contract_roles: ContractRolesWire,
 
     /// Per-target inferred device requirements (schema v32).
     pub kernel_requirements: KernelRequirementsWire,
