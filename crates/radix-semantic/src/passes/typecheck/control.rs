@@ -75,10 +75,8 @@ type Facts = Vec<(FactKey, FactValue)>;
 
 /// The subject of a flow fact: a visible binding, or a field path rooted at a
 /// visible binding (`base.path…`).
-// `Field` is produced by the field-path narrowing producer (need case
-// 2) and consumed only inside the proving branch body; the branch-edge and
-// assertion consumers still skip it until the join units land.
-#[allow(dead_code)]
+// Field facts are applied only inside their proving branch; joins and assert
+// frames currently carry binding facts only.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) enum FactKey {
     Binding(DefId),
@@ -612,8 +610,8 @@ impl TypeChecker<'_> {
     /// fallthrough of a diverging `si A aut B { redde }`), and its truth
     /// forces neither part. `non (...)` swaps the two edges.
     ///
-    /// Returns `(then_facts, else_facts)`, each a list of
-    /// `(DefId, narrowed TypeId)` for visible bindings.
+    /// Returns `(then_facts, else_facts)` for the condition. Each edge carries
+    /// `(FactKey, FactValue)` pairs for visible bindings or rooted field paths.
     fn condition_refinement(&mut self, cond: &HirExpression) -> ConditionRefinement {
         match &cond.kind {
             // Both conjuncts hold when `A and B` is true, at any depth. Its
