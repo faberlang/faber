@@ -121,7 +121,7 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     assert!(ok, "faber targets failed:\n{stderr}");
 
     // `faber run` interprets source; the only target routes it reaches are the
-    // `--device metal|cuda` launches and the compiled `--target ts` build.
+    // `--device metal|cuda` launches and the compiled `--target ts|go` builds.
     let runnable: Vec<&str> = stdout
         .lines()
         .filter(|line| line.contains(" run=yes "))
@@ -130,7 +130,7 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     assert!(
         runnable
             .iter()
-            .all(|name| ["metal-text", "llvm-text", "ts"].contains(name)),
+            .all(|name| ["metal-text", "llvm-text", "ts", "go"].contains(name)),
         "only the device routes may report run=yes, got {runnable:?}:\n{stdout}"
     );
 

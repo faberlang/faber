@@ -55,6 +55,7 @@ fn rust_and_runner_admit_the_n2_leaves() {
         Target::MirFmir,
         Target::HirFaber,
         Target::HirFhir,
+        Target::HirGo,
     ] {
         reject_unsupported_leaf(&routes, target)
             .unwrap_or_else(|error| panic!("{target} must declare fs: {error:?}"));
@@ -62,11 +63,11 @@ fn rust_and_runner_admit_the_n2_leaves() {
 }
 
 #[test]
-fn go_and_wasm_reject_fs_by_name() {
+fn typescript_and_wasm_reject_fs_by_name() {
     let mut interner = Interner::new();
     let module = ad_module(&mut interner, "solum:lege");
     let routes = routes_of(&module, &interner);
-    for target in [Target::HirGo, Target::HirTypeScript, Target::MirWasm] {
+    for target in [Target::HirTypeScript, Target::MirWasm] {
         let error =
             reject_unsupported_leaf(&routes, target).expect_err("emit-only target refuses fs");
         assert_eq!(issue_of(&error), Some("leaf_unsupported_on_target"));

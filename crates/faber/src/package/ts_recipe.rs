@@ -11,6 +11,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::build_recipe::Toolchain;
 use radix::module::diagnostics::Diagnostic;
 use radix::program::manifest::ManifestTarget;
 use serde::Deserialize;
@@ -106,16 +107,14 @@ impl TsRecipe {
     }
 }
 
-/// Find `tool` on `path` (the value of a `PATH` variable).
-pub(crate) fn find_tool(tool: &str, path: Option<&OsStr>) -> Option<PathBuf> {
-    if tool.contains(std::path::MAIN_SEPARATOR) {
-        let direct = PathBuf::from(tool);
-        return direct.is_file().then_some(direct);
-    }
-    std::env::split_paths(path?)
-        .map(|directory| directory.join(tool))
-        .find(|candidate| candidate.is_file())
-}
+/// The TypeScript toolchain, for missing-tool diagnostics.
+const TS_TOOLCHAIN: Toolchain = Toolchain {
+    programs: "TypeScript",
+    issue: "package_ts_tool_missing",
+};
+
+#[cfg(test)]
+pub(crate) use super::build_recipe::find_tool;
 
 /// Resolve the program of a command line from `PATH`, or fail naming it.
 pub(crate) fn require_tool(argv: &[String]) -> Result<PathBuf, Diagnostic> {
@@ -127,16 +126,7 @@ pub(crate) fn require_tool_on(
     argv: &[String],
     path: Option<&OsStr>,
 ) -> Result<PathBuf, Diagnostic> {
-    let Some(tool) = argv.first() else {
-        return Err(recipe_error("the TypeScript recipe has an empty command"));
-    };
-    find_tool(tool, path).ok_or_else(|| {
-        crate::package_diagnostic_error(format!(
-            "TypeScript programs require `{tool}` on PATH, and it was not found"
-        ))
-        .with_arg("issue", "package_ts_tool_missing")
-        .with_arg("tool", tool.clone())
-    })
+    super::build_recipe::require_tool_on(argv, path, &TS_TOOLCHAIN).map_err(|diag| *diag)
 }
 
 #[cfg(test)]

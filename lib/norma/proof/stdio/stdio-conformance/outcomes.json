@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "expected 'package', found 'var'",
-      "reason": "The Go package assembler writes the `norma:console` host shim ahead of the entry `package main` clause, so `go build` rejects the generated `main.go` at line 3 with `expected 'package', found 'var'` before the entry program is checked. Re-measure this row when package assembly places the shim after the package header."
+      "diagnostic_contains": "go_failable_call_unhoisted",
+      "reason": "A carried Norma module (`console`) places a failable call where Go cannot unpack the `(value, error)` pair and the hoister has no form for it (`go_failable_call_unhoisted`); the Go emitter unit for that call position is open."
     },
     "ts": {
       "outcome": "known-fail",

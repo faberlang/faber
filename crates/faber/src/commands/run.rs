@@ -49,13 +49,26 @@ pub(super) fn cmd_run(args: RunArgs) {
         exit_status::exit_usage();
     }
 
-    if let Some(crate::cli::RunTarget::Ts) = args.target {
-        package::cmd_run_ts(
+    match args.target {
+        Some(crate::cli::RunTarget::Ts) => package::cmd_run_ts(
             &input_path,
             args.locale.as_deref(),
             args.diagnostics_locale.as_deref(),
             &args.args,
-        );
+        ),
+        #[cfg(feature = "hir-go")]
+        Some(crate::cli::RunTarget::Go) => package::cmd_run_go(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+        ),
+        #[cfg(not(feature = "hir-go"))]
+        Some(crate::cli::RunTarget::Go) => {
+            eprintln!("error: this faber build has no Go target; rebuild with feature `hir-go`");
+            exit_status::exit_usage();
+        }
+        None => {}
     }
 
     if let Some(seed) = args.shuffle_seed {

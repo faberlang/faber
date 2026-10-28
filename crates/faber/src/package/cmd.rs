@@ -25,7 +25,6 @@ use super::cargo::{
 ))]
 use super::discover_build_layout as discover_package_layout;
 #[cfg(feature = "hir-go")]
-use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
 #[cfg(feature = "hir-rust")]
 use super::manifest::FaberManifest;
 use super::manifest_build_target_for_input;
@@ -430,53 +429,36 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 return;
             }
             Err(diagnostics) => {
-                super::ts_build::report_and_exit(&diagnostics, locale_pack.as_ref())
+                super::build_recipe::report_and_exit(&diagnostics, locale_pack.as_ref())
             }
         }
     }
 
-    // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
-    // The multi-module file collection travels inside the compile result
-    // itself (FBR-P2-003) — no hidden thread-local state.
+    // Package Go builds write target/faber/go (module, vendored runtime) and
+    // run the backend recipe's build command. The multi-module file
+    // collection travels inside the compile result itself (FBR-P2-003).
     if is_package && target == Target::HirGo {
         #[cfg(not(feature = "hir-go"))]
         exit_target_feature_unavailable(Target::HirGo);
         #[cfg(feature = "hir-go")]
         {
-            let go_result = radix::program::emit::compile_package_result(
-                &config,
-                &input_path,
-                &super::faber_emission_seams(),
-            );
-            crate::postprocess::print_diagnostics(
-                &go_result.compile_result.diagnostics,
-                DiagnosticMode::Normal,
-                locale_pack.as_ref(),
-            );
-            let Some(output) = go_result.compile_result.output else {
-                fail_compilation(&go_result.compile_result.diagnostics);
-            };
             let layout = match discover_build_layout(&input_path, &command.out_dir) {
                 Ok(l) => l,
                 Err(d) => fail_with_diagnostic(&d),
             };
-            let go_layout = GoBuildLayout::from_package(&layout);
-            let code = radix::services::output_code(output);
-            if let Err(d) = emit_go_module_with_postprocess(
-                &go_layout,
-                &code,
-                &go_result.go_modules,
+            match super::go_build::go_program::build_go_program(
+                &config,
+                &input_path,
+                &layout,
                 format,
                 linter,
+                locale_pack.as_ref(),
             ) {
-                fail_with_diagnostic(&d);
-            }
-            match invoke_go_build(&go_layout) {
-                Ok(binary_path) => {
-                    println!("{}", binary_path.display());
+                Ok(program) => {
+                    println!("{}", program.binary.display());
                     return;
                 }
-                Err(d) => fail_with_diagnostic(&d),
+                Err(failure) => failure.exit(locale_pack.as_ref()),
             }
         }
     }
