@@ -225,6 +225,16 @@ fn try_bind_generic_type_witness(
                 )
         }
         (
+            Type::BoundedArray {
+                element: expected_element,
+                capacity: expected_capacity,
+            },
+            Type::BoundedArray {
+                element: actual_element,
+                capacity: actual_capacity,
+            },
+        )
+        | (
             Type::BoundedQueue {
                 element: expected_element,
                 capacity: expected_capacity,
