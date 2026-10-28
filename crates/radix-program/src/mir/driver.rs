@@ -5,9 +5,9 @@ use super::{
     DeviceManifestConfig, Diagnostic, HashMap, HirItemKind, LibraryInterfaceCache, LoweredMirUnit,
     MirSeams, ModuleId, PackageMirConsumer, PackageMirLinks, Path, PathBuf, PreparedPackageMir,
     TestFunctionIds, TestPackageScope, air_specialize, canonicalize_direct_definition_callees,
-    collect_package_runtime_requirements, local_namespace_call_targets, lower_package_units,
-    mir_diag, mir_validation_diag, plan_cli_package, rewrite_unit_namespace_calls,
-    validate_program,
+    collect_package_runtime_requirements, kernel_import_calls, local_namespace_call_targets,
+    lower_package_units, mir_diag, mir_validation_diag, plan_cli_package,
+    rewrite_unit_namespace_calls, validate_program,
 };
 
 struct PackageMirPreparation<'a> {
@@ -214,6 +214,12 @@ fn link_package_lowered_functions<R>(
         library_cache,
         None,
     )?;
+    kernel_import_calls::check_kernel_import_calls(
+        &package,
+        &links,
+        &library_resolver,
+        library_cache,
+    )?;
     air_specialize::plan_package_instances(
         &mut package,
         &mut links,
@@ -388,6 +394,12 @@ fn prepare_package_mir<R>(
         &library_resolver,
         &mut library_cache,
         loaded_links,
+    )?;
+    kernel_import_calls::check_kernel_import_calls(
+        &package,
+        &links,
+        &library_resolver,
+        &mut library_cache,
     )?;
     air_specialize::plan_package_instances(
         &mut package,

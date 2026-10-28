@@ -755,6 +755,8 @@ pub fn analyze_with_cli(
                 | Target::MirWgsl
                 | Target::MirSexp
                 | Target::MirScena
+                | Target::MirFmir
+                | Target::MirFmirBinary
         )
     {
         passes::air_specialize::specialize(&mut hir, &mut radix_lanes, &mut types, interner);
