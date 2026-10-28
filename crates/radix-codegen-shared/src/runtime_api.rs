@@ -505,9 +505,10 @@ pub const FLOAT_F32_TO_BF16_BITS: RuntimeItem = RuntimeItem {
 /// `trap` rows (R0, `faber::trap`): the one place generated Rust fails. A
 /// failing index, key, conversion or assertion calls a `trap` function with a
 /// [`Trap`](`faber::Trap`) kind instead of writing `.expect(..)` / `panic!(..)`
-/// inline. The functions print the shared trap line and exit with the trap's
-/// sysexits class (`faber::trap` module doc), carrying the failure text the
-/// inline form printed. `trap.Trap` is the closed kind enum, spelled at the crate root
+/// inline. The functions unwind with the failure text the inline form printed;
+/// `trap.exit_on_trap`, called first by the generated `main`, makes them print
+/// the shared trap line and exit with the trap's sysexits class instead
+/// (`faber::trap` module doc). `trap.Trap` is the closed kind enum, spelled at the crate root
 /// as `faber::Trap`. No row applies a width limit.
 const TRAP_RUST: &[Target] = &[Target::HirRust];
 
@@ -524,6 +525,7 @@ pub const TRAP_TRAP: RuntimeItem = trap_row("Trap", RuntimeKind::Type);
 pub const TRAP_FAIL: RuntimeItem = trap_row("fail", RuntimeKind::Fn);
 pub const TRAP_RAISE: RuntimeItem = trap_row("raise", RuntimeKind::Fn);
 pub const TRAP_ABORT: RuntimeItem = trap_row("abort", RuntimeKind::Fn);
+pub const TRAP_EXIT_ON_TRAP: RuntimeItem = trap_row("exit_on_trap", RuntimeKind::Fn);
 pub const TRAP_SOME: RuntimeItem = trap_row("some", RuntimeKind::Fn);
 pub const TRAP_OK: RuntimeItem = trap_row("ok", RuntimeKind::Fn);
 pub const TRAP_OK_STATIC: RuntimeItem = trap_row("ok_static", RuntimeKind::Fn);
@@ -1286,6 +1288,7 @@ pub const TABLE: &[RuntimeItem] = &[
     TRAP_TRAP,
     TRAP_FAIL,
     TRAP_ABORT,
+    TRAP_EXIT_ON_TRAP,
     TRAP_RAISE,
     TRAP_SOME,
     TRAP_OK,

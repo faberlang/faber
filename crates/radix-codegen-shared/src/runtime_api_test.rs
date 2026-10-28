@@ -1021,6 +1021,7 @@ fn the_rust_trap_rows_spell_as_faber_trap_functions_and_the_crate_root_trap_type
             ("faber::Trap".to_owned(), RuntimeKind::Type),
             ("faber::trap::fail".to_owned(), RuntimeKind::Fn),
             ("faber::trap::abort".to_owned(), RuntimeKind::Fn),
+            ("faber::trap::exit_on_trap".to_owned(), RuntimeKind::Fn),
             ("faber::trap::raise".to_owned(), RuntimeKind::Fn),
             ("faber::trap::some".to_owned(), RuntimeKind::Fn),
             ("faber::trap::ok".to_owned(), RuntimeKind::Fn),
