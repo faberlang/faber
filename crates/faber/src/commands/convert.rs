@@ -33,7 +33,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
         let mut source = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut source) {
             eprintln!("error: failed to read <stdin>: {err}");
-            std::process::exit(exit_status::FAILURE);
+            exit_status::exit_no_input();
         }
         let path = Path::new("<stdin>");
         match convert_single_doc(path, &command.to, command.from.as_deref(), &source) {
@@ -47,15 +47,15 @@ pub fn cmd_convert(command: &ConvertCommand) {
 
     let files = match super::format::resolve_convert_paths(&command.paths) {
         Ok(files) => files,
-        Err(message) => {
+        Err((status, message)) => {
             eprintln!("error: {message}");
-            std::process::exit(exit_status::FAILURE);
+            std::process::exit(status);
         }
     };
 
     if files.is_empty() {
         eprintln!("error: no .fab files found to convert");
-        std::process::exit(exit_status::FAILURE);
+        exit_status::exit_no_input();
     }
 
     if command.stdout && files.len() > 1 {
@@ -77,7 +77,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                tally.refuse(exit_status::FAILURE);
+                tally.refuse(exit_status::NO_INPUT);
                 continue;
             }
         };
@@ -140,7 +140,7 @@ pub fn cmd_convert(command: &ConvertCommand) {
         std::process::exit(tally.refusal_status);
     }
     if tally.write_failed > 0 {
-        std::process::exit(exit_status::FAILURE);
+        exit_status::exit_cant_create();
     }
 }
 
@@ -170,7 +170,7 @@ fn convert_single_doc(
         eprintln!(
             "error: reader-locale conversion requires a faber build with feature `hir-faber`"
         );
-        Err(exit_status::FAILURE)
+        Err(exit_status::UNAVAILABLE)
     }
     #[cfg(feature = "hir-faber")]
     {

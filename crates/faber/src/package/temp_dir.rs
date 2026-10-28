@@ -37,7 +37,11 @@ pub(crate) fn unique_temp_sibling(parent: &Path, label: &str) -> Result<PathBuf,
         match fs::create_dir(&path) {
             Ok(()) => return Ok(path),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
-            Err(error) => return Err(Box::new(Diagnostic::io_error(&path, &error))),
+            Err(error) => {
+                return Err(Box::new(crate::exit_status::write_diagnostic_error(
+                    &path, &error,
+                )));
+            }
         }
     }
     Err(Box::new(crate::package_diagnostic_error(

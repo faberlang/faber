@@ -102,7 +102,7 @@ pub(crate) const PACKAGE_CHECK_MESSAGE: &str =
 #[cfg(not(feature = "runner"))]
 fn exit_runner_feature_unavailable(command: &str) -> ! {
     eprintln!("error: {command} requires the runner feature; rebuild with feature `runner`");
-    std::process::exit(1);
+    exit_status::exit_unavailable();
 }
 
 /// `faber check --air --json` machine rows (schema version 2).
@@ -217,11 +217,21 @@ pub(super) fn eprint_compile_diagnostics(diagnostics: &[radix::module::diagnosti
 ///
 /// `Diagnostic::io_error` keeps the absolutized path out of the message so the
 /// renderer names it once, and carries `path` / `base` / `artifact` as facts.
+/// This is the read side: the exit status is `NO_INPUT`.
 pub(super) fn eprint_io_error(path: &std::path::Path, err: &std::io::Error) -> ! {
     let path = package::absolutize_path(path);
     let diagnostic = radix::module::diagnostics::Diagnostic::io_error(&path, err);
     eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
-    std::process::exit(1);
+    exit_status::exit_for_diagnostic(&diagnostic);
+}
+
+/// Exit with a structured write-failure diagnostic: an output file, a
+/// directory or a standard stream that could not be written. The exit status is
+/// `CANT_CREATE`.
+pub(super) fn eprint_write_error(path: &std::path::Path, err: &std::io::Error) -> ! {
+    let diagnostic = exit_status::write_diagnostic_error(path, err);
+    eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
+    exit_status::exit_for_diagnostic(&diagnostic);
 }
 
 /// Parse argv and dispatch to the selected command handler.
@@ -320,7 +330,7 @@ fn dispatch(command: Command) {
         #[cfg(not(feature = "runner"))]
         Command::Test(_) => {
             eprintln!("error: test requires the runner feature");
-            std::process::exit(1);
+            exit_status::exit_unavailable();
         }
         Command::Lex(args) => cmd_inspect_lex(&args.input),
         Command::Parse(args) => cmd_inspect_parse(&args.input),
@@ -544,7 +554,7 @@ fn read_source(args: &[String]) -> (String, String) {
         let mut source = String::new();
         std::io::Read::read_to_string(&mut std::io::stdin(), &mut source).unwrap_or_else(|err| {
             eprintln!("error: failed to read stdin: {err}");
-            std::process::exit(1);
+            exit_status::exit_no_input();
         });
         ("<stdin>".to_owned(), source)
     } else {
@@ -637,10 +647,10 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
         let mut out = std::io::stdout().lock();
         if json {
             if let Err(err) = air_json::render_json_rows(&mut out, &rows) {
-                eprint_io_error(std::path::Path::new("<stdout>"), &err);
+                eprint_write_error(std::path::Path::new("<stdout>"), &err);
             }
         } else if let Err(err) = check_air::render_report(&mut out, &rows) {
-            eprint_io_error(std::path::Path::new("<stdout>"), &err);
+            eprint_write_error(std::path::Path::new("<stdout>"), &err);
         }
     }
     let success = result.success

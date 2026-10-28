@@ -52,21 +52,21 @@ pub fn codemod_field_modifiers(
 pub fn cmd_field_modifier_codemod(command: &FieldModifierCodemodCommand) {
     let files = match super::format::resolve_convert_paths(&command.paths) {
         Ok(files) => files,
-        Err(message) => {
+        Err((status, message)) => {
             eprintln!("error: {message}");
-            std::process::exit(1);
+            std::process::exit(status);
         }
     };
     if files.is_empty() {
         eprintln!("error: no .fab files found for field-modifier codemod");
-        std::process::exit(1);
+        faber_cli::exit_status::exit_no_input();
     }
     if command.stdout && files.len() > 1 {
         eprintln!(
             "error: --stdout accepts exactly one input file, found {}; use --check or --write for multiple files",
             files.len()
         );
-        std::process::exit(1);
+        faber_cli::exit_status::exit_usage();
     }
 
     let report_only = command.check || !command.write;
@@ -76,7 +76,7 @@ pub fn cmd_field_modifier_codemod(command: &FieldModifierCodemodCommand) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                tally.refused += 1;
+                tally.refuse(faber_cli::exit_status::NO_INPUT);
                 continue;
             }
         };
@@ -84,7 +84,7 @@ pub fn cmd_field_modifier_codemod(command: &FieldModifierCodemodCommand) {
             Ok(result) => result,
             Err(message) => {
                 eprintln!("error: {}: {message}", path.display());
-                tally.refused += 1;
+                tally.refuse(faber_cli::exit_status::DATA_ERROR);
                 continue;
             }
         };
@@ -110,21 +110,28 @@ pub fn cmd_field_modifier_codemod(command: &FieldModifierCodemodCommand) {
 
     if command.stdout {
         if tally.refused > 0 {
-            std::process::exit(1);
+            std::process::exit(tally.refusal_status);
         }
         return;
     }
     let total = files.len();
     if report_only {
         println!("{}", tally.report_summary(total));
-        if tally.changed + tally.refused > 0 {
-            std::process::exit(1);
+        if tally.refused > 0 {
+            std::process::exit(tally.refusal_status);
+        }
+        if tally.changed > 0 {
+            // Drift is a report, not a classed failure.
+            std::process::exit(faber_cli::exit_status::FAILURE);
         }
         return;
     }
     println!("{}", tally.write_summary(total));
-    if tally.refused + tally.write_failed > 0 {
-        std::process::exit(1);
+    if tally.refused > 0 {
+        std::process::exit(tally.refusal_status);
+    }
+    if tally.write_failed > 0 {
+        faber_cli::exit_status::exit_cant_create();
     }
 }
 

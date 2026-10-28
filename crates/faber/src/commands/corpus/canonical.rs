@@ -1,6 +1,6 @@
 //! Canonical generated Rust: formatted members and one batched Clippy check.
 
-use super::{Case, Judged, Outcome, SUITE_STEP_TIMEOUT, fail, ms, run_bounded, summary_status};
+use super::{Case, Judged, Outcome, SUITE_STEP_TIMEOUT, ms, run_bounded, summary_status};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -26,8 +26,9 @@ pub(super) fn execute(
     started: Instant,
 ) {
     let workspace = suite.join("target/corpus/canonical");
-    fs::create_dir_all(&workspace)
-        .unwrap_or_else(|error| fail(&format!("cannot create canonical workspace: {error}")));
+    fs::create_dir_all(&workspace).unwrap_or_else(|error| {
+        super::fail_cant_create(&format!("cannot create canonical workspace: {error}"))
+    });
     let mut rows = vec![None; cases.len()];
     let mut jobs = Vec::new();
     let mut members = Vec::new();
@@ -143,18 +144,7 @@ pub(super) fn execute(
             .and_then(|()| write_if_changed(&source, code.as_bytes()))
             .and_then(|()| write_if_changed(&manifest, manifest_text.as_bytes()));
         if let Err(error) = written {
-            rows[index] = Some(row(
-                case,
-                "fail",
-                "setup",
-                Some(format!("cannot write canonical member: {error}")),
-                Some(&argv),
-                None,
-                emit_ms,
-                0.0,
-                case_started,
-            ));
-            continue;
+            super::fail_cant_create(&format!("cannot write canonical member: {error}"));
         }
         let formatting = Instant::now();
         let fmt_argv = vec![
@@ -224,8 +214,9 @@ pub(super) fn execute(
             .map(|name| format!("    \"{name}\",\n"))
             .collect::<String>();
         let root_text = format!("[workspace]\nresolver = \"2\"\nmembers = [\n{members_text}]\n");
-        write_if_changed(&manifest, root_text.as_bytes())
-            .unwrap_or_else(|error| fail(&format!("cannot write canonical workspace: {error}")));
+        write_if_changed(&manifest, root_text.as_bytes()).unwrap_or_else(|error| {
+            super::fail_cant_create(&format!("cannot write canonical workspace: {error}"))
+        });
         let argv = vec![
             "cargo".to_owned(),
             "clippy".to_owned(),
@@ -370,7 +361,7 @@ pub(super) fn execute(
     let mut not_applicable = 0;
     for (index, row) in rows.into_iter().enumerate() {
         let Some(mut value) = row else {
-            fail(&format!(
+            super::fail_software(&format!(
                 "no result recorded for canonical case {}",
                 cases[index].id
             ))

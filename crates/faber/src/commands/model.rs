@@ -76,7 +76,7 @@ fn cmd_model_inspect(args: ModelInspectArgs) {
             Err(err) => super::eprint_io_error(path, &err),
             Ok(_) => {
                 eprintln!("error: no such file: {}", path.display());
-                std::process::exit(1);
+                faber_cli::exit_status::exit_no_input();
             }
         }
     }
@@ -101,7 +101,7 @@ fn cmd_model_inspect(args: ModelInspectArgs) {
         Ok(h) => h,
         Err(msg) => {
             eprintln!("error: invalid safetensors file: {}", msg);
-            std::process::exit(1);
+            faber_cli::exit_status::exit_data_error();
         }
     };
 

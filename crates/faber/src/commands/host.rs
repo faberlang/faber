@@ -67,7 +67,7 @@ fn cmd_host_manifest(args: &ManifestArgs) {
             Ok(json) => println!("{json}"),
             Err(error) => {
                 eprintln!("failed to serialize host manifest: {error}");
-                std::process::exit(70);
+                faber_cli::exit_status::exit_software();
             }
         }
         return;
