@@ -803,6 +803,7 @@ impl FunctionBuilder<'_> {
                 return match entry.mir_kind {
                     radix_intrinsics::IntrinsicMirKind::HigherOrderAll => self.lower_omnia(receiver, closure, expr),
                     radix_intrinsics::IntrinsicMirKind::HigherOrderAny => self.lower_quilibet(receiver, closure, expr),
+                    radix_intrinsics::IntrinsicMirKind::HigherOrderFind => self.lower_reperta(receiver, closure, expr),
                     radix_intrinsics::IntrinsicMirKind::HigherOrderFiltrata => {
                         self.lower_filtrata(receiver, closure, expr)
                     }

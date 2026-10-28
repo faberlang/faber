@@ -578,6 +578,41 @@ fn translated_pack_rows_resolve_both_twins_on_lista() {
     }
 }
 
+/// List `find` (la `reperta`) and regex `find` (la `inventa`) share a surface in
+/// every translated pack and stay apart by receiver family: each family's
+/// reverse cache maps the one surface to its own canonical row.
+#[test]
+fn list_find_and_regex_find_share_a_surface_and_resolve_by_receiver_family() {
+    for (locale, find_surface) in [
+        ("en", "find"),
+        ("ar", "ابحث"),
+        ("hi", "खोज"),
+        ("th-TH", "ค้นหา"),
+        ("vi", "tìm"),
+        ("zh-Hans", "查找"),
+        ("zh-Hant", "尋找"),
+    ] {
+        let pack = pack(locale);
+        assert_eq!(
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, find_surface),
+            Some("reperta"),
+            "{locale}: `{find_surface}` must be the list search row"
+        );
+        assert_eq!(
+            pack.intrinsic_canonical(IntrinsicReceiver::Regex, find_surface),
+            Some("inventa"),
+            "{locale}: `{find_surface}` must stay the regex find row"
+        );
+    }
+    let source = "fn probe(list<int> xs, regex r) → int ∪ none {\n    let _ m ← r.find(\"a\")\n    return xs.find(int d ∴ d ≻ 10)\n}\n";
+    let unit = analyze(source, Some(en_pack())).expect("en list `find` and regex `find` must typecheck together");
+    assert_eq!(
+        method_call_spellings(&unit.hir, &unit.interner),
+        vec!["inventa".to_owned(), "reperta".to_owned()],
+        "the one en surface must rewrite to each receiver's own canonical spelling"
+    );
+}
+
 /// done-when (pack-authoritative): the canonical Latin `omnia` spelling is not
 /// a declared en surface — the same miss law the other rows already prove.
 #[test]

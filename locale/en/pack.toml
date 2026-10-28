@@ -282,7 +282,7 @@ exchange = "exchange"
 load = "load"
 store = "store"
 
-# lista (28)
+# lista (29)
 accipe = "get"
 # sermo directional view methods (SERMO_VIEW_METHODS): `accipe` / `cursor`
 # are shared with the rows above and below; `fini` / `exhauri` live only here.
@@ -315,6 +315,7 @@ prima = "take"
 primus = "first"
 quilibet = "any"
 reducta = "reduce"
+reperta = "find"
 detrahe = "remove_last"
 sectio = "slice"
 summa = "sum"

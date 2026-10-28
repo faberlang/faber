@@ -264,6 +264,28 @@ fn predicate_twins_are_boolean_lista_higher_order_rows() {
 }
 
 #[test]
+fn reperta_is_an_optional_predicate_search_row_beside_primus() {
+    let entry = lookup_method(IntrinsicReceiver::Lista, "reperta", 1).expect("lista reperta row");
+    assert_eq!(entry.params, &[IntrinsicParamKind::Predicate]);
+    assert_eq!(entry.return_kind, IntrinsicReturnKind::OptionInner);
+    assert_eq!(entry.mir_kind, IntrinsicMirKind::HigherOrderFind);
+    assert!(mir_is_higher_order_lista(entry));
+    assert_eq!(mir_collection_op(entry), None);
+    assert_eq!(mir_atomic_op(entry), None);
+    // One signature only: no zero-argument overload, and `primus` is untouched.
+    assert!(lookup_method(IntrinsicReceiver::Lista, "reperta", 0).is_none());
+    let primus = lookup_method(IntrinsicReceiver::Lista, "primus", 0).expect("primus row");
+    assert_eq!(
+        primus.mir_kind,
+        IntrinsicMirKind::Collection(MirCollectionOp::First)
+    );
+    // The regex `inventa` row is its own row on its own receiver.
+    assert!(lookup_method(IntrinsicReceiver::Regex, "reperta", 1).is_none());
+    assert!(lookup_method(IntrinsicReceiver::Lista, "inventa", 1).is_none());
+    assert!(lookup_method(IntrinsicReceiver::Regex, "inventa", 1).is_some());
+}
+
+#[test]
 fn receivers_for_type_maps_semantic_families() {
     let mut types = radix_types::TypeTable::new();
     let element = types.intern(Type::Primitive(Primitive::Numerus));
