@@ -1,7 +1,7 @@
 //! Tests for figura expression lowering and formatting.
 //!
 //! These tests prove that figura (shape) expressions are correctly lowered
-//! from syntax to index expressions and that format_figura produces
+//! from syntax to index expressions and that `format_figura` produces
 //! expected surface syntax.
 
 use super::{format_figura, lower_figura_expr};

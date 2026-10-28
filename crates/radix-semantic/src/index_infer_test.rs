@@ -1,8 +1,8 @@
 //! Tests for index inference state and constraint solving.
 //!
-//! These tests prove that IndexInferState correctly produces IndexConstraint
+//! These tests prove that `IndexInferState` correctly produces `IndexConstraint`
 //! values and that incompatible index expressions produce expected
-//! IndexInferError diagnostics.
+//! `IndexInferError` diagnostics.
 
 use super::{IndexConstraint, IndexInferError, IndexInferState};
 use crate::TypeTable;

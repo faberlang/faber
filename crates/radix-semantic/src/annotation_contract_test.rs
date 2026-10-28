@@ -396,22 +396,22 @@ functio apply() → vacuum {
 #[test]
 fn commune_field_uniqueness_diagnostics_keep_issue_args() {
     expect_definition_issues(
-        r#"discretio Eventum {
+        r"discretio Eventum {
     @ commune
     textus message
     @ commune
     textus message
 }
-"#,
+",
         &["duplicate_commune_field"],
     );
-    let parsed = parse(lex(r#"discretio Eventum {
+    let parsed = parse(lex(r"discretio Eventum {
     @ commune
     textus message
 
     Variant { textus message }
 }
-"#));
+"));
     assert!(parsed.errors.iter().any(|error| {
         error
             .args

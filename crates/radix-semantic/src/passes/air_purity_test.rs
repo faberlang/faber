@@ -819,8 +819,8 @@ fn block_contains_kind(
             radix_hir::visit::walk_expr(self, expr);
         }
     }
-    let mut found = Contains(false, &pred);
     use radix_hir::visit::HirVisitor as _;
+    let mut found = Contains(false, &pred);
     found.visit_block(block);
     found.0
 }
