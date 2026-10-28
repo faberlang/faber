@@ -56,7 +56,7 @@ use radix::program::discovery::BuildLayout;
     feature = "hir-ts",
     feature = "mir-wasm"
 ))]
-fn discover_build_layout(
+pub(super) fn discover_build_layout(
     input: &Path,
     out_dir: &Path,
 ) -> Result<BuildLayout, Box<radix::module::Diagnostic>> {
@@ -418,6 +418,18 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                     }
                     Err(diag) => fail_with_diagnostic(&diag),
                 }
+            }
+        }
+        // Otherwise the package is a Node program: write a self-contained
+        // project under target/faber/ts, compile it with the backend recipe
+        // and print the launcher.
+        match super::ts_build::build_ts_program(&config, &input_path, &layout) {
+            Ok(program) => {
+                println!("{}", program.launcher.display());
+                return;
+            }
+            Err(diagnostics) => {
+                super::ts_build::report_and_exit(&diagnostics, locale_pack.as_ref())
             }
         }
     }

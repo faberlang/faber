@@ -71,8 +71,12 @@ mod rust_runtime_dependency;
 pub mod target_gate;
 mod temp_dir;
 mod test_route;
+mod ts_build;
 #[cfg(feature = "hir-ts")]
 mod ts_package;
+mod ts_project;
+mod ts_recipe;
+mod ts_runtime;
 
 #[cfg(feature = "hir-rust")]
 #[cfg(test)]
@@ -99,6 +103,7 @@ pub use cmd::{
     CHECKS_BUT_DOES_NOT_LOWER, DeviceAdviceRequest, cmd_build, cmd_check_package, cmd_emit_package,
     should_treat_as_package_from_args, use_package_compiler_from_args,
 };
+pub use ts_build::cmd_run_ts;
 #[cfg(feature = "hir-go")]
 #[cfg(test)]
 pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build};

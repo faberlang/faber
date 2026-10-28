@@ -120,8 +120,8 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     let (stdout, stderr, ok) = run_faber(&["targets"]);
     assert!(ok, "faber targets failed:\n{stderr}");
 
-    // `faber run` interprets source and takes no `--target`; the only target
-    // routes it reaches are the `--device metal|cuda` launches.
+    // `faber run` interprets source; the only target routes it reaches are the
+    // `--device metal|cuda` launches and the compiled `--target ts` build.
     let runnable: Vec<&str> = stdout
         .lines()
         .filter(|line| line.contains(" run=yes "))
@@ -130,7 +130,7 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     assert!(
         runnable
             .iter()
-            .all(|name| ["metal-text", "llvm-text"].contains(name)),
+            .all(|name| ["metal-text", "llvm-text", "ts"].contains(name)),
         "only the device routes may report run=yes, got {runnable:?}:\n{stdout}"
     );
 
@@ -150,7 +150,7 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
         );
     }
 
-    // And the dispatch agrees: `faber run` takes no `--target` for any of them.
+    // And the dispatch agrees: `faber run` takes no other `--target` for any of them.
     for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
         let (_, stderr, status) = run_faber_status(&["run", "--target", name, "."]);
         assert!(

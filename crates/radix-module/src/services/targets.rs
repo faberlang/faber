@@ -365,6 +365,13 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             package: true,
             note: "compact package MIR binary image via `faber build --target fmir`; `faber run` does not take the image",
         },
+        crate::codegen::Target::HirTypeScript => TargetCapabilities {
+            check: true,
+            build: true,
+            run: false,
+            package: true,
+            note: "file emission; `faber build` on a package writes a self-contained Node project (`tsc` and `node` from PATH); `faber run --target ts` builds and runs it",
+        },
         crate::codegen::Target::HirFhir => TargetCapabilities {
             check: true,
             build: true,

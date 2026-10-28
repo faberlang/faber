@@ -102,15 +102,27 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[(
 
 /// Whether `faber run` reaches `target`.
 ///
-/// `faber run` interprets source and takes no `--target`; the only targets it
-/// reaches are the device routes selected by `--device`, so this is derived
-/// from [`DeviceChoice::run_target_spelling`], the same match that maps a device choice
-/// to its route. A built FMIR image, a FHIR envelope, a native host
-/// executable and a Rust package are build outputs, never `faber run` inputs.
+/// `faber run` interprets source by default; the targets it reaches are the
+/// device routes selected by `--device` ([`DeviceChoice::run_target_spelling`],
+/// the same match that maps a device choice to its route) and the compiled
+/// targets `--target` builds and runs ([`RunTarget`]). A built FMIR image, a
+/// FHIR envelope, a native host executable and a Rust package are build
+/// outputs, never `faber run` inputs.
 fn faber_run_reaches(target: Target) -> bool {
+    let name = target.to_string();
     DeviceChoice::value_variants()
         .iter()
-        .any(|choice| choice.run_target_spelling() == Some(target.to_string().as_str()))
+        .any(|choice| choice.run_target_spelling() == Some(name.as_str()))
+        || run_target_names().contains(&name)
+}
+
+/// The spellings `faber run --target` accepts.
+fn run_target_names() -> Vec<String> {
+    crate::cli::RunTarget::value_variants()
+        .iter()
+        .filter_map(|target| target.to_possible_value())
+        .map(|value| value.get_name().to_owned())
+        .collect()
 }
 
 /// One rendered capability row.

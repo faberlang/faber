@@ -76,6 +76,10 @@ struct SuiteTarget {
     build: Vec<String>,
     #[serde(default)]
     run: Vec<String>,
+    /// Run command for a package case whose `faber build` printed a linked
+    /// artifact; without it the case runs `run` like a single-file emit.
+    #[serde(default)]
+    package_run: Vec<String>,
     #[serde(default)]
     files: BTreeMap<PathBuf, String>,
     #[serde(default)]
