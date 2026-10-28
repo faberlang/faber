@@ -649,9 +649,10 @@ impl TypeChecker<'_> {
     /// Refinement for one non-compound condition (null probe, member test,
     /// or null equality).
     fn leaf_refinement(&mut self, cond: &HirExpression) -> LeafRefinement {
-        #[cfg(test)]
-        if let Some(probed) = super::flow_range_probe::leaf(self, cond) {
-            return probed;
+        // Integer guards (`x ≺ n`, `x ≡ y`, …) carry interval facts; any other
+        // leaf falls through to the null and member probes.
+        if let Some(guard) = self.guard_refinement(cond) {
+            return guard;
         }
         if let HirExpressionKind::TypeCheck { positive, expr, ty } = &cond.kind {
             // A type test against the null type is the null-presence probe:
@@ -1303,9 +1304,8 @@ impl TypeChecker<'_> {
         for base in effects.field_roots {
             self.field_facts.retain(|(root, _), _| *root != base);
         }
-        if effects.kills_ranges {
-            self.kill_mutable_source_ranges();
-        }
+        // Calls and projected stores were already killed where they were
+        // checked (`kills_ranges` serves the loop-entry scan only).
     }
 
     /// Kill every interval fact about a mutable source (need, the

@@ -29,8 +29,8 @@
 //! `FactKey::Field` joins are not built, so interval facts are keyed by binding
 //! only; a range value attached to a field-path key is ignored.
 
-// Slice 3 adds the producers; until then only the tests construct bounds, facts
-// and queries, so a non-test build sees them as unused.
+// The consumers (slices 4-5) use the queries (`proves_at_least`, `proves_at_most`);
+// until then only the tests call them, so a non-test build sees them as unused.
 #![cfg_attr(not(test), allow(dead_code))]
 
 use std::cmp::Ordering;
@@ -107,6 +107,18 @@ impl Endpoint {
     pub(super) fn new(key: BoundKey, strict: bool) -> Self {
         Self { key, strict }
     }
+
+    /// A strict literal endpoint moved `step` to the adjacent integer and made
+    /// non-strict; anything else unchanged.
+    fn normalized(self, step: i128) -> Self {
+        match (&self.key, self.strict) {
+            (BoundKey::Const(value), true) => match value.checked_add(step) {
+                Some(adjacent) => Self::new(BoundKey::Const(adjacent), false),
+                None => self,
+            },
+            _ => self,
+        }
+    }
 }
 
 /// An integer interval with optional symbolic endpoints. An absent endpoint is
@@ -129,6 +141,43 @@ impl IntRange {
         Self {
             lo: None,
             hi: Some(Endpoint::new(key, strict)),
+        }
+    }
+
+    /// The interval holding exactly the value `key` names.
+    pub(super) fn exact(key: BoundKey) -> Self {
+        Self {
+            lo: Some(Endpoint::new(key.clone(), false)),
+            hi: Some(Endpoint::new(key, false)),
+        }
+    }
+
+    /// Integer strictness normalised: a strict literal endpoint becomes the
+    /// adjacent non-strict integer (`> 5` is `≥ 6`, `< 5` is `≤ 4`). Only
+    /// sound for integer subjects, which is all the producers admit. A strict
+    /// symbolic endpoint stays strict: it has no adjacent literal.
+    pub(super) fn normalized(self) -> Self {
+        Self {
+            lo: self.lo.map(|lo| lo.normalized(1)),
+            hi: self.hi.map(|hi| hi.normalized(-1)),
+        }
+    }
+
+    /// The range of `max(a, b)`: bounded below by either operand's lower
+    /// bound (the stronger one), and above only when both operands are.
+    pub(super) fn max_of(&self, other: &Self) -> Self {
+        Self {
+            lo: meet_side(self.lo.as_ref(), other.lo.as_ref(), Ordering::Greater),
+            hi: hull_side(self.hi.as_ref(), other.hi.as_ref(), Ordering::Greater),
+        }
+    }
+
+    /// The range of `min(a, b)`: bounded above by either operand's upper
+    /// bound (the stronger one), and below only when both operands are.
+    pub(super) fn min_of(&self, other: &Self) -> Self {
+        Self {
+            lo: hull_side(self.lo.as_ref(), other.lo.as_ref(), Ordering::Less),
+            hi: meet_side(self.hi.as_ref(), other.hi.as_ref(), Ordering::Less),
         }
     }
 
@@ -188,6 +237,20 @@ impl IntRange {
     }
 }
 
+/// How useful an endpoint key is to a consumer, to choose between two valid but
+/// incomparable ones. A lower side wants an absolute floor first. An upper side
+/// wants a relation to a length or extent first, then a literal ceiling; a bare
+/// binding bound is the weakest, since it only restates the value's own name.
+fn usefulness(key: &BoundKey, lower: bool) -> u8 {
+    match (key, lower) {
+        (BoundKey::Const(_), true) => 3,
+        (BoundKey::Axis(_) | BoundKey::LiveLength { .. }, true) => 2,
+        (BoundKey::Axis(_) | BoundKey::LiveLength { .. }, false) => 3,
+        (BoundKey::Const(_), false) => 2,
+        (BoundKey::Binding(_), _) => 1,
+    }
+}
+
 /// `want` is `Greater` when the stronger endpoint is the larger one (lower
 /// bounds) and `Less` when it is the smaller one (upper bounds).
 fn meet_side(a: Option<&Endpoint>, b: Option<&Endpoint>, want: Ordering) -> Option<Endpoint> {
@@ -196,7 +259,17 @@ fn meet_side(a: Option<&Endpoint>, b: Option<&Endpoint>, want: Ordering) -> Opti
             Some(Ordering::Equal) => Endpoint::new(a.key.clone(), a.strict || b.strict),
             Some(order) if order == want => a.clone(),
             Some(_) => b.clone(),
-            None => a.clone(),
+            // Two valid but incomparable endpoints: keep one. A lower side
+            // keeps an absolute floor (consumers need `0 ≤ i`); an upper side
+            // keeps a relation (consumers need `i < len`).
+            None => {
+                let lower = want == Ordering::Greater;
+                if usefulness(&b.key, lower) > usefulness(&a.key, lower) {
+                    b.clone()
+                } else {
+                    a.clone()
+                }
+            }
         }),
         (Some(only), None) | (None, Some(only)) => Some(only.clone()),
         (None, None) => None,
@@ -252,11 +325,17 @@ impl RangeSnapshot {
     /// current version.
     fn prune_stale(&mut self) {
         let versions = &self.versions;
-        self.facts.retain(|_, range| {
-            range
-                .live_length_sources()
-                .all(|(source, version)| versions.get(&source).copied().unwrap_or(0) == version)
-        });
+        let current = |key: &BoundKey| match key {
+            BoundKey::LiveLength { source, version } => {
+                versions.get(source).copied().unwrap_or(0) == *version
+            }
+            _ => true,
+        };
+        for range in self.facts.values_mut() {
+            range.lo = range.lo.take().filter(|lo| current(&lo.key));
+            range.hi = range.hi.take().filter(|hi| current(&hi.key));
+        }
+        self.facts.retain(|_, range| !range.is_unbounded());
     }
 }
 
@@ -345,22 +424,30 @@ impl RangeFlow {
     }
 
     /// Kill every fact about a mutable source (the version-1 closed rule):
-    /// facts whose subject is mutable, and facts bounded by the live length of
-    /// a mutable source. Every killed source gets a fresh version.
+    /// facts whose subject is mutable, and the endpoints bounded by the live
+    /// length of a mutable source (the rest of such a fact stays). Every
+    /// killed source gets a fresh version.
     pub(super) fn kill_mutable_sources(&mut self, is_mutable: impl Fn(DefId) -> bool) {
         let mut moved: Vec<DefId> = Vec::new();
         self.now.facts.retain(|subject, range| {
-            let mut live = !is_mutable(*subject);
-            for (source, _) in range.live_length_sources() {
-                if is_mutable(source) {
-                    live = false;
-                    moved.push(source);
-                }
-            }
-            if !live {
+            if is_mutable(*subject) {
                 moved.push(*subject);
+                moved.extend(range.live_length_sources().map(|(source, _)| source));
+                return false;
             }
-            live
+            let mut strip = |endpoint: &mut Option<Endpoint>| {
+                let on_mutable = endpoint
+                    .as_ref()
+                    .and_then(|endpoint| endpoint.key.live_length_source())
+                    .filter(|(source, _)| is_mutable(*source));
+                if let Some((source, _)) = on_mutable {
+                    moved.push(source);
+                    *endpoint = None;
+                }
+            };
+            strip(&mut range.lo);
+            strip(&mut range.hi);
+            !range.is_unbounded()
         });
         moved.sort_by_key(|def| def.0);
         moved.dedup();

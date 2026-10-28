@@ -104,7 +104,11 @@ pub(super) fn check_range_product_expr(
     for ((def_id, _), element) in bindings.iter().zip(element_tys.iter()) {
         checker.insert_binding(*def_id, *element);
     }
+    for ((def_id, name), range) in bindings.iter().zip(ranges.iter()) {
+        checker.seed_range_loop_binder(*def_id, *name, range);
+    }
     checker.check_loop_block(body);
+    checker.release_range_binders(bindings.iter().map(|(def_id, _)| *def_id));
     checker.pop_scope();
     checker.vacuum_type()
 }
