@@ -927,6 +927,7 @@ impl Lowerer<'_> {
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(..)
             | Type::SizedInstans(_)
             | Type::Struct(_)

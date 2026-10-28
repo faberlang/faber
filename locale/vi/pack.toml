@@ -890,6 +890,10 @@ help = "viết hình dạng bằng ngoặc vuông độ rộng của đường t
 message = "`{form}` là cách viết kiểu số đã bị loại bỏ"
 help = "viết `{bare}` thay vì `{form}`; dấu hiệu độ rộng tự nó là một kiểu"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "phạm vi cần cả hai đầu mút"
+help = "viết cả hai đầu mút, ví dụ 0‥8 hoặc 0…7; dùng ∞ hoặc -∞ khi một phía không giới hạn"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "kiểu '{type}' không được khai báo trên bề mặt ngôn ngữ đọc này"
 help = "dùng chính tả kiểu được khai báo trong ngôn ngữ đọc này{?expected|: '|'}"
@@ -1185,6 +1189,38 @@ help = "viết kiểu trapping với một độ rộng, ví dụ trapping<u8> h
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "độ rộng trapping phải là một dấu độ rộng trần"
 help = "dùng một dấu độ rộng trần như u8 hoặc i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "phạm vi cần một từ chính sách lưu; dấu chiều rộng trần không nhận phạm vi"
+help = "viết từ chính sách trước, ví dụ saturating<u32, 0‥8>, trapping<i32, -2‥3> hoặc wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "đầu mút của phạm vi phải là số nguyên literal hoặc ∞"
+help = "viết cả hai đầu mút là số nguyên literal, ví dụ 0‥8; đầu mút có tên hoặc theo size chưa được hỗ trợ"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "chính sách lưu có phạm vi nhận chiều rộng rồi đến một phạm vi"
+help = "viết policy<W, lo‥hi>, ví dụ saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "phạm vi không chứa giá trị nào"
+help = "đầu thấp phải nhỏ hơn đầu cao với lo‥hi, hoặc không lớn hơn với lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "một đầu mút của phạm vi nằm ngoài chiều rộng"
+help = "giữ cả hai đầu mút trong chiều rộng; ∞ chỉ là đầu cao và -∞ chỉ là đầu thấp"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "chiều rộng không dấu không thể có đầu thấp âm"
+help = "bắt đầu phạm vi từ 0, hoặc dùng chiều rộng có dấu như i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "chính sách lưu có phạm vi cần chiều rộng số nguyên có giới hạn"
+help = "dùng chiều rộng số nguyên như u8 hoặc i32; chiều rộng float, decimal và inf chưa nhận phạm vi"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "kernel chưa dùng được chính sách lưu có phạm vi ({site}); kernel không áp dụng phạm vi"
+help = "dùng chiều rộng thường trong kernel và áp dụng phạm vi ở phía host"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
@@ -1701,6 +1737,10 @@ help = "chỉ khai báo kiểu; dùng map ({tabula}) cho đến khi các phép t
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "kiểu ledger chưa được hỗ trợ trên đích này"
 help = "dùng MIR runner hoặc bộ phát nguồn Faber, hoặc dùng map ({tabula})"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "đích này chưa hỗ trợ chính sách lưu có phạm vi"
+help = "dùng MIR runner, đích Rust hoặc bộ phát nguồn Faber cho đến khi đích này áp dụng phạm vi"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "lá {leaf} không được hỗ trợ trên đích này"

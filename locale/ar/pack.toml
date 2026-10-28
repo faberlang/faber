@@ -890,6 +890,10 @@ help = "اكتب shape باستخدام {sugar} width sugar brackets"
 message = "الصيغة المغلّفة `{form}` للنوع العددي ملغاة"
 help = "اكتب `{bare}` بدلا من `{form}`؛ علامة العرض هي نوع بحد ذاتها"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "يحتاج النطاق إلى طرفين"
+help = "اكتب الطرفين، مثل 0‥8 أو 0…7، واستخدم ∞ أو -∞ حين لا يكون لجهة حدّ"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "النوع '{type}' غير معلن على سطح القارئ هذا"
 help = "استخدم تهجئة النوع المعلنة في لغة القارئ هذه{?expected|: '|'}"
@@ -1185,6 +1189,38 @@ help = "اكتب نوع trapping بعرض واحد، مثل trapping<u8> أو tr
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "عرض trapping يجب أن يكون علامة عرض مجردة"
 help = "استخدم علامة عرض مجردة مثل u8 أو i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "يحتاج النطاق إلى كلمة سياسة تخزين؛ علامة العرض المجردة لا تقبل نطاقًا"
+help = "اكتب كلمة السياسة أولًا، مثل saturating<u32, 0‥8> أو trapping<i32, -2‥3> أو wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "يجب أن يكون طرف النطاق عددًا صحيحًا حرفيًا أو ∞"
+help = "اكتب الطرفين كعددين صحيحين حرفيين، مثل 0‥8؛ الطرف المسمّى أو طرف size غير مدعوم بعد"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "تأخذ سياسة التخزين ذات النطاق العرض ثم نطاقًا واحدًا"
+help = "اكتب policy<W, lo‥hi>، مثل saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "النطاق لا يحوي أي قيمة"
+help = "يجب أن يكون الطرف الأدنى أصغر من الأعلى في lo‥hi، أو غير أكبر منه في lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "أحد طرفي النطاق خارج العرض"
+help = "أبقِ الطرفين داخل العرض؛ ∞ طرف أعلى فقط و -∞ طرف أدنى فقط"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "لا يمكن أن يكون للعرض غير المُوقَّع طرف أدنى سالب"
+help = "ابدأ النطاق من 0، أو استخدم عرضًا مُوقَّعًا مثل i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "تحتاج سياسة التخزين ذات النطاق إلى عرض عدد صحيح محدود"
+help = "استخدم عرض عدد صحيح مثل u8 أو i32؛ عروض float وdecimal وinf لا تقبل نطاقًا بعد"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "لا يستطيع kernel استخدام سياسة تخزين ذات نطاق بعد ({site}); لا يطبّق kernel النطاقات"
+help = "استخدم العرض العادي داخل kernel وطبّق النطاق على المضيف"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
@@ -1701,6 +1737,10 @@ help = "صرّح بالنوع فقط؛ استخدم {tabula} حتى تتوفر �
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "نوع الدفتر غير مدعوم في هذا الهدف بعد"
 help = "استخدم مشغّل MIR أو مُصدِر مصدر Faber أو {tabula} حتى يدعم هذا الهدف الدفتر"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "هذا الهدف لا يدعم سياسة التخزين ذات النطاق بعد"
+help = "استخدم MIR runner أو هدف Rust أو مُصدِر مصدر Faber إلى أن يطبّق هذا الهدف النطاقات"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "ورقة {leaf} غير مدعومة في هذا الهدف"

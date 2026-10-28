@@ -393,6 +393,7 @@ impl UseVisitor<'_> {
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)
             | Type::Tuple(_)

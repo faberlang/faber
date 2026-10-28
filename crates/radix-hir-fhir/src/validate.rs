@@ -1137,8 +1137,9 @@ fn validate_type_form(
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
                     }
                 }
-                radix_types::Type::PolicyFloat(_, _) => {
-                    // `trapping<f32>` / `saturating<f64>` are authored at the
+                radix_types::Type::PolicyFloat(_, _) | radix_types::Type::RangedInt { .. } => {
+                    // `trapping<f32>` / `saturating<f64>` and a ranged store
+                    // policy (`trapping<i32, -2‥3>`) are authored at the
                     // POLICY level; the long form remains legal.
                     if !matches!(level.0, 0 | 2) || !form.args.is_empty() {
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
@@ -3993,6 +3994,7 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::ModularWord(_)
             | radix_types::Type::Bits(_)
             | radix_types::Type::SaturatingWord(_)
+            | radix_types::Type::RangedInt { .. }
             | radix_types::Type::PolicyFloat(_, _)
             | radix_types::Type::SizedInstans(_)
             | radix_types::Type::Infer(_)

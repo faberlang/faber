@@ -385,6 +385,7 @@ pub fn generate_from_analyzed_with_options(
     radix_codegen_shared::reject_hir_errors(analysis.hir())?;
     radix_codegen_shared::reject_bits_type(analysis.types(), target)?;
     radix_codegen_shared::reject_ledger_type(analysis.types(), target)?;
+    radix_codegen_shared::reject_ranged_int_type(analysis.types(), target)?;
     reject_unsupported_leaves(analysis, target)?;
     if !target.is_available() {
         return Err(unavailable_target_error(target));
@@ -1216,8 +1217,7 @@ pub fn generate_go_cli(
 ) -> Result<crate::GoOutput, CodegenError> {
     #[cfg(feature = "hir-go")]
     {
-        radix_codegen_shared::reject_bits_type(types, Target::HirGo)?;
-        radix_codegen_shared::reject_ledger_type(types, Target::HirGo)?;
+        radix_codegen_shared::reject_unlowered_value_types(types, Target::HirGo)?;
         reject_leaf_routes_in_hir(hir, interner, Target::HirGo)?;
         let hir = hir.without_unavailable_declarations(interner);
         go::generate_go_cli(&hir, types, interner, cli_program, display_tokens)
@@ -1245,8 +1245,7 @@ pub fn generate_ts_cli(
     #[cfg(feature = "hir-ts")]
     {
         radix_codegen_shared::reject_hir_errors(hir)?;
-        radix_codegen_shared::reject_bits_type(types, Target::HirTypeScript)?;
-        radix_codegen_shared::reject_ledger_type(types, Target::HirTypeScript)?;
+        radix_codegen_shared::reject_unlowered_value_types(types, Target::HirTypeScript)?;
         reject_leaf_routes_in_hir(hir, interner, Target::HirTypeScript)?;
         let ir = cli_ir::to_cli_ir(cli_program);
         let hir = hir.without_unavailable_declarations(interner);
@@ -1276,8 +1275,7 @@ pub fn generate_python_cli(
     #[cfg(feature = "hir-python")]
     {
         radix_codegen_shared::reject_hir_errors(hir)?;
-        radix_codegen_shared::reject_bits_type(types, Target::HirPython)?;
-        radix_codegen_shared::reject_ledger_type(types, Target::HirPython)?;
+        radix_codegen_shared::reject_unlowered_value_types(types, Target::HirPython)?;
         reject_leaf_routes_in_hir(hir, interner, Target::HirPython)?;
         let ir = cli_ir::to_cli_ir(cli_program);
         let hir = hir.without_unavailable_declarations(interner);

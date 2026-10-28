@@ -740,6 +740,9 @@ fn generate_output(
     radix_codegen_shared::reject_bits_type(&analysis.types, target)?;
     // A ledger (`ledger<K, V>`) likewise has no carrier on any target yet.
     radix_codegen_shared::reject_ledger_type(&analysis.types, target)?;
+    // A ranged store policy is applied only by the Faber re-emitter, the MIR
+    // runner and the Rust target; every other target refuses it by name.
+    radix_codegen_shared::reject_ranged_int_type(&analysis.types, target)?;
     crate::codegen::reject_unsupported_leaves(analysis, target)?;
     // A list window `xs[lo‥hi]` likewise has only those two executors; every
     // other target refuses it by one named issue until its emission lands.

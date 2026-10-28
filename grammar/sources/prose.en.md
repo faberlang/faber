@@ -758,6 +758,48 @@ propagates, and nothing clamps to the largest finite value. Only `trapping<F>`
 errors, and only when a non-finite value is stored or converted into it.
 `modulus<F>` (en `wrapping<F>`) is still rejected: a modular word takes an
 integer width. The trapping float cell is not available on device targets.
+
+**Ranged store policies.** A store policy takes a range as a
+second argument after the width: `saturatus<u32, 0‥8>` (en
+`saturating<u32, 0‥8>`) stores into `u32` and clamps into `[0, 8)`;
+`exactus<i32, -2‥3>` (en `trapping<i32, -2‥3>`) traps outside `[-2, 3)`;
+`modulus<u32, 0‥8>` (en `wrapping<u32, 0‥8>`) reduces modulo the range's
+length, offset by its low end, so `10` stored in `wrapping<u32, 0‥8>` is `2`.
+The range is its own type-argument slot (`range_argument`), told apart from a
+type or a `size` argument by the range glyph after its first bound.
+
+- **The width stays explicit.** The representation, the ABI and the kernel index
+  envelope are the width's; the range refines inside it and must fit it. Both
+  ends are always written (`0…` alone is `PARSE040 range_bound_required`).
+  `‥` is half-open (`0‥8` holds `0` through `7`) and `…` is inclusive (`0…7`).
+  `∞` and `-∞` mean no bound on that side (`saturating<i32, -∞‥8>`); `∞` stays
+  illegal as an integer value. Unsigned widths need a low end of at least 0;
+  signed widths take negative ends (`-2‥3`). A range the width cannot hold, an
+  empty range, a named or `size` end (not built: `ranged_policy_bound_not_constant`)
+  and a float, decimal or `inf` width are named `SEM008` refusals.
+- **The policy word is mandatory.** `u8<0‥8>` is
+  `SEM008 ranged_policy_word_required`; the edge behaviour is always visible.
+- **Each existing form is sugar for one explicit form.** `saturating<u8>` is
+  `saturating<u8, 0…255>`, a bare `u8` is `trapping<u8, 0…255>` and `inf` is
+  `trapping<inf, -∞…∞>`. A range that is the whole width is the plain form:
+  the two spellings are one type, and no existing program changes.
+- **Arithmetic stays unbounded; the store applies the range.** A value read from
+  a ranged cell computes as its width, so `cx + 1` is exact and
+  `saturating<u32, 0‥8>` mixes with any other `saturating<u32, ..>` value in
+  arithmetic. Only a store into a ranged cell (declaration, assignment, argument,
+  return, field, element, `↑` `↓`) applies the policy once; storing a value of
+  another range is a store. A constant stored with `←` follows the policy, and a
+  trapping cell's certain trap is a compile error. The policy families do not
+  mix implicitly: a plain integer reaches a `saturating` or `wrapping` ranged
+  cell through `↦`, which reduces or clamps and cannot fail, exactly as for the
+  unranged words; `↦` into a `trapping` ranged cell is a checked narrowing and is
+  failable.
+- **Where it is built.** The MIR runner and the Rust target apply a range;
+  the Faber source emitter keeps the authored form (`faber format` prints a
+  range half-open); every other target and every kernel refuse the type by name
+  (`SEM010 ranged_policy_target_unsupported`, `SEM008 nucleum_ranged_policy_not_built`).
+  Float ranges, index containment, kernel facts and list length ranges are the
+  later parts of the series.
 **Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with

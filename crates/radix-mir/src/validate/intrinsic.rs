@@ -3819,7 +3819,10 @@ impl Validator<'_, '_> {
     /// Whether `element` is a `wrapping` or `saturating` word and `result` is
     /// a plain integer whose range holds every value of the word's width.
     fn word_sum_widens(&self, element: MirType, result: MirType) -> bool {
-        let (Type::ModularWord(word) | Type::SaturatingWord(word)) = self.type_kind(element) else {
+        let (Type::ModularWord(word)
+        | Type::SaturatingWord(word)
+        | Type::RangedInt { width: word, .. }) = self.type_kind(element)
+        else {
             return false;
         };
         let result_width = match self.type_kind(result) {
@@ -3840,6 +3843,7 @@ impl Validator<'_, '_> {
                 | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::RangedInt { .. }
                 | Type::PolicyFloat(_, _)
         )
     }
@@ -3851,6 +3855,7 @@ impl Validator<'_, '_> {
                 | Type::SizedNumeric(Primitive::Numerus, _)
                 | Type::ModularWord(_)
                 | Type::SaturatingWord(_)
+                | Type::RangedInt { .. }
         )
     }
 

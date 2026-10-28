@@ -1,0 +1,29 @@
++++
+term = "‥"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "An unsigned width cannot start below zero: `trapping<u8, -1‥5>` is refused."
+syntax = "trapping<u8, -1‥5> — rejected"
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_policy_unsigned_negative_bound"
++++
+# =============================================================================
+# ‥ — an unsigned width has no negative values
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • Unsigned widths need a low end of at least 0; signed widths take negative
+#     ends (`trapping<i8, -1‥5>` is legal).
+#
+# Common mistakes:
+#   • Using an unsigned width for an offset that can go negative; use a signed width.
+
+main {
+    let trapping<u8, -1‥5> x ← 1
+    print x
+}

@@ -1,0 +1,24 @@
+version = 1
+id = "corpus/operatores/ranged-unsigned-negative-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/ranged-unsigned-negative-reject.fab"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "ranged_policy_unsigned_negative_bound"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "ranged_policy_unsigned_negative_bound"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "ranged_policy_unsigned_negative_bound"

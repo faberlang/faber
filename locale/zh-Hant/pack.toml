@@ -934,6 +934,10 @@ help = "使用 {sugar} 寬度糖括號寫入形狀"
 message = "`{form}` 是已廢棄的數值型別寫法"
 help = "寫 `{bare}`，不要寫 `{form}`；寬度標記本身就是型別"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "範圍需要兩個端點"
+help = "寫出兩個端點，例如 0‥8 或 0…7；某一側無界時用 ∞ 或 -∞"
+
 [diagnostics.PARSE040.issues.wrong_locale_type]
 message = "型別 '{type}' 未在此讀者語言介面上宣告"
 help = "使用此讀者語言中宣告的類型拼寫{?expected|：'|'}"
@@ -1229,6 +1233,38 @@ help = "以單一寬度寫出 trapping 型別，例如 trapping<u8> 或 trapping
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping 寬度必須是裸寬度標記"
 help = "使用裸寬度標記，例如 u8 或 i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "範圍需要儲存策略詞；單獨的寬度標記不能帶範圍"
+help = "先寫策略詞，例如 saturating<u32, 0‥8>、trapping<i32, -2‥3> 或 wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "範圍端點必須是整數字面量或 ∞"
+help = "兩個端點都寫成整數字面量，例如 0‥8；具名端點或 size 端點尚未支援"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "帶範圍的儲存策略接受一個寬度，然後是一個範圍"
+help = "寫成 policy<W, lo‥hi>，例如 saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "該範圍不包含任何值"
+help = "lo‥hi 的低端必須小於高端；lo…hi 的低端不能大於高端"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "範圍端點超出了寬度"
+help = "兩個端點都要在寬度之內；∞ 只能作高端，-∞ 只能作低端"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "無號寬度的低端不能為負"
+help = "讓範圍從 0 開始，或使用有號寬度，例如 i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "帶範圍的儲存策略需要有界的整數寬度"
+help = "使用 u8 或 i32 這樣的整數寬度；浮點、十進位和 inf 寬度暫不支援範圍"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "kernel 中暫不支援帶範圍的儲存策略 ({site})；kernel 不套用範圍"
+help = "在 kernel 內使用普通寬度，在主機端套用範圍"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可呼叫項的註記姿態「{annotation_posture}」與書寫的姿態「{written_posture}」衝突"
@@ -1741,6 +1777,10 @@ help = "僅宣告該型別；在 ledger 操作可用之前請使用 map ({tabula
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "此目標暫不支援 ledger 型別"
 help = "請使用 MIR runner 或 Faber 原始碼發射器，或改用 map ({tabula})"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "此目標暫不支援帶範圍的儲存策略"
+help = "請使用 MIR runner、Rust 目標或 Faber 原始碼發射器，直到此目標支援範圍"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "此目標不支援 {leaf} 葉片"

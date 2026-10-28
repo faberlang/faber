@@ -399,6 +399,17 @@ impl TypeChecker<'_> {
                 width: *width,
                 family: IntFamily::Saturating,
             }),
+            // A ranged cell is a value of its width in its policy's family:
+            // reads compute as the width, and only a store applies the range.
+            Type::RangedInt { policy, width, .. } => Some(NumericShape {
+                prim: Primitive::Numerus,
+                width: *width,
+                family: match policy {
+                    radix_types::IntPolicy::Trapping => IntFamily::Plain,
+                    radix_types::IntPolicy::Wrapping => IntFamily::Modular,
+                    radix_types::IntPolicy::Saturating => IntFamily::Saturating,
+                },
+            }),
             Type::PolicyFloat(policy, width) => Some(NumericShape {
                 prim: Primitive::Fractus,
                 width: *width,
@@ -442,6 +453,13 @@ impl TypeChecker<'_> {
                 | Type::PolicyFloat(_, _)
         ) {
             return rhs;
+        }
+        // A ranged cell computes as the plain form it refines.
+        if self.types.ranged_int_parts(lhs).is_some() {
+            return self.types.ranged_int_base(lhs);
+        }
+        if self.types.ranged_int_parts(rhs).is_some() {
+            return self.types.ranged_int_base(rhs);
         }
         match shape.prim {
             Primitive::Numerus => self.numerus_type(),

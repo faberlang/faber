@@ -27,7 +27,9 @@ pub fn from_type_expr(ty: &TypeExpr, interner: &Interner) -> Option<Vec<Option<S
             .iter()
             .map(|param| match param {
                 GenericArgExpr::Type(ty) => ty.iuncta_label.as_ref().map(|ident| ident.name),
-                GenericArgExpr::Size(_) | GenericArgExpr::Name(_) => None,
+                GenericArgExpr::Size(_) | GenericArgExpr::Name(_) | GenericArgExpr::Range(_) => {
+                    None
+                }
             })
             .collect(),
     )

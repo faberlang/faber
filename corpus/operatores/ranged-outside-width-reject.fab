@@ -1,0 +1,29 @@
++++
+term = "‥"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A range must fit its width: `trapping<u8, 0‥300>` is refused because a u8 stops at 255."
+syntax = "trapping<u8, 0‥300> — rejected"
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_policy_range_outside_width"
++++
+# =============================================================================
+# ‥ — the range must fit inside the width
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • The width is explicit and the range refines it, so an end past the width is
+#     an error at check time (a half-open `0‥256` is the last one a u8 accepts).
+#
+# Common mistakes:
+#   • Using a range to widen a width; pick a wider width such as `u16` instead.
+
+main {
+    let trapping<u8, 0‥300> x ← 1
+    print x
+}

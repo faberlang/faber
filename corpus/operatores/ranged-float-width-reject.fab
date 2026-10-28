@@ -1,0 +1,29 @@
++++
+term = "‥"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A ranged store policy takes an integer width: `saturating<f32, 0‥8>` is refused."
+syntax = "saturating<f32, 0‥8> — rejected"
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_policy_width_unsupported"
++++
+# =============================================================================
+# ‥ — float widths take no range yet
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • Ranges are integer only. Float, decimal and `inf` widths keep their whole-width
+#     policies (`saturating<f32>` clamps nothing; `inf` has no bound).
+#
+# Common mistakes:
+#   • Expecting a float range to clamp the way an integer range does.
+
+main {
+    let saturating<f32, 0‥8> x ← 1
+    print x
+}

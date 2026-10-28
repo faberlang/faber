@@ -4550,6 +4550,9 @@ mod exact_int_test;
 mod store_boundary_test;
 
 #[cfg(test)]
+mod ranged_store_test;
+
+#[cfg(test)]
 #[path = "remainder_floor_test.rs"]
 mod remainder_floor_test;
 #[cfg(test)]

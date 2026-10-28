@@ -617,6 +617,7 @@ impl TypeName for Type {
             Type::Intervallum(..) => "intervallum",
             Type::ModularWord(_) => "modular",
             Type::SaturatingWord(_) => "saturating",
+            Type::RangedInt { .. } => "ranged_int",
             Type::PolicyFloat(_, _) => "policy_float",
             Type::TensorEdgePolicy(_) => "tensor_edge_policy",
             Type::Union(_) => "union",

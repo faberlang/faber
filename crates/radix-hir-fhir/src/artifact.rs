@@ -648,7 +648,10 @@ pub struct FunctionProvenanceTableWire {
 /// that backends read to lower an enum comparison as a rank lookup; schema-v48
 /// artifacts fail closed. Before it the wire carried no order rows, so a loaded
 /// unit lowered an `ordo` comparison as a plain operator and gave wrong results.
-pub const SCHEMA_VERSION: u32 = 49;
+/// Version 50 adds `Type::RangedInt` (a ranged store policy,
+/// `saturating|trapping|wrapping<W, lo‥hi>`) to the type table; schema-v49
+/// artifacts fail closed because the serialized `Type` enum gained a variant.
+pub const SCHEMA_VERSION: u32 = 50;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
