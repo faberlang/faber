@@ -2988,7 +2988,7 @@ fn run_metal_with_partition_memory(
     use radix::module::driver::Config;
     use radix::program::mir::DeviceSelection;
 
-    let mut registry = system_device_registry_spanning(metal_span);
+    let mut registry = system_device_registry_spanning(metal_span, 1);
     let mut host = radix_mir_runner::BufferHost::with_argumenta(
         args.iter().map(|arg| (*arg).to_owned()).collect(),
     );
@@ -3174,7 +3174,7 @@ fn run_metal_device_grid_reduce_matches_plain_metal_over_partitions() {
     }
 }
 
-/// `--partitions` belongs to the CPU and Metal devices: any other route fails
+/// `--partitions` belongs to the CPU, Metal and CUDA devices: any other route fails
 /// closed before launch instead of ignoring the flag.
 #[test]
 fn run_partitions_outside_the_cpu_device_fails_closed() {

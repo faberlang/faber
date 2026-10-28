@@ -674,7 +674,13 @@ fn run_on_device_session(
     } else {
         package::mir::MetalSpan::Unspanned
     };
-    let mut registry = package::mir::system_device_registry_spanning(metal_span);
+    // `--partitions N` on CUDA puts each partition on its own physical device.
+    let cuda_partitions = if selection == DeviceSelection::Cuda {
+        shape.partitions.get()
+    } else {
+        1
+    };
+    let mut registry = package::mir::system_device_registry_spanning(metal_span, cuda_partitions);
     run_on_device_session_shaped_with(
         config,
         input,
@@ -869,18 +875,23 @@ fn cpu_device_shape(args: &RunArgs, threads: Option<u32>) -> package::mir::CpuDe
 }
 
 /// Fail closed when `--partitions N` is given with a resolved selection
-/// other than the CPU or the Metal device: those two span one logical device
+/// other than the CPU, Metal or CUDA device: those span one logical device
 /// over several partitions (rule 18), and the flag is never silently ignored.
 fn ensure_partitions_cpu_route(
     partitions: Option<u32>,
     selection: DeviceSelection,
 ) -> Result<(), Box<Diagnostic>> {
-    if partitions.is_none() || matches!(selection, DeviceSelection::Cpu | DeviceSelection::Metal) {
+    if partitions.is_none()
+        || matches!(
+            selection,
+            DeviceSelection::Cpu | DeviceSelection::Metal | DeviceSelection::Cuda
+        )
+    {
         return Ok(());
     }
     Err(Box::new(
         exit_status::usage_diagnostic_error(
-            "`--partitions` is valid only with `--device cpu` or `--device metal`",
+            "`--partitions` is valid only with `--device cpu`, `--device metal` or `--device cuda`",
         )
         .with_arg("issue", "E_PARTITIONS_REQUIRES_CPU")
         .with_arg("device", selection.spelling()),

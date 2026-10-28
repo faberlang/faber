@@ -1213,7 +1213,7 @@ fn default_cpu_workers() -> Option<std::num::NonZeroU32> {
 /// when a device is opened, so a run without kernels does not pay for it.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub fn system_device_registry() -> radix_device_core::registry::DeviceRegistry {
-    system_device_registry_spanning(MetalSpan::Unspanned)
+    system_device_registry_spanning(MetalSpan::Unspanned, 1)
 }
 
 /// How logical Metal partitions share the physical device's memory.
@@ -1228,16 +1228,22 @@ pub enum MetalSpan {
     PrivateCopies,
 }
 
+/// Register CUDA for `cuda_partitions` partitions: one is the plain runtime,
+/// more span that many physical devices (the lowest healthy ordinals, each
+/// with its own memory; fewer devices than partitions fails closed at open).
 /// Register Metal with the requested partition-memory model. Shared mode
 /// uses one allocation owner and queue; Replicate and First execute once.
 /// Private copies keep separate stores and queues for transport tests.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub fn system_device_registry_spanning(
     metal_span: MetalSpan,
+    cuda_partitions: u32,
 ) -> radix_device_core::registry::DeviceRegistry {
     let mut registry = radix_device_core::registry::DeviceRegistry::new();
     if radix_device_cuda::driver_library_present() {
-        registry.register(Box::new(radix_device_cuda::system_runtime()));
+        registry.register(radix_device_cuda::system_runtime_for_partitions(
+            cuda_partitions,
+        ));
     }
     #[cfg(target_os = "macos")]
     if let Some(info) = radix_device_metal::system_devices().into_iter().next()
