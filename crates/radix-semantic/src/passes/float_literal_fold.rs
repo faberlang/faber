@@ -20,7 +20,13 @@
 //!
 //! What folds: a tree whose every node is float-typed, whose leaves are
 //! integer or float literals and whose interior nodes are the operators above,
-//! with at least one operator. What does not: anything with a path, call,
+//! with at least one operator. An integer constant expression stored into a
+//! float slot (`let f64 c ← 200 + 100`) folds too (ruling 20): typecheck leaves
+//! its integer literals integer-typed under a float-typed root, so it is the
+//! integer constant, computed exactly with integer operators (`/` and `%`
+//! floor, shifts and bit operations on the exact value), converted to the float
+//! once. Without the fold the runner would keep the integer in the float slot
+//! and print `300`, not `300.0`. What does not: anything with a path, call,
 //! conversion, comparison or integer-typed node (integer `/` is a floor
 //! division, a different operation); a zero divisor (the run-time NaN or ∞
 //! stays); a result that overflows the slot (the run-time ∞ stays); a value
@@ -104,11 +110,18 @@ impl Fold<'_> {
         };
         let width = self.float_width(expr.ty?)?;
         let mut operators = 0;
-        let exact = self.exact(expr, &mut operators)?;
-        if operators == 0 {
-            return None;
-        }
-        let rounded = exact.round_to_width(width)?;
+        let rounded = match self.exact(expr, &mut operators) {
+            Some(exact) => {
+                if operators == 0 {
+                    return None;
+                }
+                exact.round_to_width(width)?
+            }
+            None => {
+                let value = integer_constant(expr)?;
+                ExactRational::from_integer(Magnus::from_i128(value)).round_to_width(width)?
+            }
+        };
         if !rounded.is_finite() {
             return None;
         }
@@ -130,6 +143,53 @@ impl Fold<'_> {
             span: expr.span,
         };
         Some(HirExpressionKind::Unary(HirUnOp::Neg, Box::new(operand)))
+    }
+}
+
+/// The exact value of an integer constant expression: integer literals joined
+/// by the integer operators, `/` and `%` flooring. `None` for anything else, a
+/// zero divisor, a bad shift count, or a value past `i128`; those stay run-time.
+fn integer_constant(expr: &HirExpression) -> Option<i128> {
+    match &expr.kind {
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => Some(i128::from(*value)),
+        HirExpressionKind::Unary(HirUnOp::Neg, inner) => integer_constant(inner)?.checked_neg(),
+        HirExpressionKind::Unary(HirUnOp::BitNot, inner) => Some(!integer_constant(inner)?),
+        HirExpressionKind::Binary(op, lhs, rhs) => {
+            let (lhs, rhs) = (integer_constant(lhs)?, integer_constant(rhs)?);
+            match op {
+                HirBinOp::Add => lhs.checked_add(rhs),
+                HirBinOp::Sub => lhs.checked_sub(rhs),
+                HirBinOp::Mul => lhs.checked_mul(rhs),
+                HirBinOp::Div => {
+                    let quotient = lhs.checked_div(rhs)?;
+                    let remainder = lhs.checked_rem(rhs)?;
+                    Some(if remainder != 0 && (remainder < 0) != (rhs < 0) {
+                        quotient - 1
+                    } else {
+                        quotient
+                    })
+                }
+                HirBinOp::Mod => {
+                    let remainder = lhs.checked_rem(rhs)?;
+                    Some(if remainder != 0 && (remainder < 0) != (rhs < 0) {
+                        remainder + rhs
+                    } else {
+                        remainder
+                    })
+                }
+                HirBinOp::BitAnd => Some(lhs & rhs),
+                HirBinOp::BitOr => Some(lhs | rhs),
+                HirBinOp::BitXor => Some(lhs ^ rhs),
+                HirBinOp::Shl => {
+                    let count = u32::try_from(rhs).ok().filter(|count| *count < 127)?;
+                    let shifted = lhs.checked_shl(count)?;
+                    (shifted >> count == lhs).then_some(shifted)
+                }
+                HirBinOp::Shr => Some(lhs >> u32::try_from(rhs).ok()?.min(127)),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 
