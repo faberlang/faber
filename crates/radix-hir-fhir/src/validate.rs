@@ -2648,6 +2648,11 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                         collect_expr(init, &mut registry);
                     }
                 }
+                if let Some(cli_args) = &func.cli_args
+                    && let Some(default) = &cli_args.default
+                {
+                    collect_expr(default, &mut registry);
+                }
                 if let Some(ref body) = func.body {
                     collect_block(body, &mut registry);
                 }
@@ -2669,6 +2674,11 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                         if let Some(ref init) = param.default {
                             collect_expr(init, &mut registry);
                         }
+                    }
+                    if let Some(cli_args) = &method.func.cli_args
+                        && let Some(default) = &cli_args.default
+                    {
+                        collect_expr(default, &mut registry);
                     }
                     if let Some(ref body) = method.func.body {
                         collect_block(body, &mut registry);
@@ -3109,6 +3119,9 @@ pub(crate) fn validate_referential_integrity(
             checks.check_def(cli_args.def_id)?;
             checks.check_symbol(cli_args.name)?;
             checks.check_type(cli_args.ty)?;
+            if let Some(ref init) = cli_args.default {
+                validate_expr(init, checks)?;
+            }
         }
         if let Some(ty) = func.ret_ty {
             checks.check_type(ty)?;
