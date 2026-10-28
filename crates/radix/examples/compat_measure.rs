@@ -96,12 +96,7 @@ fn faber_cell(session: &Session, file: &Path) -> String {
     };
     let name = file.display().to_string();
     match analyze_source(session, &name, &source, AnalyzeRequest::default()) {
-        Ok(unit)
-            if !unit
-                .diagnostics
-                .iter()
-                .any(radix::Diagnostic::is_error) =>
-        {
+        Ok(unit) if !unit.diagnostics.iter().any(radix::Diagnostic::is_error) => {
             match classify_hir_coverage(HirCoverageTarget::Faber, &unit.hir, &unit.types) {
                 Lowerability::Capable => "capable".to_owned(),
                 Lowerability::Rejected(gaps) => {
