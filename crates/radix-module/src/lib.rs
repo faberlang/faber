@@ -158,7 +158,7 @@ pub enum Output {
     #[cfg(feature = "hir-pascal")]
     Pascal(PascalOutput),
 
-    /// Novelty GnuCOBOL free-format output emitted from checked HIR.
+    /// Novelty `GnuCOBOL` free-format output emitted from checked HIR.
     #[cfg(feature = "hir-cobol")]
     Cobol(CobolOutput),
 
@@ -275,7 +275,7 @@ pub struct PascalOutput {
 /// Novelty COBOL backend output.
 #[cfg(feature = "hir-cobol")]
 pub struct CobolOutput {
-    /// Complete generated GnuCOBOL free-format source.
+    /// Complete generated `GnuCOBOL` free-format source.
     pub code: String,
 }
 
