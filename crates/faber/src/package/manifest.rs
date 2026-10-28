@@ -389,6 +389,21 @@ pub(crate) fn manifest_check_section(input: &Path) -> Option<ManifestCheck> {
         .map(|(manifest, _)| manifest.check)
 }
 
+/// The `[locale] locale` a package manifest declares for an input path.
+///
+/// `None` when no package layout is discoverable, no manifest exists, the
+/// manifest cannot be read, or it names no locale: the caller applies the
+/// product default. Reference lookup (`faber explain`) uses this to follow the
+/// current package's reader locale without requiring a package.
+pub(crate) fn manifest_locale(input: &Path) -> Option<String> {
+    input_manifest(input)
+        .ok()
+        .flatten()
+        .and_then(|(manifest, _)| manifest.locale.locale)
+        .map(|locale| locale.trim().to_owned())
+        .filter(|locale| !locale.is_empty())
+}
+
 /// Map a manifest `[format] width` value to a wrap width. `None` when the key
 /// is absent: no wrapping. A value that is not a positive integer fails closed
 /// (never silently ignored).

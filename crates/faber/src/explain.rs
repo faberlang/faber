@@ -100,7 +100,7 @@ pub enum Kind {
     Concept,
 
     /// Explicit value-conversion form (`↦ target`).
-    Conversio,
+    Conversion,
 }
 
 /// Result of resolving a user query against the registry.
@@ -160,6 +160,9 @@ pub struct Registry {
     terms: BTreeMap<String, usize>,
     aliases: BTreeMap<String, usize>,
     legacy: BTreeMap<String, usize>,
+    /// Canonical identity to the spelling the reader locale shows for it, for
+    /// each entry the locale renames. Empty for the identity registry.
+    renamed: BTreeMap<String, String>,
 }
 
 /// Error type for corpus parsing, validation, and rendering failures.
@@ -186,7 +189,11 @@ impl std::fmt::Display for ExplainError {
 impl std::error::Error for ExplainError {}
 
 impl Registry {
-    /// Build the explain registry from the reference embedded in this binary.
+    /// Build the identity registry from the reference embedded in this binary.
+    ///
+    /// Terms are the canonical identities the corpus is authored against (the
+    /// Latin registry keys). User-facing lookup goes through
+    /// [`Self::load_for_locale`], which projects them through a reader pack.
     ///
     /// # Errors
     ///
@@ -196,6 +203,53 @@ impl Registry {
         crate::reference::ReferencePack::embedded()?.build_registry()
     }
 
+    /// Build the registry projected through one reader locale pack.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded reference cannot be read or the
+    /// projected registry fails validation.
+    pub fn load_for_pack(pack: &radix::module::locale::LocalePack) -> Result<Self, ExplainError> {
+        crate::reference::ReferencePack::embedded()?.build_registry_for(pack)
+    }
+
+    /// Build the registry for the reader locale named by the CLI flag, else the
+    /// current package's `faber.toml` `[locale]`, else the product default.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the locale has no embedded pack, or the projected
+    /// registry cannot be built.
+    pub fn load_for_locale(locale: Option<&str>) -> Result<Self, ExplainError> {
+        let locale = match locale {
+            Some(locale) if locale.trim().is_empty() => {
+                return Err(ExplainError::new("--locale must not be empty"));
+            }
+            Some(locale) => locale.trim().to_owned(),
+            None => crate::package::manifest_locale(std::path::Path::new("."))
+                .unwrap_or_else(|| crate::package::DEFAULT_CODE_LOCALE.to_owned()),
+        };
+        let pack = crate::package::load_embedded_locale_pack(&locale).map_err(|err| {
+            ExplainError::new(format!(
+                "failed to load reader locale '{locale}': {err}\n\
+                 next action: choose one of the embedded reader locales ({})",
+                crate::package::EMBEDDED_LOCALE_IDS.join(", ")
+            ))
+        })?;
+        Self::load_for_pack(&pack)
+    }
+
+    /// The spelling this registry's reader locale uses for a canonical
+    /// identity, when it differs (`functio` is `fn` in `en`). Lets a miss on an
+    /// identity name the spelling to ask for instead.
+    pub fn spelling_of_identity(&self, identity: &str) -> Option<&str> {
+        self.renamed.get(identity).map(String::as_str)
+    }
+
+    pub(crate) fn set_renamed(&mut self, renamed: BTreeMap<String, String>) {
+        self.renamed = renamed;
+    }
+
     /// Build a registry from parsed entries.
     pub(crate) fn from_entries(entries: Vec<Entry>) -> Result<Self, ExplainError> {
         let mut registry = Self {
@@ -203,6 +257,7 @@ impl Registry {
             terms: BTreeMap::new(),
             aliases: BTreeMap::new(),
             legacy: BTreeMap::new(),
+            renamed: BTreeMap::new(),
         };
         registry.index()?;
         registry.validate_references()?;
@@ -586,7 +641,7 @@ const LIST_KIND_ORDER: [Kind; 8] = [
     Kind::Modifier,
     Kind::Type,
     Kind::Concept,
-    Kind::Conversio,
+    Kind::Conversion,
 ];
 
 #[derive(Serialize)]
@@ -631,7 +686,7 @@ impl Kind {
             Kind::Modifier => "modifier",
             Kind::Legacy => "legacy",
             Kind::Concept => "concept",
-            Kind::Conversio => "conversio",
+            Kind::Conversion => "conversion",
         }
     }
 
@@ -645,7 +700,7 @@ impl Kind {
             Kind::Modifier => "MODIFIERS",
             Kind::Legacy => "LEGACY",
             Kind::Concept => "CONCEPTS",
-            Kind::Conversio => "CONVERSIONS",
+            Kind::Conversion => "CONVERSIONS",
         }
     }
 }

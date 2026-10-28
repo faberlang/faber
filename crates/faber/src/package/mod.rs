@@ -118,6 +118,7 @@ pub use llvm_host::{
     host_triple_for,
 };
 pub(crate) use manifest::manifest_device_inputs;
+pub(crate) use manifest::manifest_locale;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     DeviceChoice, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
