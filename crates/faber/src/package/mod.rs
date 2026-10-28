@@ -103,7 +103,6 @@ pub use cmd::{
     CHECKS_BUT_DOES_NOT_LOWER, DeviceAdviceRequest, cmd_build, cmd_check_package, cmd_emit_package,
     should_treat_as_package_from_args, use_package_compiler_from_args,
 };
-pub use ts_build::cmd_run_ts;
 #[cfg(feature = "hir-go")]
 #[cfg(test)]
 pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build};
@@ -140,6 +139,7 @@ use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibr
 use std::path::{Path, PathBuf};
 pub(crate) use temp_dir::unique_temp_sibling;
 pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
+pub use ts_build::cmd_run_ts;
 
 /// Materialized repository-shaped root for the runtime embedded in this binary.
 ///

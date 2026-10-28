@@ -129,7 +129,11 @@ pub(crate) fn generate_ts_project_files(
 fn common_unit_root(package: &AnalyzedProgram) -> PathBuf {
     let mut root: Option<PathBuf> = None;
     for unit in package.nodes.values() {
-        let dir = unit.path.parent().map(Path::to_path_buf).unwrap_or_default();
+        let dir = unit
+            .path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default();
         root = Some(match root {
             None => dir,
             Some(current) => current
@@ -179,21 +183,19 @@ pub(crate) fn generate_ts_library_files(
                 import,
                 &package.library_resolver,
                 &mut cache,
-                |analysis, _| {
-                    match radix::module::codegen::generate_from_analyzed_with_options(
-                        TS_TARGET,
-                        &*analysis,
-                        &surface,
-                        radix::module::codegen::OutputMode::Library,
-                        Some(&module_name),
-                    )? {
-                        Output::TypeScript(output) => Ok(output.code),
-                        _ => Err(radix::module::codegen::CodegenError {
-                            message: "TypeScript library codegen returned a non-TypeScript output"
-                                .to_owned(),
-                            args: Vec::new(),
-                        }),
-                    }
+                |analysis, _| match radix::module::codegen::generate_from_analyzed_with_options(
+                    TS_TARGET,
+                    &*analysis,
+                    &surface,
+                    radix::module::codegen::OutputMode::Library,
+                    Some(&module_name),
+                )? {
+                    Output::TypeScript(output) => Ok(output.code),
+                    _ => Err(radix::module::codegen::CodegenError {
+                        message: "TypeScript library codegen returned a non-TypeScript output"
+                            .to_owned(),
+                        args: Vec::new(),
+                    }),
                 },
             )
             .map_err(|diag| vec![diag])?;
