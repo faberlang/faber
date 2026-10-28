@@ -80,7 +80,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
     {
         let diagnostic = package::missing_package_path_diagnostic(&args.path);
         eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
-        std::process::exit(1);
+        exit_status::exit_for_diagnostic(&diagnostic);
     }
 
     // `--device` > manifest `[device] device` > `auto`, the same precedence as
@@ -310,8 +310,7 @@ fn emit_test_stats_if_requested(
         result_key,
     );
     if let Err(error) = test_stats::emit(&artifact, args.stats, args.stats_file.as_ref()) {
-        eprintln!("error: could not write test statistics: {error}");
-        std::process::exit(1);
+        super::run_stats::exit_for_emit_error("test statistics", &error);
     }
 }
 
@@ -361,7 +360,7 @@ fn run_single_file_with_options(
         Ok(s) => s,
         Err(err) => {
             eprintln!("error: could not read {}: {err}", path.display());
-            std::process::exit(1);
+            exit_status::exit_no_input();
         }
     };
     let session = Session::new(config.clone());
@@ -1063,7 +1062,7 @@ fn print_json_report(report: &ProbaReport, metadata: &RunMetadata, list: bool) {
         Ok(json) => println!("{json}"),
         Err(error) => {
             eprintln!("failed to serialize test report: {error}");
-            std::process::exit(70);
+            exit_status::exit_software();
         }
     }
 }

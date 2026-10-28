@@ -324,7 +324,7 @@ pub(crate) fn cmd_targets() {
         Ok(table) => println!("{table}"),
         Err(message) => {
             eprintln!("error: {message}");
-            std::process::exit(1);
+            faber_cli::exit_status::exit_software();
         }
     }
 }

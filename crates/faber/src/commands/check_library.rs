@@ -53,6 +53,17 @@ pub(crate) enum CheckLibraryError {
 }
 
 impl CheckLibraryError {
+    /// The sysexits class of this failure.
+    fn exit_status(&self) -> i32 {
+        use faber_cli::exit_status;
+        match self {
+            Self::InvalidName { .. } | Self::NotALibrary { .. } => exit_status::USAGE,
+            Self::MissingLibraryHome => exit_status::CONFIG,
+            Self::UnknownProvider { .. } | Self::MissingSourceRoot { .. } => exit_status::NO_INPUT,
+            Self::Diagnostic(diag) => exit_status::status_for_diagnostic(diag),
+        }
+    }
+
     fn into_message(self) -> String {
         match self {
             Self::InvalidName { name } => {
@@ -231,8 +242,9 @@ pub(super) fn cmd_check_library(args: CheckLibraryArgs) {
     let checkout = match resolve_dev_library(&args.name) {
         Ok(checkout) => checkout,
         Err(err) => {
+            let status = err.exit_status();
             eprintln!("{}", err.into_message());
-            std::process::exit(1);
+            std::process::exit(status);
         }
     };
     print!("{}", render_checkout(&checkout));

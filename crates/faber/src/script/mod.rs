@@ -10,8 +10,6 @@ mod trap;
 #[cfg(feature = "runner")]
 use radix::module::codegen::Target;
 #[cfg(feature = "runner")]
-use radix::module::diagnostics::Diagnostic;
-#[cfg(feature = "runner")]
 use radix::module::driver::Session;
 #[cfg(feature = "runner")]
 use radix::module::mir::run_source as radix_run_source;
@@ -144,12 +142,18 @@ fn run_as_package_source(
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |duration| duration.as_nanos());
     let dir = std::env::temp_dir().join(format!("faber-script-{}-{}", std::process::id(), nanos));
-    std::fs::create_dir(&dir)
-        .map_err(|err| RunSourceError::Frontend(vec![Diagnostic::io_error(&dir, &err)]))?;
+    std::fs::create_dir(&dir).map_err(|err| {
+        RunSourceError::Frontend(vec![faber_cli::exit_status::write_diagnostic_error(
+            &dir, &err,
+        )])
+    })?;
     let scratch = ScratchPackageDir(dir);
     let entry = scratch.0.join("main.fab");
-    std::fs::write(&entry, source)
-        .map_err(|err| RunSourceError::Frontend(vec![Diagnostic::io_error(&entry, &err)]))?;
+    std::fs::write(&entry, source).map_err(|err| {
+        RunSourceError::Frontend(vec![faber_cli::exit_status::write_diagnostic_error(
+            &entry, &err,
+        )])
+    })?;
     radix::program::mir::run_package_mir_with_selection(
         &session.config,
         &entry,

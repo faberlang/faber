@@ -13,7 +13,7 @@ pub(super) fn cmd_init(args: InitArgs) {
 
     if let Err(message) = scaffold(&root, package_name) {
         eprintln!("error: {message}");
-        std::process::exit(1);
+        faber_cli::exit_status::exit_cant_create();
     }
     println!("{}", root.join("faber.toml").display());
 }

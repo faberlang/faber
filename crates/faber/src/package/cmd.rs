@@ -90,10 +90,11 @@ fn is_manifestless_single_file(input: &Path) -> bool {
             .any(|dir| dir.join(MANIFEST_FILE).exists())
 }
 
-/// Print `message` and terminate.
+/// Print `message` and terminate with the internal-failure class: the caller
+/// reports a compile step that produced nothing without a diagnostic.
 fn fail(message: &str) -> ! {
     eprintln!("{message}");
-    std::process::exit(1);
+    crate::exit_status::exit_software();
 }
 
 /// Terminate after a compile that produced no output; the diagnostics were
@@ -124,7 +125,7 @@ fn exit_runner_feature_unavailable() -> ! {
     eprintln!(
         "error: MIR package commands are not available in this faber build; rebuild with feature `runner`"
     );
-    std::process::exit(1);
+    crate::exit_status::exit_unavailable();
 }
 
 /// Report a diagnostic's message and terminate.
@@ -671,7 +672,7 @@ fn write_output_file(output_path: &Path, bytes: &[u8]) {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).unwrap_or_else(|err| {
             eprintln!("error: failed to create '{}': {}", parent.display(), err);
-            std::process::exit(1);
+            crate::exit_status::exit_cant_create();
         });
     }
     fs::write(output_path, bytes).unwrap_or_else(|err| {
@@ -680,7 +681,7 @@ fn write_output_file(output_path: &Path, bytes: &[u8]) {
             output_path.display(),
             err
         );
-        std::process::exit(1);
+        crate::exit_status::exit_cant_create();
     });
 }
 
@@ -905,7 +906,7 @@ pub fn cmd_check_package(
                     Ok(rendered) => eprintln!("{rendered}"),
                     Err(err) => {
                         eprintln!("error: failed to render reader-pack diagnostics: {err}");
-                        std::process::exit(1);
+                        crate::exit_status::exit_software();
                     }
                 }
             }
@@ -1027,7 +1028,7 @@ fn exit_does_not_lower(
                 radix::module::diagnostics::render_expanded_diagnostics_with_pack(diagnostics, pack)
                     .unwrap_or_else(|err| {
                         eprintln!("error: failed to render reader-pack diagnostics: {err}");
-                        std::process::exit(1);
+                        crate::exit_status::exit_software();
                     })
             }
             None => radix::module::diagnostics::render_expanded_diagnostics(diagnostics),
@@ -1079,7 +1080,7 @@ fn advice_target(request: DeviceAdviceRequest) -> (super::device::AdviceDevice, 
 #[cfg(not(all(feature = "runner", feature = "device-runtime")))]
 fn advice_target(_: DeviceAdviceRequest) -> ((), u32) {
     eprintln!("error: `check --device` needs a faber built with the device runtime");
-    std::process::exit(1);
+    crate::exit_status::exit_unavailable();
 }
 
 /// Print the "serialized by the backend" advice (`INFO001`) of the checked
@@ -1126,7 +1127,7 @@ fn print_device_advice(
                 )
                 .unwrap_or_else(|err| {
                     eprintln!("error: failed to render reader-pack diagnostics: {err}");
-                    std::process::exit(1);
+                    crate::exit_status::exit_software();
                 }),
                 None => radix::module::diagnostics::render_expanded_diagnostics(&diagnostics),
             };
@@ -1256,7 +1257,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
                 }
                 Err(err) => {
                     eprintln!("error: failed to serialize GPU reflection metadata: {err}");
-                    std::process::exit(1);
+                    crate::exit_status::exit_software();
                 }
             };
             if let Some(path) = command.output {
