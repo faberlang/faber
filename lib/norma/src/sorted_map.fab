@@ -213,7 +213,5 @@ fn remove_at<K>(mut list<K> index, int positio) → void {
         i ← i + 1
     }
     while not index.is_empty() { index.remove_last() }
-    for from out let item {
-        index.append(item)
-    }
+    index.extend(out)
 }

@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/lista/methodi-extende-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/methodi-extende-reject.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "extend_requires_plain_list"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "extend_requires_plain_list"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "extend_requires_plain_list"

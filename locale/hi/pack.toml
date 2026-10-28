@@ -2449,6 +2449,10 @@ help = "स्पष्ट type argument सूची हटाएँ"
 message = "numeric lista elements आवश्यक हैं"
 help = "इस lista intrinsic के लिए numeric elements का उपयोग करें"
 
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` को सामान्य list रिसीवर चाहिए; bounded या length-ranged list अपनी जगह बढ़ नहीं सकती"
+help = "unbounded list में extend करें, या `append` से एक-एक element जोड़ें"
+
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "कुंजी वाली `.क्रमबद्ध(कुंजी)` विधि हटा दी गई है; क्रमबद्ध करने वाले व्यंजक का उपयोग करें"
 help = "`{ordinata} {via} {ascendens} {ex} स्रोत {fixum} x` लिखें और उसके बाद ऐसा ब्लॉक दें जो `{redde}` कुंजी पर समाप्त हो; उल्टे क्रम के लिए `{descendens}` लिखें"
@@ -3681,6 +3685,7 @@ argminima = "argmin"
 continet = "शामिल"
 cumulata = "संचयी"
 decapita = "पहला_हटाओ"
+extende = "पीछे_मिलाओ"
 filtrata = "छानो"
 immerge = "डुबो"
 inversa = "व्युत्क्रम"

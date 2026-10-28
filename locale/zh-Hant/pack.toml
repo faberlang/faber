@@ -2477,6 +2477,10 @@ help = "移除明確的型別引數清單"
 message = "需要數值 lista 元素"
 help = "此 lista 內建項目請使用數值元素"
 
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` 需要一般 list 接收者；有界或限定長度範圍的 list 不能原地增長"
+help = "對無界 list 使用 extend，或用 `append` 逐一加入元素"
+
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "帶鍵的 `.已排序(鍵)` 方法已移除；請使用排序運算式"
 help = "寫作 `{ordinata} {via} {ascendens} {ex} 來源 {fixum} x`，後接以 `{redde}` 鍵 結尾的區塊；用 `{descendens}` 得到相反順序"
@@ -3709,6 +3713,7 @@ argminima = "最小值索引"
 continet = "包含"
 cumulata = "累積"
 decapita = "移除首項"
+extende = "擴展"
 filtrata = "過濾"
 immerge = "浸入"
 inversa = "求逆"

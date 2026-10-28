@@ -17,9 +17,9 @@ fn encode(list<b8> data) → list<b8> {
         return "0\r\n\r\n" ↦ list<b8>
     }
     let string size_line ← hex_string(data.length()) + "\r\n"
-    mut list<b8> out ← bytes_list(size_line ↦ list<b8>)
-    out ← extend(out, data)
-    out ← extend(out, "\r\n0\r\n\r\n" ↦ list<b8>)
+    mut list<b8> out ← size_line ↦ list<b8>
+    out.extend(data)
+    out.extend("\r\n0\r\n\r\n" ↦ list<b8>)
     return out
 }
 
@@ -41,11 +41,7 @@ fn decode(list<b8> data) → list<b8> ⇥ string {
             return body
         }
         if i + size + 2 ≻ n then throw "norma:http/chunked.decode: truncated"
-        mut int k ← 0
-        while k ≺ size {
-            body.append(data.get(i + k) coalesce (0 ∷ b8))
-            k ← k + 1
-        }
+        body.extend(data.slice(i, i + size) ⊥ empty)
         i ← i + size
         if not at_crlf(data, i) then throw "norma:http/chunked.decode: missing crlf"
         i ← i + 2
@@ -64,26 +60,6 @@ fn hex_string(int n) → string {
         v ← v / 16
     }
     return acc
-}
-
-fn bytes_list(list<b8> src) → list<b8> {
-    mut list<b8> out ← []
-    mut int i ← 0
-    while i ≺ src.length() {
-        out.append(src.get(i) coalesce (0 ∷ b8))
-        i ← i + 1
-    }
-    return out
-}
-
-fn extend(list<b8> dest, list<b8> src) → list<b8> {
-    mut list<b8> out ← copy dest
-    mut int i ← 0
-    while i ≺ src.length() {
-        out.append(src.get(i) coalesce (0 ∷ b8))
-        i ← i + 1
-    }
-    return out
 }
 
 fn byte_at(list<b8> data, int i) → int {

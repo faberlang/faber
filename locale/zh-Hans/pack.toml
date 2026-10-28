@@ -2481,6 +2481,10 @@ help = "移除显式 type argument 列表"
 message = "需要 numeric lista elements"
 help = "为此 lista intrinsic 使用 numeric elements"
 
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` 需要普通 list 接收者；有界或限定长度范围的 list 不能原地增长"
+help = "对无界 list 使用 extend，或用 `append` 逐个添加元素"
+
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "带键的 `.已排序(键)` 方法已移除；请使用排序表达式"
 help = "写作 `{ordinata} {via} {ascendens} {ex} 源 {fixum} x`，后接以 `{redde}` 键 结尾的块；用 `{descendens}` 得到相反顺序"
@@ -3713,6 +3717,7 @@ argminima = "最小值索引"
 continet = "包含"
 cumulata = "累积"
 decapita = "移除首项"
+extende = "扩展"
 filtrata = "过滤"
 immerge = "浸入"
 inversa = "求逆"

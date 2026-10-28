@@ -282,7 +282,7 @@ exchange = "exchange"
 load = "load"
 store = "store"
 
-# lista (29)
+# lista (30)
 accipe = "get"
 # sermo directional view methods (SERMO_VIEW_METHODS): `accipe` / `cursor`
 # are shared with the rows above and below; `fini` / `exhauri` live only here.
@@ -297,6 +297,7 @@ argminima = "argmin"
 continet = "contains"
 cumulata = "cumulate"
 decapita = "remove_first"
+extende = "extend"
 filtrata = "filter"
 # The sinking contract's method form (`immerge`); the `⇜` operator twin is its
 # identity, and both append.
@@ -3526,6 +3527,10 @@ help = "remove the explicit type argument list"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "numeric {lista} elements required"
 help = "use numeric elements for this {lista} intrinsic"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` needs a plain list receiver; a bounded or length-ranged list cannot grow in place"
+help = "extend into an unbounded list, or append one element at a time with `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "the keyed `.sorted(key)` method was removed; use the sort expression"
