@@ -81,6 +81,13 @@ struct SuiteTarget {
     /// artifact; without it the case runs `run` like a single-file emit.
     #[serde(default)]
     package_run: Vec<String>,
+    /// Build every input, single files included, through the product command
+    /// `faber build -t <emit>` (one step that emits, links and prints the
+    /// linked artifact), then run that artifact with `run`. The lane then
+    /// exercises the same code as a user's build instead of a hand-written
+    /// emit-and-link recipe.
+    #[serde(default)]
+    product: bool,
     #[serde(default)]
     files: BTreeMap<PathBuf, String>,
     #[serde(default)]

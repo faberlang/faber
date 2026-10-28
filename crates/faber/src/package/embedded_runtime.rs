@@ -33,7 +33,7 @@ fn embedded_runtime_root_in(parent: &Path) -> Option<PathBuf> {
     root.join(COMPLETE_MARKER).is_file().then_some(root)
 }
 
-fn cache_dir() -> PathBuf {
+pub(crate) fn cache_dir() -> PathBuf {
     let nonempty = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
     if let Some(dir) = nonempty("XDG_CACHE_HOME") {
         return PathBuf::from(dir).join("faber");

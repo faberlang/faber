@@ -39,6 +39,15 @@
         "exit": 2,
         "stderr_contains": "numerus overflow"
       }
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "run",
+      "failure_kind": "nonzero-exit",
+      "expect": {
+        "exit_nonzero": true
+      },
+      "reason": "The linked program aborts at run time instead of exiting 0: expected 0, got signal: 6 (SIGABRT): numerus overflow"
     }
   }
 }

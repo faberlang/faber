@@ -1,5 +1,7 @@
 #[cfg(feature = "hir-rust")]
-use super::{discover_build_layout, is_manifestless_single_file};
+use super::build_layout::is_manifestless_single_file;
+#[cfg(feature = "hir-rust")]
+use super::discover_build_layout;
 #[cfg(feature = "hir-rust")]
 use crate::package::cargo::{RustRuntimePlan, emit_generated_crate_with_runtime_plan};
 #[cfg(feature = "hir-rust")]

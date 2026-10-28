@@ -418,7 +418,7 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             build: true,
             run: false,
             package: true,
-            note: "native host executable via `faber build --target llvm-host` (MIR-to-LLVM emitter + llvm-as/clang + faber-host-llvm runtime archive on the local host triple); `faber run` does not take a target",
+            note: "native host executable via `faber build --target llvm-host` (MIR-to-LLVM emitter + llvm-as/clang from PATH + faber-host-llvm runtime archive on the local host triple); `faber run --target llvm-host` builds and runs it",
         },
         _ => {
             capabilities.package = false;

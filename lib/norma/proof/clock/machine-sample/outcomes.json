@@ -23,6 +23,12 @@
       "phase": "build",
       "diagnostic_contains": "the machine leaf is not supported on the ts target",
       "reason": "The machine leaf (`machina:*`) has no Node port yet, so the emitter refuses any program that reaches a `machina` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the machine leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no machine leaf yet: its leaf gate refuses a program that reaches a machine route by name, before any LLVM is emitted."
     }
   }
 }

@@ -23,6 +23,12 @@
       "phase": "build",
       "diagnostic_contains": "ts_tensor_shape_unresolved",
       "reason": "The imported `norma:tensor` module has generic tensor shapes the TypeScript backend cannot resolve to values in scope, so code generation stops with ts_tensor_shape_unresolved."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "faber_external_product_norma_module_tensor_func_construct",
+      "reason": "The linked program references `faber_external_product_norma_module_tensor_func_construct`, which neither the emitted modules nor the runtime archive define, so the clang link fails."
     }
   }
 }

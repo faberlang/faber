@@ -11,6 +11,12 @@
       "phase": "build",
       "diagnostic_contains": "the process leaf is not supported on the ts target",
       "reason": "The Node port of the process leaf (`processus:*`) has not landed, so the emitter refuses any program that reaches a `processus` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the process leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no process leaf yet: its leaf gate refuses a program that reaches a process route by name, before any LLVM is emitted."
     }
   }
 }

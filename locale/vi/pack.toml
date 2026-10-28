@@ -4116,11 +4116,11 @@ help = "llvm-host chỉ xây dựng gốc trên macOS và Linux aarch64 hoặc x
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host cần bộ công cụ LLVM nhất quán (llvm-as và clang cùng phiên bản): {reason}"
-help = "hãy cài LLVM để llvm-as và clang nằm trong PATH, hoặc đặt LLVM_HOME thành tiền tố cài đặt LLVM"
+help = "hãy cài LLVM để llvm-as và clang nằm trong PATH"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "kho lưu trữ runtime faber-host-llvm không khả dụng ({cause}): {detail}"
-help = "hãy bảo đảm cargo đã được cài và nằm trong PATH (hoặc đặt CARGO) và mã nguồn runtime tồn tại, rồi xây dựng lại"
+help = "hãy bảo đảm cargo đã được cài và nằm trong PATH và mã nguồn runtime tồn tại, rồi xây dựng lại"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "kho lưu trữ runtime faber-host-llvm không qua được bước xác minh danh tính: {detail}"

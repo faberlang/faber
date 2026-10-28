@@ -4128,11 +4128,11 @@ help = "llvm-host केवल aarch64 या x86_64 के macOS और Linux �
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host को सुसंगत LLVM टूलचेन चाहिए (एक ही संस्करण के llvm-as और clang): {reason}"
-help = "LLVM इंस्टॉल करें ताकि llvm-as और clang PATH में हों, या LLVM_HOME को LLVM इंस्टॉल प्रीफ़िक्स पर सेट करें"
+help = "LLVM इंस्टॉल करें ताकि llvm-as और clang PATH में हों"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "faber-host-llvm रनटाइम आर्काइव उपलब्ध नहीं है ({cause}): {detail}"
-help = "सुनिश्चित करें कि cargo इंस्टॉल है और PATH में है (या CARGO सेट है) और रनटाइम स्रोत मौजूद हैं, फिर दोबारा बिल्ड करें"
+help = "सुनिश्चित करें कि cargo इंस्टॉल है और PATH में है और रनटाइम स्रोत मौजूद हैं, फिर दोबारा बिल्ड करें"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "faber-host-llvm रनटाइम आर्काइव पहचान सत्यापन में विफल रहा: {detail}"

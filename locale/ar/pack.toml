@@ -4260,11 +4260,11 @@ help = "يبني llvm-host أصلياً على macOS وLinux بمعمارية aa
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "يحتاج llvm-host إلى سلسلة أدوات LLVM متسقة (llvm-as وclang من الإصدار نفسه): {reason}"
-help = "ثبّت LLVM بحيث يكون llvm-as وclang في PATH، أو اضبط LLVM_HOME على بادئة تثبيت LLVM"
+help = "ثبّت LLVM بحيث يكون llvm-as وclang في PATH"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "أرشيف وقت التشغيل faber-host-llvm غير متاح ({cause}): {detail}"
-help = "تأكد من تثبيت cargo ووجوده في PATH (أو ضبط CARGO) ومن وجود مصادر وقت التشغيل، ثم أعد البناء"
+help = "تأكد من تثبيت cargo ووجوده في PATH ومن وجود مصادر وقت التشغيل، ثم أعد البناء"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "فشل أرشيف وقت التشغيل faber-host-llvm في التحقق من الهوية: {detail}"

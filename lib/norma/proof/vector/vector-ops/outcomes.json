@@ -17,6 +17,12 @@
       "phase": "build",
       "diagnostic_contains": "error TS2322",
       "reason": "The generated project fails `tsc` with error TS2322: a type the TypeScript backend emits for the imported Norma modules does not check, so no program is produced."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "llvm-as rejected the module",
+      "reason": "The emitted LLVM module is invalid ('%load20' defined with type '<3 x float>' but expected 'ptr'), so llvm-as rejects it and the build stops at verification."
     }
   }
 }

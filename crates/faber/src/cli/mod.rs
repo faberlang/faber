@@ -716,6 +716,9 @@ pub enum RunTarget {
     /// Build the package as a Go module and run the built program.
     #[value(name = "go")]
     Go,
+    /// Build the package as a native LLVM program and run the built program.
+    #[value(name = "llvm-host")]
+    LlvmHost,
 }
 
 /// Arguments for `faber run`.
