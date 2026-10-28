@@ -123,6 +123,10 @@ mod field_modifier_write_test;
 #[path = "fieldless_type_access_test.rs"]
 mod fieldless_type_access_test;
 mod flow_range;
+mod flow_range_access;
+#[cfg(test)]
+#[path = "flow_range_access_test.rs"]
+mod flow_range_access_test;
 #[cfg(test)]
 mod flow_range_probe;
 mod flow_range_produce;
