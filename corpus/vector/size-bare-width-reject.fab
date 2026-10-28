@@ -1,0 +1,31 @@
++++
+term = "vector<T, size N>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "figura", "redde_stmt", "expression", "incipit_stmt", "nota_stmt"]
+category = "vector"
+canonical = false
+summary = "A vector lane count is written after size: a bare vector<T, 4> is retired by name."
+syntax = "vector<f32, 4> — rejected; write vector<f32, size 4> (the vf32[4] shorthand is unchanged)"
+related = ["vector<T, size N>", "vf32[N]", "size"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:vector_width_needs_size"
++++
+# =============================================================================
+# vector<T, N> — the bare lane count is retired
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A vector lane count is a count, so the long form writes it after `size`: `vector<f32, size 4>`. The `vf32[4]` shorthand keeps its brackets, which already mark an extent.
+#
+# Common mistakes:
+#   • Writing the lane count as a bare number or name in the long form; it takes `size` first.
+
+fn passthrough(vector<f32, 4> v) → vector<f32, 4> {
+    return v
+}
+
+main {
+    print 1
+}

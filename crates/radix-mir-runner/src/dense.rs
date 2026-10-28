@@ -11,13 +11,26 @@
 //!   carrier `ScalarKind::decode` uses) and store with a range check; an
 //!   out-of-range or wrong-carrier value is refused (`set` returns `false`);
 //! - the byte view is the little-endian layout of the element array, one
-//!   `bool` per byte as `0`/`1`.
+//!   `bool` per byte as `0`/`1`;
+//! - a `Record` cell holds a fixed-layout genus tensor as its packed
+//!   little-endian row bytes (the layout law of `resolve_struct_layout`), one
+//!   `layout.size()` row per element, and decodes a row to a `Value::Struct`
+//!   only when an element is read. Its byte view is the row bytes verbatim.
 
 use crate::value::Value;
+use handroll::FxHashMap;
+use radix_hir::DefId;
+use radix_lexer::Symbol;
+use radix_mir::{
+    MirDeviceViewElement, MirScalarLayout, MirType, MirValidationContext, StructLayoutRefusal,
+    resolve_struct_layout,
+};
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 use std::borrow::Cow;
-use std::cell::{Cell, UnsafeCell};
+use std::cell::{Cell, RefCell, UnsafeCell};
 use std::ops::Range;
+use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Element type of a typed dense array.
@@ -57,6 +70,11 @@ pub enum DenseStorage {
     U32(Vec<u32>),
     U64(Vec<u64>),
     Bool(Vec<bool>),
+    /// A tensor of fixed-layout genus rows: `bytes.len() == len * layout.size()`.
+    Record {
+        layout: Arc<RecordLayout>,
+        bytes: Vec<u8>,
+    },
     Values(Vec<Value>),
 }
 
@@ -129,24 +147,6 @@ impl DenseElement for bool {
             _ => None,
         }
     }
-}
-
-/// Apply `$body` to the typed vector of every non-`Values` variant, bound as
-/// `$items`; `$values` handles the `Values` variant.
-macro_rules! with_typed {
-    ($storage:expr, $items:ident => $body:expr, $values:ident => $values_body:expr) => {
-        match $storage {
-            DenseStorage::F32($items) => $body,
-            DenseStorage::F64($items) => $body,
-            DenseStorage::I32($items) => $body,
-            DenseStorage::I64($items) => $body,
-            DenseStorage::U8($items) => $body,
-            DenseStorage::U32($items) => $body,
-            DenseStorage::U64($items) => $body,
-            DenseStorage::Bool($items) => $body,
-            DenseStorage::Values($values) => $values_body,
-        }
-    };
 }
 
 fn narrow_int<T: TryFrom<i64> + TryFrom<u64>>(value: &Value) -> Option<T> {
@@ -270,7 +270,8 @@ impl DenseStorage {
         }
     }
 
-    /// Element type, or `None` for `Values`.
+    /// Element type, or `None` for `Values` and `Record` (a record row is not
+    /// one scalar kind; see [`DenseStorage::record_layout`]).
     #[must_use]
     pub fn kind(&self) -> Option<DenseKind> {
         match self {
@@ -282,13 +283,50 @@ impl DenseStorage {
             Self::U32(_) => Some(DenseKind::U32),
             Self::U64(_) => Some(DenseKind::U64),
             Self::Bool(_) => Some(DenseKind::Bool),
-            Self::Values(_) => None,
+            Self::Record { .. } | Self::Values(_) => None,
+        }
+    }
+
+    /// `len` zero rows of the record `layout`.
+    #[must_use]
+    pub fn zeros_record(layout: Arc<RecordLayout>, len: usize) -> Self {
+        let bytes = vec![0; len * layout.size()];
+        Self::Record { layout, bytes }
+    }
+
+    /// Record storage over `bytes`, taken as is (no copy). `None` unless the
+    /// length is a whole number of `layout.size()` rows.
+    #[must_use]
+    pub fn from_record_bytes(layout: Arc<RecordLayout>, bytes: Vec<u8>) -> Option<Self> {
+        bytes
+            .len()
+            .is_multiple_of(layout.size())
+            .then_some(Self::Record { layout, bytes })
+    }
+
+    /// The row layout of a `Record` storage, `None` for every other storage.
+    #[must_use]
+    pub fn record_layout(&self) -> Option<&Arc<RecordLayout>> {
+        match self {
+            Self::Record { layout, .. } => Some(layout),
+            _ => None,
         }
     }
 
     #[must_use]
     pub fn len(&self) -> usize {
-        with_typed!(self, items => items.len(), values => values.len())
+        match self {
+            Self::F32(items) => items.len(),
+            Self::F64(items) => items.len(),
+            Self::I32(items) => items.len(),
+            Self::I64(items) => items.len(),
+            Self::U8(items) => items.len(),
+            Self::U32(items) => items.len(),
+            Self::U64(items) => items.len(),
+            Self::Bool(items) => items.len(),
+            Self::Record { layout, bytes } => bytes.len() / layout.size(),
+            Self::Values(items) => items.len(),
+        }
     }
 
     #[must_use]
@@ -308,6 +346,7 @@ impl DenseStorage {
             Self::U32(items) => Value::Int(i64::from(*items.get(index)?)),
             Self::U64(items) => Value::UInt(*items.get(index)?),
             Self::Bool(items) => Value::Bool(*items.get(index)?),
+            Self::Record { layout, bytes } => layout.decode(layout.row(bytes, index)?)?,
             Self::Values(items) => items.get(index)?.clone(),
         })
     }
@@ -326,6 +365,15 @@ impl DenseStorage {
             (Self::U32(items), v) => store(items, index, narrow_int(v)),
             (Self::U64(items), v) => store(items, index, narrow_int(v)),
             (Self::Bool(items), Value::Bool(v)) => items.get_mut(index).map(|s| *s = *v),
+            (Self::Record { layout, bytes }, v) => {
+                let layout = &**layout;
+                layout.row_mut(bytes, index).and_then(|row| {
+                    let mut encoded = vec![0_u8; row.len()];
+                    layout
+                        .encode(v, &mut encoded)
+                        .then(|| row.copy_from_slice(&encoded))
+                })
+            }
             (Self::Values(items), v) => items.get_mut(index).map(|s| *s = v.clone()),
             _ => None,
         }
@@ -377,6 +425,12 @@ impl DenseStorage {
             Self::U32(items) => le_bytes(items, range, f),
             Self::U64(items) => le_bytes(items, range, f),
             Self::Bool(items) => le_bytes(items, range, f),
+            Self::Record { layout, bytes } => {
+                let size = layout.size();
+                let part =
+                    bytes.get(range.start.checked_mul(size)?..range.end.checked_mul(size)?)?;
+                Some(f(Cow::Borrowed(part)))
+            }
             Self::Values(_) => None,
         }
     }
@@ -401,6 +455,24 @@ impl DenseStorage {
             Self::U32(items) => write_le(items, range, bytes),
             Self::U64(items) => write_le(items, range, bytes),
             Self::Bool(items) => write_le(items, range, bytes),
+            Self::Record {
+                layout,
+                bytes: rows,
+            } => {
+                let size = layout.size();
+                let (Some(start), Some(end)) =
+                    (range.start.checked_mul(size), range.end.checked_mul(size))
+                else {
+                    return false;
+                };
+                match rows.get_mut(start..end) {
+                    Some(part) if part.len() == bytes.len() => {
+                        part.copy_from_slice(bytes);
+                        true
+                    }
+                    _ => false,
+                }
+            }
             Self::Values(_) => false,
         }
     }
@@ -456,6 +528,238 @@ fn write_le<T: DenseElement>(items: &mut [T], range: Range<usize>, bytes: &[u8])
         }
     }
     true
+}
+
+/// One field of a [`RecordLayout`]: where it sits in a row and how its bytes
+/// read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RecordField {
+    pub name: Symbol,
+    pub offset: usize,
+    pub scalar: MirScalarLayout,
+    /// `Some(n)`: the field is a fixed array of `n` scalars (`list<T, size n>`).
+    pub array_len: Option<usize>,
+    /// `Some(w)`: the field is a `vector<scalar, w>` register.
+    pub lanes: Option<u8>,
+}
+
+/// The packed little-endian row layout of one fixed-layout genus, taken from
+/// `resolve_struct_layout` (the layout law of record device elements). It
+/// carries what a row needs to read back as a `Value::Struct`: the genus
+/// definition and each field's name, offset and scalar. It names no format;
+/// any genus the layout law admits has one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecordLayout {
+    def: DefId,
+    size: usize,
+    fields: Vec<RecordField>,
+}
+
+impl RecordLayout {
+    /// Resolve the row layout of the genus type `ty`.
+    ///
+    /// # Errors
+    /// The named refusal of the layout law when `ty` is not a fixed-layout
+    /// genus (generic, nullable, text, nested genus, too large, ...).
+    pub fn resolve(
+        ty: TypeId,
+        ctx: &MirValidationContext<'_>,
+    ) -> Result<Self, StructLayoutRefusal> {
+        let types = ctx.types.as_table();
+        let mut ty = ty;
+        while let Type::Alias(_, inner) = types.get(ty) {
+            ty = *inner;
+        }
+        let layout = resolve_struct_layout(MirType::semantic(ty), ctx)?;
+        let Type::Struct(def) = types.get(ty) else {
+            return Err(StructLayoutRefusal::NotAGenus);
+        };
+        let declared = ctx.struct_fields.get(def);
+        let fields = layout
+            .fields
+            .iter()
+            .map(|field| {
+                let is_array = declared
+                    .and_then(|fields| fields.get(&field.name))
+                    .is_some_and(|ty| {
+                        let mut ty = ty.semantic_id();
+                        while let Type::Alias(_, inner) = types.get(ty) {
+                            ty = *inner;
+                        }
+                        matches!(types.get(ty), Type::BoundedArray { .. })
+                    });
+                let (scalar, lanes) = match field.element {
+                    MirDeviceViewElement::Scalar(scalar) => (scalar, None),
+                    MirDeviceViewElement::Vector(vector) => (vector.element, Some(vector.width)),
+                    MirDeviceViewElement::Record(_) => {
+                        return Err(StructLayoutRefusal::NestedGenus);
+                    }
+                };
+                let width = scalar_width(scalar).ok_or(StructLayoutRefusal::UnsupportedField)?;
+                Ok(RecordField {
+                    name: field.name,
+                    offset: field.offset as usize,
+                    scalar,
+                    array_len: is_array.then(|| field.size as usize / width),
+                    lanes,
+                })
+            })
+            .collect::<Result<Vec<_>, StructLayoutRefusal>>()?;
+        Ok(Self {
+            def: *def,
+            size: layout.size as usize,
+            fields,
+        })
+    }
+
+    /// Bytes of one row (the layout's struct size, padding included).
+    #[must_use]
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    /// The genus definition a decoded row carries.
+    #[must_use]
+    pub fn def(&self) -> DefId {
+        self.def
+    }
+
+    fn row<'a>(&self, bytes: &'a [u8], index: usize) -> Option<&'a [u8]> {
+        let start = index.checked_mul(self.size)?;
+        bytes.get(start..start.checked_add(self.size)?)
+    }
+
+    fn row_mut<'a>(&self, bytes: &'a mut [u8], index: usize) -> Option<&'a mut [u8]> {
+        let start = index.checked_mul(self.size)?;
+        bytes.get_mut(start..start.checked_add(self.size)?)
+    }
+
+    /// One row as the struct value the runner builds for a plain binding.
+    fn decode(&self, row: &[u8]) -> Option<Value> {
+        let mut fields = FxHashMap::default();
+        for field in &self.fields {
+            let width = scalar_width(field.scalar)?;
+            let count = field
+                .array_len
+                .or(field.lanes.map(usize::from))
+                .unwrap_or(1);
+            let mut items = Vec::with_capacity(count);
+            for slot in 0..count {
+                let at = field.offset + slot * width;
+                items.push(decode_scalar(field.scalar, row.get(at..at + width)?)?);
+            }
+            let value = if field.array_len.is_some() {
+                Value::Array(Rc::new(RefCell::new(items)))
+            } else if field.lanes.is_some() {
+                Value::Vector(Rc::new(RefCell::new(items)))
+            } else {
+                items.pop()?
+            };
+            fields.insert(field.name, value);
+        }
+        Some(Value::Struct(self.def, Rc::new(RefCell::new(fields))))
+    }
+
+    /// Encode `value` into `row` (`size()` zeroed bytes). `false` for a value
+    /// that is not this genus, a missing field, or a field out of its range.
+    fn encode(&self, value: &Value, row: &mut [u8]) -> bool {
+        let Value::Struct(def, fields) = value else {
+            return false;
+        };
+        if *def != self.def {
+            return false;
+        }
+        let fields = fields.borrow();
+        self.fields.iter().all(|field| {
+            let Some(width) = scalar_width(field.scalar) else {
+                return false;
+            };
+            let Some(value) = fields.get(&field.name) else {
+                return false;
+            };
+            let scalars: Vec<Value> = match (value, field.array_len, field.lanes) {
+                (Value::Array(items), Some(count), None) if items.borrow().len() == count => {
+                    items.borrow().clone()
+                }
+                (Value::Vector(items), None, Some(lanes))
+                    if items.borrow().len() == usize::from(lanes) =>
+                {
+                    items.borrow().clone()
+                }
+                (value, None, None) => vec![value.clone()],
+                _ => return false,
+            };
+            scalars.iter().enumerate().all(|(slot, scalar)| {
+                let at = field.offset + slot * width;
+                row.get_mut(at..at + width)
+                    .is_some_and(|out| encode_scalar(field.scalar, scalar, out))
+            })
+        })
+    }
+}
+
+const fn scalar_width(scalar: MirScalarLayout) -> Option<usize> {
+    Some(match scalar {
+        MirScalarLayout::I8 | MirScalarLayout::U8 => 1,
+        MirScalarLayout::I16
+        | MirScalarLayout::U16
+        | MirScalarLayout::F16
+        | MirScalarLayout::Bf16 => 2,
+        MirScalarLayout::I32 | MirScalarLayout::U32 | MirScalarLayout::F32 => 4,
+        MirScalarLayout::I64 | MirScalarLayout::U64 => 8,
+        _ => return None,
+    })
+}
+
+fn decode_scalar(scalar: MirScalarLayout, bytes: &[u8]) -> Option<Value> {
+    Some(match scalar {
+        MirScalarLayout::I8 => Value::Int(i64::from(i8::from_le_bytes(bytes.try_into().ok()?))),
+        MirScalarLayout::U8 => Value::Int(i64::from(u8::from_le_bytes(bytes.try_into().ok()?))),
+        MirScalarLayout::I16 => Value::Int(i64::from(i16::from_le_bytes(bytes.try_into().ok()?))),
+        MirScalarLayout::U16 => Value::Int(i64::from(u16::from_le_bytes(bytes.try_into().ok()?))),
+        MirScalarLayout::I32 => Value::Int(i64::from(i32::from_le_bytes(bytes.try_into().ok()?))),
+        MirScalarLayout::U32 => Value::Int(i64::from(u32::from_le_bytes(bytes.try_into().ok()?))),
+        MirScalarLayout::I64 => Value::Int(i64::from_le_bytes(bytes.try_into().ok()?)),
+        MirScalarLayout::U64 => Value::UInt(u64::from_le_bytes(bytes.try_into().ok()?)),
+        MirScalarLayout::F32 => Value::Float(f64::from(f32::from_le_bytes(bytes.try_into().ok()?))),
+        MirScalarLayout::F16 => Value::Float(f64::from(crate::half_to_f32(u16::from_le_bytes(
+            bytes.try_into().ok()?,
+        )))),
+        MirScalarLayout::Bf16 => Value::Float(f64::from(f32::from_bits(
+            u32::from(u16::from_le_bytes(bytes.try_into().ok()?)) << 16,
+        ))),
+        _ => return None,
+    })
+}
+
+#[expect(clippy::cast_possible_truncation)]
+fn encode_scalar(scalar: MirScalarLayout, value: &Value, out: &mut [u8]) -> bool {
+    let bytes: Option<Vec<u8>> = match (scalar, value) {
+        (MirScalarLayout::I8, v) => narrow_int::<i8>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::U8, v) => narrow_int::<u8>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::I16, v) => narrow_int::<i16>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::U16, v) => narrow_int::<u16>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::I32, v) => narrow_int::<i32>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::U32, v) => narrow_int::<u32>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::I64, v) => narrow_int::<i64>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::U64, v) => narrow_int::<u64>(v).map(|n| n.to_le_bytes().to_vec()),
+        (MirScalarLayout::F32, Value::Float(v)) => Some((*v as f32).to_le_bytes().to_vec()),
+        (MirScalarLayout::F16, Value::Float(v)) => {
+            Some(crate::f32_to_f16_rn(*v as f32).to_le_bytes().to_vec())
+        }
+        (MirScalarLayout::Bf16, Value::Float(v)) => {
+            let rounded = crate::bf16_round_f64(*v) as f32;
+            Some(((rounded.to_bits() >> 16) as u16).to_le_bytes().to_vec())
+        }
+        _ => None,
+    };
+    bytes.is_some_and(|bytes| {
+        let fits = bytes.len() == out.len();
+        if fits {
+            out.copy_from_slice(&bytes);
+        }
+        fits
+    })
 }
 
 /// Shared-ownership cell around a [`DenseStorage`].
@@ -576,13 +880,18 @@ impl DenseCell {
         self.len() == 0
     }
 
-    /// Element type, or `None` for `Values`.
+    /// Element type, or `None` for `Values` and `Record`.
     pub fn kind(&self) -> Option<DenseKind> {
         self.read(DenseStorage::kind)
     }
 
     pub fn get(&self, index: usize) -> Option<Value> {
         self.read(|storage| storage.get(index))
+    }
+
+    /// Byte size of one row when the storage is `Record`, else `None`.
+    pub fn record_size(&self) -> Option<usize> {
+        self.read(|storage| storage.record_layout().map(|layout| layout.size()))
     }
 
     /// See [`DenseStorage::set`]; increments the element-store counter once per call.
@@ -598,7 +907,7 @@ impl DenseCell {
     pub fn to_values(&self) -> Vec<Value> {
         self.read(|storage| {
             let values = storage.to_values();
-            if storage.kind().is_some() {
+            if !matches!(storage, DenseStorage::Values(_)) {
                 self.boxed.fetch_add(
                     u64::try_from(storage.len()).unwrap_or(u64::MAX),
                     Ordering::Relaxed,
@@ -639,7 +948,7 @@ impl DenseCell {
     pub fn values_prefix(&self, count: usize) -> Vec<Value> {
         self.read(|storage| {
             let values = storage.values_prefix(count);
-            if storage.kind().is_some() {
+            if !matches!(storage, DenseStorage::Values(_)) {
                 self.boxed
                     .fetch_add(u64::try_from(count).unwrap_or(u64::MAX), Ordering::Relaxed);
             }

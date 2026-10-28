@@ -648,14 +648,14 @@ fn bounded_ascii_and_textus_resolve_physical_byte_aggregates_with_length_member(
     };
     let textus_layout = table
         .layout_for_type(MirType::semantic(textus_ty))
-        .expect("textus<16> layout fact");
+        .expect("textus<magnitudo 16> layout fact");
     assert_eq!(
         textus_layout.kind,
         expected(MirAggregateFamily::BoundedTextus)
     );
     let ascii_layout = table
         .layout_for_type(MirType::semantic(ascii_ty))
-        .expect("ascii<16> layout fact");
+        .expect("ascii<magnitudo 16> layout fact");
     assert_eq!(
         ascii_layout.kind,
         expected(MirAggregateFamily::BoundedAscii)
@@ -825,7 +825,7 @@ fn vector_element_tensor_resolves_device_view_with_vector_element() {
 
     let layout = table
         .layout_for_type(MirType::semantic(tensor))
-        .expect("tensor<vector<f32, 4>> layout fact");
+        .expect("tensor<vector<f32, size 4>> layout fact");
     let MirLayoutKind::DeviceView(view) = layout.kind else {
         panic!("expected DeviceView, got {:?}", layout.kind);
     };
@@ -848,7 +848,7 @@ fn vector_element_tensor_width2_is_admitted() {
     let table = MirLayoutTable::from_types(&types);
     let layout = table
         .layout_for_type(MirType::semantic(tensor))
-        .expect("tensor<vector<f32, 2>> layout fact");
+        .expect("tensor<vector<f32, size 2>> layout fact");
     assert!(matches!(
         layout.kind,
         MirLayoutKind::DeviceView(MirDeviceViewLayout {

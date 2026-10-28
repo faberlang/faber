@@ -101,6 +101,7 @@ axis = "trục"
 lege = "đọc"
 lineam = "dòng"
 omnia = "tất_cả"
+machina = "thiết_bị"
 scriptum = "văn_bản_hóa"
 sparge = "rải"
 ut = "như"
@@ -199,7 +200,7 @@ instans = "thời_điểm"
 objectum = "đối_tượng"
 quidlibet = "bất_kỳ"
 lista = "danh_sách"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "bảng"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "sổ_cái"
@@ -725,6 +726,10 @@ help = "dùng {replacement}"
 message = "'{cape}' phải đứng trước '{dum}' trong vòng lặp '{fac}'"
 help = "viết trình xử lý trước điều kiện: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "khối '{fac}' chỉ nhận một từ bổ nghĩa, không dùng '{omnia}' cùng '{machina}'"
+help = "'{machina}' đã giao mọi lỗi một lần ở cuối khối; bỏ '{omnia}'"
+
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "dấu phẩy không còn ngăn cách các đối tượng của '{discerne}'"
 help = "ngăn cách các đối tượng bằng '{et}'"
@@ -799,7 +804,7 @@ help = "ghi tên hint ngay sau via, như trong `x ↦ u32 via Hex`; các hint l�
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "hint chuyển đổi không phải là đối số kiểu"
-help = "viết hint thành mệnh đề via sau đích: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "viết hint thành mệnh đề via sau đích: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "hint chuyển đổi không đi theo sau đích trong ngoặc nhọn"
@@ -1245,6 +1250,14 @@ help = "viết phạm vi trên danh sách, ví dụ {lista}<int, {magnitudo} 1�
 message = "số phần tử của danh sách được viết sau `{magnitudo}`"
 help = "viết `{lista}<int, {magnitudo} 4>` cho tối đa 4 phần tử, hoặc `{lista}<int, {magnitudo} 1…8>` cho một phạm vi; phạm vi trần giới hạn một giá trị, không phải số lượng"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "sức chứa được viết sau `{magnitudo}`"
+help = "viết `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` hoặc `{ascii}<{magnitudo} 8>` cho sức chứa tối đa chừng đó; một con số trần không phải là sức chứa"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "số làn của vectơ được viết sau `{magnitudo}`"
+help = "viết `{vector}<f32, {magnitudo} 4>` cho bốn làn; dạng rút gọn `vf32[4]` không đổi"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1271,11 +1284,11 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue yêu cầu một hoặc hai tham số kiểu"
-help = "dùng queue<T> hoặc queue<T, N>"
+help = "dùng queue<T> hoặc queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack yêu cầu một hoặc hai tham số kiểu"
-help = "dùng stack<T> hoặc stack<T, N>"
+help = "dùng stack<T> hoặc stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu yêu cầu một mẫu"
@@ -1443,7 +1456,7 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "kiểu nguyên thủy không thể nhận tham số"
-help = "textus<N>, ascii<N> và {lista}<b8, {magnitudo} N> là dạng bounded đã phát hành"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N> và {lista}<b8, {magnitudo} N> là dạng bounded đã phát hành"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "kiểu đủ điều kiện không được namespace xuất ra"
@@ -1584,6 +1597,26 @@ help = "dùng f32 cho các giá trị kernel dấu phẩy động"
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "việc ghi với độ rộng {width} có thể gây lỗi trong kernel nucleum"
 help = "chứng minh việc ghi nằm trong phạm vi hoặc dùng cell bao hoặc bão hòa"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "vùng '{fac} {machina}' không được chứa vùng '{fac} {machina}' khác"
+help = "giữ một vùng thiết bị và gọi kernel trực tiếp từ đó"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' rời vùng '{fac} {machina}'; vùng chưa có từ thoát"
+help = "kết thúc vùng rồi quyết định sau đó, hoặc chuyển lối thoát ra ngoài khối"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "vòng lặp lane ('{construct}') ngay trong vùng '{fac} {machina}' chưa được xây dựng"
+help = "gọi một kernel từ vùng cho công việc song song"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "vùng '{fac} {machina}' chưa thể cấp phát tensor ({construct})"
+help = "cấp phát tensor trước vùng rồi dùng bên trong"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' trong vùng '{fac} {machina}' đọc giá trị tính trên thiết bị; điều khiển vòng lặp trên thiết bị chưa được xây dựng"
+help = "giữ điều kiện, cận và đối số vô hướng ở các giá trị biết trước vùng, và đọc kết quả thiết bị sau vùng"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "độ rộng số nguyên {width} vượt quá độ rộng kernel nucleum được hỗ trợ"
@@ -2190,11 +2223,11 @@ message = "kiểu phần tử vector không khớp"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector yêu cầu kiểu phần tử và độ rộng; dùng vector<T, N>"
+message = "vector yêu cầu kiểu phần tử và độ rộng; dùng vector<T, kích_thước N>"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector yêu cầu độ rộng; dùng vector<T, 4> hoặc vf32[4]"
+message = "vector yêu cầu độ rộng; dùng vector<T, kích_thước 4> hoặc vf32[4]"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2436,6 +2469,10 @@ help = "xóa danh sách đối số kiểu được chỉ rõ"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "cần các phần tử số trong lista"
 help = "dùng các phần tử số cho intrinsic lista này"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` cần bộ nhận là list thường; list có giới hạn hoặc có khoảng độ dài không thể dài ra tại chỗ"
+help = "dùng extend trên list không giới hạn, hoặc thêm từng phần tử bằng `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "phương thức có khóa `.đã_sắp_xếp(khóa)` đã bị gỡ bỏ; hãy dùng biểu thức sắp xếp"
@@ -2796,6 +2833,10 @@ help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte r
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "chuyển đổi từ {lista}<b8> sang fractus chưa được đặc tả (độ rộng IEEE và thứ tự byte); thay vào đó sử dụng `chorda` hoặc các động từ byte rõ ràng"
 help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
+
+[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+message = "tensor bản ghi đọc byte theo bố cục little-endian của bản ghi; viết `via Le`, không viết `via Be`"
+help = "viết {lista}<b8> ↦ tensor<Record, [n]> via Le; phần tử bản ghi chỉ có một thứ tự byte, do bố cục của nó quy định"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3665,6 +3706,7 @@ argminima = "argmin"
 continet = "chứa"
 cumulata = "tích_lũy"
 decapita = "bỏ_đầu"
+extende = "nối_dài"
 filtrata = "lọc"
 immerge = "chìm"
 inversa = "nghịch_đảo"

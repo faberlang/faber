@@ -1716,10 +1716,10 @@ impl Lowerer<'_> {
 
     pub(super) fn lower_fac_expr(&mut self, stmt: &radix_syntax::FacStmt) -> HirExpression {
         let mut block = self.lower_block(&stmt.body);
-        block.breakable = Some(if stmt.omnia {
-            radix_hir::HirBreakableKind::FacOmnia
-        } else {
-            radix_hir::HirBreakableKind::Fac
+        block.breakable = Some(match stmt.modifier {
+            radix_syntax::FacModifier::Omnia => radix_hir::HirBreakableKind::FacOmnia,
+            radix_syntax::FacModifier::Machina => radix_hir::HirBreakableKind::FacMachina,
+            radix_syntax::FacModifier::None => radix_hir::HirBreakableKind::Fac,
         });
         let expr = if let Some(cond) = &stmt.while_ {
             let negate_cond = HirExpression {
@@ -1767,8 +1767,14 @@ impl Lowerer<'_> {
             // The authored `omnia` marker rides the synthesized loop block so
             // the re-emitter prints it. `FacOmniaLoop` is a marker, not a
             // scope: every backend and MIR lower the loop as plain `fac … dum`.
-            if stmt.omnia {
-                loop_block.breakable = Some(radix_hir::HirBreakableKind::FacOmniaLoop);
+            match stmt.modifier {
+                radix_syntax::FacModifier::Omnia => {
+                    loop_block.breakable = Some(radix_hir::HirBreakableKind::FacOmniaLoop);
+                }
+                radix_syntax::FacModifier::Machina => {
+                    loop_block.breakable = Some(radix_hir::HirBreakableKind::FacMachinaLoop);
+                }
+                radix_syntax::FacModifier::None => {}
             }
             HirExpression {
                 id: self.next_hir_id(),

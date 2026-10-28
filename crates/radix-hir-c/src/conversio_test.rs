@@ -79,7 +79,7 @@ fn text_and_float_to_bool_and_bool_to_float() {
 #[test]
 fn a_bounded_text_conversion_checks_its_capacity() {
     let code = emitted(
-        "main {\n    let string raw ← \"ab\"\n    let string<8> t ← raw ↦ string<8>\n    print t\n}",
+        "main {\n    let string raw ← \"ab\"\n    let string<size 8> t ← raw ↦ string<size 8>\n    print t\n}",
     );
     assert!(code.contains("faber_bounded_text(l_raw, 8)"), "{code}");
 }
@@ -87,7 +87,7 @@ fn a_bounded_text_conversion_checks_its_capacity() {
 #[test]
 fn a_bounded_ascii_resize_checks_the_new_capacity() {
     let code = emitted(
-        "main {\n    let ascii<8> b ← 'abcd'\n    let ascii<4> shrunk ← b ↦ ascii<4>\n    print shrunk\n}",
+        "main {\n    let ascii<size 8> b ← 'abcd'\n    let ascii<size 4> shrunk ← b ↦ ascii<size 4>\n    print shrunk\n}",
     );
     assert!(code.contains("faber_text_length("), "{code}");
     assert!(
@@ -98,8 +98,9 @@ fn a_bounded_ascii_resize_checks_the_new_capacity() {
 
 #[test]
 fn an_ascii_pack_is_the_fixed_width_radix() {
-    let code =
-        emitted("main {\n    let ascii<8> padded ← 37 ↦ ascii<8> via Hex\n    print padded\n}");
+    let code = emitted(
+        "main {\n    let ascii<size 8> padded ← 37 ↦ ascii<size 8> via Hex\n    print padded\n}",
+    );
     assert!(code.contains("faber_try_ascii_pack(faber_a,"), "{code}");
     assert!(code.contains(", 16, 8,"), "{code}");
 }

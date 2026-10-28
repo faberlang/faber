@@ -613,6 +613,40 @@ fn list_find_and_regex_find_share_a_surface_and_resolve_by_receiver_family() {
     );
 }
 
+/// The list join `extende` has its own word in every translated pack, distinct
+/// from the one-element `appende`, and each resolves back to the Lista row.
+#[test]
+fn list_join_surface_resolves_to_extende_in_every_pack() {
+    for (locale, extend_surface, append_surface) in [
+        ("en", "extend", "append"),
+        ("ar", "ألحق_الكل", "ألحق"),
+        ("hi", "पीछे_मिलाओ", "पीछे_जोड़ो"),
+        ("th-TH", "ขยาย", "ต่อท้าย"),
+        ("vi", "nối_dài", "nối_đuôi"),
+        ("zh-Hans", "扩展", "追加"),
+        ("zh-Hant", "擴展", "附加"),
+    ] {
+        let pack = pack(locale);
+        assert_eq!(
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, extend_surface),
+            Some("extende"),
+            "{locale}: `{extend_surface}` must be the list join row"
+        );
+        assert_eq!(
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, append_surface),
+            Some("appende"),
+            "{locale}: `{append_surface}` must stay the one-element append row"
+        );
+    }
+    let source = "fn probe(mut list<int> xs, list<int> ys) → void {\n    xs.extend(ys)\n}\n";
+    let unit = analyze(source, Some(en_pack())).expect("en list `extend` must typecheck");
+    assert_eq!(
+        method_call_spellings(&unit.hir, &unit.interner),
+        vec!["extende".to_owned()],
+        "the en surface must rewrite to the canonical `extende`"
+    );
+}
+
 /// done-when (pack-authoritative): the canonical Latin `omnia` spelling is not
 /// a declared en surface — the same miss law the other rows already prove.
 #[test]

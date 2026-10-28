@@ -95,14 +95,16 @@ fn radix_text_parse_into_integer_still_accepts() {
 #[test]
 fn ascii_format_pack_from_decimal_source_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "functio p(d64 n) → ascii<8> { redde n ↦ ascii<8> via Hex }",
+        "functio p(d64 n) → ascii<magnitudo 8> { redde n ↦ ascii<magnitudo 8> via Hex }",
         "decimal_radix_hint_rejected",
     );
 }
 
 #[test]
 fn ascii_format_pack_from_integer_source_still_accepts() {
-    test_support::assert_accepts_la("incipit { sit ascii<2> hex ← 255 ↦ ascii<2> via Hex }");
+    test_support::assert_accepts_la(
+        "incipit { sit ascii<magnitudo 2> hex ← 255 ↦ ascii<magnitudo 2> via Hex }",
+    );
 }
 
 // --- wrong site class: endian hints (Be/Le) ---

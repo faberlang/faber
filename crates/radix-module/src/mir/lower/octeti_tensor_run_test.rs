@@ -68,3 +68,121 @@ fn runtime_extent_decode_runs_and_length_mismatch_is_catchable() {
         .expect("a run-time extent target decodes");
     assert_eq!(host.stdout_lines, ["1.0", "6.0", "3", "caught"]);
 }
+
+/// A bounded range of a real file becomes a tensor of fixed-layout records
+///: `octeti ↦ tensor<Block, [n]> via Le` keeps the range's
+/// bytes as the rows and a field read decodes in place. A range that is not a
+/// whole number of rows is a catchable, named failure. Nothing here names a
+/// file format; `Block` is any fixed-layout genus.
+fn record_range_program(path: &str, offset: u32, length: u32) -> String {
+    format!(
+        r#"+++
+locale = "en"
++++
+
+@ public
+class Block {{
+    let f16 scale
+    let list<i8, size 4> values
+}}
+
+fn read_blocks(tensor<Block, [2]> blocks, mut tensor<f32, [2]> out) → void {{
+    for from blocks at [i] let b {{
+        out[[i]] ← (b.scale ↦ f32) + (b.values[1] ↦ f32)
+    }}
+}}
+
+main {{
+    let list<value> args ← ["{path}", {offset}, {length}]
+    let list<b8> raw ← call 'solum:partem' (args) ↦ list<b8>
+    do {{
+        let tensor<Block, [2]> blocks ← raw ↦ tensor<Block, [2]> via Le
+        mut tensor<f32, [2]> out ← tf32[2] {{}}
+        read_blocks(blocks, mut out)
+        print out[[0]]
+        print out[[1]]
+    }}
+    catch err {{
+        print "caught"
+    }}
+}}
+"#
+    )
+}
+
+#[test]
+fn real_file_range_loads_as_record_tensor_and_misaligned_range_is_catchable() {
+    // Three bytes of lead, two 6-byte rows (f16 scale + four i8 slots), tail.
+    let rows: [u8; 12] = [
+        0x00, 0x3e, 0xfd, 0x04, 0x05, 0x06, // scale 1.5, values [-3, 4, 5, 6]
+        0x00, 0x41, 0x0a, 0xec, 0x1e, 0xd8, // scale 2.5, values [10, -20, 30, -40]
+    ];
+    let mut file = vec![0xee_u8; 3];
+    file.extend_from_slice(&rows);
+    file.extend_from_slice(&[0xdd; 5]);
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("records.bin");
+    std::fs::write(&path, &file).expect("write fixture");
+    let path = path.to_string_lossy().into_owned();
+
+    let mut host = BufferHost::default();
+    run_source(
+        &session(),
+        "octeti-record-range.fab",
+        &record_range_program(&path, 3, 12),
+        &mut host,
+    )
+    .expect("a bounded file range loads as record rows");
+    assert_eq!(host.stdout_lines, ["5.5", "-17.5"]);
+
+    // Eleven bytes: not a whole number of 6-byte rows.
+    let mut host = BufferHost::default();
+    run_source(
+        &session(),
+        "octeti-record-range-short.fab",
+        &record_range_program(&path, 3, 11),
+        &mut host,
+    )
+    .expect("the failure is caught");
+    assert_eq!(host.stdout_lines, ["caught"]);
+}
+
+/// A field store through a record tensor element reaches the tensor (need
+/// d43ea3d1): a record row decodes to a fresh value on every read, so the
+/// store writes the changed element back. The compound `↑`, a store inside a
+/// kernel-shaped loop and an untouched neighbour row all agree.
+const FIELD_WRITE_THROUGH: &str = r#"+++
+locale = "en"
++++
+
+class Cell {
+    mut i16 n
+    let list<i8, size 4> values
+}
+
+fn bump(mut tensor<Cell, [2]> cs) → void {
+    for range 0‥2 let i {
+        cs[[i]].n ← 9 + i
+    }
+}
+
+main {
+    let list<b8> raw ← [0x01, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x00, 0x05, 0x06, 0x07, 0x08]
+    mut tensor<Cell, [2]> cells ← raw ↦ tensor<Cell, [2]> via Le
+    print cells[[0]].n
+    bump(mut cells)
+    print cells[[0]].n
+    print cells[[1]].n
+    cells[[1]].n ↑
+    print cells[[1]].n
+    print cells[[1]].values[2]
+}
+"#;
+
+#[test]
+fn field_store_through_a_record_tensor_element_writes_back() {
+    let mut host = BufferHost::default();
+    run_source(&session(), "record-field-write.fab", FIELD_WRITE_THROUGH, &mut host)
+        .expect("a field store through a record tensor element runs");
+    assert_eq!(host.stdout_lines, ["1", "9", "10", "11", "7"]);
+}

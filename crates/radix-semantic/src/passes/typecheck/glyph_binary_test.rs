@@ -60,7 +60,7 @@ fn rejects_transpose_with_issue(source: &str, issue: &str) {
 #[test]
 fn glyph_dot_vector_dot_returns_scalar() {
     accepts(
-        r"functio dot(vector<f32, 3> a, vector<f32, 3> b) → f32 {
+        r"functio dot(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → f32 {
     redde a · b
 }",
     );
@@ -111,7 +111,7 @@ fn glyph_dot_generic_vs_concrete_matrix_matmul_rejects() {
 #[test]
 fn glyph_dot_matvec_returns_vector() {
     accepts(
-        r"functio apply(matrix<f32, [2, 3]> m, vector<f32, 3> v) → vector<f32, 2> {
+        r"functio apply(matrix<f32, [2, 3]> m, vector<f32, magnitudo 3> v) → vector<f32, magnitudo 2> {
     redde m · v
 }",
     );
@@ -120,7 +120,7 @@ fn glyph_dot_matvec_returns_vector() {
 #[test]
 fn glyph_dot_vector_matrix_returns_vector() {
     accepts(
-        r"functio apply(vector<f32, 3> v, matrix<f32, [3, 4]> m) → vector<f32, 4> {
+        r"functio apply(vector<f32, magnitudo 3> v, matrix<f32, [3, 4]> m) → vector<f32, magnitudo 4> {
     redde v · m
 }",
     );
@@ -129,7 +129,7 @@ fn glyph_dot_vector_matrix_returns_vector() {
 #[test]
 fn glyph_dot_vector_width_mismatch_rejects() {
     rejects_with_issue(
-        r"functio dot(vector<f32, 3> a, vector<f32, 4> b) → f32 {
+        r"functio dot(vector<f32, magnitudo 3> a, vector<f32, magnitudo 4> b) → f32 {
     redde a · b
 }",
         "glyph_inner_dim_mismatch",
@@ -151,7 +151,7 @@ fn glyph_dot_matmul_inner_dim_mismatch_rejects() {
 #[test]
 fn glyph_dot_matvec_width_mismatch_rejects() {
     rejects_with_issue(
-        r"functio apply(matrix<f32, [2, 3]> m, vector<f32, 4> v) → vector<f32, 2> {
+        r"functio apply(matrix<f32, [2, 3]> m, vector<f32, magnitudo 4> v) → vector<f32, magnitudo 2> {
     redde m · v
 }",
         "glyph_inner_dim_mismatch",
@@ -175,7 +175,7 @@ fn glyph_dot_scalar_operands_do_not_silently_pass() {
 #[test]
 fn glyph_dot_non_numeric_element_rejects() {
     rejects_with_issue(
-        r"functio dot(vector<textus, 3> a, vector<textus, 3> b) → textus {
+        r"functio dot(vector<textus, magnitudo 3> a, vector<textus, magnitudo 3> b) → textus {
     redde a · b
 }",
         "glyph_op_numeric_element_required",
@@ -186,7 +186,7 @@ fn glyph_dot_non_numeric_element_rejects() {
 #[test]
 fn glyph_dot_element_type_mismatch_rejects() {
     rejects_with_issue(
-        r"functio dot(vector<f32, 3> a, vector<f64, 3> b) → f64 {
+        r"functio dot(vector<f32, magnitudo 3> a, vector<f64, magnitudo 3> b) → f64 {
     redde a · b
 }",
         "glyph_element_type_mismatch",
@@ -199,7 +199,7 @@ fn glyph_dot_element_type_mismatch_rejects() {
 #[test]
 fn glyph_cross_width_three_typechecks() {
     accepts(
-        r"functio cross(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+        r"functio cross(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<f32, magnitudo 3> {
     redde a × b
 }",
     );
@@ -208,7 +208,7 @@ fn glyph_cross_width_three_typechecks() {
 #[test]
 fn glyph_cross_non_width_three_rejects() {
     rejects_with_issue(
-        r"functio cross(vector<f32, 4> a, vector<f32, 4> b) → vector<f32, 4> {
+        r"functio cross(vector<f32, magnitudo 4> a, vector<f32, magnitudo 4> b) → vector<f32, magnitudo 4> {
     redde a × b
 }",
         "glyph_cross_width_three_required",
@@ -219,7 +219,7 @@ fn glyph_cross_non_width_three_rejects() {
 #[test]
 fn glyph_cross_width_mismatch_rejects() {
     rejects_with_issue(
-        r"functio cross(vector<f32, 3> a, vector<f32, 4> b) → vector<f32, 4> {
+        r"functio cross(vector<f32, magnitudo 3> a, vector<f32, magnitudo 4> b) → vector<f32, magnitudo 4> {
     redde a × b
 }",
         "glyph_cross_width_mismatch",
@@ -243,7 +243,7 @@ fn glyph_cross_matrix_operands_reject() {
 #[test]
 fn glyph_tensor_product_vector_outer_returns_matrix() {
     accepts(
-        r"functio outer(vector<f32, 3> a, vector<f32, 2> b) → matrix<f32, [3, 2]> {
+        r"functio outer(vector<f32, magnitudo 3> a, vector<f32, magnitudo 2> b) → matrix<f32, [3, 2]> {
     redde a ⊗ b
 }",
     );
@@ -265,7 +265,7 @@ fn glyph_tensor_product_kronecker_on_matrices_deferred() {
 #[test]
 fn glyph_hadamard_identical_vector_shapes_typecheck() {
     accepts(
-        r"functio elementwise(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+        r"functio elementwise(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<f32, magnitudo 3> {
     redde a ⊙ b
 }",
     );
@@ -292,7 +292,7 @@ fn glyph_hadamard_identical_tensor_shapes_typecheck() {
 #[test]
 fn glyph_hadamard_vector_width_mismatch_rejects() {
     rejects_with_issue(
-        r"functio elementwise(vector<f32, 3> a, vector<f32, 4> b) → vector<f32, 4> {
+        r"functio elementwise(vector<f32, magnitudo 3> a, vector<f32, magnitudo 4> b) → vector<f32, magnitudo 4> {
     redde a ⊙ b
 }",
         "glyph_hadamard_shapes_mismatch",
@@ -325,7 +325,7 @@ fn glyph_hadamard_divide_identical_shapes_typecheck() {
 #[test]
 fn glyph_hadamard_divide_vector_shape_mismatch_rejects() {
     rejects_with_issue(
-        r"functio elementwise(vector<f32, 3> a, vector<f32, 4> b) → vector<f32, 4> {
+        r"functio elementwise(vector<f32, magnitudo 3> a, vector<f32, magnitudo 4> b) → vector<f32, magnitudo 4> {
     redde a ⊘ b
 }",
         "glyph_hadamard_shapes_mismatch",
@@ -540,7 +540,7 @@ fn glyph_hadamard_distinct_shape_params_reject() {
 #[test]
 fn glyph_tensor_product_parametric_width_returns_symbolic_matrix() {
     accepts(
-        r"functio scala<magnitudo N>(vector<f32, N> v, vector<f32, 1> w) → matrix<f32, [N, 1]> {
+        r"functio scala<magnitudo N>(vector<f32, magnitudo N> v, vector<f32, magnitudo 1> w) → matrix<f32, [N, 1]> {
     redde v ⊗ w
 }",
     );
@@ -549,7 +549,7 @@ fn glyph_tensor_product_parametric_width_returns_symbolic_matrix() {
 #[test]
 fn glyph_tensor_product_literal_widths_unchanged() {
     accepts(
-        r"functio scala(vector<f32, 3> v, vector<f32, 2> w) → matrix<f32, [3, 2]> {
+        r"functio scala(vector<f32, magnitudo 3> v, vector<f32, magnitudo 2> w) → matrix<f32, [3, 2]> {
     redde v ⊗ w
 }",
     );
@@ -560,7 +560,7 @@ fn glyph_hadamard_parametric_width_still_fails_closed() {
     // Only `⊗` publishes a symbolic shape; same-shape `⊙` keeps the literal
     // demand so an unsolved parametric width cannot silently pass.
     rejects_with_issue(
-        r"functio mask<magnitudo N>(vector<f32, N> a, vector<f32, N> b) → vector<f32, N> {
+        r"functio mask<magnitudo N>(vector<f32, magnitudo N> a, vector<f32, magnitudo N> b) → vector<f32, magnitudo N> {
     redde a ⊙ b
 }",
         "glyph_static_shape_required",

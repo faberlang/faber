@@ -585,6 +585,23 @@ fn is_register_value(ty: Option<TypeId>, types: &TypeTable) -> bool {
     })
 }
 
+/// A fixed-array (`list<T, size N>`) field of a genus value: `record.field`.
+/// The array lives inline in the record, so indexing it reads the record's own
+/// bytes (the record is the storage the enclosing access already recorded).
+fn is_record_array_field(expr: &HirExpression, types: &TypeTable) -> bool {
+    let HirExpressionKind::Field(parent, _) = &expr.kind else {
+        return false;
+    };
+    let peeled = |ty: Option<TypeId>| ty.map(|ty| types.peel_access_marker(ty).1);
+    matches!(
+        peeled(expr.ty).map(|ty| types.get(ty)),
+        Some(Type::BoundedArray { .. })
+    ) && matches!(
+        peeled(parent.ty).map(|ty| types.get(ty)),
+        Some(Type::Struct(_))
+    )
+}
+
 #[derive(Default)]
 struct Declarations {
     bindings: Vec<HirLocal>,
@@ -993,8 +1010,12 @@ impl HirVisitor for BodyProof<'_> {
                 self.decline(expr.span, "unproved_conversion_effect");
             }
             HirExpressionKind::Index(object, index) => {
-                // A component of a register-class value is no storage access.
-                if !is_register_value(object.ty, self.types) {
+                // A component of a register-class value is no storage access,
+                // nor is an element of a fixed-array field of a record: the
+                // array is part of the record's own bytes, read as a value.
+                if !is_register_value(object.ty, self.types)
+                    && !is_record_array_field(object, self.types)
+                {
                     self.access(object, Some(index), false, expr.span);
                 }
                 self.receiver(object);

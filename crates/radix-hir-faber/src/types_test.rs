@@ -2688,8 +2688,8 @@ fn bounded_types_print_via_the_surface() {
             types.bounded_array(numerus, four),
             "list<numerus, magnitudo 4>",
         ),
-        (types.bounded_textus(four), "text<4>"),
-        (types.bounded_ascii(four), "ascii<4>"),
+        (types.bounded_textus(four), "text<magnitudo 4>"),
+        (types.bounded_ascii(four), "ascii<magnitudo 4>"),
         (types.bounded_octeti(four), "list<b8, magnitudo 4>"),
     ];
     let latin_bounded_array = types.bounded_array(numerus, four);
@@ -2710,7 +2710,7 @@ fn bounded_types_print_via_the_surface() {
     );
     assert_eq!(
         codegen.type_to_faber(latin_bounded_textus, &names, &LatinSurface),
-        "textus<4>"
+        "textus<magnitudo 4>"
     );
     assert_eq!(
         codegen.type_to_faber(latin_bounded_octeti, &names, &LatinSurface),

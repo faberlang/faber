@@ -4,8 +4,8 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
 category = "list"
 canonical = false
-summary = "AIR-lane itera ex over full-literal list<b8, size N> / ascii<N> / string<N> unrolls guard-free with the scalar element type (b8 / ascii<1>); runtime-length values decline not_concrete."
-syntax = "@ radix lane \"air\"; itera ex list<b8, size N> | ascii<N> | string<N>"
+summary = "AIR-lane itera ex over full-literal list<b8, size N> / ascii<size N> / string<size N> unrolls guard-free with the scalar element type (b8 / ascii<size 1>); runtime-length values decline not_concrete."
+syntax = "@ radix lane \"air\"; itera ex list<b8, size N> | ascii<size N> | string<size N>"
 related = ["list<b8>", "ascii", "string", "ex", "itera", "radix"]
 locale = "en"
 no_expected = "rejects"
@@ -17,11 +17,11 @@ diagnostic = "SEM059:runtime_conversion"
 # =============================================================================
 #
 # What this teaches:
-#   • a full literal `list<b8, size N>` / `ascii<N>` / `string<N>` proves len == N, so
+#   • a full literal `list<b8, size N>` / `ascii<size N>` / `string<size N>` proves len == N, so
 #     `for from` unrolls guard-free on the AIR lane (N lanes against the
 #     per-function unroll budget of 64)
 #   • each lane binds the scalar index element row — `list<b8, size N>[i]` is a
-#     `b8`, `ascii<N>[i]` / `string<N>[i]` is `ascii<1>` — and a full
+#     `b8`, `ascii<size N>[i]` / `string<size N>[i]` is `ascii<size 1>` — and a full
 #     literal only reads its own slots, so the non-ASCII trap row can never
 #     fire from a dead slot
 #   • a runtime-length buffer (a parameter) keeps declining causa=
@@ -38,7 +38,7 @@ diagnostic = "SEM059:runtime_conversion"
 # Route A full-literal drivers. The itera loop itself is admitted (the
 # semantic unit tests in air_unroll_test.rs pin the emitted lanes, the
 # guard-free shape and the element types), but each bare `↦ list<b8, size 8>` /
-# `↦ ascii<8>` / `↦ string<8>` conversion is a boundary throw that the AIR
+# `↦ ascii<size 8>` / `↦ string<size 8>` conversion is a boundary throw that the AIR
 # lane declines with SEM059 runtime_conversion (air_purity.rs, ATH-3), so
 # `faber check` rejects this file: three runtime_conversion errors, one per driver.
 
@@ -50,12 +50,12 @@ fn full_bytes() → void {
 
 @ radix lane "air"
 fn full_ascii() → void {
-    let ascii<8> xs ← 'alphabet' ↦ ascii<8>
+    let ascii<size 8> xs ← 'alphabet' ↦ ascii<size 8>
     for from xs let c { }
 }
 
 @ radix lane "air"
 fn full_string() → void {
-    let string<8> xs ← "abcdefgh" ↦ string<8>
+    let string<size 8> xs ← "abcdefgh" ↦ string<size 8>
     for from xs let c { }
 }

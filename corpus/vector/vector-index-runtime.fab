@@ -14,7 +14,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `v[i]` on a `vector<T, N>` with a run-time integer `i` is a checked lane
+#   • `v[i]` on a `vector<T, size N>` with a run-time integer `i` is a checked lane
 #     select: it reads lane `i` when `0 ≤ i < N`
 #   • A loop can walk the lanes: `v[i]` is typed as the element `T`
 #   • A named constant used as the index is a run-time index too: `v[k]`
@@ -35,12 +35,12 @@ locale = "en"
 #   vector-index-runtime.expected
 # =============================================================================
 
-fn lane(vector<f32, 3> v, int i) → f32 {
+fn lane(vector<f32, size 3> v, int i) → f32 {
     return v[i]
 }
 
 main {
-    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
     mut f32 sum ← 0.0
     mut int i ← 0
     while i ≺ 3 {
@@ -51,7 +51,7 @@ main {
     let int k ← 2
     print v[k]
     print lane(v, 1)
-    mut vector<f32, 3> w ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+    mut vector<f32, size 3> w ← [0.0, 0.0, 0.0] ↦ vector<f32, size 3>
     mut int j ← 0
     while j ≺ 3 {
         w[j] ← v[j] * 2.0

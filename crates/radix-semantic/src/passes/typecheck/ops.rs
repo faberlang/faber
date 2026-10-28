@@ -2000,7 +2000,7 @@ impl TypeChecker<'_> {
                 return self.glyph_matrix_type(elem, lhs_n, rhs_m);
             }
             // S0-G8: glyph-static but parametric widths keep the outer
-            // product symbolic — `vector<f32, N> ⊗ vector<f32, 1>` is
+            // product symbolic — `vector<f32, size N> ⊗ vector<f32, size 1>` is
             // `matrix<f32, [N, 1]>` instead of demanding literals.
             if let Some(shape) = self.glyph_symbolic_outer_shape(lhs_width, rhs_width) {
                 return self.types.matrix_with_shape(elem, shape);

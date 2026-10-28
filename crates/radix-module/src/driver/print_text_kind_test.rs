@@ -26,8 +26,8 @@ fn run_en(body: &str) -> Vec<String> {
 
 const RECORD: &str = "class Rec {
     mut char c
-    mut ascii<3> a3
-    mut ascii<1> a1
+    mut ascii<size 3> a3
+    mut ascii<size 1> a1
     mut ascii u
     mut string t
     mut list<char> cs
@@ -41,8 +41,8 @@ fn genus_fields_quote_by_static_type() {
     let out = run_en(&format!(
         "{RECORD}
 main {{
-    let ascii<3> a3 ← 'abc'
-    let ascii<1> a1 ← 'z'
+    let ascii<size 3> a3 ← 'abc'
+    let ascii<size 1> a1 ← 'z'
     let Rec r ← Rec {{ c = 'q', a3 = a3, a1 = a1, u = 'q', t = \"q\", cs = ['x'], us = ['q', 'abc'], ts = [\"q\"] }}
     print r
 }}
@@ -62,13 +62,13 @@ fn lists_quote_by_static_type() {
     print cs
     let list<ascii> us ← ['q', 'abc']
     print us
-    let ascii<1> b1 ← 'z'
-    let ascii<1> b2 ← 'y'
-    let list<ascii<1>> a1s ← [b1, b2]
+    let ascii<size 1> b1 ← 'z'
+    let ascii<size 1> b2 ← 'y'
+    let list<ascii<size 1>> a1s ← [b1, b2]
     print a1s
-    let ascii<3> c1 ← 'abc'
-    let ascii<3> c2 ← 'def'
-    let list<ascii<3>> a3s ← [c1, c2]
+    let ascii<size 3> c1 ← 'abc'
+    let ascii<size 3> c2 ← 'def'
+    let list<ascii<size 3>> a3s ← [c1, c2]
     print a3s
     let list<string> ts ← ['q', \"r\"]
     print ts
@@ -95,9 +95,9 @@ fn top_level_scalars_print_bare() {
     print c
     let ascii u ← 'q'
     print u
-    let ascii<1> a1 ← 'q'
+    let ascii<size 1> a1 ← 'q'
     print a1
-    let ascii<3> a3 ← 'abc'
+    let ascii<size 3> a3 ← 'abc'
     print a3
 }
 ",

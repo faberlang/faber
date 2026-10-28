@@ -217,7 +217,7 @@ fn classify_go(hir: &HirModule, types: &TypeTable) -> Lowerability {
     // programs that *reference* those families — not units whose interned
     // type table merely contains them. The table is per-unit and carries
     // compiler-owned types the program never uses (the GPU builtins register
-    // `vector<f32,3>` / `vector<f32,4>` into every unit), so a whole-table
+    // `vector<f32,size 3>` / `vector<f32,size 4>` into every unit), so a whole-table
     // scan would reject every program for Go.
     for ty in collect_referenced_types(hir, types) {
         match types.get(ty) {
@@ -250,11 +250,11 @@ fn classify_go(hir: &HirModule, types: &TypeTable) -> Lowerability {
 /// Roots are the types named by HIR declarations and expressions (function
 /// signatures, struct/enum fields, locals, constants, alias targets, and
 /// every expression `ty`). The reachability closure then follows type
-/// children, so a program that uses `lista<vector<f32,3>>` references both
+/// children, so a program that uses `lista<vector<f32,size 3>>` references both
 /// the `lista` id and the nested `vector` id.
 ///
 /// WHY: the per-unit `TypeTable` also interns compiler-owned types the
-/// program never names (GPU builtins' register-class `vector<f32,N>` types).
+/// program never names (GPU builtins' register-class `vector<f32,size N>` types).
 /// Target classifiers that reject a family must reject programs that use it,
 /// not every unit whose table happens to contain it.
 fn collect_referenced_types(hir: &HirModule, types: &TypeTable) -> FxHashSet<TypeId> {

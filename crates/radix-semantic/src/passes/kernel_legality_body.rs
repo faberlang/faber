@@ -17,6 +17,7 @@ use super::kernel_legality_types::{
     FAMILY_ATOMIC, FAMILY_RANGED_INT, FAMILY_SATURATING_FLOAT, FAMILY_UNBOUNDED_LIST_SIZE,
     host_only_family,
 };
+use crate::file_interface::{InterfaceDeviceRole, InterfaceDeviceVisibility};
 use crate::{
     NumericWidth, Primitive, ResolvedTensorEdgePolicy, SymbolKind, Type, TypeId, WarningKind,
 };
@@ -68,12 +69,38 @@ fn walk_kernel_body(
         callees: Vec::new(),
         quiet: 0,
         check_lane_abi,
+        region: false,
     };
     walk.check_signature(function);
     if let Some(body) = &function.body {
         walk.visit_block(body);
     }
     walk.callees
+}
+
+/// Check the body of a `fac machina` region under the kernel body rules. The
+/// block is kernel code by definition, but it is not a function: no signature
+/// or lane ABI applies, and the kernels it calls must be launchable.
+pub(super) fn check_region_body(
+    env: &Env<'_>,
+    sink: &mut Sink,
+    region: &super::device_region::RegionBody<'_>,
+) {
+    let mut walk = KernelWalk {
+        env,
+        sink,
+        function_span: region.span,
+        callees: Vec::new(),
+        quiet: 0,
+        check_lane_abi: false,
+        region: true,
+    };
+    for statement in region.statements {
+        walk.visit_stmt(statement);
+    }
+    if let Some(tail) = region.tail {
+        walk.visit_expr(tail);
+    }
 }
 
 /// Check a `@ nucleum fragment` body for raw lane ids only; the fragment's
@@ -111,6 +138,9 @@ struct KernelWalk<'a, 'e> {
     /// Callback candidates use device body rules but have no kernel launch
     /// ABI, so positional-lane and builtin-name checks do not apply.
     check_lane_abi: bool,
+    /// The walk covers a `fac machina` region (host code that is checked as
+    /// kernel code): a callee must be a launchable kernel.
+    region: bool,
 }
 
 impl KernelWalk<'_, '_> {
@@ -251,7 +281,15 @@ impl KernelWalk<'_, '_> {
 
     fn check_call(&mut self, expr: &HirExpression, callee: &HirExpression) {
         let HirExpressionKind::Path(def_id) = &callee.kind else {
-            self.dynamic_call(expr.span, "expression");
+            let namespace_member = match &callee.kind {
+                HirExpressionKind::Field(object, member) => {
+                    self.check_namespace_call(expr.span, object, *member)
+                }
+                _ => false,
+            };
+            if !namespace_member {
+                self.dynamic_call(expr.span, "expression");
+            }
             return;
         };
         if let Some(builtin) = self.env.resolver.gpu_builtin(*def_id) {
@@ -272,12 +310,60 @@ impl KernelWalk<'_, '_> {
         // resolver does not carry.
     }
 
+    /// A call through an imported namespace (`kernels.advance(...)`) is a
+    /// `MethodCall` on the module path (a `Call(Field(Path(module), member))`
+    /// callee is the same shape spelled as a field). The imported `@ nucleum`
+    /// contract says whether the member is a kernel. Returns false when the
+    /// receiver is not a namespace.
+    fn check_namespace_call(&mut self, span: Span, object: &HirExpression, member: Symbol) -> bool {
+        let HirExpressionKind::Path(module) = &object.kind else {
+            return false;
+        };
+        let Some(namespace) = self
+            .env
+            .resolver
+            .get_symbol(*module)
+            .filter(|symbol| symbol.kind == SymbolKind::Module)
+        else {
+            return false;
+        };
+        let qualified = format!(
+            "{}.{}",
+            self.env.interner.resolve(namespace.name),
+            self.env.interner.resolve(member)
+        );
+        let contract = self
+            .env
+            .resolver
+            .namespace_file_device_contract_canonical(namespace.name, member);
+        match contract {
+            Some(contract)
+                if contract.role == InterfaceDeviceRole::Kernel
+                    || (contract.role == InterfaceDeviceRole::Fragment && !self.region) =>
+            {
+                if self.region && contract.visibility == InterfaceDeviceVisibility::Private {
+                    self.sink
+                        .report(ISSUE_PRIVATE_HOST_CALL, span, &[("callee", &qualified)]);
+                }
+            }
+            _ => self.sink.report(
+                ISSUE_HOST_CALL,
+                span,
+                &[("callee", &qualified), ("reason", "not_a_kernel")],
+            ),
+        }
+        true
+    }
+
     fn check_method_call(
         &mut self,
         expr: &HirExpression,
         receiver: &HirExpression,
         method: Symbol,
     ) {
+        if self.check_namespace_call(expr.span, receiver, method) {
+            return;
+        }
         let Some(receiver_ty) = receiver.ty else {
             return;
         };

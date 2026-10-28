@@ -52,7 +52,7 @@ fn tensor_minus_same_shape_integer_typechecks() {
 #[test]
 fn vector_minus_same_shape_typechecks() {
     accepts(
-        r"functio diff(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+        r"functio diff(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<f32, magnitudo 3> {
     redde a - b
 }",
     );

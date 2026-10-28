@@ -1,14 +1,14 @@
 +++
 locale = "en"
 +++
-# `ascii` is an ASCII-only text; `ascii<N>` and `string<N>` are bounded text.
+# `ascii` is an ASCII-only text; `ascii<size N>` and `string<size N>` are bounded text.
 # The bytes are the same counted UTF-8 value a `string` is, the typechecker
-# proves a literal fits, and a run-time `↦ string<N>` checks the capacity.
+# proves a literal fits, and a run-time `↦ string<size N>` checks the capacity.
 main {
     let ascii route ← 'pg:query'
     print route
-    let ascii<8> a ← 'ab'
-    let ascii<8> b ← 'ab'
+    let ascii<size 8> a ← 'ab'
+    let ascii<size 8> b ← 'ab'
     print a.length(), a.is_empty()
     if a ≡ b {
         print 1
@@ -16,26 +16,26 @@ main {
     let string s ← a ↦ string
     print s
     let string raw ← "héj"
-    let string<8> t ← raw ↦ string<8>
+    let string<size 8> t ← raw ↦ string<size 8>
     print t
     print t.slice(0, 2)
-    let string<8> u ← t ↦ string<8>
+    let string<size 8> u ← t ↦ string<size 8>
     print u
-    # The capacity is in code points: these two fit `string<2>` / `string<4>`
+    # The capacity is in code points: these two fit `string<size 2>` / `string<size 4>`
     # though their UTF-8 is three and four bytes.
-    let string<2> acute ← "hé" ↦ string<2>
-    let string<4> emoji ← "😀" ↦ string<4>
+    let string<size 2> acute ← "hé" ↦ string<size 2>
+    let string<size 4> emoji ← "😀" ↦ string<size 4>
     print acute, emoji
-    # `ascii<N> ↦ ascii<M>` is the D7 resize; `numerus ↦ ascii<N> via
+    # `ascii<size N> ↦ ascii<size M>` is the D7 resize; `numerus ↦ ascii<size N> via
     # Hex|Bin|Oct` is the fixed-width radix pack (a constant source infers
     # `_`).
-    let ascii<8> wide ← 'abcd'
-    let ascii<4> shrunk ← wide ↦ ascii<4>
+    let ascii<size 8> wide ← 'abcd'
+    let ascii<size 4> shrunk ← wide ↦ ascii<size 4>
     print shrunk
-    let ascii<2> hex ← 255 ↦ ascii<2> via Hex
-    let ascii<8> padded ← 37 ↦ ascii<8> via Hex
-    let ascii<8> bits ← 255 ↦ ascii<8> via Bin
-    let ascii<3> oct ← 255 ↦ ascii<3> via Oct
+    let ascii<size 2> hex ← 255 ↦ ascii<size 2> via Hex
+    let ascii<size 8> padded ← 37 ↦ ascii<size 8> via Hex
+    let ascii<size 8> bits ← 255 ↦ ascii<size 8> via Bin
+    let ascii<size 3> oct ← 255 ↦ ascii<size 3> via Oct
     let ascii<_> inferred ← 255 ↦ ascii<_> via Hex
     print hex, padded, bits, oct, inferred
 }

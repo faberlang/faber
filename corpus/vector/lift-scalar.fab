@@ -35,60 +35,60 @@ locale = "en"
 #
 # EXPECTED stdout: see lift-scalar.expected
 
-fn scaled(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn scaled(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return a * s
 }
 
-fn scaled_left(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn scaled_left(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return s * a
 }
 
-fn shrunk(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn shrunk(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return a / s
 }
 
-fn inverted(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn inverted(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return s / a
 }
 
-fn shifted(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn shifted(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return s - a
 }
 
-fn remainder(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn remainder(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return a % s
 }
 
-fn lifted(vector<f32, 3> a) → vector<f32, 3> {
+fn lifted(vector<f32, size 3> a) → vector<f32, size 3> {
     return a + 1.0
 }
 
-fn flipped(vector<f32, 3> a) → vector<f32, 3> {
+fn flipped(vector<f32, size 3> a) → vector<f32, size 3> {
     return -a
 }
 
-fn halved(vector<f32, 4> a) → vector<f32, 4> {
+fn halved(vector<f32, size 4> a) → vector<f32, size 4> {
     return a * 0.5
 }
 
-fn true_scaled(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn true_scaled(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return a ÷ s
 }
 
-fn true_paired(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+fn true_paired(vector<f32, size 3> a, vector<f32, size 3> b) → vector<f32, size 3> {
     return a ÷ b
 }
 
-fn raised(vector<f32, 3> a, f32 s) → vector<f32, 3> {
+fn raised(vector<f32, size 3> a, f32 s) → vector<f32, size 3> {
     return a ⤒ s
 }
 
-fn lowered(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+fn lowered(vector<f32, size 3> a, vector<f32, size 3> b) → vector<f32, size 3> {
     return a ⤓ b
 }
 
 main {
-    let vector<f32, 3> a ← [1.0, 2.0, 4.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> a ← [1.0, 2.0, 4.0] ↦ vector<f32, size 3>
     print scaled(a, 2.5)
     print scaled_left(a, 2.5)
     print shrunk(a, 4.0)
@@ -98,10 +98,10 @@ main {
     print lifted(a)
     print flipped(a)
     print a
-    let vector<f32, 4> w ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    let vector<f32, size 4> w ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, size 4>
     print halved(w)
     print true_scaled(a, 4.0)
-    let vector<f32, 3> b ← [4.0, 2.0, 1.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> b ← [4.0, 2.0, 1.0] ↦ vector<f32, size 3>
     print true_paired(a, b)
     print raised(a, 2.0)
     print lowered(a, b)

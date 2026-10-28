@@ -253,6 +253,7 @@ pub fn check(
     if let Some(entry) = &hir.entry {
         check_host_block(&env, &mut sink, entry);
     }
+    super::device_region::check_regions(&env, &mut sink, hir);
 
     let recursive_kernels = kernels_on_cycles(&edges);
     KernelLegalityReport {

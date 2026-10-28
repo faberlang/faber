@@ -98,17 +98,8 @@ pub(super) fn cmd_run(args: RunArgs) {
     // N1.1 precedence: CLI `--device` > manifest `[device] device` > `auto`.
     // An invalid manifest value fails closed with a structured diagnostic
     // (never silently ignored).
-    let selection = match resolve_route_selection(&args, &input_path) {
-        Ok(selection) => selection,
-        Err(diagnostic) => {
-            let status = exit_status::status_for_run_diagnostic(&diagnostic);
-            eprint_route_diagnostics(&[*diagnostic]);
-            std::process::exit(status);
-        }
-    };
-    // Rule 16.9: `--threads` > manifest `[device] threads` > half the cores.
-    let threads = match package::resolve_cpu_threads(args.threads, selection, &input_path) {
-        Ok(threads) => threads.map(std::num::NonZeroU32::get),
+    let (selection, workers) = match resolve_route_options(&args, &input_path) {
+        Ok(options) => options,
         Err(diagnostic) => {
             let status = exit_status::status_for_run_diagnostic(&diagnostic);
             eprint_route_diagnostics(&[*diagnostic]);
@@ -122,7 +113,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         args.locale.as_deref(),
         args.diagnostics_locale.as_deref(),
         selection,
-        cpu_device_shape(&args, threads),
+        cpu_device_shape(&args, workers),
         args.stats,
         args.stats_file.as_ref(),
     );
@@ -863,24 +854,27 @@ fn finish_device_run(
 /// combination fails closed before launch rather than silently ignoring the
 /// count. A stats request is permitted with any selection: a dispatching run
 /// reports host rows and a device receipt.
-fn resolve_route_selection(
+fn resolve_route_options(
     args: &RunArgs,
     input_path: &Path,
-) -> Result<DeviceSelection, Box<Diagnostic>> {
+) -> Result<(DeviceSelection, Option<std::num::NonZeroU32>), Box<Diagnostic>> {
     let selection = package::resolve_device_selection(args.device, input_path)?;
-    package::resolve_cpu_threads(args.threads, selection, input_path)?;
+    let workers = package::resolve_cpu_threads(args.threads, selection, input_path)?;
     ensure_partitions_cpu_route(args.partitions, selection)?;
-    Ok(selection)
+    Ok((selection, workers))
 }
 
 /// The CPU device shape: the worker count resolved by
 /// [`package::resolve_cpu_threads`] (`--threads`, then manifest `[device]
 /// threads`, then the route default when `None`) and `--partitions N` (one
 /// partition when absent). Only the CPU route reads it:
-/// [`resolve_route_selection`] refuses `--partitions` on any other route.
-fn cpu_device_shape(args: &RunArgs, threads: Option<u32>) -> package::mir::CpuDeviceShape {
+/// [`resolve_route_options`] refuses `--partitions` on any other route.
+fn cpu_device_shape(
+    args: &RunArgs,
+    workers: Option<std::num::NonZeroU32>,
+) -> package::mir::CpuDeviceShape {
     package::mir::CpuDeviceShape {
-        workers: threads.and_then(std::num::NonZeroU32::new),
+        workers,
         partitions: args
             .partitions
             .and_then(std::num::NonZeroU32::new)

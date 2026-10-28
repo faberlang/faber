@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/genus/sized-list-field-literal.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/sized-list-field-literal.fab"
+category = "class"
+domain = "types"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

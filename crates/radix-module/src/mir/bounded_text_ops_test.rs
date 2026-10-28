@@ -29,25 +29,35 @@ fn ok(body: &str) -> Vec<String> {
 #[test]
 fn bounded_textus_add_concatenates() {
     assert_eq!(
-        ok("sit textus<8> a ← \"ab\" ↦ textus<8>\nsit textus<8> b ← \"cd\" ↦ textus<8>\nnota a + b"),
+        ok(
+            "sit textus<magnitudo 8> a ← \"ab\" ↦ textus<magnitudo 8>\nsit textus<magnitudo 8> b ← \"cd\" ↦ textus<magnitudo 8>\nnota a + b"
+        ),
         ["abcd"]
     );
 }
 
 #[test]
 fn bounded_ascii_add_concatenates() {
-    assert_eq!(ok("sit ascii<8> a ← 'ab'\nsit ascii<8> b ← 'cd'\nnota a + b"), ["abcd"]);
+    assert_eq!(
+        ok("sit ascii<magnitudo 8> a ← 'ab'\nsit ascii<magnitudo 8> b ← 'cd'\nnota a + b"),
+        ["abcd"]
+    );
 }
 
 #[test]
 fn bounded_textus_ordering_uses_text_order() {
     assert_eq!(
-        ok("sit textus<8> a ← \"ab\" ↦ textus<8>\nsit textus<8> b ← \"cd\" ↦ textus<8>\nnota a ≺ b"),
+        ok(
+            "sit textus<magnitudo 8> a ← \"ab\" ↦ textus<magnitudo 8>\nsit textus<magnitudo 8> b ← \"cd\" ↦ textus<magnitudo 8>\nnota a ≺ b"
+        ),
         ["verum"]
     );
 }
 
 #[test]
 fn bounded_ascii_ordering_uses_text_order() {
-    assert_eq!(ok("sit ascii<8> a ← 'ab'\nsit ascii<8> b ← 'cd'\nnota a ≺ b"), ["verum"]);
+    assert_eq!(
+        ok("sit ascii<magnitudo 8> a ← 'ab'\nsit ascii<magnitudo 8> b ← 'cd'\nnota a ≺ b"),
+        ["verum"]
+    );
 }

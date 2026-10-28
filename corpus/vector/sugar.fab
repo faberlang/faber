@@ -12,7 +12,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Sugar syntax — `vf32[4]` as concise notation for `vector<f32, 4>`
+#   • Sugar syntax — `vf32[4]` as concise notation for `vector<f32, size 4>`
 #   • Type position — sugar works wherever type annotations are expected
 #
 # Common mistakes:

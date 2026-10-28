@@ -1547,7 +1547,7 @@ main {
             .iter()
             .any(|diag| diag.phase == DiagnosticPhase::Tool && diag.file == manifest_file.as_ref())
     );
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1781,7 +1781,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
             && diagnostic_has_arg(diag, "actual", "999")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1810,7 +1810,7 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
             .iter()
             .any(|diag| diagnostic_has_issue(diag, "fmir_text_image_parse_failed"))
     );
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1847,7 +1847,7 @@ fn package_fmir_text_image_rejects_unknown_runtime_requirement_without_source_fa
             && diagnostic_has_arg(diag, "format", "fmir-text")
             && diagnostic_has_arg(diag, "requirement", "host:teleport")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1885,7 +1885,7 @@ main args args {
         diagnostic_has_issue(diag, "fmir_image_type_metadata_invalid")
             && diagnostic_has_arg(diag, "format", "fmir-text")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -2220,7 +2220,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
             && diagnostic_has_arg(diag, "actual", "99")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 fn bytes_contain(haystack: &[u8], needle: &[u8]) -> bool {
@@ -2324,7 +2324,10 @@ main {
     .expect("write entry");
 
     let reached = with_lowered_package_mir(&Config::default(), &entry, |lowered| {
-        assert!(!lowered.validated.program().functions.is_empty());
+        assert_ne!(
+            lowered.validated.program().functions,
+            [] as [radix::module::mir::MirFunction; 0]
+        );
         assert!(
             lowered
                 .validated
@@ -3134,7 +3137,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("non-numeric CLI operand should fail");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics
             .iter()
@@ -3495,7 +3498,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("extra CLI arguments should not be ignored");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "package_mir_cli_surface_unsupported")
@@ -3529,7 +3532,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("missing required CLI operand should fail");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics
             .iter()
@@ -3619,7 +3622,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("type-incompatible CLI option defaults should remain unsupported");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "package_mir_cli_surface_unsupported")
@@ -4502,7 +4505,7 @@ fn value() → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &fixture.package, &mut host)
         .expect_err("shared import cycle should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics
             .iter()
@@ -4548,7 +4551,7 @@ fn identity(string word) → string {
     let diagnostics = run_mir_for_faber(&Config::default(), &fixture.package, &mut host)
         .expect_err("private shared export should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "import_module_private")
@@ -4708,7 +4711,7 @@ fn publicum() → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("unmarked namespace member access should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "import_module_private")
@@ -4756,7 +4759,7 @@ fn publicum() → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("private namespace access should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "import_module_private")
@@ -4799,7 +4802,7 @@ fn dupla(int n) → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("nested namespace calls should be explicitly unsupported");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "namespace_missing_export")
@@ -5238,11 +5241,11 @@ steps = 250
     .expect("write manifest");
     fs::write(
         dir.join("src").join("main.fab"),
-        r#"@ kernel
+        r"@ kernel
 fn summa(tf32[2] x) → f32 {
     return x.sum()
 }
-"#,
+",
     )
     .expect("write entry");
     let entry = dir.join("src").join("main.fab");
@@ -7729,7 +7732,7 @@ name = "defaults"
     assert!(manifest.library.is_none());
     // Implicit portable default: no explicit [build] target in the manifest.
     assert_eq!(manifest.build.target, None);
-    assert!(manifest.build.targets.is_empty());
+    assert_eq!(manifest.build.targets, [] as [String; 0]);
     assert_eq!(manifest.build.kind, "bin");
     assert!(manifest.product.is_none());
     assert!(manifest.locale.locale.is_none());
@@ -8958,7 +8961,7 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ public
 class Canis {
     mut string nomen
@@ -8968,7 +8971,7 @@ class Canis {
 class Felis {
     mut string nomen
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -9012,7 +9015,7 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ public
 class Canis {
     mut string nomen
@@ -9022,7 +9025,7 @@ class Canis {
 class Felis {
     mut string nomen
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -9767,7 +9770,7 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
     let linked = super::library_link::emit_linked_library_crates(&layout.package_root, &layout)
         .expect("entry-file layouts without manifest should not require native deps");
 
-    assert!(linked.is_empty());
+    assert_eq!(linked, [] as [super::library_link::LinkedLibraryCrate; 0]);
 }
 
 // ---------------------------------------------------------------------------
@@ -13490,7 +13493,7 @@ fn package_fmir_text_image_rejects_version_2_images() {
             && diagnostic_has_arg(diag, "actual", "2")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13522,7 +13525,7 @@ fn package_fmir_text_image_rejects_future_versions() {
             && diagnostic_has_arg(diag, "actual", "999")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13551,7 +13554,7 @@ fn package_fmir_image_rejects_version_2_images() {
             && diagnostic_has_arg(diag, "actual", "2")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13580,7 +13583,7 @@ fn package_fmir_image_rejects_future_versions() {
             && diagnostic_has_arg(diag, "actual", "99")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13949,7 +13952,7 @@ main {
     let diagnostics = run_mir_for_faber(&config, &entry, &mut host)
         .expect_err("unresolvable companion should fail closed at link time");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "package_mir_companion_unresolved")

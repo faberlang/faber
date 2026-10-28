@@ -12,8 +12,8 @@ locale = "en"
 main {
     let tf32[2, 3] grid ← tf32[2, 3] {}
     let tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
-    let tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
-    let vector<f32, 4> v ← vector<f32, 4> {}
+    let tensor<vector<f32, size 4>, [2]> lanes ← tensor<vector<f32, size 4>, [2]> {}
+    let vector<f32, size 4> v ← vector<f32, size 4> {}
     let vf32[4] sv ← vf32[4] {}
     let mf32[2, 2] sm ← mf32[2, 2] {}
     let matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
@@ -33,8 +33,8 @@ locale = "la"
 incipit {
     sit tf32[2, 3] grid ← tf32[2, 3] {}
     sit tensor<f32, [2, 3]> long ← tensor<f32, [2, 3]> {}
-    sit tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
-    sit vector<f32, 4> v ← vector<f32, 4> {}
+    sit tensor<vector<f32, magnitudo 4>, [2]> lanes ← tensor<vector<f32, magnitudo 4>, [2]> {}
+    sit vector<f32, magnitudo 4> v ← vector<f32, magnitudo 4> {}
     sit vf32[4] sv ← vf32[4] {}
     sit mf32[2, 2] sm ← mf32[2, 2] {}
     sit matrix<f32, [2, 2]> lm ← matrix<f32, [2, 2]> {}
@@ -65,16 +65,16 @@ fn format_idempotent(name: &str, source: &str) -> String {
 
 /// The zero's type prints as authored: the short sugar stays short and the
 /// long form stays long.
-fn assert_zero_forms(output: &str) {
+fn assert_zero_forms(output: &str, size: &str) {
     for line in [
-        "grid ← tf32[2, 3] {}",
-        "long ← tensor<f32, [2, 3]> {}",
-        "lanes ← tensor<vector<f32, 4>, [2]> {}",
-        "v ← vector<f32, 4> {}",
-        "sv ← vf32[4] {}",
+        "grid ← tf32[2, 3] {}".to_owned(),
+        "long ← tensor<f32, [2, 3]> {}".to_owned(),
+        format!("lanes ← tensor<vector<f32, {size} 4>, [2]> {{}}"),
+        format!("v ← vector<f32, {size} 4> {{}}"),
+        "sv ← vf32[4] {}".to_owned(),
     ] {
         assert!(
-            output.contains(line),
+            output.contains(line.as_str()),
             "typed zero `{line}` must round trip as authored:\n{output}"
         );
     }
@@ -87,7 +87,7 @@ fn assert_zero_forms(output: &str) {
 #[test]
 fn format_en_typed_zero_is_idempotent() {
     let output = format_idempotent("faber-typed-zero-en.fab", EN_SOURCE);
-    assert_zero_forms(&output);
+    assert_zero_forms(&output, "size");
     for line in ["sm ← mf32[2, 2] {}", "lm ← matrix<f32, [2, 2]> {}"] {
         assert!(
             output.contains(line),
@@ -103,7 +103,7 @@ fn format_en_typed_zero_is_idempotent() {
 #[test]
 fn format_la_typed_zero_is_idempotent() {
     let output = format_idempotent("faber-typed-zero-la.fab", LA_SOURCE);
-    assert_zero_forms(&output);
+    assert_zero_forms(&output, "magnitudo");
     assert!(
         output.contains("sit ") && output.contains("incipit"),
         "la format must keep the Latin surface:\n{output}"
@@ -144,9 +144,9 @@ fn convert_en_to_la_preserves_typed_zero() {
     ]);
     let _ = fs::remove_file(&fixture);
     assert_eq!(latin, again, "la conversion must be idempotent");
-    assert_zero_forms(&latin);
+    assert_zero_forms(&latin, "magnitudo");
     assert!(latin.contains("sit "), "converted to Latin:\n{latin}");
-    assert_zero_forms(&english);
+    assert_zero_forms(&english, "size");
     assert!(
         english.contains("let "),
         "converted back to English:\n{english}"

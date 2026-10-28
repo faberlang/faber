@@ -159,17 +159,17 @@ pub const COST_BASIS: &[CostBasisRow] = &[
         family: CostFamily::ListTensor,
         tag: CostTag::Class(CostClass::C2),
     },
-    // Register window: `octeti<N> ↦ vector<T, N/width>` in, `vector<T, N> ↦ octeti<N>` out.
+    // Register window: `octeti<N> ↦ vector<T, N/width>` in, `vector<T, size N> ↦ octeti<N>` out.
     CostBasisRow {
         family: CostFamily::RegisterWindow,
         tag: CostTag::Class(CostClass::C0),
     },
-    // Register op: `vector<T, N> ↦ vector<U, N>` element bridge. No allocation.
+    // Register op: `vector<T, size N> ↦ vector<U, size N>` element bridge. No allocation.
     CostBasisRow {
         family: CostFamily::RegisterBridge,
         tag: CostTag::Class(CostClass::C0),
     },
-    // Allocate + elementwise copy (`vector<T, N> ↦ lista<T>`, `lista<T, magnitudo N> ↦ vector<T, N>`).
+    // Allocate + elementwise copy (`vector<T, size N> ↦ lista<T>`, `lista<T, magnitudo N> ↦ vector<T, size N>`).
     CostBasisRow {
         family: CostFamily::RegisterLista,
         tag: CostTag::Class(CostClass::C2),
