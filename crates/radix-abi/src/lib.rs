@@ -446,6 +446,19 @@ abi_enum_family! {
     }
 }
 
+// Tagged interface / union carrier: the primitive type tags.
+//
+// The compiler (`radix-mir-llvm` `type_tag.rs`) owns the whole tag namespace;
+// the host only compares tags, except that it renders a boxed primitive for
+// `nota`/`scribe`, so the primitive tags are shared here. `0` is reserved and
+// never a valid tag; a tag with bit 63 set is a nominal struct (low 32 bits:
+// the struct `DefId`).
+pub const TYPE_TAG_NUMERUS: u64 = 1;
+pub const TYPE_TAG_TEXTUS: u64 = 2;
+pub const TYPE_TAG_BIVALENS: u64 = 3;
+pub const TYPE_TAG_FRACTUS: u64 = 4;
+pub const TYPE_TAG_NOMINAL_FLAG: u64 = 1 << 63;
+
 abi_enum_family! {
     INSTANS_PRECISION_ROWS: type FaberRtInstansPrecisionV1 = u32 {
         INSTANS_PRECISION_SECONDS = 0,
