@@ -471,6 +471,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "octeti_to_tensor_element_unsupported" | "tensor_to_octeti_element_unsupported" => {
             Some("use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type".to_owned())
         }
+        "octeti_to_tensor_record_big_endian" => Some("write bytes ↦ tensor<Record, [n]> via Le; a record element has one byte order, fixed by its layout".to_owned()),
         "tensor_to_octeti_unspecified" => Some("write tensor ↦ octeti via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
         "octeti_to_tensor_length_mismatch" => {
             Some("size the byte window to product(shape) times the element width, or change the tensor shape".to_owned())
