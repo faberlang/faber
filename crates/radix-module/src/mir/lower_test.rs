@@ -614,28 +614,28 @@ functio swap(matrix<f32, [2, 3]> m) → matrix<f32, [3, 2]> {
 }
 
 #[test]
-fn lowers_vector_longitudo_to_sqrt_of_dot() {
+fn lowers_vector_norma_to_sqrt_of_dot() {
     // R-W3-lane (wave3 residual C-1): assert the full sum-of-squares structure.
     // The prior `contains(".lane0")` OR-fallback was near-vacuous for any vector dump.
     let dump = dump_source(
         r"
 functio length(vector<f32, 3> v) → f32 {
-    redde v.longitudo()
+    redde v.norma()
 }
 ",
     );
-    assert!(dump.contains("sqrt"), "longitudo must lower through sqrt\n{dump}");
+    assert!(dump.contains("sqrt"), "norma must lower through sqrt\n{dump}");
     assert!(
         dump.contains("_0.lane0 * _0.lane0"),
-        "longitudo must square lane0 for dot(v,v)\n{dump}"
+        "norma must square lane0 for dot(v,v)\n{dump}"
     );
     assert!(
         dump.contains("_0.lane1 * _0.lane1"),
-        "longitudo must square lane1 for vector<f32,3>\n{dump}"
+        "norma must square lane1 for vector<f32,3>\n{dump}"
     );
     assert!(
         dump.contains("_0.lane2 * _0.lane2"),
-        "longitudo must square lane2 for vector<f32,3>\n{dump}"
+        "norma must square lane2 for vector<f32,3>\n{dump}"
     );
 }
 

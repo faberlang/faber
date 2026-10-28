@@ -18,8 +18,8 @@ main {
 
     let string id ← random.uuid()
     assert id.length() ≡ 36
-    assert id.slice(8, 9) ≡ "-"
-    assert id.slice(14, 15) ≡ "4"
+    assert (id.slice(8, 9) ⊥ "") ≡ "-"
+    assert (id.slice(14, 15) ⊥ "") ≡ "4"
     assert id ≢ random.uuid()
 
     print "entropy-wrappers-ok"

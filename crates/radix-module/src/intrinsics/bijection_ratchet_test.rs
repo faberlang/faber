@@ -822,6 +822,9 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::Ceiling,
         MirCollectionOp::Truncate,
         MirCollectionOp::TensorShape,
+        // Q-X1: the named rank and norm methods (`gradus`, `norma`).
+        MirCollectionOp::TensorRank,
+        MirCollectionOp::TensorNorm,
         MirCollectionOp::TensorReshape,
         MirCollectionOp::TensorGet,
         MirCollectionOp::TensorSet,

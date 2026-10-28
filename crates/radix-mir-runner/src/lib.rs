@@ -4520,6 +4520,10 @@ mod tensor_from_flat_failure_test;
 mod set_none_key_test;
 
 #[cfg(test)]
+#[path = "tensor_count_test.rs"]
+mod tensor_count_test;
+
+#[cfg(test)]
 #[path = "stats_test.rs"]
 mod stats_test;
 

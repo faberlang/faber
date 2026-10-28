@@ -32,11 +32,11 @@ fn byte_at(list<b8> data, int i) → int {
 
 @ private
 fn hex_digit(int digit) → string {
-    return "0123456789abcdef".slice(digit, digit + 1)
+    return "0123456789abcdef".slice(digit, digit + 1) ⊥ ""
 }
 
 fn hex_digit_upper(int digit) → string {
-    return "0123456789ABCDEF".slice(digit, digit + 1)
+    return "0123456789ABCDEF".slice(digit, digit + 1) ⊥ ""
 }
 
 @ private
@@ -45,7 +45,7 @@ fn hex_value(string c) → int ∪ none {
     let string upper ← "0123456789ABCDEF"
     mut int digit ← 0
     while digit ≺ 16 {
-        if lower.slice(digit, digit + 1) ≡ c or upper.slice(digit, digit + 1) ≡ c then return digit
+        if (lower.slice(digit, digit + 1) ⊥ "") ≡ c or (upper.slice(digit, digit + 1) ⊥ "") ≡ c then return digit
         digit ← digit + 1
     }
     return null
@@ -53,7 +53,7 @@ fn hex_value(string c) → int ∪ none {
 
 @ private
 fn sextet(int bits) → string {
-    return alphabet().slice(bits, bits + 1)
+    return alphabet().slice(bits, bits + 1) ⊥ ""
 }
 
 # Encode bytes to base64 string
@@ -98,7 +98,7 @@ fn alphabet_index(string c) → int ∪ none {
     mut int i ← 0
     let string table ← alphabet()
     while i ≺ 64 {
-        if table.slice(i, i + 1) ≡ c then return i
+        if (table.slice(i, i + 1) ⊥ "") ≡ c then return i
         i ← i + 1
     }
     return null
@@ -110,7 +110,7 @@ fn decode_base64(string data) → list<b8> ⇥ string {
     mut list<int> sextets ← []
     mut int i ← 0
     while i ≺ data.length() {
-        let string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1) ⊥ ""
         if c ≡ " " or c ≡ "\n" or c ≡ "\r" or c ≡ "\t" {
             i ← i + 1
             continue
@@ -123,7 +123,7 @@ fn decode_base64(string data) → list<b8> ⇥ string {
     }
     mut int pads ← 0
     while i ≺ data.length() {
-        let string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1) ⊥ ""
         if c ≡ "=" {
             pads ← pads + 1
         }
@@ -186,8 +186,8 @@ fn decode_hex(string data) → list<b8> ⇥ string {
     mut list<u8> out ← []
     mut int i ← 0
     while i ≺ data.length() {
-        let int ∪ none hi ← hex_value(data.slice(i, i + 1))
-        let int ∪ none lo ← hex_value(data.slice(i + 1, i + 2))
+        let int ∪ none hi ← hex_value(data.slice(i, i + 1) ⊥ "")
+        let int ∪ none lo ← hex_value(data.slice(i + 1, i + 2) ⊥ "")
         if hi is none or lo is none then throw "norma:encoding.decode_hex: invalid hex digit"
         out.append(((hi ↦ int ⊥ 0) * 16 + (lo ↦ int ⊥ 0)) ↦ u8 ⊥ 0)
         i ← i + 2
@@ -232,7 +232,7 @@ fn encode_form(string data, bool plus_space) → string {
     mut string out ← ""
     mut int i ← 0
     while i ≺ data.length() {
-        let string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1) ⊥ ""
         if plus_space and c ≡ " " {
             out ← out + "+"
         }
@@ -258,15 +258,15 @@ fn decode_percent(string data, bool plus_space) → string ⇥ string {
     mut list<u8> out ← []
     mut int i ← 0
     while i ≺ data.length() {
-        let string c ← data.slice(i, i + 1)
+        let string c ← data.slice(i, i + 1) ⊥ ""
         if plus_space and c ≡ "+" {
             out.append(32 ↦ u8 ⊥ 0)
             i ← i + 1
         }
         elif c ≡ "%" {
             if i + 3 ≻ data.length() then throw "norma:encoding.decode_url: truncated escape"
-            let int ∪ none hi ← hex_value(data.slice(i + 1, i + 2))
-            let int ∪ none lo ← hex_value(data.slice(i + 2, i + 3))
+            let int ∪ none hi ← hex_value(data.slice(i + 1, i + 2) ⊥ "")
+            let int ∪ none lo ← hex_value(data.slice(i + 2, i + 3) ⊥ "")
             if hi is none or lo is none then throw "norma:encoding.decode_url: invalid escape"
             out.append(((hi ↦ int ⊥ 0) * 16 + (lo ↦ int ⊥ 0)) ↦ u8 ⊥ 0)
             i ← i + 3

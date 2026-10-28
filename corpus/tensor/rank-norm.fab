@@ -1,0 +1,51 @@
++++
+term = "tensor"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "length() is the element count on a tensor, vector and matrix; rank() is the number of extents and norm() the Euclidean norm."
+syntax = "t.length() | t.rank() | t.norm() | v.length() | v.norm() | m.length()"
+related = ["tensor", "vector", "matrix", "lista", "magnitudines"]
+locale = "en"
++++
+# =============================================================================
+# tensor — length is the element count; rank and norm are named methods
+# =============================================================================
+#
+# What this teaches:
+#   • `length()` is the element count on every collection: a `tf32[2, 3]`
+#     has 6, a `vf32[4]` has 4, an `mf32[2, 2]` has 4.
+#   • `rank()` is the number of extents (axes) of a tensor: 2 for `tf32[2, 3]`.
+#   • `norm()` is the Euclidean norm `sqrt(sum x²)` over the logical elements,
+#     in the element type, on a tensor and on a vector.
+#
+# Common mistakes:
+#   • reading `t.length()` as the rank — it is the element count; ask `t.rank()`
+#   • reading `v.length()` as the vector norm — ask `v.norm()`
+#
+# See also: corpus/tensor/shape.fab
+# =============================================================================
+
+main {
+    let list<f32> flat ← [3.0, 4.0, 0.0, 0.0, 0.0, 0.0]
+    let list<int> plane ← [2, 3]
+    let list<int> block ← [1, 2, 3]
+
+    let tf32[2, 3] grid ← flat ↦ tf32[plane]
+    let tf32[1, 2, 3] cube ← flat ↦ tf32[block]
+
+    print grid.length()
+    print grid.rank()
+    print grid.norm()
+    print cube.length()
+    print cube.rank()
+    print cube.norm()
+
+    let vf32[4] v ← [3.0, 4.0, 0.0, 0.0] ↦ vf32[4]
+    print v.length()
+    print v.norm()
+
+    let mf32[2, 2] m ← [[1.0, 2.0], [3.0, 4.0]] ↦ mf32[2, 2]
+    print m.length()
+}

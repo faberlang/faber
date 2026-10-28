@@ -1295,7 +1295,23 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Value::Map(cell) => cell.borrow().len(),
                     Value::Ledger(cell) => cell.borrow().len(),
                     Value::Set(cell) => cell.borrow().len(),
-                    Value::Tensor(cell) => cell.borrow().shape.len(),
+                    // Q-X1: the element count (rank 0 holds one), not the rank.
+                    Value::Tensor(cell) => cell
+                        .borrow()
+                        .shape
+                        .iter()
+                        .try_fold(1_usize, |count, extent| {
+                            usize::try_from(*extent)
+                                .ok()
+                                .and_then(|extent| count.checked_mul(extent))
+                        })
+                        .ok_or_else(|| {
+                            RunnerError::internal(span, "tensor element count overflows")
+                        })?,
+                    Value::Matrix(matrix) => {
+                        let borrow = matrix.borrow();
+                        usize::from(borrow.rows) * usize::from(borrow.columns)
+                    }
                     Value::Str(text) => text.chars().count(),
                     Value::Ascii(_) => 1,
                     Value::Octeti(bytes) => bytes.len(),

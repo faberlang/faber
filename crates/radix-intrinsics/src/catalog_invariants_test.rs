@@ -49,6 +49,8 @@ fn macro_rows_keep_default_policy_unless_named() {
         (IntrinsicReceiver::Lista, "sectio", 2),
         (IntrinsicReceiver::Tabula, "apud", 1),
         (IntrinsicReceiver::Textus, "apud", 1),
+        // Q-B3: the text window reports on `⇥` exactly like the list window.
+        (IntrinsicReceiver::Textus, "sectio", 2),
         (IntrinsicReceiver::Tensor, "accipe", 1),
         (IntrinsicReceiver::Tensor, "ponde", 2),
         (IntrinsicReceiver::Tensor, "formata", 0),
@@ -836,4 +838,48 @@ fn synthetic_duplicates_return_none_and_first_match_keeps_catalog_position() {
         ),
         "first match follows bucket (catalog) order, not row identity"
     );
+}
+
+/// Operator ruling 2026-10-15, Q-X1: `longitudo` is the element count on every
+/// collection (including vector and matrix); the tensor rank and the
+/// Euclidean norm are the separate `gradus` and `norma` rows, and the vector
+/// norm moved off `longitudo` onto `norma`.
+#[test]
+fn length_is_the_element_count_and_rank_and_norm_are_named_rows() {
+    for receiver in [
+        IntrinsicReceiver::Tensor,
+        IntrinsicReceiver::Vector,
+        IntrinsicReceiver::Matrix,
+    ] {
+        let length = lookup_method(receiver, "longitudo", 0).expect("longitudo row");
+        assert!(matches!(length.return_kind, IntrinsicReturnKind::Numerus));
+    }
+    let tensor_length = lookup_method(IntrinsicReceiver::Tensor, "longitudo", 0).expect("row");
+    assert_eq!(
+        mir_collection_op(tensor_length),
+        Some(MirCollectionOp::Length)
+    );
+
+    let rank = lookup_method(IntrinsicReceiver::Tensor, "gradus", 0).expect("rank row");
+    assert_eq!(mir_collection_op(rank), Some(MirCollectionOp::TensorRank));
+    assert!(matches!(rank.return_kind, IntrinsicReturnKind::Numerus));
+
+    let norm = lookup_method(IntrinsicReceiver::Tensor, "norma", 0).expect("tensor norm row");
+    assert_eq!(mir_collection_op(norm), Some(MirCollectionOp::TensorNorm));
+    assert!(matches!(norm.return_kind, IntrinsicReturnKind::Inner));
+
+    let vector_norm = lookup_method(IntrinsicReceiver::Vector, "norma", 0).expect("vector norm");
+    assert!(matches!(
+        vector_norm.return_kind,
+        IntrinsicReturnKind::Inner
+    ));
+}
+
+/// Q-B3: the text window reports on `⇥` like the list window, so its row is
+/// failable and still the `Slice` collection op.
+#[test]
+fn text_slice_row_is_failable() {
+    let row = lookup_method(IntrinsicReceiver::Textus, "sectio", 2).expect("textus sectio");
+    assert!(row.failable);
+    assert_eq!(mir_collection_op(row), Some(MirCollectionOp::Slice));
 }

@@ -445,6 +445,9 @@ applica = "apply"
 productum = "dot"
 transversum = "cross"
 normalizata = "normalize"
+# Q-X1: the tensor rank and the Euclidean norm (tensor and vector) are named methods; `longitudo` is the element count.
+gradus = "rank"
+norma = "norm"
 swizzle = "swizzle"
 
 # range (5) — continet / longitudo shared with lista above.

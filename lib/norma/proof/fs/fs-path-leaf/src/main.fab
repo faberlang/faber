@@ -17,13 +17,13 @@ main {
 
     let string tmp ← path.temp_dir()
     assert tmp.length() ≻ 0
-    assert tmp.slice(0, 1) ≡ "/"
+    assert (tmp.slice(0, 1) ⊥ "") ≡ "/"
     let string home ← path.home()
     assert home.length() ≻ 0
 
     # resolve: a relative path gains the working directory and is absolute.
     let string absolute ← path.resolve("fs-path-leaf-nonexistent")
-    assert absolute.slice(0, 1) ≡ "/"
+    assert (absolute.slice(0, 1) ⊥ "") ≡ "/"
     assert path.file_name(absolute) ≡ "fs-path-leaf-nonexistent"
 
     # resolve on an existing directory is its own canonical form.

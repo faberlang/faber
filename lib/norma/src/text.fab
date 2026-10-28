@@ -32,7 +32,7 @@ fn reverse(string s) → string {
 
     while i ≻ 0 {
         i ← i - 1
-        out ← out + s.slice(i, i + 1)
+        out ← out + (s.slice(i, i + 1) ⊥ "")
     }
 
     return out
@@ -77,7 +77,7 @@ fn count(string s, string pattern) → int {
     # Advance by the query length on a match so overlapping occurrences are
     # intentionally not counted.
     while pos + pattern_length ≤ s.length() {
-        if s.slice(pos, pos + pattern_length) ≡ pattern {
+        if (s.slice(pos, pos + pattern_length) ⊥ "") ≡ pattern {
             count ← count + 1
             pos ← pos + pattern_length
         }
@@ -114,7 +114,7 @@ fn chars(string s) → list<string> {
     mut int i ← 0
 
     while i ≺ s.length() {
-        out.append(s.slice(i, i + 1))
+        out.append(s.slice(i, i + 1) ⊥ "")
         i ← i + 1
     }
 
@@ -132,7 +132,7 @@ fn keep_if(string s, (string) → bool pred) → string {
     mut int i ← 0
 
     while i ≺ s.length() {
-        let string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1) ⊥ ""
         if pred(c) {
             kept.append(c)
         }
@@ -157,7 +157,7 @@ fn keep_between(string s, string lower optional, string upper optional) → stri
     # Start optimistic for each scalar and rule it out only when a present
     # bound excludes it.
     while i ≺ s.length() {
-        let string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1) ⊥ ""
         mut bool keep ← true
 
         if lower not is none and c ≺ lower {
@@ -187,7 +187,7 @@ fn drop_if(string s, (string) → bool pred) → string {
     mut int i ← 0
 
     while i ≺ s.length() {
-        let string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1) ⊥ ""
         if pred(c) ≡ false {
             kept.append(c)
         }
@@ -212,7 +212,7 @@ fn drop_between(string s, string lower optional, string upper optional) → stri
     # Start with each scalar inside the purged interval; present bounds can
     # prove it lies outside and should be kept.
     while i ≺ s.length() {
-        let string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1) ⊥ ""
         mut bool drop ← true
 
         if lower not is none and c ≺ lower {
@@ -238,7 +238,7 @@ fn drop_between(string s, string lower optional, string upper optional) → stri
 # Edge: sectio owns out-of-range clamping behavior for initium.
 @ public
 fn suffix(string s, int start) → string {
-    return s.slice(start, s.length())
+    return s.slice(start, s.length()) ⊥ ""
 }
 
 # =========================================================================
@@ -265,15 +265,15 @@ fn delimiter_end(string document, string delimiter, int search_from) → int {
     mut int pos ← search_from
 
     while pos ≺ document.length() {
-        if document.slice(pos, pos + 1) ≡ nl {
+        if (document.slice(pos, pos + 1) ⊥ "") ≡ nl {
             let int line_start ← pos + 1
 
             if line_start + delim_len ≤ document.length() {
-                if document.slice(line_start, line_start + delim_len) ≡ delimiter {
+                if (document.slice(line_start, line_start + delim_len) ⊥ "") ≡ delimiter {
                     let int line_end ← line_start + delim_len
 
                     if line_end ≡ document.length() then return pos
-                    if document.slice(line_end, line_end + 1) ≡ nl then return pos
+                    if (document.slice(line_end, line_end + 1) ⊥ "") ≡ nl then return pos
                 }
             }
         }
@@ -295,11 +295,11 @@ fn trim_trailing_newlines(string s) → string {
     mut int len ← s.length()
     let string nl ← newline()
 
-    while len ≻ 0 and s.slice(len - 1, len) ≡ nl {
+    while len ≻ 0 and (s.slice(len - 1, len) ⊥ "") ≡ nl {
         len ← len - 1
     }
 
-    return s.slice(0, len)
+    return s.slice(0, len) ⊥ ""
 }
 
 # Name: split_frontmatter (Latin locale: diducta) from deducere, "to lead apart."
@@ -318,12 +318,12 @@ fn split_frontmatter(string document, string delimiter) → list<string> ⇥ str
     # block, delimiter slicing is safe and semantically meaningful.
     if delim_len ≡ 0 then throw "empty delimiter"
     if document.length() ≺ delim_len then throw "missing opening delimiter"
-    if document.slice(0, delim_len) ≢ delimiter then throw "missing opening delimiter"
+    if (document.slice(0, delim_len) ⊥ "") ≢ delimiter then throw "missing opening delimiter"
 
     mut int meta_start ← delim_len
     let string nl ← newline()
 
-    if meta_start ≺ document.length() and document.slice(meta_start, meta_start + 1) ≡ nl {
+    if meta_start ≺ document.length() and (document.slice(meta_start, meta_start + 1) ⊥ "") ≡ nl {
         meta_start ← meta_start + 1
     }
 
@@ -331,10 +331,10 @@ fn split_frontmatter(string document, string delimiter) → list<string> ⇥ str
 
     if close_line ≺ 0 then throw "missing closing delimiter"
 
-    let string metadata ← trim_trailing_newlines(document.slice(meta_start, close_line))
+    let string metadata ← trim_trailing_newlines(document.slice(meta_start, close_line) ⊥ "")
     mut int corpus_start ← (close_line + 1) + delim_len
 
-    if corpus_start ≺ document.length() and document.slice(corpus_start, corpus_start + 1) ≡ nl {
+    if corpus_start ≺ document.length() and (document.slice(corpus_start, corpus_start + 1) ⊥ "") ≡ nl {
         corpus_start ← corpus_start + 1
     }
 
@@ -357,7 +357,7 @@ fn collapse_spaces(string s) → string {
     mut bool in_space ← false
     mut int i ← 0
     while i ≺ s.length() {
-        let string c ← s.slice(i, i + 1)
+        let string c ← s.slice(i, i + 1) ⊥ ""
         if c ≡ " " {
             if not in_space {
                 out ← out + " "
@@ -421,8 +421,8 @@ fn split_n(string s, string separator, int limit) → list<string> {
             out.append(rest)
             return out
         }
-        out.append(rest.slice(0, pos))
-        rest ← rest.slice(pos + separator.length(), rest.length())
+        out.append(rest.slice(0, pos) ⊥ "")
+        rest ← rest.slice(pos + separator.length(), rest.length()) ⊥ ""
         cuts ← cuts + 1
     }
     out.append(rest)
@@ -435,7 +435,7 @@ fn index_of(string s, string needle) → int {
     if nlen ≡ 0 then return 0
     mut int i ← 0
     while i + nlen ≤ s.length() {
-        if s.slice(i, i + nlen) ≡ needle then return i
+        if (s.slice(i, i + nlen) ⊥ "") ≡ needle then return i
         i ← i + 1
     }
     return -1

@@ -60,7 +60,7 @@ fn hex_string(int n) → string {
     mut int v ← n
     while v ≻ 0 {
         let int d ← v % 16
-        acc ← digits.slice(d, d + 1) + acc
+        acc ← (digits.slice(d, d + 1) ⊥ "") + acc
         v ← v / 16
     }
     return acc

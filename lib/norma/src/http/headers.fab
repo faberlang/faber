@@ -68,7 +68,7 @@ fn ascii_lower(string s) → string {
     mut string out ← ""
     mut int i ← 0
     while i ≺ s.length() {
-        out ← out + lower_char(s.slice(i, i + 1))
+        out ← out + lower_char(s.slice(i, i + 1) ⊥ "")
         i ← i + 1
     }
     return out
@@ -79,8 +79,8 @@ fn lower_char(string c) → string {
     let string lower ← "abcdefghijklmnopqrstuvwxyz"
     mut int i ← 0
     while i ≺ 26 {
-        if upper.slice(i, i + 1) ≡ c {
-            return lower.slice(i, i + 1)
+        if (upper.slice(i, i + 1) ⊥ "") ≡ c {
+            return lower.slice(i, i + 1) ⊥ ""
         }
         i ← i + 1
     }
@@ -91,7 +91,7 @@ fn is_token(string name) → bool {
     if name.length() ≡ 0 then return false
     mut int i ← 0
     while i ≺ name.length() {
-        if not is_tchar(name.slice(i, i + 1)) then return false
+        if not is_tchar(name.slice(i, i + 1) ⊥ "") then return false
         i ← i + 1
     }
     return true
@@ -107,7 +107,7 @@ fn is_tchar(string c) → bool {
 fn is_field_value(string value) → bool {
     mut int i ← 0
     while i ≺ value.length() {
-        let string c ← value.slice(i, i + 1)
+        let string c ← value.slice(i, i + 1) ⊥ ""
         if c ≡ "\r" or c ≡ "\n" then return false
         i ← i + 1
     }

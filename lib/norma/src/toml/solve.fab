@@ -15,7 +15,7 @@ fn parse(string wire) → value ⇥ string {
     mut list<string> current ← empty
     mut int index ← skip_ignored(wire, 0)
     while index ≺ wire.length() {
-        if wire.slice(index, index + 1) ≡ "[" {
+        if (wire.slice(index, index + 1) ⊥ "") ≡ "[" {
             let cursor.Scan header ← parse_header(wire, index)
             let map<string, value> mark ↤ header.payload ⊥ empty
             current ← as_string_list(mark.get("keys"))
@@ -86,7 +86,7 @@ fn is_bare(string c) → bool {
 
 fn skip_space(string wire, int start) → int {
     mut int index ← start
-    while index ≺ wire.length() and is_space(wire.slice(index, index + 1)) {
+    while index ≺ wire.length() and is_space(wire.slice(index, index + 1) ⊥ "") {
         index ← index + 1
     }
     return index
@@ -94,8 +94,8 @@ fn skip_space(string wire, int start) → int {
 
 fn skip_comment(string wire, int start) → int {
     mut int index ← start
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "#" {
-        while index ≺ wire.length() and not is_newline(wire.slice(index, index + 1)) {
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "#" {
+        while index ≺ wire.length() and not is_newline(wire.slice(index, index + 1) ⊥ "") {
             index ← index + 1
         }
     }
@@ -105,7 +105,7 @@ fn skip_comment(string wire, int start) → int {
 fn skip_ignored(string wire, int start) → int {
     mut int index ← start
     while index ≺ wire.length() {
-        let string c ← wire.slice(index, index + 1)
+        let string c ← wire.slice(index, index + 1) ⊥ ""
         if is_space(c) or is_newline(c) {
             index ← index + 1
         }
@@ -124,7 +124,7 @@ fn hex_value(string c) → int ∪ none {
     let string upper ← "0123456789ABCDEF"
     mut int digit ← 0
     while digit ≺ 16 {
-        if lower.slice(digit, digit + 1) ≡ c or upper.slice(digit, digit + 1) ≡ c then return digit
+        if (lower.slice(digit, digit + 1) ⊥ "") ≡ c or (upper.slice(digit, digit + 1) ⊥ "") ≡ c then return digit
         digit ← digit + 1
     }
     return null
@@ -145,12 +145,12 @@ fn parse_basic_string(string wire, int start) → cursor.Scan ⇥ string {
     mut string out ← ""
     mut int index ← start + 1
     while index ≺ wire.length() {
-        let string c ← wire.slice(index, index + 1)
+        let string c ← wire.slice(index, index + 1) ⊥ ""
         if c ≡ «"» then return result(out ↦ value, index + 1)
         if c ≡ "\n" then throw "norma:toml.parse: unterminated string"
         if c ≡ "\\" {
             if index + 1 ≥ wire.length() then throw "norma:toml.parse: truncated escape"
-            let string letter ← wire.slice(index + 1, index + 2)
+            let string letter ← wire.slice(index + 1, index + 2) ⊥ ""
             if letter ≡ "u" {
                 let cursor.Scan escaped ← parse_unicode(wire, index + 2)
                 let string piece ↤ escaped.payload ⊥ ""
@@ -177,7 +177,7 @@ fn parse_unicode(string wire, int start) → cursor.Scan ⇥ string {
     mut int code ← 0
     mut int i ← 0
     while i ≺ 4 {
-        let int ∪ none digit ← hex_value(wire.slice(start + i, start + i + 1))
+        let int ∪ none digit ← hex_value(wire.slice(start + i, start + i + 1) ⊥ "")
         if digit is none then throw "norma:toml.parse: invalid unicode escape"
         code ← code * 16 + (digit ↦ int ⊥ 0)
         i ← i + 1
@@ -190,7 +190,7 @@ fn parse_literal_string(string wire, int start) → cursor.Scan ⇥ string {
     mut string out ← ""
     mut int index ← start + 1
     while index ≺ wire.length() {
-        let string c ← wire.slice(index, index + 1)
+        let string c ← wire.slice(index, index + 1) ⊥ ""
         if c ≡ "'" then return result(out ↦ value, index + 1)
         if c ≡ "\n" then throw "norma:toml.parse: unterminated literal string"
         out ← out + c
@@ -202,15 +202,15 @@ fn parse_literal_string(string wire, int start) → cursor.Scan ⇥ string {
 fn parse_key(string wire, int start) → cursor.Scan ⇥ string {
     let int index ← skip_space(wire, start)
     if index ≥ wire.length() then throw "norma:toml.parse: expected key"
-    let string c ← wire.slice(index, index + 1)
+    let string c ← wire.slice(index, index + 1) ⊥ ""
     if c ≡ «"» then return parse_basic_string(wire, index)
     if c ≡ "'" then return parse_literal_string(wire, index)
     if not is_bare(c) then throw "norma:toml.parse: expected key"
     mut int end ← index
-    while end ≺ wire.length() and is_bare(wire.slice(end, end + 1)) {
+    while end ≺ wire.length() and is_bare(wire.slice(end, end + 1) ⊥ "") {
         end ← end + 1
     }
-    return result(wire.slice(index, end) ↦ value, end)
+    return result((wire.slice(index, end) ⊥ "") ↦ value, end)
 }
 
 fn parse_key_path(string wire, int start) → cursor.Scan ⇥ string {
@@ -222,7 +222,7 @@ fn parse_key_path(string wire, int start) → cursor.Scan ⇥ string {
         let string name ↤ key.payload ⊥ ""
         keys.append(name)
         index ← skip_space(wire, key.index)
-        if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "." {
+        if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "." {
             index ← index + 1
         }
         else {
@@ -235,7 +235,7 @@ fn parse_key_path(string wire, int start) → cursor.Scan ⇥ string {
 fn parse_array(string wire, int start) → cursor.Scan ⇥ string {
     mut list<value> items ← empty
     mut int index ← skip_ignored(wire, start + 1)
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "]" {
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "]" {
         return result(items ↦ value, index + 1)
     }
     while index ≺ wire.length() {
@@ -243,11 +243,11 @@ fn parse_array(string wire, int start) → cursor.Scan ⇥ string {
         items.append(item.payload)
         index ← skip_ignored(wire, item.index)
         if index ≥ wire.length() then throw "norma:toml.parse: unterminated array"
-        let string delim ← wire.slice(index, index + 1)
+        let string delim ← wire.slice(index, index + 1) ⊥ ""
         if delim ≡ "]" then return result(items ↦ value, index + 1)
         if delim ≡ "," {
             index ← skip_ignored(wire, index + 1)
-            if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "]" {
+            if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "]" {
                 return result(items ↦ value, index + 1)
             }
         }
@@ -261,13 +261,13 @@ fn parse_array(string wire, int start) → cursor.Scan ⇥ string {
 fn parse_inline_table(string wire, int start) → cursor.Scan ⇥ string {
     mut map<string, value> fields ← empty
     mut int index ← skip_space(wire, start + 1)
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "}" {
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "}" {
         return result(fields ↦ value, index + 1)
     }
     while index ≺ wire.length() {
         let cursor.Scan path ← parse_key_path(wire, index)
         index ← skip_space(wire, path.index)
-        if index ≥ wire.length() or wire.slice(index, index + 1) ≢ "=" {
+        if index ≥ wire.length() or (wire.slice(index, index + 1) ⊥ "") ≢ "=" {
             throw "norma:toml.parse: expected '=' in inline table"
         }
         let cursor.Scan scanned ← parse_value(wire, index + 1)
@@ -275,7 +275,7 @@ fn parse_inline_table(string wire, int start) → cursor.Scan ⇥ string {
         fields ← put_path(fields, keys, scanned.payload)
         index ← skip_space(wire, scanned.index)
         if index ≥ wire.length() then throw "norma:toml.parse: unterminated inline table"
-        let string delim ← wire.slice(index, index + 1)
+        let string delim ← wire.slice(index, index + 1) ⊥ ""
         if delim ≡ "}" then return result(fields ↦ value, index + 1)
         if delim ≢ "," then throw "norma:toml.parse: expected ',' or '}'"
         index ← skip_space(wire, index + 1)
@@ -285,16 +285,16 @@ fn parse_inline_table(string wire, int start) → cursor.Scan ⇥ string {
 
 fn take_digits(string wire, int start) → int ⇥ string {
     mut int index ← start
-    if index ≥ wire.length() or not is_digit(wire.slice(index, index + 1)) {
+    if index ≥ wire.length() or not is_digit(wire.slice(index, index + 1) ⊥ "") {
         throw "norma:toml.parse: expected digit"
     }
     while index ≺ wire.length() {
-        let string c ← wire.slice(index, index + 1)
+        let string c ← wire.slice(index, index + 1) ⊥ ""
         if is_digit(c) {
             index ← index + 1
         }
         elif c ≡ "_" {
-            if index + 1 ≥ wire.length() or not is_digit(wire.slice(index + 1, index + 2)) {
+            if index + 1 ≥ wire.length() or not is_digit(wire.slice(index + 1, index + 2) ⊥ "") {
                 throw "norma:toml.parse: underscore must be between digits"
             }
             index ← index + 2
@@ -308,21 +308,21 @@ fn take_digits(string wire, int start) → int ⇥ string {
 
 fn looks_like_datetime(string wire, int start) → bool {
     if start + 10 ≻ wire.length() then return false
-    let string token ← wire.slice(start, start + 10)
-    if token.slice(4, 5) ≢ "-" or token.slice(7, 8) ≢ "-" then return false
-    return is_digit(token.slice(0, 1))
+    let string token ← wire.slice(start, start + 10) ⊥ ""
+    if (token.slice(4, 5) ⊥ "") ≢ "-" or (token.slice(7, 8) ⊥ "") ≢ "-" then return false
+    return is_digit(token.slice(0, 1) ⊥ "")
 }
 
 fn parse_datetime(string wire, int start) → cursor.Scan ⇥ string {
     mut int index ← start
     while index ≺ wire.length() {
-        let string c ← wire.slice(index, index + 1)
+        let string c ← wire.slice(index, index + 1) ⊥ ""
         if is_space(c) or is_newline(c) or c ≡ "#" or c ≡ "," or c ≡ "]" or c ≡ "}" {
             break
         }
         index ← index + 1
     }
-    let string token ← wire.slice(start, index)
+    let string token ← wire.slice(start, index) ⊥ ""
     do {
         let instant stamp ← token ↦ instant
         return result(stamp ↦ value, index)
@@ -334,34 +334,34 @@ fn parse_datetime(string wire, int start) → cursor.Scan ⇥ string {
 
 fn parse_number(string wire, int start) → cursor.Scan ⇥ string {
     mut int index ← start
-    if index ≺ wire.length() and (wire.slice(index, index + 1) ≡ "+" or wire.slice(index, index + 1) ≡ "-") {
+    if index ≺ wire.length() and ((wire.slice(index, index + 1) ⊥ "") ≡ "+" or (wire.slice(index, index + 1) ⊥ "") ≡ "-") {
         index ← index + 1
     }
     if looks_like_datetime(wire, index) then return parse_datetime(wire, start)
     mut bool is_float ← false
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "0" and index + 1 ≺ wire.length() {
-        let string mark ← wire.slice(index + 1, index + 2)
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "0" and index + 1 ≺ wire.length() {
+        let string mark ← wire.slice(index + 1, index + 2) ⊥ ""
         if mark ≡ "x" or mark ≡ "o" or mark ≡ "b" {
             return parse_prefixed_int(wire, start, index + 2, mark)
         }
     }
     index ← take_digits(wire, index)
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "." {
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "." {
         is_float ← true
         index ← take_digits(wire, index + 1)
     }
     if index ≺ wire.length() {
-        let string exp ← wire.slice(index, index + 1)
+        let string exp ← wire.slice(index, index + 1) ⊥ ""
         if exp ≡ "e" or exp ≡ "E" {
             is_float ← true
             index ← index + 1
-            if index ≺ wire.length() and (wire.slice(index, index + 1) ≡ "+" or wire.slice(index, index + 1) ≡ "-") {
+            if index ≺ wire.length() and ((wire.slice(index, index + 1) ⊥ "") ≡ "+" or (wire.slice(index, index + 1) ⊥ "") ≡ "-") {
                 index ← index + 1
             }
             index ← take_digits(wire, index)
         }
     }
-    let string token ← wire.slice(start, index).replace("_", "")
+    let string token ← (wire.slice(start, index) ⊥ "").replace("_", "")
     if is_float {
         return result((token ↦ float) ↦ value, index)
     }
@@ -376,7 +376,7 @@ fn parse_prefixed_int(string wire, int token_start, int digits_start, string mar
     mut int acc ← 0
     mut bool any ← false
     while index ≺ wire.length() {
-        let string c ← wire.slice(index, index + 1)
+        let string c ← wire.slice(index, index + 1) ⊥ ""
         if c ≡ "_" {
             index ← index + 1
             continue
@@ -390,13 +390,13 @@ fn parse_prefixed_int(string wire, int token_start, int digits_start, string mar
         index ← index + 1
     }
     if not any then throw "norma:toml.parse: invalid integer prefix"
-    if wire.slice(token_start, token_start + 1) ≡ "-" then acc ← 0 - acc
+    if (wire.slice(token_start, token_start + 1) ⊥ "") ≡ "-" then acc ← 0 - acc
     return result(acc ↦ value, index)
 }
 
 fn parse_keyword(string wire, int start, string word, value payload) → cursor.Scan ⇥ string {
     let int end ← start + word.length()
-    if end ≻ wire.length() or wire.slice(start, end) ≢ word {
+    if end ≻ wire.length() or (wire.slice(start, end) ⊥ "") ≢ word {
         throw "norma:toml.parse: invalid keyword"
     }
     return result(payload, end)
@@ -405,7 +405,7 @@ fn parse_keyword(string wire, int start, string word, value payload) → cursor.
 fn parse_value(string wire, int start) → cursor.Scan ⇥ string {
     let int index ← skip_space(wire, start)
     if index ≥ wire.length() then throw "norma:toml.parse: expected value"
-    let string c ← wire.slice(index, index + 1)
+    let string c ← wire.slice(index, index + 1) ⊥ ""
     if c ≡ «"» then return parse_basic_string(wire, index)
     if c ≡ "'" then return parse_literal_string(wire, index)
     if c ≡ "[" then return parse_array(wire, index)
@@ -419,7 +419,7 @@ fn parse_value(string wire, int start) → cursor.Scan ⇥ string {
 fn parse_keyval(string wire, int start) → cursor.Scan ⇥ string {
     let cursor.Scan path ← parse_key_path(wire, start)
     let int eq ← skip_space(wire, path.index)
-    if eq ≥ wire.length() or wire.slice(eq, eq + 1) ≢ "=" {
+    if eq ≥ wire.length() or (wire.slice(eq, eq + 1) ⊥ "") ≢ "=" {
         throw "norma:toml.parse: expected '='"
     }
     let cursor.Scan scanned ← parse_value(wire, eq + 1)
@@ -432,18 +432,18 @@ fn parse_keyval(string wire, int start) → cursor.Scan ⇥ string {
 fn parse_header(string wire, int start) → cursor.Scan ⇥ string {
     mut bool array ← false
     mut int index ← start + 1
-    if index ≺ wire.length() and wire.slice(index, index + 1) ≡ "[" {
+    if index ≺ wire.length() and (wire.slice(index, index + 1) ⊥ "") ≡ "[" {
         array ← true
         index ← index + 1
     }
     let cursor.Scan path ← parse_key_path(wire, index)
     index ← skip_space(wire, path.index)
-    if index ≥ wire.length() or wire.slice(index, index + 1) ≢ "]" {
+    if index ≥ wire.length() or (wire.slice(index, index + 1) ⊥ "") ≢ "]" {
         throw "norma:toml.parse: expected ']'"
     }
     index ← index + 1
     if array {
-        if index ≥ wire.length() or wire.slice(index, index + 1) ≢ "]" {
+        if index ≥ wire.length() or (wire.slice(index, index + 1) ⊥ "") ≢ "]" {
             throw "norma:toml.parse: expected ']]'"
         }
         index ← index + 1

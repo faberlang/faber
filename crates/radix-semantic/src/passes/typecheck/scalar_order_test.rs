@@ -112,7 +112,7 @@ fn interval_helper_native_body_scalar_order_typechecks() {
         varia lista<textus> kept ← vacua
         varia numerus i ← 0
         dum i ≺ s.longitudo() {
-            sit textus c ← s.sectio(i, i + 1)
+            sit textus c ← s.sectio(i, i + 1) ⊥ ""
             si c ≥ infimum et c ≤ supremum ergo kept.appende(c)
             i ← i + 1
         }
@@ -167,7 +167,7 @@ fn en_interval_helper_native_body_scalar_order_typechecks() {
         varia lista<textus> kept ← vacua
         varia numerus i ← 0
         dum i ≺ s.longitudo() {
-            sit textus c ← s.sectio(i, i + 1)
+            sit textus c ← s.sectio(i, i + 1) ⊥ ""
             si c ≥ infimum et c ≤ supremum ergo kept.appende(c)
             i ← i + 1
         }

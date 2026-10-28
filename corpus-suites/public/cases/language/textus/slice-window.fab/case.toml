@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/textus/slice-window.fab"
+group = "language"
+input_root = "corpus"
+input = "textus/slice-window.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

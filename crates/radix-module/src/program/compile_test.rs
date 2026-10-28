@@ -3080,7 +3080,7 @@ fn en_surface_contains_infers_with_non_literal_string_arg() {
 fn valid_tag_name(string name) → bool {
     let string litterae ← "abcdefghijklmnopqrstuvwxyz"
     if name.length() ≡ 0 then return false
-    if not litterae.contains(name.slice(0, 1)) then return false
+    if not litterae.contains(name.slice(0, 1) ⊥ "") then return false
     return true
 }
 "#;

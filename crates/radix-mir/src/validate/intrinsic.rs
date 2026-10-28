@@ -2217,13 +2217,25 @@ impl Validator<'_, '_> {
                     self.error(span, "numeric rounding receiver is not fractus");
                 }
             }
-            // Placeholder so this exhaustive dispatch compiles; the numerus
-            // contract lands in 2eecb23a-7.1.1.3.
-            MirCollectionOp::TensorRank
+            MirCollectionOp::TensorRank => {
+                self.require_exact(
+                    call.return_ty,
+                    self.primitive(Primitive::Numerus),
+                    span,
+                    "tensor rank result is not numerus",
+                );
+                if let Some(receiver_ty) = first_arg_ty {
+                    self.require_tensor_type(
+                        receiver_ty,
+                        span,
+                        "tensor rank receiver is not tensor",
+                    );
+                }
+            }
             // This is a compiler-owned operation. Its tensor/const contract is
             // validated by radix-mir::abi::contract after lowering, rather
             // than by the source-level collection validator.
-            | MirCollectionOp::TensorBatchedAttention => {}
+            MirCollectionOp::TensorBatchedAttention => {}
             MirCollectionOp::TensorNorm => {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;

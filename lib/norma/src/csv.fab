@@ -15,8 +15,8 @@ import from "norma:text" text
 fn normalize_row(string row) → string {
     if row.length() ≡ 0 then return row
 
-    let string last ← row.slice(row.length() - 1, row.length())
-    if last ≡ "\r" then return row.slice(0, row.length() - 1)
+    let string last ← row.slice(row.length() - 1, row.length()) ⊥ ""
+    if last ≡ "\r" then return row.slice(0, row.length() - 1) ⊥ ""
 
     return row
 }

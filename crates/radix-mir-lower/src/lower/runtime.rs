@@ -996,15 +996,15 @@ impl FunctionBuilder<'_> {
             && method_name == "sectio"
             && args.len() == 2
             && self.device_role.is_none()
-            && self.is_lista_receiver(receiver)
+            && (self.is_lista_receiver(receiver) || self.is_textus_receiver(receiver))
             && let (Some(start_ty), Some(end_ty), Some(receiver_ty)) = (
                 self.expr_ty(&args[0].expr),
                 self.expr_ty(&args[1].expr),
-                self.checked_tensor_receiver_ty(receiver),
+                self.checked_window_receiver_ty(receiver),
             )
         {
-            // need: the list window reports out-of-range bounds on
-            // `⇥`, the same fault family as the `at` read. The bare runtime
+            // need / Q-B3: the list and text windows report out-of-range
+            // bounds on `⇥`, the same fault family as the `at` read. The bare runtime
             // op still trims, so it is only reached behind the guard.
             let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
             let helper =
@@ -1814,13 +1814,17 @@ impl FunctionBuilder<'_> {
         };
         let vector_ty = MirType::semantic(receiver_ty);
         let (op, peer_args): (MirVectorOp, &[HirCallArg]) = match method {
-            VectorMethodKind::Crea | VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => {
+            VectorMethodKind::Crea
+            | VectorMethodKind::Longitudo
+            | VectorMethodKind::Norma
+            | VectorMethodKind::Normalizata => {
                 if !args.is_empty() {
                     return None;
                 }
                 let op = match method {
                     VectorMethodKind::Crea => MirVectorOp::Crea,
-                    VectorMethodKind::Longitudo => MirVectorOp::Length,
+                    VectorMethodKind::Longitudo => MirVectorOp::Count,
+                    VectorMethodKind::Norma => MirVectorOp::Norm,
                     _ => MirVectorOp::Normalized,
                 };
                 (op, &[])
@@ -1873,6 +1877,8 @@ impl FunctionBuilder<'_> {
         }
         let result_ty = if op.returns_vector() {
             vector_ty
+        } else if matches!(op, MirVectorOp::Count) {
+            self.expr_ty(expr)?
         } else {
             MirType::semantic(element_ty)
         };
@@ -1942,7 +1948,9 @@ impl FunctionBuilder<'_> {
         // method path below (which rejects non-literal shapes and >4x4 before
         // it ever reads the method name). Fall through to the generic
         // method-intrinsic dispatch.
-        if matches!(method_name, "accipe" | "apud" | "ponde") {
+        // `longitudo` (the element count, Q-X1) takes the same generic route
+        // through the `Length` collection op.
+        if matches!(method_name, "accipe" | "apud" | "ponde" | "longitudo") {
             return None;
         }
         let receiver_ty = receiver.ty?;
@@ -5876,6 +5884,24 @@ impl FunctionBuilder<'_> {
     /// Whether this method's receiver is a `lista` — a run-time `Array` or a
     /// fixed-capacity `BoundedArray` — and never a `textus`, whose `sectio`
     /// keeps trimming quietly.
+    /// The receiver type a checked window helper takes: a bounded cord has
+    /// already been widened to `textus` by the text-receiver copy above.
+    fn checked_window_receiver_ty(&mut self, receiver: &HirExpression) -> Option<MirType> {
+        if self.is_textus_receiver(receiver) {
+            return Some(MirType::semantic(self.types.primitive(Primitive::Textus)));
+        }
+        self.checked_tensor_receiver_ty(receiver)
+    }
+
+    fn is_textus_receiver(&self, receiver: &HirExpression) -> bool {
+        receiver.ty.is_some_and(|ty| {
+            matches!(
+                self.types.get(self.method_receiver_payload_id(ty)),
+                Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. }
+            )
+        })
+    }
+
     fn is_lista_receiver(&self, receiver: &HirExpression) -> bool {
         receiver.ty.is_some_and(|ty| {
             matches!(
@@ -6413,6 +6439,7 @@ enum VectorMethodKind {
     Cross,
     Swizzle,
     Longitudo,
+    Norma,
     Normalizata,
     Crea,
     Elementwise(MirLaneOp),
@@ -6424,6 +6451,7 @@ fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
         "transversum" => Some(VectorMethodKind::Cross),
         "swizzle" => Some(VectorMethodKind::Swizzle),
         "longitudo" => Some(VectorMethodKind::Longitudo),
+        "norma" => Some(VectorMethodKind::Norma),
         "normalizata" => Some(VectorMethodKind::Normalizata),
         "crea" => Some(VectorMethodKind::Crea),
         "addita" => Some(VectorMethodKind::Elementwise(MirLaneOp::Add)),

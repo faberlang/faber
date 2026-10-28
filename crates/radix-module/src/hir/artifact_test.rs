@@ -2154,8 +2154,9 @@ fn runtime_tensor_shape_boundary_survives_fhir_round_trip_and_recovers() {
     let mut loaded_host = BufferHost::default();
     run_analyzed(&mut loaded, &mut loaded_host).expect("loaded runtime shape check recovers");
 
-    // Tensor length reports rank; the mismatch must prevent the second entry.
-    let expected = ["entered", "2", "shape mismatch"];
+    // Tensor length is the element count (2 x 2); the mismatch must prevent
+    // the second entry.
+    let expected = ["entered", "4", "shape mismatch"];
     assert_eq!(direct_host.stdout_lines, expected);
     assert_eq!(loaded_host.stdout_lines, expected);
 }
