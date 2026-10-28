@@ -462,6 +462,31 @@ pub struct MirKernelReflection {
     /// reflection when absent so existing reflection JSON is byte-identical.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lane_range_binding: Option<u32>,
+    /// The slab-origin inputs of the kernel (owned slabs), present only when
+    /// the kernel was emitted for a logical device spanning several
+    /// partitions with slab origins: one inline argument per listed buffer,
+    /// after every declared binding and the lane range. Each is two `u32`
+    /// words `[origin, stride]`; the kernel subtracts the origin from the
+    /// global coordinate it addresses the buffer by (a flat element index for
+    /// a lane kernel; a row of the left operand, a column of the right
+    /// operand, a row or a column of the output for a matmul), and a non-zero
+    /// stride is the local row length of a column slab. `[0, 0]` is a replica.
+    /// A buffer with no entry here is addressed globally and is always a
+    /// replica. Omitted from serialized reflection when empty so existing
+    /// reflection JSON is byte-identical.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub slab_origin_bindings: Vec<MirSlabOriginBinding>,
+}
+
+/// One slab-origin input of a kernel: the argument at launch position
+/// `position` is the `[origin, stride]` words of the buffer declared at
+/// `buffer`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirSlabOriginBinding {
+    /// The buffer's declared binding.
+    pub buffer: u32,
+    /// The launch argument position of its origin words.
+    pub position: u32,
 }
 
 /// What a device fault site does when it fires.

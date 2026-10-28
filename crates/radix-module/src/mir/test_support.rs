@@ -403,6 +403,7 @@ pub fn setup_sparse_group_launch_plan() -> (TypeTable, MirKernelLaunchPlan) {
     let reflection = MirKernelReflection {
         fault_sites: Vec::new(),
         lane_range_binding: None,
+        slab_origin_bindings: Vec::new(),
         function: MirFunctionId(12),
         provenance: crate::mir::MirKernelProvenance::MirFunction(MirFunctionId(12)),
         entry_name: "sparse_groups".to_owned(),
@@ -471,6 +472,7 @@ pub fn setup_webgpu_probe_reflection() -> (TypeTable, MirType, MirKernelReflecti
     let reflection = MirKernelReflection {
         fault_sites: Vec::new(),
         lane_range_binding: None,
+        slab_origin_bindings: Vec::new(),
         function: MirFunctionId(12),
         provenance: crate::mir::MirKernelProvenance::MirFunction(MirFunctionId(12)),
         entry_name: "sparse_groups".to_owned(),

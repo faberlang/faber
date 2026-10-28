@@ -887,6 +887,7 @@ fn session_dispatcher(
         })
         .collect();
     let lane_ranges = std::mem::take(&mut image.lane_ranges);
+    let slab_origins = std::mem::take(&mut image.slab_origins);
     let write_maps = std::mem::take(&mut image.write_maps);
     let fusions = std::mem::take(&mut image.fusions);
     let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
@@ -934,7 +935,7 @@ fn session_dispatcher(
         super::device::DeviceImageBackend::MetalSpanned
             | super::device::DeviceImageBackend::CudaSpanned
     ) {
-        dispatcher.borrow_mut().set_span(lane_ranges);
+        dispatcher.borrow_mut().set_span(lane_ranges, slab_origins);
     }
     dispatcher.borrow_mut().set_backward_functions(backward);
     super::device::install_fault_sites(&fault_sites, |entry, sites| {

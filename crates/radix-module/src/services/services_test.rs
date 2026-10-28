@@ -1818,6 +1818,7 @@ fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
         kernels: vec![crate::mir::MirKernelReflection {
             fault_sites: Vec::new(),
             lane_range_binding: None,
+            slab_origin_bindings: Vec::new(),
             function: crate::mir::MirFunctionId(0),
             provenance: crate::mir::MirKernelProvenance::MirFunction(crate::mir::MirFunctionId(0)),
             entry_name: "deferred_builtins".to_owned(),
