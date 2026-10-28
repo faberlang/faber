@@ -822,7 +822,7 @@ fn fixed_array_capacity(ty: MirType, validation: &MirValidationContext<'_>) -> O
 fn literal_in_capacity(index: &MirOperand, capacity: u64) -> bool {
     match index {
         MirOperand::Constant(MirConstant::Int(n)) => u64::try_from(*n).is_ok_and(|n| n < capacity),
-        MirOperand::Constant(MirConstant::UInt(n)) => u64::try_from(*n).is_ok_and(|n| n < capacity),
+        MirOperand::Constant(MirConstant::UInt(n)) => *n < capacity,
         _ => false,
     }
 }
