@@ -8,16 +8,16 @@ use super::*;
 use crate::abi::{
     CollectionOpContract, MatMulDispatch, MirKernelDispatchSize, MirKernelResource,
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
-    MirKernelWorkgroupCount, MirWorkgroupSize,
+    MirKernelWorkgroupCount, MirWorkgroupSize, collection_op_contract,
 };
 use crate::device_program::{
-    BufferId, BufferIdentity, BufferLifetime, BufferVersion, DeviceProgram, DeviceProgramError,
-    DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit, LaunchId, LaunchUnit,
-    ObservationCadence, ResultBuffer,
+    Binding, BufferId, BufferIdentity, BufferLifetime, BufferRole, BufferVersion, DeviceProgram,
+    DeviceProgramError, DeviceProgramLifetime, DeviceResource, KernelLaunchPlan, KernelUnit,
+    LaunchId, LaunchUnit, ObservationCadence, ResultBuffer,
 };
 use crate::kernel_plan::{
-    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MatMulShapes, MatMulSharedMemory,
-    OobPaddingPolicy, ReduceOp, SharedMemoryLayout,
+    CollectionKernelPlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MatMulShapes,
+    MatMulSharedMemory, OobPaddingPolicy, ReduceOp, SharedMemoryLayout,
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::{
