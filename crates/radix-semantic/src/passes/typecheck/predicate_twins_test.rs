@@ -84,12 +84,12 @@ fn reperta_returns_the_option_of_the_element_type() {
 fn reperta_on_a_bounded_list_stays_optional() {
     // A bounded list with a minimum size of one still has no guaranteed match.
     crate::test_support::assert_accepts_la(
-        r"functio check(lista<numerus, 4> xs) → numerus ∪ nihil {
+        r"functio check(lista<numerus, magnitudo 1…4> xs) → numerus ∪ nihil {
     redde xs.reperta(numerus d ∴ d ≻ 10)
 }",
     );
     assert_rejects_with_issue_la(
-        r"functio check(lista<numerus, 4> xs) → numerus {
+        r"functio check(lista<numerus, magnitudo 1…4> xs) → numerus {
     redde xs.reperta(numerus d ∴ d ≻ 10)
 }",
         "optional_into_plain_cell",
