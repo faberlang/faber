@@ -703,6 +703,31 @@ impl super::FaberCodegen<'_> {
         let ty = self.types.get(form.ty);
         match ty {
             Type::Error => Ok("<error>".to_owned()),
+            // A list length range keeps its authored spelling:
+            // the glyph, the bounds as written and the `size` marker. The
+            // resolved witness may be any list shape (`size 0…8` is a bounded
+            // list, `size 0…∞` the plain one), so the authored range wins.
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+                if form
+                    .args
+                    .iter()
+                    .any(|arg| matches!(arg, HirTypeFormArg::Range(_))) =>
+            {
+                let [HirTypeFormArg::Type(child), HirTypeFormArg::Range(range)] =
+                    form.args.as_slice()
+                else {
+                    return Err(malformed_type_form(
+                        "a list size range form requires an element and one range".to_owned(),
+                    ));
+                };
+                Ok(format!(
+                    "{}<{}, {} {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    self.type_form_to_faber(child, names, surface)?,
+                    surface.keyword(TokenKind::Magnitudo),
+                    self.range_argument_to_faber(range)
+                ))
+            }
             Type::Primitive(Primitive::Octeti) => {
                 Self::expect_no_form_args(form)?;
                 Ok(format!(
