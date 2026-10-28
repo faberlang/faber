@@ -1203,6 +1203,10 @@ mod analyzed_application_test;
 mod annotation_contract_locale_test;
 
 #[cfg(test)]
+#[path = "function_pack_type_word_test.rs"]
+mod function_pack_type_word_test;
+
+#[cfg(test)]
 #[path = "annotation_contract_test.rs"]
 mod annotation_contract_test;
 

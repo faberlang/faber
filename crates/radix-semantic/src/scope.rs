@@ -219,6 +219,9 @@ pub struct Scope {
     pub parent: Option<ScopeId>,
     pub kind: ScopeKind,
     pub symbols: FxHashMap<LexSymbol, ScopeEntry>,
+    /// Reader-pack type spellings displaced from `symbols` by a value binding of
+    /// the same name in this frame. They stay reachable from type syntax.
+    pub shadowed_types: FxHashMap<LexSymbol, ScopeEntry>,
     /// Prior nearest-name values for bindings introduced in this frame.
     pub shadow_deltas: Vec<(LexSymbol, Option<DefId>)>,
 }
@@ -231,6 +234,7 @@ impl Scope {
             parent,
             kind,
             symbols: FxHashMap::default(),
+            shadowed_types: FxHashMap::default(),
             shadow_deltas: Vec::new(),
         }
     }
@@ -3417,7 +3421,24 @@ impl Resolver {
     ) -> Result<(), LexSymbol> {
         let previous = self.lookup_shadow.get(&name).copied();
         let scope = &mut self.scopes[self.current_scope.0 as usize];
-        if let Some(existing) = scope.symbols.get(&name) {
+        if let Some(existing) = scope.symbols.get(&name).copied() {
+            // A value binding (function or module-level value) may shadow a
+            // reader-pack type spelling in the same frame: the pack words are
+            // contextual, not reserved (`fn tensor(...)` under any locale).
+            // The type spelling stays reachable from type syntax through
+            // `shadowed_types`; a user-declared type of the same name is still
+            // a duplicate.
+            if matches!(kind, SymbolKind::Function | SymbolKind::Local)
+                && existing.kind == SymbolKind::TypeAlias
+                && self.locale_pack_type_aliases.contains_key(&existing.def_id)
+            {
+                scope.shadowed_types.insert(name, existing);
+                scope.symbols.insert(name, ScopeEntry { def_id, kind });
+                scope.shadow_deltas.push((name, previous));
+                self.lookup_shadow.insert(name, def_id);
+                return Ok(());
+            }
+
             // A module import lives in the value namespace and may shadow a
             // reader-pack type spelling that occupies the same name in the
             // same scope frame (e.g. `importa ex "norma:json" json`
@@ -3930,6 +3951,9 @@ impl Resolver {
             if let Some(entry) = scope.symbols.get(&name)
                 && entry.kind.is_type()
             {
+                return Some(entry.def_id);
+            }
+            if let Some(entry) = scope.shadowed_types.get(&name) {
                 return Some(entry.def_id);
             }
             scope_id = scope.parent;
