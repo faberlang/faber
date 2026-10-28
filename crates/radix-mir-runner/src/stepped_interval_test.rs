@@ -216,6 +216,43 @@ fn stepped_op_contains_on_step_membership() {
     );
 }
 
+#[test]
+fn interval_comparisons_keep_large_integers_exact() {
+    let base = 1_i64 << 53;
+    let contains = Value::Tuple(vec![
+        Value::Int(base + 1),
+        Value::Int(base + 2),
+        Value::Bool(true),
+    ]);
+    assert_eq!(
+        eval_interval_op(
+            MirCollectionOp::IntervalContains,
+            vec![contains, Value::Int(base)],
+        )
+        .unwrap(),
+        Value::Bool(false)
+    );
+
+    let left = Value::Tuple(vec![Value::Int(base), Value::Int(base), Value::Bool(true)]);
+    let right = Value::Tuple(vec![
+        Value::Int(base + 1),
+        Value::Int(base + 1),
+        Value::Bool(true),
+    ]);
+    assert_eq!(
+        eval_interval_op(
+            MirCollectionOp::IntervalIntersect,
+            vec![left.clone(), right.clone()],
+        )
+        .unwrap(),
+        Value::Nil
+    );
+    assert_eq!(
+        eval_interval_op(MirCollectionOp::IntervalUnion, vec![left, right]).unwrap(),
+        Value::Nil
+    );
+}
+
 /// Materializing lists the stepped members in the carrier's direction.
 #[test]
 fn stepped_op_materialize_lists_stepped_members() {
