@@ -74,6 +74,7 @@ pub fn unroll(
 ) -> Result<(), Vec<SemanticError>> {
     let mut ids = IdGen::from_module(hir);
     let mut errors = Vec::new();
+    let before = LiveNodes::of(hir);
 
     for item in &mut hir.items {
         if lanes.lane_for(item.def_id) != Some(RadixLane::Air) {
@@ -99,11 +100,134 @@ pub fn unroll(
         );
     }
 
+    // An unrolled loop's statements, its binder and its body block leave the
+    // HIR; the presentation records they owned would dangle on the finalized
+    // unit (and fail FHIR validation at load).
+    let after = LiveNodes::of(hir);
+    forget_removed_nodes(presentation, &before.removed_by(&after));
+
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors)
     }
+}
+
+/// The ids a module's HIR holds: node ids, definitions and block-end anchors.
+#[derive(Default)]
+struct LiveNodes {
+    hirs: FxHashSet<HirId>,
+    defs: FxHashSet<DefId>,
+    block_ends: FxHashSet<radix_hir::HirSourceAnchorId>,
+}
+
+impl LiveNodes {
+    fn of(hir: &HirModule) -> Self {
+        let mut nodes = Self::default();
+        walk_program(&mut nodes, hir);
+        nodes
+    }
+
+    /// The ids `self` holds that `after` no longer does.
+    fn removed_by(&self, after: &Self) -> Self {
+        Self {
+            hirs: self.hirs.difference(&after.hirs).copied().collect(),
+            defs: self.defs.difference(&after.defs).copied().collect(),
+            block_ends: self
+                .block_ends
+                .difference(&after.block_ends)
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
+impl HirVisitor for LiveNodes {
+    fn visit_def(&mut self, def_id: DefId, _name: Symbol) {
+        self.defs.insert(def_id);
+    }
+
+    fn visit_block(&mut self, block: &HirBlock) {
+        if let Some(end) = &block.end {
+            self.block_ends.insert(end.id.clone());
+        }
+        walk_block(self, block);
+    }
+
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        self.hirs.insert(stmt.id);
+        walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        self.hirs.insert(expr.id);
+        walk_expr(self, expr);
+    }
+}
+
+/// Drop every presentation record keyed by a node the pass removed.
+///
+/// A trivia owner whose statement was unrolled away goes with its attachment:
+/// the lanes that replace the loop are synthesized, not authored.
+fn forget_removed_nodes(presentation: &mut HirPresentation, removed: &LiveNodes) {
+    let gone = |id: &HirId| removed.hirs.contains(id);
+    presentation.guard_si_ids.retain(|id| !gone(id));
+    presentation.elige_expr_ids.retain(|id| !gone(id));
+    presentation.glyph_ids.retain(|id| !gone(id));
+    presentation.radical_quarta_ids.retain(|id| !gone(id));
+    presentation.numeric_twin_ids.retain(|id| !gone(id));
+    presentation.empty_dense_ids.retain(|id| !gone(id));
+    presentation.inferred_constructor_ids.retain(|id| !gone(id));
+    presentation.axis_sugar.retain(|record| !gone(&record.id));
+    presentation
+        .discard_binding_stmts
+        .retain(|record| !gone(&record.expr_id));
+    presentation
+        .tuple_label_accesses
+        .retain(|record| !gone(&record.expr_id));
+    presentation
+        .insere_exprs
+        .retain(|record| !gone(&record.expr));
+    presentation
+        .template_holes
+        .retain(|record| !gone(&record.expr));
+    presentation
+        .destructure_bindings
+        .retain(|record| !record.stmt_ids.iter().any(gone));
+    presentation
+        .await_assignment_bindings
+        .retain(|def| !removed.defs.contains(def));
+    presentation
+        .function_modifier_bindings
+        .retain(|record| !removed.defs.contains(&record.local));
+    presentation
+        .compile_time_locals
+        .retain(|def| !removed.defs.contains(def));
+    presentation.owners.retain(|owner| match &owner.semantic {
+        Some(HirOwnerRef::Hir(id)) => !gone(id),
+        Some(HirOwnerRef::Def(id)) => !removed.defs.contains(id),
+        None => {
+            owner.kind != radix_hir::HirTriviaOwnerKind::BlockEnd
+                || !removed.block_ends.contains(&owner.id)
+        }
+    });
+    let live_anchors: FxHashSet<_> = presentation
+        .owners
+        .iter()
+        .map(|owner| owner.id.clone())
+        .collect();
+    presentation
+        .attachments
+        .retain(|attachment| live_anchors.contains(&attachment.anchor));
+    presentation
+        .block_ends
+        .retain(|end| !removed.block_ends.contains(&end.id));
+    presentation
+        .authored_types
+        .retain(|record| match &record.site.owner {
+            HirOwnerRef::Hir(id) => !gone(id),
+            HirOwnerRef::Def(id) => !removed.defs.contains(id),
+        });
 }
 
 fn unroll_function(

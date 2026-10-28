@@ -721,7 +721,13 @@ pub struct FunctionProvenanceTableWire {
 /// `HirExpressionKind::FirstMatch` variant is gone, shifting the serde ordinals
 /// of every later expression variant, and the reduction operator enum gained a
 /// variant; schema-v55 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 56;
+/// Version 57 adds the `MessagePack` signed-128-bit integer extension
+/// (`fixext 16`, extension type 1, big-endian two's complement): the unit
+/// carries `i128` facts (affine size offsets, ranged-integer bounds) and the
+/// named-field codec had no wire form for them, so a unit holding one could
+/// not be written. Every `i128` field now rides the extension and reads back
+/// only from it; schema-v56 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 57;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
