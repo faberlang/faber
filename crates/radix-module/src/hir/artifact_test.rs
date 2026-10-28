@@ -2306,6 +2306,25 @@ fn declaration_store_shape_pins_survive_fhir_round_trip() {
 }
 
 #[test]
+fn proven_index_accesses_survive_fhir_round_trip() {
+    use crate::driver::{Config, Session, analyze_source};
+
+    let path = format!("{}/../../corpus/mori/mori.fab", env!("CARGO_MANIFEST_DIR"));
+    let source = std::fs::read_to_string(&path).expect("mori fixture");
+    let session = Session::new(Config::default().with_dev_locale_root());
+    let direct = analyze_source(&session, &path, &source, AnalyzeRequest::default()).expect("fixture analyzes");
+    assert!(
+        !direct.shape_obligations.proven_indexes.is_empty(),
+        "the guarded index read is a checker-proven access"
+    );
+
+    let artifact = crate::hir::serialize::from_analyzed(&direct, "proven-index", "mori");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize proven indexes");
+    let loaded = load_fhir(&bytes).expect("proven indexes survive validated FHIR load");
+    assert_eq!(loaded.shape_obligations.proven_indexes, direct.shape_obligations.proven_indexes);
+}
+
+#[test]
 fn tensor_edge_policy_facts_survive_fhir_round_trip() {
     use radix_hir::{
         ResolvedTensorEdgePolicy, TensorEdgePolicyProviderImpl, TensorEdgePolicyRequirement, TensorShiftContext,

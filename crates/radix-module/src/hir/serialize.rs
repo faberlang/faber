@@ -511,7 +511,9 @@ fn shape_obligations_wire(
         })
         .collect();
     function_size_bindings.sort_by_key(|entry| entry.function.0);
-    ShapeObligationTableWire { calls, call_size_bindings, functions, stores, function_size_bindings }
+    let mut proven_indexes: Vec<_> = obligations.proven_indexes.iter().copied().collect();
+    proven_indexes.sort_by_key(|access| access.0);
+    ShapeObligationTableWire { calls, call_size_bindings, functions, stores, function_size_bindings, proven_indexes }
 }
 
 // ── Provider carriage (ARCH-U4 / schema v14) ───────────────────────────────

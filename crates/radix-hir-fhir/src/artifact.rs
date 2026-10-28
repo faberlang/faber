@@ -733,7 +733,12 @@ pub struct FunctionProvenanceTableWire {
 /// Version 59 adds `Type::RangedArray` (a list length range,
 /// `list<T, size lo‥hi>`, need) to the type table; schema-v58
 /// artifacts fail closed because the serialized `Type` enum gained a variant.
-pub const SCHEMA_VERSION: u32 = 59;
+/// Version 60 adds `ShapeObligationTableWire::proven_indexes`: the index
+/// accesses the checker proved in bounds. The wire dropped
+/// them, so MIR lowering from a loaded unit kept the bounds check (a trap on
+/// every backend that emits one) where the direct unit lowered a proven
+/// projection; schema-v59 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 60;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -826,6 +831,8 @@ pub struct ShapeObligationTableWire {
     /// and a loaded unit lowered no runtime shape check at the store.
     pub stores: Vec<ShapeStoreObligationsWire>,
     pub function_size_bindings: Vec<FunctionSizeBindingsWire>,
+    /// Index accesses the checker proved in bounds (schema v60), sorted by id.
+    pub proven_indexes: Vec<radix_hir::HirId>,
 }
 
 // ---------------------------------------------------------------------------

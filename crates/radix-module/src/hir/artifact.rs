@@ -705,9 +705,7 @@ fn map_shape_obligations(wire: radix_hir_fhir::ShapeObligationTableWire) -> crat
             .into_iter()
             .map(|entry| (entry.function, map_bindings(entry.bindings)))
             .collect(),
-        // Index proofs are not wire facts: a unit rebuilt from an artifact keeps
-        // every bounds check (the conservative default).
-        proven_indexes: Default::default(),
+        proven_indexes: wire.proven_indexes.into_iter().collect(),
     }
 }
 
