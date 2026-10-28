@@ -30,8 +30,15 @@ fn above(value: i128) -> IntRange {
     IntRange::from_lo(c(value), true)
 }
 
+/// `< value` as a guard on an integer produces it: the adjacent non-strict
+/// integer.
+fn lt(value: i128) -> IntRange {
+    IntRange::from_hi(c(value - 1), false)
+}
+
+/// `[lo, hi)` as guards on an integer produce it.
 fn band(lo: i128, hi: i128) -> IntRange {
-    at_least(lo).meet(&below(hi))
+    at_least(lo).meet(&lt(hi))
 }
 
 /// Check `source`, require it to be accepted, and return the interval held at
@@ -57,7 +64,7 @@ fn then_and_else_edges_carry_opposite_bounds() {
     let source = int_fn("    si x ≺ 10 { n ← x } secus { n ← x }\n    n ← x");
     assert_eq!(
         reads(&source, "x"),
-        vec![None, Some(below(10)), Some(at_least(10)), None],
+        vec![None, Some(lt(10)), Some(at_least(10)), None],
         "the facts neither cross into the other edge nor escape the join"
     );
 }
@@ -65,7 +72,7 @@ fn then_and_else_edges_carry_opposite_bounds() {
 #[test]
 fn a_fact_does_not_escape_a_branch_without_else() {
     let source = int_fn("    si x ≺ 10 { n ← x }\n    n ← x");
-    assert_eq!(reads(&source, "x"), vec![None, Some(below(10)), None]);
+    assert_eq!(reads(&source, "x"), vec![None, Some(lt(10)), None]);
 }
 
 #[test]
@@ -112,7 +119,7 @@ fn not_swaps_the_edges() {
     let source = int_fn("    si non (x ≺ 10) { n ← x } secus { n ← x }");
     assert_eq!(
         reads(&source, "x"),
-        vec![None, Some(at_least(10)), Some(below(10))]
+        vec![None, Some(at_least(10)), Some(lt(10))]
     );
 }
 
@@ -136,7 +143,7 @@ fn edges_that_agree_keep_the_fact_after_the_join() {
         int_fn("    si x ≺ 10 {\n        si x ≥ 0 { n ← 1 } secus { n ← 2 }\n        n ← x\n    }");
     assert_eq!(
         reads(&source, "x"),
-        vec![None, Some(below(10)), Some(below(10))],
+        vec![None, Some(lt(10)), Some(lt(10))],
         "inner edges are [0,10) and (-∞,0): the upper hull is the weaker `< 10`, \
          and the outer fact is on both edges"
     );
@@ -182,7 +189,7 @@ fn meet_keeps_the_stronger_endpoint() {
 
 #[test]
 fn interval_queries_follow_strictness() {
-    let range = band(0, 10);
+    let range = at_least(0).meet(&below(10));
     assert!(range.proves_at_least(&c(0), false));
     assert!(!range.proves_at_least(&c(0), true));
     assert!(range.proves_at_most(&c(10), true));
@@ -483,7 +490,7 @@ fn a_call_kills_a_mutable_binding_fact_but_not_a_let_fact() {
     assert_eq!(m.last().cloned().flatten(), None, "mutable subject: killed");
     assert_eq!(
         x.last().cloned().flatten(),
-        Some(below(10)),
+        Some(lt(10)),
         "an immutable parameter cannot be written by the call: its fact survives"
     );
 }

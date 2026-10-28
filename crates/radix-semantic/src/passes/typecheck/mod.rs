@@ -125,6 +125,10 @@ mod fieldless_type_access_test;
 mod flow_range;
 #[cfg(test)]
 mod flow_range_probe;
+mod flow_range_produce;
+#[cfg(test)]
+#[path = "flow_range_produce_test.rs"]
+mod flow_range_produce_test;
 #[cfg(test)]
 #[path = "flow_range_test.rs"]
 mod flow_range_test;

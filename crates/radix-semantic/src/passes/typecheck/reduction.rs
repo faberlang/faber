@@ -503,6 +503,7 @@ pub(super) fn check_reduction_expr(
     for (id, _) in coordinates {
         checker.insert_binding(*id, integer);
     }
+    checker.seed_coordinates(dispatch, None, coordinates);
     if let Some((id, _)) = filum {
         checker.insert_binding(id, integer);
     }
@@ -571,6 +572,7 @@ pub(super) fn check_reduction_expr(
     } else {
         element
     };
+    checker.release_range_binders(coordinates.iter().map(|(id, _)| *id));
     checker.pop_scope();
     let boolean = checker.types.primitive(Primitive::Bivalens);
     let bool_op = matches!(
