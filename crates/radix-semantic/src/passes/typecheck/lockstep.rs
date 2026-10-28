@@ -8,7 +8,7 @@
 //! - The optional `apud [i]` clause stays ONE shared coordinate; it does not
 //!   grow with N (`at [i, j]` on a list zip is declined).
 //! - Every source must be a `lista` (`list<T>` or literal-capacity
-//!   `lista<T, N>`); map, tensor, queue, stack, text, and cursor surfaces
+//!   `lista<T, magnitudo N>`); map, tensor, queue, stack, text, and cursor surfaces
 //!   stay single-source until separately proven.
 //! - Equal length: statically known lengths (literal-capacity witnesses)
 //!   must already be equal here; dynamic `list<T>` lengths are guarded at
@@ -68,7 +68,7 @@ pub(super) fn check_lockstep_expr(
             Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
                 // Exact static length only when the expression is an array
                 // literal: unannotated literals are exact witnesses of their
-                // element count, while a `lista<T, N>` binding keeps a
+                // element count, while a `lista<T, magnitudo N>` binding keeps a
                 // runtime `len <= N` carrier (the same exact-bound lattice
                 // the elementwise lista operators consult).
                 let literal = match &source.kind {
@@ -121,7 +121,15 @@ pub(super) fn check_lockstep_expr(
     for ((def_id, _), element) in bindings.iter().zip(element_tys.iter()) {
         checker.insert_binding(*def_id, *element);
     }
+    // The walk guard fails closed on unequal lengths, so the shared coordinate
+    // is below every source's length: the first named source states it.
+    if let Some(first) = sources.first()
+        && let Some(first_ty) = first.ty
+    {
+        checker.seed_coordinates(first_ty, Some(first), coordinates);
+    }
     checker.check_loop_block_over(sources.iter(), body);
+    checker.release_range_binders(coordinates.iter().map(|(def_id, _)| *def_id));
     checker.pop_scope();
     checker.vacuum_type()
 }

@@ -16,7 +16,7 @@ fn rust_code(result: crate::CompileResult) -> String {
 #[test]
 fn bounded_octeti_is_not_bare_octeti_and_keeps_n_in_emit() {
     let result = compile_and_get_result_la(
-        r"functio probe(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
+        r"functio probe(lista<b8, magnitudo 8> bounded, lista<b8> unbounded) → vacuum {
     nota bounded
     nota unbounded
 }
@@ -42,7 +42,7 @@ incipit {
 #[test]
 fn bounded_octeti_scalar_index_is_o1_live_byte() {
     let result = compile_and_get_result_la(
-        r"functio probe(lista<b8, 8> xs) → u8 {
+        r"functio probe(lista<b8, magnitudo 8> xs) → u8 {
     redde xs[0]
 }
 
@@ -70,9 +70,9 @@ incipit {
 #[test]
 fn bounded_octeti_conversions_follow_d7() {
     let diagnostics = analyze_and_get_diagnostics_la(
-        r"typus OctetiOcto = lista<b8, 8>
+        r"typus OctetiOcto = lista<b8, magnitudo 8>
 
-functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
+functio bridges(lista<b8, magnitudo 8> bounded, lista<b8> unbounded) → vacuum {
     sit lista<b8> widened ← bounded ↦ lista<b8>
     sit OctetiOcto narrowed ← unbounded ↦ OctetiOcto
     nota widened
@@ -90,7 +90,7 @@ incipit {
 
     let implicit = analyze_and_get_diagnostics_la(
         r"functio assign(lista<b8> unbounded) → vacuum {
-    sit lista<b8, 8> bounded ← unbounded
+    sit lista<b8, magnitudo 8> bounded ← unbounded
     nota bounded
 }
 
@@ -104,9 +104,9 @@ incipit {
     );
 
     let result = compile_and_get_result_la(
-        r"functio bridges(lista<b8, 8> bounded, lista<b8> unbounded) → vacuum {
+        r"functio bridges(lista<b8, magnitudo 8> bounded, lista<b8> unbounded) → vacuum {
     sit lista<b8> widened ← bounded ↦ lista<b8>
-    sit lista<b8, 8> narrowed ← unbounded ↦ lista<b8, 8>
+    sit lista<b8, magnitudo 8> narrowed ← unbounded ↦ lista<b8, magnitudo 8>
     nota widened
     nota narrowed
 }
@@ -132,7 +132,7 @@ incipit {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn bounded_octeti_is_carried_on_typescript() {
-    let source = r"functio probe(lista<b8, 8> xs) → u8 {
+    let source = r"functio probe(lista<b8, magnitudo 8> xs) → u8 {
     redde xs[0]
 }
 
@@ -161,7 +161,7 @@ incipit {
 #[cfg(feature = "hir-go")]
 #[test]
 fn bounded_octeti_is_carried_on_go() {
-    let source = r"functio probe(lista<b8, 8> xs) → u8 {
+    let source = r"functio probe(lista<b8, magnitudo 8> xs) → u8 {
     redde xs[0]
 }
 

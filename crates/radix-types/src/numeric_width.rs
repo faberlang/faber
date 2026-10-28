@@ -141,7 +141,7 @@ pub enum WidthLowerIssue {
     /// A float, decimal or `inf` width with a range: ranged floats are not
     /// built, and the unbounded integer has no width to refine.
     RangedWidthUnsupported,
-    /// A list length range (`list<T, lo‥hi>`) has an end that is a name or a
+    /// A list length range (`list<T, size lo‥hi>`) has an end that is a name or a
     /// size; only integer literals and `∞` fold at compile time.
     RangedListBoundNotConstant,
     /// A list length range holds no length (`4‥4`, `5…3`, `∞‥∞`).
@@ -151,7 +151,7 @@ pub enum WidthLowerIssue {
     /// A store policy word with a range around a list
     /// (`saturating<list<T>, 0‥3>`, `wrapping<list<T>, 0‥3>`,
     /// `trapping<list<T>, 1…3>`): a list length range is spelled
-    /// `list<T, lo‥hi>` and always traps, so no policy word wraps a list. The
+    /// `list<T, size lo‥hi>` and always traps, so no policy word wraps a list. The
     /// one-argument shapes (`wrapping<list<T>>`) keep their own width-shape
     /// issues.
     RangedListPolicyWord,
@@ -182,6 +182,10 @@ impl WidthLowerIssue {
     pub const RANGED_LIST_EMPTY: &str = "ranged_list_range_empty";
     pub const RANGED_LIST_BOUND_NEGATIVE: &str = "ranged_list_bound_negative";
     pub const RANGED_LIST_POLICY_WORD: &str = "ranged_list_policy_word";
+    /// A list count written without the `size` marker: a bare number or name
+    /// (`list<T, 4>`, retired) or a bare range (`list<T, 1…8>`, which would
+    /// bound a value). The count is `list<T, size 4>` or `list<T, size 1…8>`.
+    pub const LIST_COUNT_NEEDS_SIZE: &str = "list_count_needs_size";
 
     /// Diagnostic issue identity for this failure.
     #[must_use]
@@ -881,7 +885,7 @@ fn type_expr_names_list(ty: &radix_syntax::TypeExpr, interner: &radix_lexer::Int
     )
 }
 
-/// Resolve the length range of `list<T, lo‥hi>` (need, 5/5).
+/// Resolve the length range of `list<T, size lo‥hi>` (need, 5/5).
 ///
 /// `inclusive` is `lo…hi`; the half-open `lo‥hi` holds `lo` through `hi - 1`.
 /// `∞` is a high end that means no upper bound; `-∞` as a low end means no
@@ -926,11 +930,11 @@ pub fn resolve_ranged_list(
     Ok((min, max))
 }
 
-/// Lower the length range of a list, `list<T, lo‥hi>`.
+/// Lower the length range of a list, `list<T, size lo‥hi>`.
 ///
 /// A list length range is always a trapping range, so it takes no policy
 /// word. The ends fold at compile time (integer literals and `∞`); the sugar
-/// forms keep one identity (`0…∞` is `lista<T>`, `0…N` is `lista<T, N>`).
+/// forms keep one identity (`0…∞` is `lista<T>`, `0…N` is `lista<T, magnitudo N>`).
 pub fn lower_ranged_list(
     element: TypeId,
     range: &radix_syntax::RangeArgExpr,

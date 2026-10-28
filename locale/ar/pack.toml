@@ -200,7 +200,7 @@ instans = "لحظة"
 objectum = "كائن"
 quidlibet = "مهما"
 lista = "قائمة"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
 tabula = "جدول"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "دفتر"
@@ -804,7 +804,7 @@ help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`،
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "تلميح التحويل لا يتبع الهدف بين قوسين زاويين"
-help = "اكتب التلميح كجملة via بعد الهدف: `{lista}<b8, 16> via Le`"
+help = "اكتب التلميح كجملة via بعد الهدف: `{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "تعبير مطلوب"
@@ -1164,7 +1164,7 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "{lista} يتطلب معامل نوع واحدا"
-help = "استخدم {lista}<T>؛ lista<T, N> شكل محدود مشحون"
+help = "استخدم {lista}<T>؛ {lista}<T, {magnitudo} N> شكل محدود مشحون"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "{tabula} يتطلب معاملي نوع"
@@ -1222,9 +1222,13 @@ help = "استخدم عرض عدد صحيح مثل u8 أو i32؛ عروض float 
 message = "لا يستطيع kernel استخدام سياسة تخزين ذات نطاق بعد ({site}); لا يطبّق kernel النطاقات"
 help = "استخدم العرض العادي داخل kernel وطبّق النطاق على المضيف"
 
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "لا يستطيع kernel استخدام قائمة بلا حدّ أعلى للحجم ({site}); فهو يفرد كل خانة حتى الحد الأقصى"
+help = "امنح القائمة حجمًا نهائيًا ثابتًا، مثل {lista}<int, {magnitudo} 1…8>"
+
 [diagnostics.SEM008.issues.ranged_list_bound_not_constant]
 message = "يجب أن يكون طرف نطاق طول القائمة عددًا صحيحًا حرفيًا غير سالب أو ∞"
-help = "اكتب الطرفين كعددين صحيحين حرفيين، مثل list<int, 1‥8>؛ الطرف المسمّى أو طرف size غير مدعوم بعد"
+help = "اكتب الطرفين كعددين صحيحين حرفيين، مثل {lista}<int, {magnitudo} 1‥8>؛ الطرف المسمّى أو طرف size غير مدعوم بعد"
 
 [diagnostics.SEM008.issues.ranged_list_range_empty]
 message = "نطاق طول القائمة لا يحوي أي طول"
@@ -1236,7 +1240,11 @@ help = "الطول عدد: ابدأ النطاق من 0 أو أكثر"
 
 [diagnostics.SEM008.issues.ranged_list_policy_word]
 message = "نطاق طول القائمة لا يقبل كلمة سياسة تخزين"
-help = "اكتب النطاق على القائمة، مثل list<int, 1…8>؛ فهو يوقف البرنامج دائمًا، وكلمات saturating وtrapping وwrapping تأخذ عرضًا عدديًا"
+help = "اكتب النطاق على القائمة، مثل {lista}<int, {magnitudo} 1…8>؛ فهو يوقف البرنامج دائمًا، وكلمات saturating وtrapping وwrapping تأخذ عرضًا عدديًا"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "يُكتب عدد عناصر القائمة بعد `{magnitudo}`"
+help = "اكتب `{lista}<int, {magnitudo} 4>` لأربعة عناصر على الأكثر، أو `{lista}<int, {magnitudo} 1…8>` لنطاق؛ النطاق المجرد يحدّ قيمة لا عددًا"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
@@ -1436,7 +1444,7 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type لا يقبل parameters"
-help = "textus<N> و ascii<N> و {lista}<b8, N> أشكال محدودة مشحونة"
+help = "textus<N> و ascii<N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace لا يصدر qualified type"
@@ -2800,7 +2808,7 @@ help = "استخدم واحدا من Hex أو Bin أو Oct أو Be أو Le أو 
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "هدف التحويل هذا لا يقبل تلميح تحويل"
-help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "العائم أو العشري لا يتحول إلى صحيح دون تسمية التقريب"
@@ -3357,6 +3365,10 @@ help = "أبق دوال `@ radix lane \"air\"` في المجموعة النقي�
 [diagnostics.SEM059.issues.async_function]
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: async functions خارج v1 AIR subset"
 help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "يرفض @ radix lane \"{lane}\" قائمة بلا حدّ أعلى للحجم: يفرد الاشتقاق العكسي كل خانة حتى الحد الأقصى"
+help = "امنح القائمة حجمًا نهائيًا ثابتًا، مثل {lista}<int, {magnitudo} 1…8>، أو انقل القائمة خارج المسار"
 
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: assignment هو mutation خارج v1 AIR subset"

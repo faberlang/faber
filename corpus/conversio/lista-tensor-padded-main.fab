@@ -4,7 +4,7 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "shape_suffix", "type_arguments", "type_argument", "expression", "conversio_expr", "assignment", "itera_stmt", "member_suffix", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "Route C: numeric list<T, N> ↦ tensor<T, [N]> pads spare slots with a real fill (zero default, ⊥ names another); the padded loop unrolls via Route T; non-neutral exits need a caller-built 0/1 len-mask."
+summary = "Route C: numeric list<T, size N> ↦ tensor<T, [N]> pads spare slots with a real fill (zero default, ⊥ names another); the padded loop unrolls via Route T; non-neutral exits need a caller-built 0/1 len-mask."
 syntax = "xs ↦ tensor<T, [N]> [⊥ fill]"
 related = ["lista", "tensor", "itera", "ex"]
 locale = "en"
@@ -19,7 +19,7 @@ locale = "en"
 # element values, so the padding contract is visible on stdout.
 #
 # What this teaches:
-#   • `list<T, N> ↦ tensor<T, [N]>` snapshots the live prefix 0..len and pads
+#   • `list<T, size N> ↦ tensor<T, [N]>` snapshots the live prefix 0..len and pads
 #     slots len..N with a real fill value — the default fill is the numeric
 #     zero of T; a `⊥` default names a different fill (element-typed)
 #   • the fill is a real value written at the conversion site, never a read of
@@ -29,7 +29,7 @@ locale = "en"
 #   • iterating the padded tensor is a plain Route T unroll (N lanes, budget 64)
 #
 # Common mistakes:
-#   • Padding a non-numeric list<text, N> — Route C is numeric T only.
+#   • Padding a non-numeric list<text, size N> — Route C is numeric T only.
 #   • Padding from an unbounded list<T> — the bound must be in the type.
 #   • Reading the spare slots as if they were live data instead of the fill.
 #
@@ -41,7 +41,7 @@ main {
     let list<float> l ← [1.0, 2.0, 3.0]
 
     # Capacity padding into the bounded carrier: slots 3..8 take the zero fill.
-    let list<float, 8> xs ← l ↦ list<float, 8>
+    let list<float, size 8> xs ← l ↦ list<float, size 8>
 
     # Zero-fill snapshot: 3 live values followed by 5 numeric zeros.
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>

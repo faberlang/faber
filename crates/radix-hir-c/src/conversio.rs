@@ -6,7 +6,7 @@
 //! not a finite integer after rounding) go through a `faber_try_*` call that
 //! says why it failed: with `⊥` the recovery value takes its place; without,
 //! the program ends with the runner's text for that failure. `list<T> ↦
-//! list<T, N>` copies into a fixed-capacity list and fails when the source is
+//! list<T, size N>` copies into a fixed-capacity list and fails when the source is
 //! longer, the runner's rule.
 
 use crate::Emitter;
@@ -222,7 +222,6 @@ impl Emitter<'_> {
                 };
                 return self.bits_list_width_change(
                     source,
-                    source_ty,
                     target,
                     from,
                     to,
@@ -637,7 +636,7 @@ impl Emitter<'_> {
         .with_effect(value.effect)
     }
 
-    /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
+    /// A bounded-list target (`list<T, size N>`), peeling aliases: its element type
     /// and its literal capacity. `None` for any other target.
     fn bounded_list_target(&self, ty: TypeId) -> Option<(TypeId, u64)> {
         match self.types.get(ty) {
@@ -650,7 +649,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// `list<T> ↦ list<T, N>`: a fixed copy of capacity N, or a failure the
+    /// `list<T> ↦ list<T, size N>`: a fixed copy of capacity N, or a failure the
     /// `⊥` recovery takes (`lista to bounded lista conversion failed`).
     fn bounded_list(
         &mut self,
@@ -714,11 +713,9 @@ impl Emitter<'_> {
     /// Lower a width-changing list pair through the runtime byte view. The
     /// shared predicate admits the pair; this C lane carries b8 and the u16,
     /// u32, u64, b16, b32 and b64 families only.
-    #[allow(clippy::too_many_arguments)]
     fn bits_list_width_change(
         &mut self,
         source: &HirExpression,
-        source_ty: TypeId,
         target_ty: TypeId,
         from: String,
         to: String,
@@ -728,6 +725,9 @@ impl Emitter<'_> {
         if has_recovery {
             return Err(list_width_refusal(&from, &to));
         }
+        let Some(source_ty) = source.ty else {
+            return Err(list_width_refusal(&from, &to));
+        };
         let Some(from_type) = list_element_type(self.types, source_ty) else {
             return Err(list_width_refusal(&from, &to));
         };

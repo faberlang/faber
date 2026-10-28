@@ -280,6 +280,7 @@ impl TypeChecker<'_> {
         self.reject_read_only_share_into_var(local, inferred);
         self.record_binding_name(local.def_id, local.name);
         self.insert_binding_with_scalar(local.def_id, inferred, scalar_text, local.mutable);
+        self.seed_let_range(local);
         if !local.mutable {
             self.const_locals.insert(local.def_id);
         }

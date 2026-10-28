@@ -5202,7 +5202,7 @@ impl FunctionBuilder<'_> {
         padded_literal_facts(source_ty, target, self.types).map(|(elem, _, _)| elem)
     }
 
-    /// Route C padded snapshot: `lista<T, N> ↦ tensor<T, [N]>` with the
+    /// Route C padded snapshot: `lista<T, magnitudo N> ↦ tensor<T, [N]>` with the
     /// caller's fill (a `⊥` value, element-typed) or the numeric zero. The
     /// runtime `TensorFromFlat` pads slots `len..N` with that real value; the
     /// bounded carrier's dead slots are never read.

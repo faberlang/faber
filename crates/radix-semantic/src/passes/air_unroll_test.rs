@@ -925,7 +925,7 @@ fn bounded_lista_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio bounded_sum() → vacuum {
-    sit lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
+    sit lista<f32, magnitudo 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, magnitudo 4>
     itera ex xs sit value { }
 }
 "#,
@@ -958,8 +958,8 @@ fn bounded_lista_ex_inference_chain_preserves_fullness_fact() {
 @ radix lane "air"
 functio bounded_chain() → vacuum ⇥ textus {
     sit lista<f32> raw ← [1.0, 2.0, 3.0, 4.0]
-    sit lista<f32, 4> full ← raw ↦ lista<f32, 4>
-    sit lista<f32, 4> alias ← full
+    sit lista<f32, magnitudo 4> full ← raw ↦ lista<f32, magnitudo 4>
+    sit lista<f32, magnitudo 4> alias ← full
     itera ex alias sit value { }
 }
 "#,
@@ -985,7 +985,7 @@ fn bounded_lista_ex_non_full_value_declines_not_concrete() {
 @ radix lane "air"
 functio bounded_partial() → vacuum ⇥ textus {
     sit lista<f32> raw ← [1.0, 2.0, 3.0]
-    sit lista<f32, 4> xs ← raw ↦ lista<f32, 4>
+    sit lista<f32, magnitudo 4> xs ← raw ↦ lista<f32, magnitudo 4>
     itera ex xs sit value { }
 }
 "#,
@@ -999,7 +999,7 @@ fn bounded_lista_ex_full_literal_n8_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio bounded_sum_8() → vacuum {
-    sit lista<f32, 8> xs ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] ↦ lista<f32, 8>
+    sit lista<f32, magnitudo 8> xs ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] ↦ lista<f32, magnitudo 8>
     itera ex xs sit value { }
 }
 "#,
@@ -1032,7 +1032,7 @@ fn bounded_lista_ex_over_budget_declines_whole_with_causa() {
         r#"
 @ radix lane "air"
 functio too_wide() → vacuum {{
-    sit lista<f32, 65> xs ← [{elements}] ↦ lista<f32, 65>
+    sit lista<f32, magnitudo 65> xs ← [{elements}] ↦ lista<f32, magnitudo 65>
     itera ex xs sit value {{ }}
 }}
 "#
@@ -1111,7 +1111,7 @@ fn octeti_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio octeti_full() → vacuum {
-    sit lista<b8, 8> xs ← |de ad be ef ba dc fe ca| ↦ lista<b8, 8>
+    sit lista<b8, magnitudo 8> xs ← |de ad be ef ba dc fe ca| ↦ lista<b8, magnitudo 8>
     itera ex xs sit b { }
 }
 "#,
@@ -1199,7 +1199,7 @@ fn scalar_bounded_ex_runtime_len_param_declines_not_concrete() {
     for source in [
         r#"
 @ radix lane "air"
-functio runtime(lista<b8, 8> xs) → vacuum {
+functio runtime(lista<b8, magnitudo 8> xs) → vacuum {
     itera ex xs sit b { }
 }"#,
         r#"
@@ -1831,7 +1831,7 @@ fn apud_route_a_bounded_lista_nest_admits_product_lanes() {
 @ radix lane "air"
 functio nested_lista(tensor<f32, [4]> x) → f32 {
     varia f32 total ← 0.0
-    sit lista<f32, 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, 4>
+    sit lista<f32, magnitudo 4> xs ← [1.0, 2.0, 3.0, 4.0] ↦ lista<f32, magnitudo 4>
     itera ex x apud [i] sit cell {
         itera ex xs sit value {
             total ← total + 1.0

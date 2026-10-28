@@ -1997,12 +1997,23 @@ fn resolve_type_expr(
                     CollectionKind::Lista | CollectionKind::Queue | CollectionKind::Stack => {
                         match params.as_slice() {
                             [elem] => resolve_generic_arg(resolver, interner, elem, errors),
-                            // A length range, `lista<T, lo‥hi>`, is not a capacity: its
-                            // ends fold when the type lowers.
-                            [elem, GenericArgExpr::Range(_)]
+                            // A count range, `lista<T, magnitudo lo‥hi>`, is not a
+                            // capacity: its ends fold when the type lowers. A bare
+                            // range bounds a value, so a list refuses it by name.
+                            [elem, GenericArgExpr::Range(range)]
                                 if collection == CollectionKind::Lista =>
                             {
                                 resolve_generic_arg(resolver, interner, elem, errors);
+                                if !range.sized {
+                                    errors.push(lowering_error(
+                                        crate::numeric_width::WidthLowerIssue::LIST_COUNT_NEEDS_SIZE,
+                                        range.span,
+                                    ));
+                                }
+                            }
+                            [elem, capacity] if collection == CollectionKind::Lista => {
+                                resolve_generic_arg(resolver, interner, elem, errors);
+                                validate_list_count_param(resolver, interner, capacity, errors);
                             }
                             [elem, capacity] => {
                                 resolve_generic_arg(resolver, interner, elem, errors);
@@ -2313,6 +2324,48 @@ fn validate_capacity_index_param(
     match capacity_index_issue(param, resolver, interner) {
         None => {}
         Some(issue) => errors.push(undefined_type_error(issue, generic_arg_span(param))),
+    }
+}
+
+/// A list's count slot (`list<T, size 4>`): the capacity checks of every
+/// bounded head, plus the `size` marker the list requires. A bare number or
+/// name (`list<T, 4>`) is retired by name; the `_` hole stays bare until its
+/// own need moves it.
+fn validate_list_count_param(
+    resolver: &Resolver,
+    interner: &Interner,
+    param: &GenericArgExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    let issue = match param {
+        // A spelled literal count is the sugar for `size 0…N`.
+        GenericArgExpr::Size(FiguraExpr::Lift(extent))
+            if matches!(**extent, radix_syntax::LiftExtent::Literal(_)) =>
+        {
+            return;
+        }
+        _ => capacity_index_issue(param, resolver, interner),
+    };
+    let issue = issue.or_else(|| {
+        let marked_or_hole = matches!(
+            param,
+            GenericArgExpr::Size(FiguraExpr::Lift(_) | FiguraExpr::Infer)
+                | GenericArgExpr::Type(TypeExpr {
+                    kind: TypeExprKind::Infer,
+                    ..
+                })
+        );
+        (!marked_or_hole).then_some(crate::numeric_width::WidthLowerIssue::LIST_COUNT_NEEDS_SIZE)
+    });
+    if let Some(issue) = issue {
+        let span = generic_arg_span(param);
+        errors.push(
+            if issue == crate::numeric_width::WidthLowerIssue::LIST_COUNT_NEEDS_SIZE {
+                lowering_error(issue, span)
+            } else {
+                undefined_type_error(issue, span)
+            },
+        );
     }
 }
 

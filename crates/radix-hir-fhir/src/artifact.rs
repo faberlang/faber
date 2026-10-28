@@ -717,7 +717,7 @@ pub struct FunctionProvenanceTableWire {
 /// `Orderable` as an ordinary trait and resolved it to
 /// `__faber_unresolved_def`; schema-v54 artifacts fail closed.
 /// Version 56 adds `Type::RangedArray` (a list length range,
-/// `list<T, lo‥hi>`, need) to the type table; schema-v55 artifacts
+/// `list<T, size lo‥hi>`, need) to the type table; schema-v55 artifacts
 /// fail closed because the serialized `Type` enum gained a variant.
 pub const SCHEMA_VERSION: u32 = 56;
 

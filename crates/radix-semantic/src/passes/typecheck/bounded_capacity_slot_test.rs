@@ -211,7 +211,7 @@ fn harness_twins_unify_same_family() {
     let _ = checker.unify_assign_issue(lista_src, lista_dest, span, "expression_type_mismatch");
     assert!(
         checker.errors.is_empty(),
-        "lista<numerus, 4> → lista<numerus, _> must unify: {:?}",
+        "lista<numerus, magnitudo 4> → lista<numerus, _> must unify: {:?}",
         checker.errors
     );
 }

@@ -1866,7 +1866,7 @@ impl Validator<'_, '_> {
                             );
                         }
                         // A standalone non-empty list literal types as the
-                        // exact-length witness `lista<T, N>`. Slicing it yields
+                        // exact-length witness `lista<T, magnitudo N>`. Slicing it yields
                         // the unbounded list of the same element type.
                         Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
                             match self.type_kind(call.return_ty) {
@@ -2265,7 +2265,7 @@ impl Validator<'_, '_> {
                         "tensor shape receiver is not tensor, matrix or sparsa",
                     );
                 }
-                // A tensor of static rank yields the bounded `lista<numerus, R>`;
+                // A tensor of static rank yields the bounded `lista<numerus, magnitudo R>`;
                 // one without a static rank yields the unbounded list.
                 if !matches!(
                     self.type_kind(call.return_ty),
@@ -2987,6 +2987,7 @@ impl Validator<'_, '_> {
             .args
             .first()
             .and_then(|arg| self.validate_operand(scope, arg, span));
+        let receiver_rank = receiver_ty.and_then(|ty| self.static_tensor_rank(ty));
         if let Some(receiver_ty) = receiver_ty {
             self.require_tensor_type(receiver_ty, span, "tensor slice-nd receiver is not tensor");
         }
@@ -3037,6 +3038,11 @@ impl Validator<'_, '_> {
                 }
                 Some(_) => {}
             }
+        }
+        if let (Some(rank), Some(length)) = (receiver_rank, axis_length)
+            && usize::try_from(length).ok() != Some(rank)
+        {
+            self.error(span, "tensor slice-nd lists do not match receiver rank");
         }
     }
 

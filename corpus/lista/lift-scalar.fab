@@ -23,11 +23,11 @@ locale = "en"
 #   • Operand order is kept — `0.5 - xs` is `0.5 - xs[i]` for each element
 #   • The sum is exact — `list<u8> + list<u8>` stores into a `list<u16>`; the range
 #     check happens only at the store (a `list<u8>` target would trap)
-#   • A `list<T, N>` has `len` live elements and N slots: an operator pairs the
+#   • A `list<T, size N>` has `len` live elements and N slots: an operator pairs the
 #     `len` elements, so a list shorter than N works, but two bounded lists with
 #     different live lengths stop the program — an operator dies, while the
 #     method form `added` reports on `⇥`
-#   • Different capacities (`list<T, 4> + list<T, 8>`) are a check-time error;
+#   • Different capacities (`list<T, size 4> + list<T, size 8>`) are a check-time error;
 #     convert one operand with `↦`
 #
 # Common mistakes:
@@ -62,8 +62,8 @@ fn quotients(list<int> xs, list<int> ys) → list<int> {
     return xs ⊘ ys
 }
 
-fn total(list<f32, 4> x, list<f32, 4> y) → int {
-    let list<f32, 4> sum ← x + y
+fn total(list<f32, size 4> x, list<f32, size 4> y) → int {
+    let list<f32, size 4> sum ← x + y
     return sum.length()
 }
 
@@ -95,13 +95,13 @@ main {
     let list<u16> wide ← bytes + more
     print wide
 
-    mut list<f32, 4> p ← empty
+    mut list<f32, size 4> p ← empty
     p.append(1.0)
     p.append(2.0)
-    mut list<f32, 4> q ← empty
+    mut list<f32, size 4> q ← empty
     q.append(4.0)
     q.append(5.0)
-    let list<f32, 4> sum ← p + q
+    let list<f32, size 4> sum ← p + q
     print sum
     print sum.length()
     print 10.0 - p

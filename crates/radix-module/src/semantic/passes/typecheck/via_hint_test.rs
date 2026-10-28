@@ -334,7 +334,7 @@ fn a_register_target_takes_a_via_hint() {
     // The register windows carry `Be`/`Le` in the clause like any other target.
     for source in [
         "functio w(lista<b8> c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4> via Be }",
-        "functio o(vector<u32, 4> v) → lista<b8, 16> { redde v ↦ lista<b8, 16> via Le }",
+        "functio o(vector<u32, 4> v) → lista<b8, magnitudo 16> { redde v ↦ lista<b8, magnitudo 16> via Le }",
     ] {
         let diagnostics = diagnostics_with(latin_config(), source);
         assert!(
@@ -348,7 +348,7 @@ fn a_register_target_takes_a_via_hint() {
 fn the_retired_register_tail_is_rejected_pointing_at_the_clause() {
     for source in [
         "functio w(lista<b8> c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4><Be> }",
-        "functio o(vector<u32, 4> v) → lista<b8, 16> { redde v ↦ lista<b8, 16><Le> }",
+        "functio o(vector<u32, 4> v) → lista<b8, magnitudo 16> { redde v ↦ lista<b8, magnitudo 16><Le> }",
     ] {
         assert_issue(&diagnostics_with(latin_config(), source), "conversio_hint_tail_argument");
     }

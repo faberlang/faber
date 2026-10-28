@@ -1,5 +1,5 @@
 //! Fail-closed gates for ranged store policies, `saturating|trapping|wrapping<W, lo‥hi>`,
-//! and list length ranges, `list<T, lo‥hi>`.
+//! and list length ranges, `list<T, size lo‥hi>`.
 //!
 //! A range is a refinement a store applies inside the explicit width (need
 //! d5d00916). It is built on the MIR runner and the Rust target; every other
@@ -86,12 +86,12 @@ pub fn reject_ranged_list_type(types: &TypeTable, target: Target) -> Result<(), 
     }
     Err(CodegenError {
         message: format!(
-            "the list length range `list<T, lo‥hi>` is not supported on the {target:?} target \
+            "the list length range `list<T, size lo‥hi>` is not supported on the {target:?} target \
              yet: only the Faber source emitter, the MIR runner and the Rust target accept it"
         ),
         args: vec![
             DiagnosticArg::new("issue", LIST_ISSUE),
-            DiagnosticArg::new("type", "list<T, lo‥hi>"),
+            DiagnosticArg::new("type", "list<T, size lo‥hi>"),
             DiagnosticArg::new("target", format!("{target:?}")),
         ],
     })

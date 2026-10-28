@@ -11,7 +11,7 @@ use handroll::FxHashMap;
 use radix_codegen_shared::CodegenError;
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{DefId, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite};
-use radix_lexer::{Interner, Symbol};
+use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::TypeFormLevel;
 use radix_types::{
     BitsWidth, CollectionKind, IndexExpr, IndexId, MarkerFamily, Primitive, SemanticMutability,
@@ -355,13 +355,13 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
             ),
             Type::RangedArray { element, min, max } => format!(
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                 self.type_to_faber(*element, names, surface),
-                Self::list_range_to_faber(*min, *max)
+                Self::list_range_to_faber(*min, *max, surface)
             ),
             Type::BoundedQueue { element, capacity } => format!(
                 "{}<{}, {}>",
@@ -385,7 +385,7 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                 BitsWidth::B8.faber_marker(),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
             ),
         }
     }
@@ -763,7 +763,7 @@ impl super::FaberCodegen<'_> {
                 Ok(self.bounded_primitive_head(Primitive::Ascii, *capacity, surface))
             }
             Type::BoundedOcteti { capacity } => {
-                // Ruling d477c76d spells the bounded byte buffer `lista<b8, N>`,
+                // Ruling d477c76d spells the bounded byte buffer `lista<b8, magnitudo N>`,
                 // so the live authored form carries the `b8` type child; the
                 // retired `octeti<N>`/`bytes<N>` word carried none. Both
                 // re-emit as the list form.
@@ -776,7 +776,7 @@ impl super::FaberCodegen<'_> {
                     "{}<{}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                     element,
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
                 ))
             }
             // An authored empty-arg array form witnesses the retired
@@ -924,7 +924,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
                 ))
             }
             Type::RangedArray { min, max, .. } => {
@@ -932,7 +932,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
-                    Self::list_range_to_faber(*min, *max)
+                    Self::list_range_to_faber(*min, *max, surface)
                 ))
             }
             Type::BoundedQueue { capacity, .. } => {
@@ -1220,14 +1220,13 @@ impl super::FaberCodegen<'_> {
         format!("{word}<{}, {range}>", width.faber_marker())
     }
 
-    /// A list length range spelled as the type argument `lo‥hi+1` (half open,
-    /// the form the design writes) or `lo…∞` for no upper end. A top end whose
-    /// exclusive bound would not fit a literal prints inclusive.
-    fn list_range_to_faber(min: u64, max: Option<u64>) -> String {
+    /// A list length range spelled after the `size` marker, inclusive:
+    /// `size 1…8`, or `size 1…∞` for no upper end.
+    fn list_range_to_faber(min: u64, max: Option<u64>, surface: &impl KeywordSurface) -> String {
+        let size = surface.keyword(TokenKind::Magnitudo);
         match max {
-            None => format!("{min}…∞"),
-            Some(max) if max < u64::MAX => format!("{min}‥{}", max + 1),
-            Some(max) => format!("{min}…{max}"),
+            None => format!("{size} {min}…∞"),
+            Some(max) => format!("{size} {min}…{max}"),
         }
     }
 

@@ -1,0 +1,28 @@
++++
+term = "list<T, size N>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A list count is written after size: a bare list<T, 4> is retired by name."
+syntax = "list<int, 4> — rejected; write list<int, size 4>"
+related = ["list<T, size lo‥hi>", "size", "‥", "…"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:list_count_needs_size"
++++
+# =============================================================================
+# list<T, N> — the bare count is retired
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A list bound is a count, so it follows `size`: `list<int, size 4>` holds at most 4 elements and is the sugar for `list<int, size 0…4>`.
+#
+# Common mistakes:
+#   • Writing the capacity as a bare number, as the other bounded heads still do; a list takes `size` first.
+
+main {
+    let list<int, 4> xs ← [1, 2, 3, 4]
+    print xs
+}

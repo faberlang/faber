@@ -2770,6 +2770,21 @@ impl IntegrityChecks<'_> {
         Ok(())
     }
 
+    /// A backward companion identity is synthesized in the companion `DefId`
+    /// family and names a function the reverse-AD transform generates later,
+    /// so it is declared nowhere in the artifact: it must be in that family,
+    /// not in the definition registry.
+    fn check_companion_def(&self, def_id: radix_types::DefId) -> Result<(), HirArtifactError> {
+        if def_id.is_companion() {
+            return Ok(());
+        }
+        Err(HirArtifactError::DanglingIndex {
+            kind: "DefId",
+            index: def_id.0,
+            arena_size: self.def_registry.len(),
+        })
+    }
+
     fn check_hir(&self, hir_id: radix_hir::HirId) -> Result<(), HirArtifactError> {
         if !self.hir_registry.contains(&hir_id) {
             return Err(HirArtifactError::DanglingIndex {
@@ -4809,7 +4824,7 @@ pub(crate) fn validate_referential_integrity(
         checks.check_def(entry.def_id)?;
         if let Some(backward) = &entry.backward {
             checks.check_symbol(backward.companion_name)?;
-            checks.check_def(backward.companion_def_id)?;
+            checks.check_companion_def(backward.companion_def_id)?;
         }
     }
 

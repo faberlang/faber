@@ -1487,6 +1487,8 @@ impl TypeChecker<'_> {
         }
 
         if let Some(binding) = self.lookup_binding(def_id) {
+            #[cfg(test)]
+            super::flow_range_probe::observe(self, def_id);
             return binding.ty;
         }
 

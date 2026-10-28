@@ -27,13 +27,13 @@ fn rejects_with_issue(result: &crate::SemanticResult, issue: &str) {
     );
 }
 
-const PERSONA: &str = r#"
+const PERSONA: &str = r"
 genus Persona {
     varia textus nomen
     varia numerus aetas
     varia bivalens activa
 }
-"#;
+";
 
 fn with_persona(body: &str) -> String {
     format!(

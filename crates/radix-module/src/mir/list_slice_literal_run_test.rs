@@ -1,6 +1,6 @@
 //! Runner proof for a list slice `xs.slice(lo, hi)` whose receiver is a list
 //! LITERAL. A standalone non-empty list literal types as the exact-length
-//! witness `list<T, N>` (`Type::BoundedArray`); the validator's slice branch
+//! witness `list<T, size N>` (`Type::BoundedArray`); the validator's slice branch
 //! must accept that receiver and require the unbounded list result.
 
 use crate::codegen::Target;

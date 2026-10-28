@@ -1,20 +1,19 @@
 +++
-term = "list<T, lo‥hi>"
-explains = ["list<T, lo‥hi>"]
+term = "list<T, size lo‥hi>"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "conversio_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "conversio_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "conversion"
 summary = "A list converts into a length range with ↦: a length inside the range converts, one outside takes the ⊥ recovery value."
-syntax = "xs ↦ list<int, 2‥5> ⊥ [0, 0]"
-related = ["list<T, lo‥hi>", "↦", "⊥", "lista"]
+syntax = "xs ↦ list<int, size 2‥5> ⊥ [0, 0]"
+related = ["list<T, size lo‥hi>", "↦", "⊥", "lista"]
 locale = "en"
 +++
 # =============================================================================
-# list<T, lo‥hi> — the length is checked where a list is converted into it
+# list<T, size lo‥hi> — the length is checked where a list is converted into it
 # =============================================================================
 #
 # What this teaches:
-#   • `list<int> ↦ list<int, 2‥5>` checks the source length against the range
+#   • `list<int> ↦ list<int, size 2‥5>` checks the source length against the range
 #     when the conversion runs; a length outside the range fails.
 #   • `⊥` supplies the recovery value for a failed conversion.
 #   • A range converts back to a plain list with `↦ list<int>`, which always
@@ -26,13 +25,13 @@ locale = "en"
 main {
     let list<int> three ← [1, 2, 3]
 
-    let list<int, 2‥5> fits ← three ↦ list<int, 2‥5> ⊥ [0, 0]
+    let list<int, size 2‥5> fits ← three ↦ list<int, size 2‥5> ⊥ [0, 0]
     print fits
 
-    let list<int, 5…9> short ← three ↦ list<int, 5…9> ⊥ [9, 9, 9, 9, 9]
+    let list<int, size 5…9> short ← three ↦ list<int, size 5…9> ⊥ [9, 9, 9, 9, 9]
     print short
 
-    let list<int, 1…∞> never_empty ← three ↦ list<int, 1…∞> ⊥ [0]
+    let list<int, size 1…∞> never_empty ← three ↦ list<int, size 1…∞> ⊥ [0]
     print never_empty.first()
 
     let list<int> back ← fits ↦ list<int>

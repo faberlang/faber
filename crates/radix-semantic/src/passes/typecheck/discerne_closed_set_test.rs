@@ -15,7 +15,7 @@ fn bounded_list_pattern_over_unbounded_list_is_rejected() {
     test_support::assert_rejects_with_issue(
         r"functio probe(lista<numerus> values) → vacuum {
     discerne values {
-        casu lista<numerus, 4> { tacet }
+        casu lista<numerus, magnitudo 4> { tacet }
         casu lista<numerus> { tacet }
     }
 }",
@@ -54,7 +54,7 @@ fn rejection_names_pattern_and_scrutinee_types() {
     let diagnostics = test_support::analyze_and_get_diagnostics(
         r"functio probe(lista<numerus> values) → vacuum {
     discerne values {
-        casu lista<numerus, 4> { tacet }
+        casu lista<numerus, magnitudo 4> { tacet }
         casu lista<numerus> { tacet }
     }
 }",
@@ -71,7 +71,7 @@ fn rejection_names_pattern_and_scrutinee_types() {
 #[test]
 fn family_pattern_over_a_union_that_lacks_it_is_rejected() {
     test_support::assert_rejects_with_issue(
-        r"functio probe(lista<numerus, 4> ∪ lista<numerus, 8> values) → vacuum {
+        r"functio probe(lista<numerus, magnitudo 4> ∪ lista<numerus, magnitudo 8> values) → vacuum {
     discerne values {
         casu lista<numerus> { tacet }
     }
@@ -83,10 +83,10 @@ fn family_pattern_over_a_union_that_lacks_it_is_rejected() {
 #[test]
 fn union_member_type_pattern_is_accepted() {
     test_support::assert_accepts(
-        r"functio probe(lista<numerus, 4> ∪ lista<numerus, 8> values) → vacuum {
+        r"functio probe(lista<numerus, magnitudo 4> ∪ lista<numerus, magnitudo 8> values) → vacuum {
     discerne values {
-        casu lista<numerus, 4> { tacet }
-        casu lista<numerus, 8> { tacet }
+        casu lista<numerus, magnitudo 4> { tacet }
+        casu lista<numerus, magnitudo 8> { tacet }
     }
 }",
     );

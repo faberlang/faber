@@ -41,8 +41,8 @@ locale = "en"
 
 main {
     # Nested lista iteration — 3 × 3 combinations
-    let list<int, 3> rows ← [1, 2, 3]
-    let list<string, 3> cols ← ["A", "B", "C"]
+    let list<int, size 3> rows ← [1, 2, 3]
+    let list<string, size 3> cols ← ["A", "B", "C"]
     for from rows let row {
         for from cols let col {
             print row, col

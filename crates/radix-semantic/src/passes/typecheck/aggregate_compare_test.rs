@@ -437,7 +437,7 @@ fn a_bool_aggregate_is_not_a_truth_value() {
 
 #[test]
 fn list_equality_against_a_scalar_names_the_per_element_glyph() {
-    for ty in ["lista<f32>", "lista<f32, 4>", "lista<numerus>"] {
+    for ty in ["lista<f32>", "lista<f32, magnitudo 4>", "lista<numerus>"] {
         for op in ["≡", "≢"] {
             rejects(
                 &function(&format!("{ty} a"), "bivalens", &format!("a {op} 2")),
@@ -457,7 +457,7 @@ fn list_equality_against_a_scalar_names_the_per_element_glyph() {
 
 #[test]
 fn a_bool_list_is_not_a_truth_value() {
-    for ty in ["lista<bivalens>", "lista<bivalens, 3>"] {
+    for ty in ["lista<bivalens>", "lista<bivalens, magnitudo 3>"] {
         rejects(
             &format!("functio lifted({ty} m) {{\n    si m {{ nota \"yes\" }}\n}}"),
             SemanticErrorKind::OperandTypesInvalid,
@@ -474,7 +474,7 @@ fn hadamard_glyphs_with_a_scalar_operand_name_the_scalar_forms() {
         (V, "vector"),
         (M, "matrix"),
         ("lista<f32>", "list"),
-        ("lista<f32, 3>", "list"),
+        ("lista<f32, magnitudo 3>", "list"),
     ] {
         for op in ["⊙", "⊘"] {
             rejects(
@@ -510,7 +510,7 @@ fn approximate_comparison_over_lists_fails_closed_at_check_time() {
         }
         rejects(
             &function(
-                "lista<f32, 4> a, lista<f32, 4> b",
+                "lista<f32, magnitudo 4> a, lista<f32, magnitudo 4> b",
                 "bivalens",
                 &format!("a {op} b"),
             ),

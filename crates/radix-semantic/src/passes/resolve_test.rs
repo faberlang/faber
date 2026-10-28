@@ -570,8 +570,10 @@ fn resolve_bounded_source(source: &str) -> (TypeTable, Result<(), Vec<crate::Sem
 
 #[test]
 fn resolve_test_proposed_bounded_lista_typechecks() {
-    let (_types, resolved) = resolve_bounded_source("typus X = lista<numerus, 8>");
-    resolved.unwrap_or_else(|errors| panic!("lista<numerus, 8> must resolve, got {errors:?}"));
+    let (_types, resolved) = resolve_bounded_source("typus X = lista<numerus, magnitudo 8>");
+    resolved.unwrap_or_else(|errors| {
+        panic!("lista<numerus, magnitudo 8> must resolve, got {errors:?}")
+    });
 }
 
 #[test]
@@ -579,7 +581,7 @@ fn resolve_test_proposed_bounded_cords_typecheck() {
     for source in [
         "typus X = textus<8>",
         "typus X = ascii<8>",
-        "typus X = lista<b8, 8>",
+        "typus X = lista<b8, magnitudo 8>",
     ] {
         let (_types, resolved) = resolve_bounded_source(source);
         resolved.unwrap_or_else(|errors| panic!("{source} must resolve, got {errors:?}"));
@@ -1108,7 +1110,7 @@ exemplars = ["test.fab"]
         .expect("omitted record");
     assert_eq!(omitted.owner, "Thing");
     assert_eq!(omitted.kind, "method");
-    assert!(omitted.projected_surfaces.is_empty());
+    assert_eq!(omitted.projected_surfaces, [] as [std::string::String; 0]);
     assert_eq!(omitted.remap_reason, "strict_locale_pack_member_omitted");
 
     let thing = resolver
@@ -2034,7 +2036,7 @@ fn resolves_empty_function_body() {
 
 /// S1 U2 canonical nominal identity: same-name nominals from distinct module
 /// identities stay distinct (both resolve canonically), while the same module
-/// installed under two aliases unifies to ONE TypeId.
+/// installed under two aliases unifies to ONE `TypeId`.
 #[test]
 fn canonical_nominal_identity_distinguishes_modules_and_unifies_aliases() {
     let util_identity = InterfaceLibraryIdentity {
@@ -2280,7 +2282,7 @@ fn function_named_like_the_marker_does_not_shadow_bare_vacua() {
     // marker is the empty list and `vacua()` still calls the function. No
     // SEM010 type mismatch and no WARN021 on the declaration.
     let result = compile_ok(
-        r#"
+        r"
 functio vacua() → lista<numerus> {
   redde [1]
 }
@@ -2290,7 +2292,7 @@ incipit {
   nota xs
   nota ys
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -2312,7 +2314,7 @@ fn en_function_named_like_the_marker_does_not_shadow_bare_empty() {
     let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
     config.locale_pack = Some(pack);
     let result = crate::test_support::analyze_source_with_config(
-        r#"
+        r"
 fn empty() → list<int> {
     return [1]
 }
@@ -2321,7 +2323,7 @@ fn probe() → list<int> {
     let list<int> ys ← empty()
     return xs + ys
 }
-"#,
+",
         config,
     );
     assert!(
@@ -2340,11 +2342,11 @@ fn param_named_like_the_marker_still_shadows_and_warns() {
     // em1 pin: only FUNCTIONS are exempt. A parameter named like the marker
     // still wins the name and still gets WARN021.
     let result = compile_ok(
-        r#"
+        r"
 functio f(lista<numerus> vacua) → lista<numerus> {
   redde vacua
 }
-"#,
+",
     );
     assert!(
         has_issue(&result, "WARN021", "empty_marker_shadowing"),
@@ -2357,10 +2359,10 @@ functio f(lista<numerus> vacua) → lista<numerus> {
 fn const_named_like_the_marker_still_shadows_and_warns() {
     // em1 pin: a top-level constant named like the marker still shadows and warns.
     let result = compile_ok(
-        r#"
+        r"
 fixum lista<numerus> vacua = [1]
 functio g() → lista<numerus> { redde vacua }
-"#,
+",
     );
     assert!(
         has_issue(&result, "WARN021", "empty_marker_shadowing"),
@@ -2460,11 +2462,11 @@ incipit {
 #[test]
 fn param_named_like_a_value_literal_shadows_and_warns() {
     let result = compile_ok(
-        r#"
+        r"
 functio f(textus falsum) → textus {
   redde falsum
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -2772,10 +2774,10 @@ incipit {
     );
     let mut vacua_callees = Vec::new();
     walk_exprs(&program, &mut |expr| {
-        if let ExprKind::Call(call) = &expr.kind {
-            if matches!(call.callee.kind, ExprKind::Vacua(_)) {
-                vacua_callees.push(call.callee.id);
-            }
+        if let ExprKind::Call(call) = &expr.kind
+            && matches!(call.callee.kind, ExprKind::Vacua(_))
+        {
+            vacua_callees.push(call.callee.id);
         }
     });
     assert_eq!(vacua_callees.len(), 1, "expected one Vacua call callee");

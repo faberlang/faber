@@ -1,18 +1,18 @@
 +++
-term = "list<T, lo‥hi>"
+term = "list<T, size lo‥hi>"
 kind = "reject"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
 category = "list"
 canonical = false
 summary = "A list literal whose length is outside the range is refused at compile time."
-syntax = "let list<int, 2‥5> xs ← [1] — rejected"
-related = ["list<T, lo‥hi>", "‥", "…"]
+syntax = "let list<int, size 2‥5> xs ← [1] — rejected"
+related = ["list<T, size lo‥hi>", "‥", "…"]
 locale = "en"
 no_expected = "rejects"
 diagnostic = "SEM011:ranged_list_length_out_of_range"
 +++
 # =============================================================================
-# list<T, lo‥hi> — a literal outside the range
+# list<T, size lo‥hi> — a literal outside the range
 # =============================================================================
 # This exemplum intentionally fails to compile.
 #
@@ -23,6 +23,6 @@ diagnostic = "SEM011:ranged_list_length_out_of_range"
 #   • Expecting the length check to wait for run time; build it from a list with ↦ and recover with ⊥ instead.
 
 main {
-    let list<int, 2‥5> xs ← [1]
+    let list<int, size 2‥5> xs ← [1]
     print xs
 }

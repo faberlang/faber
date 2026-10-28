@@ -19,6 +19,7 @@ locale = "en"
 #     changes the value that binding holds, exactly as a direct call would
 #   • Dispatch picks the held class's method, so each class mutates its own
 #     fields
+#   • The same holds for a union of the classes
 #
 # See also: implendum, implet
 # =============================================================================
@@ -52,6 +53,8 @@ class Sq implements Grower {
     }
 }
 
+type Figura = Circ ∪ Sq
+
 main {
     mut Grower g ← Circ {}
     g.grow()
@@ -60,4 +63,11 @@ main {
     mut Grower h ← Sq {}
     h.grow()
     print h.get()
+    mut Figura u ← Circ {}
+    u.grow()
+    u.grow()
+    print u.get()
+    mut Figura w ← Sq {}
+    w.grow()
+    print w.get()
 }

@@ -1,37 +1,41 @@
 +++
-term = "list<T, lo‥hi>"
-explains = ["list<T, lo‥hi>"]
+term = "list<T, size lo‥hi>"
+explains = ["list<T, size lo‥hi>"]
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "conversio_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "conversio_expr", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "list"
 canonical = true
 summary = "A length range on a list: growing past the maximum or shrinking below the minimum reports on the error channel, and a range of at least one element is never empty."
-syntax = "list<int, 4‥8> — lengths 4 to 7; list<int, 1…∞> — never empty"
+syntax = "list<int, size 4‥8> — lengths 4 to 7; list<int, size 1…∞> — never empty"
 related = ["lista", "‥", "…", "trapping<W, lo‥hi>"]
 locale = "en"
 +++
 # =============================================================================
-# list<T, lo‥hi> — a length range
+# list<T, size lo‥hi> — a length range
 # =============================================================================
 #
 # What this teaches:
-#   • `list<T, lo‥hi>` holds lo up to hi-1 elements (`‥` is half open);
-#     `list<T, lo…hi>` holds lo up to hi (`…` is inclusive); `∞` is no limit.
+#   • `list<T, size lo‥hi>` holds lo up to hi-1 elements (`‥` is half open);
+#     `list<T, size lo…hi>` holds lo up to hi (`…` is inclusive); `∞` is no limit.
 #   • `append` past the maximum and `remove_first` / `remove_last` below the
 #     minimum report on the error channel; the list keeps
 #     its length when they fail.
 #   • A range with a minimum of at least one is never empty, so `first()` and
 #     `last()` return the element itself, not `T ∪ none`.
-#   • `list<T>` is `list<T, 0…∞>` and `list<T, N>` is `list<T, 0…N>`: the
+#   • `list<T>` is `list<T, size 0…∞>` and `list<T, size N>` is `list<T, size 0…N>`: the
 #     sugar and the range are one type.
+#   • `size` says the range bounds a count. A bare range bounds a value
+#     (`trapping<u8, 0…255>`), so a list takes its range only after `size`.
 #
 # Common mistakes:
+#   • Writing `list<int, 4>` or `list<int, 1…8>` without `size`: both are
+#     refused by name (`list_count_needs_size`).
 #   • Expecting `first()` on a possibly-empty list to return the element:
 #     only a range whose minimum is one or more is never empty.
 
 main {
     # Never empty: first and last are plain ints.
-    mut list<int, 1…∞> xs ← [1, 2, 3]
+    mut list<int, size 1…∞> xs ← [1, 2, 3]
     print xs.first()
     print xs.last()
     print xs.length()
@@ -39,7 +43,7 @@ main {
     print xs
 
     # Lengths 2 to 4: the fifth push does not fit.
-    mut list<int, 2‥5> ys ← [10, 20]
+    mut list<int, size 2‥5> ys ← [10, 20]
     do {
         ys.append(30)
         ys.append(40)
@@ -65,9 +69,9 @@ main {
 
     # The sugar and the range are one type.
     let list<int> plain ← [7, 8]
-    let list<int, 0…∞> open ← plain
-    let list<int, 3> sized ← [1, 2, 3]
-    let list<int, 0…3> same ← sized
+    let list<int, size 0…∞> open ← plain
+    let list<int, size 3> sized ← [1, 2, 3]
+    let list<int, size 0…3> same ← sized
     print open
     print same
 }

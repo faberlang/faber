@@ -26,7 +26,7 @@ use radix_hir::HirStoreKind;
 /// the bounded-list capacity, and the length-range type when the slot is one.
 type ExpectedListShape = (TypeId, Option<radix_types::IndexId>, Option<TypeId>);
 
-/// A statically known list length outside its `list<T, lo‥hi>` range.
+/// A statically known list length outside its `list<T, size lo‥hi>` range.
 pub(super) const ISSUE_RANGED_LIST_LENGTH_OUT_OF_RANGE: &str = "ranged_list_length_out_of_range";
 
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";

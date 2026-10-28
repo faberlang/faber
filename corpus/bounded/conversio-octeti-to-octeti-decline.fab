@@ -3,14 +3,14 @@ term = "list<b8>"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
 category = "conversion"
-summary = "Decline: bounded list<b8, N> cannot resize directly to bounded list<b8, M>."
-syntax = "list<b8, N> ↦ list<b8, M>"
+summary = "Decline: bounded list<b8, size N> cannot resize directly to bounded list<b8, size M>."
+syntax = "list<b8, size N> ↦ list<b8, size M>"
 related = ["↦", "list<b8>"]
 locale = "en"
 +++
 
 # =============================================================================
-# bounded list<b8, N> resize — unsupported conversion decline
+# bounded list<b8, size N> resize — unsupported conversion decline
 # =============================================================================
 #
 # What this teaches:
@@ -21,6 +21,6 @@ locale = "en"
 # Common mistakes:
 #   • expecting a bounded byte conversion to truncate or pad silently.
 
-fn resize(list<b8, 8> raw) → list<b8, 4> {
-    return raw ↦ list<b8, 4>
+fn resize(list<b8, size 8> raw) → list<b8, size 4> {
+    return raw ↦ list<b8, size 4>
 }

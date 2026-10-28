@@ -329,10 +329,10 @@ fn lista_tensor_conversio_refuses_multi_hole_target() {
 
 #[test]
 fn lista_tensor_conversio_rejects_bounded_source_with_mismatched_target_element() {
-    // `lista<numerus, 8> ↦ tensor<textus, [8]>` must not take the padded
+    // `lista<numerus, magnitudo 8> ↦ tensor<textus, [8]>` must not take the padded
     // snapshot route: the target element type is part of the contract.
     assert_rejects_with_issue_la(
-        r"functio selecta(lista<numerus, 8> src) → tensor<textus, [8]> {
+        r"functio selecta(lista<numerus, magnitudo 8> src) → tensor<textus, [8]> {
   redde src ↦ tensor<textus, [8]>
 }",
         "lista_to_tensor_element_mismatch",
@@ -418,7 +418,7 @@ fn lista_tensor_conversio_rejects_rank_two_target_whose_leading_dim_matches_capa
 #[test]
 fn lista_tensor_conversio_rejects_rank_two_target_for_bounded_source_at_check() {
     assert_rejects_with_issue_la(
-        r"functio selecta(lista<f32, 8> src) → tensor<f32, [8, 3]> {
+        r"functio selecta(lista<f32, magnitudo 8> src) → tensor<f32, [8, 3]> {
   redde src ↦ tensor<f32, [8, 3]>
 }",
         "lista_to_tensor_capacity_mismatch",

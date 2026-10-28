@@ -187,7 +187,10 @@ fn rejects_en(source: &str) {
 fn accepts_en(source: &str) {
     let result = analyze_en(source);
     assert!(
-        !result.diagnostics.iter().any(|d| d.is_error()),
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::error::SemanticError::is_error),
         "expected no error, got: {:?}",
         result.diagnostics
     );
@@ -210,7 +213,7 @@ fn sink_method_in_loop_over_same_set_is_rejected() {
 #[test]
 fn bounded_lista_sink_in_loop_over_same_list_is_rejected() {
     rejects(
-        "functio grow() → vacuum ⇥ textus {\n    varia lista<numerus, 8> xs ← vacua\n    itera ex xs sit x {\n        xs.immerge(x)\n    }\n}",
+        "functio grow() → vacuum ⇥ textus {\n    varia lista<numerus, magnitudo 8> xs ← vacua\n    itera ex xs sit x {\n        xs.immerge(x)\n    }\n}",
     );
 }
 

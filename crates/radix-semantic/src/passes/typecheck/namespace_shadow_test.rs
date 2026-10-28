@@ -2,7 +2,7 @@
 //!
 //! LCG2-CAPE-BIND-01: `shape.numel` inside `fac`/`cape` must constrain the
 //! local error sink to the callee's declared carrier even when a parameter
-//! named `shape` owns the Path DefId.
+//! named `shape` owns the Path `DefId`.
 
 use std::collections::BTreeMap;
 
@@ -215,7 +215,7 @@ functio _numel_forma(lista<numerus> forma) → numerus ⇥ TensorError {
 }
 
 /// KPC-SEM boundary control: a local that shadows an import name owns the
-/// Path DefId, so with no namespace surface installed at all the receiver is
+/// Path `DefId`, so with no namespace surface installed at all the receiver is
 /// typed as the local value — the bare `lista<numerus>` method surface, not a
 /// namespace member route. Namespace-call repairs must key on installed
 /// surfaces, never on the binding name alone.

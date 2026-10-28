@@ -349,7 +349,7 @@ impl Target {
         matches!(self, Self::HirFaber | Self::HirRust | Self::MirStepper)
     }
 
-    /// Whether this target applies a list length range (`list<T, lo‥hi>`,
+    /// Whether this target applies a list length range (`list<T, size lo‥hi>`,
     /// need) where the list grows, shrinks and is built. Every other
     /// target would read the cell as a plain list and silently drop the
     /// range, so it is refused by name before an emitter runs.

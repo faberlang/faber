@@ -301,7 +301,10 @@ fn nested_tensor_vector_store_guards_each_unproven_index_in_metal_text() {
             assert!(!text.contains("u9_fault["), "{text}");
         } else {
             for site in 0..expected_faults {
-                assert!(text.contains(&format!("u9_fault[{site}]")), "missing fault site {site}: {text}");
+                assert!(
+                    deferred_slots(&text, expected_faults).contains(&site),
+                    "missing fault site {site}: {text}"
+                );
             }
         }
         if vector_index == "pick" {
@@ -502,10 +505,18 @@ fn a_single_lane_kernel_guards_its_unproven_indexes_in_metal_text() {
             .position(|line| line.contains(needle))
             .unwrap_or_else(|| panic!("no line with {needle}: {text}"))
     };
-    assert!(line("b0_count[0])) {") < line("b0[t"), "{text}");
-    assert!(line("&u9_fault[0]") == line("b0_count[0])) {"), "{text}");
-    assert!(line("b3_count[0])) {") < line("b3[t"), "{text}");
-    assert!(line("&u9_fault[1]") == line("b3_count[0])) {"), "{text}");
+    // Each check is a deferred compare line whose order key carries its slot.
+    assert_eq!(deferred_slots(&text, 2), [0, 1, 0, 1], "{text}");
+    assert!(line("b0_count[0]);") < line("b0[min((uint)"), "{text}");
+    assert!(line("b3_count[0]);") < line("b3[t"), "{text}");
+    // The lane leaves, writing the first failed slot, before its first store.
+    let store = line("b3[t");
+    assert!(
+        text.lines()
+            .nth(store - 1)
+            .is_some_and(|line| line.contains("&u9_fault[u9_first & 3u]")),
+        "{text}"
+    );
     // The literal `dst[0]` store is proven: its line carries no compare.
     let literal = text
         .lines()
@@ -535,7 +546,7 @@ main {
     let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
     assert!(text.contains("device atomic_uint* u9_fault"), "{text}");
-    assert!(text.contains("u9_fault[0]"), "the vector fault uses site 0: {text}");
+    assert_eq!(deferred_slots(&text, 1), [0], "the vector fault uses site 0: {text}");
     assert!(text.contains("(ulong)(4u)"), "the guard uses the vector width: {text}");
 }
 
@@ -583,7 +594,7 @@ main {
     let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
     assert!(text.contains("device atomic_uint* u9_fault"), "{text}");
-    assert!(text.contains("u9_fault[0]"), "the vector store uses site 0: {text}");
+    assert_eq!(deferred_slots(&text, 1), [0], "the vector store uses site 0: {text}");
     assert!(text.contains("(ulong)(4u)"), "the store guard uses the vector width: {text}");
 }
 
@@ -650,12 +661,30 @@ main {{
     )
 }
 
-/// The `if (...) { fault... }` guard lines of the emitted text.
+/// The deferred bounds checks of the emitted text: one
+/// `const bool u9_gN = <compares>;` line per access.
 #[cfg(feature = "mir-metal")]
 fn guard_lines(text: &str) -> Vec<&str> {
     text.lines()
         .map(str::trim_start)
-        .filter(|line| line.starts_with("if ((ulong)(") && line.contains("u9_fault["))
+        .filter(|line| line.starts_with("const bool u9_g") && line.contains("(ulong)("))
+        .collect()
+}
+
+/// The record slot of each deferred check of the text, in order. A check folds
+/// its order key (`ordinal << bits | slot`) into `u9_first`, where `bits` is
+/// the field width for `sites` record slots.
+#[cfg(feature = "mir-metal")]
+fn deferred_slots(text: &str, sites: usize) -> Vec<usize> {
+    let bits = (usize::BITS - sites.leading_zeros()).max(1);
+    text.lines()
+        .filter_map(|line| {
+            let line = line
+                .trim_start()
+                .strip_prefix("u9_first = min(u9_first, u9_g")?;
+            let key: usize = line.split("? ").nth(1)?.split('u').next()?.parse().ok()?;
+            Some(key & ((1 << bits) - 1))
+        })
         .collect()
 }
 
@@ -664,19 +693,13 @@ fn guard_lines(text: &str) -> Vec<&str> {
 fn compares(text: &str) -> usize {
     guard_lines(text)
         .iter()
-        .map(|line| {
-            line.split('{')
-                .next()
-                .unwrap_or("")
-                .matches(">= (ulong)(")
-                .count()
-        })
+        .map(|line| line.matches(">= (ulong)(").count())
         .sum()
 }
 
 #[cfg(feature = "mir-metal")]
 #[test]
-fn a_repeated_neighbour_read_is_checked_once_with_one_branch_per_access() {
+fn a_repeated_neighbour_read_is_checked_once_with_one_check_per_access() {
     // Three distinct unproven accesses (east: the column axis, south: the
     // flat compare for the row axis, diagonal: both); each read twice more.
     let source = stencil(
@@ -690,7 +713,7 @@ fn a_repeated_neighbour_read_is_checked_once_with_one_branch_per_access() {
     );
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
     let guards = guard_lines(&text);
-    assert_eq!(guards.len(), 3, "one branch per distinct access: {text}");
+    assert_eq!(guards.len(), 3, "one check per distinct access: {text}");
     // east: column axis; south: flat; diagonal: column axis (seen) + new flat.
     assert_eq!(compares(&text), 3, "{text}");
     // The extent is read from its buffer once per lane, not once per access.
@@ -700,7 +723,7 @@ fn a_repeated_neighbour_read_is_checked_once_with_one_branch_per_access() {
 
 #[cfg(feature = "mir-metal")]
 #[test]
-fn one_access_needing_two_compares_writes_one_branch() {
+fn one_access_needing_two_compares_writes_one_check() {
     let source = stencil(
         "        let f32 diag ← src[[i + 1, j + 1]]\n\
          \x20       dst[[i, j]] ← x + diag",

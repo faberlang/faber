@@ -153,7 +153,7 @@ fn conditional_into_a_narrower_slot_is_a_checked_store() {
 fn conditional_that_fits_the_slot_needs_no_node() {
     let source = "incipit {\nsit u8 a ← 200\nsit u8 b ← 3\n\
                   sit bivalens c ← falsum\nsit u8 x ← c ✓ a ✗ b\nnota x\n}\n";
-    assert!(kinds(source).is_empty());
+    assert_eq!(kinds(source), [] as [radix_hir::HirStoreKind; 0]);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn constant_expressions_take_a_word_slot_after_exact_evaluation() {
 #[test]
 fn folded_word_constant_carries_the_exact_value_and_the_slot_type() {
     let (probe, result) = probe("incipit {\nsit saturatus<u8> z ← 300 - 100\nnota z\n}\n");
-    assert!(probe.stores.is_empty());
+    assert_eq!(probe.stores, [] as [radix_hir::HirStoreSite; 0]);
     let (value, ty) = probe.literals[0];
     assert_eq!(value, 200);
     assert!(matches!(
@@ -248,7 +248,7 @@ fn integer_quotient_into_a_float_slot_names_true_division() {
 fn constant_argument_carries_the_parameter_type() {
     let source = "functio f(u8 v) → u8 { redde v }\nincipit {\nnota f(200)\n}\n";
     let (probe, result) = probe(source);
-    assert!(probe.stores.is_empty());
+    assert_eq!(probe.stores, [] as [radix_hir::HirStoreSite; 0]);
     let (value, ty) = probe
         .literals
         .iter()

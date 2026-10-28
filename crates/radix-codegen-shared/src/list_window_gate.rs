@@ -11,7 +11,7 @@
 //! Python emitters (which copy the range behind a checked helper) implement the
 //! form, as does the Rust emitter (which is checked in [`is_list_window`]).
 //! A receiver is a list window in either shape, the unbounded `lista<T>`
-//! ([`Type::Array`]) and the bounded `lista<T, N>` ([`Type::BoundedArray`]);
+//! ([`Type::Array`]) and the bounded `lista<T, magnitudo N>` ([`Type::BoundedArray`]);
 //! every emitter listed here dispatches both, so admission is per target, not
 //! per receiver shape.
 //! This gate rejects any module that takes one before an emitter runs, naming
@@ -106,7 +106,7 @@ fn is_list_window(types: &TypeTable, expr: &HirExpression, target: Target) -> bo
             !(target_admits_byte_window(target)
                 && matches!(resolved(types, *element), Type::Bits(BitsWidth::B8)))
         }
-        // A bounded list `lista<T, N>` is the same window over the same
+        // A bounded list `lista<T, magnitudo N>` is the same window over the same
         // carrier: its capacity bounds construction, never a range.
         Type::BoundedArray { .. } | Type::RangedArray { .. } => true,
         _ => false,

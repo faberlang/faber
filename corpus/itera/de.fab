@@ -48,7 +48,7 @@ main {
     }
 
     # Iterate over lista indices
-    let list<int, 3> numeri ← [10, 20, 30]
+    let list<int, size 3> numeri ← [10, 20, 30]
     for ref numeri let index {
         print "index: § valor: §"(index, numeri[index])
     }

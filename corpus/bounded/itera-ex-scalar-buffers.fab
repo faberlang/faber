@@ -4,8 +4,8 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "nota_stmt"]
 category = "list"
 canonical = false
-summary = "Value iteration over runtime-length list<b8, N> / ascii<N> / string<N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
-syntax = "for from list<b8, N> | ascii<N> | string<N> let x { }"
+summary = "Value iteration over runtime-length list<b8, size N> / ascii<N> / string<N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
+syntax = "for from list<b8, size N> | ascii<N> | string<N> let x { }"
 related = ["list<b8>", "ascii", "string", "ex", "itera", "longitudo"]
 locale = "en"
 no_expected = "declaration-only"
@@ -15,7 +15,7 @@ no_expected = "declaration-only"
 # =============================================================================
 #
 # What this teaches:
-#   • `for from` over a runtime-length `list<b8, N>` / `ascii<N>` / `string<N>`
+#   • `for from` over a runtime-length `list<b8, size N>` / `ascii<N>` / `string<N>`
 #     becomes a `discerne` on len with N+1 arms — arm k runs the body exactly
 #     k times (lanes 0..k)
 #   • each arm reads only 0..k ⊆ 0..len, so spare slots past len are never
@@ -28,16 +28,16 @@ no_expected = "declaration-only"
 #     is base-language only
 #   • capacities above 10 — the N(N+1)/2 lane budget caps at N = 10
 #
-# See also: list<b8, N>, ascii, string, itera-ex-air-scalar-buffers
+# See also: list<b8, size N>, ascii, string, itera-ex-air-scalar-buffers
 # =============================================================================
 
 # Route B static split on the carrier len — declaration-only driver (no
 # incipit: the runner lane classifies this NoEntryReference). The MIR unit
 # tests pin the N+1-arm switch and the N <= 10 decline; the ascii<N> carrier
-# runs in the runner, while the list<b8, N>/string<N> carriers stay compile-only
-# (the runner overlay declines the bounded list<b8, N>/textus carriers).
+# runs in the runner, while the list<b8, size N>/string<N> carriers stay compile-only
+# (the runner overlay declines the bounded list<b8, size N>/textus carriers).
 
-fn visit_bytes(list<b8, 8> xs) → void {
+fn visit_bytes(list<b8, size 8> xs) → void {
     for from xs let b {
         print b
     }

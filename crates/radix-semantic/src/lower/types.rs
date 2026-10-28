@@ -1407,7 +1407,7 @@ impl Lowerer<'_> {
                 self.types.array(elem)
             }
             [elem, GenericArgExpr::Range(range)] => {
-                // A length range, `list<T, lo‥hi>`: always the trapping range.
+                // A length range, `list<T, size lo‥hi>`: always the trapping range.
                 let elem = self.lower_generic_type_arg(elem);
                 let mut issue = None;
                 let ty = radix_types::lower_ranged_list(elem, range, self.types, &mut |found| {

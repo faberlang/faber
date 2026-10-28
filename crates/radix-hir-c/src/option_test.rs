@@ -99,8 +99,9 @@ fn an_optional_coalesce_parameter_keeps_its_declared_type() {
 
 #[test]
 fn an_assertion_index_reads_the_element() {
-    let code =
-        emitted("main {\n    let list<string, 3> xs ← [\"a\", \"b\", \"c\"]\n    print xs![0]\n}");
+    let code = emitted(
+        "main {\n    let list<string, size 3> xs ← [\"a\", \"b\", \"c\"]\n    print xs![0]\n}",
+    );
     assert!(code.contains("faber_list_text_at("), "{code}");
 }
 

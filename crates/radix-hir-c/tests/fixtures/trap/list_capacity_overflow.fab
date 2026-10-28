@@ -2,6 +2,6 @@
 locale = "en"
 +++
 main {
-    let list<int, 2305843009213693952> xs ← empty
+    let list<int, size 2305843009213693952> xs ← empty
     print xs.length()
 }

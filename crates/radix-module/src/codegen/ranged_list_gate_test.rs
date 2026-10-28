@@ -1,4 +1,4 @@
-//! Need: a list length range `lista<T, lo‥hi>` is applied by the
+//! Need: a list length range `lista<T, magnitudo lo‥hi>` is applied by the
 //! Rust target, the Faber source emitter and the MIR runner. Every other
 //! emitter would read the cell as a plain list and drop the range, so each
 //! rejects a module that names one with the named
@@ -7,7 +7,8 @@
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
 
-const SOURCE: &str = "functio f(lista<numerus, 1…∞> a) → lista<numerus, 1…∞> { redde a }\nincipit {\n}\n";
+const SOURCE: &str =
+    "functio f(lista<numerus, magnitudo 1…∞> a) → lista<numerus, magnitudo 1…∞> { redde a }\nincipit {\n}\n";
 
 fn issues(target: Target) -> Vec<String> {
     let session = Session::new(

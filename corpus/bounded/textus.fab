@@ -25,7 +25,7 @@ locale = "en"
 #   • Counting UTF-8 bytes as `N` — capacity is scalars.
 #   • Assigning a bare `textus` into `textus<N>` without `↦`.
 #
-# See also: lista<numerus, N>, ascii<N>, list<b8, N>
+# See also: lista<numerus, magnitudo N>, ascii<N>, list<b8, size N>
 # =============================================================================
 
 main {

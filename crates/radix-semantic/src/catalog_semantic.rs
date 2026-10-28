@@ -654,7 +654,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("start the range at 0, or use a signed width such as i32".to_owned())
         }
         WidthLowerIssue::RANGED_LIST_BOUND_NOT_CONSTANT => Some(
-            "write both ends as integer literals, such as list<int, 1‥8>; a named or size end is not built yet".to_owned(),
+            "write both ends as integer literals, such as list<int, size 1‥8>; a named or size end is not built yet".to_owned(),
         ),
         WidthLowerIssue::RANGED_LIST_EMPTY => Some(
             "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
@@ -663,10 +663,13 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("a length is a count: start the range at 0 or above".to_owned())
         }
         WidthLowerIssue::RANGED_LIST_POLICY_WORD => Some(
-            "write the range on the list, such as list<int, 1…8>; it always traps, and saturating, trapping and wrapping take a number width".to_owned(),
+            "write the range on the list, such as list<int, size 1…8>; it always traps, and saturating, trapping and wrapping take a number width".to_owned(),
         ),
         WidthLowerIssue::RANGED_WIDTH_UNSUPPORTED => Some(
             "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet".to_owned(),
+        ),
+        WidthLowerIssue::LIST_COUNT_NEEDS_SIZE => Some(
+            "write list<int, size 4> for at most 4 elements, or list<int, size 1…8> for a range; a bare range bounds a value, not a count".to_owned(),
         ),
         "ranged_list_length_out_of_range" => Some(
             "give the literal a length inside the range, or build the list with `↦` and recover with `⊥`".to_owned(),
@@ -1204,6 +1207,9 @@ const AIR_PURITY_HELP: &str = "keep the v1 AIR subset pure: immutable locals, pu
 /// shared baseline help, while `None` leaves both at their fallthrough.
 fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
     Some(match arg_value(args, "issue")? {
+        "air_unbounded_list_size" => {
+            "a list with no upper size has no unrolled AIR form".to_owned()
+        }
         "air_unbounded_integer" => {
             "the unbounded integer `inf` has no AIR representation".to_owned()
         }

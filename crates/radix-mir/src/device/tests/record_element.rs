@@ -1,7 +1,7 @@
 //! gpu-reset Q01: a `tensor<Block, [n]>` PARAMETER of a lane-form kernel whose
 //! element is a fixed-layout genus (a RECORD device view) passes the device
 //! gate when the body indexes the view and reads admitted fields of the
-//! element — a scalar field and a fixed-array (`list<u8, N>`) element.
+//! element — a scalar field and a fixed-array (`list<u8, size N>`) element.
 
 use super::*;
 use crate::validate::ValidatedMir;
@@ -20,7 +20,7 @@ const BLOCK: DefId = DefId(7);
 #[derive(Clone, Copy)]
 enum Field {
     F32,
-    /// `list<u8, 2>`
+    /// `list<u8, size 2>`
     ListU8x2,
     F64,
 }

@@ -623,7 +623,7 @@ impl Validator<'_, '_> {
             // element come from `resolve_struct_layout`, which the layout table
             // cannot see. The result must be that field's own element — a
             // scalar, a device vector, or the physical fixed-array aggregate
-            // (`list<T, N>`, validated at its own index projection below).
+            // (`list<T, size N>`, validated at its own index projection below).
             MirLayoutKind::Aggregate(layout)
                 if layout.carrier == MirAggregateCarrier::PhysicalValue
                     && layout.family == MirAggregateFamily::Struct =>

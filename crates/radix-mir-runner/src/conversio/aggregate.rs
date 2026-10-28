@@ -57,7 +57,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// `lista<T> ↦ lista<T, N>`: the store-time capacity check. A bounded
+    /// `lista<T> ↦ lista<T, magnitudo N>`: the store-time capacity check. A bounded
     /// list is held as an ordinary `Value::Array`; a source longer than `N`
     /// fails the conversion, and `⊥` recovery supplies the fallback, as for
     /// the other failable conversions.
@@ -96,7 +96,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// `lista<T> ↦ lista<T, lo‥hi>`: the copied list is kept only
+    /// `lista<T> ↦ lista<T, magnitudo lo‥hi>`: the copied list is kept only
     /// when its length lies inside `[min, max]`; any other length takes the
     /// recovery value or fails the conversion, like the bounded list's overflow.
     #[allow(clippy::too_many_arguments)]

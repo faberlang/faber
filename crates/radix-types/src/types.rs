@@ -938,7 +938,7 @@ impl TypeTable {
         self.intern(Type::Array(element))
     }
 
-    /// Allocate a `lista<T, N>` bounded array. Distinct from unbounded [`Type::Array`].
+    /// Allocate a `lista<T, magnitudo N>` bounded array. Distinct from unbounded [`Type::Array`].
     ///
     /// A bounded list of raw bits (`b8`) is the bounded byte buffer and
     /// lowers to [`Type::BoundedOcteti`]; every other
@@ -950,7 +950,7 @@ impl TypeTable {
         self.intern(Type::BoundedArray { element, capacity })
     }
 
-    /// Allocate a `lista<T, lo…hi>` length range. The range is
+    /// Allocate a `lista<T, magnitudo lo…hi>` length range. The range is
     /// inclusive and `max` is `None` for no upper end. A range that is
     /// `0…∞` *is* [`Type::Array`] and `0…N` *is* the bounded list, so the
     /// sugar forms keep one identity (rule 2 of the ranged-policy design).
@@ -2035,16 +2035,16 @@ pub enum Type {
     /// `lista<T>` collection.
     Array(TypeId),
 
-    /// `lista<T, N>` bounded array. Distinct from unbounded [`Type::Array`].
+    /// `lista<T, magnitudo N>` bounded array. Distinct from unbounded [`Type::Array`].
     BoundedArray {
         element: TypeId,
         capacity: IndexId,
     },
 
-    /// `lista<T, lo‥hi>` / `lista<T, lo…hi>` length range (need, 5/5):
+    /// `lista<T, magnitudo lo‥hi>` / `lista<T, magnitudo lo…hi>` length range (need, 5/5):
     /// the list's length stays inside `[min, max]` after every store. `max` is
-    /// `None` for an unbounded top end (`lista<T, 1…∞>`). `lista<T>` is the
-    /// range `0…∞` and `lista<T, N>` is `0…N`, so those two are interned as
+    /// `None` for an unbounded top end (`lista<T, magnitudo 1…∞>`). `lista<T>` is the
+    /// range `0…∞` and `lista<T, magnitudo N>` is `0…N`, so those two are interned as
     /// [`Type::Array`] and [`Type::BoundedArray`], never as this variant: it
     /// names only a range that is neither (see [`TypeTable::ranged_array`]).
     RangedArray {

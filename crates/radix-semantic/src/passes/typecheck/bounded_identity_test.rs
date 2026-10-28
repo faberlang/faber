@@ -37,7 +37,7 @@ fn bounded_identity_distinct_from_bare_and_across_n() {
     assert!(!types.equals(textus4, textus), "textus<4> ≠ textus");
     assert!(
         !types.equals(lista8, lista),
-        "lista<numerus, 8> ≠ lista<numerus>"
+        "lista<numerus, magnitudo 8> ≠ lista<numerus>"
     );
     assert!(types.is_assignable(ascii8, ascii64), "ascii<8> → ascii<64>");
     assert!(
@@ -121,13 +121,13 @@ fn resolve_interns_bounded_forms() {
         Type::BoundedTextus { capacity } if matches!(types.get_index(*capacity), IndexExpr::Literal(4))
     ));
 
-    let (types, ty) = resolve_alias("typus X = lista<b8, 8>");
+    let (types, ty) = resolve_alias("typus X = lista<b8, magnitudo 8>");
     assert!(matches!(
         types.get(ty),
         Type::BoundedOcteti { capacity } if matches!(types.get_index(*capacity), IndexExpr::Literal(8))
     ));
 
-    let (types, ty) = resolve_alias("typus X = lista<numerus, 8>");
+    let (types, ty) = resolve_alias("typus X = lista<numerus, magnitudo 8>");
     assert!(matches!(
         types.get(ty),
         Type::BoundedArray { capacity, .. } if matches!(types.get_index(*capacity), IndexExpr::Literal(8))

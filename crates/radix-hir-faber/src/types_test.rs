@@ -2684,10 +2684,13 @@ fn bounded_types_print_via_the_surface() {
     let numerus = types.primitive(Primitive::Numerus);
 
     let cases = [
-        (types.bounded_array(numerus, four), "list<numerus, 4>"),
+        (
+            types.bounded_array(numerus, four),
+            "list<numerus, magnitudo 4>",
+        ),
         (types.bounded_textus(four), "text<4>"),
         (types.bounded_ascii(four), "ascii<4>"),
-        (types.bounded_octeti(four), "list<b8, 4>"),
+        (types.bounded_octeti(four), "list<b8, magnitudo 4>"),
     ];
     let latin_bounded_array = types.bounded_array(numerus, four);
     let latin_bounded_textus = types.bounded_textus(four);
@@ -2703,7 +2706,7 @@ fn bounded_types_print_via_the_surface() {
     // Latin surface keeps the canonical spellings.
     assert_eq!(
         codegen.type_to_faber(latin_bounded_array, &names, &LatinSurface),
-        "lista<numerus, 4>"
+        "lista<numerus, magnitudo 4>"
     );
     assert_eq!(
         codegen.type_to_faber(latin_bounded_textus, &names, &LatinSurface),
@@ -2711,7 +2714,7 @@ fn bounded_types_print_via_the_surface() {
     );
     assert_eq!(
         codegen.type_to_faber(latin_bounded_octeti, &names, &LatinSurface),
-        "lista<b8, 4>"
+        "lista<b8, magnitudo 4>"
     );
 }
 
@@ -2736,7 +2739,7 @@ fn bare_b8_list_and_bounded_buffer_render_as_list_forms() {
     );
     assert_eq!(
         codegen.type_to_faber(bounded, &names, &LocalizedTypeSurface),
-        "list<b8, 4>"
+        "list<b8, magnitudo 4>"
     );
     assert_eq!(
         codegen.type_to_faber(primitive_octeti, &names, &LocalizedTypeSurface),
@@ -2748,7 +2751,7 @@ fn bare_b8_list_and_bounded_buffer_render_as_list_forms() {
     );
     assert_eq!(
         codegen.type_to_faber(bounded, &names, &LatinSurface),
-        "lista<b8, 4>"
+        "lista<b8, magnitudo 4>"
     );
 }
 

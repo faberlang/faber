@@ -1070,7 +1070,7 @@ fn classify_ex_loop(
         };
     };
     let (_, source_ty) = types.peel_access_marker(source_ty);
-    // Route A bounded element sources: `lista<T, N>` (AEU-3) and the scalar
+    // Route A bounded element sources: `lista<T, magnitudo N>` (AEU-3) and the scalar
     // buffer forms `octeti<N>` / `ascii<N>` / `textus<N>` (AEU-7).
     let bounded_element = match types.get(source_ty) {
         Type::BoundedArray { element, .. } => Some(*element),

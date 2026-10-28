@@ -1,0 +1,32 @@
++++
+term = "list<T, size lo…∞>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "incipit_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A kernel needs a finite constant upper size: a list with size …∞ is refused by name."
+syntax = "@ kernel fn k(list<int, size 1…∞> xs) — rejected"
+related = ["list<T, size lo‥hi>", "size", "‥", "…"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:nucleum_unbounded_list_size"
++++
+# =============================================================================
+# list<T, size 1…∞> — a kernel needs a finite size
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A kernel unrolls every slot of a list up to its maximum and masks the dead ones, so the maximum must be a finite constant.
+#
+# Common mistakes:
+#   • Leaving the upper end open in a kernel signature; write `size 1…8`.
+
+@ kernel
+@ public
+fn launch(list<int, size 1…∞> xs, u32 lane) → void {
+}
+
+main {
+    print 1
+}

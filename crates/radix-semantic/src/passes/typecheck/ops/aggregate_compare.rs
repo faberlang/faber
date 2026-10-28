@@ -97,7 +97,7 @@ impl TypeChecker<'_> {
         })
     }
 
-    /// A `lista<T>` / `lista<T, N>` operand: its element and capacity (an
+    /// A `lista<T>` / `lista<T, magnitudo N>` operand: its element and capacity (an
     /// unbounded list has the unspecified shape).
     fn list_operand(&mut self, ty: TypeId) -> Option<AggregateOperand> {
         let elem = self.lista_element_type(ty)?;

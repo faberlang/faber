@@ -840,7 +840,7 @@ impl TypeChecker<'_> {
             return target_resolved;
         }
 
-        // Route C (AEU-5): numeric `lista<T, N> ↦ tensor<T, [N]>` is a padded
+        // Route C (AEU-5): numeric `lista<T, magnitudo N> ↦ tensor<T, [N]>` is a padded
         // snapshot. The inline `⊥` value names the dead-slot fill (element
         // type `T`), not a target-typed failure recovery — padding always
         // succeeds structurally, and the fill must be a real value, never a
@@ -1874,7 +1874,7 @@ impl TypeChecker<'_> {
 
     /// Reject primitive `↦` pairs with no single obvious meaning (byte reinterpretation, etc.).
     /// Operator ruling 05ac0534: a list of anything but a
-    /// bits marker is not text. `lista<T> ↦ textus` and `lista<T, N> ↦
+    /// bits marker is not text. `lista<T> ↦ textus` and `lista<T, magnitudo N> ↦
     /// textus<M>` have no grammar row for any `T`; the byte buffer
     /// (`octeti`) is a distinct type and keeps its row. A registered user
     /// conversion row for the pair stays authoritative.
@@ -2630,7 +2630,7 @@ impl TypeChecker<'_> {
         Some(self.error_type)
     }
 
-    /// CTFP-1: non-literal `lista<T, N> ↦ vector<T, N>` — a bounded lista with
+    /// CTFP-1: non-literal `lista<T, magnitudo N> ↦ vector<T, N>` — a bounded lista with
     /// a literal capacity that exactly matches the vector width materializes
     /// into the register; unbounded `lista<T>` stays literal-only.
     fn check_bounded_lista_to_vector_conversio(
@@ -3108,7 +3108,7 @@ impl TypeChecker<'_> {
         )
     }
 
-    /// `[a, b, c] ↦ list<T, lo‥hi>`: a list literal's length is known when
+    /// `[a, b, c] ↦ list<T, size lo‥hi>`: a list literal's length is known when
     /// nothing is spread into it, so a length outside the target's range is
     /// refused here (`Some(error)`); every other source is checked when the
     /// conversion runs.

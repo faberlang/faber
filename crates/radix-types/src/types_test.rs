@@ -1960,7 +1960,7 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
     assert!(!types.equals(textus4, textus), "textus<4> ≠ textus");
     assert!(
         !types.equals(lista8, lista),
-        "lista<numerus, 8> ≠ lista<numerus>"
+        "lista<numerus, magnitudo 8> ≠ lista<numerus>"
     );
     assert!(!types.equals(octeti8, octeti), "octeti<8> ≠ octeti");
 
@@ -1983,7 +1983,7 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
 
 #[test]
 fn bounded_array_of_b8_is_bounded_octeti() {
-    // Need: `lista<b8, N>` is the bounded byte buffer. Its element
+    // Need: `lista<b8, magnitudo N>` is the bounded byte buffer. Its element
     // is raw bits, so the bounded list lowers to `Type::BoundedOcteti`
     // rather than an element-typed bounded array.
     let mut types = TypeTable::new();

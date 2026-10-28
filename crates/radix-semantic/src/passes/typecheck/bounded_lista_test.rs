@@ -1,4 +1,4 @@
-//! BB-7R pins: `lista<T, N>` typechecks as `BoundedArray`, D6 appende overflow,
+//! BB-7R pins: `lista<T, magnitudo N>` typechecks as `BoundedArray`, D6 appende overflow,
 //! and D7 conversions to/from unbounded `lista<T>`.
 
 use crate::test_support::{
@@ -10,7 +10,7 @@ use crate::{IndexExpr, Type};
 fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
     let unit = analyze_ok_la(
         r"incipit {
-    sit lista<numerus, 8> bounded ← vacua
+    sit lista<numerus, magnitudo 8> bounded ← vacua
     sit lista<numerus> unbounded ← vacua
     nota bounded
     nota unbounded
@@ -24,7 +24,7 @@ fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
             Type::BoundedArray { capacity, .. }
                 if matches!(unit.types.get_index(*capacity), IndexExpr::Literal(8))
         ),
-        "lista<numerus, 8> must intern as BoundedArray {{ 8 }}, got {:?}",
+        "lista<numerus, magnitudo 8> must intern as BoundedArray {{ 8 }}, got {:?}",
         unit.types.get(tys[0])
     );
     assert!(
@@ -34,7 +34,7 @@ fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
     );
     assert!(
         !unit.types.equals(tys[0], tys[1]),
-        "lista<numerus, 8> ≠ lista<numerus>"
+        "lista<numerus, magnitudo 8> ≠ lista<numerus>"
     );
     assert!(
         !matches!(unit.types.get(tys[1]), Type::BoundedArray { .. }),
@@ -46,7 +46,7 @@ fn bounded_lista_typechecks_as_bounded_array_distinct_from_unbounded() {
 fn bounded_lista_longitudo_and_vacua_are_len_not_capacity() {
     assert_accepts_la(
         r"incipit {
-    sit lista<numerus, 8> xs ← vacua
+    sit lista<numerus, magnitudo 8> xs ← vacua
     sit numerus n ← xs.longitudo()
     sit bivalens empty ← xs.vacua()
     nota n
@@ -59,7 +59,7 @@ fn bounded_lista_longitudo_and_vacua_are_len_not_capacity() {
 fn bounded_lista_accipe_and_index_return_element() {
     assert_accepts_la(
         r"incipit {
-    varia lista<numerus, 8> xs ← vacua
+    varia lista<numerus, magnitudo 8> xs ← vacua
     sit numerus ∪ nihil got ← xs.accipe(0)
     sit numerus x ← xs[0]
     nota got
@@ -72,7 +72,7 @@ fn bounded_lista_accipe_and_index_return_element() {
 fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
     assert_rejects_with_issue_la(
         r"incipit {
-    sit lista<numerus, 8> xs ← vacua
+    sit lista<numerus, magnitudo 8> xs ← vacua
     sit _ bad ← xs[8]
     nota bad
 }",
@@ -80,7 +80,7 @@ fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
     );
     assert_rejects_with_issue_la(
         r"incipit {
-    sit lista<numerus, 8> xs ← vacua
+    sit lista<numerus, magnitudo 8> xs ← vacua
     sit _ bad ← xs[-1]
     nota bad
 }",
@@ -103,7 +103,7 @@ fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
     nota bad
 }",
         r"incipit {
-    sit lista<b8, 8> bytes ← |61| ↦ lista<b8, 8>
+    sit lista<b8, magnitudo 8> bytes ← |61| ↦ lista<b8, magnitudo 8>
     sit _ bad ← bytes[8]
     nota bad
 }",
@@ -117,7 +117,7 @@ fn bounded_lista_appende_requires_alternate_exit() {
     // D17.8: `incipit` (main) is exempt; the rule applies in a helper.
     assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
-    varia lista<numerus, 8> xs ← vacua
+    varia lista<numerus, magnitudo 8> xs ← vacua
     xs.appende(1)
 }",
         "failable_call_requires_handler",
@@ -128,7 +128,7 @@ fn bounded_lista_appende_requires_alternate_exit() {
 fn bounded_lista_appende_propagates_on_textus_channel() {
     assert_accepts_la(
         r"functio grow() → vacuum ⇥ textus {
-    varia lista<numerus, 8> xs ← vacua
+    varia lista<numerus, magnitudo 8> xs ← vacua
     xs.appende(1)
 }
 
@@ -154,7 +154,7 @@ fn bounded_lista_sink_requires_alternate_exit() {
     // op, so a bounded receiver reports overflow the same way.
     assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
-    varia lista<numerus, 8> xs ← vacua
+    varia lista<numerus, magnitudo 8> xs ← vacua
     xs.immerge(1)
 }",
         "failable_call_requires_handler",
@@ -165,7 +165,7 @@ fn bounded_lista_sink_requires_alternate_exit() {
 fn bounded_lista_sink_propagates_on_textus_channel() {
     assert_accepts_la(
         r"functio grow() → vacuum ⇥ textus {
-    varia lista<numerus, 8> xs ← vacua
+    varia lista<numerus, magnitudo 8> xs ← vacua
     xs.immerge(1)
 }
 
@@ -190,7 +190,7 @@ fn bounded_lista_d7_conversions_are_explicit() {
     assert_accepts_la(
         r"incipit {
     sit lista<numerus> unbounded ← [1, 2]
-    sit lista<numerus, 8> bounded ← unbounded ↦ lista<numerus, 8>
+    sit lista<numerus, magnitudo 8> bounded ← unbounded ↦ lista<numerus, magnitudo 8>
     sit lista<numerus> prefix ← bounded ↦ lista<numerus>
     nota prefix
 }",
@@ -202,7 +202,7 @@ fn bounded_lista_assignment_is_not_implicit_conversion() {
     assert_rejects_with_issue_la(
         r"incipit {
     sit lista<numerus> unbounded ← [1, 2]
-    sit lista<numerus, 8> bounded ← unbounded
+    sit lista<numerus, magnitudo 8> bounded ← unbounded
     nota bounded
 }",
         "expression_type_mismatch",
@@ -251,9 +251,9 @@ fn bounded_lista_hole_solves_from_literal_witness() {
 
 #[test]
 fn explicit_bounded_lista_literal_checks_capacity() {
-    assert_accepts_la("incipit { sit lista<numerus, 2> xs ← [1, 2] }");
+    assert_accepts_la("incipit { sit lista<numerus, magnitudo 2> xs ← [1, 2] }");
     assert_rejects_with_issue_la(
-        "incipit { sit lista<numerus, 3> xs ← [1, 2] }",
+        "incipit { sit lista<numerus, magnitudo 3> xs ← [1, 2] }",
         "incompatible_tensor_index",
     );
 }
@@ -265,7 +265,7 @@ fn explicit_bounded_lista_literal_checks_capacity() {
 fn empty_list_literal_takes_the_bounded_cell_capacity() {
     let unit = analyze_ok_la(
         r"incipit {
-    varia lista<fractus, 4> xs ← []
+    varia lista<fractus, magnitudo 4> xs ← []
     nota xs
 }",
     );
@@ -276,7 +276,7 @@ fn empty_list_literal_takes_the_bounded_cell_capacity() {
             Type::BoundedArray { capacity, .. }
                 if matches!(unit.types.get_index(*capacity), IndexExpr::Literal(4))
         ),
-        "`[]` against lista<fractus, 4> must keep capacity 4, got {:?}",
+        "`[]` against lista<fractus, magnitudo 4> must keep capacity 4, got {:?}",
         unit.types.get(ty)
     );
 }
@@ -300,7 +300,7 @@ fn bounded_lista_hole_without_literal_witness_still_reports_sem014() {
 #[test]
 fn bounded_lista_parameter_widening_stays_explicit() {
     assert_rejects_with_issue_la(
-        r"functio consume(lista<numerus, 3> xs) → vacuum { nota xs }
+        r"functio consume(lista<numerus, magnitudo 3> xs) → vacuum { nota xs }
 incipit { consume([1, 2]) }",
         "argument_type_mismatch",
     );

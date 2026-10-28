@@ -211,7 +211,7 @@ instans = "instans"
 objectum = "objectum"
 quidlibet = "quidlibet"
 lista = "lista"
-# Shipped bounded forms: lista<T, N>, lista<T, lo‥hi>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, lista<T, magnitudo lo‥hi>, textus<N>, ascii<N>.
 tabula = "tabula"
 # tabulae (ledger, an insertion-ordered map) is one letter from tabula (map) on purpose:
 # "two shades of the same thing" (Roman account books were tabulae). Not a typo;
@@ -985,7 +985,7 @@ help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8>
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "a convert hint does not follow the target in angle brackets"
-help = "write the hint as a via clause after the target: `{lista}<b8, 16> via Le`"
+help = "write the hint as a via clause after the target: `{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.conditional_nested]
 message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
@@ -1489,7 +1489,7 @@ help = "use _ for a monomorphic hole or a concrete union type"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "{lista} requires one type parameter"
-help = "use {lista}<T>, {lista}<T, N> or {lista}<T, lo‥hi>"
+help = "use {lista}<T>, {lista}<T, {magnitudo} N> or {lista}<T, {magnitudo} lo‥hi>"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula requires two type parameters"
@@ -1547,9 +1547,13 @@ help = "latitudine integra utere, ut u8 aut i32; latitudines fractae, decimales 
 message = "nucleum modum condendi cum ambitu nondum adhibere potest ({site}); nucleum nullum ambitum applicat"
 help = "in nucleo latitudine nuda utere et ambitum in hospite applica"
 
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "nucleum listam sine summo magnitudinis adhibere non potest ({site}); omnes sedes usque ad maximum evolvit"
+help = "da listae magnitudinem finitam constantem, ut {lista}<int, {magnitudo} 1…8>"
+
 [diagnostics.SEM008.issues.ranged_list_bound_not_constant]
 message = "finis ambitus longitudinis listae numerus integer non negativus litteralis aut ∞ esse debet"
-help = "scribe utrumque finem ut numerum integrum litteralem, ut list<int, 1‥8>; finis nominatus aut magnitudinis nondum paratur"
+help = "scribe utrumque finem ut numerum integrum litteralem, ut {lista}<int, {magnitudo} 1‥8>; finis nominatus aut magnitudinis nondum paratur"
 
 [diagnostics.SEM008.issues.ranged_list_range_empty]
 message = "ambitus longitudinis listae nullam longitudinem tenet"
@@ -1561,7 +1565,11 @@ help = "longitudo numerus est: ambitum a 0 aut supra incipe"
 
 [diagnostics.SEM008.issues.ranged_list_policy_word]
 message = "ambitus longitudinis listae verbum modi condendi non accipit"
-help = "scribe ambitum in lista, ut list<int, 1…8>; semper trahit, et saturatus, exactus et modulus latitudinem numeri accipiunt"
+help = "scribe ambitum in lista, ut {lista}<int, {magnitudo} 1…8>; semper trahit, et saturatus, exactus et modulus latitudinem numeri accipiunt"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "numerus listae post `{magnitudo}` scribitur"
+help = "scribe `{lista}<int, {magnitudo} 4>` pro quattuor elementis ad summum, aut `{lista}<int, {magnitudo} 1…8>` pro ambitu; ambitus nudus valorem terminat, non numerum"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
@@ -1837,7 +1845,7 @@ help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as 
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
-help = "textus<N>, ascii<N>, and {lista}<b8, N> are bounded forms, spelled with their own type words"
+help = "textus<N>, ascii<N>, and {lista}<b8, {magnitudo} N> are bounded forms, spelled with their own type words"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -3685,7 +3693,7 @@ help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEv
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
-help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "a float or decimal does not convert to an integer without naming the rounding"
@@ -4474,6 +4482,10 @@ help = "keep `@ radix lane \"air\"` functions in the accepted pure subset"
 [diagnostics.SEM059.issues.air_integer_range_unproven]
 message = "@ radix lane \"{lane}\" respuit hanc operationem integram: exitus exactus fortasse extra [-2^63, 2^64 - 1] exit, et AIR nullam captionem habet"
 help = "operandum ad minorem integrum typum coarcta ut regula intervalli exitum capere probet, vel arithmeticam muta"
+
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "@ radix lane \"{lane}\" listam sine summo magnitudinis respuit: AD retrorsum omnes sedes usque ad maximum evolvit"
+help = "da listae magnitudinem finitam constantem, ut {lista}<int, {magnitudo} 1…8>, vel listam extra viam move"
 
 [diagnostics.SEM059.issues.air_unbounded_integer]
 message = "@ radix lane \"{lane}\" integrum infinitum `inf` respuit: AIR integrum in acervo repraesentare non potest"

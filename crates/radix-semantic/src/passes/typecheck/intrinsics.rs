@@ -435,7 +435,7 @@ pub(super) fn check_intrinsic_method_call(
         return Some(checker.error_type);
     }
     let resolved = checker.types.get(payload_ty);
-    // Ruling 2026-10-17 (bounded `lista<T, N>`): the sink operator `⇜` dies on
+    // Ruling 2026-10-17 (bounded `lista<T, magnitudo N>`): the sink operator `⇜` dies on
     // overflow, its method form reports. `appende` and `immerge` are two names
     // for one append op on a bounded receiver (the `immerge` registry row lowers
     // to `collection Append`), so both carry the `⇥ textus` alternate exit.
@@ -1191,7 +1191,7 @@ fn resolve_return_type(
             {
                 // WHY: K14 gives a tensor a static rank with run-time extents,
                 // so the shape list has a compile-time length — the rank — and
-                // is the bounded `lista<numerus, R>` whose elements are the
+                // is the bounded `lista<numerus, magnitudo R>` whose elements are the
                 // run-time dimension values. A receiver without a static rank
                 // (an inference hole, or a bare `size` parameter standing for a
                 // whole shape of any rank) keeps the unbounded list.

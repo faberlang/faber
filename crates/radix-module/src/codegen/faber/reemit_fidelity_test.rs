@@ -639,10 +639,11 @@ fn littera_code_via_clause_round_trips() {
 #[test]
 fn register_target_via_clause_round_trips() {
     // A register target keeps its hint in the clause, not as a bracketed tail.
-    let code =
-        assert_idempotent("functio out(vector<u32, 4> v) → lista<b8, 16> {\n    redde v ↦ lista<b8, 16> via Le\n}\n");
+    let code = assert_idempotent(
+        "functio out(vector<u32, 4> v) → lista<b8, magnitudo 16> {\n    redde v ↦ lista<b8, magnitudo 16> via Le\n}\n",
+    );
     assert!(
-        code.contains("↦ lista<b8, 16> via Le"),
+        code.contains("↦ lista<b8, magnitudo 16> via Le"),
         "register hint must re-emit as a via clause:\n{code}"
     );
 }
@@ -1661,4 +1662,17 @@ fn first_match_over_array_literal_reemits_with_meaning_intact() {
         emitted.contains("primus_quem([1.0, -2.0, 3.0]"),
         "first-match head kept: {emitted}"
     );
+}
+
+#[test]
+fn list_counts_re_emit_after_the_size_marker() {
+    // Need: a list count is written after `magnitudo` (en `size`).
+    // The count and the range re-emit from the resolved type: `size N`, and
+    // the inclusive range `size lo…hi` / `size lo…∞` (the authored glyph is
+    // the formatter's d3f98601 mechanism, not built here).
+    let source = "functio f(lista<numerus, magnitudo 4> a, lista<numerus, magnitudo 2‥5> b, lista<numerus, magnitudo 1…∞> c) → numerus { redde 0 }\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("lista<numerus, magnitudo 4> a"), "{emitted}");
+    assert!(emitted.contains("lista<numerus, magnitudo 2…4> b"), "{emitted}");
+    assert!(emitted.contains("lista<numerus, magnitudo 1…∞> c"), "{emitted}");
 }

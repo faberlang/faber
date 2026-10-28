@@ -1,0 +1,28 @@
++++
+term = "list<T, size lo‥hi>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A bare range after a list is refused: a bare range bounds a value, not a count."
+syntax = "list<int, 1…8> — rejected; write list<int, size 1…8>"
+related = ["list<T, size lo‥hi>", "size", "‥", "…"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:list_count_needs_size"
++++
+# =============================================================================
+# list<T, lo…hi> — a bare range bounds a value
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • In a type a bare range bounds a value (`trapping<u8, 0…255>`); after `size` a range bounds a count. A list names its count, so the range needs `size`.
+#
+# Common mistakes:
+#   • Reading `list<int, 1…8>` as a length range; the range is the value bound of a number type.
+
+main {
+    let list<int, 1…8> xs ← [1]
+    print xs
+}

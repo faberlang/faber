@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "branch"
 canonical = false
 summary = "Decline: discerne matches a closed set, so a length-shaped collection pattern or a numeric width pattern is not a member of the scrutinee type and is rejected with SEM010:discerne_pattern_not_in_closed_set."
-syntax = "discerne <list<T>> { case list<T, N> ... } — rejected; ask a length with .length() in an if, a width with is"
+syntax = "discerne <list<T>> { case list<T, size N> ... } — rejected; ask a length with .length() in an if, a width with is"
 related = ["discerne", "casu", "est"]
 locale = "en"
 +++
@@ -23,7 +23,7 @@ locale = "en"
 # A length bound is not a member of list<int>.
 fn classify(list<int> values) → string {
     match values {
-        case list<int, 4> {
+        case list<int, size 4> {
             return "short"
         }
         case list<int> {

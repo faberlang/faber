@@ -4,7 +4,7 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
 summary = "A list longer than the target capacity takes the recovery value; one that fits converts."
-syntax = "lista<T> ↦ lista<T, N> ⊥ [7, 8]"
+syntax = "lista<T> ↦ lista<T, magnitudo N> ⊥ [7, 8]"
 related = ["↦", "⊥", "lista", "bounded"]
 locale = "en"
 +++
@@ -13,7 +13,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • `list<int> ↦ list<int, 2>` checks the source length against the
+#   • `list<int> ↦ list<int, size 2>` checks the source length against the
 #     capacity when the conversion runs.
 #   • A source longer than the capacity takes the `⊥` recovery value.
 #   • A source that fits converts unchanged.
@@ -25,10 +25,10 @@ main {
     let list<int> big ← [1, 2, 3]
     let list<int> small ← [4, 5]
 
-    let list<int, 2> over ← big ↦ list<int, 2> ⊥ [7, 8]
+    let list<int, size 2> over ← big ↦ list<int, size 2> ⊥ [7, 8]
     print over
     print over.length()
 
-    let list<int, 2> fits ← small ↦ list<int, 2> ⊥ [7, 8]
+    let list<int, size 2> fits ← small ↦ list<int, size 2> ⊥ [7, 8]
     print fits
 }

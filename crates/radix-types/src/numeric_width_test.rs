@@ -839,7 +839,7 @@ mod ranged_list {
     fn the_sugar_forms_keep_one_identity() {
         let mut types = TypeTable::new();
         let int = types.primitive(Primitive::Numerus);
-        // `list<T>` is `0…∞`; `list<T, N>` is `0…N`.
+        // `list<T>` is `0…∞`; `list<T, size N>` is `0…N`.
         assert_eq!(types.ranged_array(int, 0, None), types.array(int));
         let capacity = types.intern_index(crate::IndexExpr::Literal(6));
         let bounded = types.bounded_array(int, capacity);
