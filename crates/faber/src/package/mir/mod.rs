@@ -619,18 +619,20 @@ fn run_declared_kernels_on_device_session<H: radix_mir_runner::Host + ?Sized>(
 /// An admitted, opened device session: the discovery receipt line has been
 /// printed, and the session waits for the lowered unit to dispatch.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
-struct AdmittedDeviceSession {
+pub(crate) struct AdmittedDeviceSession {
     session: radix_device_core::session::DeviceSession,
     backend: super::device::DeviceImageBackend,
-    receipt: String,
+    pub(crate) receipt: String,
     /// Time spent opening and admitting the session, in nanoseconds.
     admit_ns: u64,
+    /// Whether the run captures its kernel calls (the C3 comparator).
+    pub(crate) trace_kernels: bool,
 }
 
 /// Open the selected device, print the discovery receipt, and pick the
 /// per-kernel image backend.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
-fn admit_device_session(
+pub(crate) fn admit_device_session(
     input: &Path,
     selection: DeviceSelection,
     registry: &mut radix_device_core::registry::DeviceRegistry,
@@ -685,6 +687,7 @@ fn open_device_session(
         backend,
         receipt: receipt.render(),
         admit_ns,
+        trace_kernels: false,
     })
 }
 
@@ -708,6 +711,8 @@ pub struct DeviceRunPhases {
     /// Wall time spent executing the entry, in nanoseconds.
     pub execution_ns: u64,
     dispatcher: super::device::DispatcherReceipt,
+    /// The kernel calls the run captured, when it was a traced run.
+    pub kernel_trace: Option<radix_mir_runner::kernel_trace::KernelTrace>,
 }
 
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
@@ -902,7 +907,7 @@ fn session_dispatcher(
 /// Build the device image from the lowered unit and run the argument-bound
 /// entry on the MIR runner under kernel dispatch through the admitted session.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
-fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
+pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     input: &Path,
     admitted: AdmittedDeviceSession,
     lowered: &radix::module::mir::LoweredMirUnit<'_>,
@@ -915,6 +920,7 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     use std::time::Instant;
 
     let admit_ns = admitted.admit_ns;
+    let trace_kernels = admitted.trace_kernels;
     let SessionDispatcher {
         dispatcher,
         image_build_ns,
@@ -960,9 +966,19 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
     // plain runner route). Reading the return on the unmetered arm too keeps a
     // dynamic exit from being silently dropped now that plan time admits it.
     let execution_start = Instant::now();
-    let outcome = radix_mir_runner::run_function_with_kernel_dispatcher_and_stats(
-        validated, entry, host, &hook,
-    )
+    let outcome = if trace_kernels {
+        radix_mir_runner::run_function_with_kernel_trace(
+            validated,
+            entry,
+            host,
+            radix_mir_runner::RunnerKernelPolicy::Dispatch,
+            Some(&hook),
+        )
+    } else {
+        radix_mir_runner::run_function_with_kernel_dispatcher_and_stats(
+            validated, entry, host, &hook,
+        )
+    }
     .map_err(runner_diagnostics)?;
     let execution_ns = execution_start.elapsed().as_nanos() as u64;
     // WHY: taken here, before the exit handling (`host.exit` panics in tests)
@@ -979,12 +995,17 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         module_compile_ns,
         execution_ns,
         dispatcher: dispatcher_receipt,
+        kernel_trace: outcome.kernel_trace.clone(),
     };
     if let Err(errors) = outcome.result {
         return Err(DeviceRunFailure {
             diagnostics: runner_diagnostics(errors),
             partial: Some((collect_stats.then_some(outcome.stats), phases)),
         });
+    }
+    // A traced run is a measurement: the entry's exit status is not applied.
+    if trace_kernels {
+        return Ok((None, phases));
     }
     if let Some(radix_mir_runner::Value::Int(code)) = outcome.return_value {
         // WHY: a process exit status is `i32` while the Faber `numerus`
@@ -1001,8 +1022,8 @@ fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
 /// A failed [`run_admitted_device_session`]: the diagnostics, and the host
 /// meter and phase clocks of a run that failed after it started executing.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
-struct DeviceRunFailure {
-    diagnostics: Vec<Diagnostic>,
+pub(crate) struct DeviceRunFailure {
+    pub(crate) diagnostics: Vec<Diagnostic>,
     partial: Option<(Option<radix_mir_runner::RunnerStats>, DeviceRunPhases)>,
 }
 
