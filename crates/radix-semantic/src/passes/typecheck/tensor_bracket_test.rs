@@ -303,6 +303,24 @@ fn tensor_bracket_slot_count_mismatch_rejects() {
 }
 
 #[test]
+fn tensor_bracket_slot_negative_range_bounds_rejects() {
+    rejects_with_issue(
+        r"functio bad(tf32[2, 3] g) → vacuum {
+    sit _ slice ← g[[1, -1 ‥ 2]]
+    nota slice
+}",
+        "index_provably_out_of_bounds",
+    );
+    rejects_with_issue(
+        r"functio bad(tf32[2, 3] g) → vacuum {
+    sit _ slice ← g[[1, 0 ‥ 3 per -1]]
+    nota slice
+}",
+        "index_provably_out_of_bounds",
+    );
+}
+
+#[test]
 fn tensor_bracket_slot_window_out_of_range_rejects() {
     rejects_with_issue(
         r"functio bad(tf32[2, 3] g) → tf32[2] {
