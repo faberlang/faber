@@ -72,7 +72,6 @@ impl HirVisitor for DecisionPointCounter {
             | HirExpressionKind::Handled { .. }
             | HirExpressionKind::Trap(_)
             | HirExpressionKind::CallDefault { .. }
-            | HirExpressionKind::FirstMatch { .. }
             | HirExpressionKind::Scan { .. } => self.0 += 1,
             HirExpressionKind::Binary(HirBinOp::And | HirBinOp::Or | HirBinOp::Coalesce, _, _) => {
                 self.0 += 1;

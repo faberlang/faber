@@ -716,7 +716,18 @@ pub struct FunctionProvenanceTableWire {
 /// records. A loaded unit carried none, so a backend treated an imported
 /// `Orderable` as an ordinary trait and resolved it to
 /// `__faber_unresolved_def`; schema-v54 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 55;
+/// Version 56 retires the dedicated first-match expression and adds
+/// `HirReductionOp::First` (`reduce via first`, la `reducta via prima`): the
+/// `HirExpressionKind::FirstMatch` variant is gone, shifting the serde ordinals
+/// of every later expression variant, and the reduction operator enum gained a
+/// variant; schema-v55 artifacts fail closed.
+/// Version 57 adds the `MessagePack` signed-128-bit integer extension
+/// (`fixext 16`, extension type 1, big-endian two's complement): the unit
+/// carries `i128` facts (affine size offsets, ranged-integer bounds) and the
+/// named-field codec had no wire form for them, so a unit holding one could
+/// not be written. Every `i128` field now rides the extension and reads back
+/// only from it; schema-v56 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 57;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -104,6 +104,7 @@ fn reduction_words_are_tokenless_contextual_rows_with_reduction_owners() {
         ("quilibet", KeywordOwner::ReductionOperator),
         ("argmaxima", KeywordOwner::ReductionOperator),
         ("argminima", KeywordOwner::ReductionOperator),
+        ("prima", KeywordOwner::ReductionOperator),
     ];
     for &(text, owner) in new_rows {
         let spec =
@@ -382,11 +383,7 @@ fn identifier_like_owner_policy_is_shared_across_keyword_scopes() {
         );
     }
 
-    for owner in [
-        KeywordOwner::AnnotationName,
-        KeywordOwner::FunctionModifier,
-        KeywordOwner::PredicateOperator,
-    ] {
+    for owner in [KeywordOwner::AnnotationName, KeywordOwner::FunctionModifier] {
         assert_eq!(keyword_allowed_as_ident(owner, &TokenKind::Scribe), None);
         assert_eq!(keyword_allowed_as_ident(owner, &TokenKind::Fragilis), None);
     }

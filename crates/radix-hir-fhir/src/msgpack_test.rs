@@ -1297,3 +1297,104 @@ fn msgpack_resolved_use_local_round_trips() {
     let decoded = decode_msgpack(&bytes).expect("valid resolved-use locals must round-trip");
     assert_eq!(decoded.resolved_uses, artifact.resolved_uses);
 }
+
+/// Serializes a value through the codec's serde `Serializer` and reads it
+/// back through the `Value` tree, the way every wire type travels.
+fn serde_round_trip<T>(value: &T) -> (Vec<u8>, T)
+where
+    T: Serialize + for<'de> Deserialize<'de>,
+{
+    let mut out = Vec::new();
+    value
+        .serialize(Serializer { out: &mut out })
+        .expect("serialize");
+    let back = T::deserialize(Value::from_bytes(&out).expect("parse")).expect("deserialize");
+    (out, back)
+}
+
+#[test]
+fn msgpack_i128_extension_pins_its_wire_form() {
+    // `fixext 16` (0xd8), extension type 1, then 16 big-endian two's
+    // complement bytes, whatever the magnitude.
+    let mut zero = vec![0xd8, 0x01];
+    zero.extend_from_slice(&[0u8; 16]);
+    assert_wire(&Value::Int128(0), &zero, "i128 zero is still the extension");
+    let mut minus_one = vec![0xd8, 0x01];
+    minus_one.extend_from_slice(&[0xffu8; 16]);
+    assert_wire(&Value::Int128(-1), &minus_one, "i128 -1 is all ones");
+}
+
+#[test]
+fn msgpack_i128_round_trips_the_full_range_and_the_i64_boundary() {
+    let values = [
+        i128::MIN,
+        i128::MIN + 1,
+        i128::from(i64::MIN) - 1,
+        i128::from(i64::MIN),
+        -1,
+        0,
+        1,
+        i128::from(i64::MAX),
+        i128::from(i64::MAX) + 1,
+        i128::from(u64::MAX),
+        i128::from(u64::MAX) + 1,
+        i128::MAX - 1,
+        i128::MAX,
+    ];
+    for value in values {
+        assert_wire(&Value::Int128(value), &[0xd8, 0x01], "i128 value");
+        let (bytes, back) = serde_round_trip(&value);
+        assert_eq!(bytes.len(), 18, "{value}: one fixext 16 value");
+        assert_eq!(back, value, "{value}: serde round trip");
+    }
+}
+
+#[test]
+fn msgpack_i128_wire_facts_round_trip() {
+    // The artifact's own i128 carriers: a constant range bound and the extent
+    // condition's two bounds.
+    let range = crate::artifact::KernelRangeExprWire::Add(
+        Box::new(crate::artifact::KernelRangeExprWire::Constant(i128::MIN)),
+        Box::new(crate::artifact::KernelRangeExprWire::Constant(i128::MAX)),
+    );
+    let (_, back) = serde_round_trip(&range);
+    assert_eq!(back, range);
+
+    let condition = crate::artifact::KernelExtentConditionWire {
+        span: radix_lexer::Span::default(),
+        range: crate::artifact::KernelValueRangeWire {
+            minimum: crate::artifact::KernelRangeExprWire::Constant(i128::from(i64::MIN) - 1),
+            maximum: crate::artifact::KernelRangeExprWire::Constant(i128::from(i64::MAX) + 1),
+        },
+        minimum: i128::MIN,
+        maximum: i128::MAX,
+    };
+    let (_, back) = serde_round_trip(&condition);
+    assert_eq!(back, condition);
+}
+
+#[test]
+fn msgpack_i128_decode_fails_closed_on_other_shapes() {
+    // An `i128` field reads only the extension: a plain int is not one.
+    let mut plain = Vec::new();
+    write_int(&mut plain, 7);
+    let err = i128::deserialize(Value::from_bytes(&plain).expect("parse"))
+        .expect_err("a plain int is not an i128");
+    assert!(matches!(err, MsgpackError::Decode(_)), "{err:?}");
+
+    // Any other extension type is refused at parse time.
+    let mut other = vec![0xd8, 0x02];
+    other.extend_from_slice(&[0u8; 16]);
+    assert!(matches!(
+        Value::from_bytes(&other),
+        Err(MsgpackError::Decode(_))
+    ));
+
+    // A short payload is truncation, not a narrower value.
+    let mut short = vec![0xd8, 0x01];
+    short.extend_from_slice(&[0u8; 15]);
+    assert!(matches!(
+        Value::from_bytes(&short),
+        Err(MsgpackError::Truncated)
+    ));
+}

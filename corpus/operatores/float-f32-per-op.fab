@@ -1,0 +1,49 @@
++++
+term = "f32"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "additive_expr", "multiplicative_expr"]
+category = "arithmetic"
+summary = "f32 arithmetic rounds to single precision after every operation; nothing traps or clamps."
+syntax = "f32"
+related = ["f32", "f64", "policy-float"]
+locale = "en"
++++
+# =============================================================================
+# f32 — f32 arithmetic rounds to single precision after every operation; nothing traps or clamps.
+# =============================================================================
+#
+# What this teaches:
+#   • A bare `f32` is IEEE single precision: each operation rounds its
+#     result to 24 bits of significand, so the order of the additions
+#     changes the answer
+#   • `16777216.0 + 1.0 + 1.0` stays 16777216 in `f32`, while `16777216.0
+#     + (1.0 + 1.0)` is 16777218; the same sums in `f64` are exact
+#   • An overflow gives infinity as IEEE says; no operation traps and
+#     nothing clamps to the largest finite value
+#
+# Common mistakes:
+#   • Expecting the `f32` sum to equal the `f64` sum: it is rounded at
+#     every operation, not once at the end
+#   • Expecting `m * m` to trap or clamp: only a `trapping<f32>` cell
+#     checks, and only at a store (see policy-float)
+#
+# See also: policy-float, f32, f64
+# =============================================================================
+
+main {
+    let f32 big ← 16777216.0
+    let f32 one ← 1.0
+    print big + one
+    print big + one + one
+    print big + (one + one)
+    let f64 wide ← 16777216.0
+    print wide + 1.0 + 1.0
+    let f32 tenth ← 0.1
+    print tenth + tenth + tenth
+    let f64 wide_tenth ← 0.1
+    print wide_tenth + wide_tenth + wide_tenth
+    let f32 m ← 3.4028235e38
+    print m * m
+    let f32 sq ← m * m
+    print sq - sq
+}

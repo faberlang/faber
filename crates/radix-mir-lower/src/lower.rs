@@ -2445,6 +2445,9 @@ struct ReductionFoldContext {
     group: Option<HirExpression>,
     group_dims: Vec<usize>,
     error_tensor: Option<MirOperand>,
+    /// The term binder's local: the element a `First` fold stores when its
+    /// predicate holds. Unused by every other operator.
+    element: Option<MirLocalId>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -3776,6 +3779,21 @@ impl<'a> FunctionBuilder<'a> {
                             return None;
                         }
                     };
+                    // A device body reads the axis extent the launch already
+                    // carries, as the loop bounds do: no `f64` shape-size call.
+                    if self.is_device_lowering()
+                        && let MirShapeExpr::TensorAxis { argument, axis } = &expression
+                        && let Some(MirOperand::Place(tensor)) = usize::try_from(*argument)
+                            .ok()
+                            .and_then(|index| arguments.get(index))
+                    {
+                        let ty = self.expr_ty(expr)?;
+                        return Some(self.assign_temp(
+                            MirValueKind::TensorExtent { tensor: MirOperand::Place(tensor.clone()), axis: *axis },
+                            ty,
+                            expr.span,
+                        ));
+                    }
                     let scalar = self.runtime_call_value(
                         MirIntrinsic::TensorShapeSize(expression),
                         arguments,
@@ -3785,19 +3803,19 @@ impl<'a> FunctionBuilder<'a> {
                     // Size-type Z1 force: the size name reads as an int, so
                     // convert the Fractus shape-size operand (same pattern as
                     // lower/runtime.rs rope shape arguments).
-                    let numerus = self.types.primitive(Primitive::Numerus);
+                    let numerus = self.expr_ty(expr)?;
                     return Some(self.runtime_call_value(
                         MirIntrinsic::Convert(MirConversion {
                             store: None,
                             flavor: MirConversionFlavor::Runtime,
                             source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
-                            target_ty: MirType::semantic(numerus),
+                            target_ty: numerus,
                             params: Vec::new(),
                             recovery: None,
                             struct_defaults: Vec::new(),
                         }),
                         vec![scalar],
-                        MirType::semantic(numerus),
+                        numerus,
                         expr.span,
                     ));
                 }
@@ -5612,9 +5630,6 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Reduction { .. } => "reducta_not_lowered",
         HirExpressionKind::Scan { .. } => "scan_not_lowered",
         HirExpressionKind::Sort { .. } => "sort_expression_not_lowered",
-        // Unreachable from the lowering dispatcher (first-match lowers through
-        // `collection_higher_order`); kept so this naming match stays exhaustive.
-        HirExpressionKind::FirstMatch { .. } => "primus_quem before first-match MIR lowering",
         HirExpressionKind::Intervallum { .. } => "range expressions before range MIR lowering",
         HirExpressionKind::Array(_) => "array literals before aggregate MIR lowering",
         HirExpressionKind::Struct(_, _) => "struct literals before aggregate MIR lowering",

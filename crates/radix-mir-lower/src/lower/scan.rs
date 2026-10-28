@@ -56,7 +56,7 @@ impl FunctionBuilder<'_> {
         else {
             return None;
         };
-        if matches!(op, HirReductionOp::ArgMax | HirReductionOp::ArgMin) {
+        if matches!(op, HirReductionOp::ArgMax | HirReductionOp::ArgMin | HirReductionOp::First) {
             self.errors
                 .push(MirError::unsupported(expr.span, "scan_operator_unsupported"));
             return None;
@@ -344,6 +344,7 @@ impl FunctionBuilder<'_> {
             group: None,
             group_dims: Vec::new(),
             error_tensor: None,
+            element: None,
         };
         self.combine_reduction_bucket(&fold, &bucket, MirOperand::Place(MirPlace::local(term_local)), span);
         if *total == HirScanTotal::Inclusive {

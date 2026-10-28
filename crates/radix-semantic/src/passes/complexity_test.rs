@@ -429,16 +429,6 @@ fn row_body_carrying_folds_count() {
         2,
         "Reduction per-element body"
     );
-    assert_eq!(
-        score(vec![expr(HirExpressionKind::FirstMatch {
-            source: boxed(HirExpressionKind::Literal(HirLiteral::Nil)),
-            coordinates: Vec::new(),
-            binding,
-            body: block(vec![]),
-        })]),
-        2,
-        "FirstMatch per-candidate body"
-    );
 }
 
 #[test]

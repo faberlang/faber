@@ -1151,11 +1151,42 @@ fn validate_type_form(
                 | radix_types::Type::SaturatingWord(_)
                 | radix_types::Type::SizedInstans(_)
                 | radix_types::Type::BoundedTextus { .. }
-                | radix_types::Type::BoundedAscii { .. }
-                | radix_types::Type::BoundedOcteti { .. } => {
+                | radix_types::Type::BoundedAscii { .. } => {
                     if level.0 != 0 || !form.args.is_empty() {
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
                     }
+                }
+                radix_types::Type::BoundedOcteti { .. } => {
+                    // The authored `list<b8, N>`: the bounded byte buffer is
+                    // authored as a list head over one raw-byte (`b8`) element
+                    // argument; the capacity lives in the root witness, as for
+                    // every bounded list.
+                    if level.0 != 0 || form.args.len() != 1 {
+                        return Err(type_presentation_issue("bounded_octeti_shape", site));
+                    }
+                    let radix_hir::HirTypeFormArg::Type(child) = &form.args[0] else {
+                        return Err(type_presentation_issue("type_argument_kind", site));
+                    };
+                    if !matches!(
+                        types.types().get(child.ty.0 as usize),
+                        Some(radix_types::Type::Bits(radix_types::BitsWidth::B8))
+                    ) {
+                        return Err(type_presentation_issue("bounded_octeti_element", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        child.ty,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        alias_params,
+                        conversation,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
                 }
                 radix_types::Type::Array(element) => {
                     // `octeti` is authored as the zero-argument primitive word
@@ -1968,19 +1999,6 @@ fn collect_expr_defs(
                 collect_block_defs(body, registry);
             }
         }
-        HirExpressionKind::FirstMatch {
-            source,
-            coordinates,
-            binding,
-            body,
-        } => {
-            collect_expr_defs(source, registry);
-            for (def_id, _) in coordinates {
-                registry.insert(*def_id);
-            }
-            registry.insert(binding.0);
-            collect_block_defs(body, registry);
-        }
         HirExpressionKind::Praefixum(inner)
         | HirExpressionKind::Format { value: inner, .. }
         | HirExpressionKind::Unary(_, inner)
@@ -2365,10 +2383,6 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 if let Some(body) = body {
                     collect_block(body, registry);
                 }
-            }
-            HirExpressionKind::FirstMatch { source, body, .. } => {
-                collect_expr(source, registry);
-                collect_block(body, registry);
             }
             HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
                 collect_expr(lhs, registry);
@@ -3433,21 +3447,6 @@ pub(crate) fn validate_referential_integrity(
                 if let Some(body) = body {
                     validate_block(body, checks)?;
                 }
-            }
-            HirExpressionKind::FirstMatch {
-                source,
-                coordinates,
-                binding,
-                body,
-            } => {
-                validate_expr(source, checks)?;
-                for (def_id, name) in coordinates {
-                    checks.check_def(*def_id)?;
-                    checks.check_symbol(*name)?;
-                }
-                checks.check_def(binding.0)?;
-                checks.check_symbol(binding.1)?;
-                validate_block(body, checks)?;
             }
             HirExpressionKind::Path(def_id) => checks.check_def(*def_id)?,
             HirExpressionKind::Literal(lit) => match lit {

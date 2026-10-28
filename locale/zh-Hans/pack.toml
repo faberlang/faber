@@ -88,8 +88,6 @@ reddet = "等返"
 tacebit = "等弃"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "空集"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "求和"
 filum = "线程"
 maxima = "最大"
@@ -163,6 +161,7 @@ numeratio = "计数"
 quilibet = "任一"
 argmaxima = "最大值索引"
 argminima = "最小值索引"
+prima = "第一个"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "排序"
 ascendens = "升序"
@@ -4025,18 +4024,6 @@ message = "non-null 索引表达式后需要 ']'"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null 调用参数后需要 ')'"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "'primus_quem' 后需要 '('"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "首个匹配来源后需要 ','"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "需要 'ubi' 谓词尾部"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "首个匹配谓词后需要 ')'"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor 字段后需要 '}'"
 
@@ -4176,3 +4163,9 @@ help = "'⇇' 现在会将右侧的值复制到左侧现有的 tensor 存储中�
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking 合约必须在一个类型参数上准确声明 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
 help = "声明 `{implendum} Sink<T>`，并包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "内核 `{kernel}` 在 {device} 设备上串行运行"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "内核 `{kernel}`：其跨 {partitions} 个分区的 {kind} 是可以避免的：{avoidable}（{reason}）"

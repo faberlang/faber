@@ -1539,11 +1539,14 @@ fn assignment_targets_in_block(block: &HirBlock) -> FxHashSet<DefId> {
     collector.targets
 }
 
-fn assignment_targets_in_expr(expr: &HirExpression) -> AssignmentTargetCollector {
+fn assignment_targets_in_expr(expr: &HirExpression) -> AssignmentTargetCollector<'_> {
     let mut collector = AssignmentTargetCollector::default();
     collector.visit_expr(expr);
     collector
 }
+
+/// Whether a method call (receiver, name, argument count) only reads.
+type ReadOnlyCall<'a> = dyn Fn(&HirExpression, Symbol, usize) -> bool + 'a;
 
 #[derive(Default)]
 struct AssignmentTargetCollector<'a> {
@@ -1557,7 +1560,7 @@ struct AssignmentTargetCollector<'a> {
     kills_ranges: bool,
     /// Whether a method call is a registry intrinsic that only reads and so
     /// writes no list. Absent where only assignment targets are wanted.
-    read_only: Option<&'a dyn Fn(&HirExpression, Symbol, usize) -> bool>,
+    read_only: Option<&'a ReadOnlyCall<'a>>,
 }
 
 impl HirVisitor for AssignmentTargetCollector<'_> {

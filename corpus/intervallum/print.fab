@@ -1,0 +1,42 @@
++++
+term = "range"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "type_arguments", "type_argument", "range_expr"]
+category = "range"
+summary = "A range prints in its glyph form: `2‥5` for an exclusive end and `2…5` for an inclusive one."
+syntax = "print <range>"
+related = ["range", "‥", "…", "range-of-value"]
+locale = "en"
++++
+# =============================================================================
+# range — A range prints in its glyph form: `2‥5` for an exclusive end and `2…5` for an inclusive one.
+# =============================================================================
+#
+# What this teaches:
+#   • `print r` on a `range<int>` shows the range as it was written,
+#     bounds and glyph
+#   • The exclusive glyph `‥` and the inclusive glyph `…` print
+#     differently, so two ranges with the same bounds differ in their
+#     output
+#   • A stepped range prints its step after `per`: `0…9 step 3` prints as
+#     `0…9 per 3`
+#
+# Common mistakes:
+#   • Expecting `print r` to list the members: iterate with `for range r
+#     let i` for that
+#   • Expecting the inclusive and exclusive forms to print alike: the
+#     glyph is part of the value
+#
+# See also: range-of-value, stepped-value, algebra
+# =============================================================================
+
+main {
+    let range<int> exclusive ← 2‥5
+    let range<int> inclusive ← 2…5
+    print exclusive
+    print inclusive
+    let range<int> empty_run ← 3‥3
+    print empty_run
+    let range<int, 3> stepped ← 0…9 step 3
+    print stepped
+}

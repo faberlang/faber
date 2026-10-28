@@ -1,0 +1,18 @@
+version = 1
+id = "corpus/importa/selective-constant.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/selective-constant.fab"
+category = "package"
+domain = "program"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.mir]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "unsupported MIR lowering: path that does not resolve to a local value"
+known_fail_why = "The MIR emit declines this program: unsupported MIR lowering: path that does not resolve to a local value."

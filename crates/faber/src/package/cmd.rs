@@ -24,7 +24,6 @@ use super::cargo::{
     feature = "mir-wasm"
 ))]
 use super::discover_build_layout as discover_package_layout;
-#[cfg(feature = "hir-go")]
 #[cfg(feature = "hir-rust")]
 use super::manifest::FaberManifest;
 use super::manifest_build_target_for_input;
@@ -1052,10 +1051,6 @@ fn advice_target(request: DeviceAdviceRequest) -> (super::device::AdviceDevice, 
             crate::exit_status::exit_usage();
         }
     };
-    if request.partitions.is_some() && device == AdviceDevice::Cuda {
-        eprintln!("error: `--partitions` is valid only with `--device cpu` or `--device metal`");
-        crate::exit_status::exit_usage();
-    }
     (device, request.partitions.unwrap_or(1))
 }
 
@@ -1080,12 +1075,18 @@ fn print_device_advice(
     locale_pack: Option<&radix::module::locale::LocalePack>,
 ) {
     let mut advice = Vec::new();
+    let mut audit = Vec::new();
     let mut failures = Vec::new();
     for unit in lowering_units(config, input_path) {
         match super::mir::with_check_lowered_package_mir(config, &unit, |lowered| {
-            super::device::split_advice(lowered, device, partitions)
+            let rows = super::device::split_advice(lowered, device, partitions)?;
+            let syncs = super::device::span_audit(lowered, device, partitions)?;
+            Ok((rows, syncs))
         }) {
-            Ok(Ok(rows)) => advice.extend(rows),
+            Ok(Ok((rows, syncs))) => {
+                advice.extend(rows);
+                audit.extend(syncs);
+            }
             Ok(Err(errors)) | Err(errors) => failures.extend(errors),
         }
     }
@@ -1095,10 +1096,17 @@ fn print_device_advice(
     // A library's modules lower one by one and may share kernels.
     advice.sort_by(|a, b| a.kernel.cmp(&b.kernel));
     advice.dedup();
+    audit.sort();
+    audit.dedup();
     let file = input_path.display().to_string();
     let diagnostics: Vec<_> = advice
         .iter()
         .map(|row| super::device::advice_diagnostic(row, device, partitions, &file))
+        .chain(
+            audit
+                .iter()
+                .map(|row| super::device::audit_diagnostic(row, device, partitions, &file)),
+        )
         .collect();
     if mode == DiagnosticMode::Diagnostics {
         if !diagnostics.is_empty() {

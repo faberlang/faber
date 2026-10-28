@@ -515,19 +515,6 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
                 visitor.visit_block(body);
             }
         }
-        HirExpressionKind::FirstMatch {
-            source,
-            coordinates,
-            binding,
-            body,
-        } => {
-            for (coordinate_def_id, coordinate_name) in coordinates {
-                visitor.visit_def(*coordinate_def_id, *coordinate_name);
-            }
-            visitor.visit_def(binding.0, binding.1);
-            visitor.visit_expr(source);
-            visitor.visit_block(body);
-        }
         HirExpressionKind::Intervallum {
             start, end, step, ..
         } => {
@@ -1162,19 +1149,6 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             if let Some(body) = body {
                 visitor.visit_block_mut(body);
             }
-        }
-        HirExpressionKind::FirstMatch {
-            source,
-            coordinates,
-            binding,
-            body,
-        } => {
-            for (coordinate_def_id, coordinate_name) in coordinates {
-                visitor.visit_def(*coordinate_def_id, *coordinate_name);
-            }
-            visitor.visit_def(binding.0, binding.1);
-            visitor.visit_expr_mut(source);
-            visitor.visit_block_mut(body);
         }
         HirExpressionKind::Intervallum {
             start, end, step, ..

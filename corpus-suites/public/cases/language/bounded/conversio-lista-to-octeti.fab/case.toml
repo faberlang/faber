@@ -8,4 +8,14 @@ domain = "numerics"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+failure_kind = "stdout-mismatch"
+known_fail_why = "The runner prints a bounded list<b8, N> as its raw bytes (here 0x01 0x02 on stdout), not as the bit-token list `[0x01, 0x02]` that the display rule gives list<b8>."
+
+[targets.runner.expect]
+stdout = "stdout.expected"

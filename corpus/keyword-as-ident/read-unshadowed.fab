@@ -8,7 +8,6 @@ summary = "Unshadowed read stays the lege builtin."
 syntax = "let _ input ← read"
 related = ["lege"]
 locale = "en"
-no_expected = "reads-stdin"
 +++
 # =============================================================================
 # keyword-as-ident — unshadowed `read` builtin
@@ -16,13 +15,13 @@ no_expected = "reads-stdin"
 #
 # What this teaches:
 #   • When no binding named `read` is in scope, bare `read` is the lege
-#     builtin (stdin line). Same rule as corpus/lege/lege.fab.
+#     builtin (all of stdin). Same rule as corpus/lege/lege.fab.
 #   • No syntactic escape hatch — the builtin stays reachable by not
 #     shadowing the spelling.
 #
 # Common mistakes:
-#   • Treating this file as a stdout golden — stdin is interactive (no
-#     sibling .expected), matching lege/lege.fab.
+#   • Expecting a prompt: stdin comes from the sibling read-unshadowed.stdin
+#     fixture, which is empty, so the read reaches end of input at once.
 #
 # See also: lege, read-shadowed.fab
 # =============================================================================
@@ -34,10 +33,12 @@ no_expected = "reads-stdin"
 #   readExpr :← 'read'
 #
 # EXPECTED OUTPUT:
-#   none — interactive stdin, same class as lege/lege.fab
+#   none — the empty stdin fixture ends the input, so the read gives `none`
+#   (read-unshadowed.expected).
 #
 # BACKEND:
-#   Rust/Go/roundtrip e2e follow the lege/lege.fab stdin-read class.
+#   Targets read the fixture through the case manifest's `stdin` field; the
+#   outcomes row of each target pins how it handles a read to end of input.
 
 main {
     let string ∪ none input ← read

@@ -53,7 +53,7 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
             "functio total(tf32[4] xs) → f32 { redde reducta via summa ex xs }\n",
             "functio total(tf32[4] xs) → f32 { redde reducta via unknown ex xs }\n",
             "functio total(tf32[4] xs) → f32 { redde reducta ex xs }\n",
-            "summa, factum, maxima, minima, argmaxima, argminima, omnia, quilibet, numeratio",
+            "summa, factum, maxima, minima, argmaxima, argminima, omnia, quilibet, numeratio, prima",
         ),
         (
             "en",
@@ -61,7 +61,7 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
             "fn total(tf32[4] xs) → f32 { return reduce via sum from xs }\n",
             "fn total(tf32[4] xs) → f32 { return reduce via unknown from xs }\n",
             "fn total(tf32[4] xs) → f32 { return reduce from xs }\n",
-            "sum, product, max, min, argmax, argmin, all, any, count",
+            "sum, product, max, min, argmax, argmin, all, any, count, first",
         ),
         (
             "zh-Hans",
@@ -69,7 +69,7 @@ fn reduction_surface_round_trips_in_latin_english_and_simplified_chinese() {
             "函数 total(tf32[4] xs) → f32 { 返回 归约 经由 求和 取自 xs }\n",
             "函数 total(tf32[4] xs) → f32 { 返回 归约 经由 unknown 取自 xs }\n",
             "函数 total(tf32[4] xs) → f32 { 返回 归约 取自 xs }\n",
-            "求和, 求积, 最大, 最小, 最大值索引, 最小值索引, 全部, 任一, 计数",
+            "求和, 求积, 最大, 最小, 最大值索引, 最小值索引, 全部, 任一, 计数, 第一个",
         ),
     ];
     for (locale, surface, source, invalid_source, missing_via_source, operators) in cases {
@@ -1642,11 +1642,12 @@ fn inferred_constructor_at_an_optional_slot_reemits_as_the_hole() {
 }
 
 #[test]
-fn first_match_over_array_literal_reemits_with_meaning_intact() {
-    let source = "functio elige() → fractus ∪ nihil {\n    redde primus_quem([1.0, -2.0, 3.0], ubi x { x ≻ 0.0 })\n}\n";
+fn first_reduction_reemits_with_meaning_intact() {
+    let source =
+        "functio elige(tf32[3] x) → fractus ∪ nihil {\n    redde reducta via prima ex x sit v { redde v ≻ 0.0 }\n}\n";
     let session = latin_source_session();
     let emit_pack = crate::locale::latin_locale_pack();
-    let result = reemit_faber(&session, &emit_pack, "first_match.fab", source);
+    let result = reemit_faber(&session, &emit_pack, "first_reduction.fab", source);
     assert!(
         result.success(),
         "re-emit refused: {:?}",
@@ -1657,8 +1658,5 @@ fn first_match_over_array_literal_reemits_with_meaning_intact() {
             .collect::<Vec<_>>()
     );
     let emitted = result.output.expect("emit should produce output").code;
-    assert!(
-        emitted.contains("primus_quem([1.0, -2.0, 3.0]"),
-        "first-match head kept: {emitted}"
-    );
+    assert!(emitted.contains("reducta via prima ex x"), "first operator kept: {emitted}");
 }

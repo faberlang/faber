@@ -193,7 +193,6 @@ mod closing;
 #[path = "construction_source_test.rs"]
 mod construction_source_test;
 pub mod finalize;
-pub mod first_match;
 pub mod format;
 pub mod generic;
 pub mod hashable;

@@ -14,6 +14,7 @@
 //! crate-local so lower-level compiler APIs do not inherit package tool
 //! assumptions.
 
+mod explain_locale;
 mod explain_render;
 pub mod input_shape;
 pub mod io_buf;
@@ -40,6 +41,8 @@ pub fn package_diagnostic_error(
 mod diagnostic_explain_test;
 #[cfg(test)]
 mod explain_example_test;
+#[cfg(test)]
+mod explain_locale_test;
 #[cfg(test)]
 mod explain_test;
 #[cfg(test)]

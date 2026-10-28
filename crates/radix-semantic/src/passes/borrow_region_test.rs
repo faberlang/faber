@@ -202,7 +202,7 @@ fn shifted_limes_view_keeps_provenance_through_wrapper_and_policy_type_args() {
     let main = r"
 main {
     mut tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    mut tf32[3] escaped ← true ✓ base.shift([1]).limes<ZeroGhost>() ✗ base.shift([1]).limes<ZeroGhost>()
+    mut tf32[3] escaped ← true ✓ base.shift([1]).edge<ZeroGhost>() ✗ base.shift([1]).edge<ZeroGhost>()
 }
 ";
     let source = format!("{TENSOR_EDGE_POLICY_DECLARATIONS}{main}");
@@ -222,7 +222,7 @@ fn custom_limes_view_conflicts_with_base_write_until_last_use() {
     let main = r"
 main {
     mut tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    let tf32[3] view ← base.shift([1]).limes<ZeroGhost>()
+    let tf32[3] view ← base.shift([1]).edge<ZeroGhost>()
     base.set([0], 9.0)
     print view.length()
 }

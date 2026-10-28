@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 526 | 530 | 99% |
-| go | 475 | 530 | 90% |
-| ts | 530 | 530 | 100% |
-| faber | 530 | 530 | 100% |
+| rust | 534 | 538 | 99% |
+| go | 483 | 538 | 90% |
+| ts | 538 | 538 | 100% |
+| faber | 538 | 538 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 463 | 533 | 87% |
-| wasm-text | 386 | 533 | 72% |
-| wasm | 385 | 533 | 72% |
-| metal-text | 5 | 533 | 1% |
-| wgsl-text | 5 | 533 | 1% |
-| sexp-struct | 473 | 533 | 89% |
-| sexp | 470 | 533 | 88% |
-| runner | 471 | 533 | 88% |
+| llvm-text | 467 | 541 | 86% |
+| wasm-text | 390 | 541 | 72% |
+| wasm | 389 | 541 | 72% |
+| metal-text | 5 | 541 | 1% |
+| wgsl-text | 5 | 541 | 1% |
+| sexp-struct | 478 | 541 | 88% |
+| sexp | 475 | 541 | 88% |
+| runner | 476 | 541 | 88% |
 
 ## Keywords — application lane
 
@@ -362,10 +362,10 @@ pages of the documentation site.
 | term | llvm-text | wasm-text | wasm | metal-text | wgsl-text | sexp-struct | sexp | runner |
 |---|---|---|---|---|---|---|---|---|
 | <a id=""></a>`!(` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`!.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`!.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id=""></a>`![` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`=` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`?(` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`?(` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
 | <a id=""></a>`?.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`?[` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="aut"></a>`aut` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -397,7 +397,7 @@ pages of the documentation site.
 | <a id=""></a>`∈` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`∧` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`∨` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`∴` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`∴` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id=""></a>`∷` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≡` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≢` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |

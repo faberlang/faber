@@ -51,8 +51,8 @@ N display columns, indentation included. `--width` wins over the manifest key,
 and with neither set nothing wraps. Wrapping only moves existing token
 boundaries onto a new line; it never splits a token, string or comment, and
 never breaks where a newline changes meaning (annotation sugar, schema
-columns, the `si` of a guarded `iace`/`mori`, the `ex` of copy-with-changes, a
-`redde` value, `scribe` and extraction lists). An unbreakable span wider than N
+columns, the `if` of a guarded `throw`/`panic`, the `from` of copy-with-changes, a
+`return` value, `write` and extraction lists). An unbreakable span wider than N
 overflows. `--stdin` has no package, so only the flag applies.
 ";
 
@@ -196,7 +196,7 @@ pub enum Command {
     /// Interactive runner REPL (accumulating cells, re-lowers each line)
     Repl(ReplArgs),
 
-    /// Run proba cases on the MIR runner (no Cargo / rustc on the package)
+    /// Run test cases on the MIR runner (no Cargo / rustc on the package)
     Test(TestArgs),
 
     /// Internal FMIR image runner used by generated executable bundles
@@ -235,7 +235,7 @@ pub enum Command {
     #[command(long_about = CONVERT_LONG_ABOUT)]
     Convert(ConvertArgs),
 
-    /// Insert `var`/`varia` before every unmarked genus field (D16.1 migration;
+    /// Insert `mut` before every unmarked class field (D16.1 migration;
     /// span-based, every other byte unchanged; report-only unless `--write`
     /// is given)
     #[command(name = "field-modifier-codemod")]
@@ -606,7 +606,9 @@ pub struct CheckArgs {
     /// (`cpu`, `metal` or `cuda`): a single-lane kernel, a kernel the device
     /// runs as one sequential call, a kernel it cannot place, and with
     /// `--partitions` a kernel that will not split across the partitions.
-    /// The rows are `info` advice (INFO001), never errors; the package is
+    /// With `--device cuda --partitions N` (N above 1) it also prints the
+    /// planner audit: each kernel whose cross-partition syncs are avoidable,
+    /// and why. The rows are `info` advice (INFO001), never errors; the package is
     /// lowered and its device image built as `faber run --device` builds it,
     /// and nothing runs. Needs a file or package path
     #[arg(
@@ -617,8 +619,8 @@ pub struct CheckArgs {
     )]
     pub device: Option<DeviceChoice>,
 
-    /// With `--device cpu` or `--device metal`: the partition count of the
-    /// one spanned logical device to advise for (default 1), as
+    /// With `--device`: the partition count of the one spanned logical
+    /// device to advise for (default 1), as
     /// `faber run --partitions N`
     #[arg(
         long = "partitions",
@@ -665,6 +667,11 @@ pub struct ExplainArgs {
     /// Emit a machine-readable JSON explanation (one term, or the --list index)
     #[arg(long, requires = "json_target")]
     pub json: bool,
+
+    /// Reader locale whose spellings terms are listed and looked up by (default: the
+    /// current package's faber.toml `[locale]`, else en)
+    #[arg(long = "locale", value_name = "LOCALE")]
+    pub locale: Option<String>,
 
     /// Message language for diagnostic explanation text
     #[arg(
@@ -886,10 +893,10 @@ pub struct TestArgs {
     #[arg(long = "threads", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
     pub threads: Option<u32>,
 
-    /// Environment name that `solum_in` modifiers match, in addition to the
+    /// Environment name that `only_in` modifiers match, in addition to the
     /// OS name.
-    #[arg(long = "solum-in", value_name = "NAME")]
-    pub solum_in: Option<String>,
+    #[arg(long = "only-in", value_name = "NAME")]
+    pub only_in: Option<String>,
 
     /// Promote all warning diagnostics to errors
     #[arg(long)]
@@ -923,11 +930,11 @@ pub struct TestArgs {
     #[arg(long = "exclude", value_name = "PATTERN")]
     pub exclude: Vec<String>,
 
-    /// Select tests by source-level proba name
+    /// Select tests by source-level test name
     #[arg(long)]
     pub name: Option<String>,
 
-    /// Select tests by source-level probandum suite path, joined with `/`.
+    /// Select tests by source-level suite path, joined with `/`.
     /// Repeatable values are combined with OR.
     #[arg(long, value_name = "SUITE")]
     pub suite: Vec<String>,
@@ -949,7 +956,7 @@ pub struct TestArgs {
     #[arg(long = "fail-fast")]
     pub fail_fast: bool,
 
-    /// Select only cases marked with the source-level `solum` focus modifier
+    /// Select only cases marked with the source-level `only` focus modifier
     #[arg(long)]
     pub focused: bool,
 
@@ -982,7 +989,7 @@ pub struct TestArgs {
     pub allow_no_tests: bool,
 
     /// Wall-clock timeout (seconds) applied to every test case that has no
-    /// per-test `timeout` / `temporis` modifier. 0 is rejected fail-closed.
+    /// per-test `timeout` modifier. 0 is rejected fail-closed.
     #[arg(long = "test-timeout", value_name = "SECONDS", value_parser = parse_test_timeout_secs)]
     pub test_timeout: Option<u64>,
 

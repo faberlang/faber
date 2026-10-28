@@ -577,7 +577,7 @@ fn map_edges<size N>(
     tensor<f32, [N]> input,
     mut tensor<f32, [N]> output
 ) → void {
-    let tensor<f32, [N]> mapped ← input.shift([1]).limes<ZeroGhost>()
+    let tensor<f32, [N]> mapped ← input.shift([1]).edge<ZeroGhost>()
     for from mapped at [i] let value {
         output[i] ← value
     }
@@ -1702,4 +1702,31 @@ fn caller_dynamic(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
         "one non-constant argument keeps the conservative row: {:?}",
         helper.failures
     );
+}
+
+#[test]
+fn size_name_read_in_a_kernel_is_an_i32_extent_not_a_wide_integer() {
+    // A size name read in a kernel body is in the lane-coordinate carrier
+    // (`i32`), bounded by the launch extent: it composes with the lane
+    // binders in a guard, in arithmetic stored to an `i32`, and as a float.
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn edges<size H, size W>(tensor<f32, [H, W]> src, mut tensor<f32, [H, W]> dst) → void {
+    for from src at [i, j] thread lane let c {
+        mut f32 r ← c
+        if j ≥ W - 2 then r ← r + 1000.0
+        if i ≡ H - 1 then r ← r + 10.0
+        let i32 q ← (j * 3) ⤓ (W - 2)
+        dst[[i, j]] ← r + (q ↦ f32) + (W ↦ f32)
+    }
+}
+main {}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    assert!(issue_arg(&fixture, "nucleum_wide_integer", "width").is_none());
+    let row = target_row(&fixture, "edges", Target::MirMetal);
+    assert!(row.admitted, "{:?}", row.failures);
 }

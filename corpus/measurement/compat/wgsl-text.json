@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 533
+    "analyzable": 541
   },
   "terms": [
     {
@@ -19,7 +19,7 @@
       "term": "!.",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "![",
@@ -493,7 +493,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 16
+      "analyzable": 18
     },
     {
       "term": "manifest",
@@ -688,12 +688,6 @@
       "analyzable": 1
     },
     {
-      "term": "primus_quem",
-      "rule": "concept",
-      "capable": 0,
-      "analyzable": 2
-    },
-    {
       "term": "privata",
       "rule": "keyword",
       "capable": 0,
@@ -744,6 +738,12 @@
     {
       "term": "reddet",
       "rule": "keyword",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "reducta-first",
+      "rule": "concept",
       "capable": 0,
       "analyzable": 1
     },
@@ -1075,7 +1075,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 43
+      "analyzable": 44
     },
     {
       "term": "⇇",
@@ -1087,7 +1087,7 @@
       "term": "⇐",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "⇒",
@@ -1105,7 +1105,7 @@
       "term": "⇥",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "∈",
@@ -1135,7 +1135,7 @@
       "term": "∴",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 4
     },
     {
       "term": "∷",

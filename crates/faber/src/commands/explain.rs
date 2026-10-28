@@ -7,7 +7,7 @@ use faber_cli::explain::{self, Registry};
 /// Renders explain-corpus entries with CLI policies around mutually exclusive modes.
 pub(super) fn cmd_explain(args: ExplainArgs) {
     if args.list {
-        let registry = load_registry();
+        let registry = load_registry(args.locale.as_deref());
         if args.json {
             match explain::render_list_json(&registry) {
                 Ok(json) => println!("{json}"),
@@ -23,7 +23,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
     }
 
     if let Some(category) = args.category {
-        let registry = load_registry();
+        let registry = load_registry(args.locale.as_deref());
         if let Some(output) = explain::render_category(&registry, &category) {
             print!("{output}");
         } else {
@@ -40,7 +40,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
     }
 
     if let Some(query) = args.search {
-        let registry = load_registry();
+        let registry = load_registry(args.locale.as_deref());
         let hits = registry.search(&query);
         if hits.is_empty() {
             eprintln!("error: no matches found for '{query}'");
@@ -57,12 +57,13 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
         eprintln!();
         eprintln!("Usage:");
         eprintln!("    faber explain <term>");
+        eprintln!("    faber explain --locale <locale> <term>");
         eprintln!("    faber explain --list");
         eprintln!("    faber explain --category <category>");
         eprintln!("    faber explain --search <query>");
         eprintln!();
         eprintln!("Examples:");
-        eprintln!("    faber explain functio");
+        eprintln!("    faber explain fn");
         eprintln!("    faber explain ≡");
         eprintln!("    faber explain ==");
         eprintln!("    faber explain --list");
@@ -102,9 +103,12 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
         }
     }
 
-    let registry = load_registry();
+    let registry = load_registry(args.locale.as_deref());
     let Some(lookup) = registry.lookup(&term) else {
         eprintln!("error: no explanation found for '{term}'");
+        if let Some(spelling) = registry.spelling_of_identity(&term) {
+            eprintln!("hint: in this reader locale '{term}' is spelled '{spelling}'");
+        }
         eprintln!("hint: run `faber explain --list`");
         faber_cli::exit_status::exit_usage();
     };
@@ -122,8 +126,8 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
     }
 }
 
-fn load_registry() -> Registry {
-    match Registry::load() {
+fn load_registry(locale: Option<&str>) -> Registry {
+    match Registry::load_for_locale(locale) {
         Ok(registry) => registry,
         Err(err) => {
             eprintln!("error: failed to load the embedded reference: {err}");
