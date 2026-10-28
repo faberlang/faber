@@ -44,6 +44,16 @@ conversion use `faber convert --to <LOCALE>`. A local declaration must be inside
 a complete function or `main` unit; format does not accept fragments. Does not
 write unless `--write` is given: the default reports each file that would change
 and exits 1 when any would.
+
+Output is not wrapped: canonical lines keep no width limit. `--width N` (or the
+package manifest key `[format] width = N`) opts in to wrapping lines wider than
+N display columns, indentation included. `--width` wins over the manifest key,
+and with neither set nothing wraps. Wrapping only moves existing token
+boundaries onto a new line; it never splits a token, string or comment, and
+never breaks where a newline changes meaning (annotation sugar, schema
+columns, the `si` of a guarded `iace`/`mori`, the `ex` of copy-with-changes, a
+`redde` value, `scribe` and extraction lists). An unbreakable span wider than N
+overflows. `--stdin` has no package, so only the flag applies.
 ";
 
 const CONVERT_LONG_ABOUT: &str = "\
@@ -313,6 +323,13 @@ pub struct FormatArgs {
     /// result to stdout (incompatible with path arguments and the other modes)
     #[arg(long, conflicts_with_all = ["check", "write", "stdout", "paths"])]
     pub stdin: bool,
+
+    /// Wrap lines wider than N display columns (indentation included) at
+    /// legal token boundaries. Wins over the manifest `[format] width`; with
+    /// neither set output is not wrapped. A token or protected span wider
+    /// than N overflows rather than breaking
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+    pub width: Option<u32>,
 }
 
 /// Arguments for `faber convert`.

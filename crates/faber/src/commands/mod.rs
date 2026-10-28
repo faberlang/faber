@@ -386,6 +386,7 @@ fn dispatch(command: Command) {
             stdout: args.stdout,
             write: args.write,
             stdin: args.stdin,
+            width: args.width.and_then(std::num::NonZeroU32::new),
         }),
         Command::FieldModifierCodemod(args) => {
             cmd_field_modifier_codemod(&field_modifier_codemod::FieldModifierCodemodCommand {

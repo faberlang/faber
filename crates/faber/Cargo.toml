@@ -23,6 +23,9 @@ radix = { path = "../radix", default-features = false }
 radix-codegen-shared = { path = "../radix-codegen-shared" }
 # The Rust package build reads the Rust target's needs (regex, runtime) from
 # the HIR; pulled only by `hir-rust`.
+# `faber format --width N`: the opt-in wrapping pass over emitted Faber source;
+# pulled only by `hir-faber`.
+radix-hir-faber = { path = "../radix-hir-faber", optional = true }
 # GI3-5 (gpu-inference-gguf): the Q1-default prefill device-run driver
 # constructs the prefill MIR program programmatically (tensor types via the
 # shared TypeTable / IndexExpr surface — the same typed-fact construction the
@@ -72,7 +75,7 @@ tempfile = "3"
 [features]
 default = ["full-targets", "hir-c"]
 full-targets = ["hir-faber", "hir-fhir", "mir-fmir", "mir-clif", "runner"]
-hir-faber = ["radix/hir-faber"]
+hir-faber = ["radix/hir-faber", "dep:radix-hir-faber"]
 hir-c = ["radix/hir-c"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]

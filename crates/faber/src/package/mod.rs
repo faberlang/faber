@@ -113,7 +113,7 @@ pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     DeviceChoice, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders, manifest_package_build_target as manifest_build_target_for_input,
-    read_manifest,
+    read_manifest, resolve_format_width,
 };
 #[cfg(feature = "runner")]
 pub use manifest::{
