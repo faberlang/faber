@@ -1,0 +1,71 @@
++++
+term = "implendum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "implendum_decl", "implendum_method_decl", "genus_decl", "genus_member", "genus_field_decl", "functio_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "sit_decl", "fixum_decl", "assignment", "incipit_stmt", "itera_stmt", "itera_binding", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "nota_stmt"]
+category = "class"
+canonical = false
+summary = "A concrete argument to a `mut` or `ref` interface parameter: the callee's writes reach the caller."
+syntax = "fn f(mut <interface> p); f(mut <concrete place>)"
+aliases = ["interface access parameter"]
+related = ["implendum", "genus", "implet"]
+locale = "en"
++++
+# =============================================================================
+# implendum — A `mut` or `ref` interface parameter
+# =============================================================================
+#
+# What this teaches:
+#   • A concrete class value passed to a `mut` interface parameter is changed
+#     by the callee's mutating calls, exactly as a direct call would change it
+#   • A `ref` interface parameter reads the held value without changing it
+#
+# See also: implendum, implet, unio
+# =============================================================================
+
+interface Grower {
+    fn grow() → void
+    fn get() → int
+}
+
+class Circ implements Grower {
+    mut int r = 1
+
+    fn grow() → void {
+        self.r ← self.r + 1
+    }
+
+    fn get() → int {
+        return self.r
+    }
+}
+
+class Sq implements Grower {
+    mut int s = 10
+
+    fn grow() → void {
+        self.s ← self.s + 5
+    }
+
+    fn get() → int {
+        return self.s
+    }
+}
+
+fn bump(mut Grower g) → void {
+    g.grow()
+    g.grow()
+}
+
+fn peek(ref Grower g) → int {
+    return g.get()
+}
+
+main {
+    mut Circ c ← Circ {}
+    bump(mut c)
+    print c.get()
+    mut Sq s ← Sq {}
+    bump(mut s)
+    print s.get()
+    print peek(ref c)
+}

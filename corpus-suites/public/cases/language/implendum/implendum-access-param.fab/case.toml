@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/implendum/implendum-access-param.fab"
+group = "language"
+input_root = "corpus"
+input = "implendum/implendum-access-param.fab"
+category = "class"
+domain = "types"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
