@@ -3163,6 +3163,9 @@ fn validate_shape_obligation_table(
             checks.check_index(binding.witness)?;
         }
     }
+    for access in &table.proven_indexes {
+        checks.check_hir(*access)?;
+    }
     Ok(())
 }
 
