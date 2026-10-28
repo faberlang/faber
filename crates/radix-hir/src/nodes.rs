@@ -2685,6 +2685,14 @@ pub enum HirTypeFormHead {
     /// and expand to several canonical children); validation proves the
     /// instantiation equivalent to the site's canonical type.
     Named { def_id: DefId, path: Vec<Symbol> },
+    /// An imported type alias written by its authored path (`decl.Quad`).
+    ///
+    /// A file-interface import carries an alias as its resolved body and no
+    /// definition of its own, so the alias has no `DefId` for a `Named` head to
+    /// name. The witness `ty` is the alias body; the path is the authored
+    /// spelling, with no authored arguments (an applied imported alias keeps
+    /// the semantic head).
+    ImportedAlias { path: Vec<Symbol> },
     /// Authored `_` inference hole.
     Infer,
     /// Authored standalone `∪` hole.
