@@ -40,6 +40,9 @@
 //!
 //! KEEP IN SYNC: `runtime/clif/src/lib.rs` takes its class from this table
 //! through `exit_trap`; the runner takes it from `RunnerError::exit_status`.
+//! `runtime/rust/src/contract/trap.rs` is a faithful copy of the two line
+//! prefixes and the conversion and program-logic classes (the Rust runtime
+//! package is standalone and cannot depend on this crate).
 
 use crate::fault_codes::FAULT_CODES;
 

@@ -8,10 +8,11 @@
       }
     },
     "rust": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "numerus overflow",
-      "reason": "The runner reports the shift-count trap as a clean nonzero exit with `error: numerus overflow`; the generated Rust executable raises the same trap by panicking (thread 'main' panicked at ...: numerus overflow, exit 101) instead of printing the trap diagnostic, so the rust lane's stderr is not the product error surface. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
+      "outcome": "pass",
+      "expect": {
+        "exit": 70,
+        "stderr_contains": "numerus overflow"
+      }
     },
     "clif": {
       "outcome": "pass",
