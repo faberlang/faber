@@ -1,8 +1,8 @@
 version = 1
-id = "corpus/primus-quem/primus-quem-air.fab"
+id = "corpus/summa/reducta-first-air.fab"
 group = "language"
 input_root = "corpus"
-input = "primus-quem/primus-quem-air.fab"
+input = "summa/reducta-first-air.fab"
 category = "kernel"
 domain = "gpu"
 

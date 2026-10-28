@@ -88,8 +88,6 @@ reddet = "รอคืน"
 tacebit = "รอทิ้ง"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "เซตว่าง"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "ผลรวม"
 filum = "เส้นใย"
 maxima = "สูงสุด"
@@ -163,6 +161,7 @@ numeratio = "นับ"
 quilibet = "ใดก็ได้"
 argmaxima = "ดัชนีค่าสูงสุด"
 argminima = "ดัชนีค่าต่ําสุด"
+prima = "ตัวแรก"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "เรียง"
 ascendens = "น้อยไปมาก"
@@ -4036,18 +4035,6 @@ message = "ต้องมี ']' หลังนิพจน์ดัชนี�
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบไม่เป็น null"
-
-[diagnostics.PARSE001.issues.first_match_start]
-message = "ต้องมี '(' หลัง 'primus_quem'"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "ต้องมี ',' หลังแหล่งที่มาของ first-match"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "ต้องมีส่วนท้าย predicate 'ubi'"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "ต้องมี ')' หลัง predicate ของ first-match"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้าง"

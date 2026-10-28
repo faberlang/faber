@@ -88,8 +88,6 @@ reddet = "等返"
 tacebit = "等弃"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "空集"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "求和"
 filum = "线程"
 maxima = "最大"
@@ -163,6 +161,7 @@ numeratio = "计数"
 quilibet = "任一"
 argmaxima = "最大值索引"
 argminima = "最小值索引"
+prima = "第一个"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "排序"
 ascendens = "升序"
@@ -4024,18 +4023,6 @@ message = "non-null 索引表达式后需要 ']'"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null 调用参数后需要 ')'"
-
-[diagnostics.PARSE001.issues.first_match_start]
-message = "'primus_quem' 后需要 '('"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "首个匹配来源后需要 ','"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "需要 'ubi' 谓词尾部"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "首个匹配谓词后需要 ')'"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor 字段后需要 '}'"

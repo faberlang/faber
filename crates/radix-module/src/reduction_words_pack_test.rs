@@ -1,17 +1,19 @@
 //! Op-word pins for the `reducta via Op ex source` surface (K3-1).
 //!
-//! The nine op words are `[keywords]` rows whose value is the pack's method
+//! The ten op words are `[keywords]` rows whose value is the pack's method
 //! spelling. A word that has an `[intrinsics]` row must read the same in both
-//! sections; `maxima`, `minima`, `factum` and `numeratio` have no intrinsic
-//! row, so their keyword rows are the only spelling. The `locale_pack_completeness`
-//! prefix puts the test under `scripta/check-reader-pack-completeness`.
+//! sections; `maxima`, `minima`, `factum`, `numeratio` and `prima` have no
+//! equal intrinsic row (the list method `prima` is `take`, a different word),
+//! so their keyword rows are the only spelling. The
+//! `locale_pack_completeness` prefix puts the test under
+//! `scripta/check-reader-pack-completeness`.
 
 use crate::locale::LocalePack;
 use std::collections::BTreeMap;
 
 const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
 
-/// The nine op words, by Latin key.
+/// The ten op words, by Latin key.
 const OP_KEYS: &[&str] = &[
     "summa",
     "factum",
@@ -22,6 +24,7 @@ const OP_KEYS: &[&str] = &[
     "omnia",
     "quilibet",
     "numeratio",
+    "prima",
 ];
 
 /// Keys whose `[keywords]` row must equal the `[intrinsics]` row in every

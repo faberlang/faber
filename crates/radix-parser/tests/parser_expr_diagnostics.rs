@@ -13,7 +13,7 @@ use std::path::PathBuf;
 const LOCALES: [&str; 8] = ["en", "la", "ar", "hi", "vi", "th-TH", "zh-Hans", "zh-Hant"];
 
 /// Minimal broken source per expression-level token contract.
-const EXPR_CASES: [(&str, &str); 31] = [
+const EXPR_CASES: [(&str, &str); 28] = [
     ("conditional_else_marker", "sit _ x ← a ✓ b"),
     ("call_arguments_end", "sit _ x ← f(1"),
     ("index_end", "sit _ x ← a[1"),
@@ -23,12 +23,6 @@ const EXPR_CASES: [(&str, &str); 31] = [
     ("optional_call_arguments_end", "sit _ x ← a?(1"),
     ("non_null_index_end", "sit _ x ← a![1"),
     ("non_null_call_arguments_end", "sit _ x ← a!(1"),
-    ("first_match_source_separator", "sit _ x ← primus_quem(a"),
-    ("first_match_predicate_tail", "sit _ x ← primus_quem(a, 1"),
-    (
-        "first_match_end",
-        "sit _ x ← primus_quem(a, ubi y { y ≻ 0.0 }",
-    ),
     ("typed_constructor_fields_end", "sit _ x ← Point { a = 1"),
     ("inferred_constructor_elements_end", "sit _ x ← _ [1"),
     ("array_literal_end", "sit _ x ← [1"),
@@ -53,7 +47,6 @@ const EXPR_CASES: [(&str, &str); 31] = [
 /// Contracts that no source can surface as a diagnostic. They still route
 /// through the issue so the guard can move without reintroducing prose.
 ///
-/// - `first_match_start`: `primus_quem` claims only when `(` follows.
 /// - `ratio_type_arguments_start`: the `ratio` constructor claims only when
 ///   `<` follows.
 /// - `closure_parameters_end`, `closure_body_marker`: the compact closure
@@ -66,8 +59,7 @@ const EXPR_CASES: [(&str, &str); 31] = [
 ///   speculatively and a failure restores the cursor, so `<` falls back to
 ///   comparison.
 /// - `scriptum_start`: `scriptum` is claimed only when `(` follows.
-const GUARDED_SLUGS: [&str; 9] = [
-    "first_match_start",
+const GUARDED_SLUGS: [&str; 8] = [
     "ratio_type_arguments_start",
     "closure_parameters_end",
     "closure_body_marker",

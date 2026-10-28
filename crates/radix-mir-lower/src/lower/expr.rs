@@ -125,9 +125,6 @@ pub trait HirExpressionLoweringVisitor {
                     expr,
                 ),
             HirExpressionKind::Scan { .. } => self.visit_scan_expr(expr),
-            HirExpressionKind::FirstMatch { source, coordinates, binding, body } => {
-                self.visit_first_match_expr(source, coordinates, binding, body, expr)
-            }
             HirExpressionKind::Sort { direction, source_mode, source, binding, body, .. } => {
                 self.visit_sort_expr(*direction, *source_mode, source, binding.as_ref(), body.as_ref(), expr)
             }
@@ -351,14 +348,6 @@ pub trait HirExpressionLoweringVisitor {
     ) -> Option<MirOperand>;
     fn visit_scan_expr(&mut self, expr: &HirExpression) -> Option<MirOperand>;
 
-    fn visit_first_match_expr(
-        &mut self,
-        source: &HirExpression,
-        coordinates: &[(DefId, Symbol)],
-        binding: &(DefId, Symbol),
-        body: &HirBlock,
-        expr: &HirExpression,
-    ) -> Option<MirOperand>;
     fn visit_sort_expr(
         &mut self,
         direction: radix_hir::HirSortDirection,
@@ -851,17 +840,6 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
     }
     fn visit_scan_expr(&mut self, expr: &HirExpression) -> Option<MirOperand> {
         self.lower_scan_expr(expr)
-    }
-
-    fn visit_first_match_expr(
-        &mut self,
-        source: &HirExpression,
-        coordinates: &[(DefId, Symbol)],
-        binding: &(DefId, Symbol),
-        body: &HirBlock,
-        expr: &HirExpression,
-    ) -> Option<MirOperand> {
-        self.lower_first_match_expr(source, coordinates, binding, body, expr)
     }
 
     fn visit_sort_expr(

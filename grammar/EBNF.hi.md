@@ -443,7 +443,7 @@ literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '
 # [216] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 # [217] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
+primary ::= IDENTIFIER | literal | regex_literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
 # [218] ad_expr
 ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
 # [219] ad_opener
@@ -490,107 +490,105 @@ praefixum_expr ::= 'उपसर्ग' block_stmt
 scriptum_expr ::= 'लिखित' '(' STRING (',' expression)* ')'
 # [240] lege_expr
 lege_expr ::= 'पढ़ो' 'पंक्ति'?
-# [241] first_match_expr
-first_match_expr ::= 'प्रथम_मेल' '(' expression apud_clause? ',' 'जहाँ' IDENTIFIER block_stmt ')'
-# [242] reducta_expr
+# [241] reducta_expr
 reducta_expr ::= 'समेटो' 'द्वारा' reducta_op 'सेवन' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [243] reducta_op
-reducta_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'argmax' | 'argmin' | 'सभी' | 'कोई' | 'गिनती'
-# [244] reducta_group
+# [242] reducta_op
+reducta_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'argmax' | 'argmin' | 'सभी' | 'कोई' | 'गिनती' | 'पहला'
+# [243] reducta_group
 reducta_group ::= 'अनुसार' expression
-# [245] reducta_body
+# [244] reducta_body
 reducta_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
-# [246] reducta_identity
+# [245] reducta_identity
 reducta_identity ::= 'डिफ़ॉल्ट' expression
-# [247] scan_expr
+# [246] scan_expr
 scan_expr ::= 'scan' 'द्वारा' scan_op ('total' ('inclusive' | 'exclusive'))? 'सेवन' expression apud_clause scan_group? scan_order_clause? filum_clause 'बैठा' IDENTIFIER block_stmt
-# [248] scan_op
+# [247] scan_op
 scan_op ::= 'योग' | 'गुणनफल' | 'अधिकतम' | 'न्यूनतम' | 'सभी' | 'कोई' | 'गिनती'
-# [249] scan_group
+# [248] scan_group
 scan_group ::= 'अनुसार' expression
-# [250] scan_order_clause
+# [249] scan_order_clause
 scan_order_clause ::= 'order' ('आरोही' | 'अवरोही')
-# [251] sort_expr
+# [250] sort_expr
 sort_expr ::= 'क्रमबद्ध_करो' 'द्वारा' sort_direction ('सेवन' | 'से') expression sort_body?
-# [252] sort_direction
+# [251] sort_direction
 sort_direction ::= 'आरोही' | 'अवरोही'
-# [253] sort_body
+# [252] sort_body
 sort_body ::= ('बैठा' | 'चर') IDENTIFIER block_stmt
-# [254] filum_clause
+# [253] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
-# [255] capta_expr
+# [254] capta_expr
 capta_expr ::= 'जाल' block_stmt
-# [256] object_pattern
+# [255] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [257] pattern_property
+# [256] pattern_property
 pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
-# [258] array_pattern
+# [257] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [259] array_pattern_element
+# [258] array_pattern_element
 array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
-# [260] nota_stmt
+# [259] nota_stmt
 nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
-# [261] entry_header
+# [260] entry_header
 entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
-# [262] incipit_stmt
+# [261] incipit_stmt
 incipit_stmt ::= 'आरंभ' entry_header block_stmt
-# [263] incipiet_stmt
+# [262] incipiet_stmt
 incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
-# [264] probandum_decl
+# [263] probandum_decl
 probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
-# [265] probandum_body
+# [264] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [266] proba_stmt
+# [265] proba_stmt
 proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
-# [267] proba_modifier
+# [266] proba_modifier
 proba_modifier ::= 'अपेक्षित_विफलता' | 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NATURAL | 'मापो' | 'पुनरावृत्ति' NATURAL | 'नाज़ुक' NATURAL | 'केवलमें' STRING
-# [268] praepara_block
+# [267] praepara_block
 praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सभी'? block_stmt
-# [269] fac_stmt
+# [268] fac_stmt
 fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [270] IDENTIFIER
+# [269] IDENTIFIER
 IDENTIFIER ::=
-# [271] NUMBER
+# [270] NUMBER
 NUMBER ::=
-# [272] NATURAL
+# [271] NATURAL
 NATURAL ::=
-# [273] STRING
+# [272] STRING
 STRING ::=
-# [274] ASCII_STRING
+# [273] ASCII_STRING
 ASCII_STRING ::=
-# [275] BACKTICK_STRING
+# [274] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [276] OCTETI_STRING
+# [275] OCTETI_STRING
 OCTETI_STRING ::=
-# [277] REGEX_TYPE_WORD
+# [276] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [278] REGEX_BODY
+# [277] REGEX_BODY
 REGEX_BODY ::=
-# [279] NEWLINE
+# [278] NEWLINE
 NEWLINE ::=
-# [280] WIDTH_MARKER
+# [279] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [281] LISTA_WIDTH_SUGAR
+# [280] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [282] TENSOR_WIDTH_SUGAR
+# [281] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [283] SPARSA_WIDTH_SUGAR
+# [282] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [284] VECTOR_WIDTH_SUGAR
+# [283] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [285] MATRIX_WIDTH_SUGAR
+# [284] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [286] FRONTMATTER_DELIMITER
+# [285] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [287] TOML_LINES
+# [286] TOML_LINES
 TOML_LINES ::=
-# [288] ANNOTATION_NAME
+# [287] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [289] ANNOTATION_FIELD_NAME
+# [288] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [290] NON_NEWLINE_TOKEN
+# [289] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [291] NO_NEWLINE
+# [290] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -860,7 +858,6 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#उपसर्ग-expr` | live |
 | [`scriptum_expr`](#scriptum-expr) | `#लिखित-expr` | live |
 | [`lege_expr`](#lege-expr) | `#पढ़ो-expr` | live |
-| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
 | [`reducta_expr`](#reducta-expr) | `#समेटो-expr` | live |
 | [`reducta_op`](#reducta-op) | `#समेटो-op` | live |
 | [`reducta_group`](#reducta-group) | `#समेटो-group` | live |
@@ -1024,7 +1021,7 @@ productions. It is not a second keyword authority.
 | Objects | `उपसर्ग` | prefix expression |
 | Testing | `पूर्वतैयार` | setup |
 | Testing | `पूर्वतैयारasync` | async setup |
-| Grammar | `प्रथम_मेल` | first-match selection head |
+| Expression | `पहला` | first-match reduction operator (en `first`; contextual) |
 | Expression | `अनुसार` | grouped reduction clause (en `प्रति`; contextual) |
 | Testing | `परीक्षण` | test |
 | Testing | `परीक्षणसमूह` | test suite |
@@ -1063,7 +1060,6 @@ productions. It is not a second keyword authority.
 | Testing | `समय` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `प्रकार` | type alias |
-| Grammar | `जहाँ` | first-match predicate tail |
 | Iteration | `तक` | range until inclusive |
 | Params | `रूपमें` | as / alias |
 | Declarations | `चर` | mutable binding |
@@ -2844,7 +2840,7 @@ xs[lo‥hi]
 ```
 
 The copy-out methods report on the error channel instead of trimming:
-`xs.sectio(start, end)` (en `slice`) and `xs.prima(n)` (en `take`) are failable
+`xs.sectio(start, end)` (en `slice`) and `xs.पहला(n)` (en `take`) are failable
 (`⇥`; a `⊥` default or a handler takes the fault), and the fault carries the
 requested bounds or count and the list length as data.
 
@@ -2948,17 +2944,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } सेवन sour
 ### Special Expressions
 
 
-`प्रथम_मेल(source, जहाँ binder { predicate })` is the dedicated first-match
-selection expression over a statically bounded source: the predicate is
-evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `nihil`
-(the result type is `T ∪ nihil`). The `जहाँ` predicate tail is owned by this
-head and never shares the reduce/scan `स्थिर`/`चर` binder tail.
-`प्रथम_मेल` claims only the expression-head position immediately followed
-by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`पर` coordinate clause binds per-axis indices as in `दोहराओ सेवन`.
-
-`समेटो द्वारा <op> सेवन source [पर [coords]] [अनुसार key | अनुसार [key, …]] ([धागा f] (स्थिर | चर) x { लौटाओ term } | डिफ़ॉल्ट identity)?` is the general reduction form. The optional tail is either a body (with an optional `धागा`) or a bodiless identity; without either, the source elements are the terms. `द्वारा` is mandatory and selects exactly one of `योग`, `गुणनफल`, `अधिकतम`, `न्यूनतम`, `argmax`, `argmin`, `सभी`, `कोई`, or `गिनती`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `द्वारा` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.समेटो(f)` (en `xs.reduce(f)`).
+`समेटो द्वारा <op> सेवन source [पर [coords]] [अनुसार key | अनुसार [key, …]] ([धागा f] (स्थिर | चर) x { लौटाओ term } | डिफ़ॉल्ट identity)?` is the general reduction form. The optional tail is either a body (with an optional `धागा`) or a bodiless identity; without either, the source elements are the terms. `द्वारा` is mandatory and selects exactly one of `योग`, `गुणनफल`, `अधिकतम`, `न्यूनतम`, `argmax`, `argmin`, `सभी`, `कोई`, `गिनती`, or `पहला`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `द्वारा` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.समेटो(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `पर [coords]` binds one integer coordinate per source axis. A body is claimed only when `(स्थिर | चर) IDENTIFIER '{'` follows, so a declaration such as `स्थिर numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `लौटाओ` term per element. Without a body, each source element is the term. `धागा f` requires a body and a kernel context; it retains the existing sum path, while other `धागा` operators fail closed by name until their lowering is implemented. Without `धागा`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2970,6 +2956,9 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 | `argmax`, `argmin` | numeric scalar | rank-one coordinate `numerus`; higher-rank `टपल<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `डिफ़ॉल्ट` | `nihil` or the supplied coordinate identity |
 | `सभी`, `कोई` | `bivalens` | `bivalens` | `सत्य`, `असत्य` |
 | `गिनती` | `bivalens` | `numerus`, the number of true terms | `0` |
+| `पहला` | `bivalens` predicate, required body | the first element whose predicate holds: `T ∪ nihil`, always optional | `nihil` |
+
+`पहला` (en `first`) takes a required body that is the predicate over the element and yields the first element in row-major order for which it holds, or `nihil` for an empty source or no match. Evaluation is total: the predicate runs on every element, including those after the first match, and a predicate error is never turned into `nihil`. It takes no `अनुसार` group (`reducta_group_op_unsupported`) and no `डिफ़ॉल्ट` identity, and a source that is not a tensor or matrix, like every reduction source, is refused; first-match over lists is not a reduction source. `पहला` is the one reduction operator whose result is always optional, even over a statically non-empty source. On `@ radix लेन "air"` it is admitted over a statically bounded source only (`reducta_first_unbounded_source`), forward-only: it never becomes an AIR tensor op, so reverse AD stays closed.
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
@@ -3184,9 +3173,7 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `जहाँ` is
-the owned predicate-tail introducer of the `प्रथम_मेल` first-match expression
-(see Special Expressions), not collection syntax.
+`पहला` and `ultima` are ordinary method names, not transform keywords.
 
 `ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `क्रमबद्ध_करो(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument

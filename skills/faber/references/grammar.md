@@ -406,8 +406,7 @@ Banned:
 - `match` / `case` — pattern-match dispatch, a statement not an expression; `match all` (la `discerne omnia`) is the exhaustive form and forbids `default` (`SEM044 catchall_arm`, `SEM040 missing_variants`); patterns are flat (no nesting, no guards, no range patterns)
   - closed set only: a union's members or an enum/`union`'s variants. A type pattern outside the scrutinee's closed set is `SEM010 discerne_pattern_not_in_closed_set`; width (`case u32`) and length-shape (`case list<int, 4>`) patterns are retired — ask width with `is`, length with `if x.length() …`; open scrutinees use `switch`
 - concrete patterns bind in `match`/`case` clauses, `for` binders, and `←` destructuring: `_`, literals, `ID as alias`, multi-bind `(let|mut) a as b, c as d`, arrays `[a, _, rest tail]`, objects `{ f, f as alias, rest … }` (`pattern`, `array_pattern`, `object_pattern`)
-- `primus_quem(expr at? [i, j], ubi binder { predicate })` — first-match selection expression (`first_match_expr`)
-- `reduce via op from expr at? per? (thread? (let | mut) binder { … } | coalesce identity)?` (la `reducta via op ex …`) — shaped-source reduction expression (`reducta_expr`; `via` selects one of nine locale-pack operator words)
+- `reduce via op from expr at? per? (thread? (let | mut) binder { … } | coalesce identity)?` (la `reducta via op ex …`) — shaped-source reduction expression (`reducta_expr`; `via` selects one of ten locale-pack operator words; `first` (la `prima`) is the first-match selection: its body is a boolean predicate written with `return`, the result is always `T ∪ none` (none for no match or an empty source), the predicate runs for every element, and it takes no `per` group and no `coalesce` identity; the source is a tensor or matrix)
 - `guard { if cond … }` — guard
 - `c ✓ a ✗ b` — the one value conditional ("`a` when `c` holds, else `b`"); replaces the retired
   `?:`/`sic … secus` ternary, which now reports a migration diagnostic
@@ -540,6 +539,7 @@ Grounded in `EBNF.md` and probes against the built binary.
   success value and the result type is the success type united with every escaping error type
   (`let r ← trap { f() }`); success and error types that coincide are rejected.
 - `reduce via max from t at? (coalesce identity)?` / `reduce via min from t …` (la `reducta via maxima ex t apud? (vel identity)?` / `reducta via minima ex t …`) — extrema over a shaped tensor or matrix, not a `list`.
+- `reduce via first from t at? let x { return pred }` (la `reducta via prima ex t apud? sit x { redde pred }`) — first element of a shaped tensor or matrix whose predicate holds, as `T ∪ none` (none for no match or an empty source; `corpus/summa/reducta-first-en.fab`); the former dedicated first-match form is retired, and a `list` is not a source.
 - `"§"(a)` renders a template; `format("§!", x)` (la `scriptum`) is its explicit desugaring. `read` / `read line` (la `lege` / `lege lineam`) are builtin read expressions (a user binding of the same spelling wins).
 - `#` comments start a line (`LEX007 inline_hash_after_code` after code); `//` and `/* */` are not comments.
 - Commas are required between items and forbidden after the last (`PARSE001 item_list_trailing_comma`); declaration

@@ -1643,32 +1643,6 @@ fn resolve_expr(
             }
             resolver.exit_scope();
         }
-        ExprKind::FirstMatch(expr) => {
-            resolve_expr(resolver, interner, &expr.source, errors);
-            resolver.enter_scope(ScopeKind::Block);
-            for coordinate in &expr.apud {
-                define_symbol(
-                    resolver,
-                    coordinate.name,
-                    coordinate.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-            }
-            // The `ubi` predicate binder is read-only: the owned tail has no
-            // mutability marker by construction.
-            define_symbol(
-                resolver,
-                expr.binding.name,
-                expr.binding.span,
-                SymbolKind::Local,
-                false,
-                errors,
-            );
-            resolve_block(resolver, interner, &expr.body, errors);
-            resolver.exit_scope();
-        }
         ExprKind::Cede(expr) => resolve_expr(resolver, interner, &expr.expr, errors),
         ExprKind::Array(expr) => {
             for element in &expr.elements {

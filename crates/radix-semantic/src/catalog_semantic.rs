@@ -1208,14 +1208,6 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         "dum_loop" => "`dum` loops are outside the v1 AIR subset".to_owned(),
         "expression_ad" => "expression-form ad is outside the v1 AIR subset".to_owned(),
         "expression_statement" => "expression statements are outside the v1 AIR subset".to_owned(),
-        "first_match_expression_unsupported" => {
-            "first-match expressions with coordinate bindings are outside the v1 AIR subset"
-                .to_owned()
-        }
-        "first_match_unbounded_source" => {
-            "first-match sources must have a statically known extent in the v1 AIR subset"
-                .to_owned()
-        }
         "generator_function" => "generator functions are outside the v1 AIR subset".to_owned(),
         "iace" => "`iace` is outside the v1 AIR subset".to_owned(),
         "inc_dec_mutation" => {
@@ -1247,6 +1239,10 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         }
         "reducta_expression_unsupported" => {
             "reduction expressions are outside the v1 AIR subset".to_owned()
+        }
+        "reducta_first_unbounded_source" => {
+            "first reductions need a source with a statically known extent in the v1 AIR subset"
+                .to_owned()
         }
         "recoverable_handler" => "recoverable handlers are outside the v1 AIR subset".to_owned(),
         "recovery_type_mismatch" => {

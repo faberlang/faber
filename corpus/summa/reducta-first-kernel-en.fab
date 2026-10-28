@@ -1,0 +1,49 @@
++++
+locale = "en"
+term = "reducta-first-kernel-en"
+kind = "concept"
+category = "reduction"
+grammar = ["reducta_expr", "reducta_op", "reducta_body", "filum_clause"]
+canonical = false
+summary = "reduce via first with thread inside a kernel: checks everywhere, runs as the plain fold on the host, and declines by name on device lowering."
+syntax = "reduce via first from <tensor> at [i] thread lane let <binder> { return <predicate> }"
+related = ["reduce", "thread", "kernel", "none"]
++++
+# =============================================================================
+# reduce via first … thread — the first-match reduction in a kernel
+# =============================================================================
+#
+# What this teaches:
+#   • `thread` is a permission for parallel evaluation. Its sequential meaning
+#     is the plain reduction folded in iteration order, so `first` selects the
+#     same element with or without it: the first element in row-major order
+#     whose predicate holds, `none` for no match
+#   • `thread` is admitted only inside a `@ kernel` function and takes a term
+#     body; a known extent must be a multiple of 32 elements
+#   • the plain twin below runs on the host; the runner never executes a
+#     `@ kernel` function itself
+#   • a device lowering has no recipe yet for the earliest-lane selection and
+#     the optional result, so it declines by name
+#     (`first_reduce_device_unsupported`) instead of routing through another
+#     reducer
+#
+# Common mistakes:
+#   • `thread` without a term body — declined (reducta_filum_requires_body)
+#   • `thread` outside `@ kernel` — declined (reducta_filum_requires_nucleum_kernel)
+#
+# See also: reducta-first-en, reducta-filum-en, thread, kernel
+# =============================================================================
+
+@ kernel
+fn t_first(tf32[32] a) → f32 ∪ none {
+    return reduce via first from a at [i] thread lane let s { return s ≻ 2.5 }
+}
+
+fn p_first(tf32[4] a) → f32 ∪ none {
+    return reduce via first from a at [i] let s { return s ≻ 2.5 }
+}
+
+main {
+    let tf32[4] a ← [3.0, 1.0, 4.0, 2.0] ↦ tf32[4]
+    print p_first(a)
+}

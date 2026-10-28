@@ -1160,12 +1160,6 @@ pub enum ExprKind {
     Scan(Box<ScanExpr>),
     /// Owned sort expression: `ordinata via ascendens ex source [fixum x { key }]`.
     Sort(Box<SortExpr>),
-    /// Dedicated first-match selection: `primus_quem(source, ubi binder { predicate })`.
-    ///
-    /// The parser claims this spelling only in expression-head position when
-    /// `primus_quem` is immediately followed by `(`; the `ubi` predicate tail
-    /// is owned by this head and is never shared with the reduce/scan tails.
-    FirstMatch(Box<FirstMatchExpr>),
     /// Copy-into statement: `target ⇇ value` (U+21C7).
     ///
     /// Copies every value of `value` into the existing storage of `target`;
@@ -1206,19 +1200,6 @@ pub struct CallDefaultExpr {
 pub struct TrapExpr {
     pub body: BlockStmt,
     pub span: Span,
-}
-
-/// Source shape for the dedicated `primus_quem` first-match expression.
-#[derive(Debug)]
-pub struct FirstMatchExpr {
-    /// Bounded source expression whose elements are candidates.
-    pub source: Box<Expr>,
-    /// Optional coordinate names from the shared `apud` production.
-    pub apud: Vec<Ident>,
-    /// Candidate binder introduced by the owned `ubi` predicate tail.
-    pub binding: Ident,
-    /// Predicate body evaluated for every candidate lane.
-    pub body: BlockStmt,
 }
 
 /// Source shape for the `¶` format operator (D2.1, D2.2).
@@ -1292,7 +1273,7 @@ pub enum ScanTotal {
     Exclusive,
 }
 
-/// The nine operations; surface spellings belong to the active locale pack.
+/// The ten operations; surface spellings belong to the active locale pack.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReductaOp {
     Sum,
@@ -1304,6 +1285,8 @@ pub enum ReductaOp {
     All,
     Any,
     Count,
+    /// `prima` (en `first`): the first element whose body predicate holds.
+    First,
 }
 
 /// Sort expression: direction word, `ex` (values) or `de` (keys), a source and

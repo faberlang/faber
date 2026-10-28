@@ -2445,6 +2445,9 @@ struct ReductionFoldContext {
     group: Option<HirExpression>,
     group_dims: Vec<usize>,
     error_tensor: Option<MirOperand>,
+    /// The term binder's local: the element a `First` fold stores when its
+    /// predicate holds. Unused by every other operator.
+    element: Option<MirLocalId>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -5612,9 +5615,6 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Reduction { .. } => "reducta_not_lowered",
         HirExpressionKind::Scan { .. } => "scan_not_lowered",
         HirExpressionKind::Sort { .. } => "sort_expression_not_lowered",
-        // Unreachable from the lowering dispatcher (first-match lowers through
-        // `collection_higher_order`); kept so this naming match stays exhaustive.
-        HirExpressionKind::FirstMatch { .. } => "primus_quem before first-match MIR lowering",
         HirExpressionKind::Intervallum { .. } => "range expressions before range MIR lowering",
         HirExpressionKind::Array(_) => "array literals before aggregate MIR lowering",
         HirExpressionKind::Struct(_, _) => "struct literals before aggregate MIR lowering",

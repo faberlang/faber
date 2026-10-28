@@ -88,8 +88,6 @@ reddet = "रुको_लौटाओ"
 tacebit = "रुको"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "खाली"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "योग"
 filum = "धागा"
 maxima = "अधिकतम"
@@ -163,6 +161,7 @@ numeratio = "गिनती"
 quilibet = "कोई"
 argmaxima = "argmax"
 argminima = "argmin"
+prima = "पहला"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "क्रमबद्ध_करो"
 ascendens = "आरोही"
@@ -4036,18 +4035,6 @@ message = "non-null index expression के बाद ']' अपेक्षि�
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null call arguments के बाद ')' अपेक्षित है"
-
-[diagnostics.PARSE001.issues.first_match_start]
-message = "'primus_quem' के बाद '(' अपेक्षित है"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "first-match source के बाद ',' अपेक्षित है"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "'ubi' predicate tail अपेक्षित है"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "first-match predicate के बाद ')' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor fields के बाद एक closing brace अपेक्षित है"
