@@ -7,7 +7,8 @@
 //!
 //! The package, its arguments and the output file come from the environment
 //! (`FABER_SPAN_A2_PACKAGE`, `FABER_SPAN_A2_ARGS` split on `;`,
-//! `FABER_SPAN_STATS_FILE`); without the package variable the test skips, so
+//! `FABER_SPAN_STATS_FILE`; `FABER_SPAN_HOST_STAGED` forces the host-staged
+//! transport); without the package variable the test skips, so
 //! it never runs by accident. `FABER_REQUIRE_CUDA` turns a missing device into
 //! a failure.
 
@@ -46,8 +47,14 @@ fn a2_at_two_private_partitions_writes_the_span_stats_file() {
         );
         return;
     }
-    let spanning = radix_device_cuda::system_private_copies_runtime()
-        .expect("the private-copies runtime opens");
+    // `FABER_SPAN_HOST_STAGED` forces every pair through host memory (the
+    // fallback transport), for the before/after comparison on one GPU.
+    let spanning = if std::env::var_os("FABER_SPAN_HOST_STAGED").is_some() {
+        radix_device_cuda::system_private_copies_host_staged_runtime()
+    } else {
+        radix_device_cuda::system_private_copies_runtime()
+    }
+    .expect("the private-copies runtime opens");
     let mut registry = DeviceRegistry::new();
     registry.register(Box::new(spanning));
 
