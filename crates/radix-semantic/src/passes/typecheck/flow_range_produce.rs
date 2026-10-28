@@ -46,7 +46,7 @@ use super::*;
 /// a fact (a bare `numerus` is unbounded for this purpose).
 fn finite(value: i128) -> Option<i128> {
     const LIMIT: i128 = 1 << 62;
-    (-LIMIT <= value && value <= LIMIT).then_some(value)
+    (-LIMIT..=LIMIT).contains(&value).then_some(value)
 }
 
 fn const_of(endpoint: &Endpoint) -> Option<i128> {
