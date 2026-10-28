@@ -331,7 +331,7 @@ fn empty_run_detail(unmatched_include: bool) -> &'static str {
 
 /// Exit code for an empty report: nonzero unless `--allow-no-tests`.
 fn empty_run_exit_code(allow_no_tests: bool) -> i32 {
-    if allow_no_tests { 0 } else { 1 }
+    i32::from(!allow_no_tests)
 }
 
 /// True when `--include` was given and no analyzed unit is a `*.proba` file.

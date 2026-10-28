@@ -457,7 +457,10 @@ targets = ["rust"]
     assert_eq!(json["census"]["blocked"].as_array().unwrap().len(), 1);
     assert_eq!(json["census"]["blocked"][0]["name"], "blocked");
     assert_eq!(json["census"]["blocked"][0]["gap"], gap);
-    assert!(!json["census"]["gaps"].as_array().unwrap().is_empty());
+    assert_ne!(
+        json["census"]["gaps"].as_array().unwrap(),
+        &[] as &[serde_json::Value]
+    );
 }
 
 #[test]
@@ -526,7 +529,7 @@ fn empty_selection_json_is_not_success_without_changing_exit_policy() {
         super::empty_run_exit_code(false),
         super::empty_run_exit_code(true)
     );
-    assert!(report.results.is_empty());
+    assert_eq!(report.results, [] as [proba::CaseResult; 0]);
     assert_eq!(json["success"], false);
     assert_eq!(super::empty_run_exit_code(false), 1);
     assert_eq!(super::empty_run_exit_code(true), 0);
