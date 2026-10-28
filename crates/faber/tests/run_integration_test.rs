@@ -3680,6 +3680,34 @@ fn assert_metal_route_matches_reference_fixture(package: &str) {
     assert_prints_reference_fixture(package, "metal route", program);
 }
 
+/// The CUDA device line every CUDA device session prints ahead of the program.
+const CUDA_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `cuda` on ";
+
+/// The CUDA device route must print what the hand-computed `main.ref.json`
+/// says, within its tolerance: the same values the reference route prints.
+/// Skips without a CUDA device; fails when `FABER_REQUIRE_CUDA` is set.
+fn assert_cuda_route_matches_reference_fixture(package: &str) {
+    let path = repo_root()
+        .join("corpus-product/tensor-fragment")
+        .join(package)
+        .display()
+        .to_string();
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cuda", &path]);
+    let Some((_, program)) = stdout
+        .split_once('\n')
+        .filter(|(receipt, _)| receipt.starts_with(CUDA_DEVICE_RECEIPT_PREFIX))
+    else {
+        assert!(
+            std::env::var_os("FABER_REQUIRE_CUDA").is_none(),
+            "FABER_REQUIRE_CUDA is set but {package} did not run on a CUDA device:\n{stdout}\n{stderr}"
+        );
+        eprintln!("no CUDA device: skipped");
+        return;
+    };
+    assert!(status.success(), "{package}: cuda run failed:\n{stderr}");
+    assert_prints_reference_fixture(package, "cuda route", program);
+}
+
 #[test]
 fn tiny_linear_device_reference_route_prints_the_reference_fixture() {
     assert_reference_route_matches_reference_fixture("tiny-linear-device");
@@ -3718,6 +3746,27 @@ fn tiny_linear_device_relu_metal_route_prints_the_reference_fixture() {
 #[test]
 fn tiny_linear_device_two_matmul_metal_route_prints_the_reference_fixture() {
     assert_metal_route_matches_reference_fixture("tiny-linear-device-two-matmul");
+}
+
+/// CUDA runs the matmul and the fused bias add as one NVVM kernel that stores
+/// `x·W + b` into the output parameter `y`. The out-parameter form used to
+/// store the raw accumulator, so CUDA printed `x·W`.
+#[test]
+fn tiny_linear_device_cuda_route_prints_the_reference_fixture() {
+    assert_cuda_route_matches_reference_fixture("tiny-linear-device");
+}
+
+/// CUDA's fused tail ends in the relu: four of the eight outputs are zeroed.
+#[test]
+fn tiny_linear_device_relu_cuda_route_prints_the_reference_fixture() {
+    assert_cuda_route_matches_reference_fixture("tiny-linear-device-relu");
+}
+
+/// Two matmuls run as one NVVM kernel per matmul; the final one stores
+/// `(x·W)·V + b` into the output parameter `y`.
+#[test]
+fn tiny_linear_device_two_matmul_cuda_route_prints_the_reference_fixture() {
+    assert_cuda_route_matches_reference_fixture("tiny-linear-device-two-matmul");
 }
 
 /// A whole-grid reduction with a `coalesce` fallback over an empty run-time
