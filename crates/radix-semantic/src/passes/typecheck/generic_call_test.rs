@@ -1202,15 +1202,15 @@ functio caller(lista<numerus> l, queue<numerus> q, stack<numerus> s) → numerus
 #[test]
 fn inferred_generic_call_binds_through_bounded_queue_and_stack() {
     accepts(
-        r"functio peek_bounded_queue<T>(queue<T, 4> q) → numerus {
+        r"functio peek_bounded_queue<T>(queue<T, magnitudo 4> q) → numerus {
     redde 0
 }
 
-functio peek_bounded_stack<T>(stack<T, 4> s) → numerus {
+functio peek_bounded_stack<T>(stack<T, magnitudo 4> s) → numerus {
     redde 0
 }
 
-functio caller(queue<numerus, 4> bq, stack<numerus, 4> bs) → numerus {
+functio caller(queue<numerus, magnitudo 4> bq, stack<numerus, magnitudo 4> bs) → numerus {
     redde peek_bounded_queue(bq) + peek_bounded_stack(bs)
 }",
     );
@@ -1386,11 +1386,11 @@ functio caller(queue<textus> q) → numerus {
 #[test]
 fn inferred_generic_call_rejects_bounded_capacity_mismatch() {
     rejects_with_issue(
-        r"functio wants(queue<numerus, 4> q) → numerus {
+        r"functio wants(queue<numerus, magnitudo 4> q) → numerus {
     redde 0
 }
 
-functio caller(queue<numerus, 8> q) → numerus {
+functio caller(queue<numerus, magnitudo 8> q) → numerus {
     redde wants(q)
 }",
         "incompatible_tensor_index",

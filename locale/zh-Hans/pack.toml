@@ -199,7 +199,7 @@ instans = "时刻"
 objectum = "对象"
 quidlibet = "任意"
 lista = "列表"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "映射"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "账本"
@@ -843,7 +843,7 @@ help = "把提示紧写在 via 之后，例如 `x ↦ u32 via Hex`；提示有 H
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "转换提示不是类型参数"
-help = "把提示写成目标之后的 via 子句：`u32 via Le`、`ascii<8> via Hex`、`littera via Code`"
+help = "把提示写成目标之后的 via 子句：`u32 via Le`、`ascii<{magnitudo} 8> via Hex`、`littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "转换提示不写在目标之后的尖括号中"
@@ -1289,6 +1289,10 @@ help = "把范围写在列表上，例如 {lista}<int, {magnitudo} 1…8>；它�
 message = "列表的元素个数写在 `{magnitudo}` 之后"
 help = "写 `{lista}<int, {magnitudo} 4>` 表示最多 4 个元素，或 `{lista}<int, {magnitudo} 1…8>` 表示一个范围；裸范围限定的是值，不是个数"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "容量写在 `{magnitudo}` 之后"
+help = "写 `{queue}<int, {magnitudo} 4>`、`{stack}<int, {magnitudo} 4>`、`{textus}<{magnitudo} 8>` 或 `{ascii}<{magnitudo} 8>` 表示最多这么多的容量；裸数字不是容量"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可调用项的注解姿态“{annotation_posture}”与书写的姿态“{written_posture}”冲突"
 help = "修正用于 lowering 的 AST construct"
@@ -1315,11 +1319,11 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue 需要一个或两个类型参数"
-help = "使用 queue<T> 或 queue<T, N>"
+help = "使用 queue<T> 或 queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack 需要一个或两个类型参数"
-help = "使用 stack<T> 或 stack<T, N>"
+help = "使用 stack<T> 或 stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu 需要一个 pattern"
@@ -1487,7 +1491,7 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type 不能接受 parameters"
-help = "textus<N>、ascii<N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
+help = "textus<{magnitudo} N>、ascii<{magnitudo} N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace 未导出 qualified type"

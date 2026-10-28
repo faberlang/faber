@@ -25,7 +25,7 @@ locale = "en"
 #   • Treating `N` as exact length — spare slots are unreadable.
 #   • Inventing `capacitas` — capacity is type identity, not a method.
 #
-# See also: textus<N>, ascii<N>, list<b8, size N>
+# See also: textus<magnitudo N>, ascii<size N>, list<b8, size N>
 # =============================================================================
 
 main {

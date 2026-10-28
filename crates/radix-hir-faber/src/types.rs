@@ -370,13 +370,13 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
             ),
             Type::BoundedStack { element, capacity } => format!(
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
             ),
             Type::BoundedTextus { capacity } => {
                 self.bounded_primitive_head(Primitive::Textus, *capacity, surface)
@@ -1006,7 +1006,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
                 ))
             }
             Type::BoundedStack { capacity, .. } => {
@@ -1014,7 +1014,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
                 ))
             }
             Type::Option(_) => match form.args.as_slice() {
@@ -1259,7 +1259,7 @@ impl super::FaberCodegen<'_> {
         format!(
             "{}<{}>",
             surface.type_surface(TypeBindingKind::Primitive(prim)),
-            self.format_figura(capacity, surface)
+            self.list_count_to_faber(capacity, surface)
         )
     }
 

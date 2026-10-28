@@ -7,7 +7,7 @@ use super::{MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable
 use handroll::FxHashMap;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
-use radix_types::{AppliedArg, IndexExpr};
+use radix_types::{AppliedArg, IndexExpr, IndexId};
 
 /// Recover Faber source type syntax for one resolved [`TypeId`].
 pub fn format_faber_type<F: Fn(DefId) -> String>(
@@ -32,7 +32,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
         Type::BoundedArray { element, capacity } => format!(
             "lista<{}, {}>",
             format_faber_type(*element, types, interner, resolve_def),
-            format_figura(*capacity, types, interner)
+            format_capacity(*capacity, types, interner)
         ),
         Type::RangedArray { element, min, max } => format!(
             "lista<{}, {min}…{}>",
@@ -46,7 +46,7 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
         Type::BoundedQueue { element, capacity } => format!(
             "queue<{}, {}>",
             format_faber_type(*element, types, interner, resolve_def),
-            format_figura(*capacity, types, interner)
+            format_capacity(*capacity, types, interner)
         ),
         Type::Stack(elem) => format!(
             "stack<{}>",
@@ -55,16 +55,16 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
         Type::BoundedStack { element, capacity } => format!(
             "stack<{}, {}>",
             format_faber_type(*element, types, interner, resolve_def),
-            format_figura(*capacity, types, interner)
+            format_capacity(*capacity, types, interner)
         ),
         Type::BoundedTextus { capacity } => {
-            format!("textus<{}>", format_figura(*capacity, types, interner))
+            format!("textus<{}>", format_capacity(*capacity, types, interner))
         }
         Type::BoundedAscii { capacity } => {
-            format!("ascii<{}>", format_figura(*capacity, types, interner))
+            format!("ascii<{}>", format_capacity(*capacity, types, interner))
         }
         Type::BoundedOcteti { capacity } => {
-            format!("lista<b8, {}>", format_figura(*capacity, types, interner))
+            format!("lista<b8, {}>", format_capacity(*capacity, types, interner))
         }
 
         Type::Map(key, value) => format!(
@@ -307,4 +307,15 @@ fn primitive_to_faber(prim: Primitive) -> String {
         Primitive::Instans => "instans",
     }
     .to_owned()
+}
+
+/// A bounded head's capacity as written after the `size` marker
+/// (`queue<int, size 4>`, `ascii<size 1>`); the `_` hole stays bare.
+fn format_capacity(capacity: IndexId, types: &TypeTable, interner: &Interner) -> String {
+    let figura = format_figura(capacity, types, interner);
+    if figura == "_" {
+        figura
+    } else {
+        format!("size {figura}")
+    }
 }

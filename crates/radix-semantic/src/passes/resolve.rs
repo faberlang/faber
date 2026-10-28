@@ -1949,7 +1949,13 @@ fn resolve_type_expr(
                             ));
                         }
                         [capacity] => {
-                            validate_capacity_index_param(resolver, interner, capacity, errors);
+                            validate_count_param(
+                                resolver,
+                                interner,
+                                capacity,
+                                crate::numeric_width::WidthLowerIssue::CAPACITY_NEEDS_SIZE,
+                                errors,
+                            );
                         }
                         _ => errors.push(lowering_error(ISSUE_PRIMITIVE_PARAMS, name.span)),
                     }
@@ -1987,11 +1993,23 @@ fn resolve_type_expr(
                             }
                             [elem, capacity] if collection == CollectionKind::Lista => {
                                 resolve_generic_arg(resolver, interner, elem, errors);
-                                validate_list_count_param(resolver, interner, capacity, errors);
+                                validate_count_param(
+                                    resolver,
+                                    interner,
+                                    capacity,
+                                    crate::numeric_width::WidthLowerIssue::LIST_COUNT_NEEDS_SIZE,
+                                    errors,
+                                );
                             }
                             [elem, capacity] => {
                                 resolve_generic_arg(resolver, interner, elem, errors);
-                                validate_capacity_index_param(resolver, interner, capacity, errors);
+                                validate_count_param(
+                                    resolver,
+                                    interner,
+                                    capacity,
+                                    crate::numeric_width::WidthLowerIssue::CAPACITY_NEEDS_SIZE,
+                                    errors,
+                                );
                             }
                             _ => {
                                 for param in params {
@@ -2289,26 +2307,16 @@ fn named_type_is_ascii_format_hint(param: &GenericArgExpr, interner: &Interner) 
     })
 }
 
-fn validate_capacity_index_param(
+/// A bounded head's count slot (`list<T, size 4>`, `queue<T, size 4>`,
+/// `string<size 8>`): the capacity checks of every bounded head, plus the
+/// `size` marker each requires. A bare number or name (`queue<T, 4>`) is
+/// retired by name with `needs_size`; the `_` hole stays bare until its own
+/// need moves it.
+fn validate_count_param(
     resolver: &Resolver,
     interner: &Interner,
     param: &GenericArgExpr,
-    errors: &mut Vec<SemanticError>,
-) {
-    match capacity_index_issue(param, resolver, interner) {
-        None => {}
-        Some(issue) => errors.push(undefined_type_error(issue, generic_arg_span(param))),
-    }
-}
-
-/// A list's count slot (`list<T, size 4>`): the capacity checks of every
-/// bounded head, plus the `size` marker the list requires. A bare number or
-/// name (`list<T, 4>`) is retired by name; the `_` hole stays bare until its
-/// own need moves it.
-fn validate_list_count_param(
-    resolver: &Resolver,
-    interner: &Interner,
-    param: &GenericArgExpr,
+    needs_size: &'static str,
     errors: &mut Vec<SemanticError>,
 ) {
     let issue = match param {
@@ -2329,17 +2337,15 @@ fn validate_list_count_param(
                     ..
                 })
         );
-        (!marked_or_hole).then_some(crate::numeric_width::WidthLowerIssue::LIST_COUNT_NEEDS_SIZE)
+        (!marked_or_hole).then_some(needs_size)
     });
     if let Some(issue) = issue {
         let span = generic_arg_span(param);
-        errors.push(
-            if issue == crate::numeric_width::WidthLowerIssue::LIST_COUNT_NEEDS_SIZE {
-                lowering_error(issue, span)
-            } else {
-                undefined_type_error(issue, span)
-            },
-        );
+        errors.push(if issue == needs_size {
+            lowering_error(issue, span)
+        } else {
+            undefined_type_error(issue, span)
+        });
     }
 }
 

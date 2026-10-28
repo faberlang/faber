@@ -332,7 +332,7 @@ fn text_parses_any_length_and_formats_in_every_radix() {
     );
     assert_eq!(
         ok(&format!(
-            "sit inf big ← {TWO_64}\nsit inf neg ← -1\nnota big ↦ textus\nnota neg ↦ textus\nsit ascii<17> h ← big ↦ ascii<17> via Hex\nnota h"
+            "sit inf big ← {TWO_64}\nsit inf neg ← -1\nnota big ↦ textus\nnota neg ↦ textus\nsit ascii<magnitudo 17> h ← big ↦ ascii<magnitudo 17> via Hex\nnota h"
         )),
         ["18446744073709551616", "-1", "10000000000000000"]
     );

@@ -199,7 +199,7 @@ instans = "執行個體"
 objectum = "物件"
 quidlibet = "任意值"
 lista = "列表"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "表格"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "帳本"
@@ -843,7 +843,7 @@ help = "在 via 之後立即寫出提示，例如 `x ↦ u32 via Hex`；提示�
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "轉換提示不是型別引數"
-help = "將提示寫成目標之後的 via 子句：`u32 via Le`、`ascii<8> via Hex`、`littera via Code`"
+help = "將提示寫成目標之後的 via 子句：`u32 via Le`、`ascii<{magnitudo} 8> via Hex`、`littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "轉換提示不跟在角括號裡的目標之後"
@@ -1289,6 +1289,10 @@ help = "把範圍寫在列表上，例如 {lista}<int, {magnitudo} 1…8>；它�
 message = "列表的元素個數寫在 `{magnitudo}` 之後"
 help = "寫 `{lista}<int, {magnitudo} 4>` 表示最多 4 個元素，或 `{lista}<int, {magnitudo} 1…8>` 表示一個範圍；裸範圍限定的是值，不是個數"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "容量寫在 `{magnitudo}` 之後"
+help = "寫 `{queue}<int, {magnitudo} 4>`、`{stack}<int, {magnitudo} 4>`、`{textus}<{magnitudo} 8>` 或 `{ascii}<{magnitudo} 8>` 表示最多這麼多的容量；裸數字不是容量"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可呼叫項的註記姿態「{annotation_posture}」與書寫的姿態「{written_posture}」衝突"
 help = "修正用於降階的 AST 結構"
@@ -1315,11 +1319,11 @@ help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue 需要一個或兩個型別參數"
-help = "使用 queue<T> 或 queue<T, N>"
+help = "使用 queue<T> 或 queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack 需要一個或兩個型別參數"
-help = "使用 stack<T> 或 stack<T, N>"
+help = "使用 stack<T> 或 stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu 需要模式"
@@ -1487,7 +1491,7 @@ help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "基本型別不能接受參數"
-help = "textus<N>、ascii<N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
+help = "textus<{magnitudo} N>、ascii<{magnitudo} N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "命名空間未匯出限定型別"

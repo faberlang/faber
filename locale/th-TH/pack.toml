@@ -199,7 +199,7 @@ instans = "อินสแตนซ์"
 objectum = "ออบเจ็กต์"
 quidlibet = "อะไรก็ได้"
 lista = "รายการ"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "ตาราง"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "สมุดบัญชี"
@@ -799,7 +799,7 @@ help = "ระบุชื่อ hint ต่อจาก via ทันที เ
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "convert hint ไม่ใช่อาร์กิวเมนต์ชนิด"
-help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "convert hint ไม่ได้ตามหลังเป้าหมายในวงเล็บแหลม"
@@ -1257,6 +1257,10 @@ help = "เขียนช่วงบนรายการ เช่น {lista}
 message = "จำนวนของรายการเขียนหลัง `{magnitudo}`"
 help = "เขียน `{lista}<int, {magnitudo} 4>` สำหรับไม่เกิน 4 รายการ หรือ `{lista}<int, {magnitudo} 1…8>` สำหรับช่วง; ช่วงเปล่า ๆ จำกัดค่า ไม่ใช่จำนวน"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "ความจุเขียนหลัง `{magnitudo}`"
+help = "เขียน `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` หรือ `{ascii}<{magnitudo} 8>` สำหรับความจุไม่เกินจำนวนนั้น; ตัวเลขเปล่า ๆ ไม่ใช่ความจุ"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1283,11 +1287,11 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue ต้องมีพารามิเตอร์ชนิดหนึ่งหรือสองตัว"
-help = "ใช้ queue<T> หรือ queue<T, N>"
+help = "ใช้ queue<T> หรือ queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack ต้องมีพารามิเตอร์ชนิดหนึ่งหรือสองตัว"
-help = "ใช้ stack<T> หรือ stack<T, N>"
+help = "ใช้ stack<T> หรือ stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu ต้องมีแพตเทิร์น"
@@ -1455,7 +1459,7 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "ชนิด primitive รับพารามิเตอร์ไม่ได้"
-help = "textus<N>, ascii<N> และ {lista}<b8, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N> และ {lista}<b8, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace ไม่ได้ส่งออก qualified type"

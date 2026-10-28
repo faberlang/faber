@@ -24,7 +24,7 @@ locale = "en"
 #   • Reading spare `len..N` slots — they are unreadable.
 #   • Implicit assignment from `list<b8>` to `list<b8, size N>` — conversion is explicit.
 #
-# See also: lista<numerus, magnitudo N>, textus<N>, ascii<N>
+# See also: lista<numerus, magnitudo N>, textus<magnitudo N>, ascii<size N>
 # =============================================================================
 
 main {

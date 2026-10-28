@@ -210,7 +210,7 @@ instans = "instans"
 objectum = "objectum"
 quidlibet = "quidlibet"
 lista = "lista"
-# Shipped bounded forms: lista<T, magnitudo N>, lista<T, magnitudo lo‥hi>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, lista<T, magnitudo lo‥hi>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "tabula"
 # tabulae (ledger, an insertion-ordered map) is one letter from tabula (map) on purpose:
 # "two shades of the same thing" (Roman account books were tabulae). Not a typo;
@@ -980,7 +980,7 @@ help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are 
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "a convert hint is not a type argument"
-help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "a convert hint does not follow the target in angle brackets"
@@ -1570,6 +1570,10 @@ help = "scribe ambitum in lista, ut {lista}<int, {magnitudo} 1…8>; semper trah
 message = "numerus listae post `{magnitudo}` scribitur"
 help = "scribe `{lista}<int, {magnitudo} 4>` pro quattuor elementis ad summum, aut `{lista}<int, {magnitudo} 1…8>` pro ambitu; ambitus nudus valorem terminat, non numerum"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "capacitas post `{magnitudo}` scribitur"
+help = "scribe `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` aut `{ascii}<{magnitudo} 8>` pro capacitate tot ad summum; numerus nudus capacitas non est"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
 help = "emenda structuram AST ad demittendum"
@@ -1596,11 +1600,11 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
-help = "use queue<T> or queue<T, N>"
+help = "use queue<T> or queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack requires one or two type parameters"
-help = "use stack<T> or stack<T, N>"
+help = "use stack<T> or stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne {casu} requires a pattern"
@@ -1839,12 +1843,12 @@ message = "precision marker must be a bare spelling such as ms or us"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.ascii_format_hint_not_capacity]
-message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N> via Hex|Bin|Oct"
-help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width"
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<{magnitudo} N> via Hex|Bin|Oct"
+help = "write ascii<{magnitudo} N> via Hex, ascii<{magnitudo} N> via Bin, or ascii<{magnitudo} N> via Oct with N as digit width"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
-help = "textus<N>, ascii<N>, and {lista}<b8, {magnitudo} N> are bounded forms, spelled with their own type words"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N>, and {lista}<b8, {magnitudo} N> are bounded forms, spelled with their own type words"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -3036,7 +3040,7 @@ help = "convert both operands to the same {modulus} width, or keep both operands
 
 [diagnostics.SEM011.issues.textus_literal_too_long]
 message = "{textus} literal exceeds its declared capacity of {capacity}"
-help = "shorten the {textus}<N> literal to fit its declared capacity, or use unbounded {textus}"
+help = "shorten the {textus}<{magnitudo} N> literal to fit its declared capacity, or use unbounded {textus}"
 
 [diagnostics.SEM011.issues.glyph_operands_unsupported]
 message = "operator {op} does not apply to these operand types"
@@ -3548,7 +3552,7 @@ help = "add a declared collection type for vacua"
 
 [diagnostics.SEM014.issues.bounded_capacity_unsolved]
 message = "bounded capacity could not be inferred"
-help = "write a concrete N ({ascii}<8>) or give the hole a bounded witness"
+help = "write a concrete N ({ascii}<{magnitudo} 8>) or give the hole a bounded witness"
 
 [diagnostics.SEM014.issues.marker_width_unsolved]
 message = "numeric width marker could not be inferred"
@@ -3647,8 +3651,8 @@ message = "{lista}<b8> endian conversion requires a window whose length matches 
 help = "use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64"
 
 [diagnostics.SEM016.issues.ascii_format_hint_not_capacity]
-message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N> via Hex|Bin|Oct"
-help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width"
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<{magnitudo} N> via Hex|Bin|Oct"
+help = "write ascii<{magnitudo} N> via Hex, ascii<{magnitudo} N> via Bin, or ascii<{magnitudo} N> via Oct with N as digit width"
 
 [diagnostics.SEM016.issues.ascii_pack_width_overflow]
 message = "ascii format pack needs more digits than the declared capacity N; widen N or narrow the source first"
@@ -4948,11 +4952,11 @@ help = "choose a different binding name when the `{keyword}` literal is needed"
 
 [diagnostics.WARN022]
 message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
-help = "convert to textus<N> for O(1) indexing or iterate scalars"
+help = "convert to textus<{magnitudo} N> for O(1) indexing or iterate scalars"
 
 [diagnostics.WARN022.issues.unbounded_textus_index]
 message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
-help = "convert to textus<N> for O(1) indexing or iterate scalars"
+help = "convert to textus<{magnitudo} N> for O(1) indexing or iterate scalars"
 
 [diagnostics.WARN023]
 message = "type test names a member its union cannot hold"

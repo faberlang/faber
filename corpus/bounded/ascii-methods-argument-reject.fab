@@ -4,30 +4,30 @@ kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
 category = "text"
 canonical = false
-summary = "Rejected: a multi-byte ascii<N> value is not an implicit string argument of a text method."
-syntax = "a.starts_with(p) with ascii<4> p — rejected; convert with p ↦ string first"
+summary = "Rejected: a multi-byte ascii<size N> value is not an implicit string argument of a text method."
+syntax = "a.starts_with(p) with ascii<size 4> p — rejected; convert with p ↦ string first"
 related = ["ascii", "textus", "↦"]
 locale = "en"
 no_expected = "rejects"
 diagnostic = "SEM010:argument_type_mismatch"
 +++
 # =============================================================================
-# ascii<N> argument to a text method — rejected
+# ascii<size N> argument to a text method — rejected
 # =============================================================================
 #
 # What this teaches:
-#   • Only bare `ascii` and one-letter `ascii<1>` widen to `string` on their
-#     own. An `ascii<4>` value reaches `string` through an explicit `↦ string`.
+#   • Only bare `ascii` and one-letter `ascii<size 1>` widen to `string` on their
+#     own. An `ascii<size 4>` value reaches `string` through an explicit `↦ string`.
 #   • The checker refuses the call with one named diagnostic, so `faber check`
 #     and `faber check --lower` agree.
 #
 # Common mistakes:
-#   • Passing a bounded `ascii<N>` value straight to starts_with, ends_with,
+#   • Passing a bounded `ascii<size N>` value straight to starts_with, ends_with,
 #     replace or split.
 # =============================================================================
 
 main {
-    let ascii<16> a ← ' Hello '
-    let ascii<4> prefix ← ' H'
+    let ascii<size 16> a ← ' Hello '
+    let ascii<size 4> prefix ← ' H'
     print a.starts_with(prefix)
 }

@@ -38,7 +38,7 @@ fn assert_no_warning(source: &str) {
 #[test]
 fn warns_on_unbounded_textus_scalar_index_with_structured_identity() {
     warning_for(
-        r"functio probe(textus xs) → ascii<1> {
+        r"functio probe(textus xs) → ascii<magnitudo 1> {
     redde xs[0]
 }
 
@@ -64,7 +64,7 @@ incipit {
 #[test]
 fn does_not_warn_on_bounded_textus_or_ascii_scalar_index() {
     assert_no_warning(
-        r"functio probe(textus<32> xs, ascii<32> ys) → ascii<1> {
+        r"functio probe(textus<magnitudo 32> xs, ascii<magnitudo 32> ys) → ascii<magnitudo 1> {
     nota ys[0]
     redde xs[0]
 }

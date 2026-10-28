@@ -38,61 +38,76 @@ fn ok(body: &str) -> Vec<String> {
 
 #[test]
 fn bounded_cord_ascii_slice_widens_to_textus() {
-    assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a.sectio(0, 2)"), ["ab"]);
+    assert_eq!(ok("sit ascii<magnitudo 8> a ← 'abc'\nnota a.sectio(0, 2)"), ["ab"]);
 }
 
 #[test]
 fn bounded_cord_ascii_uppercase_widens_to_textus() {
-    assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a.maiuscula()"), ["ABC"]);
+    assert_eq!(ok("sit ascii<magnitudo 8> a ← 'abc'\nnota a.maiuscula()"), ["ABC"]);
 }
 
 #[test]
 fn bounded_cord_ascii_starts_with_widens_to_textus() {
-    assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a.initium(\"ab\")"), ["verum"]);
+    assert_eq!(ok("sit ascii<magnitudo 8> a ← 'abc'\nnota a.initium(\"ab\")"), ["verum"]);
 }
 
 #[test]
 fn bounded_cord_ascii_ends_with_widens_to_textus() {
-    assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a.finis(\"bc\")"), ["verum"]);
+    assert_eq!(ok("sit ascii<magnitudo 8> a ← 'abc'\nnota a.finis(\"bc\")"), ["verum"]);
 }
 
 #[test]
 fn bounded_cord_ascii_contains_widens_to_textus() {
-    assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a.continet(\"bc\")"), ["verum"]);
+    assert_eq!(ok("sit ascii<magnitudo 8> a ← 'abc'\nnota a.continet(\"bc\")"), ["verum"]);
 }
 
 #[test]
 fn bounded_cord_textus_trim_widens_to_textus() {
-    assert_eq!(ok("sit textus<8> s ← \"  ab \" ↦ textus<8>\nnota s.recide()"), ["ab"]);
+    assert_eq!(
+        ok("sit textus<magnitudo 8> s ← \"  ab \" ↦ textus<magnitudo 8>\nnota s.recide()"),
+        ["ab"]
+    );
 }
 
 #[test]
 fn bounded_cord_textus_split_widens_to_textus() {
     assert_eq!(
-        ok("sit textus<8> s ← \"a,b\" ↦ textus<8>\nnota s.divide(\",\").longitudo()"),
+        ok("sit textus<magnitudo 8> s ← \"a,b\" ↦ textus<magnitudo 8>\nnota s.divide(\",\").longitudo()"),
         ["2"]
     );
 }
 
 #[test]
 fn bounded_cord_textus_replace_widens_to_textus() {
-    assert_eq!(ok("sit textus<8> s ← \"abc\" ↦ textus<8>\nnota s.muta(\"b\", \"z\")"), ["azc"]);
+    assert_eq!(
+        ok("sit textus<magnitudo 8> s ← \"abc\" ↦ textus<magnitudo 8>\nnota s.muta(\"b\", \"z\")"),
+        ["azc"]
+    );
 }
 
 #[test]
 fn bounded_cord_textus_escape_widens_to_textus() {
-    assert_eq!(ok("sit textus<8> s ← \"ab\" ↦ textus<8>\nnota s.munita()"), ["ab"]);
+    assert_eq!(
+        ok("sit textus<magnitudo 8> s ← \"ab\" ↦ textus<magnitudo 8>\nnota s.munita()"),
+        ["ab"]
+    );
 }
 
 #[test]
 fn bounded_cord_textus_range_window_reads_a_textus_window() {
-    assert_eq!(ok("sit textus<8> s ← \"abcdef\" ↦ textus<8>\nnota s[1‥3]"), ["bc"]);
-    assert_eq!(ok("sit textus<8> s ← \"abcdef\" ↦ textus<8>\nnota s[1 usque 3]"), ["bcd"]);
+    assert_eq!(
+        ok("sit textus<magnitudo 8> s ← \"abcdef\" ↦ textus<magnitudo 8>\nnota s[1‥3]"),
+        ["bc"]
+    );
+    assert_eq!(
+        ok("sit textus<magnitudo 8> s ← \"abcdef\" ↦ textus<magnitudo 8>\nnota s[1 usque 3]"),
+        ["bcd"]
+    );
 }
 
 #[test]
 fn bounded_cord_ascii_range_window_reads_a_textus_window() {
-    assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a[0‥2]"), ["ab"]);
+    assert_eq!(ok("sit ascii<magnitudo 8> a ← 'abc'\nnota a[0‥2]"), ["ab"]);
 }
 
 fn frontend_rejection(body: &str) -> String {
@@ -112,7 +127,7 @@ fn frontend_rejection(body: &str) -> String {
 
 #[test]
 fn bounded_cord_ascii_literal_arguments_widen_to_textus() {
-    let prelude = "sit ascii<16> a ← ' Hello '\n";
+    let prelude = "sit ascii<magnitudo 16> a ← ' Hello '\n";
     assert_eq!(ok(&format!("{prelude}nota a.initium(' H')")), ["verum"]);
     assert_eq!(ok(&format!("{prelude}nota a.finis('o ')")), ["verum"]);
     assert_eq!(ok(&format!("{prelude}nota a.muta('l', 'L')")), [" HeLLo "]);
@@ -121,7 +136,7 @@ fn bounded_cord_ascii_literal_arguments_widen_to_textus() {
 
 #[test]
 fn bounded_cord_ascii_variable_arguments_widen_to_textus() {
-    let prelude = "sit ascii<16> a ← ' Hello '\nsit ascii p ← ' H'\nsit ascii<1> l ← 'l'\nsit ascii<1> u ← 'L'\n";
+    let prelude = "sit ascii<magnitudo 16> a ← ' Hello '\nsit ascii p ← ' H'\nsit ascii<magnitudo 1> l ← 'l'\nsit ascii<magnitudo 1> u ← 'L'\n";
     assert_eq!(ok(&format!("{prelude}nota a.initium(p)")), ["verum"]);
     assert_eq!(ok(&format!("{prelude}nota a.finis(p)")), ["falsum"]);
     assert_eq!(ok(&format!("{prelude}nota a.muta(l, u)")), [" HeLLo "]);
@@ -139,7 +154,9 @@ fn textus_receiver_ascii_arguments_widen_to_textus() {
 #[test]
 fn bounded_ascii_argument_over_one_is_refused_at_check() {
     for call in ["initium(p)", "finis(p)", "muta(p, p)", "divide(p)"] {
-        let text = frontend_rejection(&format!("sit ascii<16> a ← ' Hello '\nsit ascii<4> p ← 'll'\nnota a.{call}"));
+        let text = frontend_rejection(&format!(
+            "sit ascii<magnitudo 16> a ← ' Hello '\nsit ascii<magnitudo 4> p ← 'll'\nnota a.{call}"
+        ));
         assert!(text.contains(ISSUE_ARGUMENT_TYPE_MISMATCH), "{call}: {text}");
     }
 }
@@ -155,8 +172,8 @@ fn bounded_cord_ascii_slice_out_of_range_aborts_like_textus() {
             .cloned()
             .unwrap_or_else(|| "<non-string panic>".to_owned())
     };
-    let ascii = abort_reason("sit ascii<8> a ← 'abc'\nnota a.sectio(2, 9)");
-    let textus = abort_reason("sit textus<8> s ← \"abc\" ↦ textus<8>\nnota s.sectio(2, 9)");
+    let ascii = abort_reason("sit ascii<magnitudo 8> a ← 'abc'\nnota a.sectio(2, 9)");
+    let textus = abort_reason("sit textus<magnitudo 8> s ← \"abc\" ↦ textus<magnitudo 8>\nnota s.sectio(2, 9)");
     assert!(ascii.contains("slice_out_of_range"), "{ascii}");
     assert_eq!(ascii, textus);
 }
