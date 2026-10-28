@@ -1,0 +1,45 @@
++++
+term = "?."
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "optional_suffix"]
+category = "type"
+summary = "A `?.method()` call runs only when the receiver is present, and gives `none` when it is absent."
+syntax = "<expression>?.<method>(<args>)"
+related = ["?.", "?(", "?["]
+locale = "en"
++++
+# =============================================================================
+# ?. — A `?.method()` call runs only when the receiver is present, and gives `none` when it is absent.
+# =============================================================================
+#
+# What this teaches:
+#   • `obj?.method()` calls the method only when `obj` is present; an
+#     absent receiver gives `none` and the method body does not run
+#   • The result is `T ∪ none`, so a `coalesce` default can fill in the
+#     absent case
+#
+# Common mistakes:
+#   • Expecting an absent receiver's method to print or change anything:
+#     its body never runs
+#   • Expecting an absent receiver to give a default value: it gives
+#     `none`, and `coalesce` supplies the default
+#
+# See also: chain-call, optional-chain, optionalis, vel
+# =============================================================================
+
+class Greeter {
+    let string name
+
+    fn greet(string who) → string {
+        print "greeting §"(who)
+        return "hello §, I am §"(who, self.name)
+    }
+}
+
+main {
+    let Greeter ∪ none here ← Greeter { name = "Aelia" }
+    let Greeter ∪ none gone ← null
+    print here?.greet("Brutus")
+    print gone?.greet("Brutus")
+    print gone?.greet("Brutus") coalesce "nobody"
+}

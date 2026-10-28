@@ -1711,7 +1711,12 @@ impl FunctionLower<'_, '_> {
     ) -> Lowered<(Value, Rep)> {
         if !matches!(
             link,
-            MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_)
+            MirOptionChainLink::Field(_)
+                | MirOptionChainLink::Index(_)
+                | MirOptionChainLink::Call {
+                    callee: MirCallee::Value(_),
+                    ..
+                }
         ) {
             return Err(Decline::new("optional chain link"));
         }
@@ -1801,6 +1806,18 @@ impl FunctionLower<'_, '_> {
                 }
                 self.call_runtime(&abi::LIST_GET_OPT, &[payload, index])?
                     .ok_or_else(|| Decline::new("chain index result"))?
+            }
+            // `f?(args)` on a present function value: the call's result is
+            // boxed as present unless it is itself optional. The arguments are
+            // evaluated by the caller only on the present path.
+            MirOptionChainLink::Call {
+                callee: MirCallee::Value(_),
+                args,
+            } if inner_rep == Rep::Func => {
+                let (result, result_rep) = self
+                    .indirect_call_value(payload, inner, args)?
+                    .ok_or_else(|| Decline::new("chain call result"))?;
+                self.coerce(result, result_rep, Rep::Opt)?
             }
             _ => return Err(Decline::new("optional chain link")),
         })
@@ -4306,49 +4323,14 @@ impl FunctionLower<'_, '_> {
         if rep != Rep::Func {
             return Err(Decline::new("call of a non-function"));
         }
-        let (pointer, environment) = self.function_parts(object)?;
         let ty = self.operand_type(callee)?;
-        let table = self.state.input.types;
-        let Type::Func(signature) = resolve(table, ty.semantic_id()) else {
-            return Err(Decline::new("call of a non-function"));
-        };
-        let flags = self.type_address_flags(signature);
-        let mut abi_signature = self.state.module.make_signature();
-        abi_signature.params.push(AbiParam::new(types::I64));
-        let mut wanted = Vec::with_capacity(signature.params.len());
-        for (position, param) in signature.params.iter().enumerate() {
-            let rep = rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
-            let Some(cl) = rep.cl_type() else {
-                return Err(Decline::new("unit parameter"));
-            };
-            let cl = if flags.get(position).copied().unwrap_or(false) {
-                types::I64
-            } else {
-                cl
-            };
-            abi_signature.params.push(AbiParam::new(cl));
-            wanted.push(rep);
-        }
-        let result_rep = rep_of(table, MirType::semantic(signature.ret))?;
-        if let Some(cl) = result_rep.cl_type() {
-            abi_signature.returns.push(AbiParam::new(cl));
-        }
-        let mut values = Vec::with_capacity(args.len() + 1);
-        values.push(environment);
-        let returns = self.call_arguments(&flags, args, &wanted, &mut values)?;
-        let signature_ref = self.builder.import_signature(abi_signature);
-        let call = self
-            .builder
-            .ins()
-            .call_indirect(signature_ref, pointer, &values);
-        self.read_back_arguments(args, &returns)?;
-        if let Some(destination) = destination {
-            let results = self.builder.inst_results(call).to_vec();
-            if let Some(result) = results.first() {
-                let (variable, slot_rep) = self.place_slot(destination)?;
-                let result = self.coerce(*result, result_rep, slot_rep)?;
-                self.builder.def_var(variable, result);
-            }
+        let result = self.indirect_call_value(object, ty, args)?;
+        if let Some(destination) = destination
+            && let Some((result, result_rep)) = result
+        {
+            let (variable, slot_rep) = self.place_slot(destination)?;
+            let result = self.coerce(result, result_rep, slot_rep)?;
+            self.builder.def_var(variable, result);
         }
         Ok(())
     }

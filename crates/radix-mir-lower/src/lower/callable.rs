@@ -97,8 +97,15 @@ impl FunctionBuilder<'_> {
             return None;
         }
         let value_ty = expr.ty?;
+        // WHY: a named function bound into an optional function type
+        // (`let Op ∪ none f ← shout`) is typed at the store's option type; the
+        // function value is the present payload.
         let signature = match self.normalized_type(value_ty) {
             Type::Func(signature) => signature.clone(),
+            Type::Option(inner) => match self.normalized_type(*inner) {
+                Type::Func(signature) => signature.clone(),
+                _ => return None,
+            },
             _ => return None,
         };
         let span = expr.span;

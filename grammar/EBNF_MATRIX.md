@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 534 | 538 | 99% |
-| go | 483 | 538 | 90% |
-| ts | 538 | 538 | 100% |
-| faber | 538 | 538 | 100% |
+| rust | 536 | 540 | 99% |
+| go | 485 | 540 | 90% |
+| ts | 540 | 540 | 100% |
+| faber | 540 | 540 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 467 | 541 | 86% |
-| wasm-text | 390 | 541 | 72% |
-| wasm | 389 | 541 | 72% |
-| metal-text | 5 | 541 | 1% |
-| wgsl-text | 5 | 541 | 1% |
-| sexp-struct | 478 | 541 | 88% |
-| sexp | 475 | 541 | 88% |
-| runner | 476 | 541 | 88% |
+| llvm-text | 467 | 543 | 86% |
+| wasm-text | 390 | 543 | 72% |
+| wasm | 389 | 543 | 72% |
+| metal-text | 5 | 543 | 1% |
+| wgsl-text | 5 | 543 | 1% |
+| sexp-struct | 481 | 543 | 89% |
+| sexp | 478 | 543 | 88% |
+| runner | 478 | 543 | 88% |
 
 ## Keywords — application lane
 
@@ -365,8 +365,8 @@ pages of the documentation site.
 | <a id=""></a>`!.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id=""></a>`![` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`=` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`?(` | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ |
-| <a id=""></a>`?.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`?(` | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`?.` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`?[` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="aut"></a>`aut` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ergo"></a>`ergo` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |

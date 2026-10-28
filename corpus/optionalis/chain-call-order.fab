@@ -1,0 +1,59 @@
++++
+term = "?("
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "clausura_expr", "function_type", "optional_suffix"]
+category = "type"
+summary = "An optional call `?(` skips its arguments when the callee is absent; a named function binds into an optional function type."
+syntax = "<expression>?(<args>) | <expression>?[<index>]"
+related = ["?(", "?[", "?."]
+locale = "en"
++++
+# =============================================================================
+# ?( — An optional call `?(` skips its arguments when the callee is absent; a named function binds into an optional function type.
+# =============================================================================
+#
+# What this teaches:
+#   • `f?(arg())` evaluates `arg()` only when `f` is present: an absent
+#     `f` short-circuits the whole call, arguments included
+#   • `xs?[idx()]` follows the same rule for its index expression
+#   • A named function binds into an optional function type
+#     (`let Op ∪ none f ← shout`) exactly as it binds into `Op`
+#
+# Common mistakes:
+#   • Expecting the arguments of an absent callee to still run for their
+#     side effects: they never run
+#
+# See also: chain-call, optional-chain, optionalis
+# =============================================================================
+
+type Op = (int) → int
+
+fn shout(int x) → int {
+    return x + 100
+}
+
+fn arg() → int {
+    print "arg evaluated"
+    return 5
+}
+
+fn idx() → int {
+    print "idx evaluated"
+    return 1
+}
+
+main {
+    let Op ∪ none absent ← null
+    print absent?(arg())
+    let Op ∪ none present ← int x → int ∴ x * 2
+    print present?(arg())
+    let Op ∪ none named ← shout
+    print named?(1)
+    let Op plain ← shout
+    print plain(2)
+
+    let list<int> ∪ none gone ← null
+    print gone?[idx()]
+    let list<int> ∪ none here ← [10, 20, 30]
+    print here?[idx()]
+}

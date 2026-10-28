@@ -5075,6 +5075,65 @@ impl<'a> FunctionBuilder<'a> {
         Some(MirOperand::Temp(result))
     }
 
+    /// An optional-chain link short-circuits (the optional-chain rule of the
+    /// grammar: an absent base runs nothing after the `?`). The link's
+    /// arguments and index are evaluated only on the present branch, so an
+    /// effectful argument never runs for an absent base. A base that is not
+    /// nullable, or a link with only effect-free operands, keeps the single
+    /// `option chain` op: eager evaluation is unobservable there.
+    pub(super) fn lower_option_chain_guarded(
+        &mut self,
+        base: &MirOperand,
+        base_ty: Option<TypeId>,
+        operands_effect_free: bool,
+        ty: MirType,
+        span: Span,
+        build: impl FnOnce(&mut Self) -> Option<MirOptionChainLink>,
+    ) -> Option<MirOperand> {
+        let base_nullable = base_ty.is_some_and(|ty| self.types.nullable_inner(ty).is_some());
+        if operands_effect_free || !base_nullable {
+            let link = build(self)?;
+            return Some(self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }),
+                ty,
+                span,
+            ));
+        }
+        let result = self.push_temp(ty, span);
+        let result_place = MirPlace::temp(result);
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let is_nil = self.assign_temp(
+            MirValueKind::Unary { op: MirUnOp::IsNil, operand: base.clone() },
+            bivalens,
+            span,
+        );
+        let absent_id = self.fresh_block(span);
+        let present_id = self.fresh_block(span);
+        let join_id = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: is_nil, then_block: absent_id, else_block: present_id },
+            span,
+        );
+
+        self.switch_to(absent_id);
+        let none = self.assign_temp(MirValueKind::Option(MirOptionOp::None), ty, span);
+        self.assign(result_place.clone(), none, ty, span);
+        let absent_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+
+        self.switch_to(present_id);
+        let link = build(self)?;
+        let chained = self.assign_temp(MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }), ty, span);
+        self.assign(result_place, chained, ty, span);
+        let present_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+
+        if absent_reaches || present_reaches {
+            self.switch_to(join_id);
+        } else {
+            self.seal_unreachable(join_id, span);
+        }
+        Some(MirOperand::Temp(result))
+    }
+
     fn assign(&mut self, place: MirPlace, operand: MirOperand, ty: MirType, span: Span) {
         let value = self.new_value(MirValueKind::Operand(operand), ty, span);
         self.append_stmt(MirStatement { kind: MirStatementKind::Assign { place, value }, span });

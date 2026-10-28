@@ -15,4 +15,4 @@ check_only = false
 outcome = "known-fail"
 phase = "emit"
 diagnostic_contains = "CODEGEN006:variant_path_spelling_reanalysis_failed"
-known_fail_why = "The roundtrip leg cannot re-read the canonical Faber it emits for this program (CODEGEN006:variant_path_spelling_reanalysis_failed)."
+known_fail_why = "The roundtrip leg cannot re-read the Latin Faber it emits for `Op ∪ none`: the alias of a function type is inlined, and `(numerus) → numerus ∪ nihil` reads as a function with an optional result (CODEGEN006:variant_path_spelling_reanalysis_failed)."

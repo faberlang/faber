@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 467,
-    "analyzable": 541
+    "analyzable": 543
   },
   "terms": [
     {
@@ -37,13 +37,13 @@
       "term": "?(",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "?.",
       "rule": "operator-group",
       "capable": 2,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "?[",
