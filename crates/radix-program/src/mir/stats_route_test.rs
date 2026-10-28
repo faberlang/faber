@@ -135,7 +135,7 @@ fn stats_package_run_compile_failure_returns_diagnostics_without_summary() {
         !diagnostics.is_empty(),
         "compile failures return diagnostics without a summary"
     );
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, Vec::<String>::new());
 }
 
 #[test]

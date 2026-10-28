@@ -99,7 +99,7 @@ kind = "bin"
 /// not module-exported nominals and never register in the validation context,
 /// so counting them would pollute the unification assertion. Before S1 U2 the
 /// sibling's nominal def was interned as-is, producing a second (coincident)
-/// TypeId; the canonical remap collapses same-nominal references to one.
+/// `TypeId`; the canonical remap collapses same-nominal references to one.
 fn count_merged_nominals(lowered: &LoweredMirUnit<'_>, kind: &str) -> usize {
     let types = lowered.validated.validation().types.as_table();
     let validation = lowered.validated.validation();
@@ -369,8 +369,8 @@ fn package_mir_merged_validation_carries_imported_struct_fields() {
 }
 
 /// The canonical identity contract, pinned here for the delivery/campaign
-/// note: the key shape is (nominal kind, home-module InterfaceLibraryIdentity
-/// {provider, package, module_path}, export name); the unification rule is
+/// note: the key shape is (nominal kind, home-module `InterfaceLibraryIdentity`
+/// {provider, package, `module_path`}, export name); the unification rule is
 /// same-key → one semantic type in the merged program.
 #[test]
 fn canonical_nominal_identity_key_shape_is_module_qualified() {
@@ -412,7 +412,7 @@ const NOMINAL_VARIANT_MAIN: &str =
 /// (a) Post-MRL-4 truth: the variant-payload sibling module registers in the
 /// consumer transitively, so the payload variant resolves and the merge does
 /// NOT fail closed. The fail-closed diagnostic this fixture used to pin is
-/// unreachable by design since MRL-4 (install_transitive_local_interfaces).
+/// unreachable by design since MRL-4 (`install_transitive_local_interfaces`).
 #[test]
 fn identity_bearing_enum_variant_sibling_payload_registers_transitively() {
     let dir = crate::test_support::test_temp_dir("s1u2-variant-transitive");
