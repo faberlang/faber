@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 389,
-    "analyzable": 541
+    "analyzable": 544
   },
   "terms": [
     {
@@ -482,6 +482,12 @@
       "rule": "keyword",
       "capable": 2,
       "analyzable": 2
+    },
+    {
+      "term": "list<T, size lo‥hi>",
+      "rule": "operator-group",
+      "capable": 0,
+      "analyzable": 3
     },
     {
       "term": "list<b8>",

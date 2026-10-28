@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 534 | 538 | 99% |
-| go | 483 | 538 | 90% |
-| ts | 538 | 538 | 100% |
-| faber | 538 | 538 | 100% |
+| rust | 537 | 541 | 99% |
+| go | 486 | 541 | 90% |
+| ts | 541 | 541 | 100% |
+| faber | 541 | 541 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 467 | 541 | 86% |
-| wasm-text | 390 | 541 | 72% |
-| wasm | 389 | 541 | 72% |
-| metal-text | 5 | 541 | 1% |
-| wgsl-text | 5 | 541 | 1% |
-| sexp-struct | 478 | 541 | 88% |
-| sexp | 475 | 541 | 88% |
-| runner | 476 | 541 | 88% |
+| llvm-text | 467 | 544 | 86% |
+| wasm-text | 390 | 544 | 72% |
+| wasm | 389 | 544 | 72% |
+| metal-text | 5 | 544 | 1% |
+| wgsl-text | 5 | 544 | 1% |
+| sexp-struct | 480 | 544 | 88% |
+| sexp | 477 | 544 | 88% |
+| runner | 478 | 544 | 88% |
 
 ## Keywords — application lane
 
@@ -190,6 +190,7 @@ pages of the documentation site.
 | <a id="aut"></a>`aut` | ✓ | ✓ | ✓ | ✓ |
 | <a id="ergo"></a>`ergo` | ✓ | ✓ | ✓ | ✓ |
 | <a id="et"></a>`et` | ✓ | ✓ | ✓ | ✓ |
+| <a id="list-t-size-lo-hi"></a>`list<T, size lo‥hi>` | ✓ | ✓ | ✓ | ✓ |
 | <a id="modulus-u16"></a>`modulus<u16>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="modulus-u32"></a>`modulus<u32>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✕ | ✓ | ✓ |
@@ -371,6 +372,7 @@ pages of the documentation site.
 | <a id="aut"></a>`aut` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ergo"></a>`ergo` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="et"></a>`et` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="list-t-size-lo-hi"></a>`list<T, size lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ◐ | ◐ | ◐ |
 | <a id="modulus-u16"></a>`modulus<u16>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="modulus-u32"></a>`modulus<u32>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |

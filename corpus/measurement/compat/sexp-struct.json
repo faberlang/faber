@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 478,
-    "analyzable": 541
+    "capable": 480,
+    "analyzable": 544
   },
   "terms": [
     {
@@ -482,6 +482,12 @@
       "rule": "keyword",
       "capable": 1,
       "analyzable": 2
+    },
+    {
+      "term": "list<T, size lo‥hi>",
+      "rule": "operator-group",
+      "capable": 2,
+      "analyzable": 3
     },
     {
       "term": "list<b8>",
