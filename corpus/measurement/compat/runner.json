@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 467,
-    "analyzable": 529
+    "capable": 469,
+    "analyzable": 531
   },
   "terms": [
     {
@@ -414,8 +414,8 @@
     {
       "term": "implendum",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "implet",
@@ -900,8 +900,8 @@
     {
       "term": "textus",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 9
+      "capable": 8,
+      "analyzable": 10
     },
     {
       "term": "trapped",

@@ -60,7 +60,15 @@ fn missing_build_and_run_tools_are_told_apart_by_name() {
     let empty = OsString::from("/nonexistent-faber-path");
     let tsc = require_tool_on(&["tsc".to_owned()], Some(empty.as_os_str())).expect_err("no tsc");
     let node = require_tool_on(&["node".to_owned()], Some(empty.as_os_str())).expect_err("no node");
-    assert!(tsc.message.contains("`tsc`"), "{}", tsc.message);
-    assert!(node.message.contains("`node`"), "{}", node.message);
-    assert!(!tsc.message.contains("`node`"));
+    let tool_arg = |diagnostic: &Diagnostic| {
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "tool")
+            .map(|arg| arg.value.clone())
+    };
+    assert_eq!(tsc.issue(), Some("package_ts_tool_missing"));
+    assert_eq!(node.issue(), Some("package_ts_tool_missing"));
+    assert_eq!(tool_arg(&tsc).as_deref(), Some("tsc"));
+    assert_eq!(tool_arg(&node).as_deref(), Some("node"));
 }

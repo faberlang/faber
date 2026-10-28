@@ -125,6 +125,7 @@ fn wrap_faber_source_keeps_line_comments_whole() {
 fn wrap_faber_source_keeps_annotation_sugar_on_one_line() {
     for annotation in [
         "@ nucleum fragment",
+        // ALLOW_DIAGNOSTIC_RENDER_TEXT: Faber source input for the wrapper, not diagnostic text.
         "@ radix lane \"air\" contract \"c\" backward \"b\" extra",
         "@ ad 'some/path/to/a/target/file.ext' more tokens here ok",
         "@ nondum one two three four five six seven eight nine ten",
