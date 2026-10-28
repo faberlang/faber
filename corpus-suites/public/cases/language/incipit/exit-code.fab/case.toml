@@ -1,0 +1,20 @@
+version = 1
+id = "corpus/incipit/exit-code.fab"
+group = "language"
+input_root = "corpus"
+input = "incipit/exit-code.fab"
+category = "package"
+domain = "program"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 3
+stdout = "stdout.expected"
+check_only = false

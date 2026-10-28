@@ -2985,6 +2985,7 @@ impl Validator<'_, '_> {
             .args
             .first()
             .and_then(|arg| self.validate_operand(scope, arg, span));
+        let receiver_rank = receiver_ty.and_then(|ty| self.static_tensor_rank(ty));
         if let Some(receiver_ty) = receiver_ty {
             self.require_tensor_type(receiver_ty, span, "tensor slice-nd receiver is not tensor");
         }
@@ -3035,6 +3036,11 @@ impl Validator<'_, '_> {
                 }
                 Some(_) => {}
             }
+        }
+        if let (Some(rank), Some(length)) = (receiver_rank, axis_length)
+            && usize::try_from(length).ok() != Some(rank)
+        {
+            self.error(span, "tensor slice-nd lists do not match receiver rank");
         }
     }
 

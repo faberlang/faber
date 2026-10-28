@@ -360,3 +360,85 @@ fn witness_canonicalization_survives_inference_solving() {
         Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
     ));
 }
+
+/// An imported type keeps its `Named` head: a selectively imported name and a
+/// qualified `module.Type` path both record the imported definition beside
+/// the spelled path, exactly as a locally declared type does.
+#[test]
+fn imported_authored_type_carries_named_heads() {
+    use crate::file_interface::{
+        FileExport, FileExportKind, FileInterface, InterfaceStructExport, InterfaceStructField,
+        InterfaceTypeSnapshot,
+    };
+    use std::collections::BTreeMap;
+
+    let interface = || {
+        let mut interface = FileInterface::new();
+        interface.insert(FileExport {
+            name: "Circle".to_owned(),
+            kind: FileExportKind::Struct(InterfaceStructExport {
+                is_json: false,
+                implements: Vec::new(),
+                name: "Circle".to_owned(),
+                params: Vec::new(),
+                fields: vec![InterfaceStructField {
+                    name: "radius".to_owned(),
+                    ty: InterfaceTypeSnapshot::Primitive(Primitive::Numerus),
+                    optional: false,
+                    required: true,
+                    default: None,
+                    modifier: None,
+                    visibility: radix_syntax::MemberVisibility::Publica,
+                }],
+                methods: Vec::new(),
+                annotation_contract: None,
+            }),
+        });
+        interface
+    };
+    let public_circle = |key: &str| {
+        (
+            key.to_owned(),
+            BTreeMap::from([(
+                "Circle".to_owned(),
+                crate::passes::visibility_annotation::VisibilityTier::Publica,
+            )]),
+        )
+    };
+    let fixture = crate::test_support::analyze_source_with_import_contract(
+        concat!(
+            "importa ex \"./geo\" fixum Circle\n",
+            "importa ex \"./geo\" geo\n",
+            "functio probe(Circle picked, geo.Circle qualified) {\n",
+            "    sit Circle first ← picked\n",
+            "    sit geo.Circle second ← qualified\n",
+            "}\n"
+        ),
+        BTreeMap::from([public_circle("geo"), public_circle("./geo")]),
+        BTreeMap::from([
+            ("geo".to_owned(), interface()),
+            ("./geo".to_owned(), interface()),
+        ]),
+    );
+    assert!(fixture.is_ok(), "diagnostics: {:?}", fixture.diagnostics);
+
+    for (local, expected_path) in [("first", vec!["Circle"]), ("second", vec!["geo", "Circle"])] {
+        let (form, local_ty) = first_declared_form(&fixture, local);
+        let HirTypeFormHead::Named { def_id, path } = &form.head else {
+            panic!("{local}: expected a Named head, got {:?}", form.head);
+        };
+        let spelled: Vec<String> = path
+            .iter()
+            .map(|symbol| fixture.interner.resolve(*symbol).to_owned())
+            .collect();
+        assert_eq!(spelled, expected_path, "{local}: spelled path");
+        assert!(
+            matches!(
+                fixture.result.types.get(form.ty),
+                Type::Struct(witness_def) if witness_def == def_id
+            ),
+            "{local}: head definition names the witness struct"
+        );
+        assert_eq!(Some(form.ty), local_ty, "{local}: witness equals HIR type");
+    }
+}

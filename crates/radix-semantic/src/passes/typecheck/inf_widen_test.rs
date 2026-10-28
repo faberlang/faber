@@ -169,21 +169,21 @@ fn arithmetic_over_bounded_operands_widens_its_own_result() {
 fn a_value_already_typed_inf_takes_no_node() {
     let source = "functio id(inf a) → inf {\nsit inf b ← a\nredde b + a\n}\n\
         incipit {\nsit inf x ← 3\nsit lista<inf> xs ← [x, x]\nnota id(x)\nnota xs\n}\n";
-    assert!(widens_of(source).is_empty());
+    assert_eq!(widens_of(source), [] as [Widened; 0]);
 }
 
 #[test]
 fn an_untyped_constant_takes_no_node() {
     let source = "incipit {\nsit inf a ← 5\nsit inf b ← -5\nsit inf c ← 2 ⇐ 70\n\
         sit lista<inf> xs ← [1, 2]\nnota a\nnota b\nnota c\nnota xs\n}\n";
-    assert!(widens_of(source).is_empty());
+    assert_eq!(widens_of(source), [] as [Widened; 0]);
 }
 
 #[test]
 fn a_bounded_value_into_a_bounded_or_open_slot_takes_no_node() {
     let source = "incipit {\nsit u8 b ← 1\nsit u64 w ← b\nsit _ r ← b\n\
         nota w\nnota r\n}\n";
-    assert!(widens_of(source).is_empty());
+    assert_eq!(widens_of(source), [] as [Widened; 0]);
 }
 
 #[test]
@@ -191,15 +191,11 @@ fn an_inf_operand_joins_a_bounded_one_with_each_keeping_its_own_type() {
     // `x + b` is typed `inf` by the join; the bounded operand is not stamped,
     // so no store happens and no node is needed.
     let source = "incipit {\nsit inf x ← 3\nsit u8 b ← 1\nsit _ r ← x + b\nnota r\n}\n";
-    assert!(widens_of(source).is_empty());
+    assert_eq!(widens_of(source), [] as [Widened; 0]);
 }
 
 #[test]
 fn the_operand_keeps_its_declared_type_not_the_slot() {
-    let fixture =
-        test_support::analyze_ok_la("incipit {\nsit u64 u ← 5\nsit inf w ← u\nnota w\n}\n");
-    let hir = fixture.hir.as_ref().expect("hir");
-    let mut seen = None;
     struct Probe<'a>(&'a TypeTable, &'a mut Option<Type>);
     impl HirVisitor for Probe<'_> {
         fn visit_expr(&mut self, expr: &HirExpression) {
@@ -209,6 +205,10 @@ fn the_operand_keeps_its_declared_type_not_the_slot() {
             walk_expr(self, expr);
         }
     }
+    let fixture =
+        test_support::analyze_ok_la("incipit {\nsit u64 u ← 5\nsit inf w ← u\nnota w\n}\n");
+    let hir = fixture.hir.as_ref().expect("hir");
+    let mut seen = None;
     walk_program(&mut Probe(&fixture.types, &mut seen), hir);
     assert!(
         matches!(seen, Some(Type::SizedNumeric(_, U64))),

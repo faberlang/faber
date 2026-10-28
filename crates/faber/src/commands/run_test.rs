@@ -451,6 +451,25 @@ fn run_partitions_pass_on_the_cpu_route_and_shape_the_device() {
 }
 
 #[test]
+fn run_partitions_pass_on_the_cuda_route_and_still_refuse_auto() {
+    let dir = temp_dir("partitions-cuda-route");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let mut args = run_args(dir.clone(), Some(DeviceChoice::Cuda));
+    args.partitions = Some(2);
+    assert_eq!(
+        resolve_route_selection(&args, &dir).expect("partitions with cuda passes"),
+        DeviceSelection::Cuda
+    );
+    assert_eq!(cpu_device_shape(&args, None).partitions.get(), 2);
+    // `auto` is not a spanning selection: the flag is refused, not ignored.
+    let mut auto = run_args(dir.clone(), Some(DeviceChoice::Auto));
+    auto.partitions = Some(2);
+    let err = resolve_route_selection(&auto, &dir).expect_err("auto refuses --partitions");
+    assert_eq!(err.issue(), Some("E_PARTITIONS_REQUIRES_CPU"));
+}
+
+#[test]
 fn run_threads_clap_accepts_positive_and_rejects_zero() {
     let parsed = <crate::cli::Cli as clap::Parser>::try_parse_from([
         "faber",

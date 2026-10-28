@@ -43,6 +43,12 @@ impl TypeChecker<'_> {
     /// immutability but still return their declared type so the right-hand side
     /// can be checked. Field and index lvalues reuse the normal access rules.
     pub fn check_lvalue(&mut self, target: &mut HirExpression) -> TypeId {
+        // An index read inside a target is evaluated at the store, so it
+        // records no proof here (the store proves its own target).
+        self.without_index_proofs(|checker| checker.check_lvalue_place(target))
+    }
+
+    fn check_lvalue_place(&mut self, target: &mut HirExpression) -> TypeId {
         let ty = match &mut target.kind {
             HirExpressionKind::Path(def_id) => {
                 // WHY: write-once enforcement for `fixum` locals lives in the
@@ -1470,6 +1476,18 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// The type of a size-name read (size-type Z1 force). A size name reads as
+    /// a read-only `int`; inside a kernel it reads in the portable signed
+    /// carrier the lane coordinates use, because the launch requirements prove
+    /// each extent fits that carrier.
+    fn size_value_type(&mut self) -> TypeId {
+        if self.current_nucleum_entry {
+            self.width_type(radix_types::NumericWidth::I32)
+        } else {
+            self.types.primitive(Primitive::Numerus)
+        }
+    }
+
     /// Converts a resolved definition path into the value type visible at an
     /// expression site.
     ///
@@ -1484,6 +1502,8 @@ impl TypeChecker<'_> {
         }
 
         if let Some(binding) = self.lookup_binding(def_id) {
+            #[cfg(test)]
+            super::flow_range_probe::observe(self, def_id);
             return binding.ty;
         }
 
@@ -1513,9 +1533,7 @@ impl TypeChecker<'_> {
                 }
                 // Size-type Z1 force: a size name reads as a read-only int
                 // (safe widening at use); assignment is rejected in check_lvalue.
-                crate::SymbolKind::IndexParam => {
-                    return self.types.primitive(Primitive::Numerus);
-                }
+                crate::SymbolKind::IndexParam => return self.size_value_type(),
                 _ => {}
             }
 
@@ -1536,7 +1554,7 @@ impl TypeChecker<'_> {
         // function has a HirTypeParam def and no resolver symbol; it reads
         // as a read-only int (assignment is rejected in check_lvalue).
         if self.current_size_param_defs.contains(&def_id) {
-            return self.types.primitive(Primitive::Numerus);
+            return self.size_value_type();
         }
 
         // A selective import that binds a type (D22.5) names no value.

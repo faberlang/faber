@@ -19,7 +19,10 @@ fn analyze_en(source: &str) -> AnalyzedFixture {
 fn count(source: &str, kind: WarningKind, issue_name: &str) -> usize {
     let result = analyze_en(source);
     assert!(
-        !result.diagnostics.iter().any(|d| d.is_error()),
+        !result
+            .diagnostics
+            .iter()
+            .any(super::super::error::SemanticError::is_error),
         "fixture must be error-free: {:?}",
         result.diagnostics
     );

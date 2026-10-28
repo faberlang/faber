@@ -1349,7 +1349,7 @@ impl FunctionLower<'_, '_> {
     /// The type after one projection step.
     fn projected_type(&self, ty: MirType, projection: &MirProjection) -> Lowered<MirType> {
         match projection {
-            MirProjection::Index(index) => {
+            MirProjection::Index(index) | MirProjection::ProvenIndex(index) => {
                 match resolve(self.state.input.types, ty.semantic_id()) {
                     Type::Map(_, value) => Ok(MirType::semantic(*value)),
                     Type::Tuple(elements) => match index {
@@ -1702,7 +1702,9 @@ impl FunctionLower<'_, '_> {
         let mut current = self.builder.use_var(variable);
         let mut current_rep = rep;
         for projection in &place.projections {
-            if let (MirProjection::Index(index), Rep::Text) = (projection, current_rep) {
+            if let (MirProjection::Index(index) | MirProjection::ProvenIndex(index), Rep::Text) =
+                (projection, current_rep)
+            {
                 let (index, index_rep) = self.scalar(index)?;
                 if index_rep == Rep::Tuple {
                     // The runtime ends the run itself on a window outside the text.
@@ -1752,7 +1754,9 @@ impl FunctionLower<'_, '_> {
                     let zero = self.builder.ins().iconst(types::I64, 0);
                     self.call_runtime(&abi::LIST_GET, &[current, zero])?
                 }
-                MirProjection::Index(index) if current_rep == Rep::Map => {
+                MirProjection::Index(index) | MirProjection::ProvenIndex(index)
+                    if current_rep == Rep::Map =>
+                {
                     let (key_ty, _) = self.map_types(ty)?;
                     let (key, key_rep) = self.element_operand(index, key_ty)?;
                     let tag = self
@@ -1762,7 +1766,7 @@ impl FunctionLower<'_, '_> {
                     let key = self.element_bits(key, key_rep);
                     self.call_runtime(&abi::MAP_GET, &[current, tag, key])?
                 }
-                MirProjection::Index(index) => {
+                MirProjection::Index(index) | MirProjection::ProvenIndex(index) => {
                     if current_rep != Rep::List && current_rep != Rep::Tuple {
                         return Err(Decline::new("index of a non-list"));
                     }
@@ -1831,7 +1835,9 @@ impl FunctionLower<'_, '_> {
             .iconst(types::I32, Self::element_tag(rep)?);
         let bits = self.element_bits(value, rep);
         match last {
-            MirProjection::Index(last_index) if handle_rep == Rep::Map => {
+            MirProjection::Index(last_index) | MirProjection::ProvenIndex(last_index)
+                if handle_rep == Rep::Map =>
+            {
                 let (key_ty, _) = self.map_types(container_ty)?;
                 let (key, key_rep) = self.element_operand(last_index, key_ty)?;
                 let key_tag = self
@@ -1841,7 +1847,7 @@ impl FunctionLower<'_, '_> {
                 let key = self.element_bits(key, key_rep);
                 self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, tag, bits])?;
             }
-            MirProjection::Index(last_index) => {
+            MirProjection::Index(last_index) | MirProjection::ProvenIndex(last_index) => {
                 if handle_rep != Rep::List {
                     return Err(Decline::new("index of a non-list"));
                 }

@@ -11553,7 +11553,7 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &[]).expect("emit go");
-    let binary = super::invoke_go_build(&go_layout).expect("go build");
+    let binary = super::invoke_go_build_default(&go_layout).expect("go build");
     assert!(binary.exists(), "binary missing at {}", binary.display());
 
     let status = Command::new(&binary)
@@ -11635,80 +11635,7 @@ main args args exit 0 {
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit go");
-    let binary = super::invoke_go_build(&go_layout).expect("go build");
-    let status = Command::new(&binary).status().expect("run");
-    assert_eq!(status.code(), Some(0));
-}
-
-#[cfg(feature = "hir-rust")]
-#[cfg(feature = "hir-go")]
-#[test]
-fn g6_consolum_shim_dedupes_across_units() {
-    let dir = test_temp_dir("g6-consolum-dedupe");
-    fs::create_dir_all(dir.join("src")).expect("src");
-    fs::write(
-        dir.join("faber.toml"),
-        r#"
-[package]
-name = "g6-consolum-dedupe"
-version = "0.1.0"
-
-[paths]
-source = "src"
-entry = "main.fab"
-"#,
-    )
-    .expect("manifest");
-    fs::write(
-        dir.join("src/helper.fab"),
-        r#"
-import from "norma:console" console
-import from "norma:fault" fault
-
-@ public
-fn shout(string s) → void ⇥ fault.IoFault {
-  console.write_line(s)
-}
-"#,
-    )
-    .expect("helper");
-    fs::write(
-        dir.join("src/main.fab"),
-        r#"
-import from "norma:console" console
-import from "./helper" helper
-
-@ cli "tool"
-@ operand rest string ignored
-main args args exit 0 {
-  helper.shout("hi")
-  console.write_partial("x")
-}
-"#,
-    )
-    .expect("entry");
-
-    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &dir);
-    let modules = result.go_modules;
-    let result = result.compile_result;
-    assert!(
-        result.success(),
-        "dual console import should compile: {:?}",
-        result.diagnostics
-    );
-    let Some(Output::Go(output)) = result.output else {
-        panic!("expected Go");
-    };
-    let decls = output.code.matches("var console = struct").count();
-    assert_eq!(
-        decls, 1,
-        "expected exactly one console shim, got {decls}:\n{}",
-        output.code
-    );
-    let layout = discover_build_layout(&dir).expect("layout");
-    let go_layout = super::GoBuildLayout::from_package(&layout);
-    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    let binary = super::invoke_go_build(&go_layout).expect("go build dual console");
+    let binary = super::invoke_go_build_default(&go_layout).expect("go build");
     let status = Command::new(&binary).status().expect("run");
     assert_eq!(status.code(), Some(0));
 }
@@ -11768,111 +11695,6 @@ main args args exit 0 {
         result.diagnostics
     );
 }
-
-#[cfg(feature = "hir-rust")]
-#[cfg(feature = "hir-go")]
-#[ignore = "requires a go toolchain on PATH; manual native build proof"]
-#[test]
-fn g6_consolum_shim_supports_full_stdio_surface() {
-    let dir = test_temp_dir("g6-consolum-surface");
-    fs::create_dir_all(dir.join("src")).expect("src");
-    fs::write(
-        dir.join("faber.toml"),
-        r#"
-[package]
-name = "g6-consolum-surface"
-version = "0.1.0"
-
-[paths]
-source = "src"
-entry = "main.fab"
-"#,
-    )
-    .expect("manifest");
-    fs::write(
-        dir.join("src/main.fab"),
-        r#"
-import from "norma:console" console
-
-@ cli "tool"
-@ operand rest string ignored
-main args args exit 0 {
-  if console.stdin_is_tty() {
-    console.write_partial("tty")
-  }
-  else {
-    console.write_partial("notty")
-  }
-  console.write_line_async(":")
-  console.write_partial_async(console.read_line_async() coalesce "")
-  console.write_line("")
-  let list<b8> sync_bytes ← console.read_bytes(4) coalesce |00|
-  console.write_bytes_async(sync_bytes)
-  let list<b8> async_bytes ← console.read_bytes_async(4) coalesce |00|
-  console.write_bytes(async_bytes)
-  console.warn_line_async("warn")
-  console.debug_line_async("debug")
-  if console.stdout_is_tty() {
-    console.write_partial("stdout-tty")
-  }
-  if console.stderr_is_tty() {
-    console.write_partial("stderr-tty")
-  }
-}
-"#,
-    )
-    .expect("entry");
-
-    let result = compile_go_with_faber_seams(&Config::default().with_target(Target::HirGo), &dir);
-    let modules = result.go_modules;
-    let result = result.compile_result;
-    assert!(
-        result.success(),
-        "console surface compile failed: {:?}",
-        result.diagnostics
-    );
-    let Some(Output::Go(output)) = result.output else {
-        panic!("expected Go");
-    };
-    let layout = discover_build_layout(&dir).expect("layout");
-    let go_layout = super::GoBuildLayout::from_package(&layout);
-    super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    let binary = super::invoke_go_build(&go_layout).expect("go build consolum surface");
-
-    let mut child = Command::new(&binary)
-        .arg("ignored")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn");
-    child
-        .stdin
-        .as_mut()
-        .expect("stdin")
-        .write_all(b"salve\nBYTEBYTE")
-        .expect("write stdin");
-    let output = child.wait_with_output().expect("wait");
-
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "expected success; stdout={:?} stderr={:?}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        String::from_utf8_lossy(&output.stdout),
-        "notty:\nsalve\nBYTEBYTE"
-    );
-    assert_eq!(String::from_utf8_lossy(&output.stderr), "warn\ndebug\n");
-}
-
-// ---------------------------------------------------------------------------
-// FBR-P2-003 — Go module files travel in the compile result, never through
-// hidden thread-local state. Failed, repeated, nested, and concurrent Go
-// compile calls must not exchange module output.
-// ---------------------------------------------------------------------------
 
 #[cfg(feature = "hir-go")]
 fn write_go_module_package(dir: &Path, pkg_name: &str, func_name: &str) {

@@ -122,6 +122,24 @@ mod field_modifier_write_test;
 #[cfg(test)]
 #[path = "fieldless_type_access_test.rs"]
 mod fieldless_type_access_test;
+mod flow_range;
+mod flow_range_access;
+#[cfg(test)]
+#[path = "flow_range_access_test.rs"]
+mod flow_range_access_test;
+mod flow_range_index;
+#[cfg(test)]
+#[path = "flow_range_index_test.rs"]
+mod flow_range_index_test;
+#[cfg(test)]
+mod flow_range_probe;
+mod flow_range_produce;
+#[cfg(test)]
+#[path = "flow_range_produce_test.rs"]
+mod flow_range_produce_test;
+#[cfg(test)]
+#[path = "flow_range_test.rs"]
+mod flow_range_test;
 #[cfg(test)]
 #[path = "loop_shape_test.rs"]
 mod loop_shape_test;
@@ -175,7 +193,6 @@ mod closing;
 #[path = "construction_source_test.rs"]
 mod construction_source_test;
 pub mod finalize;
-pub mod first_match;
 pub mod format;
 pub mod generic;
 pub mod hashable;
@@ -521,6 +538,10 @@ pub(crate) struct TypeChecker<'a> {
     /// Generic call bindings retained until deferred edge-policy obligations
     /// can be discharged after every local body has been checked.
     tensor_edge_generic_calls: Vec<tensor_edge_policy_generic::GenericPolicyCall>,
+    /// Nesting depth of assignment-target checks. An index read inside a
+    /// target is evaluated at the store, not where the checker meets it, so it
+    /// records no proof (need, slice 4).
+    index_proof_suppressed: u32,
     /// Generic edge-policy obligations imported with namespace functions.
     /// These remain separate from local HIR summaries and carry only
     /// consumer-arena type identities.
@@ -762,6 +783,11 @@ pub(crate) struct TypeChecker<'a> {
     /// implicit fallthrough never carry them.
     pub(crate) field_facts: FxHashMap<(DefId, Vec<Symbol>), TypeId>,
 
+    /// Integer interval facts in force at the current point, with the mutation
+    /// versions of the sources their bounds name. Snapshotted,
+    /// restored and joined with the type facts at every branch edge.
+    range_flow: flow_range::RangeFlow,
+
     /// Conversation types of the `@ ad` routes this module can see, keyed
     /// by route (D6.11). Routes absent here type as bare `sermo`.
     pub ad_routes: FxHashMap<Symbol, sermo_route::AdRouteTypes>,
@@ -948,6 +974,7 @@ impl<'a> TypeChecker<'a> {
             shape_obligations: ShapeObligationTable::default(),
             tensor_edge_policies: crate::TensorEdgePolicyTable::default(),
             tensor_edge_generic_calls: Vec::new(),
+            index_proof_suppressed: 0,
             tensor_edge_policy_imported_requirements: FxHashMap::default(),
             tensor_edge_policy_runtime_params: FxHashSet::default(),
             compile_time_locals: FxHashSet::default(),
@@ -1007,6 +1034,7 @@ impl<'a> TypeChecker<'a> {
             assert_refinements: Vec::new(),
             flow_bases: FxHashMap::default(),
             field_facts: FxHashMap::default(),
+            range_flow: flow_range::RangeFlow::default(),
             ad_routes: FxHashMap::default(),
             current_member_owner: None,
             cross_package_structs: FxHashSet::default(),

@@ -8,8 +8,6 @@ summary = "Extracts fields from a value into local bindings."
 syntax = "ex <expression> <sit|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
-no_expected = "awaiting-ruling"
-ruling = "6e66822e"
 +++
 
 # =============================================================================
@@ -20,7 +18,7 @@ ruling = "6e66822e"
 #   • Field destructuring — `ex <expr> sit <field>, ...` extracts named fields from genus records into local bindings.
 #   • Aliasing — `ex <expr> sit <field> ut <alias>` renames extracted fields.
 #   • Mutable extraction — `ex <expr> varia <field>, ...` for mutable field bindings.
-#   • Rest pattern — `ex <expr> sit <field>, ceteri <rest>` captures remaining fields as a tabula.
+#   • Rest pattern — `ex <expr> sit <field>, ceteri <rest>` binds `<rest>` to the whole source value, which still holds every field.
 #   • Nested paths — `ex <expr>.<field> sit ...` destructures through nested paths.
 #
 # Common mistakes:
@@ -45,7 +43,8 @@ ruling = "6e66822e"
 #   destructStmt :← 'ex' expr ('sit' | 'varia') patternList
 #
 # EXPECTED OUTPUT:
-#   Extracted field values, aliased names, mutated varia bindings, rest maps.
+#   objectum.expected — extracted field values, aliased names, mutated varia
+#   bindings, and the rest binding printing the whole source record.
 
 class Persona {
     mut string nomen

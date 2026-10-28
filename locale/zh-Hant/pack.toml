@@ -88,8 +88,6 @@ reddet = "等返"
 tacebit = "等棄"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "空集"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "求和"
 filum = "執行緒"
 maxima = "最大"
@@ -163,6 +161,7 @@ numeratio = "計數"
 quilibet = "任一"
 argmaxima = "最大值索引"
 argminima = "最小值索引"
+prima = "第一個"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "排序"
 ascendens = "升序"
@@ -4021,18 +4020,6 @@ message = "非空索引運算式後需要 ']'"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "非空呼叫引數後需要 ')'"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "'primus_quem' 後需要 '('"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "首個匹配來源後需要 ','"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "需要 'ubi' 述詞尾部"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "首個匹配述詞後需要 ')'"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "建構子欄位後需要 '}'"
 
@@ -4172,3 +4159,9 @@ help = "'⇇' 現在會將右側的值複製到左側現有的 tensor 儲存區�
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking 合約必須在一個型別參數上準確宣告 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
 help = "宣告 `{implendum} Sink<T>`，並包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "核心 `{kernel}` 在 {device} 裝置上串行執行"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "核心 `{kernel}`：其跨 {partitions} 個分區的 {kind} 是可以避免的：{avoidable}（{reason}）"

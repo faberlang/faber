@@ -6,7 +6,7 @@
 //! route.
 
 use crate::IndexId;
-use handroll::FxHashMap;
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::{DefId, HirId};
 use radix_lexer::Span;
 
@@ -69,4 +69,11 @@ pub struct ShapeObligationTable {
     pub stores: FxHashMap<HirId, Vec<ShapeRelation>>,
     /// Function-generic size values witnessed by formal tensor/record axes.
     pub function_size_bindings: FxHashMap<DefId, Vec<RuntimeSizeBinding>>,
+    /// Index accesses (`Index` expression ids) whose every component the
+    /// checker proved `0 <= i < bound` against its own container or axis at
+    /// the access point (need, slice 4). Absence is the conservative
+    /// default: an access not listed keeps its run-time bounds check. Lowering
+    /// carries a listed access as a proven projection; no consumer derives a
+    /// proof of its own.
+    pub proven_indexes: FxHashSet<HirId>,
 }

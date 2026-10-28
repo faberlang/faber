@@ -1,7 +1,7 @@
 //! Regression coverage for atomic intrinsic method typecheck rules.
 //!
 //! These tests prove that `atomic<T>` receivers accept load, store, exchange,
-//! and compare_exchange with matching argument types, and that non-atomic
+//! and `compare_exchange` with matching argument types, and that non-atomic
 //! receivers or unsupported method names produce targeted diagnostics.
 
 use radix_diagnostics::DiagnosticArg;

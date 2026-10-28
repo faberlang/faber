@@ -136,7 +136,7 @@ fn a_lane_region_over_a_shift_view_takes_the_base_parameter_for_its_domain() {
 @ kernel
 @ public
 fn iterate(tensor<f32, [_, _]> src, mut tensor<f32, [_, _]> dst) → void {
-    for from src.shift([0, -1]).limes<wrap>() at [i, j] thread lane let w {
+    for from src.shift([0, -1]).edge<wrap>() at [i, j] thread lane let w {
         dst[[i, j]] ← w * 10.0 + src[[i, j]]
     }
 }

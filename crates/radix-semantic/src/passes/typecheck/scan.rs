@@ -33,7 +33,10 @@ pub(super) fn check_scan_expr(
     span: radix_lexer::Span,
 ) -> TypeId {
     *group_domain = None;
-    if matches!(op, HirReductionOp::ArgMax | HirReductionOp::ArgMin) {
+    if matches!(
+        op,
+        HirReductionOp::ArgMax | HirReductionOp::ArgMin | HirReductionOp::First
+    ) {
         checker.error_issue(
             SemanticErrorKind::TypeMismatch,
             ISSUE_SCAN_OPERATOR_UNSUPPORTED,
@@ -99,6 +102,7 @@ pub(super) fn check_scan_expr(
     for (id, _) in coordinates {
         checker.insert_binding(*id, coordinate_ty);
     }
+    checker.seed_coordinates(dispatch, None, coordinates);
     checker.insert_binding(filum.0, coordinate_ty);
     let mut grouped = false;
     if let Some(group) = group {
@@ -155,6 +159,7 @@ pub(super) fn check_scan_expr(
     checker.inferred_return = previous_inferred;
     checker.allow_inferred_return = previous_allow;
     super::reduction::check_reducta_body_laws(checker, coordinates, Some(filum), binding, body);
+    checker.release_range_binders(coordinates.iter().map(|(id, _)| *id));
     checker.pop_scope();
 
     let term_ty = checker.resolve_inferred_type(term_ty);
@@ -183,7 +188,9 @@ pub(super) fn check_scan_expr(
         HirReductionOp::All | HirReductionOp::Any => boolean,
         HirReductionOp::Sum | HirReductionOp::Product => checker.summa_result_type(term_ty),
         HirReductionOp::Max | HirReductionOp::Min => term_ty,
-        HirReductionOp::ArgMax | HirReductionOp::ArgMin => checker.error_type,
+        HirReductionOp::ArgMax | HirReductionOp::ArgMin | HirReductionOp::First => {
+            checker.error_type
+        }
     };
     checker.types.array(output_element);
     let result = checker.types.tensor_with_shape(output_element, shape);

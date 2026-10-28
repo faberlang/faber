@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/operatores/div-zero-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/div-zero-trap.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout = "stdout.expected"
+stderr_contains = "division failed"
+check_only = false

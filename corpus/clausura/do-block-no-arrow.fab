@@ -1,0 +1,46 @@
++++
+term = "∴"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "functio_decl", "param_list", "parameter", "assignment", "expr_stmt", "clausura_expr", "function_type", "call_expr", "call_suffix", "argument_list", "argument"]
+category = "function"
+summary = "A closure whose body is a `do` block and that has no `→` is effect-only: it returns nothing and writes what it captured."
+syntax = "() ∴ do { … }"
+related = ["∴", "do", "clausura", "shared-capture"]
+locale = "en"
++++
+# =============================================================================
+# ∴ — A closure whose body is a `do` block and that has no `→` is effect-only: it returns nothing and writes what it captured.
+# =============================================================================
+#
+# What this teaches:
+#   • A closure with no `→ T` has no result: its `do` block is a run of
+#     statements, and calling it is a statement
+#   • The closure writes the binding it captured, so the effect shows
+#     after the call
+#   • A parameter list still works: `int k ∴ do { … }` takes a value and
+#     returns nothing
+#
+# Common mistakes:
+#   • Writing `redde` in an arrowless closure: a closure that returns a
+#     value spells `→ T` first
+#   • Using bare `{ … }` as the body: the body is `do { … }`
+#
+# See also: shared-capture, clausura, fac-block
+# =============================================================================
+
+main {
+    mut int total ← 0
+    let () → void bump ← () ∴ do {
+        total ← total + 1
+    }
+    bump()
+    bump()
+    print total
+    let (int) → void add ← int k ∴ do {
+        total ← total + k
+        print "added §"(k)
+    }
+    add(10)
+    add(5)
+    print total
+}

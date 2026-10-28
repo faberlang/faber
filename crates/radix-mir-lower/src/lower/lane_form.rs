@@ -46,6 +46,10 @@ pub(crate) const KERNEL_CALL_DEFAULT_PENDING_ISSUE: &str = "kernel_call_default_
 /// Issue name: a `thread lane` reduce inside a lane region (C4-8 nested).
 pub const LANE_FORM_NESTED_REDUCE_ISSUE: &str = "lane_form_nested_reduce";
 
+/// A `thread` first reduction on a device lowering: declined by name until a
+/// device recipe carries the earliest-lane selection and the optional result.
+pub const FIRST_REDUCE_DEVICE_ISSUE: &str = "first_reduce_device_unsupported";
+
 /// Intern the device word (`u32`) the lane-form arithmetic runs in. Lowering
 /// holds the type table immutably, so the arena gets it before function
 /// lowering starts.

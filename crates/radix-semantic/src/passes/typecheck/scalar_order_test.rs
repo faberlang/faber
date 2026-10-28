@@ -41,11 +41,11 @@ fn full_cord_text_order_typechecks() {
 #[test]
 fn textus_bindings_whole_string_order_typechecks() {
     accepts(&compile(
-        r#"
+        r"
 functio prior(textus left, textus right) → bivalens {
     redde left ≺ right
 }
-"#,
+",
     ));
 }
 

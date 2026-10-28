@@ -88,15 +88,7 @@ incipit {
 }
 
 #[test]
-fn go_rejects_inline_fs_leaf() {
+fn go_declares_inline_fs_leaf() {
     let result = compile(Target::HirGo, INLINE_FS);
-    assert!(!result.success(), "go must refuse fs");
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diag| diag.issue() == Some("leaf_unsupported_on_target")),
-        "expected leaf_unsupported_on_target, got {:?}",
-        issue_values(&result)
-    );
+    assert!(result.success(), "go must declare fs: {:?}", issue_values(&result));
 }

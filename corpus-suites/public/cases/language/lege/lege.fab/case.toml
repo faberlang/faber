@@ -5,7 +5,9 @@ input_root = "corpus"
 input = "lege/lege.fab"
 category = "console"
 domain = "io"
+stdin = "stdin.txt"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false

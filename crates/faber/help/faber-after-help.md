@@ -17,8 +17,8 @@ LLM Guidance:
      faber build .
   5. Language reference (glyphs, keywords, grammar terms):
      faber explain --list
-     faber explain functio
-     faber explain --json functio
+     faber explain fn
+     faber explain --json fn
      faber explain --list --json
   6. Compatibility aliases (`lex`, `parse`, `hir`, `cli-ir`, `emit`) match `radix`
      for single-file inspection; package paths still prefer explicit `faber` commands.
@@ -96,7 +96,7 @@ Common flows:
     staticlib (the in-tree faber-host-llvm crate); unsupported host triples
     fail with a structured diagnostic. `-t llvm-text` stays emit-only (radix emit).
 
-  Test selection (proba cases run on the runner, not a Cargo harness):
+  Test selection (test cases run on the runner, not a Cargo harness):
     faber test .
     faber test path/to/file.fab
     faber test . --name my_case
@@ -110,24 +110,24 @@ Common flows:
     faber explain --category keywords
     faber explain --search return
     faber explain ≡
-    faber explain --json functio
+    faber explain --json fn
 
   Interpret source (runner, no Cargo) — `faber run` is interpreted execution,
   always; `faber script` retired and folded into it:
-    faber run corpus/incipit/salve-munde.fab
+    faber run hello.fab
     faber run path/to/pkg           # package directory or faber.toml
     faber run app.zip               # source archive
     faber run script.fab -- alpha beta
-    faber -c 'incipit { nota 1 }'
+    faber -c 'main { print 1 }'
     faber repl
 
-  Scripting host routes (`ad` routes):
+  Scripting host routes (`call` routes):
     runtime:echo and processus:exi work (processus:exi exits the interpreter).
     Every other host route fails closed at plan time and is unavailable in
     this release; the rest return with the native host (core-norma N2).
 
   Single-file check (non-package):
-    faber check corpus/incipit/salve-munde.fab
+    faber check hello.fab
 
   Format and convert complete Faber source units:
     faber format path/to/file.fab           (report drift, writes nothing; exit 1)
@@ -156,11 +156,11 @@ Common flows:
     faber build --target fmir path/to/pkg
 
   Inspect phases without a package (radix-compatible aliases):
-    faber lex corpus/incipit/salve-munde.fab
-    faber parse corpus/incipit/salve-munde.fab
+    faber lex hello.fab
+    faber parse hello.fab
 
   MIR probe emit on single `.fab` files (systems lane; package MIR image targets use `build`):
-    faber emit -t llvm-text corpus/incipit/salve-munde.fab
+    faber emit -t llvm-text hello.fab
     faber emit -t wgsl-text corpus/vector/kernel.fab
     faber emit --reflection -t wgsl-text corpus/vector/kernel.fab
 

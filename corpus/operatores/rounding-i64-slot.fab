@@ -1,0 +1,49 @@
++++
+term = "⌊⌉"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "unary_expr", "conversio_expr"]
+category = "arithmetic"
+summary = "A rounding glyph stored into an i64, a smaller signed slot or an unsigned slot gives the same exact integer."
+syntax = "⌊<float>⌋ | ⌈<float>⌉ | ⌊<float>⌉"
+related = ["⌊⌋", "⌈⌉", "⌊⌉", "i64", "rounding-glyphs"]
+locale = "en"
++++
+# =============================================================================
+# ⌊⌉ — A rounding glyph stored into an i64, a smaller signed slot or an unsigned slot gives the same exact integer.
+# =============================================================================
+#
+# What this teaches:
+#   • A rounding glyph gives an integer, and the slot it lands in decides
+#     its width: `i64`, `i8` and `u8` all take a value that fits
+#   • Ties round to the even neighbour under `⌊x⌉`: `2.5` gives 2 and
+#     `3.5` gives 4
+#   • The glyph's result is exact; the slot only checks it once, at the
+#     store
+#
+# Common mistakes:
+#   • Expecting `⌊x⌋` to need an `i64` slot: a smaller slot is fine when
+#     the rounded value fits it
+#   • Expecting a negative rounded value in an unsigned slot to wrap: it
+#     does not fit, and the store would trap
+#
+# See also: rounding-glyphs, rounding-ceiling-floor, i64
+# =============================================================================
+
+main {
+    let float up ← 2.5
+    let float down ← -2.5
+    let i64 a ← ⌊up⌉
+    let i64 b ← ⌈up⌉
+    let i64 c ← ⌊down⌋
+    let i8 d ← ⌊down⌉
+    let i32 e ← ⌈down⌉
+    let u8 f ← ⌊up⌋
+    let u16 g ← ⌊3.5⌉
+    print a
+    print b
+    print c
+    print d
+    print e
+    print f
+    print g
+}

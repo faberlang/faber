@@ -9,7 +9,7 @@ locale = "en"
 
 @ public
 fn resolve_shift<P>(tf32[3] source) → list<f32> {
-    return source.shift([1]).limes<P>().flatten()
+    return source.shift([1]).edge<P>().flatten()
 }
 "#;
 

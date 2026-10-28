@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "package_go_codegen_failed",
-      "reason": "The Go lane package emitter does not yet lower the async console wrapper routes."
+      "diagnostic_contains": "go_failable_call_unhoisted",
+      "reason": "A carried Norma module (`console`) places a failable call where Go cannot unpack the `(value, error)` pair and the hoister has no form for it (`go_failable_call_unhoisted`); the Go emitter unit for that call position is open."
     },
     "ts": {
       "outcome": "known-fail",

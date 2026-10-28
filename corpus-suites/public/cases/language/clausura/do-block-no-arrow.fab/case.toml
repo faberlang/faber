@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/clausura/do-block-no-arrow.fab"
+group = "language"
+input_root = "corpus"
+input = "clausura/do-block-no-arrow.fab"
+category = "function"
+domain = "functions"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

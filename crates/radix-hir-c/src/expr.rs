@@ -2513,7 +2513,6 @@ pub(crate) fn construct_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Reduction { .. } => "reduction",
         HirExpressionKind::Scan { .. } => "scan",
         HirExpressionKind::Sort { .. } => "sort expression",
-        HirExpressionKind::FirstMatch { .. } => "first-match selection",
         HirExpressionKind::Intervallum { .. } => "range value",
         HirExpressionKind::Assign(..) => "assignment",
         HirExpressionKind::ConversioAssign { .. } => "conversion assignment",

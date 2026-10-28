@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/iace/error-payload-types.fab"
+group = "language"
+input_root = "corpus"
+input = "iace/error-payload-types.fab"
+category = "error"
+domain = "control"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

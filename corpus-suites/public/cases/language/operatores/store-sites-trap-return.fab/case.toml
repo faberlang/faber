@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/operatores/store-sites-trap-return.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/store-sites-trap-return.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout = "stdout.expected"
+stderr_contains = "300 does not fit in `u8` (return)"
+check_only = false

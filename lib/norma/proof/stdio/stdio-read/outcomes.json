@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "package_go_codegen_failed",
-      "reason": "The Go package emitter fails this package's compilation with `package_go_codegen_failed` before any Go source reaches `go build`, so the console read routes are never lowered on this lane. Re-measure this row when the Go package emitter lowers the console read routes."
+      "diagnostic_contains": "go_failable_call_unhoisted",
+      "reason": "A carried Norma module (`console`) places a failable call where Go cannot unpack the `(value, error)` pair and the hoister has no form for it (`go_failable_call_unhoisted`); the Go emitter unit for that call position is open."
     },
     "ts": {
       "outcome": "known-fail",

@@ -1,0 +1,54 @@
++++
+term = "reducta-first-air"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "shape_suffix", "redde_stmt", "reducta_expr", "reducta_op", "reducta_body", "optional_suffix", "expression", "literal"]
+category = "kernel"
+canonical = false
+summary = "AIR-lane admission rows for reducta via prima: a statically shaped tensor, a matrix, and a zero-extent tensor (empty → nihil)."
+syntax = "@ radix lane \"air\"; reducta via prima ex <bounded source> sit <binder> { redde <predicate> }"
+related = ["reducta", "nihil", "tensor"]
+locale = "la"
+no_expected = "declaration-only"
++++
+
+# =============================================================================
+# reducta via prima (AIR lane) — bounded-source admission rows.
+# =============================================================================
+#
+# What this teaches:
+#   • the operator admits on the AIR lane only over statically bounded
+#     sources (a statically shaped tensor or matrix, the zero-extent shape
+#     included) — admission needs the bound, not an unroll
+#   • a statically zero-extent source is a bounded route and admits; the
+#     `nihil` contract is carried unchanged through the gate
+#   • reverse AD is forward-only v1: the operator never becomes an AIR tensor
+#     op; the other reduction operators stay outside the AIR subset
+#
+# Common mistakes:
+#   • expecting an unbounded source to admit — the gate declines a source
+#     without a static extent with SEM059 `reducta_first_unbounded_source`
+#     (every tensor or matrix a signature can name is bounded, so the decline
+#     is a guard rather than a row an exemplar can show)
+#   • expecting `summa` or another reduction operator to admit — only `prima`
+#     is admitted on the AIR lane; the rest stay outside the v1 subset
+#
+# See also: reducta, nihil, tensor
+# =============================================================================
+
+# Statically shaped tensor parameter admits.
+@ radix lane "air"
+functio elige(tf32[4] x) → fractus ∪ nihil {
+    redde reducta via prima ex x sit v { redde v ≻ 0.0 }
+}
+
+# Zero extent — a statically empty source admits; result is nihil.
+@ radix lane "air"
+functio elige_vacuum(tf32[0] x) → fractus ∪ nihil {
+    redde reducta via prima ex x sit v { redde v ≻ 0.0 }
+}
+
+# Matrix — a static two-axis shape admits, with its coordinates bound.
+@ radix lane "air"
+functio elige_cellam(tf32[2, 2] x) → fractus ∪ nihil {
+    redde reducta via prima ex x apud [i, j] sit v { redde v ≻ 0.0 }
+}

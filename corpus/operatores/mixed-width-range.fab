@@ -1,0 +1,51 @@
++++
+term = "u8"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "additive_expr", "multiplicative_expr", "assignment", "expr_stmt"]
+category = "arithmetic"
+summary = "Mixed integer widths compute exactly, and the width is checked once, at the store."
+syntax = "<u8> + <i16>"
+related = ["u8", "i16", "numerus-widening", "numerus-overflow"]
+locale = "en"
++++
+# =============================================================================
+# u8 — Mixed integer widths compute exactly, and the width is checked once, at the store.
+# =============================================================================
+#
+# What this teaches:
+#   • Arithmetic over mixed widths is exact: `u8 + u8` is 300 and `u8 *
+#     u8` is 20000, with no wrapping in the middle
+#   • A value that does not fit the slot it lands in is a store problem
+#     only: `(a + b) / 2` is 150 and fits a `u8`, even though the sum 300
+#     does not
+#   • A signed and an unsigned operand mix freely under exact arithmetic:
+#     `a + c` over a `u8` and an `i16` is -100
+#
+# Common mistakes:
+#   • Expecting `u8 + u8` to overflow at the `+`: the intermediate is
+#     exact, and only the store is checked
+#   • Expecting an intermediate that does not fit the slot's width to be
+#     clamped: nothing clamps in the middle of an expression
+#
+# See also: numerus-widening, numerus-overflow-sizes, wrapping-store-rule
+# =============================================================================
+
+main {
+    let u8 a ← 200
+    let u8 b ← 100
+    let i16 c ← -300
+    print a + b
+    print a * b
+    print a - b - 250
+    print a + c
+    let int mean ← (a + b) / 2
+    print mean
+    let u8 half ← (a + b) / 2
+    print half
+    let u8 back ← a + b - 150
+    print back
+    let i8 small ← (a + c) / 2
+    print small
+    let i16 mix ← a * b + c
+    print mix
+}

@@ -394,6 +394,28 @@ pub struct DeviceRunReceipt {
     pub host_blocked_ns: u64,
     /// How much of the launch time the runtime could measure.
     pub gpu_timing: DeviceGpuTiming,
+    /// The avoidable cross-partition syncs the spanned run's calls implied
+    /// (the planner audit's classification; the counters are in
+    /// `runtime.span`). Empty on an unspanned device.
+    pub span_avoidable: Vec<SpanAvoidable>,
+}
+
+/// One planner-audit classification: the entry's syncs of `kind` are
+/// avoidable for this reason. A dispatcher fact; the spanning runtime only
+/// counts the syncs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpanAvoidable {
+    /// The launched entry.
+    pub entry: String,
+    /// The sync kind the class describes (`own-write-gather`,
+    /// `partials-all-gather`, `first-broadcast`, `fault-combine`).
+    pub kind: &'static str,
+    /// The class: `unbounded-read`, `fusable-with-previous`, `first-fallback`
+    /// or `fault-combine-per-launch`.
+    pub avoidable: &'static str,
+    /// The class's data: the missing read set, the entry a reduction would
+    /// fuse into, or the fallback reason.
+    pub detail: Option<String>,
 }
 
 /// The result of an in-process device run: the discovery receipt line that was
@@ -676,6 +698,11 @@ fn open_device_session(
             DeviceImageBackend::MetalSpanned
         }
         DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
+        // A CUDA device spanning several partitions takes the lane-range
+        // image too (rule 18).
+        DeviceClass::Backend(DeviceBackend::Cuda) if receipt.partitions > 1 => {
+            DeviceImageBackend::CudaSpanned
+        }
         DeviceClass::Backend(DeviceBackend::Cuda) => DeviceImageBackend::Cuda,
         DeviceClass::Cpu => DeviceImageBackend::Cpu,
     };
@@ -741,6 +768,17 @@ impl DeviceRunPhases {
             host_encode_ns: self.dispatcher.host_encode_ns,
             host_blocked_ns: self.dispatcher.host_blocked_ns,
             gpu_timing,
+            span_avoidable: self
+                .dispatcher
+                .span_avoidable
+                .iter()
+                .map(|(entry, class)| SpanAvoidable {
+                    entry: entry.clone(),
+                    kind: class.kind().as_str(),
+                    avoidable: class.name(),
+                    detail: class.detail(),
+                })
+                .collect(),
         }
     }
 }
@@ -765,7 +803,7 @@ fn session_dispatcher(
     lowered: &radix::module::mir::LoweredMirUnit<'_>,
     validated: &radix::module::mir::ValidatedMir<'_>,
 ) -> Result<SessionDispatcher, Vec<Diagnostic>> {
-    use super::device::{SessionKernelDispatcher, device_image_for_lowered};
+    use super::device::{SessionKernelDispatcher, device_image_for_lowered_with};
     use super::host_factory::host_error_diagnostic;
     use std::time::Instant;
 
@@ -773,13 +811,17 @@ fn session_dispatcher(
         session, backend, ..
     } = admitted;
     let image_start = Instant::now();
-    let cuda_libdevice = if backend == super::device::DeviceImageBackend::Cuda {
+    let cuda = matches!(
+        backend,
+        super::device::DeviceImageBackend::Cuda | super::device::DeviceImageBackend::CudaSpanned
+    );
+    let cuda_libdevice = if cuda {
         super::resolve_cuda_libdevice(input).map_err(|diagnostic| vec![*diagnostic])?
     } else {
         None
     };
     let (mut image, omitted, image_timing) =
-        device_image_for_lowered(lowered, backend, cuda_libdevice.as_deref())?;
+        device_image_for_lowered_with(lowered, backend, cuda_libdevice.as_deref(), true)?;
     let image_build_ns = image_start.elapsed().as_nanos() as u64;
     if image.kernels.is_empty() {
         let reasons = omitted
@@ -846,12 +888,15 @@ fn session_dispatcher(
         .collect();
     let lane_ranges = std::mem::take(&mut image.lane_ranges);
     let write_maps = std::mem::take(&mut image.write_maps);
+    let fusions = std::mem::take(&mut image.fusions);
     let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher_start = Instant::now();
-    let dispatcher = SessionKernelDispatcher::new(
+    let fused_entries = fusions.iter().map(|fused| fused.entry.clone()).collect();
+    let dispatcher = SessionKernelDispatcher::with_fused_entries(
         session,
         image.artifact,
         units,
+        fused_entries,
         validated.validation().types.as_table(),
     )
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
@@ -877,15 +922,18 @@ fn session_dispatcher(
             })
             .collect(),
     );
-    dispatcher
-        .borrow_mut()
-        .set_scalars_by_buffer(backend == super::device::DeviceImageBackend::Cuda);
+    dispatcher.borrow_mut().set_scalars_by_buffer(cuda);
     dispatcher.borrow_mut().set_extents(extents);
     dispatcher
         .borrow_mut()
         .set_empty_reductions(empty_reductions);
     dispatcher.borrow_mut().set_write_maps(write_maps);
-    if backend == super::device::DeviceImageBackend::MetalSpanned {
+    dispatcher.borrow_mut().set_reduce_fusions(fusions);
+    if matches!(
+        backend,
+        super::device::DeviceImageBackend::MetalSpanned
+            | super::device::DeviceImageBackend::CudaSpanned
+    ) {
         dispatcher.borrow_mut().set_span(lane_ranges);
     }
     dispatcher.borrow_mut().set_backward_functions(backward);
@@ -1209,7 +1257,7 @@ fn default_cpu_workers() -> Option<std::num::NonZeroU32> {
 /// when a device is opened, so a run without kernels does not pay for it.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub fn system_device_registry() -> radix_device_core::registry::DeviceRegistry {
-    system_device_registry_spanning(MetalSpan::Unspanned)
+    system_device_registry_spanning(MetalSpan::Unspanned, 1)
 }
 
 /// How logical Metal partitions share the physical device's memory.
@@ -1224,16 +1272,22 @@ pub enum MetalSpan {
     PrivateCopies,
 }
 
+/// Register CUDA for `cuda_partitions` partitions: one is the plain runtime,
+/// more span that many physical devices (the lowest healthy ordinals, each
+/// with its own memory; fewer devices than partitions fails closed at open).
 /// Register Metal with the requested partition-memory model. Shared mode
 /// uses one allocation owner and queue; Replicate and First execute once.
 /// Private copies keep separate stores and queues for transport tests.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub fn system_device_registry_spanning(
     metal_span: MetalSpan,
+    cuda_partitions: u32,
 ) -> radix_device_core::registry::DeviceRegistry {
     let mut registry = radix_device_core::registry::DeviceRegistry::new();
     if radix_device_cuda::driver_library_present() {
-        registry.register(Box::new(radix_device_cuda::system_runtime()));
+        registry.register(radix_device_cuda::system_runtime_for_partitions(
+            cuda_partitions,
+        ));
     }
     #[cfg(target_os = "macos")]
     if let Some(info) = radix_device_metal::system_devices().into_iter().next()

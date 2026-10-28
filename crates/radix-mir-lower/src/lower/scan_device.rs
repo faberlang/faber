@@ -17,11 +17,11 @@ impl FunctionBuilder<'_> {
         else {
             return None;
         };
-        if matches!(op, HirReductionOp::ArgMax | HirReductionOp::ArgMin) {
+        let Some(scan_op) = scan_mir_reduce_op(*op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "scan_operator_unsupported"));
             return None;
-        }
+        };
         if *total == HirScanTotal::Exclusive && matches!(op, HirReductionOp::Max | HirReductionOp::Min) {
             self.errors
                 .push(MirError::unsupported(expr.span, "scan_exclusive_extremum_unsupported"));
@@ -142,7 +142,7 @@ impl FunctionBuilder<'_> {
         };
 
         let declaration = MirScanOp {
-            op: scan_mir_reduce_op(*op),
+            op: scan_op,
             total: match total {
                 HirScanTotal::Inclusive => MirScanTotal::Inclusive,
                 HirScanTotal::Exclusive => MirScanTotal::Exclusive,
@@ -333,18 +333,19 @@ impl FunctionBuilder<'_> {
     }
 }
 
-fn scan_mir_reduce_op(op: HirReductionOp) -> MirReduceOp {
-    match op {
+/// The device scan recipe for a value-prefix operator; `None` for the
+/// coordinate extrema and the first reduction, which no scan carries.
+fn scan_mir_reduce_op(op: HirReductionOp) -> Option<MirReduceOp> {
+    Some(match op {
         HirReductionOp::Sum => MirReduceOp::Sum,
         HirReductionOp::Product => MirReduceOp::Product,
         HirReductionOp::Max => MirReduceOp::Max,
         HirReductionOp::Min => MirReduceOp::Min,
-        HirReductionOp::ArgMax => MirReduceOp::ArgMax,
-        HirReductionOp::ArgMin => MirReduceOp::ArgMin,
         HirReductionOp::All => MirReduceOp::All,
         HirReductionOp::Any => MirReduceOp::Any,
         HirReductionOp::Count => MirReduceOp::Count,
-    }
+        HirReductionOp::ArgMax | HirReductionOp::ArgMin | HirReductionOp::First => return None,
+    })
 }
 
 fn scan_device_key_domain(domain: HirScanKeyDomain) -> Option<(i128, u64)> {

@@ -29,8 +29,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: random",
-      "reason": "The Go lane does not yet provide the Norma entropy leaf binding used by this case."
+      "diagnostic_contains": "func() {…}() (no value) used as value",
+      "reason": "The Go emitter writes a void closure where a value is expected inside a carried Norma `random` function (`func() {...}() (no value) used as value`); the emitter unit is open."
     },
     "ts": {
       "outcome": "known-fail",

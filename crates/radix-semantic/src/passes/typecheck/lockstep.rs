@@ -121,7 +121,15 @@ pub(super) fn check_lockstep_expr(
     for ((def_id, _), element) in bindings.iter().zip(element_tys.iter()) {
         checker.insert_binding(*def_id, *element);
     }
+    // The walk guard fails closed on unequal lengths, so the shared coordinate
+    // is below every source's length: the first named source states it.
+    if let Some(first) = sources.first()
+        && let Some(first_ty) = first.ty
+    {
+        checker.seed_coordinates(first_ty, Some(first), coordinates);
+    }
     checker.check_loop_block_over(sources.iter(), body);
+    checker.release_range_binders(coordinates.iter().map(|(def_id, _)| *def_id));
     checker.pop_scope();
     checker.vacuum_type()
 }

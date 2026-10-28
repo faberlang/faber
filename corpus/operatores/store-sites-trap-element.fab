@@ -1,0 +1,42 @@
++++
+term = "trapping"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "array_literal", "qualified_type", "type_arguments", "type_argument", "additive_expr"]
+category = "arithmetic"
+summary = "A `trapping<u8>` list element takes an in-range value and aborts the run on one that does not fit."
+syntax = "list<trapping<u8>>"
+related = ["trapping", "store-sites", "store-sites-trap"]
+locale = "en"
++++
+# =============================================================================
+# trapping — A `trapping<u8>` list element takes an in-range value and aborts the run on one that does not fit.
+# =============================================================================
+#
+# What this teaches:
+#   • A list element is a store site: `n + 50` is exact and fits a
+#     `trapping<u8>` element when `n` is 150
+#   • `n + 150` is exactly 300, and storing it as an element aborts with
+#     "300 does not fit in `u8`"
+#   • A constant that does not fit is refused at check time (`SEM010
+#     store_constant_out_of_range`), so the trap needs a value known only
+#     at run time
+#
+# Common mistakes:
+#   • Reading the trap as happening where the arithmetic is computed:
+#     arithmetic is exact, and only the store into the `trapping` slot
+#     checks
+#   • Expecting the trap to be recoverable with `do … catch`: an implicit
+#     store trap is not in the `⇥` error channel
+#
+# See also: store-sites, store-sites-trap
+# =============================================================================
+
+main {
+    let int n ← 150
+    let list<trapping<u8>> fine ← [n + 50, 5]
+    print fine
+    print "before"
+    let list<trapping<u8>> over ← [n + 150, 5]
+    print over
+    print "after"
+}

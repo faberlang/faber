@@ -30,7 +30,7 @@ fn reduction_head_requires_via_and_known_operator() {
             source,
             ParseExpectation::Arg {
                 name: "operators",
-                value: "summa, factum, maxima, minima, argmaxima, argminima, omnia, quilibet, numeratio",
+                value: "summa, factum, maxima, minima, argmaxima, argminima, omnia, quilibet, numeratio, prima",
             },
         );
     }
@@ -112,4 +112,44 @@ fn operator_word_and_head_remain_contextual_identifiers() {
             "source did not parse: {source}"
         );
     }
+}
+
+#[test]
+fn prima_parses_as_the_first_reduction_operator_after_via() {
+    let result = parse_ok(
+        "functio t(tensor<fractus, [4]> xs) → fractus ∪ nihil { reducta via prima ex xs sit v { redde v ≻ 0.0 } }",
+    );
+    let program = result.program.expect("program");
+    let StmtKind::Func(function) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let StmtKind::Expr(statement) = &function.body.as_ref().unwrap().statements[0].kind else {
+        panic!("expected expression statement");
+    };
+    let ExprKind::Reducta(reduction) = &statement.expr.kind else {
+        panic!("expected Reduction node");
+    };
+    assert_eq!(reduction.op, ReductaOp::First);
+    assert!(reduction.body.is_some());
+}
+
+#[test]
+fn prima_remains_an_ordinary_identifier_outside_the_via_slot() {
+    for source in [
+        "functio t(numerus prima) → numerus { redde prima }",
+        "functio t(lista<numerus> xs) → numerus ∪ nihil { redde xs.prima(2) }",
+    ] {
+        assert!(
+            parse_program(source).success(),
+            "source did not parse: {source}"
+        );
+    }
+}
+
+#[test]
+fn scan_refuses_the_first_operator() {
+    let result = parse_program(
+        "functio t(tensor<fractus, [4]> xs) → tensor<fractus, [4]> { scan via prima ex xs apud [i] filum f sit v { redde v } }",
+    );
+    assert!(!result.success(), "scan admits only value-prefix operators");
 }

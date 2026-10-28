@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/operatores/shift-unmasked.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/shift-unmasked.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

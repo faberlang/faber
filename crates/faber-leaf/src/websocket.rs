@@ -57,7 +57,7 @@ pub fn reset_handles() {
 }
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "websocket:connect",
     "websocket:connect_open",
     "websocket:connect_finish",

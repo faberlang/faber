@@ -15,8 +15,8 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: deque",
-      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:deque` module this proof imports, so the generated `main.go` calls `deque.*` with no such package-level identifier and `go build` stops with `undefined: deque`. Re-measure this row when the Go package emitter lowers that module binding."
+      "diagnostic_contains": "invalid operation: operator ! not defined on len(self.Tail) (value of ",
+      "reason": "The Go emitter writes the logical `not` over an integer length (`!len(x)`) in a carried Norma `deque` module; the emitter unit is open."
     },
     "ts": {
       "outcome": "known-fail",

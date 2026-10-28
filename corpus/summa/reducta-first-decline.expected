@@ -1,0 +1,7 @@
+# Reject oracle: reducta via prima admission laws.
+# Tokens: stable semantic issue identities.
+SEM010:reducta_first_requires_body
+SEM010:reducta_term_type_not_bool
+SEM010:reducta_group_op_unsupported
+SEM010:reducta_identity_not_applicable
+SEM010:reducta_requires_shaped_iterable

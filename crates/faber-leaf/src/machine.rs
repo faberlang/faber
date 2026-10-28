@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 const ROUTE: &str = "machina:specimen";
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[ROUTE];
+pub(crate) const ROUTES: &[&str] = &[ROUTE];
 
 /// Process-table cap for one snapshot; the sampler keeps the busiest rows.
 pub const MAX_PROCS: usize = 64;

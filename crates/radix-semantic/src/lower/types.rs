@@ -846,6 +846,7 @@ impl Lowerer<'_> {
             // A selectively imported type (D22.5) is the imported `TypeId`
             // itself, exactly as its qualified `module.Type` path lowers.
             if let Some(type_id) = self.resolver.lookup_selective_import_type(name.name) {
+                self.record_imported_named_head(type_id, vec![name.name]);
                 if params.is_empty() {
                     return type_id;
                 }
@@ -1492,6 +1493,30 @@ impl Lowerer<'_> {
         }
     }
 
+    /// Authored-form capture for an imported named type: record the imported
+    /// definition beside the spelled `path` so the completed head is a `Named`
+    /// constructor exactly as a locally declared type's is.
+    ///
+    /// `type_id` is the imported base type; its definition identity is the
+    /// struct, enum, interface or alias it names. A base that names no
+    /// definition keeps the semantic head.
+    fn record_imported_named_head(&mut self, type_id: TypeId, path: Vec<radix_lexer::Symbol>) {
+        let mut current = type_id;
+        let def_id = loop {
+            match self.types.get(current) {
+                Type::Struct(def_id)
+                | Type::Enum(def_id)
+                | Type::Interface(def_id)
+                | Type::Alias(def_id, _) => break *def_id,
+                Type::Applied(base, _) => current = *base,
+                _ => return,
+            }
+        };
+        if let Some(frame) = self.form_frames.last_mut() {
+            frame.named = Some((def_id, path));
+        }
+    }
+
     fn lower_qualified_type(&mut self, path: &[Ident], params: &[GenericArgExpr]) -> TypeId {
         let Some((namespace, type_name)) = path.first().zip(path.last()) else {
             self.error("empty_qualified_type_path");
@@ -1514,6 +1539,10 @@ impl Lowerer<'_> {
             .resolver
             .namespace_file_type(namespace.name, type_name.name)
         {
+            self.record_imported_named_head(
+                type_id,
+                path.iter().map(|segment| segment.name).collect(),
+            );
             // Imported declarations carry their ordered declaration kinds on
             // the file interface (S0-R1); kind mismatches fail closed instead
             // of silently accepting any argument spelling.
@@ -1546,6 +1575,11 @@ impl Lowerer<'_> {
                             .map(|type_id| (def_id, type_id))
                     })
         {
+            // Authored-form capture: the exported member is a resolved user
+            // definition, recorded under the spelled qualified path.
+            if let Some(frame) = self.form_frames.last_mut() {
+                frame.named = Some((def_id, path.iter().map(|segment| segment.name).collect()));
+            }
             let has_declared_params = self.has_declared_generic_params(def_id);
             if params.is_empty() && !has_declared_params {
                 return type_id;

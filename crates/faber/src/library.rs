@@ -98,14 +98,18 @@ pub(crate) fn default_library_home() -> Option<PathBuf> {
 
 /// Configure the process-wide library home for this run.
 ///
-/// Precedence: `flag` (the `--library-home` CLI flag), else the nearest
+/// Precedence: `flag` (the `--library-home` CLI flag, made absolute against
+/// the current directory), else the nearest
 /// `faber.toml`'s `[paths] library_home` walked up from `probe` (a directory,
 /// or a file's parent; the current directory when `probe` is `None`). A
 /// relative manifest path is joined onto the manifest directory. When nothing
 /// is chosen the process-wide setting is left untouched.
 pub fn configure_library_home(flag: Option<&Path>, probe: Option<&Path>) {
+    // A relative flag is relative to the working directory, and the library
+    // resolver needs an absolute home: later steps resolve provider paths
+    // against other directories (a package root), where `..` names another place.
     let chosen = flag
-        .map(Path::to_path_buf)
+        .map(|flag| std::path::absolute(flag).unwrap_or_else(|_| flag.to_path_buf()))
         .or_else(|| manifest_library_home(probe));
     if let Some(home) = chosen {
         radix::program::set_configured_library_home(Some(home));

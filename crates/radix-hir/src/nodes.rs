@@ -1430,21 +1430,6 @@ pub enum HirExpressionKind {
         mutable: bool,
     },
 
-    /// Dedicated `primus_quem` first-match selection.
-    ///
-    /// This is a source-declaration node only in AFM-2. Typecheck deliberately
-    /// declines it until the AFM-3 admission rules and lowering land.
-    FirstMatch {
-        /// Bounded source expression supplying the candidates.
-        source: Box<HirExpression>,
-        /// Coordinate bindings inherited from the shared `apud` production.
-        coordinates: Vec<(DefId, Symbol)>,
-        /// Candidate binding introduced by the owned `ubi` predicate tail.
-        binding: (DefId, Symbol),
-        /// Predicate body evaluated for every candidate lane.
-        body: HirBlock,
-    },
-
     /// Range (`intervallum`).
     Intervallum {
         start: Box<HirExpression>,
@@ -1775,6 +1760,8 @@ pub enum HirReductionOp {
     All,
     Any,
     Count,
+    /// The first element whose body predicate holds (`prima`); `T ∪ nihil`.
+    First,
 }
 
 /// Whether a prefix output includes its own input element.
@@ -1824,6 +1811,7 @@ impl HirReductionOp {
             Self::All => "omnia",
             Self::Any => "quilibet",
             Self::Count => "numeratio",
+            Self::First => "prima",
         }
     }
 }

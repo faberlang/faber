@@ -827,6 +827,7 @@ fn analyze_kernel(
             base.ranges.insert(param.def_id, range);
         }
     }
+    base.bind_size_values(function);
     if let Some(ret_ty) = function.ret_ty
         && !is_integer_value_type(Some(ret_ty), types)
     {
@@ -2647,6 +2648,38 @@ impl BodyFacts<'_> {
                 .push(KernelRequirementFailure::OptionFRequired { span, width });
         }
         AbstractRange(Some(slot_range))
+    }
+
+    /// Size-name reads. A `size` parameter named in a kernel body reads as an
+    /// `i32` (the lane-coordinate carrier), and the launch contract owns its
+    /// value: it is the symbolic extent of the tensor axis the parameter
+    /// names, so arithmetic on it is bounded by a launch-time extent condition
+    /// rather than by the carrier's full range. A size parameter no tensor
+    /// parameter's shape names has no axis to read and keeps the carrier range.
+    fn bind_size_values(&mut self, function: &HirFunction) {
+        for type_param in &function.type_params {
+            if type_param.kind != radix_syntax::GenericParamKind::Magnitudo {
+                continue;
+            }
+            let axis = function
+                .params
+                .iter()
+                .flat_map(|param| shape_dimensions(param.ty, self.types))
+                .find(|axis| {
+                    matches!(self.types.get_index(*axis), IndexExpr::Param(name) if *name == type_param.name)
+                });
+            let Some(axis) = axis else {
+                continue;
+            };
+            let extent = KernelRangeExpr::Shape(axis);
+            self.ranges.insert(
+                type_param.def_id,
+                AbstractRange(Some(KernelValueRange {
+                    minimum: extent.clone(),
+                    maximum: extent,
+                })),
+            );
+        }
     }
 
     fn record_type(&mut self, ty: TypeId, span: Span) {

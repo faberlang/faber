@@ -2898,8 +2898,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     /// Append the record of one completed kernel call: every tensor argument
-    /// (`arg<N>`, as written at the call site) and a returned tensor
-    /// (`return`).
+    /// (`arg<N>`, as written at the call site), a returned tensor (`return`),
+    /// and a returned scalar.
     fn record_kernel_call(
         &mut self,
         function_id: MirFunctionId,
@@ -2937,6 +2937,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 entry,
                 physical_stages,
                 tensors,
+                result: kernel_trace::traced_result(returned),
             });
         }
         Ok(())
@@ -3110,8 +3111,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         }
                         // An element of a tuple is its declared part.
                         MirProjection::Index(MirOperand::Constant(MirConstant::Int(position)))
-                            if matches!(self.types.get(ty), Type::Tuple(_)) =>
-                        {
+                        | MirProjection::ProvenIndex(MirOperand::Constant(MirConstant::Int(
+                            position,
+                        ))) if matches!(self.types.get(ty), Type::Tuple(_)) => {
                             let Type::Tuple(parts) = self.types.get(ty) else {
                                 return None;
                             };
@@ -3120,6 +3122,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         // An element of a numeric collection renders at the
                         // collection's element width.
                         MirProjection::Index(_)
+                        | MirProjection::ProvenIndex(_)
                         | MirProjection::VectorLane(_)
                         | MirProjection::MatrixCell { .. } => ty,
                         _ => return None,
@@ -3615,6 +3618,32 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         Ok(())
     }
 
+    /// An element read the checker proved in range (`ProvenIndex`, need
+    /// 5d3a8afd): `0 <= index` and `index <` the list's live length or the
+    /// tensor's extent. The list read builds no bounds fault and a dense
+    /// tensor read skips the logical-extent comparison; a proof that turns out
+    /// wrong is a compiler bug (a Rust panic for a list, the storage's own
+    /// miss for a tensor), never a silent wrong read. Text, windows, maps,
+    /// cursors, octeti and vector lanes keep the checked read: the scalar
+    /// lookup of a text has no separate length test to omit.
+    pub(crate) fn collection_index_proven(
+        receiver: Value,
+        index: &Value,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Some(at) = crate::value::proven_position(index) else {
+            return Self::collection_index(receiver, index, span);
+        };
+        match receiver {
+            Value::Array(cell) => Ok(cell.borrow()[at].clone()),
+            Value::Tensor(tensor) => tensor
+                .borrow()
+                .value_at_proven(at)
+                .ok_or_else(|| RunnerError::internal(span, "tensor index out of bounds")),
+            other => Self::collection_index(other, index, span),
+        }
+    }
+
     fn project_write(
         &mut self,
         value: Value,
@@ -3623,7 +3652,25 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         match projection {
-            radix_mir::MirProjection::Index(index) => {
+            // A proven list element write: the checker showed
+            // `0 <= index < live length`, so the slot is written without the
+            // negative and past-the-end tests. A wrong proof is a compiler
+            // bug and panics in the slice index, never a silent wrong write.
+            // Every other receiver keeps the checked write below (a tensor
+            // store has no separate extent test to omit).
+            radix_mir::MirProjection::ProvenIndex(index) if matches!(value, Value::Array(_)) => {
+                let index = self.eval_operand(index, span)?;
+                let Some(at) = value::proven_position(&index) else {
+                    return Err(RunnerError::internal(span, trap_text::NEGATIVE_INDEX));
+                };
+                let Value::Array(cell) = value else {
+                    return Err(RunnerError::internal(span, "index write on non-array"));
+                };
+                cell.borrow_mut()[at] = assigned;
+                Ok(Value::Array(cell))
+            }
+            radix_mir::MirProjection::Index(index)
+            | radix_mir::MirProjection::ProvenIndex(index) => {
                 let index = self.eval_operand(index, span)?;
                 match value {
                     Value::Array(cell) => {
@@ -4583,6 +4630,9 @@ mod ascii_cursor_test;
 #[path = "textus_index_test.rs"]
 mod textus_index_test;
 
+#[cfg(test)]
+#[path = "proven_index_test.rs"]
+mod proven_index_test;
 #[cfg(test)]
 #[path = "textus_bracket_test.rs"]
 mod textus_bracket_test;

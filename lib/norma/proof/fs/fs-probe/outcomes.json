@@ -12,12 +12,6 @@
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
     },
-    "go": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "leaf_unsupported_on_target",
-      "reason": "The Go lane carries no `solum:*` fs port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
-    },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",

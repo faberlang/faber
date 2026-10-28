@@ -7,8 +7,6 @@ summary = "Compile-admitted bounded list<u8, N> to bounded list<b8, M> route."
 syntax = "list<u8, N> ↦ list<b8, M>"
 related = ["↦", "lista", "list<b8>", "u8"]
 locale = "en"
-no_expected = "awaiting-ruling"
-ruling = "6a13d711"
 +++
 # =============================================================================
 # bounded list<u8, N> to list<b8, M> — compile-admitted byte carrier route
@@ -16,8 +14,8 @@ ruling = "6a13d711"
 #
 # What this teaches:
 #   • The bounded u8 list names a bounded byte target explicitly.
-#   • The route is currently a check-level contract; the runner has no
-#     bounded list<b8, N> carrier.
+#   • The converted bytes are the two initialized elements, `0x01` and `0x02`;
+#     the capacity 8 is a bound, not a length, and prints as the bytes alone.
 #
 # Common mistakes:
 #   • using a general integer list for a byte carrier — the element width is

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "tensor"
 canonical = false
 summary = "Shifted tensor views resolve edges by an explicit policy or fused coalesce."
-related = ["tensor", "limes", "materialize"]
+related = ["tensor", "edge", "materialize"]
 locale = "en"
 +++
 
@@ -29,11 +29,11 @@ class ZeroGhost implements EdgePolicy<vector<int, 1>> ∩ EdgeTransform<vector<i
 
 main {
     let tf32[3] base ← [1.0, 2.0, 3.0] ↦ tf32[3]
-    let tf32[3] clamped ← base.shift([1]).limes<clamp>()
-    let tf32[3] reflected ← base.shift([1]).limes<reflect>()
-    let tf32[3] wrapped ← base.shift([1]).limes<wrap>()
+    let tf32[3] clamped ← base.shift([1]).edge<clamp>()
+    let tf32[3] reflected ← base.shift([1]).edge<reflect>()
+    let tf32[3] wrapped ← base.shift([1]).edge<wrap>()
     let tf32[3] filled ← base.shift([1]) coalesce 0.0
-    let tf32[3] custom ← base.shift([1]).limes<ZeroGhost>()
+    let tf32[3] custom ← base.shift([1]).edge<ZeroGhost>()
     print clamped.flatten()
     print reflected.flatten()
     print wrapped.flatten()

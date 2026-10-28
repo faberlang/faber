@@ -1015,7 +1015,7 @@ impl Validator<'_, '_> {
                     source,
                 } => self.project_closure_capture(*environment, *source, span)?,
                 MirProjection::SharedCell => ty,
-                MirProjection::Index(index) => {
+                MirProjection::Index(index) | MirProjection::ProvenIndex(index) => {
                     let index_ty = self.validate_operand(scope, index, span);
                     self.project_index(ty, index_ty.map(|ty| (index, ty)), span)?
                 }

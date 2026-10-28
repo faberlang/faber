@@ -6,7 +6,9 @@
 //! on-disk pack, no index file, and nothing to drift from the compiler.
 
 use crate::explain::{Entry, ExplainError, Registry};
+use crate::explain_locale::Projection;
 use radix::module::driver::split_frontmatter;
+use radix::module::locale::LocalePack;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
@@ -219,13 +221,42 @@ impl ReferencePack {
         })
     }
 
-    /// Parse exempla entries and build an explain [`Registry`].
+    /// Parse exempla entries and build the identity [`Registry`].
     ///
     /// # Errors
     ///
     /// Returns an error if an exempla entry or a legacy redirect entry fails to
     /// build, or if the assembled registry fails validation.
     pub fn build_registry(&self) -> Result<Registry, ExplainError> {
+        Registry::from_entries(self.build_entries()?)
+    }
+
+    /// Parse exempla entries and build a [`Registry`] projected through one
+    /// reader locale pack (see [`crate::explain_locale`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an entry fails to build, or if the projected
+    /// registry fails validation (for example a projected spelling that
+    /// collides with a legacy redirect).
+    pub fn build_registry_for(&self, pack: &LocalePack) -> Result<Registry, ExplainError> {
+        let mut entries = self.build_entries()?;
+        let projection = Projection::new(&entries, pack);
+        projection.apply(&mut entries);
+        // Registry order is list order: keep it sorted by the spelling shown.
+        entries.sort_by(|left, right| left.term.cmp(&right.term));
+        let renamed = projection
+            .terms()
+            .iter()
+            .filter(|(identity, term)| identity != term)
+            .map(|(identity, term)| (identity.clone(), term.clone()))
+            .collect();
+        let mut registry = Registry::from_entries(entries)?;
+        registry.set_renamed(renamed);
+        Ok(registry)
+    }
+
+    fn build_entries(&self) -> Result<Vec<Entry>, ExplainError> {
         let mut entries = Vec::new();
 
         for record in &self.terms {
@@ -248,7 +279,7 @@ impl ReferencePack {
             )?);
         }
 
-        Registry::from_entries(entries)
+        Ok(entries)
     }
 }
 

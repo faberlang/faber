@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/lista/index-oob-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/index-oob-trap.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout = "stdout.expected"
+stderr_contains = "array index out of bounds"
+check_only = false

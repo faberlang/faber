@@ -499,7 +499,8 @@ fn view_read_indexes(function: &MirFunction, view: &ShiftView) -> Vec<MirOperand
     impl MirVisitor for Reads<'_> {
         fn visit_place(&mut self, place: &MirPlace) {
             if self.names.contains(&Key::of(&place.base))
-                && let Some(MirProjection::Index(index)) = place.projections.first()
+                && let Some(MirProjection::Index(index) | MirProjection::ProvenIndex(index)) =
+                    place.projections.first()
             {
                 self.found.push(index.clone());
             }
@@ -772,7 +773,9 @@ impl Rewriter {
         if !view.names.contains(&Key::of(&place.base)) {
             return Ok(());
         }
-        let Some(MirProjection::Index(index)) = place.projections.first() else {
+        let Some(MirProjection::Index(index) | MirProjection::ProvenIndex(index)) =
+            place.projections.first()
+        else {
             return Err(refuse(ERR_SHIFT_VIEW_USE, "whole-view read"));
         };
         let ty = types
