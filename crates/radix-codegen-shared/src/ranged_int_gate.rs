@@ -1,4 +1,5 @@
-//! Fail-closed gate for ranged store policies, `saturating|trapping|wrapping<W, lo‥hi>`.
+//! Fail-closed gates for ranged store policies, `saturating|trapping|wrapping<W, lo‥hi>`,
+//! and list length ranges, `list<T, size lo‥hi>`.
 //!
 //! A range is a refinement a store applies inside the explicit width (need
 //! d5d00916). It is built on the MIR runner and the Rust target; every other
@@ -56,6 +57,46 @@ pub fn reject_ranged_int_type(types: &TypeTable, target: Target) -> Result<(), C
     })
 }
 
+const LIST_ISSUE: &str = "ranged_list_target_unsupported";
+
+/// Whether the type table names a list length range.
+fn names_ranged_list(types: &TypeTable) -> bool {
+    (0..types.type_count()).any(|index| {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "TypeId is u32 by design; type_count is bounded by u32::MAX"
+        )]
+        let ty = radix_types::TypeId(index as u32);
+        matches!(types.get(ty), Type::RangedArray { .. })
+    })
+}
+
+/// A list length range is applied by the Faber source emitter, the MIR runner
+/// and the Rust target; every other emitter would read the
+/// cell as a plain list and silently drop the range.
+///
+/// # Errors
+///
+/// Returns a [`CodegenError`] (`ranged_list_target_unsupported`) when the
+/// module's type table names a list length range and `target` has no lowering
+/// for it.
+pub fn reject_ranged_list_type(types: &TypeTable, target: Target) -> Result<(), CodegenError> {
+    if target.lowers_ranged_list() || !names_ranged_list(types) {
+        return Ok(());
+    }
+    Err(CodegenError {
+        message: format!(
+            "the list length range `list<T, size lo‥hi>` is not supported on the {target:?} target \
+             yet: only the Faber source emitter, the MIR runner and the Rust target accept it"
+        ),
+        args: vec![
+            DiagnosticArg::new("issue", LIST_ISSUE),
+            DiagnosticArg::new("type", "list<T, size lo‥hi>"),
+            DiagnosticArg::new("target", format!("{target:?}")),
+        ],
+    })
+}
+
 /// The value-type gates a CLI product path runs together before any emitter:
 /// raw bits, ledgers and ranged store policies have no carrier on those
 /// targets, so each fails closed by name instead of reaching the emitter's
@@ -64,9 +105,11 @@ pub fn reject_ranged_int_type(types: &TypeTable, target: Target) -> Result<(), C
 /// # Errors
 ///
 /// Returns the first [`CodegenError`] of [`crate::reject_bits_type`],
-/// [`crate::reject_ledger_type`] and [`reject_ranged_int_type`].
+/// [`crate::reject_ledger_type`], [`reject_ranged_int_type`] and
+/// [`reject_ranged_list_type`].
 pub fn reject_unlowered_value_types(types: &TypeTable, target: Target) -> Result<(), CodegenError> {
     crate::reject_bits_type(types, target)?;
     crate::reject_ledger_type(types, target)?;
-    reject_ranged_int_type(types, target)
+    reject_ranged_int_type(types, target)?;
+    reject_ranged_list_type(types, target)
 }

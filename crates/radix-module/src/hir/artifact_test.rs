@@ -497,6 +497,30 @@ fn load_unit_for(source: &str) -> Result<AnalyzedModule, HirArtifactError> {
 }
 
 #[test]
+fn authored_policy_range_survives_the_fhir_round_trip() {
+    let loaded = load_unit_for(concat!(
+        "+++\nlocale = \"en\"\n+++\n",
+        "fn bounded() → int {\n",
+        "    let trapping<i32, -∞‥8> value ← 1\n",
+        "    return 0\n",
+        "}\n",
+    ))
+    .expect("ranged-policy artifact must load");
+    let authored = loaded
+        .presentation
+        .authored_types
+        .iter()
+        .find(|authored| matches!(authored.form.args.as_slice(), [radix_hir::HirTypeFormArg::Range(_)]))
+        .expect("range spelling remains in the authored HIR form");
+    let [radix_hir::HirTypeFormArg::Range(range)] = authored.form.args.as_slice() else {
+        unreachable!("the filter selected a single range argument");
+    };
+    assert_eq!(range.lo, radix_hir::HirRangeBound::Unbounded { negative: true });
+    assert_eq!(range.hi, radix_hir::HirRangeBound::Literal("8".to_owned()));
+    assert!(!range.inclusive);
+}
+
+#[test]
 fn comptime_module_constant_survives_the_fhir_round_trip() {
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",
@@ -2282,6 +2306,25 @@ fn declaration_store_shape_pins_survive_fhir_round_trip() {
 }
 
 #[test]
+fn proven_index_accesses_survive_fhir_round_trip() {
+    use crate::driver::{Config, Session, analyze_source};
+
+    let path = format!("{}/../../corpus/mori/mori.fab", env!("CARGO_MANIFEST_DIR"));
+    let source = std::fs::read_to_string(&path).expect("mori fixture");
+    let session = Session::new(Config::default().with_dev_locale_root());
+    let direct = analyze_source(&session, &path, &source, AnalyzeRequest::default()).expect("fixture analyzes");
+    assert!(
+        !direct.shape_obligations.proven_indexes.is_empty(),
+        "the guarded index read is a checker-proven access"
+    );
+
+    let artifact = crate::hir::serialize::from_analyzed(&direct, "proven-index", "mori");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize proven indexes");
+    let loaded = load_fhir(&bytes).expect("proven indexes survive validated FHIR load");
+    assert_eq!(loaded.shape_obligations.proven_indexes, direct.shape_obligations.proven_indexes);
+}
+
+#[test]
 fn tensor_edge_policy_facts_survive_fhir_round_trip() {
     use radix_hir::{
         ResolvedTensorEdgePolicy, TensorEdgePolicyProviderImpl, TensorEdgePolicyRequirement, TensorShiftContext,
@@ -2462,7 +2505,7 @@ import from "demo:policy" policy
 
 @ public
 fn resolve(tf32[3] source) → f32 ⇥ string {
-    return source.shift([1]).limes<policy.ZeroGhost>().materialize().get([2])
+    return source.shift([1]).edge<policy.ZeroGhost>().materialize().get([2])
 }
 "#;
     let consumer_path = home.join("consumer.fab");
@@ -3051,4 +3094,49 @@ fn size_generic_genus_applied_to_size_survives_round_trip() {
     let artifact = from_analyzed(&original, "size-generic", "size-generic.fab");
     let bytes = postcard::to_allocvec(&artifact).expect("serialize size-generic artifact");
     load_fhir(&bytes).expect("size-generic artifact must load");
+}
+
+/// Analyze an English-locale `source` for `target`, serialize it to FHIR, and
+/// return the load result.
+fn load_en_unit_for(source: &str, target: crate::codegen::Target) -> Result<AnalyzedModule, HirArtifactError> {
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let session = Session::new(Config::default().with_dev_locale_root().with_target(target));
+    let original =
+        analyze_source(&session, "air.fab", source, AnalyzeRequest::default()).expect("AIR fixture analyzes");
+    let artifact = from_analyzed(&original, "air", "air.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize AIR artifact");
+    load_fhir(&bytes)
+}
+
+#[test]
+fn air_unrolled_hir_ids_round_trip_fhir() {
+    // An AIR-lane `for from` over a rank-1 tensor unrolls into straight-line
+    // lanes on every non-Faber target; the unrolled unit must serialize with
+    // every HirId it carries naming a node of the finalized HIR.
+    use crate::codegen::Target;
+
+    let source = r#"@ radix lane "air"
+fn tensor_sum(tf32[4] x) → f32 {
+    mut f32 total ← 0.0
+    for from x let value {
+        total ← total + value
+    }
+    return total
+}
+"#;
+    for target in [
+        Target::HirPython,
+        Target::HirHaskell,
+        Target::MirWasm,
+        Target::MirLlvm,
+        Target::MirClif,
+        Target::MirMetal,
+        Target::MirWgsl,
+        Target::MirSexp,
+    ] {
+        load_en_unit_for(source, target)
+            .unwrap_or_else(|err| panic!("{target:?}: AIR-unrolled unit must load: {err:?}"));
+    }
 }

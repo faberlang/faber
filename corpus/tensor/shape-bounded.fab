@@ -15,7 +15,7 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • a tensor of static rank R yields `list<int, R>`; the extents may be
+#   • a tensor of static rank R yields `list<int, size R>`; the extents may be
 #     compile-time literals (`tf32[2, 3]`) or run-time values (`tf32[2, size n]`)
 #   • one extent reads straight from the call: `t.shape()[1]`
 #   • `let list<int, _> dims ← t.shape()` infers the capacity from the source

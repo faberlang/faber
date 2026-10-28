@@ -1,7 +1,7 @@
 //! Bounded-param PKG001 empty-message regression (goal
 //! `flow-narrowing-and-match-patterns`, P2 rider).
 //!
-//! `fn probe(list<int, 4> b)` is legal type grammar — the same type is green
+//! `fn probe(list<int, size 4> b)` is legal type grammar — the same type is green
 //! in main-body position (`ct-w6`) and `numerus<u32>` params pass (`ct-w1`).
 //! Package check still rejects it: the file-interface snapshot cannot yet
 //! represent bounded collection types, so the exported signature fails closed
@@ -72,7 +72,7 @@ fn bounded_param_exported_signature_emits_real_rendered_diagnostic() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        "@ public\nfn probe(list<int, 4> b) → void {\n    print b\n}\n",
+        "@ public\nfn probe(list<int, size 4> b) → void {\n    print b\n}\n",
     )
     .expect("write source");
 

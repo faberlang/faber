@@ -1,7 +1,8 @@
 use crate::{
-    MirAggregateFields, MirAggregateItem, MirAggregateKind, MirFunction, MirLayoutKind, MirLocalId,
-    MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirScalarLayout, MirScanOp,
-    MirStatementKind, MirTerminatorKind, MirType, MirValidationContext,
+    MirAggregateFields, MirAggregateItem, MirAggregateKind, MirFunction, MirIntrinsic,
+    MirLayoutKind, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase,
+    MirScalarLayout, MirScanOp, MirStatementKind, MirTerminatorKind, MirType, MirValidationContext,
+    MirValueKind,
 };
 use radix_lexer::Interner;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
@@ -158,8 +159,6 @@ fn is_gather_ids_param(
 /// stay per-resource.
 const RUNTIME_EXTENT_RESOURCE_NAME: &str = "runtime_extent";
 
-/// Build a runtime-extent count resource.
-///
 /// CXO F2: extents are `Vec`-capable from day one — one entry per extent
 /// channel, appended to `extra_inputs`; Wave 1 populates at most one. The
 /// binding is caller-assigned as the next free binding from the positional
@@ -547,7 +546,6 @@ fn scan_partial_type(
     Ok(scan.result_element_ty)
 }
 
-/// The partial layout of a grid reduction node.
 pub(crate) fn grid_reduce_partial_layout(
     filum: &crate::MirFilumReduceOp,
     validation: &MirValidationContext<'_>,
@@ -1785,7 +1783,9 @@ impl MirKernelSignature {
             return Ok(signature);
         }
 
-        if Self::is_single_lane_form(function, validation) {
+        if Self::is_single_lane_form(function, validation)
+            || Self::is_elementwise_output_form(function, validation)
+        {
             let output_position = function
                 .params
                 .iter()
@@ -1937,10 +1937,15 @@ impl MirKernelSignature {
                 .map(|(position, _)| *position)
                 .collect(),
         };
+        // The single positional-input arm reads its input as a tensor device
+        // view: a lone scalar input (`seed(mut w, i32 salt)`) is a count-one
+        // resource and takes the multi-input arm like every scalar beside
+        // tensors.
         let single_tensor_input = match inputs.as_slice() {
             [input]
                 if extra_outputs.is_empty()
-                    && genus_param_layout(input.ty, validation)?.is_none() =>
+                    && genus_param_layout(input.ty, validation)?.is_none()
+                    && !Self::is_kernel_scalar_input(input.ty, validation)? =>
             {
                 Some(input)
             }
@@ -2502,7 +2507,10 @@ impl MirKernelSignature {
         if let Some(index) = index {
             require_u32_index(index.ty, validation)?;
         }
-        let per_lane = index.is_none() || is_lane_form(function);
+        // An elementwise output-parameter kernel has no index parameter either,
+        // but it is not a single lane: it runs per element.
+        let elementwise_output = index.is_none() && body_has_tensor_elementwise(function);
+        let per_lane = (index.is_none() && !elementwise_output) || is_lane_form(function);
 
         let output_element_ty =
             device_view_element_type(output.ty, validation, context.allow_host_owned_tensor_entry)?;
@@ -2579,7 +2587,7 @@ impl MirKernelSignature {
             ),
         };
         maybe_append_runtime_extent(function, &mut signature, validation);
-        if index.is_none() {
+        if index.is_none() && !elementwise_output {
             // Single lane: one thread runs the whole body. No recipe contract
             // applies; the body's collection-op statements are scalar math.
             signature.dispatch_size = MirKernelDispatchSize { x: 1, y: 1, z: 1 };
@@ -2675,6 +2683,30 @@ impl MirKernelSignature {
     /// shape with a result are not single-lane.
     #[must_use]
     pub fn is_single_lane_form(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+    ) -> bool {
+        Self::is_void_single_output_form(function, validation)
+            && !body_has_tensor_elementwise(function)
+    }
+
+    /// Whether `function` is an elementwise output-parameter kernel: the
+    /// single-lane shape (a void body, no lane loop, no index parameter, one
+    /// `mut` tensor, tensor / scalar / genus inputs, no tensor recipe) whose
+    /// body is a whole-tensor elementwise statement (`out ⇇ a ⊙ b`,
+    /// `out ⇇ w - g * lr`). It is a per-element tensor expression, not a
+    /// sequential body: one invocation per output element, the result stored
+    /// into the `mut` parameter.
+    #[must_use]
+    pub fn is_elementwise_output_form(
+        function: &MirFunction,
+        validation: &MirValidationContext<'_>,
+    ) -> bool {
+        Self::is_void_single_output_form(function, validation)
+            && body_has_tensor_elementwise(function)
+    }
+
+    fn is_void_single_output_form(
         function: &MirFunction,
         validation: &MirValidationContext<'_>,
     ) -> bool {
@@ -2897,4 +2929,34 @@ impl MirKernelSignature {
         };
         u32::try_from(threads).ok()
     }
+}
+
+/// Whether a body carries a whole-tensor elementwise statement: an elementwise
+/// collection op (`TensorAdd`, `TensorMul`, ...), a tensor lift (a scalar
+/// operator applied per element, such as `g * lr`), or a whole-tensor store
+/// of one tensor operand into the `mut` parameter (`out ⇇ a`).
+fn body_has_tensor_elementwise(function: &MirFunction) -> bool {
+    function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .any(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. } => match &call.intrinsic {
+                MirIntrinsic::Collection(op) => {
+                    crate::device_program_plans::is_elementwise_collection_op(*op)
+                }
+                MirIntrinsic::TensorLift(_) => true,
+                _ => false,
+            },
+            MirStatementKind::Assign { place, value } => {
+                place.projections.is_empty()
+                    && matches!(place.base, MirPlaceBase::Local(local)
+                    if function.params.iter().any(|param| {
+                        param.local == local && param.mode == MirParamMode::MutRef
+                    }))
+                    && matches!(&value.kind, MirValueKind::Operand(MirOperand::Place(source))
+                        if source.projections.is_empty())
+            }
+            _ => false,
+        })
 }

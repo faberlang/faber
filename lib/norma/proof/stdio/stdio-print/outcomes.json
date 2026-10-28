@@ -15,14 +15,20 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "go_selective_import_unsupported",
-      "reason": "The Go package emitter refuses a selective import (`import from \"norma:console\" const print`) with PKG001 go_selective_import_unsupported; this case imports the member by name on purpose. Re-measure this row when Go package emit supports selective imports."
+      "diagnostic_contains": "go_failable_call_unhoisted",
+      "reason": "A carried Norma module (`console`) places a failable call where Go cannot unpack the `(value, error)` pair and the hoister has no form for it (`go_failable_call_unhoisted`); the Go emitter unit for that call position is open."
     },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "the stdio leaf is not supported on the ts target",
       "reason": "The Node port of the stdio leaf (`consolum:*`) has not landed, so the emitter refuses any program that reaches a `consolum` route (leaf_unsupported_on_target). Porting it also needs the TypeScript backend to propagate a declared error conversion (the Norma console wrappers return `IoFault` from a leaf `call`), which it declines today."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the stdio leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no stdio leaf yet: its leaf gate refuses a program that reaches a stdio route by name, before any LLVM is emitted."
     }
   }
 }

@@ -370,6 +370,7 @@ impl TypeChecker<'_> {
             self.types.get(only),
             Type::Array(_)
                 | Type::BoundedArray { .. }
+                | Type::RangedArray { .. }
                 | Type::Set(_)
                 | Type::Map(..)
                 | Type::Tensor(..)
@@ -494,6 +495,7 @@ impl TypeChecker<'_> {
         match self.types.get(self.types.peel_access_marker(resolved).1) {
             Type::Array(inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::Tensor(inner, _)
             | Type::Sparsa(inner, _)
             | Type::Matrix(inner, _)

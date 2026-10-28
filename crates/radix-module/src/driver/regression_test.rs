@@ -1016,14 +1016,16 @@ fn rust_output_emits_option_map_and_and_then_for_optional_chain() {
   varia textus name = "Anon"
 }
 
-functio id(textus x) → textus ∪ nihil {
+typus Fn = (textus) → textus
+
+functio id(textus x) → textus {
   redde x
 }
 
 incipit {
   sit User ∪ nihil maybeUser ← nulla
   sit _ a ← maybeUser?.name
-  sit (textus) → textus ∪ nihil maybeFn ← id
+  sit Fn ∪ nihil maybeFn ← id
   sit _ c ← maybeFn?("x")
   nota a, c
 }"#;

@@ -828,11 +828,19 @@ impl TypeChecker<'_> {
         }
 
         if self.is_bounded_lista_conversio(source_ty, target_resolved) {
+            // A literal source has a statically known length: outside the
+            // target's length range it is a compile-time refusal, not a
+            // recovery value.
+            if let Some(error_ty) =
+                self.check_ranged_literal_conversio(source, target_resolved, span)
+            {
+                return error_ty;
+            }
             self.settle_conversio_result(recovery, source_ty, target_resolved, span);
             return target_resolved;
         }
 
-        // Route C (AEU-5): numeric `lista<T, N> ↦ tensor<T, [N]>` is a padded
+        // Route C (AEU-5): numeric `lista<T, magnitudo N> ↦ tensor<T, [N]>` is a padded
         // snapshot. The inline `⊥` value names the dead-slot fill (element
         // type `T`), not a target-typed failure recovery — padding always
         // succeeds structurally, and the fill must be a real value, never a
@@ -1866,7 +1874,7 @@ impl TypeChecker<'_> {
 
     /// Reject primitive `↦` pairs with no single obvious meaning (byte reinterpretation, etc.).
     /// Operator ruling 05ac0534: a list of anything but a
-    /// bits marker is not text. `lista<T> ↦ textus` and `lista<T, N> ↦
+    /// bits marker is not text. `lista<T> ↦ textus` and `lista<T, magnitudo N> ↦
     /// textus<M>` have no grammar row for any `T`; the byte buffer
     /// (`octeti`) is a distinct type and keeps its row. A registered user
     /// conversion row for the pair stays authoritative.
@@ -1885,7 +1893,9 @@ impl TypeChecker<'_> {
         }
         let source = self.resolve_inferred_type(source_ty);
         let element = match self.types.get(source) {
-            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
+            Type::Array(element)
+            | Type::BoundedArray { element, .. }
+            | Type::RangedArray { element, .. } => *element,
             _ => return None,
         };
         let element = self.resolve_inferred_type(element);
@@ -1923,7 +1933,7 @@ impl TypeChecker<'_> {
     ) -> Option<TypeId> {
         if !matches!(
             self.types.get(target_carrier),
-            Type::Array(_) | Type::BoundedArray { .. }
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
         ) {
             return None;
         }
@@ -2620,7 +2630,7 @@ impl TypeChecker<'_> {
         Some(self.error_type)
     }
 
-    /// CTFP-1: non-literal `lista<T, N> ↦ vector<T, N>` — a bounded lista with
+    /// CTFP-1: non-literal `lista<T, magnitudo N> ↦ vector<T, N>` — a bounded lista with
     /// a literal capacity that exactly matches the vector width materializes
     /// into the register; unbounded `lista<T>` stays literal-only.
     fn check_bounded_lista_to_vector_conversio(
@@ -2783,6 +2793,10 @@ impl TypeChecker<'_> {
         | Type::BoundedArray {
             element: source_elem,
             ..
+        }
+        | Type::RangedArray {
+            element: source_elem,
+            ..
         }) = self.types.get(source_resolved).clone()
         else {
             self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
@@ -2890,14 +2904,14 @@ impl TypeChecker<'_> {
 
     fn collection_conversio_shape(&self, ty: TypeId) -> Option<CollectionConversioShape> {
         match self.types.get(ty) {
-            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
-                Some(CollectionConversioShape {
-                    family: CollectionConversioFamily::Array,
-                    elem: Some(*elem),
-                    key: None,
-                    value: None,
-                })
-            }
+            Type::Array(elem)
+            | Type::BoundedArray { element: elem, .. }
+            | Type::RangedArray { element: elem, .. } => Some(CollectionConversioShape {
+                family: CollectionConversioFamily::Array,
+                elem: Some(*elem),
+                key: None,
+                value: None,
+            }),
             Type::Set(elem) => Some(CollectionConversioShape {
                 family: CollectionConversioFamily::Set,
                 elem: Some(*elem),
@@ -3094,6 +3108,33 @@ impl TypeChecker<'_> {
         )
     }
 
+    /// `[a, b, c] ↦ list<T, size lo‥hi>`: a list literal's length is known when
+    /// nothing is spread into it, so a length outside the target's range is
+    /// refused here (`Some(error)`); every other source is checked when the
+    /// conversion runs.
+    fn check_ranged_literal_conversio(
+        &mut self,
+        source: &HirExpression,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let target = self.resolve_inferred_type(target_resolved);
+        if !matches!(self.types.get(target), Type::RangedArray { .. }) {
+            return None;
+        }
+        let HirExpressionKind::Array(elements) = &source.kind else {
+            return None;
+        };
+        if !elements
+            .iter()
+            .all(|element| matches!(element, HirArrayElement::Expr(_)))
+        {
+            return None;
+        }
+        let checked = self.check_ranged_literal_length(target, elements.len(), span);
+        (checked == self.error_type).then_some(checked)
+    }
+
     /// D7's explicit bounded-list bridges. Bounded → unbounded copies the
     /// initialized prefix; unbounded → bounded keeps `N` for the host carrier
     /// to enforce with a fail-closed overflow.
@@ -3102,8 +3143,22 @@ impl TypeChecker<'_> {
             self.types.get(self.resolve_inferred_type(source_ty)),
             self.types.get(self.resolve_inferred_type(target_ty)),
         ) {
-            (Type::BoundedArray { element: from, .. }, Type::Array(to))
-            | (Type::Array(from), Type::BoundedArray { element: to, .. }) => {
+            (
+                Type::BoundedArray { element: from, .. } | Type::RangedArray { element: from, .. },
+                Type::Array(to),
+            )
+            | (
+                Type::Array(from),
+                Type::BoundedArray { element: to, .. } | Type::RangedArray { element: to, .. },
+            ) => self.types.equals(*from, *to),
+            // A length range converts to and from the bounded list and to
+            // another range: the destination range is checked when the
+            // conversion runs.
+            (
+                Type::BoundedArray { element: from, .. } | Type::RangedArray { element: from, .. },
+                Type::RangedArray { element: to, .. },
+            )
+            | (Type::RangedArray { element: from, .. }, Type::BoundedArray { element: to, .. }) => {
                 self.types.equals(*from, *to)
             }
             _ => false,
@@ -3223,6 +3278,7 @@ impl TypeChecker<'_> {
             self.types.get(ty),
             Type::Array(_)
                 | Type::BoundedArray { .. }
+                | Type::RangedArray { .. }
                 | Type::Set(_)
                 | Type::Map(_, _)
                 | Type::Tensor(_, _)
@@ -3744,6 +3800,11 @@ impl TypeChecker<'_> {
                     Type::Array(_),
                     Type::Tensor(_, _) | Type::BoundedArray { .. }
                 ) | (
+                    // Into a length range any list can fail: the source
+                    // length may fall outside `[min, max]`.
+                    Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. },
+                    Type::RangedArray { .. }
+                ) | (
                     Type::Primitive(Primitive::Octeti) | Type::BoundedOcteti { .. },
                     Type::Tensor(_, _)
                 )
@@ -3994,7 +4055,7 @@ impl TypeChecker<'_> {
             matches!(&source.kind, HirExpressionKind::Array(elements) if elements.is_empty());
         let list_target = matches!(
             self.types.get(effective_target),
-            Type::Array(_) | Type::BoundedArray { .. }
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
         );
         // WHY: a list literal ascribed to a list whose slot is optional
         // (`[null, 1] ∷ list<int ∪ none>`) must be typed against that slot
@@ -4130,7 +4191,7 @@ impl TypeChecker<'_> {
     ) {
         if matches!(
             self.types.get(source),
-            Type::Array(_) | Type::BoundedArray { .. }
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
         ) {
             self.invalid_conversion(issue, span);
         }
@@ -4329,6 +4390,7 @@ impl TypeChecker<'_> {
             Type::Infer(_) => true,
             Type::Array(inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::Set(inner)
             | Type::Tensor(inner, _)
             | Type::Sparsa(inner, _)
@@ -4570,9 +4632,9 @@ impl TypeChecker<'_> {
     /// through nested lists (`list<int ∪ none>`, `list<list<int ∪ none>>`).
     fn list_slot_carries_optional(&self, ty: TypeId) -> bool {
         match self.types.get(self.resolve_inferred_type(ty)) {
-            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
-                self.slot_carries_optional(*elem)
-            }
+            Type::Array(elem)
+            | Type::BoundedArray { element: elem, .. }
+            | Type::RangedArray { element: elem, .. } => self.slot_carries_optional(*elem),
             _ => false,
         }
     }
@@ -4581,9 +4643,9 @@ impl TypeChecker<'_> {
     /// through nested lists (`list<map<string, int>>`).
     fn list_slot_carries_map(&self, ty: TypeId) -> bool {
         match self.types.get(self.resolve_inferred_type(ty)) {
-            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
-                self.slot_carries_map(*elem)
-            }
+            Type::Array(elem)
+            | Type::BoundedArray { element: elem, .. }
+            | Type::RangedArray { element: elem, .. } => self.slot_carries_map(*elem),
             _ => false,
         }
     }
@@ -4627,7 +4689,9 @@ impl TypeChecker<'_> {
                 HirArrayElement::Spread(expr) => {
                     let spread_ty = self.check_expr(expr);
                     match self.types.get(self.resolve_inferred_type(spread_ty)) {
-                        Type::Array(inner) | Type::BoundedArray { element: inner, .. } => {
+                        Type::Array(inner)
+                        | Type::BoundedArray { element: inner, .. }
+                        | Type::RangedArray { element: inner, .. } => {
                             self.unify_join(
                                 *inner,
                                 elem_ty,

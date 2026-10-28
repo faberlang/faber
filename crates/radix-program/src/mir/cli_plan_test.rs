@@ -552,3 +552,293 @@ fn version() → void {
         nomen_values[0].value
     );
 }
+
+// ── option parsing refusals and value shapes ───────────────────────────────
+
+const VALUE_OPTION_MAIN: &str = r#"
+@ cli "tool"
+@ option verbose short "v" long "verbose" type bool
+@ option name short "n" long "name" type string
+main args args {
+  print args.verbose
+  print args.name coalesce "none"
+}
+"#;
+
+fn surfaces(diagnostics: &[radix_module::diagnostics::Diagnostic]) -> Vec<&str> {
+    diagnostics
+        .iter()
+        .flat_map(|diag| diag.args.iter())
+        .filter(|arg| arg.name == "surface")
+        .map(|arg| arg.value.as_str())
+        .collect()
+}
+
+#[test]
+fn package_mir_cli_refuses_an_undeclared_option() {
+    for argument in ["--nope", "-z"] {
+        let diagnostics = run_cli_package(
+            "cli-unknown-option",
+            &[("main.fab", VALUE_OPTION_MAIN)],
+            &[argument],
+        )
+        .expect_err("an undeclared option must be refused");
+        assert_eq!(surfaces(&diagnostics), ["CLI option match"], "{argument}");
+        assert_eq!(diagnostics.len(), 1, "{argument}");
+    }
+}
+
+#[test]
+fn package_mir_cli_refuses_a_value_option_with_no_value() {
+    for argument in ["--name", "-n"] {
+        let diagnostics = run_cli_package(
+            "cli-missing-option-value",
+            &[("main.fab", VALUE_OPTION_MAIN)],
+            &[argument],
+        )
+        .expect_err("a value option at the end of argv must be refused");
+        assert_eq!(surfaces(&diagnostics), ["CLI option value"], "{argument}");
+    }
+}
+
+#[test]
+fn package_mir_cli_accepts_inline_long_short_and_flag_option_forms() {
+    for (argumenta, expected) in [
+        (vec!["--name=Ian"], vec!["false", "Ian"]),
+        (vec!["--name", "Ian"], vec!["false", "Ian"]),
+        (vec!["-n", "Ian", "-v"], vec!["true", "Ian"]),
+        (vec!["--verbose"], vec!["true", "none"]),
+        (vec![], vec!["false", "none"]),
+    ] {
+        let lines = run_cli_package(
+            "cli-option-forms",
+            &[("main.fab", VALUE_OPTION_MAIN)],
+            &argumenta,
+        )
+        .unwrap_or_else(|diagnostics| {
+            panic!(
+                "{argumenta:?} must parse, got {:?}",
+                diagnostic_identities(&diagnostics)
+            )
+        });
+        assert_eq!(lines, expected, "arguments {argumenta:?}");
+    }
+}
+
+#[test]
+fn package_mir_cli_refuses_an_unmatched_command() {
+    let main = r#"
+@ cli "tool"
+main args args {}
+
+@ command "greet"
+fn greet() args args {
+  print "hi"
+}
+"#;
+    let diagnostics = run_cli_package("cli-unmatched-command", &[("main.fab", main)], &["nope"])
+        .expect_err("an unknown command must be refused");
+    // Command matching refuses without a surface-unsupported diagnostic: the
+    // argv is wrong, not the declared CLI shape.
+    assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
+    assert!(surfaces(&diagnostics).is_empty(), "{diagnostics:?}");
+}
+
+#[test]
+fn package_mir_cli_refuses_an_exit_expression_in_subcommand_mode() {
+    let main = r#"
+@ cli "tool"
+main args args exit 2 {}
+
+@ command "greet"
+fn greet() args args {
+  print "hi"
+}
+"#;
+    let diagnostics = run_cli_package("cli-subcommand-exit", &[("main.fab", main)], &[])
+        .expect_err("an exit expression cannot be dispatched with commands");
+    assert_eq!(
+        surfaces(&diagnostics),
+        ["CLI exit expressions"],
+        "{diagnostics:?}"
+    );
+}
+
+// ── fmir-text runtime planning ─────────────────────────────────────────────
+
+fn plan_cli_source(
+    tag: &str,
+    source: &str,
+    mode: CliPlanningMode,
+) -> Result<super::CliPackagePlan, Vec<radix_module::diagnostics::Diagnostic>> {
+    let dir = crate::test_support::test_temp_dir(tag);
+    std::fs::write(dir.join("main.fab"), source).expect("write package file");
+    let mut package = crate::analyze::analyze_package(
+        &radix_module::driver::Config::default(),
+        &dir,
+        &crate::test_support::test_analysis_seams(),
+    )
+    .expect("analyze package");
+    super::plan_cli_package(&mut package, &[], mode)
+}
+
+#[test]
+fn fmir_text_runtime_plans_scalar_operands_and_a_final_rest_list() {
+    use radix_mir_fmir::FmirTextCliValueType as Ty;
+    let plan = plan_cli_source(
+        "cli-fmir-operands",
+        r#"
+@ cli "tool"
+@ operand string name
+@ operand int count
+@ operand float ratio
+@ operand bool on
+@ operand rest string files
+main args args {}
+"#,
+        CliPlanningMode::FmirTextRuntime,
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!("must plan, got {:?}", diagnostic_identities(&diagnostics))
+    });
+    let section = plan.fmir_text_cli.expect("the image carries a CLI section");
+    assert_eq!(section.root.record, "args");
+    let operands: Vec<_> = section
+        .root
+        .operand
+        .iter()
+        .map(|operand| (operand.field.as_str(), operand.ty))
+        .collect();
+    assert_eq!(
+        operands,
+        [
+            ("name", Ty::Textus),
+            ("count", Ty::Numerus),
+            ("ratio", Ty::Fractus),
+            ("on", Ty::Bivalens),
+            ("files", Ty::ListaTextus),
+        ]
+    );
+}
+
+#[test]
+fn fmir_text_runtime_plans_an_entry_without_operands_to_an_empty_operand_list() {
+    let plan = plan_cli_source(
+        "cli-fmir-no-operands",
+        "@ cli \"tool\"\nmain args args {}\n",
+        CliPlanningMode::FmirTextRuntime,
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!("must plan, got {:?}", diagnostic_identities(&diagnostics))
+    });
+    let section = plan.fmir_text_cli.expect("the image carries a CLI section");
+    assert_eq!(section.root.record, "args");
+    assert!(section.root.operand.is_empty());
+}
+
+#[test]
+fn fmir_text_runtime_refuses_options_and_a_non_final_list_operand() {
+    let diagnostics = plan_cli_source(
+        "cli-fmir-options",
+        r#"
+@ cli "tool"
+@ option verbose long "verbose" type bool
+@ operand list<string> files
+@ operand string last
+main args args {}
+"#,
+        CliPlanningMode::FmirTextRuntime,
+    )
+    .err()
+    .expect("options and a leading list operand are outside the image runtime");
+    let surfaces = surfaces(&diagnostics);
+    assert!(surfaces.contains(&"fmir-text runtime CLI options"));
+    assert!(
+        surfaces
+            .iter()
+            .any(|surface| surface.starts_with("fmir-text runtime CLI operands"))
+    );
+}
+
+#[test]
+fn fmir_text_runtime_refuses_subcommand_dispatch() {
+    let diagnostics = plan_cli_source(
+        "cli-fmir-subcommand",
+        r#"
+@ cli "tool"
+main args args {}
+
+@ command "greet"
+fn greet() args args {}
+"#,
+        CliPlanningMode::FmirTextRuntime,
+    )
+    .err()
+    .expect("subcommand dispatch is outside the image runtime");
+    assert_eq!(
+        surfaces(&diagnostics),
+        ["fmir-text runtime CLI subcommand dispatch"]
+    );
+}
+
+// ── type import across tables ──────────────────────────────────────────────
+
+#[test]
+fn import_semantic_type_preserves_bounded_and_map_shapes() {
+    use radix_types::{IndexExpr, Primitive, Type, TypeTable};
+    let mut source = TypeTable::new();
+    let numerus = source.primitive(Primitive::Numerus);
+    let cap = source.intern_index(IndexExpr::Literal(4));
+    let inputs = [
+        source.bounded_array(numerus, cap),
+        source.bounded_queue(numerus, cap),
+        source.bounded_stack(numerus, cap),
+        source.bounded_textus(cap),
+        source.bounded_ascii(cap),
+        source.bounded_octeti(cap),
+        source.map(numerus, numerus),
+    ];
+
+    let mut target = TypeTable::new();
+    let mut imported = std::collections::HashMap::new();
+    let outputs: Vec<_> = inputs
+        .iter()
+        .map(|&input| {
+            super::import_semantic_type_with_nominal(
+                &source,
+                &mut target,
+                input,
+                &mut imported,
+                None,
+            )
+        })
+        .collect();
+
+    let numerus = target.primitive(Primitive::Numerus);
+    let literal_four = |target: &TypeTable, cap| target.get_index(cap) == &IndexExpr::Literal(4);
+    let shapes: Vec<_> = outputs
+        .iter()
+        .map(|&id| match target.get(id).clone() {
+            Type::BoundedArray { element, capacity }
+            | Type::BoundedQueue { element, capacity }
+            | Type::BoundedStack { element, capacity } => {
+                element == numerus && literal_four(&target, capacity)
+            }
+            Type::BoundedTextus { capacity }
+            | Type::BoundedAscii { capacity }
+            | Type::BoundedOcteti { capacity } => literal_four(&target, capacity),
+            Type::Map(key, value) => key == numerus && value == numerus,
+            other => panic!("unexpected imported shape {other:?}"),
+        })
+        .collect();
+    assert_eq!(shapes, [true; 7]);
+    // Each source shape keeps its own constructor.
+    let kinds: Vec<_> = outputs
+        .iter()
+        .map(|&id| std::mem::discriminant(target.get(id)))
+        .collect();
+    assert_eq!(
+        kinds.iter().collect::<std::collections::HashSet<_>>().len(),
+        7
+    );
+}

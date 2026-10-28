@@ -754,6 +754,7 @@ fn generate_output(
     // A ranged store policy is applied only by the Faber re-emitter, the MIR
     // runner and the Rust target; every other target refuses it by name.
     radix_codegen_shared::reject_ranged_int_type(&analysis.types, target)?;
+    radix_codegen_shared::reject_ranged_list_type(&analysis.types, target)?;
     crate::codegen::reject_unsupported_leaves(analysis, target)?;
     // A list window `xs[lo‥hi]` likewise has only those two executors; every
     // other target refuses it by one named issue until its emission lands.

@@ -151,6 +151,9 @@ pub enum IntrinsicMirKind {
     Atomic(MirAtomicOp),
     HigherOrderAll,
     HigherOrderAny,
+    /// `reperta` (en `find`): the first element, in list order, whose
+    /// predicate holds, as `T ∪ nihil`. Stops at the first match like `quilibet`.
+    HigherOrderFind,
     HigherOrderFiltrata,
     HigherOrderMap,
     HigherOrderReduce,
@@ -249,6 +252,19 @@ impl MethodIntrinsic {
     #[must_use]
     pub fn generic_arity(&self) -> usize {
         self.generic.len()
+    }
+
+    /// Whether this row reads or removes an end of a list: `primus`,
+    /// `ultimus`, `decapita`, `detrahe`. On a list length range whose
+    /// minimum is one or more (`list<T, size 1…∞>`, need) the list is
+    /// never empty, so these return `T` instead of `T ∪ none`; the removals
+    /// report a violated minimum on `⇥`.
+    #[must_use]
+    pub fn reads_list_end(&self) -> bool {
+        matches!(
+            self.faber_name,
+            "primus" | "ultimus" | "decapita" | "detrahe"
+        )
     }
 }
 
@@ -397,6 +413,18 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         &[IntrinsicParamKind::Predicate],
         ArrayInner,
         HigherOrderFiltrata
+    ),
+    // `reperta` (en `find`): predicate search. Its own name and one signature;
+    // `primus` (the unconditional first element) is unchanged. The result is
+    // `T ∪ nihil` even for a bounded list of minimum size one: a match is not
+    // guaranteed.
+    intrinsic!(
+        Lista,
+        "reperta",
+        1,
+        &[IntrinsicParamKind::Predicate],
+        OptionInner,
+        HigherOrderFind
     ),
     intrinsic!(Lista, "inversa", 0, &[], ArrayInner, collection Reverse),
     intrinsic!(Lista, "inverte", 0, &[], Vacuum, collection ReverseInPlace),

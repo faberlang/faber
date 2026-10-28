@@ -12,17 +12,17 @@
       "diagnostic_contains": "clif-policy",
       "reason": "The clif package builder declines this case before any code is generated: the MIR capability classifier reports the `clif-policy` issue, so the `norma:vector` genus is never lowered. The clif lane carries no vector port for this family yet; re-measure this row when that port lands."
     },
-    "go": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "undefined: vector",
-      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:vector` module this proof imports, so the generated `main.go` calls `vector.*` with no such package-level identifier and `go build` stops with `undefined: vector`. Re-measure this row when the Go package emitter lowers that module binding."
-    },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "error TS2322",
       "reason": "The generated project fails `tsc` with error TS2322: a type the TypeScript backend emits for the imported Norma modules does not check, so no program is produced."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "llvm-as rejected the module",
+      "reason": "The emitted LLVM module is invalid ('%load20' defined with type '<3 x float>' but expected 'ptr'), so llvm-as rejects it and the build stops at verification."
     }
   }
 }

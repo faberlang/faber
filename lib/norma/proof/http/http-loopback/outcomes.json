@@ -15,14 +15,20 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "leaf_unsupported_on_target",
-      "reason": "The Go lane carries no `http:*` http port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
+      "diagnostic_contains": "go_bare_conversio_in_failable_context",
+      "reason": "A carried Norma module converts with a bare scalar `↦` inside a failable body in a shape the Go emitter does not hoist yet (`go_bare_conversio_in_failable_context`); the Go emitter unit for that conversion shape is open."
     },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "the http leaf is not supported on the ts target",
       "reason": "The Node port of the http leaf (`http:*`) has not landed; client routes will go through a worker thread and server accept loops are declined by name. Until then the emitter refuses any program that reaches an `http` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the http leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no http leaf yet: its leaf gate refuses a program that reaches a http route by name, before any LLVM is emitted."
     }
   }
 }

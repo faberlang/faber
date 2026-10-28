@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/operatores/rounding-i64-slot.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/rounding-i64-slot.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

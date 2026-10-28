@@ -42,7 +42,7 @@ fn sink_into_a_list_appends_and_keeps_duplicates() {
 fn sink_into_a_bounded_list_runs_without_a_contract_declaration() {
     let lines = run_lines(
         "sink-into-bounded-list.fab",
-        "mut list<int, 2> xs ← []\nxs ⇜ 3\nprint xs.length()\nprint xs[0]",
+        "mut list<int, size 2> xs ← []\nxs ⇜ 3\nprint xs.length()\nprint xs[0]",
     );
     assert_eq!(lines, ["1", "3"]);
 }
@@ -62,7 +62,7 @@ fn sink_into_a_set_is_a_no_op_when_present() {
 #[test]
 fn sink_into_a_full_bounded_list_dies_at_capacity() {
     let mut host = BufferHost::default();
-    let source = program("mut list<int, 2> xs ← [1, 2]\nxs ⇜ 3\nprint \"unreachable\"");
+    let source = program("mut list<int, size 2> xs ← [1, 2]\nxs ⇜ 3\nprint \"unreachable\"");
     let outcome = catch_unwind(AssertUnwindSafe(|| {
         run_source(&session(), "sink-into-full-bounded-list.fab", &source, &mut host)
     }));
@@ -77,12 +77,12 @@ fn sink_into_a_full_bounded_list_dies_at_capacity() {
 
 #[test]
 fn the_sink_method_reports_a_full_bounded_list() {
-    const REPORTING: &str = r#"fn grow(mut list<int, 2> xs) → void ⇥ string {
+    const REPORTING: &str = r#"fn grow(mut list<int, size 2> xs) → void ⇥ string {
     xs.sink(3)
 }
 
 main {
-    mut list<int, 2> xs ← [1, 2]
+    mut list<int, size 2> xs ← [1, 2]
     do {
         grow(mut xs)
         print "no overflow"

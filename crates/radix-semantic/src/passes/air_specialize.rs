@@ -57,6 +57,10 @@ pub struct AirSpecializationRequest {
 struct GenericAirTemplate {
     function: HirFunction,
     span: Span,
+    /// The template item's annotations: an instance carries the same
+    /// visibility (`@ public`) as its template, so a concrete kernel instance
+    /// is a launchable entry exactly when the authored kernel is.
+    annotations: Vec<radix_hir::HirAnnotation>,
 }
 
 #[derive(Clone)]
@@ -115,6 +119,18 @@ fn specialize_with_requests(
         return AirSpecializationReport::default();
     }
 
+    // A declared `@ radix backward` companion of a generic template is called
+    // by its own identity; a concrete caller's call to it plans through the
+    // template's instance and retargets to that instance's companion.
+    let companion_primals = templates
+        .keys()
+        .filter_map(|template| {
+            lanes
+                .backward_for(*template)
+                .map(|backward| (backward.companion_def_id, *template))
+        })
+        .collect::<FxHashMap<_, _>>();
+
     let mut ids = IdAllocator::from_module(hir);
     let mut work = collect_calls(hir)
         .into_iter()
@@ -130,7 +146,14 @@ fn specialize_with_requests(
         cursor += 1;
         let (template, template_id, bindings, site) = match item {
             SpecializationWork::Call(site) => {
-                let Some(template) = templates.get(&site.callee) else {
+                let template_id = if templates.contains_key(&site.callee) {
+                    site.callee
+                } else if let Some(primal) = companion_primals.get(&site.callee) {
+                    *primal
+                } else {
+                    continue;
+                };
+                let Some(template) = templates.get(&template_id) else {
                     continue;
                 };
                 let Some(bindings) = binding_vector(&site, template, types, interner) else {
@@ -139,7 +162,7 @@ fn specialize_with_requests(
                 if !bindings_are_concrete(&template.function.type_params, &bindings, types) {
                     continue;
                 }
-                (template, site.callee, bindings, Some(site))
+                (template, template_id, bindings, Some(site))
             }
             SpecializationWork::Request(request) => {
                 let Some(template) = templates.get(&request.template) else {
@@ -172,7 +195,7 @@ fn specialize_with_requests(
                 &mut ids,
             );
             let item = HirItem {
-                annotations: Vec::new(),
+                annotations: template.annotations.clone(),
                 id: ids.next_hir(),
                 def_id: instance,
                 span: template.span,
@@ -203,10 +226,19 @@ fn specialize_with_requests(
             // The span pair handles both the call expression span and the
             // callee span used by the typechecker when it records resolved
             // witnesses.
+            let target = if site.callee == template_id {
+                instance
+            } else {
+                // The call names the template's companion: it runs the
+                // instance's companion.
+                lanes
+                    .backward_for(instance)
+                    .map_or(instance, |backward| backward.companion_def_id)
+            };
             retarget_call(
                 hir,
                 site.callee,
-                instance,
+                target,
                 site.span,
                 site.callee_span,
                 site.owner,
@@ -242,6 +274,7 @@ fn collect_templates(
                     GenericAirTemplate {
                         function: (**function).clone(),
                         span: item.span,
+                        annotations: item.annotations.clone(),
                     },
                 )
             })
@@ -546,6 +579,7 @@ fn contains_unresolved_type(
         | Type::Atomic(inner)
         | Type::Intervallum(inner, _)
         | Type::Option(inner) => contains_unresolved_type(*inner, types, seen),
+        Type::RangedArray { element, .. } => contains_unresolved_type(*element, types, seen),
         Type::BoundedArray { element, capacity }
         | Type::BoundedQueue { element, capacity }
         | Type::BoundedStack { element, capacity } => {
@@ -777,6 +811,11 @@ fn substitute_type(
         Type::Option(inner) => {
             Type::Option(substitute_type(inner, type_map, index_map, types, interner))
         }
+        Type::RangedArray { element, min, max } => Type::RangedArray {
+            element: substitute_type(element, type_map, index_map, types, interner),
+            min,
+            max,
+        },
         Type::BoundedArray { element, capacity } => Type::BoundedArray {
             element: substitute_type(element, type_map, index_map, types, interner),
             capacity: substitute_index(capacity, index_map, types),

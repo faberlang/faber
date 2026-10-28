@@ -92,6 +92,7 @@ impl IntrinsicTypeContext {
         match checker.types.get(resolved) {
             Type::Array(inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::Queue(inner)
             | Type::BoundedQueue { element: inner, .. }
             | Type::Stack(inner)
@@ -434,7 +435,7 @@ pub(super) fn check_intrinsic_method_call(
         return Some(checker.error_type);
     }
     let resolved = checker.types.get(payload_ty);
-    // Ruling 2026-10-17 (bounded `lista<T, N>`): the sink operator `⇜` dies on
+    // Ruling 2026-10-17 (bounded `lista<T, magnitudo N>`): the sink operator `⇜` dies on
     // overflow, its method form reports. `appende` and `immerge` are two names
     // for one append op on a bounded receiver (the `immerge` registry row lowers
     // to `collection Append`), so both carry the `⇥ textus` alternate exit.
@@ -443,12 +444,21 @@ pub(super) fn check_intrinsic_method_call(
         && matches!(
             resolved,
             Type::BoundedArray { .. }
+                // A length range with an upper end reports a push past it on
+                // `⇥`; `lo…∞` has no upper end and stays infallible.
+                | Type::RangedArray { max: Some(_), .. }
                 | Type::BoundedQueue { .. }
                 | Type::BoundedStack { .. }
                 | Type::BoundedTextus { .. }
                 | Type::BoundedAscii { .. }
                 | Type::BoundedOcteti { .. }
         );
+    // A length range's low end is at least one, so `decapita` / `detrahe`
+    // (the removals) would drop a list at its minimum below it. Like the push
+    // past the maximum, the method form reports that on `⇥ textus`.
+    let ranged_removal = matches!(entry.faber_name, "decapita" | "detrahe")
+        && matches!(resolved, Type::RangedArray { .. });
+    let bounded_appende = bounded_appende || ranged_removal;
     let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
 
     // The extrema twins are elementwise clamp methods on numeric lists. Keep
@@ -772,17 +782,26 @@ fn check_registered_intrinsic(
         // and `textus` is a failable call: an out-of-range index or a
         // missing key is reported on `⇥ textus`, so the call needs a
         // handler, a `⊥` default or an enclosing `⇥` (D17.8).
+        //
+        // need (slice 5): a list/text `at` or `slice` whose range is
+        // proven (`0 ≤ i < len`; `0 ≤ start ≤ end ≤ len`) cannot fail and
+        // needs none of those. A `⊥` default or `cape` already written on it
+        // stays legal (the proof is the checker's strength, not the
+        // program's), so a local handler still takes the error type.
         let value_ty = checker.check_known_method_args(args, params, ret, span);
-        let err = checker.textus_type();
-        let sig = FuncSig {
-            type_params: Vec::new(),
-            params: Vec::new(),
-            ret: value_ty,
-            err: Some(err),
-            is_async: false,
-            is_generator: false,
-        };
-        checker.reject_failable_call(&sig, span);
+        if !checker.list_text_access_proven(entry, receiver, args) || checker.has_local_error_sink()
+        {
+            let err = checker.textus_type();
+            let sig = FuncSig {
+                type_params: Vec::new(),
+                params: Vec::new(),
+                ret: value_ty,
+                err: Some(err),
+                is_async: false,
+                is_generator: false,
+            };
+            checker.reject_failable_call(&sig, span);
+        }
         value_ty
     } else if bounded_appende {
         // D6: bounded `appende` is a typed recoverable alternate exit.
@@ -1137,6 +1156,16 @@ fn resolve_return_type(
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
             };
+            // A list whose length range starts at one or more is never empty:
+            // `primus` / `ultimus` / `decapita` / `detrahe` return `T`, not
+            // `T ∪ none` (the removals report a violated minimum on `⇥`).
+            let non_empty = entry.reads_list_end()
+                && ctx
+                    .receiver_ty
+                    .is_some_and(|ty| matches!(checker.types.get(ty), Type::RangedArray { .. }));
+            if non_empty {
+                return inner;
+            }
             optional_of(checker, inner)
         }
         IntrinsicReturnKind::OptionNumerus => {
@@ -1171,7 +1200,7 @@ fn resolve_return_type(
             {
                 // WHY: K14 gives a tensor a static rank with run-time extents,
                 // so the shape list has a compile-time length — the rank — and
-                // is the bounded `lista<numerus, R>` whose elements are the
+                // is the bounded `lista<numerus, magnitudo R>` whose elements are the
                 // run-time dimension values. A receiver without a static rank
                 // (an inference hole, or a bare `size` parameter standing for a
                 // whole shape of any rank) keeps the unbounded list.

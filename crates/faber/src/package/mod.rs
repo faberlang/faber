@@ -33,6 +33,7 @@ pub mod binding;
 mod binding_manifest;
 #[cfg(feature = "hir-rust")]
 mod binding_probe;
+mod build_recipe;
 #[cfg(feature = "hir-rust")]
 mod cargo;
 #[cfg(feature = "mir-clif")]
@@ -48,6 +49,8 @@ pub(crate) mod embedded_runtime;
 mod fhir;
 #[cfg(feature = "hir-go")]
 mod go_build;
+#[cfg(feature = "hir-go")]
+mod go_recipe;
 #[cfg(feature = "device-runtime")]
 mod host_factory;
 #[cfg(feature = "hir-rust")]
@@ -104,15 +107,18 @@ pub use cmd::{
     should_treat_as_package_from_args, use_package_compiler_from_args,
 };
 #[cfg(feature = "hir-go")]
+pub use go_build::go_program::cmd_run_go;
+#[cfg(feature = "hir-go")]
 #[cfg(test)]
-pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build};
+pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build_default};
 #[cfg(feature = "mir-llvm")]
 pub use llvm_host::{
-    LlvmHostBuild, LlvmHostProfile, build_host_program, compile_nvvm_to_ptx,
+    LlvmHostBuild, LlvmHostProfile, build_host_program, build_host_program_in, compile_nvvm_to_ptx,
     discover_llvm_host_toolchain, ensure_llvm_runtime_archive, host_llvm_target_triple,
-    host_triple_for,
+    host_triple_for, llvm_program::cmd_run_llvm_host,
 };
 pub(crate) use manifest::manifest_device_inputs;
+pub(crate) use manifest::manifest_locale;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     DeviceChoice, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,

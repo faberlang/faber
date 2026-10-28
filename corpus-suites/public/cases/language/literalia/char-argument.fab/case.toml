@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/literalia/char-argument.fab"
+group = "language"
+input_root = "corpus"
+input = "literalia/char-argument.fab"
+category = "literal"
+domain = "text"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

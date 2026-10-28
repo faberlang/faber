@@ -1,8 +1,8 @@
 //! The explicit numeric conversion matrix: which source/target pairs lower,
 //! and which stay declined by name.
 
-use super::convert::{MemberTest, Num, Seq, member_tests, numeric_conversion, sequence_conversion};
 use super::rep_of;
+use super::{MemberTest, Num, Seq, member_tests, numeric_conversion, sequence_conversion};
 use crate::{StructMeta, emit_program};
 use radix_lexer::{Interner, Span};
 use radix_mir::{

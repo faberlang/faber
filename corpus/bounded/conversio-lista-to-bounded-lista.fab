@@ -3,8 +3,8 @@ term = "↦"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
-summary = "Compile-admitted bounded lista<T,N> capacity resize route."
-syntax = "lista<T, N> ↦ lista<T, M>"
+summary = "Compile-admitted bounded lista<T,magnitudo N> capacity resize route."
+syntax = "lista<T, magnitudo N> ↦ lista<T, magnitudo M>"
 related = ["↦", "lista", "bounded"]
 locale = "en"
 +++
@@ -23,7 +23,7 @@ locale = "en"
 
 main {
     let list<int> base ← [1, 2]
-    let list<int, 8> raw ← base ↦ list<int, 8>
-    let list<int, 4> out ← raw ↦ list<int, 4>
+    let list<int, size 8> raw ← base ↦ list<int, size 8>
+    let list<int, size 4> out ← raw ↦ list<int, size 4>
     print out
 }

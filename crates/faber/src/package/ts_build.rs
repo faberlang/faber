@@ -19,6 +19,7 @@ use radix::module::diagnostics::Diagnostic;
 use radix::module::driver::Config;
 use radix::program::discovery::BuildLayout;
 
+use super::build_recipe::{exit_code_of, report_and_exit, sanitize_file_stem};
 use super::ts_project::{
     TS_TARGET, TsProjectFiles, generate_ts_library_files, generate_ts_project_files,
 };
@@ -239,57 +240,6 @@ pub fn cmd_run_ts(
     match run_ts_program(&program, program_args) {
         Ok(status) => std::process::exit(exit_code_of(status)),
         Err(diag) => report_and_exit(std::slice::from_ref(&diag), locale_pack.as_ref()),
-    }
-}
-
-/// Print the failure of a TypeScript build or run and terminate. A package
-/// diagnostic has no message template, so its own message is the report; any
-/// other diagnostic renders as usual.
-pub(super) fn report_and_exit(
-    diagnostics: &[Diagnostic],
-    locale_pack: Option<&radix::module::locale::LocalePack>,
-) -> ! {
-    for diag in diagnostics {
-        if diag.code == Some(crate::PACKAGE_DIAGNOSTIC_CODE) {
-            eprintln!("error: {}", diag.message);
-        } else {
-            crate::postprocess::print_diagnostics(
-                std::slice::from_ref(diag),
-                radix::services::DiagnosticMode::Normal,
-                locale_pack,
-            );
-        }
-    }
-    crate::exit_status::exit_for_diagnostics(diagnostics);
-}
-
-/// The status a shell would report: the exit code, or 128 plus the signal.
-fn exit_code_of(status: ExitStatus) -> i32 {
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        if let Some(signal) = status.signal() {
-            return 128 + signal;
-        }
-    }
-    status.code().unwrap_or(1)
-}
-
-fn sanitize_file_stem(name: &str) -> String {
-    let cleaned: String = name
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
-                ch
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    if cleaned.is_empty() {
-        "program".to_owned()
-    } else {
-        cleaned
     }
 }
 

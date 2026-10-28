@@ -1,6 +1,6 @@
 #![cfg(feature = "runner")]
 
-//! `faber run` — interpreted execution, always.
+//! `faber run` — interpreted execution unless `--target` builds and runs.
 //!
 //! `faber run <path>` interprets a single `.fab` file, package directory,
 //! `faber.toml` manifest, or archive through the runner — mode is never
@@ -49,13 +49,40 @@ pub(super) fn cmd_run(args: RunArgs) {
         exit_status::exit_usage();
     }
 
-    if let Some(crate::cli::RunTarget::Ts) = args.target {
-        package::cmd_run_ts(
+    match args.target {
+        Some(crate::cli::RunTarget::Ts) => package::cmd_run_ts(
             &input_path,
             args.locale.as_deref(),
             args.diagnostics_locale.as_deref(),
             &args.args,
-        );
+        ),
+        #[cfg(feature = "hir-go")]
+        Some(crate::cli::RunTarget::Go) => package::cmd_run_go(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+        ),
+        #[cfg(not(feature = "hir-go"))]
+        Some(crate::cli::RunTarget::Go) => {
+            eprintln!("error: this faber build has no Go target; rebuild with feature `hir-go`");
+            exit_status::exit_usage();
+        }
+        #[cfg(feature = "mir-llvm")]
+        Some(crate::cli::RunTarget::LlvmHost) => package::cmd_run_llvm_host(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+        ),
+        #[cfg(not(feature = "mir-llvm"))]
+        Some(crate::cli::RunTarget::LlvmHost) => {
+            eprintln!(
+                "error: this faber build has no LLVM target; rebuild with feature `mir-llvm`"
+            );
+            exit_status::exit_usage();
+        }
+        None => {}
     }
 
     if let Some(seed) = args.shuffle_seed {
@@ -661,7 +688,13 @@ fn run_on_device_session(
     } else {
         package::mir::MetalSpan::Unspanned
     };
-    let mut registry = package::mir::system_device_registry_spanning(metal_span);
+    // `--partitions N` on CUDA puts each partition on its own physical device.
+    let cuda_partitions = if selection == DeviceSelection::Cuda {
+        shape.partitions.get()
+    } else {
+        1
+    };
+    let mut registry = package::mir::system_device_registry_spanning(metal_span, cuda_partitions);
     run_on_device_session_shaped_with(
         config,
         input,
@@ -856,18 +889,23 @@ fn cpu_device_shape(args: &RunArgs, threads: Option<u32>) -> package::mir::CpuDe
 }
 
 /// Fail closed when `--partitions N` is given with a resolved selection
-/// other than the CPU or the Metal device: those two span one logical device
+/// other than the CPU, Metal or CUDA device: those span one logical device
 /// over several partitions (rule 18), and the flag is never silently ignored.
 fn ensure_partitions_cpu_route(
     partitions: Option<u32>,
     selection: DeviceSelection,
 ) -> Result<(), Box<Diagnostic>> {
-    if partitions.is_none() || matches!(selection, DeviceSelection::Cpu | DeviceSelection::Metal) {
+    if partitions.is_none()
+        || matches!(
+            selection,
+            DeviceSelection::Cpu | DeviceSelection::Metal | DeviceSelection::Cuda
+        )
+    {
         return Ok(());
     }
     Err(Box::new(
         exit_status::usage_diagnostic_error(
-            "`--partitions` is valid only with `--device cpu` or `--device metal`",
+            "`--partitions` is valid only with `--device cpu`, `--device metal` or `--device cuda`",
         )
         .with_arg("issue", "E_PARTITIONS_REQUIRES_CPU")
         .with_arg("device", selection.spelling()),

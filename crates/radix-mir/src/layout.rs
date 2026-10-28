@@ -631,6 +631,11 @@ fn layout_kind_for_type(
         | Type::Error
         | Type::Intersection(_) => LayoutResolution::NoLayout,
         Type::Array(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Array)),
+        // A length range is a store rule over a heap list: the carrier is the
+        // plain array, and the range is checked where the list is stored.
+        Type::RangedArray { .. } => {
+            LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Array))
+        }
         // A ledger is a map underneath; its own carrier lands with the ledger
         // operations (need, L2+).
         Type::Map(_, _) | Type::Ledger(_, _) => {

@@ -33,23 +33,23 @@ pages of the documentation site.
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| rust | 526 | 530 | 99% |
-| go | 475 | 530 | 90% |
-| ts | 530 | 530 | 100% |
-| faber | 530 | 530 | 100% |
+| rust | 539 | 543 | 99% |
+| go | 488 | 543 | 90% |
+| ts | 543 | 543 | 100% |
+| faber | 543 | 543 | 100% |
 
 **Systems lane (MIR → device/IR artifacts)**
 
 | target | capable | analyzable | % |
 |---|---|---|---|
-| llvm-text | 463 | 533 | 87% |
-| wasm-text | 386 | 533 | 72% |
-| wasm | 385 | 533 | 72% |
-| metal-text | 5 | 533 | 1% |
-| wgsl-text | 5 | 533 | 1% |
-| sexp-struct | 473 | 533 | 89% |
-| sexp | 470 | 533 | 88% |
-| runner | 471 | 533 | 88% |
+| llvm-text | 467 | 546 | 86% |
+| wasm-text | 390 | 546 | 71% |
+| wasm | 389 | 546 | 71% |
+| metal-text | 5 | 546 | 1% |
+| wgsl-text | 5 | 546 | 1% |
+| sexp-struct | 483 | 546 | 88% |
+| sexp | 480 | 546 | 88% |
+| runner | 480 | 546 | 88% |
 
 ## Keywords — application lane
 
@@ -190,6 +190,7 @@ pages of the documentation site.
 | <a id="aut"></a>`aut` | ✓ | ✓ | ✓ | ✓ |
 | <a id="ergo"></a>`ergo` | ✓ | ✓ | ✓ | ✓ |
 | <a id="et"></a>`et` | ✓ | ✓ | ✓ | ✓ |
+| <a id="list-t-size-lo-hi"></a>`list<T, size lo‥hi>` | ✓ | ✓ | ✓ | ✓ |
 | <a id="modulus-u16"></a>`modulus<u16>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="modulus-u32"></a>`modulus<u32>` | ✓ | ✕ | ✓ | ✓ |
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✕ | ✓ | ✓ |
@@ -362,15 +363,16 @@ pages of the documentation site.
 | term | llvm-text | wasm-text | wasm | metal-text | wgsl-text | sexp-struct | sexp | runner |
 |---|---|---|---|---|---|---|---|---|
 | <a id=""></a>`!(` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`!.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`!.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ◐ |
 | <a id=""></a>`![` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`=` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`?(` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`?.` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`?(` | ✕ | ✕ | ✕ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`?.` | ◐ | ◐ | ◐ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`?[` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="aut"></a>`aut` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="ergo"></a>`ergo` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="et"></a>`et` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id="list-t-size-lo-hi"></a>`list<T, size lo‥hi>` | ✕ | ✕ | ✕ | ✕ | ✕ | ◐ | ◐ | ◐ |
 | <a id="modulus-u16"></a>`modulus<u16>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="modulus-u32"></a>`modulus<u32>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id="modulus-u64"></a>`modulus<u64>` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
@@ -397,7 +399,7 @@ pages of the documentation site.
 | <a id=""></a>`∈` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`∧` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`∨` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
-| <a id=""></a>`∴` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
+| <a id=""></a>`∴` | ◐ | ◐ | ◐ | ✕ | ✕ | ◐ | ◐ | ✓ |
 | <a id=""></a>`∷` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≡` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |
 | <a id=""></a>`≢` | ✓ | ✓ | ✓ | ✕ | ✕ | ✓ | ✓ | ✓ |

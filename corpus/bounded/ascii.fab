@@ -25,7 +25,7 @@ locale = "en"
 #   • Treating bare `ascii` as `ascii<64>` — capacity is not a language default.
 #   • Calling `capacitas` — `N` is the type, not a method.
 #
-# See also: lista<numerus, N>, textus<N>, list<b8, N>
+# See also: lista<numerus, magnitudo N>, textus<N>, list<b8, size N>
 # =============================================================================
 
 main {

@@ -81,6 +81,13 @@ struct SuiteTarget {
     /// artifact; without it the case runs `run` like a single-file emit.
     #[serde(default)]
     package_run: Vec<String>,
+    /// Build every input, single files included, through the product command
+    /// `faber build -t <emit>` (one step that emits, links and prints the
+    /// linked artifact), then run that artifact with `run`. The lane then
+    /// exercises the same code as a user's build instead of a hand-written
+    /// emit-and-link recipe.
+    #[serde(default)]
+    product: bool,
     #[serde(default)]
     files: BTreeMap<PathBuf, String>,
     #[serde(default)]
@@ -978,7 +985,7 @@ fn parse_case(
                 || (target == "runner" && expectation.phase.as_deref() != Some("run"))
                 || !matches!(
                     expectation.failure_kind.as_deref().unwrap_or("diagnostic"),
-                    "diagnostic" | "stdout-mismatch" | "nonzero-exit"
+                    "diagnostic" | "stdout-mismatch" | "nonzero-exit" | "exit-mismatch"
                 )
                 || (expectation.failure_kind.as_deref() == Some("stdout-mismatch")
                     && (expectation.phase.as_deref() != Some("run")
@@ -986,15 +993,21 @@ fn parse_case(
                 || (expectation.failure_kind.as_deref() == Some("nonzero-exit")
                     && (expectation.phase.as_deref() != Some("run")
                         || expect.as_ref().is_none_or(|item| !item.exit_nonzero)))
-                || (expectation.failure_kind.as_deref() != Some("stdout-mismatch")
-                    && expectation.failure_kind.as_deref() != Some("nonzero-exit")
-                    && expectation
-                        .diagnostic_contains
-                        .as_ref()
-                        .is_none_or(String::is_empty)) =>
+                || (expectation.failure_kind.as_deref() == Some("exit-mismatch")
+                    && (expectation.phase.as_deref() != Some("run")
+                        || expect
+                            .as_ref()
+                            .is_none_or(|item| item.exit == 0 || item.exit_nonzero)))
+                || (!matches!(
+                    expectation.failure_kind.as_deref(),
+                    Some("stdout-mismatch" | "nonzero-exit" | "exit-mismatch")
+                ) && expectation
+                    .diagnostic_contains
+                    .as_ref()
+                    .is_none_or(String::is_empty)) =>
         {
             return Err(format!(
-                "{id}: known-fail requires a supported phase and a stable diagnostic or stdout-mismatch oracle"
+                "{id}: known-fail requires a supported phase and a stable diagnostic, stdout-mismatch, nonzero-exit or exit-mismatch oracle"
             ));
         }
         Outcome::Pass
@@ -1079,8 +1092,8 @@ fn check_executor_support(
     let unsupported = |what: &str| Err(format!("{id}: target {target} cannot judge {what}"));
     match (target, expectation.outcome) {
         (_, Outcome::NotApplicable) => Ok(()),
-        ("runner", Outcome::KnownFail) if kind == "nonzero-exit" => {
-            unsupported("failure_kind nonzero-exit")
+        ("runner", Outcome::KnownFail) if matches!(kind, "nonzero-exit" | "exit-mismatch") => {
+            unsupported(&format!("failure_kind {kind}"))
         }
         ("runner", Outcome::Pass) if !matches!(phase, None | Some("run")) => {
             unsupported("a passing case with a phase other than run")
@@ -1398,7 +1411,7 @@ fn judge_known_fail(
 }
 
 /// Judge a known-fail pin whose oracle is the program's own run (`stdout-mismatch`,
-/// `nonzero-exit`) rather than a diagnostic fragment. `None` means the pin is a
+/// `nonzero-exit`, `exit-mismatch`) rather than a diagnostic fragment. `None` means the pin is a
 /// diagnostic pin and the caller judges it. Shared by every executor that runs the
 /// built program, so one definition decides what each run-phase kind means.
 fn judge_known_run_kind(case: &Case, output: &Output) -> Option<(&'static str, Option<String>)> {
@@ -1456,6 +1469,32 @@ fn judge_known_run_kind(case: &Case, output: &Output) -> Option<(&'static str, O
                     )),
                 )
             })
+        }
+        Some("exit-mismatch") => {
+            let expected = match case.expected() {
+                Ok(expected) => expected,
+                Err(reason) => return Some(("fail", Some(reason))),
+            };
+            if exit_matches(expected, &output.status) {
+                return Some((
+                    "fail",
+                    Some("unexpected exit match; update target expectation".to_owned()),
+                ));
+            }
+            // The pin names the exit status as the one known failure, so the
+            // output the program does produce must still be the golden.
+            if let Some(path) = expected.stdout.as_ref() {
+                let golden = match fs::read(path) {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        return Some(("fail", Some(format!("cannot read stdout golden: {error}"))));
+                    }
+                };
+                if normalize_stdout(&golden) != normalize_stdout(&output.stdout) {
+                    return Some(("fail", Some("stdout mismatch".to_owned())));
+                }
+            }
+            Some(("expected-fail", None))
         }
         _ => None,
     }

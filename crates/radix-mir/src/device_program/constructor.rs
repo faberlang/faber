@@ -727,7 +727,8 @@ pub fn build_device_program(
         .filter(|buffer| buffer.param)
         .map(|buffer| buffer.id)
         .collect();
-    device_program.launches = dependency_ordered_launches(&device_program, &param_buffer_ids)?;
+    device_program.launches =
+        dependency_ordered_launches(&device_program, &param_buffer_ids, &builder.wiring)?;
 
     // S5A-U1: declare the observation-eligible results with their cadence —
     // the constructor's DECLARED fact from the training program's structure,
@@ -749,6 +750,7 @@ pub fn build_device_program(
         &builder.buffers,
         companions,
         &param_buffer_ids,
+        &builder.wiring,
     );
     semantics.observations = device_program
         .results
@@ -1726,18 +1728,25 @@ fn value_origin(
 /// reads — so the write→read edge within one step's sequence would form a
 /// cycle.
 ///
+/// A host loop's carried edges are EXCLUDED the same way: an
+/// edge whose consumer the host calls only after the producer's NEXT
+/// iteration (`fwd(w, mut y); upd(y, mut w)` — `fwd` reads the `w` that `upd`
+/// wrote one iteration earlier) orders no launch within one iteration.
+///
 /// # Errors
 /// Fail-closed when the dependency graph contains a cycle (a launch sequence
 /// that follows it would never terminate).
 fn dependency_ordered_launches(
     program: &DeviceProgram,
     excluded_buffers: &[BufferId],
+    wiring: &HostWiring,
 ) -> Result<Vec<LaunchUnit>, DeviceProgramBuildError> {
     let edges = program
         .buffer_registry()
         .data_flow_pairs()
         .into_iter()
         .filter(|edge| !excluded_buffers.contains(&edge.buffer))
+        .filter(|edge| !is_loop_carried_edge(program, wiring, edge))
         .collect::<Vec<_>>();
     let mut indegree: BTreeMap<LaunchId, usize> = BTreeMap::new();
     let mut dependents: BTreeMap<LaunchId, Vec<LaunchId>> = BTreeMap::new();
@@ -1791,6 +1800,28 @@ fn dependency_ordered_launches(
     let mut sorted = program.launches.clone();
     sorted.sort_by_key(|launch| position.get(&launch.id).copied().unwrap_or(usize::MAX));
     Ok(sorted)
+}
+
+/// Whether a data-flow edge is a host loop's carry: the host calls the
+/// consumer's kernel only after the producer's kernel's next iteration (see
+/// [`HostWiring::is_loop_carried`]).
+fn is_loop_carried_edge(
+    program: &DeviceProgram,
+    wiring: &HostWiring,
+    edge: &super::DataFlowPair,
+) -> bool {
+    let function_of = |launch: LaunchId| {
+        program
+            .launches
+            .iter()
+            .find(|unit| unit.id == launch)
+            .and_then(|unit| program.kernels.get(unit.kernel_index))
+            .map(|kernel| kernel.function)
+    };
+    match (function_of(edge.producer), function_of(edge.consumer)) {
+        (Some(producer), Some(consumer)) => wiring.is_loop_carried(producer, consumer),
+        _ => false,
+    }
 }
 
 /// The independent allocation-lifetime axis (F5) of a unified buffer, decided
@@ -1932,7 +1963,8 @@ fn declared_result_rows(
 /// - generations: every logical write in the ordered launch sequence is an
 ///   explicit new generation (F2);
 /// - roots + dependencies: the carried graph the host schedules from (F3);
-///   a trainable parameter's edges are persistent-state facts — excluded;
+///   a trainable parameter's edges are persistent-state facts and a host loop's
+///   carried edges are loop-carry facts — both excluded;
 /// - relations: the lossless primal/companion rows from the carrier (F4);
 /// - initializations: the independent axis facts (F5) — a trainable
 ///   parameter is `HostProvided` (copied in exactly once at session creation),
@@ -1942,6 +1974,7 @@ fn semantic_facts(
     buffers: &[ProgramBuffer],
     companions: &MirCompanionMap,
     param_buffer_ids: &[BufferId],
+    wiring: &HostWiring,
 ) -> DeviceSemantics {
     let values = buffers
         .iter()
@@ -1995,6 +2028,7 @@ fn semantic_facts(
         .data_flow_pairs()
         .into_iter()
         .filter(|pair| !param_buffer_ids.contains(&pair.buffer))
+        .filter(|pair| !is_loop_carried_edge(program, wiring, pair))
         .map(|pair| DependencyEdge {
             producer: pair.producer,
             consumer: pair.consumer,

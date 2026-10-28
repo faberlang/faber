@@ -9,14 +9,20 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: time",
-      "reason": "The Go lane does not yet provide the Norma time leaf binding used by these async clock routes."
+      "diagnostic_contains": "direct failable Go call requires",
+      "reason": "The Go emitter reaches a failable call in a position that is neither a failable function body nor a fac/cape handler (a carried Norma module such as `time`, `http/server` or `net/connection`), so it fails closed at compile time; hoisting that call shape is a separate emitter unit."
     },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "the clock leaf is not supported on the ts target",
       "reason": "The Node port of the clock leaf (`tempus:*`) has not landed, so the emitter refuses any program that reaches a `tempus` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the clock leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no clock leaf yet: its leaf gate refuses a program that reaches a clock route by name, before any LLVM is emitted."
     }
   }
 }

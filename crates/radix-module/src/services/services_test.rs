@@ -399,19 +399,16 @@ fn target_name_table_matches_display() {
 }
 
 #[test]
-fn rust_and_runner_declare_the_n2_leaves() {
+fn rust_runner_and_go_declare_the_n2_leaves() {
     use crate::codegen::Leaf;
     for target in [
         crate::codegen::Target::HirRust,
         crate::codegen::Target::MirFmir,
         crate::codegen::Target::MirFmirBinary,
+        crate::codegen::Target::HirGo,
     ] {
         assert_eq!(target_leaves(target), Leaf::ALL, "{target} must declare N2 leaves");
     }
-    assert_eq!(
-        target_leaves(crate::codegen::Target::HirGo),
-        &[Leaf::Stdio, Leaf::Process, Leaf::Clock, Leaf::Entropy]
-    );
 }
 
 #[test]
@@ -1821,6 +1818,7 @@ fn emit_reflection_json_serializes_deferred_gpu_builtin_facts() {
         kernels: vec![crate::mir::MirKernelReflection {
             fault_sites: Vec::new(),
             lane_range_binding: None,
+            slab_origin_bindings: Vec::new(),
             function: crate::mir::MirFunctionId(0),
             provenance: crate::mir::MirKernelProvenance::MirFunction(crate::mir::MirFunctionId(0)),
             entry_name: "deferred_builtins".to_owned(),

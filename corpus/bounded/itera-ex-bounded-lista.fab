@@ -4,8 +4,8 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "nota_stmt"]
 category = "list"
 canonical = false
-summary = "Value iteration over a runtime-length list<T, N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
-syntax = "for from list<T, N> let x { }"
+summary = "Value iteration over a runtime-length list<T, size N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
+syntax = "for from list<T, size N> let x { }"
 related = ["lista", "ex", "itera", "longitudo"]
 locale = "en"
 no_expected = "declaration-only"
@@ -15,7 +15,7 @@ no_expected = "declaration-only"
 # =============================================================================
 #
 # What this teaches:
-#   • `for from` over a `list<T, N>` with runtime len becomes a `discerne` on
+#   • `for from` over a `list<T, size N>` with runtime len becomes a `discerne` on
 #     len with N+1 arms — arm k runs the body exactly k times (lanes 0..k)
 #   • each arm reads only 0..k ⊆ 0..len, so spare slots past len are never read
 #   • the branch lives in the base lane; AIR functions keep declining this
@@ -33,7 +33,7 @@ no_expected = "declaration-only"
 # Route B static split on the carrier len — declaration-only driver; the MIR
 # unit tests pin the N+1-arm switch and the N <= 10 decline.
 
-fn sumBounded(list<int, 8> xs) → int {
+fn sumBounded(list<int, size 8> xs) → int {
     mut int total ← 0
     for from xs let x {
         total ← total + x

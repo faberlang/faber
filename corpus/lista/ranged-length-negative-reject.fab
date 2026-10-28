@@ -1,0 +1,28 @@
++++
+term = "list<T, size lo‥hi>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A negative end is refused: a length is a count."
+syntax = "list<int, size -1‥3> — rejected"
+related = ["list<T, size lo‥hi>", "‥", "…"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_list_bound_negative"
++++
+# =============================================================================
+# list<T, size lo‥hi> — a negative end
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A length is never negative, so a range end cannot be.
+#
+# Common mistakes:
+#   • Writing -1 to mean no lower limit; write 0, or the plain list<int>.
+
+main {
+    let list<int, size -1‥3> xs ← [1]
+    print xs
+}

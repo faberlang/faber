@@ -67,6 +67,9 @@ struct AirPurityChecker<'a> {
 
 /// Ruling 39(c): an `inf` type anywhere in an AIR-lane function.
 const ISSUE_AIR_UNBOUNDED_INTEGER: &str = "air_unbounded_integer";
+/// A list with no upper size (`list<T, size 1…∞>`): reverse AD unrolls every
+/// slot up to the maximum, so the lane needs a finite constant one.
+const ISSUE_AIR_UNBOUNDED_LIST_SIZE: &str = "air_unbounded_list_size";
 
 #[derive(Clone, Copy)]
 enum HandlerRegion {
@@ -353,13 +356,28 @@ impl AirPurityChecker<'_> {
                 self.check_block(body);
             }
             HirExpressionKind::Reduction {
+                op,
                 source,
                 group,
                 body,
                 identity,
                 ..
             } => {
-                self.reject(expr.span, "reducta_expression_unsupported");
+                // The first reduction admits over a statically bounded source
+                // (forward execution; reverse AD is fail-closed, see the vjp.rs
+                // forward-only note). Every other reduction stays outside the
+                // v1 subset. The body is still traversed so impure predicates
+                // keep their own decline causes.
+                if *op != radix_hir::HirReductionOp::First {
+                    self.reject(expr.span, "reducta_expression_unsupported");
+                } else if !super::air_unroll::first_source_is_bounded(source, self.types) {
+                    self.reject_with_arg(
+                        expr.span,
+                        "reducta_first_unbounded_source",
+                        "causa",
+                        "not_bounded",
+                    );
+                }
                 self.check_expr(source);
                 if let Some(group) = group {
                     self.check_expr(group);
@@ -389,30 +407,6 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 if let Some(body) = body {
                     self.check_block(body);
-                }
-            }
-            HirExpressionKind::FirstMatch {
-                source,
-                coordinates,
-                body,
-                ..
-            } => {
-                // AFM-4: bounded sources admit on the AIR lane (forward
-                // execution; reverse AD is fail-closed — see the vjp.rs
-                // forward-only note). The predicate is still traversed so
-                // impure bodies keep their own decline causes.
-                self.check_expr(source);
-                self.check_block(body);
-                if !coordinates.is_empty() {
-                    self.reject(expr.span, "first_match_expression_unsupported");
-                } else if super::air_unroll::first_match_source_route(source, self.types).is_none()
-                {
-                    self.reject_with_arg(
-                        expr.span,
-                        "first_match_unbounded_source",
-                        "causa",
-                        "not_bounded",
-                    );
                 }
             }
             HirExpressionKind::Intervallum {
@@ -780,11 +774,32 @@ impl AirPurityChecker<'_> {
             .unbounded_sites
             .iter()
             .any(|site| site.start <= span.start && span.end <= site.end);
-        if covered || !self.mentions_unbounded(ty) {
+        let issue = if self.mentions_unbounded(ty) {
+            ISSUE_AIR_UNBOUNDED_INTEGER
+        } else if self.mentions_unbounded_list(ty) {
+            ISSUE_AIR_UNBOUNDED_LIST_SIZE
+        } else {
+            return;
+        };
+        if covered {
             return;
         }
         self.unbounded_sites.push(span);
-        self.reject(span, ISSUE_AIR_UNBOUNDED_INTEGER);
+        self.reject(span, issue);
+    }
+
+    fn mentions_unbounded_list(&self, ty: TypeId) -> bool {
+        let ty = self.types.peel_access_marker(ty).1;
+        match self.types.get(ty) {
+            Type::RangedArray { max: None, .. } => true,
+            Type::Alias(_, inner) | Type::Option(inner) | Type::Array(inner) => {
+                self.mentions_unbounded_list(*inner)
+            }
+            Type::RangedArray { element, .. } | Type::BoundedArray { element, .. } => {
+                self.mentions_unbounded_list(*element)
+            }
+            _ => false,
+        }
     }
 
     fn mentions_unbounded(&self, ty: TypeId) -> bool {

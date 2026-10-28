@@ -1,6 +1,6 @@
 +++
 term = "?."
-explains = ["?[", "?.", "?("]
+explains = ["?[", "?."]
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "array_literal", "optional_suffix", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "expression", "literal", "nota_stmt"]
 category = "type"
@@ -53,7 +53,7 @@ main {
     let Civis brutus ← Civis { nomen = "Brutus" }
     print brutus?.locus?.urbs
     print brutus?.locus?.regio
-    let list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, size 3> litterae ← ["a", "b", "c"]
     print litterae?[0]
     print litterae?[10]
 }

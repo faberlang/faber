@@ -76,12 +76,12 @@ fn numeric_lista_dynamic_lengths_are_deferred_to_a2() {
 #[test]
 fn numeric_lista_static_bounds_must_match() {
     assert_accepts(
-        r"functio same(lista<numerus, 3> a, lista<numerus, 3> b) → lista<numerus, 3> {
+        r"functio same(lista<numerus, magnitudo 3> a, lista<numerus, magnitudo 3> b) → lista<numerus, magnitudo 3> {
     redde a + b
 }",
     );
     assert_rejects_with_issue(
-        r"functio mismatch(lista<numerus, 2> a, lista<numerus, 3> b) → lista<numerus, 2> {
+        r"functio mismatch(lista<numerus, magnitudo 2> a, lista<numerus, magnitudo 3> b) → lista<numerus, magnitudo 2> {
     redde a + b
 }",
         "lista_capacity_mismatch",
@@ -262,7 +262,7 @@ fn numeric_lista_unary_minus_keeps_the_list() {
         r"functio negated(lista<numerus> xs) → lista<numerus> {
     redde -xs
 }
-functio bounded(lista<f32, 4> xs) → lista<f32, 4> {
+functio bounded(lista<f32, magnitudo 4> xs) → lista<f32, magnitudo 4> {
     redde -xs
 }",
     );
@@ -293,22 +293,22 @@ fn numeric_lista_glyphs_reject_scalars_and_mixed_elements() {
 #[test]
 fn numeric_lista_capacity_is_part_of_the_type_for_every_pairing_form() {
     assert_rejects_with_issue(
-        r"functio hadamard(lista<numerus, 4> a, lista<numerus, 8> b) → lista<numerus, 4> {
+        r"functio hadamard(lista<numerus, magnitudo 4> a, lista<numerus, magnitudo 8> b) → lista<numerus, magnitudo 4> {
     redde a ⊙ b
 }",
         "lista_capacity_mismatch",
     );
     assert_rejects_with_issue(
-        r"functio quotient(lista<f32, 4> a, lista<f32, 8> b) → lista<f64, 4> {
+        r"functio quotient(lista<f32, magnitudo 4> a, lista<f32, magnitudo 8> b) → lista<f64, magnitudo 4> {
     redde a ÷ b
 }",
         "lista_capacity_mismatch",
     );
     assert_accepts(
-        r"functio same(lista<numerus, 4> a, lista<numerus, 4> b) → lista<numerus, 4> {
+        r"functio same(lista<numerus, magnitudo 4> a, lista<numerus, magnitudo 4> b) → lista<numerus, magnitudo 4> {
     redde a ⊙ b
 }
-functio scalar(lista<numerus, 4> a) → lista<numerus, 4> {
+functio scalar(lista<numerus, magnitudo 4> a) → lista<numerus, magnitudo 4> {
     redde a % 3
 }",
     );
@@ -381,7 +381,7 @@ functio equal(lista<numerus> a, lista<numerus> b) → lista<bivalens> {
 functio apart(lista<numerus> a, lista<numerus> b) → lista<bivalens> {
     redde a ≇ b
 }
-functio bounded(lista<numerus, 4> a, lista<numerus, 4> b) → lista<bivalens, 4> {
+functio bounded(lista<numerus, magnitudo 4> a, lista<numerus, magnitudo 4> b) → lista<bivalens, magnitudo 4> {
     redde a ≥ b
 }",
     );
@@ -412,7 +412,7 @@ functio text_equal(lista<textus> a, lista<textus> b) → bivalens {
 #[test]
 fn numeric_lista_comparison_keeps_the_capacity_law() {
     assert_rejects_with_issue(
-        r"functio mismatched(lista<numerus, 4> a, lista<numerus, 8> b) → lista<bivalens, 4> {
+        r"functio mismatched(lista<numerus, magnitudo 4> a, lista<numerus, magnitudo 8> b) → lista<bivalens, magnitudo 4> {
     redde a ≺ b
 }",
         "lista_capacity_mismatch",
@@ -591,7 +591,7 @@ fn bool_list_logic_result_is_not_a_scalar_bool() {
 fn numeric_lista_comparison_capacity_mismatch_adds_no_scalar_operand_diagnostic() {
     for glyph in ["≺", "≅"] {
         let source = format!(
-            "functio mismatched(lista<numerus, 4> a, lista<numerus, 8> b) → lista<bivalens, 4> {{
+            "functio mismatched(lista<numerus, magnitudo 4> a, lista<numerus, magnitudo 8> b) → lista<bivalens, magnitudo 4> {{
     redde a {glyph} b
 }}"
         );

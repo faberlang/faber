@@ -860,6 +860,25 @@ pub const SERMO_READ_TEXT_RESULT: RuntimeItem = sermo_row("read_text_result", Ru
 pub const SERMO_FAULT_RECORD: RuntimeItem = sermo_row("fault_record", RuntimeKind::Fn);
 pub const SERMO_READ_NUMERUS: RuntimeItem = sermo_row("read_numerus", RuntimeKind::Fn);
 pub const SERMO_DRAIN: RuntimeItem = sermo_row("drain", RuntimeKind::Fn);
+/// Typed conversation readers (Go): the trapping form and the `_result` form
+/// whose failure is the returned error (a `*FrameFault` for a terminal `error`
+/// frame), for a `valor`, bool, float, byte buffer and list of text.
+pub const SERMO_READ_VALUE: RuntimeItem = sermo_row("read_value", RuntimeKind::Fn);
+pub const SERMO_READ_VALUE_RESULT: RuntimeItem = sermo_row("read_value_result", RuntimeKind::Fn);
+pub const SERMO_READ_BOOL: RuntimeItem = sermo_row("read_bool", RuntimeKind::Fn);
+pub const SERMO_READ_BOOL_RESULT: RuntimeItem = sermo_row("read_bool_result", RuntimeKind::Fn);
+pub const SERMO_READ_FLOAT: RuntimeItem = sermo_row("read_float", RuntimeKind::Fn);
+pub const SERMO_READ_FLOAT_RESULT: RuntimeItem = sermo_row("read_float_result", RuntimeKind::Fn);
+pub const SERMO_READ_BYTES: RuntimeItem = sermo_row("read_bytes", RuntimeKind::Fn);
+pub const SERMO_READ_BYTES_RESULT: RuntimeItem = sermo_row("read_bytes_result", RuntimeKind::Fn);
+pub const SERMO_READ_STRINGS: RuntimeItem = sermo_row("read_strings", RuntimeKind::Fn);
+pub const SERMO_READ_STRINGS_RESULT: RuntimeItem =
+    sermo_row("read_strings_result", RuntimeKind::Fn);
+/// `sermo.read_as`: the reader chosen by a type parameter (Go generic).
+pub const SERMO_READ_AS: RuntimeItem = sermo_row("read_as", RuntimeKind::Fn);
+pub const SERMO_READ_AS_RESULT: RuntimeItem = sermo_row("read_as_result", RuntimeKind::Fn);
+/// `sermo.drain_result`: the unit drain whose failure is the returned error (Go).
+pub const SERMO_DRAIN_RESULT: RuntimeItem = sermo_row("drain_result", RuntimeKind::Fn);
 /// `sermo.read_line`: one process-wide stdin line as `string ∪ none` (Go).
 pub const SERMO_READ_LINE: RuntimeItem = sermo_row("read_line", RuntimeKind::Fn);
 
@@ -1367,6 +1386,19 @@ pub const TABLE: &[RuntimeItem] = &[
     SERMO_FAULT_RECORD,
     SERMO_READ_NUMERUS,
     SERMO_DRAIN,
+    SERMO_READ_VALUE,
+    SERMO_READ_VALUE_RESULT,
+    SERMO_READ_BOOL,
+    SERMO_READ_BOOL_RESULT,
+    SERMO_READ_FLOAT,
+    SERMO_READ_FLOAT_RESULT,
+    SERMO_READ_BYTES,
+    SERMO_READ_BYTES_RESULT,
+    SERMO_READ_STRINGS,
+    SERMO_READ_STRINGS_RESULT,
+    SERMO_READ_AS,
+    SERMO_READ_AS_RESULT,
+    SERMO_DRAIN_RESULT,
     SERMO_READ_LINE,
     TRAP_TEXT_WINDOW,
     TEXT_SPLIT,

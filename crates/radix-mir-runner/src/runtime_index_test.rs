@@ -97,7 +97,7 @@ fn valor_tabula_missing_key_returns_nil() {
     assert_eq!(value, Value::Nil);
 }
 
-/// Evaluate `value est lista<numerus, 8>` (or `non est`) against one runner value.
+/// Evaluate `value est lista<numerus, magnitudo 8>` (or `non est`) against one runner value.
 fn eval_bounded_lista_type_check(value: Value, positive: bool) -> Value {
     let mut type_table = TypeTable::new();
     let numerus = type_table.primitive(Primitive::Numerus);

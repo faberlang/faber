@@ -451,6 +451,25 @@ fn run_partitions_pass_on_the_cpu_route_and_shape_the_device() {
 }
 
 #[test]
+fn run_partitions_pass_on_the_cuda_route_and_still_refuse_auto() {
+    let dir = temp_dir("partitions-cuda-route");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+    let mut args = run_args(dir.clone(), Some(DeviceChoice::Cuda));
+    args.partitions = Some(2);
+    assert_eq!(
+        resolve_route_selection(&args, &dir).expect("partitions with cuda passes"),
+        DeviceSelection::Cuda
+    );
+    assert_eq!(cpu_device_shape(&args, None).partitions.get(), 2);
+    // `auto` is not a spanning selection: the flag is refused, not ignored.
+    let mut auto = run_args(dir.clone(), Some(DeviceChoice::Auto));
+    auto.partitions = Some(2);
+    let err = resolve_route_selection(&auto, &dir).expect_err("auto refuses --partitions");
+    assert_eq!(err.issue(), Some("E_PARTITIONS_REQUIRES_CPU"));
+}
+
+#[test]
 fn run_threads_clap_accepts_positive_and_rejects_zero() {
     let parsed = <crate::cli::Cli as clap::Parser>::try_parse_from([
         "faber",
@@ -837,7 +856,7 @@ locale = "en"
 @ public
 class Block {
     let f16 scale
-    let list<int, 2> values
+    let list<int, size 2> values
 }
 
 @ public
@@ -848,7 +867,7 @@ fn read_blocks(tensor<Block, [2]> blocks, mut tensor<f32, [2]> out) → void {
 }
 
 main {
-    let list<Block> rows ← [Block { scale = 1.5 ↦ f16, values = [3, 4] ↦ list<int, 2> }, Block { scale = 2.5 ↦ f16, values = [5, 6] ↦ list<int, 2> }]
+    let list<Block> rows ← [Block { scale = 1.5 ↦ f16, values = [3, 4] ↦ list<int, size 2> }, Block { scale = 2.5 ↦ f16, values = [5, 6] ↦ list<int, size 2> }]
     mut tensor<Block, [2]> blocks ← rows ↦ tensor<Block, [2]>
     mut tensor<f32, [2]> out ← tf32[2] {}
     read_blocks(blocks, mut out)

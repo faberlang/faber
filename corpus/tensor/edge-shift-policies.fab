@@ -5,16 +5,16 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "tensor"
 canonical = false
 summary = "Negative, zero, large and rank-2 shifts resolve edges under clamp, coalesce, wrap and reflect."
-related = ["tensor", "limes", "shift"]
+related = ["tensor", "edge", "shift"]
 locale = "en"
 +++
 
 main {
     let tf32[4] base ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
-    let tf32[4] clamped ← base.shift([-1]).limes<clamp>()
+    let tf32[4] clamped ← base.shift([-1]).edge<clamp>()
     let tf32[4] filled ← base.shift([-2]) coalesce 9.0
-    let tf32[4] wrapped ← base.shift([5]).limes<wrap>()
-    let tf32[4] reflected ← base.shift([0]).limes<reflect>()
+    let tf32[4] wrapped ← base.shift([5]).edge<wrap>()
+    let tf32[4] reflected ← base.shift([0]).edge<reflect>()
     print clamped.flatten()
     print filled.flatten()
     print wrapped.flatten()
@@ -22,7 +22,7 @@ main {
 
     let list<f32> source ← [1.0, 2.0, 3.0, 4.0]
     let tf32[2, 2] grid ← source ↦ tf32[2, 2]
-    let tf32[2, 2] grid_wrapped ← grid.shift([1, 0]).limes<wrap>()
+    let tf32[2, 2] grid_wrapped ← grid.shift([1, 0]).edge<wrap>()
     let tf32[2, 2] grid_filled ← grid.shift([0, 1]) coalesce 0.0
     print grid_wrapped.flatten()
     print grid_filled.flatten()

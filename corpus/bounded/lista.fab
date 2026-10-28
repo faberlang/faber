@@ -4,20 +4,20 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "list"
 canonical = false
-summary = "Bounded lista<T, N>: length plus N slots; longitudo is len; appende overflow is an alternate exit."
-syntax = "lista<T, N>"
+summary = "Bounded lista<T, magnitudo N>: length plus N slots; longitudo is len; appende overflow is an alternate exit."
+syntax = "lista<T, magnitudo N>"
 related = ["longitudo", "appende", "accipe", "sectio", "vacua"]
 locale = "en"
 +++
 # =============================================================================
-# lista<T, N> — bounded array (BB-8R)
+# lista<T, magnitudo N> — bounded array (BB-8R)
 # =============================================================================
 #
-# Latin spelling: lista<numerus, 8>
-# English surface: list<int, 8>
+# Latin spelling: lista<numerus, magnitudo 8>
+# English surface: list<int, size 8>
 #
 # What this teaches:
-#   • `lista<T, N>` is a distinct type from unbounded `lista<T>`.
+#   • `lista<T, magnitudo N>` is a distinct type from unbounded `lista<T>`.
 #   • `longitudo` / `vacua` observe runtime `len`, not capacity `N`.
 #   • `appende` past `N` is a recoverable alternate exit (`⇥ textus`).
 #
@@ -25,11 +25,11 @@ locale = "en"
 #   • Treating `N` as exact length — spare slots are unreadable.
 #   • Inventing `capacitas` — capacity is type identity, not a method.
 #
-# See also: textus<N>, ascii<N>, list<b8, N>
+# See also: textus<N>, ascii<N>, list<b8, size N>
 # =============================================================================
 
 main {
-    let list<int, 8> xs ← empty
+    let list<int, size 8> xs ← empty
     let int n ← xs.length()
     let bool vacant ← xs.is_empty()
     print n

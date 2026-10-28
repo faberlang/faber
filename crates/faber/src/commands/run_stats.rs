@@ -143,7 +143,112 @@ pub(crate) struct DeviceSpanMetadata {
     pub(crate) split_launches: u64,
     pub(crate) replicated_launches: u64,
     pub(crate) first_launches: u64,
+    /// Bytes that moved device to device (peer and same-device pairs).
+    #[serde(default)]
+    pub(crate) peer_bytes: u64,
+    /// Bytes that moved through host memory (host-staged pairs and the fault
+    /// words the combine gathers). With `peer_bytes` they are `moved_bytes`.
+    #[serde(default)]
+    pub(crate) host_staged_bytes: u64,
+    /// How each ordered pair of partitions moves bytes, chosen when the
+    /// logical device opened, with what moved over it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) links: Vec<DeviceSpanLinkMetadata>,
+    /// The device-to-device copies the partitions enqueued and the dependency
+    /// latency measured around them; absent when there were none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) peer: Option<DevicePeerCopyMetadata>,
+    /// Every cross-partition sync, totalled per kind.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) syncs: Vec<DeviceSpanSyncMetadata>,
+    /// The planner audit: one row per entry and sync kind the dispatcher
+    /// classified as avoidable, with that kind's counters.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) avoidable: Vec<DeviceSpanAvoidableMetadata>,
     pub(crate) entries: Vec<DeviceSpanEntryMetadata>,
+}
+
+/// How bytes move from partition `from` to partition `to` (`peer`,
+/// `same-device` or `host-staged`), and what moved.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceSpanLinkMetadata {
+    pub(crate) from: u32,
+    pub(crate) to: u32,
+    pub(crate) class: String,
+    pub(crate) transfers: u64,
+    pub(crate) bytes: u64,
+}
+
+/// Device-to-device copies and their dependency latency. A copy is ordered on
+/// the devices by events, so its latency is the consumer stream's time from
+/// reaching the dependency to holding the bytes (the stall on the producer
+/// plus the copy), measured for `timed` of the `copies`.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DevicePeerCopyMetadata {
+    pub(crate) copies: u64,
+    pub(crate) bytes: u64,
+    pub(crate) timed: u64,
+    pub(crate) dependency_us: u64,
+    pub(crate) max_dependency_us: u64,
+}
+
+/// The cross-partition syncs of one kind. `count` is transport calls for a
+/// byte-moving kind and waits for `host-wait-all`; `peer_bytes` is the part
+/// of `bytes` that moved device to device. `blocked_ns` is the host wall time
+/// spent in them: for a host-staged pair that includes the copy; for a
+/// device-to-device pair it is only the host's time enqueueing copies and
+/// events, and the dependency's own latency is `span.peer`.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceSpanSyncMetadata {
+    pub(crate) kind: String,
+    pub(crate) count: u64,
+    pub(crate) bytes: u64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub(crate) peer_bytes: u64,
+    pub(crate) blocked_ns: u64,
+}
+
+fn is_zero(value: &u64) -> bool {
+    *value == 0
+}
+
+impl DeviceSpanSyncMetadata {
+    pub(crate) fn new(kind: &str, count: u64, bytes: u64, blocked_ns: u64) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            count,
+            bytes,
+            peer_bytes: 0,
+            blocked_ns,
+        }
+    }
+
+    #[cfg(feature = "device-runtime")]
+    pub(crate) fn with_peer_bytes(mut self, peer_bytes: u64) -> Self {
+        self.peer_bytes = peer_bytes;
+        self
+    }
+}
+
+/// An avoidable sync: the dispatcher classified entry `entry`'s syncs of
+/// `kind` as `avoidable` (`unbounded-read`, `fusable-with-previous`,
+/// `first-fallback`), with `detail` (the missing
+/// read set, the entry it fuses into, the fallback reason) and the runtime's
+/// counters for them.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceSpanAvoidableMetadata {
+    pub(crate) entry: String,
+    pub(crate) kind: String,
+    pub(crate) avoidable: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) detail: Option<String>,
+    pub(crate) count: u64,
+    pub(crate) bytes: u64,
+    pub(crate) blocked_ns: u64,
 }
 
 /// How one entry's launches ran on a spanned logical device; `fallback`
@@ -157,6 +262,9 @@ pub(crate) struct DeviceSpanEntryMetadata {
     pub(crate) first_launches: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) fallback: Option<String>,
+    /// The entry's syncs by kind.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) syncs: Vec<DeviceSpanSyncMetadata>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -330,7 +438,9 @@ impl DeviceMetadata {
                 peak_allocated_bytes: runtime.peak_allocated_bytes,
                 host_to_device_bytes: runtime.host_to_device_bytes,
                 device_to_host_bytes: runtime.device_to_host_bytes,
-                span: runtime.span.as_ref().map(DeviceSpanMetadata::from_stats),
+                span: runtime.span.as_ref().map(|span| {
+                    DeviceSpanMetadata::from_stats(span).with_avoidable(&receipt.span_avoidable)
+                }),
             },
             entries: runtime
                 .entry_gpu
@@ -356,6 +466,40 @@ impl DeviceSpanMetadata {
             split_launches: span.split_launches,
             replicated_launches: span.replicated_launches,
             first_launches: span.first_launches,
+            peer_bytes: span.peer_bytes,
+            host_staged_bytes: span.host_staged_bytes,
+            links: span
+                .links
+                .iter()
+                .map(|link| DeviceSpanLinkMetadata {
+                    from: link.from,
+                    to: link.to,
+                    class: link.class.as_str().to_owned(),
+                    transfers: link.transfers,
+                    bytes: link.bytes,
+                })
+                .collect(),
+            peer: (span.peer.copies != 0).then(|| DevicePeerCopyMetadata {
+                copies: span.peer.copies,
+                bytes: span.peer.bytes,
+                timed: span.peer.timed,
+                dependency_us: span.peer.dependency_us,
+                max_dependency_us: span.peer.max_dependency_us,
+            }),
+            syncs: span
+                .syncs
+                .iter()
+                .map(|sync| {
+                    DeviceSpanSyncMetadata::new(
+                        sync.kind.as_str(),
+                        sync.count,
+                        sync.bytes,
+                        sync.blocked_ns,
+                    )
+                    .with_peer_bytes(sync.peer_bytes)
+                })
+                .collect(),
+            avoidable: Vec::new(),
             entries: span
                 .entries
                 .iter()
@@ -365,9 +509,52 @@ impl DeviceSpanMetadata {
                     replicated_launches: entry.replicated_launches,
                     first_launches: entry.first_launches,
                     fallback: entry.fallback.map(|reason| reason.as_str().to_owned()),
+                    syncs: entry
+                        .syncs
+                        .iter()
+                        .map(|sync| {
+                            DeviceSpanSyncMetadata::new(
+                                sync.kind.as_str(),
+                                sync.count,
+                                sync.bytes,
+                                sync.blocked_ns,
+                            )
+                            .with_peer_bytes(sync.peer_bytes)
+                        })
+                        .collect(),
                 })
                 .collect(),
         }
+    }
+
+    /// Join the dispatcher's classification to the runtime's counters: one
+    /// `avoidable` row per classified (entry, kind) that the run synced, with
+    /// that entry's counters for the kind. The runtime counts; the dispatcher
+    /// classified, so a class whose sync never ran produces no row.
+    pub(crate) fn with_avoidable(
+        mut self,
+        classes: &[faber_cli::package::mir::SpanAvoidable],
+    ) -> Self {
+        for class in classes {
+            let kind = class.kind;
+            let counters = self
+                .entries
+                .iter()
+                .find(|entry| entry.entry == class.entry)
+                .and_then(|entry| entry.syncs.iter().find(|sync| sync.kind == kind));
+            if let Some(sync) = counters {
+                self.avoidable.push(DeviceSpanAvoidableMetadata {
+                    entry: class.entry.clone(),
+                    kind: kind.to_owned(),
+                    avoidable: class.avoidable.to_owned(),
+                    detail: class.detail.clone(),
+                    count: sync.count,
+                    bytes: sync.bytes,
+                    blocked_ns: sync.blocked_ns,
+                });
+            }
+        }
+        self
     }
 }
 

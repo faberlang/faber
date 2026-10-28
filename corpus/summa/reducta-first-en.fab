@@ -1,0 +1,71 @@
++++
+locale = "en"
+term = "reducta-first-en"
+kind = "concept"
+category = "reduction"
+grammar = ["reducta_expr", "reducta_op", "reducta_body", "apud_clause"]
+canonical = true
+summary = "First-match reduction: reduce via first returns the first element whose predicate holds, `none` for no match and empty sources."
+syntax = "reduce via first from <tensor> [at [coords]] let <binder> { return <predicate> }"
+related = ["reduce", "none", "tensor"]
++++
+
+# =============================================================================
+# reduce via first — total first-match selection over a tensor or matrix
+# =============================================================================
+#
+# What this teaches:
+#   • `first` is a reduction operator beside sum, product, max, min, argmax,
+#     argmin, all, any and count; the body is the predicate, exactly as for
+#     count, any and all, and the result is the first element it accepts
+#   • `T ∪ none` — no match and an empty source give `none`, never an error,
+#     and the result is optional even over a statically non-empty source
+#   • total evaluation — the predicate runs for EVERY element, the ones after
+#     the first match included; selection is first-live in row-major order,
+#     never an early exit ([1.0, 5.0, 3.0] over `> 2.0` picks 5.0, not 3.0)
+#   • a predicate error rides the error channel and is never turned into `none`
+#   • the source is a tensor or matrix, as for every reduction; `at [i, j]`
+#     binds the coordinates of the element under test
+#
+# Common mistakes:
+#   • `reduce via first` over a list — a reduction source is a tensor or
+#     matrix; lists keep their methods
+#   • expecting an index — the result is the element; read the coordinates
+#     inside the predicate if you need them
+#   • expecting early exit — the predicate still runs after the first match
+#   • `per` grouping or a `coalesce` identity on the operator itself —
+#     refused by name (`coalesce` on the whole expression is the ordinary
+#     default for an optional value)
+#
+# See also: reduce, none, count, any, all
+# =============================================================================
+
+fn pick(tf32[3] xs) → f32 ∪ none {
+    return reduce via first from xs let x { return x ≻ 2.0 }
+}
+
+fn pick_cell(tf32[2, 2] m) → f32 ∪ none {
+    return reduce via first from m at [i, j] let x { return x ≻ 1.0 }
+}
+
+fn pick_past(tf32[4] xs, int start) → f32 ∪ none {
+    return reduce via first from xs at [i] let x { return i ≻ start }
+}
+
+fn pick_empty(tf32[0] xs) → f32 ∪ none {
+    return reduce via first from xs let x { return x ≻ 0.0 }
+}
+
+main {
+    let tf32[3] xs ← [1.0, 5.0, 3.0] ↦ tf32[3]
+    print pick(xs)
+    let tf32[3] none_above ← [1.0, 0.5, 2.0] ↦ tf32[3]
+    print pick(none_above)
+    let tf32[0] nothing ← empty
+    print pick_empty(nothing)
+    let list<f32> flat ← [0.5, 2.0, 3.0, 4.0]
+    let tf32[2, 2] m ← flat ↦ tf32[2, 2]
+    print pick_cell(m)
+    let tf32[4] ys ← [10.0, 20.0, 30.0, 40.0] ↦ tf32[4]
+    print pick_past(ys, 1)
+}

@@ -655,6 +655,9 @@ fn device_span_stats_appear_only_for_a_spanned_device() {
         split_launches: 2,
         replicated_launches: 1,
         first_launches: 1,
+        syncs: Vec::new(),
+        peer_bytes: 64,
+        host_staged_bytes: 32,
         entries: vec![
             SpanEntryStats {
                 entry: "gradus".to_owned(),
@@ -668,6 +671,7 @@ fn device_span_stats_appear_only_for_a_spanned_device() {
                 ..SpanEntryStats::default()
             },
         ],
+        ..SpanStats::default()
     };
     let runtime = |span| run_stats::DeviceRuntimeMetadata {
         launch_count: 4,
@@ -697,4 +701,206 @@ fn device_span_stats_appear_only_for_a_spanned_device() {
     assert_eq!(decoded, spanned);
     let plain = serde_json::to_value(runtime(None)).expect("plain JSON");
     assert!(plain.get("span").is_none(), "{plain}");
+}
+
+/// The planner audit's stats schema (need, U3): per-kind syncs under
+/// `span.syncs` and per entry, and one `span.avoidable[]` row per classified
+/// (entry, kind) the run synced. Every field name is pinned, and an artifact
+/// written before the audit (no `syncs`, no `avoidable`) still decodes.
+#[cfg(all(feature = "device-runtime", feature = "runner"))]
+#[test]
+fn device_span_stats_carry_the_sync_audit_schema() {
+    use faber_cli::package::mir::SpanAvoidable;
+    use radix_device_core::runtime::{SpanEntryStats, SpanStats, SpanSyncKind, SpanSyncStats};
+    let row = |kind, count, bytes, blocked_ns| SpanSyncStats {
+        kind,
+        count,
+        bytes,
+        peer_bytes: 0,
+        blocked_ns,
+    };
+    let gather = row(SpanSyncKind::OwnWriteGather, 2, 32, 700);
+    let wait = row(SpanSyncKind::HostWaitAll, 1, 0, 300);
+    let partials = row(SpanSyncKind::PartialsAllGather, 2, 8, 90);
+    let span = SpanStats {
+        partitions: 2,
+        moved_bytes: 40,
+        transfers: 4,
+        split_launches: 2,
+        syncs: vec![gather, partials, wait],
+        entries: vec![
+            SpanEntryStats {
+                entry: "k1".to_owned(),
+                split_launches: 1,
+                syncs: vec![gather, wait],
+                ..SpanEntryStats::default()
+            },
+            SpanEntryStats {
+                entry: "k2".to_owned(),
+                split_launches: 1,
+                syncs: vec![partials],
+                ..SpanEntryStats::default()
+            },
+        ],
+        ..SpanStats::default()
+    };
+    let classes = [
+        SpanAvoidable {
+            entry: "k1".to_owned(),
+            kind: "own-write-gather",
+            avoidable: "unbounded-read",
+            detail: Some("no read set".to_owned()),
+        },
+        SpanAvoidable {
+            entry: "k2".to_owned(),
+            kind: "partials-all-gather",
+            avoidable: "fusable-with-previous",
+            detail: Some("k1".to_owned()),
+        },
+        // Classified, never synced: no row.
+        SpanAvoidable {
+            entry: "k1".to_owned(),
+            kind: "first-broadcast",
+            avoidable: "first-fallback",
+            detail: Some("recipe".to_owned()),
+        },
+    ];
+    let metadata = run_stats::DeviceSpanMetadata::from_stats(&span).with_avoidable(&classes);
+    let value = serde_json::to_value(&metadata).expect("span JSON");
+    assert_eq!(
+        value["syncs"],
+        serde_json::json!([
+            {"kind": "own-write-gather", "count": 2, "bytes": 32, "blocked_ns": 700},
+            {"kind": "partials-all-gather", "count": 2, "bytes": 8, "blocked_ns": 90},
+            {"kind": "host-wait-all", "count": 1, "bytes": 0, "blocked_ns": 300},
+        ])
+    );
+    assert_eq!(
+        value["entries"][0]["syncs"][1],
+        serde_json::json!({"kind": "host-wait-all", "count": 1, "bytes": 0, "blocked_ns": 300})
+    );
+    assert_eq!(
+        value["avoidable"],
+        serde_json::json!([
+            {
+                "entry": "k1", "kind": "own-write-gather", "avoidable": "unbounded-read",
+                "detail": "no read set", "count": 2, "bytes": 32, "blocked_ns": 700
+            },
+            {
+                "entry": "k2", "kind": "partials-all-gather", "avoidable": "fusable-with-previous",
+                "detail": "k1", "count": 2, "bytes": 8, "blocked_ns": 90
+            },
+        ])
+    );
+    let decoded: run_stats::DeviceSpanMetadata =
+        serde_json::from_value(value).expect("audit schema");
+    assert_eq!(decoded, metadata);
+
+    // An artifact from before the audit has neither field.
+    let old = serde_json::json!({
+        "partitions": 2, "moved_bytes": 0, "transfers": 0, "replica_write_bytes": 0,
+        "split_launches": 1, "replicated_launches": 0, "first_launches": 0,
+        "entries": [{"entry": "k", "split_launches": 1, "replicated_launches": 0, "first_launches": 0}]
+    });
+    let old: run_stats::DeviceSpanMetadata = serde_json::from_value(old).expect("old artifact");
+    assert!(old.syncs.is_empty() && old.avoidable.is_empty());
+    let plain = serde_json::to_value(&old).expect("JSON");
+    assert!(plain.get("syncs").is_none() && plain.get("avoidable").is_none());
+}
+
+/// The transport audit (need, U5): peer and host-staged bytes apart,
+/// the class chosen for every ordered pair with what moved over it, and the
+/// device-to-device copies with their measured dependency latency. A sync row
+/// carries `peer_bytes` only when some bytes moved device to device, an
+/// artifact from before the transport work still decodes, and a run with no
+/// peer copy has no `peer` key.
+#[cfg(feature = "device-runtime")]
+#[test]
+fn device_span_stats_carry_the_transport_audit() {
+    use radix_device_core::runtime::{
+        PeerCopyStats, PeerLinkClass, SpanLinkStats, SpanStats, SpanSyncKind, SpanSyncStats,
+    };
+    let span = SpanStats {
+        partitions: 2,
+        moved_bytes: 100,
+        transfers: 3,
+        peer_bytes: 60,
+        host_staged_bytes: 40,
+        syncs: vec![SpanSyncStats {
+            kind: SpanSyncKind::OwnWriteGather,
+            count: 3,
+            bytes: 100,
+            peer_bytes: 60,
+            blocked_ns: 5,
+        }],
+        links: vec![
+            SpanLinkStats {
+                from: 0,
+                to: 1,
+                class: PeerLinkClass::Peer,
+                transfers: 2,
+                bytes: 60,
+            },
+            SpanLinkStats {
+                from: 1,
+                to: 0,
+                class: PeerLinkClass::HostStaged,
+                transfers: 1,
+                bytes: 40,
+            },
+        ],
+        peer: PeerCopyStats {
+            copies: 2,
+            bytes: 60,
+            timed: 2,
+            dependency_us: 90,
+            max_dependency_us: 70,
+        },
+        ..SpanStats::default()
+    };
+    let metadata = run_stats::DeviceSpanMetadata::from_stats(&span);
+    let value = serde_json::to_value(&metadata).expect("span JSON");
+    assert_eq!(value["peer_bytes"], 60);
+    assert_eq!(value["host_staged_bytes"], 40);
+    assert_eq!(
+        value["links"],
+        serde_json::json!([
+            {"from": 0, "to": 1, "class": "peer", "transfers": 2, "bytes": 60},
+            {"from": 1, "to": 0, "class": "host-staged", "transfers": 1, "bytes": 40},
+        ])
+    );
+    assert_eq!(
+        value["peer"],
+        serde_json::json!({
+            "copies": 2, "bytes": 60, "timed": 2, "dependency_us": 90, "max_dependency_us": 70
+        })
+    );
+    assert_eq!(
+        value["syncs"][0],
+        serde_json::json!({
+            "kind": "own-write-gather", "count": 3, "bytes": 100, "peer_bytes": 60,
+            "blocked_ns": 5
+        })
+    );
+    let decoded: run_stats::DeviceSpanMetadata =
+        serde_json::from_value(value).expect("transport schema");
+    assert_eq!(decoded, metadata);
+
+    let host_only = run_stats::DeviceSpanMetadata::from_stats(&SpanStats {
+        partitions: 2,
+        ..SpanStats::default()
+    });
+    let value = serde_json::to_value(&host_only).expect("span JSON");
+    assert!(value.get("peer").is_none(), "{value}");
+    assert!(value.get("links").is_none(), "{value}");
+    // An artifact from before the transport audit has none of the new keys.
+    let old = serde_json::json!({
+        "partitions": 2, "moved_bytes": 8, "transfers": 1, "replica_write_bytes": 0,
+        "split_launches": 1, "replicated_launches": 0, "first_launches": 0,
+        "entries": []
+    });
+    let decoded: run_stats::DeviceSpanMetadata =
+        serde_json::from_value(old).expect("pre-transport artifact");
+    assert_eq!((decoded.peer_bytes, decoded.host_staged_bytes), (0, 0));
+    assert!(decoded.links.is_empty() && decoded.peer.is_none());
 }

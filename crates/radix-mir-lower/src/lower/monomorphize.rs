@@ -1758,13 +1758,15 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     fn projection_ty(&mut self, base_ty: MirType, projection: &MirProjection, span: Span) -> Option<MirType> {
         match projection {
             MirProjection::Field(field) => self.field_projection_ty(base_ty, *field, span),
-            MirProjection::Index(_) => index_projection_result_ty(base_ty, self.types())
-                .map_err(|err| {
-                    self.lowerer
-                        .errors
-                        .push(MirError::validation(span, err.to_string()));
-                })
-                .ok(),
+            MirProjection::Index(_) | MirProjection::ProvenIndex(_) => {
+                index_projection_result_ty(base_ty, self.types())
+                    .map_err(|err| {
+                        self.lowerer
+                            .errors
+                            .push(MirError::validation(span, err.to_string()));
+                    })
+                    .ok()
+            }
             MirProjection::VariantField { .. } => {
                 self.lowerer.errors.push(MirError::validation(
                     span,

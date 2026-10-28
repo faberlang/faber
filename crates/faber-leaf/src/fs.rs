@@ -22,7 +22,7 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
 pub const MAX_RANGE_READ_BYTES: usize = 512 * 1024 * 1024;
 
 /// Route names this leaf serves. Must match the `serve` match arms below.
-const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "solum:lege",
     "solum:hauri",
     "solum:hauriet",

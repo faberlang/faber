@@ -712,6 +712,21 @@ impl LocalePack {
                     .get(placeholder)
                     .map(|binding| binding.canonical.clone())
             })
+            .or_else(|| self.intrinsic_placeholder_value(placeholder))
+    }
+
+    /// A placeholder naming a registered intrinsic canonical (`{limes}`)
+    /// renders the pack's own spelling of that intrinsic, so a diagnostic can
+    /// name a method without hard-coding another pack's word. Keywords and
+    /// types win a name collision; a pack with no row keeps the canonical.
+    fn intrinsic_placeholder_value(&self, placeholder: &str) -> Option<String> {
+        let is_intrinsic = INTRINSICS
+            .iter()
+            .any(|entry| entry.faber_name == placeholder)
+            || SERMO_VIEW_METHODS
+                .iter()
+                .any(|entry| entry.faber_name == placeholder);
+        is_intrinsic.then(|| self.intrinsic_surface(placeholder).to_owned())
     }
 }
 

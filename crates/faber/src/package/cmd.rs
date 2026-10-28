@@ -17,15 +17,6 @@ use super::cargo::{
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, invoke_cargo_build_library,
     lock_generated_crate_build,
 };
-#[cfg(any(
-    feature = "hir-rust",
-    feature = "hir-go",
-    feature = "hir-ts",
-    feature = "mir-wasm"
-))]
-use super::discover_build_layout as discover_package_layout;
-#[cfg(feature = "hir-go")]
-use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
 #[cfg(feature = "hir-rust")]
 use super::manifest::FaberManifest;
 use super::manifest_build_target_for_input;
@@ -34,61 +25,65 @@ use super::package_host_selection_diagnostic;
 #[cfg(any(feature = "hir-rust", feature = "hir-ts"))]
 use super::read_manifest;
 #[cfg(feature = "mir-llvm")]
-use super::{LlvmHostProfile, build_host_program};
+use super::{LlvmHostProfile, build_host_program_in};
 use super::{MANIFEST_FILE, config_with_locale};
-#[cfg(any(
-    feature = "hir-rust",
-    feature = "hir-go",
-    feature = "hir-ts",
-    feature = "mir-wasm"
-))]
-use radix::program::discovery::BuildLayout;
 
-/// Layout for a package-mode build of `input`.
-///
-/// A manifest-backed package owns its `target/` tree. A single `.fab` file
-/// with no `faber.toml` above it has no package of its own: its generated
-/// project and `target/` go under `out_dir`, never into the source directory.
-/// The layout's `package_root` and `manifest_path` still name the source side.
 #[cfg(any(
     feature = "hir-rust",
     feature = "hir-go",
     feature = "hir-ts",
-    feature = "mir-wasm"
+    feature = "mir-wasm",
+    feature = "mir-llvm"
 ))]
-pub(super) fn discover_build_layout(
-    input: &Path,
-    out_dir: &Path,
-) -> Result<BuildLayout, Box<radix::module::Diagnostic>> {
-    let layout = discover_package_layout(input)?;
-    if !is_manifestless_single_file(input) {
-        return Ok(layout);
+pub(super) mod build_layout {
+    use std::path::Path;
+
+    use radix::program::discovery::BuildLayout;
+
+    use crate::package::{MANIFEST_FILE, absolutize_path};
+
+    /// Layout for a package-mode build of `input`.
+    ///
+    /// A manifest-backed package owns its `target/` tree. A single `.fab` file
+    /// with no `faber.toml` above it has no package of its own: its generated
+    /// project and `target/` go under `out_dir`, never into the source directory.
+    /// The layout's `package_root` and `manifest_path` still name the source side.
+    pub(in crate::package) fn discover_build_layout(
+        input: &Path,
+        out_dir: &Path,
+    ) -> Result<BuildLayout, Box<radix::module::Diagnostic>> {
+        let layout = crate::package::discover_build_layout(input)?;
+        if !is_manifestless_single_file(input) {
+            return Ok(layout);
+        }
+        let relocated =
+            BuildLayout::from_package_root(absolutize_path(out_dir), layout.binary_name());
+        Ok(BuildLayout {
+            package_root: layout.package_root,
+            manifest_path: layout.manifest_path,
+            ..relocated
+        })
     }
-    let relocated =
-        BuildLayout::from_package_root(super::absolutize_path(out_dir), layout.binary_name());
-    Ok(BuildLayout {
-        package_root: layout.package_root,
-        manifest_path: layout.manifest_path,
-        ..relocated
-    })
-}
 
-/// True for a regular source file that is not a manifest and has no
-/// `faber.toml` in any ancestor directory.
+    /// True for a regular source file that is not a manifest and has no
+    /// `faber.toml` in any ancestor directory.
+    pub(in crate::package) fn is_manifestless_single_file(input: &Path) -> bool {
+        input.is_file()
+            && input.file_name().and_then(|name| name.to_str()) != Some(MANIFEST_FILE)
+            && !input
+                .ancestors()
+                .skip(1)
+                .any(|dir| dir.join(MANIFEST_FILE).exists())
+    }
+}
 #[cfg(any(
     feature = "hir-rust",
     feature = "hir-go",
     feature = "hir-ts",
-    feature = "mir-wasm"
+    feature = "mir-wasm",
+    feature = "mir-llvm"
 ))]
-fn is_manifestless_single_file(input: &Path) -> bool {
-    input.is_file()
-        && input.file_name().and_then(|name| name.to_str()) != Some(MANIFEST_FILE)
-        && !input
-            .ancestors()
-            .skip(1)
-            .any(|dir| dir.join(MANIFEST_FILE).exists())
-}
+pub(super) use build_layout::discover_build_layout;
 
 /// Print `message` and terminate with the internal-failure class: the caller
 /// reports a compile step that produced nothing without a diagnostic.
@@ -319,13 +314,12 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
             } else {
                 LlvmHostProfile::Debug
             };
-            let build = match build_host_program(&config, &input_path, profile) {
+            let build = match build_host_program_in(&config, &input_path, profile, &command.out_dir)
+            {
                 Ok(build) => build,
-                Err(diagnostics) => report_diagnostics_and_exit(
-                    &diagnostics,
-                    locale_pack.as_ref(),
-                    "llvm-host build failed",
-                ),
+                Err(diagnostics) => {
+                    super::build_recipe::report_and_exit(&diagnostics, locale_pack.as_ref())
+                }
             };
             println!("{}", build.binary_path.display());
             return;
@@ -430,53 +424,36 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 return;
             }
             Err(diagnostics) => {
-                super::ts_build::report_and_exit(&diagnostics, locale_pack.as_ref())
+                super::build_recipe::report_and_exit(&diagnostics, locale_pack.as_ref())
             }
         }
     }
 
-    // G6 GO3/GO4: package Go builds write target/faber/go and invoke `go build`.
-    // The multi-module file collection travels inside the compile result
-    // itself (FBR-P2-003) — no hidden thread-local state.
+    // Package Go builds write target/faber/go (module, vendored runtime) and
+    // run the backend recipe's build command. The multi-module file
+    // collection travels inside the compile result itself (FBR-P2-003).
     if is_package && target == Target::HirGo {
         #[cfg(not(feature = "hir-go"))]
         exit_target_feature_unavailable(Target::HirGo);
         #[cfg(feature = "hir-go")]
         {
-            let go_result = radix::program::emit::compile_package_result(
-                &config,
-                &input_path,
-                &super::faber_emission_seams(),
-            );
-            crate::postprocess::print_diagnostics(
-                &go_result.compile_result.diagnostics,
-                DiagnosticMode::Normal,
-                locale_pack.as_ref(),
-            );
-            let Some(output) = go_result.compile_result.output else {
-                fail_compilation(&go_result.compile_result.diagnostics);
-            };
             let layout = match discover_build_layout(&input_path, &command.out_dir) {
                 Ok(l) => l,
                 Err(d) => fail_with_diagnostic(&d),
             };
-            let go_layout = GoBuildLayout::from_package(&layout);
-            let code = radix::services::output_code(output);
-            if let Err(d) = emit_go_module_with_postprocess(
-                &go_layout,
-                &code,
-                &go_result.go_modules,
+            match super::go_build::go_program::build_go_program(
+                &config,
+                &input_path,
+                &layout,
                 format,
                 linter,
+                locale_pack.as_ref(),
             ) {
-                fail_with_diagnostic(&d);
-            }
-            match invoke_go_build(&go_layout) {
-                Ok(binary_path) => {
-                    println!("{}", binary_path.display());
+                Ok(program) => {
+                    println!("{}", program.binary.display());
                     return;
                 }
-                Err(d) => fail_with_diagnostic(&d),
+                Err(failure) => failure.exit(locale_pack.as_ref()),
             }
         }
     }
@@ -609,7 +586,8 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                     .and_then(|s| s.to_str())
                     .filter(|s| !s.is_empty())
                     .unwrap_or("faber_out");
-                let layout = BuildLayout::from_package_root(&package_root, stem);
+                let layout =
+                    radix::program::discovery::BuildLayout::from_package_root(&package_root, stem);
                 // Same per-package lock as package builds: the emit + cargo
                 // sequence shares `target/faber/` under the current directory.
                 let _build_lock = match lock_generated_crate_build(&layout) {
@@ -646,7 +624,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
 /// production to Cargo, returning the produced binary path.
 #[cfg(feature = "hir-rust")]
 fn emit_crate_and_build(
-    layout: &BuildLayout,
+    layout: &radix::program::discovery::BuildLayout,
     code: &str,
     meta: Option<&FaberManifest>,
     plan: &super::RustRuntimePlan,
@@ -1070,10 +1048,6 @@ fn advice_target(request: DeviceAdviceRequest) -> (super::device::AdviceDevice, 
             crate::exit_status::exit_usage();
         }
     };
-    if request.partitions.is_some() && device == AdviceDevice::Cuda {
-        eprintln!("error: `--partitions` is valid only with `--device cpu` or `--device metal`");
-        crate::exit_status::exit_usage();
-    }
     (device, request.partitions.unwrap_or(1))
 }
 
@@ -1098,12 +1072,18 @@ fn print_device_advice(
     locale_pack: Option<&radix::module::locale::LocalePack>,
 ) {
     let mut advice = Vec::new();
+    let mut audit = Vec::new();
     let mut failures = Vec::new();
     for unit in lowering_units(config, input_path) {
         match super::mir::with_check_lowered_package_mir(config, &unit, |lowered| {
-            super::device::split_advice(lowered, device, partitions)
+            let rows = super::device::split_advice(lowered, device, partitions)?;
+            let syncs = super::device::span_audit(lowered, device, partitions)?;
+            Ok((rows, syncs))
         }) {
-            Ok(Ok(rows)) => advice.extend(rows),
+            Ok(Ok((rows, syncs))) => {
+                advice.extend(rows);
+                audit.extend(syncs);
+            }
             Ok(Err(errors)) | Err(errors) => failures.extend(errors),
         }
     }
@@ -1113,10 +1093,17 @@ fn print_device_advice(
     // A library's modules lower one by one and may share kernels.
     advice.sort_by(|a, b| a.kernel.cmp(&b.kernel));
     advice.dedup();
+    audit.sort();
+    audit.dedup();
     let file = input_path.display().to_string();
     let diagnostics: Vec<_> = advice
         .iter()
         .map(|row| super::device::advice_diagnostic(row, device, partitions, &file))
+        .chain(
+            audit
+                .iter()
+                .map(|row| super::device::audit_diagnostic(row, device, partitions, &file)),
+        )
         .collect();
     if mode == DiagnosticMode::Diagnostics {
         if !diagnostics.is_empty() {

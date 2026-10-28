@@ -42,21 +42,12 @@ fn all_is_the_declared_set() {
 }
 
 #[test]
-fn supported_leaves_go_is_exactly_the_ported_set() {
-    assert_eq!(
-        Target::HirGo.supported_leaves(),
-        &[Leaf::Stdio, Leaf::Process, Leaf::Clock, Leaf::Entropy]
-    );
-    for leaf in [
-        Leaf::Fs,
-        Leaf::Tcp,
-        Leaf::Http,
-        Leaf::Websocket,
-        Leaf::Machine,
-    ] {
+fn supported_leaves_go_is_every_leaf() {
+    assert_eq!(Target::HirGo.supported_leaves(), Leaf::ALL);
+    for leaf in Leaf::ALL {
         assert!(
-            !Target::HirGo.supports_leaf(leaf),
-            "go must refuse {leaf:?}: no native port"
+            Target::HirGo.supports_leaf(*leaf),
+            "go ports every leaf: {leaf:?}"
         );
     }
 }

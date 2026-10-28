@@ -102,8 +102,8 @@ mod entry_args_tests;
 #[path = "lower/explicit_generic_constructor_test.rs"]
 mod explicit_generic_constructor_tests;
 #[cfg(test)]
-#[path = "lower/first_match_test.rs"]
-mod first_match_tests;
+#[path = "lower/first_reduction_test.rs"]
+mod first_reduction_tests;
 #[cfg(test)]
 #[path = "lower_glyph_test.rs"]
 mod glyph_tests;

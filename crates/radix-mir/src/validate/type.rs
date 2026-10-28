@@ -290,7 +290,9 @@ impl Validator<'_, '_> {
         span: Span,
     ) -> Option<MirType> {
         match self.type_kind(base_ty).clone() {
-            Type::Array(inner) | Type::BoundedArray { element: inner, .. }
+            Type::Array(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
                 if index.is_some_and(|(_, index_ty)| {
                     matches!(self.type_kind(index_ty), Type::Intervallum(..))
                 }) =>
@@ -331,7 +333,7 @@ impl Validator<'_, '_> {
             }
             // Route B (AEU-4): bounded lista element gathers index the live
             // prefix lanes only (the lowerer emits constants below len).
-            Type::BoundedArray { element, .. } => {
+            Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
                 self.require_numerus_index(index, span, "bounded array index is not numerus");
                 Some(MirType::semantic(element))
             }
@@ -541,7 +543,10 @@ impl Validator<'_, '_> {
         };
         match base_layout.kind {
             MirLayoutKind::DeviceView(view) => {
-                if !matches!(projection, MirProjection::Index(_)) {
+                if !matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(span, "device view projection must be an index");
                 }
                 if !view.row_major || view.offset_elements != 0 {
@@ -603,7 +608,10 @@ impl Validator<'_, '_> {
                             | MirAggregateFamily::BoundedTextus
                     ) =>
             {
-                if !matches!(projection, MirProjection::Index(_)) {
+                if !matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(span, "bounded array projection must be an index");
                 }
                 let Ok(result_layout) = self.context.layouts.layout_for_type(result_ty) else {
@@ -621,7 +629,7 @@ impl Validator<'_, '_> {
             // element come from `resolve_struct_layout`, which the layout table
             // cannot see. The result must be that field's own element — a
             // scalar, a device vector, or the physical fixed-array aggregate
-            // (`list<T, N>`, validated at its own index projection below).
+            // (`list<T, size N>`, validated at its own index projection below).
             MirLayoutKind::Aggregate(layout)
                 if layout.carrier == MirAggregateCarrier::PhysicalValue
                     && layout.family == MirAggregateFamily::Struct =>
@@ -654,7 +662,10 @@ impl Validator<'_, '_> {
                     self.error(span, "genus field projection result has no layout");
                     return;
                 };
-                if matches!(self.type_kind(result_ty), Type::BoundedArray { .. }) {
+                if matches!(
+                    self.type_kind(result_ty),
+                    Type::BoundedArray { .. } | Type::RangedArray { .. }
+                ) {
                     let physical_array = matches!(
                         result_layout.kind,
                         MirLayoutKind::Aggregate(array)
@@ -681,7 +692,10 @@ impl Validator<'_, '_> {
                 if layout.carrier == MirAggregateCarrier::PhysicalValue
                     && layout.family != MirAggregateFamily::Tuple =>
             {
-                if matches!(projection, MirProjection::Index(_)) {
+                if matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(
                         span,
                         "physical aggregate representation has no index projection contract",
@@ -691,7 +705,10 @@ impl Validator<'_, '_> {
             MirLayoutKind::Aggregate(layout)
                 if layout.family == MirAggregateFamily::TensorRuntime =>
             {
-                if matches!(projection, MirProjection::Index(_)) {
+                if matches!(
+                    projection,
+                    MirProjection::Index(_) | MirProjection::ProvenIndex(_)
+                ) {
                     self.error(
                         span,
                         "tensor runtime aggregate has no device-view projection contract",
@@ -734,7 +751,10 @@ impl Validator<'_, '_> {
     ) {
         if !matches!(
             projection,
-            MirProjection::Field(_) | MirProjection::VectorLane(_) | MirProjection::Index(_)
+            MirProjection::Field(_)
+                | MirProjection::VectorLane(_)
+                | MirProjection::Index(_)
+                | MirProjection::ProvenIndex(_)
         ) {
             self.error(
                 span,
@@ -818,6 +838,7 @@ impl Validator<'_, '_> {
             | Type::Ref(_, inner)
             | Type::Alias(_, inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::BoundedQueue { element: inner, .. }
             | Type::BoundedStack { element: inner, .. } => self.validate_type_id(inner, span, seen),
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {

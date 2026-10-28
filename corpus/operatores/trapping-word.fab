@@ -1,0 +1,57 @@
++++
+term = "trapping"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "qualified_type", "type_arguments", "type_argument", "additive_expr", "assignment", "expr_stmt"]
+category = "arithmetic"
+summary = "`trapping<u8>` and `trapping<i32>` cells accept every in-range store, and arithmetic over them is exact."
+syntax = "trapping<u8> | trapping<i32>"
+related = ["trapping", "wrapping", "saturating", "numerus-overflow"]
+locale = "en"
++++
+# =============================================================================
+# trapping — `trapping<u8>` and `trapping<i32>` cells accept every in-range store, and arithmetic over them is exact.
+# =============================================================================
+#
+# What this teaches:
+#   • A `trapping` cell holds a width, and the width is checked only where
+#     a value is stored into it: an in-range store simply lands
+#   • Arithmetic over cells is exact: `a + b` over two `trapping<u8>`
+#     values of 200 is 400, and nothing is stored, so nothing traps
+#   • A store that fits, including the extremes of the width, succeeds; a
+#     store that does not fit is the trap shown in store-sites-trap
+#
+# Common mistakes:
+#   • Reading the trap as happening where the arithmetic is computed:
+#     arithmetic is exact, and only the store into the `trapping` slot
+#     checks
+#   • Expecting a `trapping` cell to wrap or clamp: that is `wrapping<W>`
+#     and `saturating<W>`
+#
+# See also: store-sites-trap, numerus-overflow, wrapping-store-rule
+# =============================================================================
+
+main {
+    let trapping<u8> a ← 200
+    let trapping<u8> b ← 100 + 100
+    print a
+    print b
+    print a + b
+    let trapping<u8> top ← 255
+    let trapping<u8> bottom ← 0
+    print top
+    print bottom
+    let trapping<i32> c ← 2000000000
+    let trapping<i32> d ← -2000000000
+    print c + c
+    print c + d
+    print d + d
+    mut trapping<i32> n ← 5
+    n ← n + 10
+    print n
+    n ← n * 1000
+    print n
+    n ← n - 2000000000
+    print n
+    let u8 plain ← (a + b) - 200
+    print plain
+}

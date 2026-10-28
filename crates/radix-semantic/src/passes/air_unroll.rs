@@ -74,6 +74,7 @@ pub fn unroll(
 ) -> Result<(), Vec<SemanticError>> {
     let mut ids = IdGen::from_module(hir);
     let mut errors = Vec::new();
+    let before = LiveNodes::of(hir);
 
     for item in &mut hir.items {
         if lanes.lane_for(item.def_id) != Some(RadixLane::Air) {
@@ -99,11 +100,134 @@ pub fn unroll(
         );
     }
 
+    // An unrolled loop's statements, its binder and its body block leave the
+    // HIR; the presentation records they owned would dangle on the finalized
+    // unit (and fail FHIR validation at load).
+    let after = LiveNodes::of(hir);
+    forget_removed_nodes(presentation, &before.removed_by(&after));
+
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors)
     }
+}
+
+/// The ids a module's HIR holds: node ids, definitions and block-end anchors.
+#[derive(Default)]
+struct LiveNodes {
+    hirs: FxHashSet<HirId>,
+    defs: FxHashSet<DefId>,
+    block_ends: FxHashSet<radix_hir::HirSourceAnchorId>,
+}
+
+impl LiveNodes {
+    fn of(hir: &HirModule) -> Self {
+        let mut nodes = Self::default();
+        walk_program(&mut nodes, hir);
+        nodes
+    }
+
+    /// The ids `self` holds that `after` no longer does.
+    fn removed_by(&self, after: &Self) -> Self {
+        Self {
+            hirs: self.hirs.difference(&after.hirs).copied().collect(),
+            defs: self.defs.difference(&after.defs).copied().collect(),
+            block_ends: self
+                .block_ends
+                .difference(&after.block_ends)
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
+impl HirVisitor for LiveNodes {
+    fn visit_def(&mut self, def_id: DefId, _name: Symbol) {
+        self.defs.insert(def_id);
+    }
+
+    fn visit_block(&mut self, block: &HirBlock) {
+        if let Some(end) = &block.end {
+            self.block_ends.insert(end.id.clone());
+        }
+        walk_block(self, block);
+    }
+
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        self.hirs.insert(stmt.id);
+        walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        self.hirs.insert(expr.id);
+        walk_expr(self, expr);
+    }
+}
+
+/// Drop every presentation record keyed by a node the pass removed.
+///
+/// A trivia owner whose statement was unrolled away goes with its attachment:
+/// the lanes that replace the loop are synthesized, not authored.
+fn forget_removed_nodes(presentation: &mut HirPresentation, removed: &LiveNodes) {
+    let gone = |id: &HirId| removed.hirs.contains(id);
+    presentation.guard_si_ids.retain(|id| !gone(id));
+    presentation.elige_expr_ids.retain(|id| !gone(id));
+    presentation.glyph_ids.retain(|id| !gone(id));
+    presentation.radical_quarta_ids.retain(|id| !gone(id));
+    presentation.numeric_twin_ids.retain(|id| !gone(id));
+    presentation.empty_dense_ids.retain(|id| !gone(id));
+    presentation.inferred_constructor_ids.retain(|id| !gone(id));
+    presentation.axis_sugar.retain(|record| !gone(&record.id));
+    presentation
+        .discard_binding_stmts
+        .retain(|record| !gone(&record.expr_id));
+    presentation
+        .tuple_label_accesses
+        .retain(|record| !gone(&record.expr_id));
+    presentation
+        .insere_exprs
+        .retain(|record| !gone(&record.expr));
+    presentation
+        .template_holes
+        .retain(|record| !gone(&record.expr));
+    presentation
+        .destructure_bindings
+        .retain(|record| !record.stmt_ids.iter().any(gone));
+    presentation
+        .await_assignment_bindings
+        .retain(|def| !removed.defs.contains(def));
+    presentation
+        .function_modifier_bindings
+        .retain(|record| !removed.defs.contains(&record.local));
+    presentation
+        .compile_time_locals
+        .retain(|def| !removed.defs.contains(def));
+    presentation.owners.retain(|owner| match &owner.semantic {
+        Some(HirOwnerRef::Hir(id)) => !gone(id),
+        Some(HirOwnerRef::Def(id)) => !removed.defs.contains(id),
+        None => {
+            owner.kind != radix_hir::HirTriviaOwnerKind::BlockEnd
+                || !removed.block_ends.contains(&owner.id)
+        }
+    });
+    let live_anchors: FxHashSet<_> = presentation
+        .owners
+        .iter()
+        .map(|owner| owner.id.clone())
+        .collect();
+    presentation
+        .attachments
+        .retain(|attachment| live_anchors.contains(&attachment.anchor));
+    presentation
+        .block_ends
+        .retain(|end| !removed.block_ends.contains(&end.id));
+    presentation
+        .authored_types
+        .retain(|record| match &record.site.owner {
+            HirOwnerRef::Hir(id) => !gone(id),
+            HirOwnerRef::Def(id) => !removed.defs.contains(id),
+        });
 }
 
 fn unroll_function(
@@ -1070,7 +1194,7 @@ fn classify_ex_loop(
         };
     };
     let (_, source_ty) = types.peel_access_marker(source_ty);
-    // Route A bounded element sources: `lista<T, N>` (AEU-3) and the scalar
+    // Route A bounded element sources: `lista<T, magnitudo N>` (AEU-3) and the scalar
     // buffer forms `octeti<N>` / `ascii<N>` / `textus<N>` (AEU-7).
     let bounded_element = match types.get(source_ty) {
         Type::BoundedArray { element, .. } => Some(*element),
@@ -1367,75 +1491,28 @@ fn classify_ex_tensor_ready(
     }))
 }
 
-// ── First-match bounded-source admission (AFM-4) ───────────────────────
+// ── First-reduction bounded-source admission ──────────────────────────
 
-/// AIR-lane bounded-source route for a `primus_quem` source expression.
+/// Whether a `reducta via prima` source has a statically known extent.
 ///
-/// The first-match head admits on the AIR lane only over statically bounded
-/// sources; the MIR dataflow lowering (AFM-3) traverses the full extent with
-/// total predicate evaluation, so admission needs the bound, not an unroll.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FirstMatchSourceRoute {
-    /// Route T: array literal with per-element entries (no spread).
-    LiteralArray,
-    /// Routes A/B: concrete integer interval with a statically known extent.
-    ConcreteRange,
-    /// Route M: statically shaped tensor/matrix (or capacity-bounded array).
-    StaticShape,
-    /// Route C interplay: padded `conversio` with a static padded capacity.
-    /// The traversal consumes the padded extent; no mask is constructed
-    /// in-region (the caller-built 0/1 len-mask operand stays with the
-    /// caller).
-    PaddedConversio,
-}
-
-/// Classify a `primus_quem` source as a bounded AIR-lane route.
-///
-/// Returns `None` when the extent is not statically known: open or
-/// runtime-bound intervals, spreads, unbounded `lista`/array types, and
-/// incomplete tensor shapes all fail closed.
-pub(crate) fn first_match_source_route(
-    source: &HirExpression,
-    types: &TypeTable,
-) -> Option<FirstMatchSourceRoute> {
-    match &source.kind {
-        HirExpressionKind::Array(elements)
-            if elements
-                .iter()
-                .all(|element| matches!(element, HirArrayElement::Expr(_))) =>
-        {
-            Some(FirstMatchSourceRoute::LiteralArray)
+/// The first reduction admits on the AIR lane only over statically bounded
+/// sources; the MIR dataflow lowering traverses the full extent with total
+/// predicate evaluation, so admission needs the bound, not an unroll. The
+/// source is a tensor or matrix, as for every reduction. Incomplete tensor
+/// shapes fail closed, and a statically zero-extent shape is a bounded route.
+pub(crate) fn first_source_is_bounded(source: &HirExpression, types: &TypeTable) -> bool {
+    let Some(ty) = source.ty else {
+        return false;
+    };
+    let (_, peeled) = types.peel_access_marker(ty);
+    match types.get(peeled) {
+        Type::Tensor(_, _) => {
+            crate::tensor_type_directed::complete_tensor_type(ty, types).is_some()
         }
-        HirExpressionKind::Intervallum { .. } => {
-            concrete_range_values(source).map(|_| FirstMatchSourceRoute::ConcreteRange)
+        Type::Matrix(_, shape) => {
+            crate::i64s_from_literal_index(*shape, types).is_some_and(|dims| !dims.is_empty())
         }
-        HirExpressionKind::Conversio {
-            source: inner,
-            target: HirConversioTarget::Type(target),
-            ..
-        } => {
-            if bounded_capacity(*target, types).is_some() {
-                Some(FirstMatchSourceRoute::PaddedConversio)
-            } else {
-                first_match_source_route(inner, types)
-            }
-        }
-        _ => {
-            let ty = source.ty?;
-            let (_, peeled) = types.peel_access_marker(ty);
-            match types.get(peeled) {
-                Type::Tensor(_, _) => crate::tensor_type_directed::complete_tensor_type(ty, types)
-                    .map(|_| FirstMatchSourceRoute::StaticShape),
-                Type::Matrix(_, shape) => {
-                    let dims = crate::i64s_from_literal_index(*shape, types)?;
-                    (!dims.is_empty()).then_some(FirstMatchSourceRoute::StaticShape)
-                }
-                Type::BoundedArray { .. } => {
-                    bounded_capacity(ty, types).map(|_| FirstMatchSourceRoute::StaticShape)
-                }
-                _ => None,
-            }
-        }
+        _ => false,
     }
 }
 

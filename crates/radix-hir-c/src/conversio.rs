@@ -6,7 +6,7 @@
 //! not a finite integer after rounding) go through a `faber_try_*` call that
 //! says why it failed: with `⊥` the recovery value takes its place; without,
 //! the program ends with the runner's text for that failure. `list<T> ↦
-//! list<T, N>` copies into a fixed-capacity list and fails when the source is
+//! list<T, size N>` copies into a fixed-capacity list and fails when the source is
 //! longer, the runner's rule.
 
 use crate::Emitter;
@@ -206,9 +206,9 @@ impl Emitter<'_> {
             if radix_codegen_shared::is_byte_text_conversion(self.types, source_ty, target) {
                 let value = self.expr(source)?;
                 return if matches!(value.value, Value::List(_)) {
-                    self.bytes_text_decode(value, recovery)
+                    self.bytes_text_decode(&value, recovery)
                 } else {
-                    Ok(self.text_bytes_encode(value))
+                    Ok(self.text_bytes_encode(&value))
                 };
             }
             if radix_codegen_shared::list_text_conversion(self.types, source_ty, target).is_some() {
@@ -223,8 +223,8 @@ impl Emitter<'_> {
                 return self.bits_list_width_change(
                     source,
                     target,
-                    from,
-                    to,
+                    &from,
+                    &to,
                     be,
                     recovery.is_some(),
                 );
@@ -236,10 +236,33 @@ impl Emitter<'_> {
         if let Some(construct) = bits_conversion_width_mismatch(source_class, class) {
             return Err(unsupported(construct));
         }
-        let integer = matches!(value.value, Value::Int | Value::Exact);
         let effect = value.effect;
         // Conversions that cannot fail ignore a recovery (typecheck allows
         // one only where the conversion can fail).
+        let operand = self.bits_scalar_conversion(value, class, source_class, params, recovery)?;
+        // `textus ↦ string<N>`: the capacity check is a runtime store.
+        let operand = match self.text_capacity(target) {
+            Some(capacity) if operand.value == Value::Text => {
+                self.support.need(Helper::TextRead);
+                Operand::new(
+                    format!("faber_bounded_text({}, {capacity})", operand.text),
+                    Value::Text,
+                )
+            }
+            _ => operand,
+        };
+        Ok(operand.with_effect(effect))
+    }
+
+    /// Emit same-width raw-bits views.
+    fn bits_scalar_conversion(
+        &mut self,
+        value: Operand,
+        class: Ty,
+        source_class: Option<Ty>,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
         let operand = match (value.value, class) {
             // Raw bits are a same-width view of an integer's low-width
             // pattern. C's conversion to an unsigned cell is defined modulo
@@ -295,6 +318,20 @@ impl Emitter<'_> {
             {
                 Operand::new(format!("faber_f64_of_bits({})", value.text), Value::Float)
             }
+            _ => return self.plain_scalar_conversion(value, class, params, recovery),
+        };
+        Ok(operand)
+    }
+
+    /// Emit plain scalar casts and display.
+    fn plain_scalar_conversion(
+        &mut self,
+        value: Operand,
+        class: Ty,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        let operand = match (value.value, class) {
             // A conversion into a float class is the C cast: `int ↦ float`
             // widens, `float ↦ f32` narrows, and `f32 ↦ float` widens the
             // already-binary32 value.
@@ -339,6 +376,20 @@ impl Emitter<'_> {
             (Value::Int | Value::Exact, Ty::Bool) => {
                 Operand::new(format!("(({}) != 0)", value.text), Value::Truth)
             }
+            _ => return self.decimal_word_conversion(value, class, params, recovery),
+        };
+        Ok(operand)
+    }
+
+    /// Emit decimal and word conversions.
+    fn decimal_word_conversion(
+        &mut self,
+        value: Operand,
+        class: Ty,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        let operand = match (value.value, class) {
             // `d64` rows (D11.7): the exact carrier converts through the
             // runner's `faber_dec` helpers.
             (Value::Decimal, Ty::Int | Ty::Sized(_)) => {
@@ -387,6 +438,20 @@ impl Emitter<'_> {
             (Value::Int | Value::Exact, Ty::Saturating(width)) => {
                 self.store_word(&value, Ty::Saturating(width), "saturating", width)
             }
+            _ => return self.collection_conversion(value, class, params, recovery),
+        };
+        Ok(operand)
+    }
+
+    /// Emit identity and collection conversions.
+    fn collection_conversion(
+        &mut self,
+        value: Operand,
+        class: Ty,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        let operand = match (value.value, class) {
             (Value::Text, Ty::Text)
             | (Value::Float, Ty::Float)
             | (Value::Float32, Ty::Float32)
@@ -434,15 +499,30 @@ impl Emitter<'_> {
                     Value::List(v),
                 )
             }
+            _ => return self.fallible_scalar_conversion(&value, class, params, recovery),
+        };
+        Ok(operand)
+    }
+
+    /// Emit fallible numeric and truth conversions.
+    fn fallible_scalar_conversion(
+        &mut self,
+        value: &Operand,
+        class: Ty,
+        params: &[Symbol],
+        recovery: Option<&HirExpression>,
+    ) -> Result<Operand, CodegenError> {
+        let integer = matches!(value.value, Value::Int | Value::Exact);
+        let operand = match (value.value, class) {
             (_, Ty::Int | Ty::Sized(_)) if integer => {
-                self.fallible_int(&value, class, Kind::IntInt, None, params, recovery)?
+                self.fallible_int(value, class, Kind::IntInt, None, params, recovery)?
             }
             (Value::Text, Ty::Int | Ty::Sized(_)) => {
-                self.fallible_int(&value, class, Kind::TextInt, None, params, recovery)?
+                self.fallible_int(value, class, Kind::TextInt, None, params, recovery)?
             }
             (Value::Float | Value::Float32, Ty::Int | Ty::Sized(_)) => {
                 let mode = self.rounding_mode(params)?;
-                self.fallible_int(&value, class, Kind::FloatInt, Some(mode), params, recovery)?
+                self.fallible_int(value, class, Kind::FloatInt, Some(mode), params, recovery)?
             }
             (Value::Text, Ty::Float | Ty::Float32) => {
                 let float_value = if class == Ty::Float32 {
@@ -450,13 +530,13 @@ impl Emitter<'_> {
                 } else {
                     Value::Float
                 };
-                self.text_to_float(&value, recovery, float_value)?
+                self.text_to_float(value, recovery, float_value)?
             }
             // `text ↦ bool` parses the code locale's own `true`/`false`
             // words and fails on any other text (the runner's ruling);
             // `fractus ↦ bool` is non-zero (`-0.0` is false, NaN is true).
             // `bool ↦ fractus` is 1.0 / 0.0.
-            (Value::Text, Ty::Bool) => self.text_to_bool(&value, recovery)?,
+            (Value::Text, Ty::Bool) => self.text_to_bool(value, recovery)?,
             (Value::Float, Ty::Bool) => {
                 Operand::new(format!("(({}) != 0.0)", value.text), Value::Truth)
             }
@@ -471,18 +551,7 @@ impl Emitter<'_> {
             }
             _ => return Err(unsupported("conversion between these value classes")),
         };
-        // `textus ↦ string<N>`: the capacity check is a runtime store.
-        let operand = match self.text_capacity(target) {
-            Some(capacity) if operand.value == Value::Text => {
-                self.support.need(Helper::TextRead);
-                Operand::new(
-                    format!("faber_bounded_text({}, {capacity})", operand.text),
-                    Value::Text,
-                )
-            }
-            _ => operand,
-        };
-        Ok(operand.with_effect(effect))
+        Ok(operand)
     }
 
     /// Whether the target (peeling aliases) is a bounded `ascii<N>`.
@@ -588,7 +657,7 @@ impl Emitter<'_> {
     /// recovery takes its place.
     fn bytes_text_decode(
         &mut self,
-        value: Operand,
+        value: &Operand,
         recovery: Option<&HirExpression>,
     ) -> Result<Operand, CodegenError> {
         self.support.need(Helper::Conv);
@@ -624,7 +693,7 @@ impl Emitter<'_> {
     /// `string ↦ lista<b8>`: the UTF-8 encode. The header's byte count is
     /// copied into a fresh byte list, and it cannot fail: a text never carries
     /// a NUL byte.
-    fn text_bytes_encode(&mut self, value: Operand) -> Operand {
+    fn text_bytes_encode(&mut self, value: &Operand) -> Operand {
         self.support.need(Helper::List(
             crate::ty::Elem::Bits(radix_types::BitsWidth::B8),
             ListOp::New,
@@ -636,7 +705,7 @@ impl Emitter<'_> {
         .with_effect(value.effect)
     }
 
-    /// A bounded-list target (`list<T, N>`), peeling aliases: its element type
+    /// A bounded-list target (`list<T, size N>`), peeling aliases: its element type
     /// and its literal capacity. `None` for any other target.
     fn bounded_list_target(&self, ty: TypeId) -> Option<(TypeId, u64)> {
         match self.types.get(ty) {
@@ -649,7 +718,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// `list<T> ↦ list<T, N>`: a fixed copy of capacity N, or a failure the
+    /// `list<T> ↦ list<T, size N>`: a fixed copy of capacity N, or a failure the
     /// `⊥` recovery takes (`lista to bounded lista conversion failed`).
     fn bounded_list(
         &mut self,
@@ -717,41 +786,41 @@ impl Emitter<'_> {
         &mut self,
         source: &HirExpression,
         target_ty: TypeId,
-        from: String,
-        to: String,
+        from: &str,
+        to: &str,
         be: bool,
         has_recovery: bool,
     ) -> Result<Operand, CodegenError> {
         if has_recovery {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         }
         let Some(source_ty) = source.ty else {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         };
         let Some(from_type) = list_element_type(self.types, source_ty) else {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         };
         let Some(to_type) = list_element_type(self.types, target_ty) else {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         };
         let Some((from_elem, from_bytes)) = bytes_list_element(self.types, from_type) else {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         };
         let Some((to_elem, to_bytes)) = bytes_list_element(self.types, to_type) else {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         };
         let decode = from_elem == Elem::Bits(BitsWidth::B8) && to_bytes > 1;
         let encode = to_elem == Elem::Bits(BitsWidth::B8) && from_bytes > 1;
         if !decode && !encode {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         }
 
         let mut value = self.expr(source)?;
         let Value::List(actual_elem) = value.value else {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         };
         if actual_elem != from_elem {
-            return Err(list_width_refusal(&from, &to));
+            return Err(list_width_refusal(from, to));
         }
         let prelude = self.bind(&mut value);
         let be = if be { "true" } else { "false" };

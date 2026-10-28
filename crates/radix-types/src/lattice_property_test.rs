@@ -597,6 +597,7 @@ impl TypeName for Type {
             Type::SizedInstans(p) => Box::leak(format!("instans<{p:?}>").into_boxed_str()),
             Type::Array(_) => "lista",
             Type::BoundedArray { .. } => "lista_n",
+            Type::RangedArray { .. } => "lista_range",
             Type::Queue(_) => "queue",
             Type::BoundedQueue { .. } => "queue_n",
             Type::Stack(_) => "stack",

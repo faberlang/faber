@@ -29,6 +29,9 @@ mod insere_node_test;
 mod ordo_order_test;
 #[cfg(test)]
 mod ranged_int_test;
+
+#[cfg(test)]
+mod ranged_list_test;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]

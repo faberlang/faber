@@ -115,7 +115,7 @@ impl Parser {
         // Type-name lookahead mirrors `est` classification. `nihil` is a
         // deliberate exception to the ordinary literal table: in a `discerne`
         // arm it denotes the null member of the scrutinee union. Parse the
-        // complete type expression so bounded families (`lista<T, N>`) and
+        // complete type expression so bounded families (`lista<T, magnitudo N>`) and
         // tensor figures remain available to lowering.
         if (self.check_keyword_ident(TokenKind::Nihil)
             || self.check_null_type_word()

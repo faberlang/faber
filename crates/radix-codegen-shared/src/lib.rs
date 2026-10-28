@@ -41,6 +41,7 @@ pub mod breakable;
 pub mod cli_ir;
 pub mod conversio_arm;
 pub mod decimal;
+pub mod entry_exit;
 pub mod frame;
 pub mod hints;
 pub mod hygiene;
@@ -317,7 +318,9 @@ pub use ident::{
 pub use leaf_gate::{collect_ad_routes, reject_unsupported_leaf};
 pub use ledger_gate::reject_ledger_type;
 pub use list_window_gate::reject_list_window;
-pub use ranged_int_gate::{reject_ranged_int_type, reject_unlowered_value_types};
+pub use ranged_int_gate::{
+    reject_ranged_int_type, reject_ranged_list_type, reject_unlowered_value_types,
+};
 pub use tensor_lift_gate::reject_tensor_lift;
 pub use unbounded_gate::{big_literal_unsupported, reject_unbounded_integer};
 pub use validation::{find_error_expr_in_program, reject_hir_errors};

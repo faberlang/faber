@@ -169,7 +169,7 @@ pub const COST_BASIS: &[CostBasisRow] = &[
         family: CostFamily::RegisterBridge,
         tag: CostTag::Class(CostClass::C0),
     },
-    // Allocate + elementwise copy (`vector<T, N> ↦ lista<T>`, `lista<T, N> ↦ vector<T, N>`).
+    // Allocate + elementwise copy (`vector<T, N> ↦ lista<T>`, `lista<T, magnitudo N> ↦ vector<T, N>`).
     CostBasisRow {
         family: CostFamily::RegisterLista,
         tag: CostTag::Class(CostClass::C2),
@@ -332,7 +332,10 @@ fn is_struct(ty: &Type) -> bool {
 }
 
 fn is_list(ty: &Type) -> bool {
-    matches!(ty, Type::Array(_) | Type::BoundedArray { .. })
+    matches!(
+        ty,
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+    )
 }
 
 fn is_tensor(ty: &Type) -> bool {

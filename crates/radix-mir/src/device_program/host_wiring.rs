@@ -28,6 +28,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::loop_carry::{CallSite, call_order};
 use crate::visit::{MirVisitor, walk_callee, walk_operand, walk_stmt, walk_value};
 use crate::{
     MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId, MirOperand, MirPlace,
@@ -110,6 +111,10 @@ pub(super) struct HostWiring {
     slots: BTreeMap<Slot, SlotSites>,
     /// Kernels reached through something other than a direct host `Call`.
     opaque: BTreeSet<MirFunctionId>,
+    /// `(a, b)`: some host function calls `a` before `b` within one iteration.
+    before: BTreeSet<(MirFunctionId, MirFunctionId)>,
+    /// `(a, b)`: some host function can run a call of `b` after a call of `a`.
+    reaches: BTreeSet<(MirFunctionId, MirFunctionId)>,
 }
 
 impl HostWiring {
@@ -137,6 +142,20 @@ impl HostWiring {
             return false;
         };
         !a_sites.values.is_empty() && a_sites.values == b_sites.values
+    }
+
+    /// Whether data `producer` writes reaches `consumer` only through a host
+    /// loop's carry: the host can run a call of `consumer` after a call of
+    /// `producer`, and never calls `producer` ahead of `consumer` within one
+    /// iteration. A kernel reached other than by a direct host `Call` has no
+    /// known call order, so no pair naming it is loop-carried.
+    #[must_use]
+    pub(super) fn is_loop_carried(&self, producer: MirFunctionId, consumer: MirFunctionId) -> bool {
+        producer != consumer
+            && !self.opaque.contains(&producer)
+            && !self.opaque.contains(&consumer)
+            && self.reaches.contains(&(producer, consumer))
+            && !self.before.contains(&(producer, consumer))
     }
 
     fn known(&self, slot: Slot) -> Option<&SlotSites> {
@@ -186,6 +205,10 @@ pub(super) fn collect_host_wiring(
     {
         collector.function = Some(function.id);
         collector.visit_function(function);
+        let sites = collector.call_sites(function);
+        let order = call_order(function, &sites);
+        collector.wiring.before.extend(order.before);
+        collector.wiring.reaches.extend(order.reaches);
     }
     collector.wiring
 }
@@ -241,6 +264,27 @@ impl Collector<'_> {
         self.by_source
             .iter()
             .find_map(|&(def, id)| (def == source).then_some(id))
+    }
+
+    /// The direct call sites of selected kernels in `function`, by block and
+    /// statement position.
+    fn call_sites(&self, function: &MirFunction) -> Vec<CallSite> {
+        let mut sites = Vec::new();
+        for (block, data) in function.blocks.iter().enumerate() {
+            for (statement, stmt) in data.statements.iter().enumerate() {
+                let MirStatementKind::Call { callee, .. } = &stmt.kind else {
+                    continue;
+                };
+                if let Some(kernel) = self.selected_direct(callee) {
+                    sites.push(CallSite {
+                        kernel,
+                        block,
+                        statement,
+                    });
+                }
+            }
+        }
+        sites
     }
 
     fn mark_opaque(&mut self, id: MirFunctionId) {

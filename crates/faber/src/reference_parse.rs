@@ -238,7 +238,7 @@ fn parse_exempla_kind(path_label: &str, value: &str) -> Result<Kind, ExplainErro
         "modifier" => Ok(Kind::Modifier),
         "legacy" => Ok(Kind::Legacy),
         "concept" => Ok(Kind::Concept),
-        "conversio" => Ok(Kind::Conversio),
+        "conversion" | "conversio" => Ok(Kind::Conversion),
         other => Err(ExplainError::new(format!(
             "{path_label}: unknown kind {other}"
         ))),

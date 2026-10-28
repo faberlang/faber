@@ -43,6 +43,12 @@ impl TypeChecker<'_> {
     /// immutability but still return their declared type so the right-hand side
     /// can be checked. Field and index lvalues reuse the normal access rules.
     pub fn check_lvalue(&mut self, target: &mut HirExpression) -> TypeId {
+        // An index read inside a target is evaluated at the store, so it
+        // records no proof here (the store proves its own target).
+        self.without_index_proofs(|checker| checker.check_lvalue_place(target))
+    }
+
+    fn check_lvalue_place(&mut self, target: &mut HirExpression) -> TypeId {
         let ty = match &mut target.kind {
             HirExpressionKind::Path(def_id) => {
                 // WHY: write-once enforcement for `fixum` locals lives in the
@@ -292,7 +298,9 @@ impl TypeChecker<'_> {
         // or octeti is one named issue.
         if self.is_range_index(idx_ty) {
             match &resolved_kind {
-                Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                Type::Array(elem)
+                | Type::BoundedArray { element: elem, .. }
+                | Type::RangedArray { element: elem, .. } => {
                     if !self.is_textus_index_type(idx_ty) {
                         self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index_span);
                     }
@@ -318,9 +326,9 @@ impl TypeChecker<'_> {
             return elem;
         }
         let kind = match resolved_kind {
-            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
-                Some((Some(elem), None, None))
-            }
+            Type::Array(elem)
+            | Type::BoundedArray { element: elem, .. }
+            | Type::RangedArray { element: elem, .. } => Some((Some(elem), None, None)),
             Type::Map(key, value) | Type::Ledger(key, value) => {
                 Some((None, Some(key), Some(value)))
             }
@@ -619,6 +627,7 @@ impl TypeChecker<'_> {
                 | Type::BoundedAscii { .. }
                 | Type::Array(_)
                 | Type::BoundedArray { .. }
+                | Type::RangedArray { .. }
         );
         if is_length && sequence_receiver {
             self.undefined_member("length_is_method", span);
@@ -1253,7 +1262,7 @@ impl TypeChecker<'_> {
         if self.is_range_index(idx_ty)
             && matches!(
                 self.types.get(resolved),
-                Type::Array(_) | Type::BoundedArray { .. }
+                Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
             )
         {
             self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index.span);
@@ -1470,6 +1479,18 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// The type of a size-name read (size-type Z1 force). A size name reads as
+    /// a read-only `int`; inside a kernel it reads in the portable signed
+    /// carrier the lane coordinates use, because the launch requirements prove
+    /// each extent fits that carrier.
+    fn size_value_type(&mut self) -> TypeId {
+        if self.current_nucleum_entry {
+            self.width_type(radix_types::NumericWidth::I32)
+        } else {
+            self.types.primitive(Primitive::Numerus)
+        }
+    }
+
     /// Converts a resolved definition path into the value type visible at an
     /// expression site.
     ///
@@ -1515,9 +1536,7 @@ impl TypeChecker<'_> {
                 }
                 // Size-type Z1 force: a size name reads as a read-only int
                 // (safe widening at use); assignment is rejected in check_lvalue.
-                crate::SymbolKind::IndexParam => {
-                    return self.types.primitive(Primitive::Numerus);
-                }
+                crate::SymbolKind::IndexParam => return self.size_value_type(),
                 _ => {}
             }
 
@@ -1538,7 +1557,7 @@ impl TypeChecker<'_> {
         // function has a HirTypeParam def and no resolver symbol; it reads
         // as a read-only int (assignment is rejected in check_lvalue).
         if self.current_size_param_defs.contains(&def_id) {
-            return self.types.primitive(Primitive::Numerus);
+            return self.size_value_type();
         }
 
         // A selective import that binds a type (D22.5) names no value.

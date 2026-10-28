@@ -653,8 +653,26 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::RANGED_UNSIGNED_NEGATIVE => {
             Some("start the range at 0, or use a signed width such as i32".to_owned())
         }
+        WidthLowerIssue::RANGED_LIST_BOUND_NOT_CONSTANT => Some(
+            "write both ends as integer literals, such as list<int, size 1‥8>; a named or size end is not built yet".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_LIST_EMPTY => Some(
+            "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
+        ),
+        WidthLowerIssue::RANGED_LIST_BOUND_NEGATIVE => {
+            Some("a length is a count: start the range at 0 or above".to_owned())
+        }
+        WidthLowerIssue::RANGED_LIST_POLICY_WORD => Some(
+            "write the range on the list, such as list<int, size 1…8>; it always traps, and saturating, trapping and wrapping take a number width".to_owned(),
+        ),
         WidthLowerIssue::RANGED_WIDTH_UNSUPPORTED => Some(
             "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet".to_owned(),
+        ),
+        WidthLowerIssue::LIST_COUNT_NEEDS_SIZE => Some(
+            "write list<int, size 4> for at most 4 elements, or list<int, size 1…8> for a range; a bare range bounds a value, not a count".to_owned(),
+        ),
+        "ranged_list_length_out_of_range" => Some(
+            "give the literal a length inside the range, or build the list with `↦` and recover with `⊥`".to_owned(),
         ),
         "policy_float_family_mismatch" => Some(
             "convert the other operand to the same float cell with `↦`; a trapping or saturating float never mixes with a bare float, another cell, or another width implicitly".to_owned(),
@@ -1189,6 +1207,9 @@ const AIR_PURITY_HELP: &str = "keep the v1 AIR subset pure: immutable locals, pu
 /// shared baseline help, while `None` leaves both at their fallthrough.
 fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
     Some(match arg_value(args, "issue")? {
+        "air_unbounded_list_size" => {
+            "a list with no upper size has no unrolled AIR form".to_owned()
+        }
         "air_unbounded_integer" => {
             "the unbounded integer `inf` has no AIR representation".to_owned()
         }
@@ -1208,14 +1229,6 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         "dum_loop" => "`dum` loops are outside the v1 AIR subset".to_owned(),
         "expression_ad" => "expression-form ad is outside the v1 AIR subset".to_owned(),
         "expression_statement" => "expression statements are outside the v1 AIR subset".to_owned(),
-        "first_match_expression_unsupported" => {
-            "first-match expressions with coordinate bindings are outside the v1 AIR subset"
-                .to_owned()
-        }
-        "first_match_unbounded_source" => {
-            "first-match sources must have a statically known extent in the v1 AIR subset"
-                .to_owned()
-        }
         "generator_function" => "generator functions are outside the v1 AIR subset".to_owned(),
         "iace" => "`iace` is outside the v1 AIR subset".to_owned(),
         "inc_dec_mutation" => {
@@ -1247,6 +1260,10 @@ fn air_purity_reason(args: &[DiagnosticArg]) -> Option<String> {
         }
         "reducta_expression_unsupported" => {
             "reduction expressions are outside the v1 AIR subset".to_owned()
+        }
+        "reducta_first_unbounded_source" => {
+            "first reductions need a source with a statically known extent in the v1 AIR subset"
+                .to_owned()
         }
         "recoverable_handler" => "recoverable handlers are outside the v1 AIR subset".to_owned(),
         "recovery_type_mismatch" => {

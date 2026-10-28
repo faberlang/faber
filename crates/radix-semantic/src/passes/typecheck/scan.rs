@@ -33,7 +33,10 @@ pub(super) fn check_scan_expr(
     span: radix_lexer::Span,
 ) -> TypeId {
     *group_domain = None;
-    if matches!(op, HirReductionOp::ArgMax | HirReductionOp::ArgMin) {
+    if matches!(
+        op,
+        HirReductionOp::ArgMax | HirReductionOp::ArgMin | HirReductionOp::First
+    ) {
         checker.error_issue(
             SemanticErrorKind::TypeMismatch,
             ISSUE_SCAN_OPERATOR_UNSUPPORTED,
@@ -185,7 +188,9 @@ pub(super) fn check_scan_expr(
         HirReductionOp::All | HirReductionOp::Any => boolean,
         HirReductionOp::Sum | HirReductionOp::Product => checker.summa_result_type(term_ty),
         HirReductionOp::Max | HirReductionOp::Min => term_ty,
-        HirReductionOp::ArgMax | HirReductionOp::ArgMin => checker.error_type,
+        HirReductionOp::ArgMax | HirReductionOp::ArgMin | HirReductionOp::First => {
+            checker.error_type
+        }
     };
     checker.types.array(output_element);
     let result = checker.types.tensor_with_shape(output_element, shape);
@@ -229,6 +234,7 @@ fn scan_group_components<'a>(
         checker.types.get(group_ty),
         Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Tuple(_)
             | Type::Tensor(..)
             | Type::Matrix(..)

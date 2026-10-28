@@ -58,7 +58,7 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 | exact-list-equality-through-cast | non-preferred | strict list equality states the concrete bound with `↦`, not a loose untyped literal comparison |
 | equality-ladder-tier-choice | non-preferred | choose strict `≡`, promoted-exact `≅`, or fuzzy `≈` in the operands' own joined precision by intent; do not swap tiers |
 | redundant-ascription | non-preferred | no `∷` cast when the receiver is already typed and auto-conversion applies |
-| dimensional-types-when-fixed | non-preferred | fixed-size data uses dimensional types (`vf32[3]`, `tf32[4]`) or the bounded `list<T, N>` family |
+| dimensional-types-when-fixed | non-preferred | fixed-size data uses dimensional types (`vf32[3]`, `tf32[4]`) or the bounded `list<T, size N>` family |
 | numeric-type-sugar-by-context | non-preferred | bare widths everywhere (wrapped forms are rejected); collection sugar only in numeric modules per the sugar guide |
 | endian-conversion-not-manual-packing | non-preferred | `list<b8>` + `↦ u32 via Be|Le` instead of hand-rolled shift packing |
 | range-loop-over-open-while | non-preferred | `for range a‥b` over open-ended index `while` — ranges are unrollable |
@@ -533,7 +533,7 @@ Keep `∷` where the receiver is untyped or no auto-conversion exists (`0x80 ∷
 
 ## dimensional-types-when-fixed
 
-**Data whose size is a compile-time fact uses dimensional types — `vf32[3]`, `tf32[4]`, `matrix<f32, [3, 2]>` — or, for a capacity bound on a list or string, the bounded forms `list<T, N>` / `string<N>`; not un-sized collections. Fixed dimensions enable loop unrolling and register representation.**
+**Data whose size is a compile-time fact uses dimensional types — `vf32[3]`, `tf32[4]`, `matrix<f32, [3, 2]>` — or, for a capacity bound on a list or string, the bounded forms `list<T, size N>` / `string<N>`; not un-sized collections. Fixed dimensions enable loop unrolling and register representation.**
 
 non-preferred · Evidence: `corpus/tensor/bracket-access.fab` (`mut tf32[4] input ← seed.create(0.0, [4])`), `glyph-elementwise.fab` (`let vf32[3] a ← …`); sizing caveat (`matrix<T, [R,C]>` and `mf32[R,C]` are register types of the semantic and MIR layers; Rust/Go/TS package targets reject them until host representations exist)
 
@@ -545,7 +545,7 @@ mut list<f32> input ← seed.create(0.0, [4])
 mut tf32[4] input ← seed.create(0.0, [4])
 ```
 
-**Bounded-buffer family — shipped.** `list<T, N>` (la `lista<T, N>`), `string<N>` and `ascii<N>` are the capacity-bearing forms (`grammar/EBNF.md` Generic Collections lists the bounded list form as the shipped one). Probed: `mut list<f32, 2> a ← [1.0, 2.0, 3.0]` is rejected (`SEM010 incompatible_tensor_index`), the type works in parameter position, and `append` on a bounded list is a failable call (`SEM011 failable_call_requires_handler` without a handler). The `string<_>` / `ascii<_>` capacity-hole forms are admitted but not fully shipped (EBNF row). Bounded `map` / `set` are not implied by the family.
+**Bounded-buffer family — shipped.** `list<T, size N>` (la `lista<T, magnitudo N>`), `string<N>` and `ascii<N>` are the capacity-bearing forms (`grammar/EBNF.md` Generic Collections lists the bounded list form as the shipped one). Probed: `mut list<f32, size 2> a ← [1.0, 2.0, 3.0]` is rejected (`SEM010 incompatible_tensor_index`), the type works in parameter position, and `append` on a bounded list is a failable call (`SEM011 failable_call_requires_handler` without a handler). The `string<_>` / `ascii<_>` capacity-hole forms are admitted but not fully shipped (EBNF row). Bounded `map` / `set` are not implied by the family.
 
 **Hardcoded-width variant spellings in closed host-vocabulary enums are temporary.** A graphics library's `VertexFormat` (`Float32x4`, `Uint32`, …) mirrors WebGPU `GPUVertexFormat` (itself inherited from three.js); the spellings are accepted only because component width is a runtime value generics cannot parameterize — not because they are canonical. The intent is to convert such unions to proper generics once value-parameterized generics land; the library marks them with a TEMPORARY SHAPE note, so do not flag them today, and treat new ones that mirror a host vocabulary the same way.
 

@@ -1678,7 +1678,7 @@ impl Validator<'_, '_> {
                 if let Some(collection_ty) = first_arg_ty {
                     // A fixed-width receiver (BoundedArray) yields an
                     // ArrayInner copy/view: only the element type carries.
-                    let (Type::Array(_) | Type::BoundedArray { .. }) =
+                    let (Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }) =
                         self.type_kind(collection_ty)
                     else {
                         self.error(span, "list copy/view receiver is not a lista");
@@ -1750,7 +1750,9 @@ impl Validator<'_, '_> {
                     return;
                 };
                 let inner = match self.type_kind(collection_ty) {
-                    Type::Array(inner) | Type::BoundedArray { element: inner, .. } => *inner,
+                    Type::Array(inner)
+                    | Type::BoundedArray { element: inner, .. }
+                    | Type::RangedArray { element: inner, .. } => *inner,
                     _ => {
                         self.error(span, "collection argmax/argmin receiver is not a lista");
                         return;
@@ -1864,9 +1866,9 @@ impl Validator<'_, '_> {
                             );
                         }
                         // A standalone non-empty list literal types as the
-                        // exact-length witness `lista<T, N>`. Slicing it yields
+                        // exact-length witness `lista<T, magnitudo N>`. Slicing it yields
                         // the unbounded list of the same element type.
-                        Type::BoundedArray { element, .. } => {
+                        Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
                             match self.type_kind(call.return_ty) {
                                 Type::Array(inner) if *inner == *element => {}
                                 _ => self.error(span, "list slice result type mismatch"),
@@ -2109,9 +2111,9 @@ impl Validator<'_, '_> {
                     | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _) => receiver_ty,
                     // Tensors returned above; a lista receiver clamps by its
                     // element type.
-                    Type::Array(element) | Type::BoundedArray { element, .. } => {
-                        MirType::semantic(*element)
-                    }
+                    Type::Array(element)
+                    | Type::BoundedArray { element, .. }
+                    | Type::RangedArray { element, .. } => MirType::semantic(*element),
                     _ => {
                         self.error(
                             span,
@@ -2263,11 +2265,11 @@ impl Validator<'_, '_> {
                         "tensor shape receiver is not tensor, matrix or sparsa",
                     );
                 }
-                // A tensor of static rank yields the bounded `lista<numerus, R>`;
+                // A tensor of static rank yields the bounded `lista<numerus, magnitudo R>`;
                 // one without a static rank yields the unbounded list.
                 if !matches!(
                     self.type_kind(call.return_ty),
-                    Type::Array(_) | Type::BoundedArray { .. }
+                    Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
                 ) {
                     self.error(span, "tensor collection result is not lista");
                 }
@@ -3784,7 +3786,9 @@ impl Validator<'_, '_> {
         collection_ty: MirType,
     ) -> Option<ElementwiseCollectionKind> {
         match self.type_kind(collection_ty) {
-            Type::Array(_) | Type::BoundedArray { .. } => Some(ElementwiseCollectionKind::Array),
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => {
+                Some(ElementwiseCollectionKind::Array)
+            }
             Type::Queue(_) | Type::BoundedQueue { .. } => Some(ElementwiseCollectionKind::Queue),
             Type::Stack(_) | Type::BoundedStack { .. } => Some(ElementwiseCollectionKind::Stack),
             _ => None,
@@ -3795,6 +3799,7 @@ impl Validator<'_, '_> {
         match self.type_kind(collection_ty) {
             Type::Array(inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::Queue(inner)
             | Type::BoundedQueue { element: inner, .. }
             | Type::Stack(inner)

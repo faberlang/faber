@@ -437,10 +437,6 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_go_block(body, file, diagnostics);
             }
         }
-        ExprKind::FirstMatch(first_match) => {
-            scan_go_expr(&first_match.source, file, diagnostics);
-            scan_go_block(&first_match.body, file, diagnostics);
-        }
         // `⇇` copy-into: walk the subexpressions only; per-target support is
         // decided by the emitter.
         ExprKind::CopyInto(copy) => {
@@ -822,10 +818,6 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             if let Some(body) = &sort.body {
                 scan_rust_block(body, file, diagnostics);
             }
-        }
-        ExprKind::FirstMatch(first_match) => {
-            scan_rust_expr(&first_match.source, file, diagnostics);
-            scan_rust_block(&first_match.body, file, diagnostics);
         }
         // `⇇` copy-into: same contract as the Go scanner — walk
         // subexpressions only.

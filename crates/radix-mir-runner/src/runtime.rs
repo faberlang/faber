@@ -1154,7 +1154,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                             | Type::Array(_)
                             | Type::BoundedOcteti { .. }
                     )
-                    | (Value::Array(_), Type::Array(_) | Type::BoundedArray { .. })
+                    | (
+                        Value::Array(_),
+                        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+                    )
                     | (Value::Map(_), Type::Map(_, _))
                     | (Value::Ledger(_), Type::Ledger(_, _))
                     | (Value::Set(_), Type::Set(_))
@@ -3286,7 +3289,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             | Type::BoundedQueue { element, .. }
             | Type::Stack(element)
             | Type::BoundedStack { element, .. } => (*element, false),
-            Type::BoundedArray { element, .. } => (*element, true),
+            Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
+                (*element, true)
+            }
             _ => {
                 return Err(RunnerError::internal(
                     span,
@@ -3358,6 +3363,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let element_ty = match self.types.get(return_ty.semantic_id()) {
             Type::Array(element)
             | Type::BoundedArray { element, .. }
+            | Type::RangedArray { element, .. }
             | Type::Queue(element)
             | Type::BoundedQueue { element, .. }
             | Type::Stack(element)
@@ -5585,7 +5591,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Value, RunnerError> {
         let is_array = matches!(
             self.types.get(return_ty.semantic_id()),
-            Type::Array(_) | Type::BoundedArray { .. }
+            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
         );
         let is_tensor = matches!(self.types.get(return_ty.semantic_id()), Type::Tensor(_, _));
         if is_array {
@@ -5955,6 +5961,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             radix_mir::MirProjection::Index(index) => {
                 let index = self.eval_operand(index, span)?;
                 Self::collection_index(value, &index, span)
+            }
+            radix_mir::MirProjection::ProvenIndex(index) => {
+                let index = self.eval_operand(index, span)?;
+                Self::collection_index_proven(value, &index, span)
             }
             radix_mir::MirProjection::VectorLane(lane) => match value {
                 Value::Vector(lanes) => lanes

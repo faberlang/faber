@@ -15,14 +15,20 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "leaf_unsupported_on_target",
-      "reason": "The Go lane carries no `caelum:*` tcp port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands. The async case never reaches the Go runtime: the leaf gate refuses the build before any program starts, so no async stream is lowered."
+      "diagnostic_contains": "direct failable Go call requires",
+      "reason": "The Go emitter reaches a failable call in a position that is neither a failable function body nor a fac/cape handler (a carried Norma module such as `time`, `http/server` or `net/connection`), so it fails closed at compile time; hoisting that call shape is a separate emitter unit."
     },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "the tcp leaf is not supported on the ts target",
       "reason": "The Node port of the tcp leaf (`caelum:*`) has not landed; client routes will go through a worker thread and server accept loops are declined by name. Until then the emitter refuses any program that reaches a `caelum` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the tcp leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no tcp leaf yet: its leaf gate refuses a program that reaches a tcp route by name, before any LLVM is emitted."
     }
   }
 }

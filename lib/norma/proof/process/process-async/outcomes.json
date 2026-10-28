@@ -12,17 +12,17 @@
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced and the process leaf (`processus`) is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
     },
-    "go": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "undefined: process",
-      "reason": "The Go lane does not yet provide the Norma process leaf binding used by the async wrapper case."
-    },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "the process leaf is not supported on the ts target",
       "reason": "The Node port of the process leaf (`processus:*`) has not landed, so the emitter refuses any program that reaches a `processus` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the process leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no process leaf yet: its leaf gate refuses a program that reaches a process route by name, before any LLVM is emitted."
     }
   }
 }

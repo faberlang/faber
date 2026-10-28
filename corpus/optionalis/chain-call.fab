@@ -1,0 +1,40 @@
++++
+term = "?("
+explains = ["?("]
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "clausura_expr", "function_type", "optional_suffix"]
+category = "type"
+summary = "A `?(` call runs only when the function value is present, and gives `none` when it is absent."
+syntax = "<expression>?(<args>)"
+related = ["?(", "?.", "?["]
+locale = "en"
++++
+# =============================================================================
+# ?( — A `?(` call runs only when the function value is present, and gives `none` when it is absent.
+# =============================================================================
+#
+# What this teaches:
+#   • `f?(x)` calls the optional function value `f` only when it is
+#     present; when `f` is `none` the call does not run and the result is
+#     `none`
+#   • The result is `T ∪ none`, so a `coalesce` default can fill in the
+#     absent case
+#
+# Common mistakes:
+#   • Expecting an absent function to give a default value: it gives `none`,
+#     and `coalesce` supplies the default
+#
+# See also: chain-call-order, chain-method-call, optional-chain, optionalis
+# =============================================================================
+
+type Op = (int) → int
+
+main {
+    let Op ∪ none present ← int x → int ∴ x * 2
+    let Op ∪ none absent ← null
+    print present?(5)
+    print absent?(5)
+    print absent?(5) coalesce -1
+    let int ∪ none found ← present?(1)
+    print found
+}

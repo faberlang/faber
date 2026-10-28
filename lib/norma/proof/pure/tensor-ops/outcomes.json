@@ -15,14 +15,20 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: tensor",
-      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:tensor` module this proof imports, so the generated `main.go` calls `tensor.*` with no such package-level identifier and `go build` stops with `undefined: tensor`. Re-measure this row when the Go package emitter lowers that module binding."
+      "diagnostic_contains": "requires a literal Figura shape",
+      "reason": "The Go emitter declines `tensor`/`sparsa` vacua without a literal Figura shape, and the carried `norma:tensor` module needs one; tensor on Go is a separate goal."
     },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "ts_tensor_shape_unresolved",
       "reason": "The imported `norma:tensor` module has generic tensor shapes the TypeScript backend cannot resolve to values in scope, so code generation stops with ts_tensor_shape_unresolved."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "faber_external_product_norma_module_tensor_func_construct",
+      "reason": "The linked program references `faber_external_product_norma_module_tensor_func_construct`, which neither the emitted modules nor the runtime archive define, so the clang link fails."
     }
   }
 }

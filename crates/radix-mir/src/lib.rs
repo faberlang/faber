@@ -39,6 +39,7 @@ pub mod names;
 pub mod nodes;
 pub mod placement;
 pub mod rank2_reduction_readiness;
+pub mod reduce_fusion;
 pub mod result_use;
 pub mod shader_contract;
 pub mod static_shape_fold;
@@ -58,6 +59,8 @@ pub mod validate;
 pub mod vector_expand;
 pub mod visit;
 
+#[cfg(test)]
+mod control_test;
 #[cfg(test)]
 mod device_copy_into_test;
 mod figura;
@@ -103,9 +106,9 @@ pub use abi::{
     MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
     MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature,
     MirKernelWorkgroupCount, MirPrimitiveTopology, MirRankExtensionBroadcast, MirRuntimeAbi,
-    MirRuntimeAbiFamily, MirRuntimeAbiKind, MirStencilFaceState, MirStencilOp,
-    MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
-    MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor,
+    MirRuntimeAbiFamily, MirRuntimeAbiKind, MirSlabOriginBinding, MirStencilFaceState,
+    MirStencilOp, MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat,
+    MirVertexInputReflection, MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor,
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor,
     MirWebGpuDispatchWorkgroups, MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor,
     MirWebGpuVertexAttributeDescriptor, MirWebGpuVertexBufferLayoutDescriptor,

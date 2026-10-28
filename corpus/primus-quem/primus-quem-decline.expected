@@ -1,4 +1,0 @@
-# Reject oracle for primus_quem AIR-lane admission declines.
-# Tokens: stable diagnostic identities (faber check output); one per line.
-SEM059:first_match_unbounded_source
-SEM059:first_match_expression_unsupported

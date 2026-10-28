@@ -716,7 +716,29 @@ pub struct FunctionProvenanceTableWire {
 /// records. A loaded unit carried none, so a backend treated an imported
 /// `Orderable` as an ordinary trait and resolved it to
 /// `__faber_unresolved_def`; schema-v54 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 55;
+/// Version 56 retires the dedicated first-match expression and adds
+/// `HirReductionOp::First` (`reduce via first`, la `reducta via prima`): the
+/// `HirExpressionKind::FirstMatch` variant is gone, shifting the serde ordinals
+/// of every later expression variant, and the reduction operator enum gained a
+/// variant; schema-v55 artifacts fail closed.
+/// Version 57 adds the `MessagePack` signed-128-bit integer extension
+/// (`fixext 16`, extension type 1, big-endian two's complement): the unit
+/// carries `i128` facts (affine size offsets, ranged-integer bounds) and the
+/// named-field codec had no wire form for them, so a unit holding one could
+/// not be written. Every `i128` field now rides the extension and reads back
+/// only from it; schema-v56 artifacts fail closed.
+/// Version 58 adds authored ranged-policy arguments to `HirTypeFormArg`, so
+/// formatters and loaded HIR preserve the range glyph, infinity endpoints, and
+/// inclusive/exclusive spelling; schema-v57 artifacts fail closed.
+/// Version 59 adds `Type::RangedArray` (a list length range,
+/// `list<T, size lo‥hi>`, need) to the type table; schema-v58
+/// artifacts fail closed because the serialized `Type` enum gained a variant.
+/// Version 60 adds `ShapeObligationTableWire::proven_indexes`: the index
+/// accesses the checker proved in bounds. The wire dropped
+/// them, so MIR lowering from a loaded unit kept the bounds check (a trap on
+/// every backend that emits one) where the direct unit lowered a proven
+/// projection; schema-v59 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 60;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -809,6 +831,8 @@ pub struct ShapeObligationTableWire {
     /// and a loaded unit lowered no runtime shape check at the store.
     pub stores: Vec<ShapeStoreObligationsWire>,
     pub function_size_bindings: Vec<FunctionSizeBindingsWire>,
+    /// Index accesses the checker proved in bounds (schema v60), sorted by id.
+    pub proven_indexes: Vec<radix_hir::HirId>,
 }
 
 // ---------------------------------------------------------------------------

@@ -550,7 +550,7 @@ fn portable_tensor_edge_type_identity(
         // A ranged cell has no portable tensor-edge identity (tensor edges
         // over ranges are need 5 of the ranged-policy series).
         Type::RangedInt { .. }
-        | Type::BoundedArray { .. }
+        | Type::BoundedArray { .. } | Type::RangedArray { .. }
         | Type::Queue(_)
         | Type::BoundedQueue { .. }
         | Type::Stack(_)
@@ -748,6 +748,8 @@ pub fn lower_analyzed_unit(
         at_out_of_range: interner.intern("at: index out of range or key missing"),
         slice_out_of_range: interner.intern("slice_out_of_range § § §"),
         take_out_of_range: interner.intern("take_out_of_range § §"),
+        ranged_push_past_maximum: interner.intern("list length range: push past the maximum"),
+        ranged_remove_below_minimum: interner.intern("list length range: removal below the minimum"),
     };
     let kernel_lowering = options.kernel_lowering;
     let mut lowerer = MirLowerer {
@@ -1576,6 +1578,10 @@ struct DiagnosticSymbols {
     /// The list `take` trim's (la `prima`) fault payload template: the fault
     /// kind plus count and list length as data.
     take_out_of_range: Symbol,
+    /// A push past the maximum of a list length range.
+    ranged_push_past_maximum: Symbol,
+    /// A removal below the minimum of a list length range.
+    ranged_remove_below_minimum: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -2009,6 +2015,7 @@ impl<'a> MirLowerer<'a> {
         context.shape_functions = Arc::new(self.unit.shape_obligations.functions.clone());
         context.call_size_bindings = Arc::new(self.unit.shape_obligations.call_size_bindings.clone());
         context.shape_stores = Arc::new(self.unit.shape_obligations.stores.clone());
+        context.proven_indexes = Arc::new(self.unit.shape_obligations.proven_indexes.clone());
         context.function_size_bindings = Arc::new(self.unit.shape_obligations.function_size_bindings.clone());
         context.tensor_edge_policies = Arc::new(self.unit.tensor_edge_policies.clone());
         context.pending_tensor_limes = Arc::clone(&self.pending_tensor_limes);
@@ -2444,6 +2451,9 @@ struct ReductionFoldContext {
     group: Option<HirExpression>,
     group_dims: Vec<usize>,
     error_tensor: Option<MirOperand>,
+    /// The term binder's local: the element a `First` fold stores when its
+    /// predicate holds. Unused by every other operator.
+    element: Option<MirLocalId>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -2550,6 +2560,8 @@ pub struct FunctionBuilderContext<'a> {
     diagnostic_slice_out_of_range: Symbol,
     /// The list `take` fault payload template.
     diagnostic_take_out_of_range: Symbol,
+    diagnostic_ranged_push_past_maximum: Symbol,
+    diagnostic_ranged_remove_below_minimum: Symbol,
     /// A `⇥` kernel exists in the unit: handled blocks emit the device
     /// fault-delivery markers (U9-5).
     fault_delivery: bool,
@@ -2564,6 +2576,9 @@ pub struct FunctionBuilderContext<'a> {
     shape_functions: Arc<FxHashMap<DefId, Vec<ShapeRelation>>>,
     call_size_bindings: Arc<FxHashMap<radix_hir::HirId, Vec<RuntimeSizeBinding>>>,
     shape_stores: Arc<FxHashMap<radix_hir::HirId, Vec<ShapeRelation>>>,
+    /// Index accesses the checker proved in range: lowered as
+    /// [`MirProjection::ProvenIndex`]. Absent means checked.
+    proven_indexes: Arc<FxHashSet<radix_hir::HirId>>,
     function_size_bindings: Arc<FxHashMap<DefId, Vec<RuntimeSizeBinding>>>,
     structs: Arc<FxHashMap<DefId, Vec<&'a HirField>>>,
     /// Producer-side defaults for imported class fields.
@@ -2652,6 +2667,8 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_at_out_of_range: Symbol(0),
             diagnostic_slice_out_of_range: Symbol(0),
             diagnostic_take_out_of_range: Symbol(0),
+            diagnostic_ranged_push_past_maximum: Symbol(0),
+            diagnostic_ranged_remove_below_minimum: Symbol(0),
             fault_delivery: false,
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
@@ -2664,6 +2681,7 @@ impl<'a> FunctionBuilderContext<'a> {
             shape_functions: Arc::new(FxHashMap::default()),
             call_size_bindings: Arc::new(FxHashMap::default()),
             shape_stores: Arc::new(FxHashMap::default()),
+            proven_indexes: Arc::new(FxHashSet::default()),
             function_size_bindings: Arc::new(FxHashMap::default()),
             structs: Arc::new(FxHashMap::default()),
             imported_struct_defaults: Arc::new(FxHashMap::default()),
@@ -3679,7 +3697,7 @@ impl<'a> FunctionBuilder<'a> {
             }
             HirExpressionKind::Index(object, index) => {
                 let mut place = self.lower_projectable_place(object)?;
-                let projection = self.lower_index_projection(&place, object.ty, index)?;
+                let projection = self.lower_index_projection(&place, object.ty, index, expr.id)?;
                 place.projections.push(projection);
                 let ty = expr.ty.map_or(fallback_ty, MirType::semantic);
                 Some((place, ty))
@@ -3771,6 +3789,21 @@ impl<'a> FunctionBuilder<'a> {
                             return None;
                         }
                     };
+                    // A device body reads the axis extent the launch already
+                    // carries, as the loop bounds do: no `f64` shape-size call.
+                    if self.is_device_lowering()
+                        && let MirShapeExpr::TensorAxis { argument, axis } = &expression
+                        && let Some(MirOperand::Place(tensor)) = usize::try_from(*argument)
+                            .ok()
+                            .and_then(|index| arguments.get(index))
+                    {
+                        let ty = self.expr_ty(expr)?;
+                        return Some(self.assign_temp(
+                            MirValueKind::TensorExtent { tensor: MirOperand::Place(tensor.clone()), axis: *axis },
+                            ty,
+                            expr.span,
+                        ));
+                    }
                     let scalar = self.runtime_call_value(
                         MirIntrinsic::TensorShapeSize(expression),
                         arguments,
@@ -3780,19 +3813,19 @@ impl<'a> FunctionBuilder<'a> {
                     // Size-type Z1 force: the size name reads as an int, so
                     // convert the Fractus shape-size operand (same pattern as
                     // lower/runtime.rs rope shape arguments).
-                    let numerus = self.types.primitive(Primitive::Numerus);
+                    let numerus = self.expr_ty(expr)?;
                     return Some(self.runtime_call_value(
                         MirIntrinsic::Convert(MirConversion {
                             store: None,
                             flavor: MirConversionFlavor::Runtime,
                             source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
-                            target_ty: MirType::semantic(numerus),
+                            target_ty: numerus,
                             params: Vec::new(),
                             recovery: None,
                             struct_defaults: Vec::new(),
                         }),
                         vec![scalar],
-                        MirType::semantic(numerus),
+                        numerus,
                         expr.span,
                     ));
                 }
@@ -4166,9 +4199,12 @@ impl<'a> FunctionBuilder<'a> {
         // 2026-10-04 comparisons ruling); both sides are always evaluated, so
         // it precedes the short-circuit.
         if matches!(op, HirBinOp::And | HirBinOp::Or)
-            && expr
-                .ty
-                .is_some_and(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
+            && expr.ty.is_some_and(|ty| {
+                matches!(
+                    self.normalized_type(ty),
+                    Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+                )
+            })
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
@@ -4216,10 +4252,12 @@ impl<'a> FunctionBuilder<'a> {
         if matches!(
             op,
             HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq | HirBinOp::ApproxEq | HirBinOp::ApproxNotEq
-        ) && expr
-            .ty
-            .is_some_and(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
-        {
+        ) && expr.ty.is_some_and(|ty| {
+            matches!(
+                self.normalized_type(ty),
+                Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+            )
+        }) {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
         if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq)
@@ -5052,6 +5090,65 @@ impl<'a> FunctionBuilder<'a> {
         Some(MirOperand::Temp(result))
     }
 
+    /// An optional-chain link short-circuits (the optional-chain rule of the
+    /// grammar: an absent base runs nothing after the `?`). The link's
+    /// arguments and index are evaluated only on the present branch, so an
+    /// effectful argument never runs for an absent base. A base that is not
+    /// nullable, or a link with only effect-free operands, keeps the single
+    /// `option chain` op: eager evaluation is unobservable there.
+    pub(super) fn lower_option_chain_guarded(
+        &mut self,
+        base: &MirOperand,
+        base_ty: Option<TypeId>,
+        operands_effect_free: bool,
+        ty: MirType,
+        span: Span,
+        build: impl FnOnce(&mut Self) -> Option<MirOptionChainLink>,
+    ) -> Option<MirOperand> {
+        let base_nullable = base_ty.is_some_and(|ty| self.types.nullable_inner(ty).is_some());
+        if operands_effect_free || !base_nullable {
+            let link = build(self)?;
+            return Some(self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }),
+                ty,
+                span,
+            ));
+        }
+        let result = self.push_temp(ty, span);
+        let result_place = MirPlace::temp(result);
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let is_nil = self.assign_temp(
+            MirValueKind::Unary { op: MirUnOp::IsNil, operand: base.clone() },
+            bivalens,
+            span,
+        );
+        let absent_id = self.fresh_block(span);
+        let present_id = self.fresh_block(span);
+        let join_id = self.fresh_block(span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: is_nil, then_block: absent_id, else_block: present_id },
+            span,
+        );
+
+        self.switch_to(absent_id);
+        let none = self.assign_temp(MirValueKind::Option(MirOptionOp::None), ty, span);
+        self.assign(result_place.clone(), none, ty, span);
+        let absent_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+
+        self.switch_to(present_id);
+        let link = build(self)?;
+        let chained = self.assign_temp(MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }), ty, span);
+        self.assign(result_place, chained, ty, span);
+        let present_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
+
+        if absent_reaches || present_reaches {
+            self.switch_to(join_id);
+        } else {
+            self.seal_unreachable(join_id, span);
+        }
+        Some(MirOperand::Temp(result))
+    }
+
     fn assign(&mut self, place: MirPlace, operand: MirOperand, ty: MirType, span: Span) {
         let value = self.new_value(MirValueKind::Operand(operand), ty, span);
         self.append_stmt(MirStatement { kind: MirStatementKind::Assign { place, value }, span });
@@ -5465,6 +5562,7 @@ impl<'a> FunctionBuilder<'a> {
                 self.normalized_type(ty),
                 Type::Array(_)
                     | Type::BoundedArray { .. }
+                    | Type::RangedArray { .. }
                     | Type::Queue(_)
                     | Type::BoundedQueue { .. }
                     | Type::Stack(_)
@@ -5607,9 +5705,6 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Reduction { .. } => "reducta_not_lowered",
         HirExpressionKind::Scan { .. } => "scan_not_lowered",
         HirExpressionKind::Sort { .. } => "sort_expression_not_lowered",
-        // Unreachable from the lowering dispatcher (first-match lowers through
-        // `collection_higher_order`); kept so this naming match stays exhaustive.
-        HirExpressionKind::FirstMatch { .. } => "primus_quem before first-match MIR lowering",
         HirExpressionKind::Intervallum { .. } => "range expressions before range MIR lowering",
         HirExpressionKind::Array(_) => "array literals before aggregate MIR lowering",
         HirExpressionKind::Struct(_, _) => "struct literals before aggregate MIR lowering",

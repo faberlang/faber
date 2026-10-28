@@ -1,4 +1,4 @@
-//! AEU-4 (Route B): runtime-len `lista<T, N>` `itera ex` lowers in the base
+//! AEU-4 (Route B): runtime-len `lista<T, magnitudo N>` `itera ex` lowers in the base
 //! MIR lane to a static split on the carrier `len` — a switch with N+1
 //! literal arms, arm k a guard-free k-lane unroll. The AIR lane never admits
 //! the loop (runtime-len declines `not_concrete` at `air_unroll`), so the
@@ -14,7 +14,7 @@ fn session() -> Session {
 
 #[test]
 fn bounded_lista_ex_lowers_to_len_static_split() {
-    let source = r"functio sumBounded(lista<numerus, 8> xs) → numerus {
+    let source = r"functio sumBounded(lista<numerus, magnitudo 8> xs) → numerus {
   varia numerus total ← 0
   itera ex xs sit x {
     total ← total + x
@@ -30,7 +30,7 @@ fn bounded_lista_ex_lowers_to_len_static_split() {
     let dump = dump_program(lowered.validated.program());
     assert!(
         !dump.contains("itera collection before iterator MIR lowering"),
-        "runtime-len lista<T, 8> must lower to the Route B split: {dump}"
+        "runtime-len lista<T, magnitudo 8> must lower to the Route B split: {dump}"
     );
     assert!(
         dump.contains("runtime collection length("),
@@ -56,7 +56,7 @@ fn bounded_lista_ex_lowers_to_len_static_split() {
 /// runtime-length index loop an unbounded lista does, not a static split.
 #[test]
 fn bounded_lista_de_lowers_to_index_loop() {
-    let source = r"functio firstIndex(lista<numerus, 8> xs) → numerus {
+    let source = r"functio firstIndex(lista<numerus, magnitudo 8> xs) → numerus {
   itera de xs sit index {
     redde index
   }
@@ -71,7 +71,7 @@ fn bounded_lista_de_lowers_to_index_loop() {
     let dump = dump_program(lowered.validated.program());
     assert!(
         !dump.contains("itera collection before iterator MIR lowering"),
-        "bounded lista<T, 8> itera de must lower to an index loop: {dump}"
+        "bounded lista<T, magnitudo 8> itera de must lower to an index loop: {dump}"
     );
     assert!(
         dump.contains("runtime collection length("),
@@ -83,7 +83,7 @@ fn bounded_lista_de_lowers_to_index_loop() {
 /// loop has no literal-capacity dependence.
 #[test]
 fn bounded_lista_de_above_ten_lowers() {
-    let source = r"functio firstIndex(lista<numerus, 16> xs) → numerus {
+    let source = r"functio firstIndex(lista<numerus, magnitudo 16> xs) → numerus {
   itera de xs sit index {
     redde index
   }
@@ -98,7 +98,7 @@ fn bounded_lista_de_above_ten_lowers() {
     let dump = dump_program(lowered.validated.program());
     assert!(
         !dump.contains("itera collection before iterator MIR lowering"),
-        "bounded lista<T, 16> itera de must lower to an index loop: {dump}"
+        "bounded lista<T, magnitudo 16> itera de must lower to an index loop: {dump}"
     );
     assert!(
         dump.contains("runtime collection length("),
@@ -108,9 +108,9 @@ fn bounded_lista_de_above_ten_lowers() {
 
 #[test]
 fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
-    // lista<numerus, 3>: arm 2 must read exactly lanes 0 and 1 by constant
+    // lista<numerus, magnitudo 3>: arm 2 must read exactly lanes 0 and 1 by constant
     // index — no dead-slot (i >= len) read anywhere in the split.
-    let source = r"functio visit(lista<numerus, 3> xs) → vacuum {
+    let source = r"functio visit(lista<numerus, magnitudo 3> xs) → vacuum {
   itera ex xs sit x {
     nota x
   }
@@ -143,7 +143,7 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
     let unit = analyze_source(
         &session(),
         "bounded-itera.fab",
-        r"functio big(lista<numerus, 11> xs) → vacuum {
+        r"functio big(lista<numerus, magnitudo 11> xs) → vacuum {
   itera ex xs sit x {
     nota x
   }
@@ -164,10 +164,10 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
     );
 }
 
-// --- AEU-7: scalar bounded buffer forms (`lista<b8, N>` / `ascii<N>` / `textus<N>`)
+// --- AEU-7: scalar bounded buffer forms (`lista<b8, magnitudo N>` / `ascii<N>` / `textus<N>`)
 
 /// Route B proof: the scalar buffers lower to the same live-prefix static
-/// split as `lista<T, N>` — a switch on the carrier `len` with N+1 arms, arm
+/// split as `lista<T, magnitudo N>` — a switch on the carrier `len` with N+1 arms, arm
 /// k reading only lanes 0..k by constant index. Arm k ⊆ 0..len holds for
 /// every arm, so the `textus<N>` non-ASCII trap row can never fire from a
 /// dead slot.
@@ -175,8 +175,8 @@ fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
 fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
     let cases: [(&str, &str); 3] = [
         (
-            "lista<b8, 8>",
-            r"functio visit(lista<b8, 8> xs) → vacuum {
+            "lista<b8, magnitudo 8>",
+            r"functio visit(lista<b8, magnitudo 8> xs) → vacuum {
   itera ex xs sit b {
     nota b
   }
@@ -236,7 +236,7 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
 }
 
 /// The N <= 10 code-size cap governs the scalar buffer forms exactly as it
-/// governs `lista<T, N>`.
+/// governs `lista<T, magnitudo N>`.
 #[test]
 fn scalar_bounded_buffers_capacity_above_ten_stay_unsupported() {
     let unit = analyze_source(

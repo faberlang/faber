@@ -32,6 +32,10 @@ pub(super) const FAMILY_SATURATING_FLOAT: &str = "saturating<float>";
 /// d5d00916 build kernels over range facts).
 pub(super) const FAMILY_RANGED_INT: &str = "ranged policy";
 
+/// Family label of a list with no upper size (`list<T, size 1…∞>`): a kernel
+/// unrolls every slot up to the maximum, so it needs a finite constant one.
+pub(super) const FAMILY_UNBOUNDED_LIST_SIZE: &str = "list size …∞";
+
 /// First host-only family found inside `ty`, or `None` when the whole type is
 /// legal in a kernel.
 pub(super) fn host_only_family(
@@ -73,7 +77,11 @@ impl Walk<'_> {
             Type::Atomic(_) => Some(FAMILY_ATOMIC),
             Type::SizedInstans(_) => Some("instans"),
             Type::Interface(_) => Some("pactum"),
+            // A size range with no upper end cannot be unrolled; a finite one
+            // is as legal here as a bounded list (the device gate owns carriers).
+            Type::RangedArray { max: None, .. } => Some(FAMILY_UNBOUNDED_LIST_SIZE),
             Type::BoundedArray { element, .. }
+            | Type::RangedArray { element, .. }
             | Type::BoundedQueue { element, .. }
             | Type::BoundedStack { element, .. }
             | Type::Tensor(element, _)

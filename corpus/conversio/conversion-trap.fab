@@ -1,0 +1,39 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "conversio_expr", "assignment", "expr_stmt"]
+category = "conversion"
+summary = "A failing conversion in `main` with no handler aborts the run: stdout before it is printed, the run exits non-zero."
+syntax = "<expression> ↦ <type>"
+related = ["↦", "⊥", "fallibilis"]
+locale = "en"
++++
+# =============================================================================
+# ↦ — A failing conversion in `main` with no handler aborts the run: stdout before it is printed, the run exits non-zero.
+# =============================================================================
+#
+# What this teaches:
+#   • `text ↦ int` parses the digits: a well-formed text converts and
+#     prints
+#   • A text that is not a number fails the conversion; with no `⊥
+#     default` and no `do … catch`, `main` ends on it and exits non-zero
+#   • The line printed before the failure is kept; the line after it never
+#     runs
+#
+# Common mistakes:
+#   • Expecting a failed conversion to give `0` or `none`: it fails; write
+#     `↦ int ⊥ 0` for a fallback
+#   • Reading the abort as a style choice: outside `main` the same
+#     unhandled conversion is a compile error
+#
+# See also: ↦, fallibilis, conversio
+# =============================================================================
+
+main {
+    let string good ← "42"
+    print good ↦ int
+    let string bad ← "4x2"
+    print "before"
+    print bad ↦ int
+    print "after"
+}

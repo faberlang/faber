@@ -186,7 +186,9 @@ pub fn lookup_namespace_method_by_name(
 #[must_use]
 pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
     match ty {
-        Type::Array(_) | Type::BoundedArray { .. } => &[IntrinsicReceiver::Lista],
+        Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. } => {
+            &[IntrinsicReceiver::Lista]
+        }
         Type::Queue(_) | Type::BoundedQueue { .. } => &[IntrinsicReceiver::Queue],
         Type::Stack(_) | Type::BoundedStack { .. } => &[IntrinsicReceiver::Stack],
         // WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. Routing it to
@@ -346,6 +348,7 @@ pub fn mir_collection_op(entry: &MethodIntrinsic) -> Option<MirCollectionOp> {
         IntrinsicMirKind::Atomic(_)
         | IntrinsicMirKind::HigherOrderAll
         | IntrinsicMirKind::HigherOrderAny
+        | IntrinsicMirKind::HigherOrderFind
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
@@ -364,6 +367,7 @@ pub fn mir_atomic_op(entry: &MethodIntrinsic) -> Option<MirAtomicOp> {
         IntrinsicMirKind::Collection(_)
         | IntrinsicMirKind::HigherOrderAll
         | IntrinsicMirKind::HigherOrderAny
+        | IntrinsicMirKind::HigherOrderFind
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
@@ -381,6 +385,7 @@ pub fn mir_is_higher_order_lista(entry: &MethodIntrinsic) -> bool {
         entry.mir_kind,
         IntrinsicMirKind::HigherOrderAll
             | IntrinsicMirKind::HigherOrderAny
+            | IntrinsicMirKind::HigherOrderFind
             | IntrinsicMirKind::HigherOrderFiltrata
             | IntrinsicMirKind::HigherOrderMap
             | IntrinsicMirKind::HigherOrderReduce

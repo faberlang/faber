@@ -225,6 +225,16 @@ fn try_bind_generic_type_witness(
                 )
         }
         (
+            Type::BoundedArray {
+                element: expected_element,
+                capacity: expected_capacity,
+            },
+            Type::BoundedArray {
+                element: actual_element,
+                capacity: actual_capacity,
+            },
+        )
+        | (
             Type::BoundedQueue {
                 element: expected_element,
                 capacity: expected_capacity,
@@ -1153,6 +1163,17 @@ fn instantiate_type_id<W: InstantiateWalk>(
             index,
             Type::Sparsa,
         ),
+        Type::RangedArray { element, min, max } => {
+            let element = instantiate_type_id(
+                types,
+                element,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            resolve_type(types, &Type::RangedArray { element, min, max }, span, index)
+        }
         Type::BoundedArray { element, capacity } => instantiate_indexed_type(
             types,
             element,
@@ -1631,6 +1652,18 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
             types.equals(*a_ty, *b_ty) && types.index_equals(*a_shape, *b_shape)
         }
         (
+            Type::RangedArray {
+                element: a_elem,
+                min: a_min,
+                max: a_max,
+            },
+            Type::RangedArray {
+                element: b_elem,
+                min: b_min,
+                max: b_max,
+            },
+        ) => types.equals(*a_elem, *b_elem) && a_min == b_min && a_max == b_max,
+        (
             Type::BoundedArray {
                 element: a_elem,
                 capacity: a_cap,
@@ -1775,6 +1808,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Option(inner)
         | Type::Ref(_, inner)
         | Type::Alias(_, inner) => type_contains_param_inner(types, *inner, seen),
+        Type::RangedArray { element, .. } => type_contains_param_inner(types, *element, seen),
         Type::BoundedArray { element, capacity }
         | Type::BoundedQueue { element, capacity }
         | Type::BoundedStack { element, capacity } => {
@@ -2196,7 +2230,7 @@ fn rewrite_place_constants(
     rewrite: &mut impl FnMut(&mut MirConstant) -> bool,
 ) -> bool {
     for projection in &mut place.projections {
-        if let MirProjection::Index(index) = projection
+        if let MirProjection::Index(index) | MirProjection::ProvenIndex(index) = projection
             && !rewrite_operand_constants(index, rewrite)
         {
             return false;

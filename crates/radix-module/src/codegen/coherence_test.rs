@@ -211,6 +211,7 @@ const HOST_ONLY_SYMBOLS: &[&str] = &[
     host_abi::SYMBOL_ASSERT_MESSAGE,
     host_abi::SYMBOL_FATAL,
     host_abi::SYMBOL_FATAL_OPAQUE,
+    host_abi::SYMBOL_TRAP,
     host_abi::SYMBOL_FORMAT_I64,
     host_abi::SYMBOL_FORMAT_I1,
     host_abi::SYMBOL_FORMAT_I64_I64,

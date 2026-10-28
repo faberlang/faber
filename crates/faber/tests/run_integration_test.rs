@@ -121,7 +121,8 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     assert!(ok, "faber targets failed:\n{stderr}");
 
     // `faber run` interprets source; the only target routes it reaches are the
-    // `--device metal|cuda` launches and the compiled `--target ts` build.
+    // `--device metal|cuda` launches and the compiled `--target ts|go|llvm-host`
+    // builds.
     let runnable: Vec<&str> = stdout
         .lines()
         .filter(|line| line.contains(" run=yes "))
@@ -130,11 +131,11 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     assert!(
         runnable
             .iter()
-            .all(|name| ["metal-text", "llvm-text", "ts"].contains(name)),
+            .all(|name| ["metal-text", "llvm-text", "ts", "go", "llvm-host"].contains(name)),
         "only the device routes may report run=yes, got {runnable:?}:\n{stdout}"
     );
 
-    for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
+    for name in ["fmir-text", "fmir", "fhir", "rust"] {
         let prefix = format!("{name} ");
         let row = stdout
             .lines()
@@ -151,7 +152,7 @@ fn targets_run_column_claims_only_the_device_routes_faber_run_launches() {
     }
 
     // And the dispatch agrees: `faber run` takes no other `--target` for any of them.
-    for name in ["fmir-text", "fmir", "fhir", "llvm-host", "rust"] {
+    for name in ["fmir-text", "fmir", "fhir", "rust"] {
         let (_, stderr, status) = run_faber_status(&["run", "--target", name, "."]);
         assert!(
             !status.success(),
@@ -2988,7 +2989,7 @@ fn run_metal_with_partition_memory(
     use radix::module::driver::Config;
     use radix::program::mir::DeviceSelection;
 
-    let mut registry = system_device_registry_spanning(metal_span);
+    let mut registry = system_device_registry_spanning(metal_span, 1);
     let mut host = radix_mir_runner::BufferHost::with_argumenta(
         args.iter().map(|arg| (*arg).to_owned()).collect(),
     );
@@ -3174,7 +3175,7 @@ fn run_metal_device_grid_reduce_matches_plain_metal_over_partitions() {
     }
 }
 
-/// `--partitions` belongs to the CPU and Metal devices: any other route fails
+/// `--partitions` belongs to the CPU, Metal and CUDA devices: any other route fails
 /// closed before launch instead of ignoring the flag.
 #[test]
 fn run_partitions_outside_the_cpu_device_fails_closed() {

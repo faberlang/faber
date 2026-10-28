@@ -34,7 +34,10 @@ use crate::{
 };
 use handroll::FxHashMap;
 use radix_diagnostics::DiagnosticArg;
-use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
+use radix_syntax::{
+    FiguraExpr, GenericArgExpr, GenericParamKind, Ident, RangeBoundExpr, RangeKind, TypeExpr,
+    TypeExprKind,
+};
 use radix_types::{
     AppliedArg, BuiltinTensorEdgePolicy, compose_index_affine_constant, divide_index_exact,
     evaluate_index_dimension,
@@ -348,12 +351,43 @@ impl Lowerer<'_> {
                 None => radix_hir::HirTypeFormHead::Semantic(expr.form),
             },
         };
-        let args = match &expr.kind {
+        let mut args = match &expr.kind {
             TypeExprKind::Func(_) | TypeExprKind::Union(_) | TypeExprKind::Intersection(_) => {
                 Vec::new()
             }
             _ => frame.args,
         };
+        // Range endpoints and the inclusive/exclusive glyph do not contribute
+        // to the resolved type's child tree. Keep the source argument beside
+        // the witness so the formatter can re-emit the authored surface.
+        if let TypeExprKind::Named(_, params) = &expr.kind {
+            args.extend(params.iter().filter_map(|param| {
+                let GenericArgExpr::Range(range) = param else {
+                    return None;
+                };
+                let bound = |bound: &RangeBoundExpr| match bound {
+                    RangeBoundExpr::Literal { value, .. } => {
+                        radix_hir::HirRangeBound::Literal(value.to_string())
+                    }
+                    RangeBoundExpr::Unbounded { negative, .. } => {
+                        radix_hir::HirRangeBound::Unbounded {
+                            negative: *negative,
+                        }
+                    }
+                    RangeBoundExpr::Name { name, lifted, .. } => radix_hir::HirRangeBound::Name {
+                        name: name.name,
+                        lifted: *lifted,
+                    },
+                };
+                Some(radix_hir::HirTypeFormArg::Range(
+                    radix_hir::HirRangeArgument {
+                        lo: bound(&range.lo),
+                        hi: bound(&range.hi),
+                        inclusive: matches!(range.kind, RangeKind::Inclusive),
+                    },
+                ))
+            }));
+        }
         radix_hir::HirTypeForm {
             ty,
             head,
@@ -812,6 +846,7 @@ impl Lowerer<'_> {
             // A selectively imported type (D22.5) is the imported `TypeId`
             // itself, exactly as its qualified `module.Type` path lowers.
             if let Some(type_id) = self.resolver.lookup_selective_import_type(name.name) {
+                self.record_imported_named_head(type_id, vec![name.name]);
                 if params.is_empty() {
                     return type_id;
                 }
@@ -1406,6 +1441,18 @@ impl Lowerer<'_> {
                 let elem = self.lower_generic_type_arg(elem);
                 self.types.array(elem)
             }
+            [elem, GenericArgExpr::Range(range)] => {
+                // A length range, `list<T, size lo‥hi>`: always the trapping range.
+                let elem = self.lower_generic_type_arg(elem);
+                let mut issue = None;
+                let ty = radix_types::lower_ranged_list(elem, range, self.types, &mut |found| {
+                    issue.get_or_insert(found);
+                });
+                if let Some(issue) = issue {
+                    self.error(issue.issue());
+                }
+                ty
+            }
             [elem, capacity] => {
                 let elem = self.lower_generic_type_arg(elem);
                 let Some(capacity) = self.lower_generic_index_arg(capacity) else {
@@ -1458,6 +1505,30 @@ impl Lowerer<'_> {
         }
     }
 
+    /// Authored-form capture for an imported named type: record the imported
+    /// definition beside the spelled `path` so the completed head is a `Named`
+    /// constructor exactly as a locally declared type's is.
+    ///
+    /// `type_id` is the imported base type; its definition identity is the
+    /// struct, enum, interface or alias it names. A base that names no
+    /// definition keeps the semantic head.
+    fn record_imported_named_head(&mut self, type_id: TypeId, path: Vec<radix_lexer::Symbol>) {
+        let mut current = type_id;
+        let def_id = loop {
+            match self.types.get(current) {
+                Type::Struct(def_id)
+                | Type::Enum(def_id)
+                | Type::Interface(def_id)
+                | Type::Alias(def_id, _) => break *def_id,
+                Type::Applied(base, _) => current = *base,
+                _ => return,
+            }
+        };
+        if let Some(frame) = self.form_frames.last_mut() {
+            frame.named = Some((def_id, path));
+        }
+    }
+
     fn lower_qualified_type(&mut self, path: &[Ident], params: &[GenericArgExpr]) -> TypeId {
         let Some((namespace, type_name)) = path.first().zip(path.last()) else {
             self.error("empty_qualified_type_path");
@@ -1480,6 +1551,10 @@ impl Lowerer<'_> {
             .resolver
             .namespace_file_type(namespace.name, type_name.name)
         {
+            self.record_imported_named_head(
+                type_id,
+                path.iter().map(|segment| segment.name).collect(),
+            );
             // Imported declarations carry their ordered declaration kinds on
             // the file interface (S0-R1); kind mismatches fail closed instead
             // of silently accepting any argument spelling.
@@ -1512,6 +1587,11 @@ impl Lowerer<'_> {
                             .map(|type_id| (def_id, type_id))
                     })
         {
+            // Authored-form capture: the exported member is a resolved user
+            // definition, recorded under the spelled qualified path.
+            if let Some(frame) = self.form_frames.last_mut() {
+                frame.named = Some((def_id, path.iter().map(|segment| segment.name).collect()));
+            }
             let has_declared_params = self.has_declared_generic_params(def_id);
             if params.is_empty() && !has_declared_params {
                 return type_id;

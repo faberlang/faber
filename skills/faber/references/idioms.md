@@ -274,7 +274,7 @@ Preserve visible distinctions:
 - `let` versus `mut` versus `ref` versus `const` (la `sit` / `varia` / `de` / `fixum`): write-once name, writable name, re-pointable read-only name, compile-time constant
 - `class` versus `interface` (la `genus` / `implendum`)
 - `enum` versus `union` (la `ordo` / `discretio`)
-- `switch` versus `match` (la `elige` / `discerne`): `match` matches a closed set only (variants of a `union`/`enum`, or members of a union), and a pattern outside it is `SEM010 discerne_pattern_not_in_closed_set` (`case u32` over an `int`, `case list<int, 4>` over a `list<int>`); an open scrutinee uses `switch`, and an integer's width or a length is asked with `is` or `.length()` in an `if`
+- `switch` versus `match` (la `elige` / `discerne`): `match` matches a closed set only (variants of a `union`/`enum`, or members of a union), and a pattern outside it is `SEM010 discerne_pattern_not_in_closed_set` (`case u32` over an `int`, `case list<int, size 4>` over a `list<int>`); an open scrutinee uses `switch`, and an integer's width or a length is asked with `is` or `.length()` in an `if`
 - `ref` versus `mut` versus `from` (la `de` / `in` / `ex`)
 - `T ∪ none` (la `T ∪ nihil`) versus `optional` (la `sponte`) slots
 - `async` / `generator` / `async_generator` (la `fiet` / `fiunt` / `fient`) versus ordinary functions

@@ -60,6 +60,7 @@ impl TypeChecker<'_> {
             | Type::Ref(_, inner)
             | Type::Alias(_, inner)
             | Type::BoundedArray { element: inner, .. }
+            | Type::RangedArray { element: inner, .. }
             | Type::BoundedQueue { element: inner, .. }
             | Type::BoundedStack { element: inner, .. } => vec![*inner],
             Type::Tuple(parts) | Type::Union(parts) => parts.clone(),
@@ -94,6 +95,7 @@ impl TypeChecker<'_> {
             | Type::SizedNumeric(Primitive::Fractus, _)
             | Type::Array(_)
             | Type::BoundedArray { .. }
+            | Type::RangedArray { .. }
             | Type::Map(_, _)
             | Type::Ledger(_, _)
             | Type::Set(_)

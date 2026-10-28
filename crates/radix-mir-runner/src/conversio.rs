@@ -372,6 +372,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 struct_defaults,
                 span,
             ),
+            Type::RangedArray { element, min, max } => self.convert_to_ranged_array(
+                value,
+                source_ty,
+                *element,
+                *min,
+                *max,
+                recovery,
+                struct_defaults,
+                span,
+            ),
             other => Err(RunnerError::unsupported(
                 span,
                 &format!("runtime conversio to {other:?}"),

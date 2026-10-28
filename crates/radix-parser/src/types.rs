@@ -210,8 +210,9 @@ impl Parser {
         // `wrapping<inf>` / `saturating<inf>` denote bare `inf` (ruling 32);
         // the level keeps which policy word the author wrote (ruling 49).
         if let TypeExprKind::Named(head, args) = &kind
-            && let [arg] = args.as_slice()
-            && self.generic_arg_is_inf_marker(arg)
+            && args
+                .first()
+                .is_some_and(|arg| self.generic_arg_is_inf_marker(arg))
         {
             match self.interner.resolve(head.name) {
                 "modulus" => form = TypeFormLevel::WRAPPING_INF,
@@ -467,28 +468,35 @@ impl Parser {
         let mut params = Vec::new();
         let mut labels = HashSet::new();
         loop {
-            let param = if path.len() == 1
-                && name_str != "iuncta"
-                && name_str != "ratio"
-                && self.looks_like_range_arg()
-            {
-                // A range is its own argument slot (`saturating<u32, 0‥W>`):
-                // it never reads as a type or a size, so it is unambiguous
-                // beside both. Which heads take one is decided at lowering.
-                GenericArgExpr::Range(self.parse_range_arg()?)
-            } else if name_str == "iuncta" {
-                GenericArgExpr::Type(self.parse_iuncta_type_argument(&mut labels)?)
-            } else if path.len() == 1 && name_str == "ratio" {
-                GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
-            } else if path.len() == 1 && is_bounded_capacity_head(name_str) {
-                // lista/textus/ascii spell their capacity in
-                // the type surface itself, so their arguments keep
-                // the explicit `Type` shape (NATURAL interns as a
-                // named type) rather than the kinded split.
-                self.parse_explicit_type_argument()?
-            } else {
-                self.parse_type_argument()?
-            };
+            let param =
+                if path.len() == 1 && name_str == "lista" && self.looks_like_sized_range_arg() {
+                    // A count range after the `size` marker: `lista<T, magnitudo 1…8>`.
+                    self.advance();
+                    let mut range = self.parse_range_arg()?;
+                    range.sized = true;
+                    GenericArgExpr::Range(range)
+                } else if path.len() == 1
+                    && name_str != "iuncta"
+                    && name_str != "ratio"
+                    && self.looks_like_range_arg()
+                {
+                    // A range is its own argument slot (`saturating<u32, 0‥W>`):
+                    // it never reads as a type or a size, so it is unambiguous
+                    // beside both. Which heads take one is decided at lowering.
+                    GenericArgExpr::Range(self.parse_range_arg()?)
+                } else if name_str == "iuncta" {
+                    GenericArgExpr::Type(self.parse_iuncta_type_argument(&mut labels)?)
+                } else if path.len() == 1 && name_str == "ratio" {
+                    GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
+                } else if path.len() == 1 && is_bounded_capacity_head(name_str) {
+                    // lista/textus/ascii spell their capacity in
+                    // the type surface itself, so their arguments keep
+                    // the explicit `Type` shape (NATURAL interns as a
+                    // named type) rather than the kinded split.
+                    self.parse_explicit_type_argument()?
+                } else {
+                    self.parse_type_argument()?
+                };
             params.push(param);
             if !self.consume_item_separator(&TokenKind::GtAscii, "type_parameters")? {
                 break;
@@ -936,6 +944,20 @@ impl Parser {
         })
     }
 
+    /// Whether the next tokens spell a count range, `size lo‥hi` or
+    /// `size lo…hi`: the `size` marker, then a whole range. The marker covers
+    /// the range, so a bound after it is a plain bound (`size 1…8`), never a
+    /// lifted name.
+    fn looks_like_sized_range_arg(&self) -> bool {
+        self.keyword_ident_at(0) == Some(TokenKind::Magnitudo)
+            && self.range_bound_len(1).is_some_and(|len| {
+                matches!(
+                    self.peek_at(1 + len).kind,
+                    TokenKind::DotDot | TokenKind::Ellipsis
+                )
+            })
+    }
+
     /// Parse the range argument of a ranged store policy.
     ///
     /// GRAMMAR:
@@ -958,6 +980,7 @@ impl Parser {
             lo,
             hi,
             kind,
+            sized: false,
             span: start.merge(self.previous_span()),
         })
     }

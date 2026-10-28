@@ -60,3 +60,38 @@ main {
 "#;
     assert_eq!(run_lines(source), vec!["AB", "none"]);
 }
+
+#[test]
+fn optional_chain_call_evaluates_arguments_only_for_a_present_callee() {
+    let source = r#"+++
+locale = "en"
++++
+type Op = (int) → int
+
+fn shout(int x) → int {
+    return x + 100
+}
+
+fn arg() → int {
+    print "arg"
+    return 5
+}
+
+fn idx() → int {
+    print "idx"
+    return 1
+}
+
+main {
+    let Op ∪ none absent ← null
+    print absent?(arg())
+    let Op ∪ none named ← shout
+    print named?(arg())
+    let list<int> ∪ none gone ← null
+    print gone?[idx()]
+    let list<int> ∪ none here ← [10, 20]
+    print here?[idx()]
+}
+"#;
+    assert_eq!(run_lines(source), vec!["none", "arg", "105", "none", "idx", "20"]);
+}

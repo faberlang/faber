@@ -1029,7 +1029,7 @@ incipit {
   sit tf32[2, 3] grid ← vacua
   sit numerus n ← runtime_extent(3)
   sit tf32[2, magnitudo n] dynamic ← vacua
-  sit lista<numerus, 2> exact ← grid.magnitudines()
+  sit lista<numerus, magnitudo 2> exact ← grid.magnitudines()
   sit lista<numerus, _> inferred ← dynamic.magnitudines()
   sit numerus second ← grid.magnitudines()[1] vel 0
   nota exact.longitudo(), inferred.longitudo(), second

@@ -57,7 +57,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    /// `lista<T> ↦ lista<T, N>`: the store-time capacity check. A bounded
+    /// `lista<T> ↦ lista<T, magnitudo N>`: the store-time capacity check. A bounded
     /// list is held as an ordinary `Value::Array`; a source longer than `N`
     /// fails the conversion, and `⊥` recovery supplies the fallback, as for
     /// the other failable conversions.
@@ -93,6 +93,37 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Ok(converted)
         } else {
             self.recover_or_fail(recovery, span, "lista to bounded lista conversion failed")
+        }
+    }
+
+    /// `lista<T> ↦ lista<T, magnitudo lo‥hi>`: the copied list is kept only
+    /// when its length lies inside `[min, max]`; any other length takes the
+    /// recovery value or fails the conversion, like the bounded list's overflow.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn convert_to_ranged_array(
+        &mut self,
+        value: Value,
+        source_ty: radix_types::TypeId,
+        element: radix_types::TypeId,
+        min: u64,
+        max: Option<u64>,
+        recovery: Option<&MirOperand>,
+        struct_defaults: &[MirStructFieldDefaults],
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Ok(converted) =
+            self.convert_to_array_inner(value, source_ty, element, struct_defaults, span)
+        else {
+            return self.recover_or_fail(recovery, span, "lista to ranged lista conversion failed");
+        };
+        let fits = matches!(&converted, Value::Array(cell) if {
+            let length = cell.borrow().len() as u64;
+            length >= min && max.is_none_or(|max| length <= max)
+        });
+        if fits {
+            Ok(converted)
+        } else {
+            self.recover_or_fail(recovery, span, "lista to ranged lista conversion failed")
         }
     }
 

@@ -1430,21 +1430,6 @@ pub enum HirExpressionKind {
         mutable: bool,
     },
 
-    /// Dedicated `primus_quem` first-match selection.
-    ///
-    /// This is a source-declaration node only in AFM-2. Typecheck deliberately
-    /// declines it until the AFM-3 admission rules and lowering land.
-    FirstMatch {
-        /// Bounded source expression supplying the candidates.
-        source: Box<HirExpression>,
-        /// Coordinate bindings inherited from the shared `apud` production.
-        coordinates: Vec<(DefId, Symbol)>,
-        /// Candidate binding introduced by the owned `ubi` predicate tail.
-        binding: (DefId, Symbol),
-        /// Predicate body evaluated for every candidate lane.
-        body: HirBlock,
-    },
-
     /// Range (`intervallum`).
     Intervallum {
         start: Box<HirExpression>,
@@ -1775,6 +1760,8 @@ pub enum HirReductionOp {
     All,
     Any,
     Count,
+    /// The first element whose body predicate holds (`prima`); `T ∪ nihil`.
+    First,
 }
 
 /// Whether a prefix output includes its own input element.
@@ -1824,6 +1811,7 @@ impl HirReductionOp {
             Self::All => "omnia",
             Self::Any => "quilibet",
             Self::Count => "numeratio",
+            Self::First => "prima",
         }
     }
 }
@@ -2711,6 +2699,32 @@ pub enum HirTypeFormArg {
     Size(IndexId),
     /// Authored generic name argument (e.g. `lista<numerus>`).
     Name(Symbol),
+    /// Authored range argument of a ranged integer store policy. Unlike a
+    /// resolved `Type::RangedInt`, this retains the written glyph and bounds.
+    Range(HirRangeArgument),
+}
+
+/// Source spelling of a range argument on a store-policy type.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirRangeArgument {
+    pub lo: HirRangeBound,
+    pub hi: HirRangeBound,
+    /// `true` for the inclusive `…` glyph, `false` for half-open `‥`.
+    pub inclusive: bool,
+}
+
+/// One authored endpoint of a store-policy range.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirRangeBound {
+    /// The authored decimal spelling of an integer endpoint.
+    Literal(String),
+    Unbounded {
+        negative: bool,
+    },
+    Name {
+        name: Symbol,
+        lifted: bool,
+    },
 }
 
 /// Authored source path for one resolved enum or union variant.

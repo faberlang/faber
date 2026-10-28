@@ -67,7 +67,7 @@ main {
 
     # --- Accessus optionalis on lista ---
 
-    let list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, size 3> litterae ← ["a", "b", "c"]
     # "a"
     print litterae?[0]
     # nihil (out of range)

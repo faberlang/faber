@@ -61,9 +61,9 @@ fn embedded_registry_loads_canonical_and_legacy_entries() {
         registry.entries().len(),
         pack.term_count() + pack.legacy_redirects().len()
     );
-    // 202 explained terms (including `⇜` and the four ranged store policy
-    // terms) plus 14 legacy redirects (`generis` is retired).
-    assert_eq!(registry.entries().len(), 216);
+    // 203 explained terms (including `⇜`, the four ranged store policy terms
+    // and the list size range) plus 14 legacy redirects (`generis` is retired).
+    assert_eq!(registry.entries().len(), 217);
     assert!(registry.lookup("functio").is_some());
     assert!(matches!(registry.lookup("=="), Some(Lookup::Legacy { .. })));
 }
@@ -98,10 +98,9 @@ fn audit_finding_topics_resolve_with_current_behavior() {
     assert!(selective.contains("[071]"));
     assert!(selective.contains("fixum"));
 
-    // primus_quem documents first-match semantics and the SEM059 declines.
-    let primus = render_plain(&registry.lookup("primus_quem").expect("primus_quem"));
-    assert!(primus.contains("first live"));
-    assert!(primus.contains("SEM059"));
+    // The first reduction documents first-match semantics.
+    let first = render_plain(&registry.lookup("reducta-first").expect("reducta-first"));
+    assert!(first.contains("first live"));
 
     // filum is the distributed `reducta via summa ex` reduction, not a list op.
     let filum = render_plain(&registry.lookup("filum").expect("filum"));

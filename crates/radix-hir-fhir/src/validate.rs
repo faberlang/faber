@@ -660,6 +660,9 @@ fn validate_named_form(
                 radix_hir::HirTypeFormArg::Size(_) => {
                     return Err(type_presentation_issue("named_argument_kind", site));
                 }
+                radix_hir::HirTypeFormArg::Range(_) => {
+                    return Err(type_presentation_issue("named_argument_kind", site));
+                }
             },
             radix_types::AppliedArg::Size(expected) => {
                 // A size-generic genus applied to a size (`Box<3>`) binds a
@@ -882,6 +885,22 @@ fn generic_alias_body_matches(
             radix_types::Type::Ref(witness_mutability, witness_child),
         ) => body_mutability == witness_mutability && recurse(*body_child, *witness_child),
         (
+            radix_types::Type::RangedArray {
+                element: body_child,
+                min: body_min,
+                max: body_max,
+            },
+            radix_types::Type::RangedArray {
+                element: witness_child,
+                min: witness_min,
+                max: witness_max,
+            },
+        ) => {
+            body_min == witness_min
+                && body_max == witness_max
+                && recurse(*body_child, *witness_child)
+        }
+        (
             radix_types::Type::BoundedArray {
                 element: body_child,
                 capacity: body_capacity,
@@ -1020,7 +1039,9 @@ fn transparent_generic_alias_witness(
         .iter()
         .map(|arg| match arg {
             radix_hir::HirTypeFormArg::Type(child) => Some(child.as_ref()),
-            radix_hir::HirTypeFormArg::Name(_) | radix_hir::HirTypeFormArg::Size(_) => None,
+            radix_hir::HirTypeFormArg::Name(_)
+            | radix_hir::HirTypeFormArg::Size(_)
+            | radix_hir::HirTypeFormArg::Range(_) => None,
         })
         .collect::<Option<Vec<&radix_hir::HirTypeForm>>>()?;
     let bindings: Vec<(radix_lexer::Symbol, radix_types::TypeId)> = params
@@ -1052,6 +1073,115 @@ fn named_witness(
         radix_types::Type::Ref(_, inner) => named_witness(types, *inner),
         _ => None,
     }
+}
+
+fn validate_policy_range(
+    form: &radix_hir::HirTypeForm,
+    ty: &radix_types::Type,
+    site: &radix_hir::HirTypeSite,
+    check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
+) -> Result<(), HirArtifactError> {
+    let [radix_hir::HirTypeFormArg::Range(range)] = form.args.as_slice() else {
+        return Err(type_presentation_issue("policy_range_arity", site));
+    };
+    for bound in [&range.lo, &range.hi] {
+        if let radix_hir::HirRangeBound::Name { name, .. } = bound {
+            check_symbol(*name)?;
+        }
+    }
+    let endpoint = |bound: &radix_hir::HirRangeBound| match bound {
+        radix_hir::HirRangeBound::Literal(value) => value
+            .parse::<i128>()
+            .ok()
+            .map(radix_types::numeric_width::RangeEnd::Value),
+        radix_hir::HirRangeBound::Unbounded { negative: true } => {
+            Some(radix_types::numeric_width::RangeEnd::NegInf)
+        }
+        radix_hir::HirRangeBound::Unbounded { negative: false } => {
+            Some(radix_types::numeric_width::RangeEnd::PosInf)
+        }
+        radix_hir::HirRangeBound::Name { .. } => None,
+    };
+    let (Some(lo), Some(hi)) = (endpoint(&range.lo), endpoint(&range.hi)) else {
+        return Err(type_presentation_issue("policy_range_not_constant", site));
+    };
+    if matches!(
+        ty,
+        radix_types::Type::SizedNumeric(radix_types::Primitive::Numerus, width)
+            if width.is_unbounded()
+    ) {
+        return if matches!(lo, radix_types::numeric_width::RangeEnd::NegInf)
+            && matches!(hi, radix_types::numeric_width::RangeEnd::PosInf)
+        {
+            Ok(())
+        } else {
+            Err(type_presentation_issue("policy_range_witness", site))
+        };
+    }
+    let (width, bounds) = match ty {
+        radix_types::Type::RangedInt { width, lo, hi, .. } => (*width, (*lo, *hi)),
+        radix_types::Type::SizedNumeric(radix_types::Primitive::Numerus, width)
+        | radix_types::Type::ModularWord(width)
+        | radix_types::Type::SaturatingWord(width) => (
+            *width,
+            width
+                .integer_range()
+                .ok_or_else(|| type_presentation_issue("policy_range_witness", site))?,
+        ),
+        _ => return Err(type_presentation_issue("policy_range_witness", site)),
+    };
+    let resolved = radix_types::resolve_ranged_int(width, lo, hi, range.inclusive)
+        .map_err(|_| type_presentation_issue("policy_range_witness", site))?;
+    if resolved != bounds {
+        return Err(type_presentation_issue("policy_range_witness", site));
+    }
+    Ok(())
+}
+
+/// The authored `size lo‥hi` range of a list form, checked
+/// against the resolved witness: the endpoints are constants and resolve to the
+/// witness's length bounds. The authored range is a presentation record; the
+/// witness stays the authority.
+fn validate_list_size_range(
+    range: &radix_hir::HirRangeArgument,
+    ty: &radix_types::Type,
+    types: &radix_types::TypeTableSnapshot,
+    site: &radix_hir::HirTypeSite,
+) -> Result<(), HirArtifactError> {
+    let endpoint = |bound: &radix_hir::HirRangeBound| match bound {
+        radix_hir::HirRangeBound::Literal(value) => value
+            .parse::<i128>()
+            .ok()
+            .map(radix_types::numeric_width::RangeEnd::Value),
+        radix_hir::HirRangeBound::Unbounded { negative: true } => {
+            Some(radix_types::numeric_width::RangeEnd::NegInf)
+        }
+        radix_hir::HirRangeBound::Unbounded { negative: false } => {
+            Some(radix_types::numeric_width::RangeEnd::PosInf)
+        }
+        radix_hir::HirRangeBound::Name { .. } => None,
+    };
+    let (Some(lo), Some(hi)) = (endpoint(&range.lo), endpoint(&range.hi)) else {
+        return Err(type_presentation_issue("list_range_not_constant", site));
+    };
+    let resolved = radix_types::numeric_width::resolve_ranged_list(lo, hi, range.inclusive)
+        .map_err(|_| type_presentation_issue("list_range_witness", site))?;
+    let witness = match ty {
+        radix_types::Type::Array(_) => (0, None),
+        radix_types::Type::RangedArray { min, max, .. } => (*min, *max),
+        radix_types::Type::BoundedArray { capacity, .. }
+        | radix_types::Type::BoundedOcteti { capacity } => {
+            match types.indices().get(capacity.0 as usize) {
+                Some(radix_types::IndexExpr::Literal(max)) => (0, Some(*max)),
+                _ => return Err(type_presentation_issue("list_range_witness", site)),
+            }
+        }
+        _ => return Err(type_presentation_issue("list_range_witness", site)),
+    };
+    if resolved != witness {
+        return Err(type_presentation_issue("list_range_witness", site));
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1120,14 +1250,44 @@ fn validate_type_form(
             match ty {
                 radix_types::Type::SizedNumeric(prim, width) => {
                     // Level 2 is the explicit policy word (`trapping<u8>`);
-                    // it only spells integer and `d64` widths, never floats.
-                    // Levels 3 and 4 (`wrapping<inf>`, `saturating<inf>`) spell
-                    // a policy word over the one unbounded integer type only.
+                    // a retained full-width range is the sole permitted arg.
                     let policy_ok = level.0 != 2 || *prim == radix_types::Primitive::Numerus;
                     let inf_word_ok = !matches!(level.0, 3 | 4)
                         || (*prim == radix_types::Primitive::Numerus && width.is_unbounded());
-                    if level.0 > 4 || !policy_ok || !inf_word_ok || !form.args.is_empty() {
+                    let range_arg =
+                        matches!(form.args.as_slice(), [radix_hir::HirTypeFormArg::Range(_)]);
+                    if level.0 > 4
+                        || !policy_ok
+                        || !inf_word_ok
+                        || (!form.args.is_empty()
+                            && !(range_arg
+                                && matches!(level.0, 2..=4)
+                                && *prim == radix_types::Primitive::Numerus))
+                    {
                         return Err(type_presentation_issue("numeric_level_or_arity", site));
+                    }
+                    if range_arg {
+                        validate_policy_range(form, ty, site, check_symbol)?;
+                    }
+                }
+                radix_types::Type::PolicyFloat(_, _) => {
+                    // Float policy cells do not admit ranged integer arguments.
+                    if !matches!(level.0, 0 | 2) || !form.args.is_empty() {
+                        return Err(type_presentation_issue("semantic_level_or_arity", site));
+                    }
+                }
+                radix_types::Type::RangedInt { .. } => {
+                    if !matches!(level.0, 0 | 2)
+                        || (!form.args.is_empty()
+                            && !matches!(
+                                form.args.as_slice(),
+                                [radix_hir::HirTypeFormArg::Range(_)]
+                            ))
+                    {
+                        return Err(type_presentation_issue("semantic_level_or_arity", site));
+                    }
+                    if !form.args.is_empty() {
+                        validate_policy_range(form, ty, site, check_symbol)?;
                     }
                 }
                 radix_types::Type::Bits(_) => {
@@ -1137,25 +1297,76 @@ fn validate_type_form(
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
                     }
                 }
-                radix_types::Type::PolicyFloat(_, _) | radix_types::Type::RangedInt { .. } => {
-                    // `trapping<f32>` / `saturating<f64>` and a ranged store
-                    // policy (`trapping<i32, -2‥3>`) are authored at the
-                    // POLICY level; the long form remains legal.
-                    if !matches!(level.0, 0 | 2) || !form.args.is_empty() {
-                        return Err(type_presentation_issue("semantic_level_or_arity", site));
-                    }
-                }
                 radix_types::Type::Primitive(_)
                 | radix_types::Type::TensorEdgePolicy(_)
-                | radix_types::Type::ModularWord(_)
-                | radix_types::Type::SaturatingWord(_)
                 | radix_types::Type::SizedInstans(_)
                 | radix_types::Type::BoundedTextus { .. }
-                | radix_types::Type::BoundedAscii { .. }
-                | radix_types::Type::BoundedOcteti { .. } => {
+                | radix_types::Type::BoundedAscii { .. } => {
                     if level.0 != 0 || !form.args.is_empty() {
                         return Err(type_presentation_issue("semantic_level_or_arity", site));
                     }
+                }
+                radix_types::Type::ModularWord(width)
+                | radix_types::Type::SaturatingWord(width) => {
+                    if level.0 != 0
+                        || (!form.args.is_empty()
+                            && !matches!(
+                                form.args.as_slice(),
+                                [radix_hir::HirTypeFormArg::Range(_)]
+                            ))
+                    {
+                        return Err(type_presentation_issue("semantic_level_or_arity", site));
+                    }
+                    if !form.args.is_empty() {
+                        validate_policy_range(form, ty, site, check_symbol)?;
+                    }
+                    // Ensure these policy carriers have an integer width.
+                    if width.integer_range().is_none() {
+                        return Err(type_presentation_issue("policy_range_witness", site));
+                    }
+                }
+                radix_types::Type::BoundedOcteti { .. } => {
+                    // The authored `list<b8, size N>`: the bounded byte buffer is
+                    // authored as a list head over one raw-byte (`b8`) element
+                    // argument; the capacity lives in the root witness, as for
+                    // every bounded list.
+                    // `size 0…8` keeps its authored range beside the element.
+                    let authored_range = if let [_, radix_hir::HirTypeFormArg::Range(range)] =
+                        form.args.as_slice()
+                    {
+                        Some(range)
+                    } else {
+                        None
+                    };
+                    if level.0 != 0 || (authored_range.is_none() && form.args.len() != 1) {
+                        return Err(type_presentation_issue("bounded_octeti_shape", site));
+                    }
+                    if let Some(range) = authored_range {
+                        validate_list_size_range(range, ty, types, site)?;
+                    }
+                    let radix_hir::HirTypeFormArg::Type(child) = &form.args[0] else {
+                        return Err(type_presentation_issue("type_argument_kind", site));
+                    };
+                    if !matches!(
+                        types.types().get(child.ty.0 as usize),
+                        Some(radix_types::Type::Bits(radix_types::BitsWidth::B8))
+                    ) {
+                        return Err(type_presentation_issue("bounded_octeti_element", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        child.ty,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        alias_params,
+                        conversation,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
                 }
                 radix_types::Type::Array(element) => {
                     // `octeti` is authored as the zero-argument primitive word
@@ -1169,7 +1380,10 @@ fn validate_type_form(
                     {
                         return Ok(());
                     }
-                    if form.args.len() != 1 {
+                    // `size 0…∞` keeps the authored range beside the element.
+                    if let [_, radix_hir::HirTypeFormArg::Range(range)] = form.args.as_slice() {
+                        validate_list_size_range(range, ty, types, site)?;
+                    } else if form.args.len() != 1 {
                         return Err(type_presentation_issue("array_argument_arity", site));
                     }
                     validate_type_arg(
@@ -1192,8 +1406,14 @@ fn validate_type_form(
                         return Err(type_presentation_issue("array_level", site));
                     }
                 }
-                radix_types::Type::BoundedArray { element, .. } => {
-                    if level.0 != 0 || form.args.len() != 1 {
+                radix_types::Type::BoundedArray { element, .. }
+                | radix_types::Type::RangedArray { element, .. } => {
+                    if let [_, radix_hir::HirTypeFormArg::Range(range)] = form.args.as_slice() {
+                        validate_list_size_range(range, ty, types, site)?;
+                    } else if form.args.len() != 1 {
+                        return Err(type_presentation_issue("bounded_array_shape", site));
+                    }
+                    if level.0 != 0 {
                         return Err(type_presentation_issue("bounded_array_shape", site));
                     }
                     validate_type_arg(
@@ -1968,19 +2188,6 @@ fn collect_expr_defs(
                 collect_block_defs(body, registry);
             }
         }
-        HirExpressionKind::FirstMatch {
-            source,
-            coordinates,
-            binding,
-            body,
-        } => {
-            collect_expr_defs(source, registry);
-            for (def_id, _) in coordinates {
-                registry.insert(*def_id);
-            }
-            registry.insert(binding.0);
-            collect_block_defs(body, registry);
-        }
         HirExpressionKind::Praefixum(inner)
         | HirExpressionKind::Format { value: inner, .. }
         | HirExpressionKind::Unary(_, inner)
@@ -2365,10 +2572,6 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 if let Some(body) = body {
                     collect_block(body, registry);
                 }
-            }
-            HirExpressionKind::FirstMatch { source, body, .. } => {
-                collect_expr(source, registry);
-                collect_block(body, registry);
             }
             HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
                 collect_expr(lhs, registry);
@@ -2960,6 +3163,9 @@ fn validate_shape_obligation_table(
             checks.check_index(binding.witness)?;
         }
     }
+    for access in &table.proven_indexes {
+        checks.check_hir(*access)?;
+    }
     Ok(())
 }
 
@@ -3433,21 +3639,6 @@ pub(crate) fn validate_referential_integrity(
                 if let Some(body) = body {
                     validate_block(body, checks)?;
                 }
-            }
-            HirExpressionKind::FirstMatch {
-                source,
-                coordinates,
-                binding,
-                body,
-            } => {
-                validate_expr(source, checks)?;
-                for (def_id, name) in coordinates {
-                    checks.check_def(*def_id)?;
-                    checks.check_symbol(*name)?;
-                }
-                checks.check_def(binding.0)?;
-                checks.check_symbol(binding.1)?;
-                validate_block(body, checks)?;
             }
             HirExpressionKind::Path(def_id) => checks.check_def(*def_id)?,
             HirExpressionKind::Literal(lit) => match lit {
@@ -4071,6 +4262,9 @@ pub(crate) fn validate_referential_integrity(
                     checks.check_symbol(sym)?;
                     checks.check_type(tid)?;
                 }
+            }
+            radix_types::Type::RangedArray { element, .. } => {
+                checks.check_type(*element)?;
             }
             radix_types::Type::Tensor(t, i)
             | radix_types::Type::Vector(t, i)

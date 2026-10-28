@@ -349,6 +349,15 @@ impl Target {
         matches!(self, Self::HirFaber | Self::HirRust | Self::MirStepper)
     }
 
+    /// Whether this target applies a list length range (`list<T, size lo‥hi>`,
+    /// need) where the list grows, shrinks and is built. Every other
+    /// target would read the cell as a plain list and silently drop the
+    /// range, so it is refused by name before an emitter runs.
+    #[must_use]
+    pub fn lowers_ranged_list(self) -> bool {
+        matches!(self, Self::HirFaber | Self::HirRust | Self::MirStepper)
+    }
+
     /// Feature that enables this target when it is feature-gated.
     #[must_use]
     pub fn required_feature(self) -> Option<&'static str> {
@@ -454,7 +463,8 @@ impl Target {
     /// declared as a whole leaf, so any leaf missing here fails closed
     /// (`leaf_unsupported_on_target`). Rust, the runner family
     /// (`MirStepper`, `MirFmir*`), and Faber/FHIR share `faber-leaf` or
-    /// preserve its calls and declare every leaf. Clif's clock is served by
+    /// preserve its calls and declare every leaf. Go declares every leaf: each
+    /// has a standard-library port in the Go runtime. Clif's clock is served by
     /// the native runtime's `faber-leaf` conversations; every other leaf
     /// fails closed there.
     #[must_use]
@@ -465,8 +475,8 @@ impl Target {
             | Target::MirFmir
             | Target::MirFmirBinary
             | Target::HirFaber
-            | Target::HirFhir => Leaf::ALL,
-            Target::HirGo => &[Leaf::Stdio, Leaf::Process, Leaf::Clock, Leaf::Entropy],
+            | Target::HirFhir
+            | Target::HirGo => Leaf::ALL,
             Target::MirWasm => &[Leaf::Stdio],
             Target::MirClif => &[Leaf::Clock],
             Target::HirTypeScript

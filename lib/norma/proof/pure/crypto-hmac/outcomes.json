@@ -15,14 +15,20 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "undefined: encoding",
-      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:encoding` module this proof imports, so the generated `main.go` calls `encoding.*` with no such package-level identifier and `go build` stops with `undefined: encoding`. Re-measure this row when the Go package emitter lowers that module binding."
+      "diagnostic_contains": "Sigma0_32 redeclared",
+      "reason": "Two imports of one Norma module each emit its constants into the entry file, so the Go build reports a redeclared identifier; deduplicating imported constants per package is an open emitter unit."
     },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "ts_trap_expression_unsupported",
       "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "code generation failed: unsupported-mir-shape:duplicate of this value shape (copy marker)",
+      "reason": "MIR code generation fails before any LLVM is emitted: unsupported-mir-shape:duplicate of this value shape (copy marker)."
     }
   }
 }

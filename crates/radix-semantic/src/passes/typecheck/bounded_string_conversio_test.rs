@@ -1,6 +1,6 @@
 //! CTFP-2 pins: bounded string conversio rows — `ascii<N> ↦ textus`,
 //! `textus<N> ↦ textus`, `ascii<N> ↔ ascii<M>` (D7 resize: copy initialized
-//! prefix, fail-closed overflow). The landed AEU-5 `lista<T,N> ↦ tensor<T,[N]>`
+//! prefix, fail-closed overflow). The landed AEU-5 `lista<T,magnitudo N> ↦ tensor<T,[N]>`
 //! row is pinned by `lista_tensor_conversio` tests — cited, not duplicated.
 
 use crate::test_support::{assert_accepts_la, assert_rejects_with_issue_la};

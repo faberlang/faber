@@ -88,8 +88,6 @@ reddet = "أعد_منتظرا"
 tacebit = "انتظر"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "فارغ"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "المجموع"
 filum = "خيط"
 maxima = "الأقصى"
@@ -163,6 +161,7 @@ numeratio = "العدّ"
 quilibet = "أي"
 argmaxima = "فهرس_الأكبر"
 argminima = "فهرس_الأصغر"
+prima = "الأول"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "رتب"
 ascendens = "تصاعدي"
@@ -200,7 +199,7 @@ instans = "لحظة"
 objectum = "كائن"
 quidlibet = "مهما"
 lista = "قائمة"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
 tabula = "جدول"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "دفتر"
@@ -804,7 +803,7 @@ help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`،
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "تلميح التحويل لا يتبع الهدف بين قوسين زاويين"
-help = "اكتب التلميح كجملة via بعد الهدف: `{lista}<b8, 16> via Le`"
+help = "اكتب التلميح كجملة via بعد الهدف: `{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "تعبير مطلوب"
@@ -1164,7 +1163,7 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "{lista} يتطلب معامل نوع واحدا"
-help = "استخدم {lista}<T>؛ lista<T, N> شكل محدود مشحون"
+help = "استخدم {lista}<T>؛ {lista}<T, {magnitudo} N> شكل محدود مشحون"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "{tabula} يتطلب معاملي نوع"
@@ -1221,6 +1220,30 @@ help = "استخدم عرض عدد صحيح مثل u8 أو i32؛ عروض float 
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "لا يستطيع kernel استخدام سياسة تخزين ذات نطاق بعد ({site}); لا يطبّق kernel النطاقات"
 help = "استخدم العرض العادي داخل kernel وطبّق النطاق على المضيف"
+
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "لا يستطيع kernel استخدام قائمة بلا حدّ أعلى للحجم ({site}); فهو يفرد كل خانة حتى الحد الأقصى"
+help = "امنح القائمة حجمًا نهائيًا ثابتًا، مثل {lista}<int, {magnitudo} 1…8>"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "يجب أن يكون طرف نطاق طول القائمة عددًا صحيحًا حرفيًا غير سالب أو ∞"
+help = "اكتب الطرفين كعددين صحيحين حرفيين، مثل {lista}<int, {magnitudo} 1‥8>؛ الطرف المسمّى أو طرف size غير مدعوم بعد"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "نطاق طول القائمة لا يحوي أي طول"
+help = "يجب أن يكون الطرف الأدنى أصغر من الأعلى في lo‥hi، أو غير أكبر منه في lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "لا يمكن أن يكون طرف نطاق طول القائمة سالبًا"
+help = "الطول عدد: ابدأ النطاق من 0 أو أكثر"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "نطاق طول القائمة لا يقبل كلمة سياسة تخزين"
+help = "اكتب النطاق على القائمة، مثل {lista}<int, {magnitudo} 1…8>؛ فهو يوقف البرنامج دائمًا، وكلمات saturating وtrapping وwrapping تأخذ عرضًا عدديًا"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "يُكتب عدد عناصر القائمة بعد `{magnitudo}`"
+help = "اكتب `{lista}<int, {magnitudo} 4>` لأربعة عناصر على الأكثر، أو `{lista}<int, {magnitudo} 1…8>` لنطاق؛ النطاق المجرد يحدّ قيمة لا عددًا"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
@@ -1420,7 +1443,7 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type لا يقبل parameters"
-help = "textus<N> و ascii<N> و {lista}<b8, N> أشكال محدودة مشحونة"
+help = "textus<N> و ascii<N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace لا يصدر qualified type"
@@ -1741,6 +1764,10 @@ help = "استخدم مشغّل MIR أو مُصدِر مصدر Faber أو {tabul
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "هذا الهدف لا يدعم سياسة التخزين ذات النطاق بعد"
 help = "استخدم MIR runner أو هدف Rust أو مُصدِر مصدر Faber إلى أن يطبّق هذا الهدف النطاقات"
+
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "هذا الهدف لا يدعم نطاق طول القائمة بعد"
+help = "استخدم MIR runner أو هدف Rust أو مُصدِر مصدر Faber إلى أن يطبّق هذا الهدف نطاقات القوائم"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "ورقة {leaf} غير مدعومة في هذا الهدف"
@@ -2185,6 +2212,10 @@ help = "أضف method {method} بالتوقيع الذي يعلنه {contract}،
 [diagnostics.SEM011]
 message = "أنواع operands غير صالحة"
 help = "استخدم أنواع operands متوافقة"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "طول هذه القائمة خارج نطاق طول القائمة"
+help = "أعطِ الحرفي طولًا داخل النطاق، أو ابنِ القائمة بـ ↦ وتعافَ بـ ⊥"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "رموز التقريب لا تنطبق على قيم المصفوفات بعد"
@@ -2776,7 +2807,7 @@ help = "استخدم واحدا من Hex أو Bin أو Oct أو Be أو Le أو 
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "هدف التحويل هذا لا يقبل تلميح تحويل"
-help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "العائم أو العشري لا يتحول إلى صحيح دون تسمية التقريب"
@@ -3334,6 +3365,10 @@ help = "أبق دوال `@ radix lane \"air\"` في المجموعة النقي�
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: async functions خارج v1 AIR subset"
 help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
 
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "يرفض @ radix lane \"{lane}\" قائمة بلا حدّ أعلى للحجم: يفرد الاشتقاق العكسي كل خانة حتى الحد الأقصى"
+help = "امنح القائمة حجمًا نهائيًا ثابتًا، مثل {lista}<int, {magnitudo} 1…8>، أو انقل القائمة خارج المسار"
+
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: assignment هو mutation خارج v1 AIR subset"
 help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
@@ -3788,6 +3823,7 @@ prima = "خذ_الأولى"
 primus = "الأول"
 quilibet = "أي"
 reducta = "اختزل"
+reperta = "ابحث"
 detrahe = "احذف_الأخير"
 sectio = "شريحة"
 summa = "المجموع"
@@ -4169,18 +4205,6 @@ message = "مطلوب ']' بعد تعبير الفهرس غير null"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "مطلوب ')' بعد وسائط الاستدعاء غير null"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "مطلوب '(' بعد 'primus_quem'"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "مطلوب ',' بعد مصدر المطابقة الأولى"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "مطلوب ذيل شرط 'ubi'"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "مطلوب ')' بعد شرط المطابقة الأولى"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول المنشئ"
 
@@ -4273,11 +4297,11 @@ help = "يبني llvm-host أصلياً على macOS وLinux بمعمارية aa
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "يحتاج llvm-host إلى سلسلة أدوات LLVM متسقة (llvm-as وclang من الإصدار نفسه): {reason}"
-help = "ثبّت LLVM بحيث يكون llvm-as وclang في PATH، أو اضبط LLVM_HOME على بادئة تثبيت LLVM"
+help = "ثبّت LLVM بحيث يكون llvm-as وclang في PATH"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "أرشيف وقت التشغيل faber-host-llvm غير متاح ({cause}): {detail}"
-help = "تأكد من تثبيت cargo ووجوده في PATH (أو ضبط CARGO) ومن وجود مصادر وقت التشغيل، ثم أعد البناء"
+help = "تأكد من تثبيت cargo ووجوده في PATH ومن وجود مصادر وقت التشغيل، ثم أعد البناء"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "فشل أرشيف وقت التشغيل faber-host-llvm في التحقق من الهوية: {detail}"
@@ -4320,3 +4344,9 @@ help = "ينسخ '⇇' الآن قيم الطرف الأيمن إلى تخزين
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "يجب أن يعرّف عقد الإرسال بالضبط `sink(T) → vacuum ⇥ E` و`flush() → vacuum ⇥ E` باستخدام معامل نوع واحد"
 help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum ⇥ E` و`{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "النواة `{kernel}` تعمل بشكل متسلسل على جهاز {device}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "النواة `{kernel}`: يمكن تجنّب {kind} عبر الأقسام الـ {partitions}: {avoidable} ({reason})"

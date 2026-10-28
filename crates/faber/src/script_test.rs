@@ -55,7 +55,7 @@ fn bounded_lista_for_ref_runs_indices_end_to_end() {
     let status = run_source(
         r#"
 main {
-    let list<int, 3> numeri ← [10, 20, 30]
+    let list<int, size 3> numeri ← [10, 20, 30]
     for ref numeri let index {
         print index
     }

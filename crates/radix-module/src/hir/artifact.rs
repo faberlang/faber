@@ -705,6 +705,7 @@ fn map_shape_obligations(wire: radix_hir_fhir::ShapeObligationTableWire) -> crat
             .into_iter()
             .map(|entry| (entry.function, map_bindings(entry.bindings)))
             .collect(),
+        proven_indexes: wire.proven_indexes.into_iter().collect(),
     }
 }
 

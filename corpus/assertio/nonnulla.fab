@@ -52,7 +52,7 @@ main {
     print p!.urbs
 
     # !. on lista index — asserts element exists
-    let list<string, 3> litterae ← ["a", "b", "c"]
+    let list<string, size 3> litterae ← ["a", "b", "c"]
     print litterae![0]
     print litterae![2]
 }

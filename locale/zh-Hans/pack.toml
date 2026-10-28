@@ -88,8 +88,6 @@ reddet = "等返"
 tacebit = "等弃"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "空集"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "求和"
 filum = "线程"
 maxima = "最大"
@@ -163,6 +161,7 @@ numeratio = "计数"
 quilibet = "任一"
 argmaxima = "最大值索引"
 argminima = "最小值索引"
+prima = "第一个"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "排序"
 ascendens = "升序"
@@ -200,7 +199,7 @@ instans = "时刻"
 objectum = "对象"
 quidlibet = "任意"
 lista = "列表"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
 tabula = "映射"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "账本"
@@ -848,7 +847,7 @@ help = "把提示写成目标之后的 via 子句：`u32 via Le`、`ascii<8> via
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "转换提示不写在目标之后的尖括号中"
-help = "把提示写成目标之后的 via 子句：`{lista}<b8, 16> via Le`"
+help = "把提示写成目标之后的 via 子句：`{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "需要表达式"
@@ -1208,7 +1207,7 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "lista 需要一个 type parameter"
-help = "使用 {lista}<T>；lista<T, N> 是已交付的有界形式"
+help = "使用 {lista}<T>；{lista}<T, {magnitudo} N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula 需要两个 type parameters"
@@ -1265,6 +1264,30 @@ help = "使用 u8 或 i32 这样的整数宽度；浮点、十进制和 inf 宽�
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "kernel 中暂不支持带范围的存储策略 ({site})；kernel 不应用范围"
 help = "在 kernel 内使用普通宽度，在主机端应用范围"
+
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "kernel 不能使用没有大小上限的列表 ({site})；kernel 会展开直到上限的每个槽位"
+help = "给列表一个有限的常量大小，例如 {lista}<int, {magnitudo} 1…8>"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "列表长度范围的端点必须是非负整数字面量或 ∞"
+help = "两个端点都写成整数字面量，例如 {lista}<int, {magnitudo} 1‥8>；命名端点或 size 端点尚未支持"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "该列表长度范围不包含任何长度"
+help = "lo‥hi 的低端必须小于高端；lo…hi 的低端不能大于高端"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "列表长度范围的端点不能为负"
+help = "长度是计数：让范围从 0 或更大开始"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "列表长度范围不接受存储策略词"
+help = "把范围写在列表上，例如 {lista}<int, {magnitudo} 1…8>；它总是陷阱，saturating、trapping 和 wrapping 只接受数字宽度"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "列表的元素个数写在 `{magnitudo}` 之后"
+help = "写 `{lista}<int, {magnitudo} 4>` 表示最多 4 个元素，或 `{lista}<int, {magnitudo} 1…8>` 表示一个范围；裸范围限定的是值，不是个数"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可调用项的注解姿态“{annotation_posture}”与书写的姿态“{written_posture}”冲突"
@@ -1464,7 +1487,7 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type 不能接受 parameters"
-help = "textus<N>、ascii<N> 和 {lista}<b8, N> 是已交付的有界形式"
+help = "textus<N>、ascii<N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace 未导出 qualified type"
@@ -1785,6 +1808,10 @@ help = "请使用 MIR runner 或 Faber 源码发射器，或改用 map ({tabula}
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "此目标暂不支持带范围的存储策略"
 help = "请使用 MIR runner、Rust 目标或 Faber 源码发射器，直到此目标支持范围"
+
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "此目标暂不支持列表长度范围"
+help = "请使用 MIR runner、Rust 目标或 Faber 源码发射器，直到此目标支持列表范围"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "此目标不支持 {leaf} 叶片"
@@ -2229,6 +2256,10 @@ help = "添加签名符合 {contract} 所声明的 {method} method，或移除 {
 [diagnostics.SEM011]
 message = "无效 operand 类型"
 help = "使用兼容的 operand 类型"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "该列表的长度超出列表长度范围"
+help = "让字面量的长度落在范围内，或用 ↦ 构造列表并用 ⊥ 恢复"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "取整符号暂不适用于张量值"
@@ -2820,7 +2851,7 @@ help = "在 via 之后使用 Hex、Bin、Oct、Be、Le 或 Code 之一；Floor�
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "此转换目标不接受转换提示"
-help = "去掉 via 子句；只有 numeric、ascii、littera、vector 和 {lista}<b8, N> 目标接受提示"
+help = "去掉 via 子句；只有 numeric、ascii、littera、vector 和 {lista}<b8, {magnitudo} N> 目标接受提示"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "float 或 decimal 不指名 rounding 就不能转换为 integer"
@@ -3378,6 +3409,10 @@ help = "把 `@ radix lane \"air\"` 函数保持在可接受的纯子集之内"
 message = "@ radix lane \"{lane}\" 拒绝此函数体：async 函数不在 v1 AIR subset 之内"
 help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
 
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "@ radix lane \"{lane}\" 拒绝没有大小上限的列表：反向 AD 会展开直到上限的每个槽位"
+help = "给列表一个有限的常量大小，例如 {lista}<int, {magnitudo} 1…8>，或把列表移出该 lane"
+
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" 拒绝此函数体：assignment 是 mutation，不在 v1 AIR subset 之内"
 help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
@@ -3688,6 +3723,7 @@ prima = "取前"
 primus = "第一个"
 quilibet = "任一"
 reducta = "归约"
+reperta = "查找"
 detrahe = "移除末项"
 sectio = "切片"
 summa = "求和"
@@ -4025,18 +4061,6 @@ message = "non-null 索引表达式后需要 ']'"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null 调用参数后需要 ')'"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "'primus_quem' 后需要 '('"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "首个匹配来源后需要 ','"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "需要 'ubi' 谓词尾部"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "首个匹配谓词后需要 ')'"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor 字段后需要 '}'"
 
@@ -4129,11 +4153,11 @@ help = "llvm-host 仅在 aarch64 或 x86_64 的 macOS 和 Linux 上原生构建�
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host 需要一致的 LLVM 工具链（同一版本的 llvm-as 与 clang）：{reason}"
-help = "请安装 LLVM，使 llvm-as 和 clang 位于 PATH 中，或将 LLVM_HOME 设为 LLVM 安装前缀"
+help = "请安装 LLVM，使 llvm-as 和 clang 位于 PATH 中"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "faber-host-llvm 运行时归档不可用（{cause}）：{detail}"
-help = "请确认已安装 cargo 且位于 PATH 中（或设置 CARGO），并且运行时源码存在，然后重新构建"
+help = "请确认已安装 cargo 且位于 PATH 中，并且运行时源码存在，然后重新构建"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "faber-host-llvm 运行时归档未通过身份校验：{detail}"
@@ -4176,3 +4200,9 @@ help = "'⇇' 现在会将右侧的值复制到左侧现有的 tensor 存储中�
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking 合约必须在一个类型参数上准确声明 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
 help = "声明 `{implendum} Sink<T>`，并包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "内核 `{kernel}` 在 {device} 设备上串行运行"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "内核 `{kernel}`：其跨 {partitions} 个分区的 {kind} 是可以避免的：{avoidable}（{reason}）"

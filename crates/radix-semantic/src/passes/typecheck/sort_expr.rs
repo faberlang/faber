@@ -47,7 +47,9 @@ pub(super) fn check_sort_expr(
         return checker.error_type;
     }
     let kind = match checker.types.get(dispatch) {
-        Type::Array(element) | Type::BoundedArray { element, .. } => SortSource::Array(*element),
+        Type::Array(element)
+        | Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. } => SortSource::Array(*element),
         Type::Set(element) => SortSource::Set(*element),
         Type::Map(key, value) | Type::Ledger(key, value) => SortSource::Map(*key, *value),
         Type::Tensor(..) | Type::Matrix(..) | Type::Sparsa(..) => SortSource::Tensor,

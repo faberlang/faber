@@ -88,8 +88,6 @@ reddet = "รอคืน"
 tacebit = "รอทิ้ง"
 # Empty-collection expression marker (contextual, tokenless).
 vacua = "เซตว่าง"
-primus_quem = "primus_quem"
-ubi = "ubi"
 summa = "ผลรวม"
 filum = "เส้นใย"
 maxima = "สูงสุด"
@@ -163,6 +161,7 @@ numeratio = "นับ"
 quilibet = "ใดก็ได้"
 argmaxima = "ดัชนีค่าสูงสุด"
 argminima = "ดัชนีค่าต่ําสุด"
+prima = "ตัวแรก"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "เรียง"
 ascendens = "น้อยไปมาก"
@@ -200,7 +199,7 @@ instans = "อินสแตนซ์"
 objectum = "ออบเจ็กต์"
 quidlibet = "อะไรก็ได้"
 lista = "รายการ"
-# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
 tabula = "ตาราง"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "สมุดบัญชี"
@@ -804,7 +803,7 @@ help = "เขียน hint เป็นอนุประโยค via หล�
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "convert hint ไม่ได้ตามหลังเป้าหมายในวงเล็บแหลม"
-help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `{lista}<b8, 16> via Le`"
+help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.expected_expression]
 message = "ต้องมีนิพจน์"
@@ -1176,7 +1175,7 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "lista ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
-help = "ใช้ {lista}<T>; lista<T, N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+help = "ใช้ {lista}<T>; {lista}<T, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula ต้องมีพารามิเตอร์ชนิดสองรายการ"
@@ -1233,6 +1232,30 @@ help = "ใช้ความกว้างจำนวนเต็ม เช�
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "kernel ยังใช้นโยบายการจัดเก็บแบบมีช่วงไม่ได้ ({site}); kernel ไม่ใช้ช่วง"
 help = "ใช้ความกว้างปกติใน kernel แล้วใช้ช่วงฝั่งโฮสต์"
+
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "kernel ใช้รายการที่ไม่มีขนาดสูงสุดไม่ได้ ({site}); kernel คลี่ทุกช่องจนถึงค่าสูงสุด"
+help = "กำหนดขนาดคงที่ที่จำกัดให้รายการ เช่น {lista}<int, {magnitudo} 1…8>"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "ปลายของช่วงความยาวรายการต้องเป็นจำนวนเต็มลิเทอรัลที่ไม่ติดลบหรือ ∞"
+help = "เขียนปลายทั้งสองเป็นจำนวนเต็มลิเทอรัล เช่น {lista}<int, {magnitudo} 1‥8>; ปลายที่เป็นชื่อหรือ size ยังไม่รองรับ"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "ช่วงความยาวรายการนี้ไม่มีความยาวใดเลย"
+help = "ปลายล่างต้องน้อยกว่าปลายบนใน lo‥hi หรือไม่เกินปลายบนใน lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "ปลายของช่วงความยาวรายการติดลบไม่ได้"
+help = "ความยาวคือจำนวนนับ: เริ่มช่วงที่ 0 หรือมากกว่า"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "ช่วงความยาวรายการไม่รับคำนโยบายการจัดเก็บ"
+help = "เขียนช่วงบนรายการ เช่น {lista}<int, {magnitudo} 1…8>; ช่วงนี้จะ trap เสมอ ส่วน saturating, trapping และ wrapping รับความกว้างของตัวเลข"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "จำนวนของรายการเขียนหลัง `{magnitudo}`"
+help = "เขียน `{lista}<int, {magnitudo} 4>` สำหรับไม่เกิน 4 รายการ หรือ `{lista}<int, {magnitudo} 1…8>` สำหรับช่วง; ช่วงเปล่า ๆ จำกัดค่า ไม่ใช่จำนวน"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
@@ -1432,7 +1455,7 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "ชนิด primitive รับพารามิเตอร์ไม่ได้"
-help = "textus<N>, ascii<N> และ {lista}<b8, N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+help = "textus<N>, ascii<N> และ {lista}<b8, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace ไม่ได้ส่งออก qualified type"
@@ -1753,6 +1776,10 @@ help = "ใช้ MIR runner หรือ Faber source emitter หรือใ�
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "เป้าหมายนี้ยังไม่รองรับนโยบายการจัดเก็บแบบมีช่วง"
 help = "ใช้ MIR runner เป้าหมาย Rust หรือตัวปล่อยซอร์ส Faber จนกว่าเป้าหมายนี้จะใช้ช่วงได้"
+
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "เป้าหมายนี้ยังไม่รองรับช่วงความยาวรายการ"
+help = "ใช้ MIR runner เป้าหมาย Rust หรือตัวปล่อยซอร์ส Faber จนกว่าเป้าหมายนี้จะใช้ช่วงรายการได้"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "เป้าหมายนี้ไม่รองรับใบ {leaf}"
@@ -2197,6 +2224,10 @@ help = "เพิ่ม method {method} ที่มีลายเซ็นต�
 [diagnostics.SEM011]
 message = "ชนิดตัวถูกดำเนินการไม่ถูกต้อง"
 help = "ใช้ชนิดตัวถูกดำเนินการที่เข้ากันได้"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "ความยาวของรายการนี้อยู่นอกช่วงความยาวรายการ"
+help = "ให้ลิเทอรัลมีความยาวอยู่ในช่วง หรือสร้างรายการด้วย ↦ แล้วกู้ด้วย ⊥"
 
 [diagnostics.SEM011.issues.glyph_rounding_tensor_unsupported]
 message = "สัญลักษณ์การปัดเศษยังใช้กับค่า tensor ไม่ได้"
@@ -2788,7 +2819,7 @@ help = "ใช้หนึ่งใน Hex, Bin, Oct, Be, Le หรือ Code �
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "เป้าหมายการแปลงนี้ไม่รับ convert hint"
-help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "float หรือทศนิยมไม่แปลงเป็นจำนวนเต็มหากไม่ระบุการปัดเศษ"
@@ -3346,6 +3377,10 @@ help = "ให้ฟังก์ชัน `@ radix lane \"air\"` อยู่ใ
 message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ฟังก์ชัน async อยู่นอกเซตย่อย AIR v1"
 help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
 
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "@ radix lane \"{lane}\" ปฏิเสธรายการที่ไม่มีขนาดสูงสุด: reverse AD คลี่ทุกช่องจนถึงค่าสูงสุด"
+help = "กำหนดขนาดคงที่ที่จำกัดให้รายการ เช่น {lista}<int, {magnitudo} 1…8> หรือย้ายรายการออกจากเลน"
+
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การกำหนดค่าเป็นการเปลี่ยนแปลงที่อยู่นอกเซตย่อย AIR v1"
 help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
@@ -3656,6 +3691,7 @@ prima = "ส่วนต้น"
 primus = "ตัวแรก"
 quilibet = "ใดก็ได้"
 reducta = "ลดรูป"
+reperta = "ค้นหา"
 detrahe = "ลบตัวท้าย"
 sectio = "ตัดช่วง"
 summa = "ผลรวม"
@@ -4037,18 +4073,6 @@ message = "ต้องมี ']' หลังนิพจน์ดัชนี�
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบไม่เป็น null"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "ต้องมี '(' หลัง 'primus_quem'"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "ต้องมี ',' หลังแหล่งที่มาของ first-match"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "ต้องมีส่วนท้าย predicate 'ubi'"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "ต้องมี ')' หลัง predicate ของ first-match"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้าง"
 
@@ -4141,11 +4165,11 @@ help = "llvm-host สร้างแบบเนทีฟบน macOS และ 
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host ต้องใช้ชุดเครื่องมือ LLVM ที่สอดคล้องกัน (llvm-as และ clang รุ่นเดียวกัน): {reason}"
-help = "ติดตั้ง LLVM ให้ llvm-as และ clang อยู่ใน PATH หรือตั้ง LLVM_HOME เป็นคำนำหน้าการติดตั้ง LLVM"
+help = "ติดตั้ง LLVM ให้ llvm-as และ clang อยู่ใน PATH"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "ไม่พบอาร์ไคฟ์รันไทม์ faber-host-llvm ({cause}): {detail}"
-help = "ตรวจสอบว่าติดตั้ง cargo และอยู่ใน PATH (หรือตั้ง CARGO) และมีซอร์สรันไทม์อยู่ แล้วสร้างใหม่"
+help = "ตรวจสอบว่าติดตั้ง cargo และอยู่ใน PATH และมีซอร์สรันไทม์อยู่ แล้วสร้างใหม่"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "อาร์ไคฟ์รันไทม์ faber-host-llvm ไม่ผ่านการตรวจสอบเอกลักษณ์: {detail}"
@@ -4188,3 +4212,9 @@ help = "ตอนนี้ '⇇' คัดลอกค่าด้านขว�
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking contract ต้องประกาศ `sink(T) → vacuum ⇥ E` และ `flush() → vacuum ⇥ E` อย่างละหนึ่งเมธอด โดยมี type parameter เดียว"
 help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink(T res) → vacuum ⇥ E` และ `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "เคอร์เนล `{kernel}` ทำงานแบบอนุกรมบนอุปกรณ์ {device}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "เคอร์เนล `{kernel}`: {kind} ข้าม {partitions} พาร์ติชันสามารถหลีกเลี่ยงได้: {avoidable} ({reason})"

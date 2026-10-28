@@ -233,269 +233,269 @@ type_head ::= IDENTIFIER | 'modulus'
 # [111] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
 # [112] type_argument
-type_argument ::= labeled_type_argument | range_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument ::= labeled_type_argument | range_argument | sized_range_argument | type_annotation | NATURAL | '[' figura_list? ']'
 # [113] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
 # [114] range_argument
 range_argument ::= range_bound range_glyph range_bound
-# [115] range_glyph
+# [115] sized_range_argument
+sized_range_argument ::= 'magnitudo' range_argument
+# [116] range_glyph
 range_glyph ::= '‥' | '…'
-# [116] range_bound
+# [117] range_bound
 range_bound ::= '-'? NATURAL | '-'? '∞' | 'magnitudo'? IDENTIFIER
-# [117] width_type_sugar
+# [118] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [118] shape_suffix
+# [119] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [119] figura
+# [120] figura
 figura ::= spelled_lift | figura_product (('+' | '-') NATURAL)*
-# [120] spelled_lift
+# [121] spelled_lift
 spelled_lift ::= 'magnitudo' lift_extent
-# [121] lift_extent
+# [122] lift_extent
 lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER | '[' figura_list? ']'
-# [122] figura_product
+# [123] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [123] figura_primary
+# [124] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [124] figura_list
+# [125] figura_list
 figura_list ::= figura (',' figura)*
-# [125] function_type
+# [126] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [126] type_list
+# [127] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [127] si_stmt
+# [128] si_stmt
 si_stmt ::= 'si' si_tail
-# [128] si_tail
+# [129] si_tail
 si_tail ::= expression arm ('sin' si_tail | secus_clause)?
-# [129] secus_clause
+# [130] secus_clause
 secus_clause ::= 'secus' else_arm
-# [130] arm
+# [131] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [131] else_arm
+# [132] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [132] dum_stmt
+# [133] dum_stmt
 dum_stmt ::= 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
-# [133] itera_stmt
+# [134] itera_stmt
 itera_stmt ::= 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression (',' expression)*) apud_clause? filum_clause? ('sit' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [134] itera_binding
+# [135] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [135] apud_clause
+# [136] apud_clause
 apud_clause ::= 'apud' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [136] elige_stmt
+# [137] elige_stmt
 elige_stmt ::= 'elige' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [137] casu_elige_clause
+# [138] casu_elige_clause
 casu_elige_clause ::= 'casu' expression (block_stmt | ergo_joint statement)
-# [138] ceterum_clause
+# [139] ceterum_clause
 ceterum_clause ::= 'ceterum' (block_stmt | ergo_joint statement)
-# [139] discerne_stmt
+# [140] discerne_stmt
 discerne_stmt ::= 'discerne' 'omnia'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [140] discriminants
+# [141] discriminants
 discriminants ::= subject_path ('et' subject_path)*
-# [141] subject_path
+# [142] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [142] casu_variant_clause
+# [143] casu_variant_clause
 casu_variant_clause ::= 'casu' patterns (block_stmt | ergo_joint statement)
-# [143] patterns
+# [144] patterns
 patterns ::= pattern ('et' pattern)*
-# [144] pattern
+# [145] pattern
 pattern ::= pattern_atom ('aut' pattern_atom)*
-# [145] pattern_atom
+# [146] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [146] negated_number
+# [147] negated_number
 negated_number ::= '-' NUMBER
-# [147] type_pattern
+# [148] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [148] ut_pattern
+# [149] ut_pattern
 ut_pattern ::= ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)
-# [149] pattern_binding
+# [150] pattern_binding
 pattern_binding ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [150] custodi_stmt
+# [151] custodi_stmt
 custodi_stmt ::= 'custodi' '{' si_guard_clause+ '}'
-# [151] si_guard_clause
+# [152] si_guard_clause
 si_guard_clause ::= 'si' expression (block_stmt | ergo_joint statement)
-# [152] ex_stmt
+# [153] ex_stmt
 ex_stmt ::= 'ex' expression ('sit' | 'varia') extract_fields
-# [153] extract_fields
+# [154] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [154] extract_field
+# [155] extract_field
 extract_field ::= IDENTIFIER ('ut' IDENTIFIER)?
-# [155] ceteri_field
+# [156] ceteri_field
 ceteri_field ::= 'ceteri' IDENTIFIER
-# [156] redde_stmt
+# [157] redde_stmt
 redde_stmt ::= 'redde' expression?
-# [157] reddet_stmt
+# [158] reddet_stmt
 reddet_stmt ::= 'reddet' expression
-# [158] tacebit_stmt
+# [159] tacebit_stmt
 tacebit_stmt ::= 'tacebit' expression
-# [159] cede_stmt
+# [160] cede_stmt
 cede_stmt ::= 'cede' expression
-# [160] rumpe_stmt
+# [161] rumpe_stmt
 rumpe_stmt ::= 'rumpe'
-# [161] perge_stmt
+# [162] perge_stmt
 perge_stmt ::= 'perge'
-# [162] tacet_stmt
+# [163] tacet_stmt
 tacet_stmt ::= 'tacet'
-# [163] iace_stmt
+# [164] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [164] iace_expr
+# [165] iace_expr
 iace_expr ::= ('iace' | 'mori') expression
-# [165] iace_guarded_expr
+# [166] iace_guarded_expr
 iace_guarded_expr ::= ('iace' | 'mori') expression NO_NEWLINE 'si' expression
-# [166] cape_clause
+# [167] cape_clause
 cape_clause ::= 'cape' IDENTIFIER block_stmt
-# [167] adfirma_stmt
+# [168] adfirma_stmt
 adfirma_stmt ::= 'adfirma' expression ('mori' expression)?
-# [168] requirit_stmt
+# [169] requirit_stmt
 requirit_stmt ::= 'requirit' expression 'iace' expression
-# [169] reice_stmt
+# [170] reice_stmt
 reice_stmt ::= 'reice' expression 'iace' expression
-# [170] expression
+# [171] expression
 expression ::= assignment
-# [171] transfer
+# [172] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [172] sink_into
+# [173] sink_into
 sink_into ::= transfer ('⇜' ternary)?
-# [173] value_marker
+# [174] value_marker
 value_marker ::= 'own' | 'copy'
-# [174] assignment
+# [175] assignment
 assignment ::= sink_into ('←' 'copy'? assignment | '↤' assignment via_clause? inline_default?)?
-# [175] inc_dec_stmt
+# [176] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [176] place
+# [177] place
 place ::= call_expr
-# [177] ternary
+# [178] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [178] aut_expr
+# [179] aut_expr
 aut_expr ::= et_expr (('aut') et_expr)*
-# [179] et_expr
+# [180] et_expr
 et_expr ::= equality (('et') equality)*
-# [180] equality
+# [181] equality
 equality ::= comparison equality_tail*
-# [181] equality_tail
+# [182] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('est' | 'non' 'est') type_annotation
-# [182] comparison
+# [183] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [183] format_expr
+# [184] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [184] bitwise_or_expr
+# [185] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [185] bitwise_xor_expr
+# [186] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [186] bitwise_and_expr
+# [187] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [187] shift_expr
+# [188] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [188] range_expr
+# [189] range_expr
 range_expr ::= additive_expr range_tail?
-# [189] range_tail
+# [190] range_tail
 range_tail ::= ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
-# [190] additive_expr
+# [191] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [191] multiplicative_expr
+# [192] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [192] vel_expr
+# [193] vel_expr
 vel_expr ::= unary_expr ('vel' vel_rhs)*
-# [193] vel_rhs
+# [194] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [194] vel_range_tail
+# [195] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'ante' | 'usque') unary_expr ('per' unary_expr)?
-# [195] unary_expr
+# [196] unary_expr
 unary_expr ::= ('-' | '¬' | 'non' | '√' | '∛' | '∜') unary_expr | rounding_expr | finge_expr | cast_expr
-# [196] rounding_expr
+# [197] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [197] gradient_expr
+# [198] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [198] gradient_selection
+# [199] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [199] gradient_place
+# [200] gradient_place
 gradient_place ::= expression
-# [200] cast_expr
+# [201] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [201] conversio_expr
+# [202] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [202] interval_target
+# [203] interval_target
 interval_target ::= range_expr
-# [203] via_clause
+# [204] via_clause
 via_clause ::= 'via' IDENTIFIER
-# [204] inline_default
+# [205] inline_default
 inline_default ::= '⊥' unary_expr
-# [205] call_expr
+# [206] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [206] call_suffix
+# [207] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [207] member_suffix
+# [208] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [208] transpose_suffix
+# [209] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [209] optional_suffix
+# [210] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [210] non_null_suffix
+# [211] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [211] argument_list
+# [212] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [212] argument
+# [213] argument
 argument ::= template_argument | (call_marker | 'axis')? 'sparge'? expression
-# [213] call_marker
+# [214] call_marker
 call_marker ::= 'de' | 'varia' | 'own' | 'copy'
-# [214] template_argument
+# [215] template_argument
 template_argument ::= 'sparge'? IDENTIFIER ':' expression
-# [215] literal
+# [216] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nulla' | '∞' | 'nonnumerus'
-# [216] regex_literal
+# [217] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
-# [217] primary
-primary ::= IDENTIFIER | literal | regex_literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
-# [218] ad_expr
+# [218] primary
+primary ::= IDENTIFIER | literal | regex_literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
+# [219] ad_expr
 ad_expr ::= 'ad' ASCII_STRING ad_opener?
-# [219] ad_opener
+# [220] ad_opener
 ad_opener ::= '(' expression ')'
-# [220] array_literal
+# [221] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [221] array_element_list
+# [222] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [222] array_element
+# [223] array_element
 array_element ::= argument | '_'
-# [223] iuncta_expr
+# [224] iuncta_expr
 iuncta_expr ::= 'iuncta' type_arguments '[' argument_list? ']'
-# [224] json_literal
+# [225] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [225] json_member
+# [226] json_member
 json_member ::= STRING ':' json_value
-# [226] typed_constructor
+# [227] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | type_annotation json_literal | hole_type json_literal | '{' field_list '}' construction_source? | type_annotation '[' array_element_list? ']'
-# [227] field_list
+# [228] field_list
 field_list ::= field_init (',' field_init)*
-# [228] field_init
+# [229] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [229] field_key
+# [230] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [230] construction_source
+# [231] construction_source
 construction_source ::= 'ex' call_expr
-# [231] json_value
+# [232] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [232] json_object
+# [233] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [233] json_array
+# [234] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [234] json_string
+# [235] json_string
 json_string ::= STRING
-# [235] json_number
+# [236] json_number
 json_number ::= NUMBER
-# [236] finge_expr
+# [237] finge_expr
 finge_expr ::= 'finge' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [237] qualified_ident
+# [238] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [238] praefixum_expr
+# [239] praefixum_expr
 praefixum_expr ::= 'praefixum' block_stmt
-# [239] scriptum_expr
+# [240] scriptum_expr
 scriptum_expr ::= 'scriptum' '(' STRING (',' expression)* ')'
-# [240] lege_expr
+# [241] lege_expr
 lege_expr ::= 'lege' 'lineam'?
-# [241] first_match_expr
-first_match_expr ::= 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
 # [242] reducta_expr
 reducta_expr ::= 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
 # [243] reducta_op
-reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
+reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio' | 'prima'
 # [244] reducta_group
 reducta_group ::= 'pro' expression
 # [245] reducta_body
@@ -734,6 +734,7 @@ NO_NEWLINE ::=
 | [`type_argument`](#type-argument) | `#type-argument` | live |
 | [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live |
 | [`range_argument`](#range-argument) | `#range-argument` | live |
+| [`sized_range_argument`](#sized-range-argument) | `#sized-range-argument` | live |
 | [`range_glyph`](#range-glyph) | `#range-glyph` | live |
 | [`range_bound`](#range-bound) | `#range-bound` | live |
 | [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live |
@@ -860,7 +861,6 @@ NO_NEWLINE ::=
 | [`praefixum_expr`](#praefixum-expr) | `#praefixum-expr` | live |
 | [`scriptum_expr`](#scriptum-expr) | `#scriptum-expr` | live |
 | [`lege_expr`](#lege-expr) | `#lege-expr` | live |
-| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
 | [`reducta_expr`](#reducta-expr) | `#reducta-expr` | live |
 | [`reducta_op`](#reducta-op) | `#reducta-op` | live |
 | [`reducta_group`](#reducta-group) | `#reducta-group` | live |
@@ -1024,7 +1024,7 @@ productions. It is not a second keyword authority.
 | Objects | `praefixum` | prefix expression |
 | Testing | `praepara` | setup |
 | Testing | `praeparabit` | async setup |
-| Grammar | `primus_quem` | first-match selection head |
+| Expression | `prima` | first-match reduction operator (en `first`; contextual) |
 | Expression | `pro` | grouped reduction clause (en `per`; contextual) |
 | Testing | `proba` | test |
 | Testing | `probandum` | test suite |
@@ -1063,7 +1063,6 @@ productions. It is not a second keyword authority.
 | Testing | `temporis` | timeout |
 | JSON | `true` | JSON true |
 | Declarations | `typus` | type alias |
-| Grammar | `ubi` | first-match predicate tail |
 | Iteration | `usque` | range until inclusive |
 | Params | `ut` | as / alias |
 | Declarations | `varia` | mutable binding |
@@ -1633,7 +1632,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - A call-site argument list (`callTypeArgs`) carries each explicit size argument behind the `size` marker (la `magnitudo`), the way the call echoes `axis` and `mut`/`own`/`copy`: `take<size 2, size 2>(a)`, `construct<int, size [4]>(xs)`, `f<size n>(x)`. The grammar still parses the bare forms (a natural, a bracketed shape, a dimension term such as `n + 1`) so the checker can name the missing marker: a bare natural, shape, dimension term or caller `size` name in a call list is `SEM057 size_marker_required`, and a `size` argument on a callee that declares no `size` parameter is `SEM057 size_marker_unexpected` (one past the declared `size` parameters is an arity miss, `wrong_number_of_type_arguments`). The list binds by marker: a `size` argument binds the next `size` parameter of the callee and an unmarked argument the next type parameter, the two cursors advancing independently, so `mk<int, size 4>(xs)` binds `fn mk<T, size N>` and a list of only `size` arguments (`construct<size [4]>(xs)`) leaves every type to inference. The operand decides the binding time: `size 4` and `size [2, 3]` are compile-time witnesses and a shape travels as one argument (`tensor.construct<int, size [4]>(xs)`, checked against its store as a scalar size is: `tensor<int, [5]>` is `SEM010 incompatible_tensor_index`); `size n` of an in-scope integer stays the run-time extent described above, checked at its store; `size D` of a caller `size` parameter forwards it. A shape inside a call list holds natural literals only: a `_` hole, a name, a run-time lift or a nested term in it is `size_shape_dimension_unsupported`, and `size [..]` outside a call's list is `size_shape_outside_call_args`. An unmarked name or `_` stays a type there; the callee decides which type parameter it binds.
-- Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
+- Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, magnitudo N>` (the `magnitudo` marker is required on a list), `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
 - **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `via` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
@@ -1648,7 +1647,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - Member-by-label (`i.gx`) requires that label to be present on the receiver's `iuncta` annotation.
 - `iuncta` element slots admit `_` (monomorphic hole, solved element-wise from the single position witness) and reject `∪`. A wanted union element is declared with binary cup (`iuncta<f32, textus ∪ nihil>`). `lista<∪>` / `tabula<K, ∪>` keep heterogeneous-union behavior. Labels compose with holes (`iuncta<loss: _, T>`).
 - `ratio` type arguments require a label for every element, labels are unique, `_` is admitted as a monomorphic element hole, and `∪` is rejected in an element slot. A `ratio` has no positional or bracket access, and it has no structural equivalence with another ratio or a genus; fields are accessed by label only.
-- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, N>` is the shipped bounded form; see Generic Collections.
+- Arrays are written `lista<T>` (unbounded, shipped). Postfix `T[]` is not accepted. `lista<T, magnitudo N>` is the shipped bounded form; see Generic Collections.
 - `de`/`in`/`own`/`copy` mark ownership on the type they prefix: one union member, or a standalone `∪` hole. There is no grouping parenthesis in type position — `(` opens a function type and nothing else, so `(A ∪ B)` is a parse error (`PARSE001`); write the marker on the member (`de A ∪ B`).
 - Two hole kinds share the `holeType` production. `_` is the monomorphic hole ("infer exactly one inhabitant type"); the standalone `∪` is the union hole ("infer a finite multi-member union"). Both are legal wherever a base type is: bindings, returns, params, fields, and type arguments (`lista<∪>`, `tabula<K, ∪>`, `→ ∪`).
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
@@ -1896,8 +1895,26 @@ type or a `size` argument by the range glyph after its first bound.
   the Faber source emitter keeps the authored form (`faber format` prints a
   range half-open); every other target and every kernel refuse the type by name
   (`SEM010 ranged_policy_target_unsupported`, `SEM008 nucleum_ranged_policy_not_built`).
-  Float ranges, index containment, kernel facts and list length ranges are the
-  later parts of the series.
+  Float ranges, index containment and kernel facts are the later parts of the
+  series.
+
+**List size ranges.** After the `magnitudo` marker (en
+`size`) the same range slot is the second argument of `lista`:
+`lista<numerus, magnitudo 4‥8>` (en `list<int, size 4‥8>`) holds four to seven
+elements and `lista<numerus, magnitudo 1…∞>` is never empty. The marker says the
+range bounds a count: a bare range bounds a value (`exactus<u8, 0…255>`), and
+`lista<T, 4>` or `lista<T, 4‥8>` is retired by name
+(`SEM008 list_count_needs_size`). A list range is
+trapping only and takes no policy word: `saturatus<lista<T>, …>` and the other
+policy words around a list are `SEM008 ranged_list_policy_word`. `lista<T>` is
+`magnitudo 0…∞` and `lista<T, magnitudo N>` is `magnitudo 0…N`, one type each. A push past the maximum and a
+removal below the minimum report on `⇥`, a `↦` into a range checks the length
+and takes `⊥`, and `primus` / `ultimus` of a range with a floor of one return
+`T`. Both ends are integer literals or `∞` (`ranged_list_bound_not_constant`),
+non-negative (`ranged_list_bound_negative`) and the range holds a length
+(`ranged_list_range_empty`); a literal outside it is
+`SEM011 ranged_list_length_out_of_range`; a target that does not lower it is
+`SEM010 ranged_list_target_unsupported`.
 **Shipped (N7c/N7d):** the
 retirement of the long forms: the canonical emitter writes the bare marker and
 the parser rejects `numerus<W>`/`fractus<W>` (en `int<W>`/`float<W>`) with
@@ -2141,7 +2158,7 @@ matrix and the numeric model; this file states only the language.
 | Faber          | Meaning  |
 | -------------- | -------- |
 | `lista<T>`     | array    |
-| `lista<T, N>`  | shipped; bounded array; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `lista<T, magnitudo N>`  | shipped; bounded array; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker (a bare `lista<T, N>` is `SEM008 list_count_needs_size`). `lista<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `queue<T>`     | shipped; unbounded FIFO queue |
 | `queue<T, N>`  | shipped; bounded FIFO queue; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `stack<T>`     | shipped; unbounded LIFO stack |
@@ -2384,7 +2401,7 @@ A negative number pattern is written with a leading minus (`casu -1`,
 pattern that is not a member of the scrutinee's closed set is rejected
 (`SEM010 discerne_pattern_not_in_closed_set`). That covers numeric-width
 patterns (`casu u32` over a `numerus`) and length-shaped patterns (`casu
-lista<numerus, 4>` over a `lista<numerus>`; bounded `textus` and `ascii`; tensor figures). Ask an integer's width or range with an `est` test,
+lista<numerus, magnitudo 4>` over a `lista<numerus>`; bounded `textus` and `ascii`; tensor figures). Ask an integer's width or range with an `est` test,
 and ask a length with `.longitudo()` in a `si`.
 
 There are no range patterns (`casu 1‥5`). Test the range with `si` inside the
@@ -2606,10 +2623,10 @@ The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code
 - `"ff" ↦ i32 via Hex` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
 - `lista<b8>[lo‥hi] ↦ W via Be` / `… ↦ W via Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). A `lista<b8>` itself has no endian; `lista<b8> ↦ u32` without `via Be` / `via Le` stays rejected. A short window fails (no pad).
 - `lista<b8>[lo‥hi] ↦ f32 via Be|Le` / `… ↦ f64 via Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `via Be` / `via Le` mandatory).
-- `lista<b8> ↦ tensor<E, [d1, …, dk]> via Le` / `… via Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `magnitudo n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `via Le` / `via Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`cape`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse `tensor ↦ lista<b8> via Be|Le` is not available. `lista<f32> via Le` stays rejected (`SEM016` `unsupported_conversio`); the tensor row is the only bulk endian decode. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> via Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> via Be` prints `[258, 772]` where `via Le` prints `[513, 1027]`.
+- `lista<b8> ↦ tensor<E, [d1, …, dk]> via Le` / `… via Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, magnitudo N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `magnitudo n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `via Le` / `via Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`cape`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse `tensor ↦ lista<b8> via Be|Le` is not available. `lista<f32> via Le` stays rejected (`SEM016` `unsupported_conversio`); the tensor row is the only bulk endian decode. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> via Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> via Be` prints `[258, 772]` where `via Le` prints `[513, 1027]`.
 - `lista<bN> ↦ lista<E>` / `lista<E> ↦ lista<bN>` — bulk conversion between a raw-bits list and a numeric list (a `via Le` / `via Be` clause exactly when the bit width changes, and never when it stays the same). A same-width conversion (`lista<b8> ↦ lista<u8>`, `lista<b16> ↦ lista<u16>`, the signed twins, and back) takes no clause at any width, and a clause written on one is `SEM016` `bits_via_clause_not_allowed`. A width change (`lista<b8> ↦ lista<u16>`, `lista<u16> ↦ lista<b8>`, `lista<b8> ↦ lista<b16>`, `lista<b8> ↦ lista<f32>`) requires the clause (`SEM016` `bits_via_clause_required`): each source element is written as width/8 bytes in the byte order of the clause and the byte stream is regrouped at the target width, so `lista<b8> ↦ lista<u16> via Le` of `[1, 2, 3, 4]` is `[513, 1027]` and `via Be` is `[258, 772]`. A byte total that is not a whole number of target elements is a recoverable run-time error (`bits list length mismatch`). Shipped on the checker and the MIR runner; every emitter refuses the width-changing form by name. The `lista<b8> ↦ tensor<E, [shape]>` row above follows the same rule (no clause on an 8-bit element).
 - `via Bits` — **retired**. A bit pattern is a `bN` value (`b8`, `b16`, `b32`, `b64`), and the one rule is: from a number, `↦` converts the value; from bits, `↦` to a same-width type reads those bits as that type. A float to its pattern is `x ↦ b32` (b16 for f16 and bf16, b64 for f64); a pattern to a float is `p ↦ f32`; a number that holds a pattern says so in one step, `u16 ↦ b16 ↦ f16`. `n ↦ f32` on a `u32` stays the value conversion. Every `via Bits` spelling is `SEM016` (`conversio_via_bits_retired`), whose help names the `↦ bN` replacement.
-- `W ↦ lista<b8, N> via Be` / `… ↦ lista<b8, N> via Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, N>` whose `N` equals the source element's byte width. The `via Le` / `via Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, N>`. Register targets take the clause today: `v ↦ lista<b8, 16> via Le`, `corpus[0‥16] ↦ vector<u32, 4> via Be`.
+- `W ↦ lista<b8, magnitudo N> via Be` / `… ↦ lista<b8, magnitudo N> via Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, magnitudo N>` whose `N` equals the source element's byte width. The `via Le` / `via Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, magnitudo 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, magnitudo N>`. Register targets take the clause today: `v ↦ lista<b8, magnitudo 16> via Le`, `corpus[0‥16] ↦ vector<u32, 4> via Be`.
 - `'A' ↦ u32 via Code` — shipped; the code point as a `u32` (`u32` holds every code point, as Rust's `char as u32`); the source must be `littera`. `65 ↦ littera via Code` — shipped; builds the character for that code point, failing above U+10FFFF and on a surrogate. `Code` is a `via` hint like `Hex`/`Le`; any other hint on these targets, or a source/target type other than `littera`/`u32`, is `SEM016` (`code_hint_pair_mismatch`).
 - `n ↦ textus` / `n ↦ ascii` / `n ↦ littera` — a number's digits (D10.6): `7 ↦ textus` = `"7"`, `7 ↦ ascii` = `"7"`, `7 ↦ littera` = `'7'`; `littera` fails outside 0–9 (`42 ↦ littera` fails, two letters).
 - `littera ↦ numerus` — parses the digit, failing otherwise (as `"22" ↦ numerus` parses).
@@ -2948,17 +2965,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } ex source`.
 ### Special Expressions
 
 
-`primus_quem(source, ubi binder { predicate })` is the dedicated first-match
-selection expression over a statically bounded source: the predicate is
-evaluated for every candidate lane (total evaluation, no early exit), the
-first live match is selected, and a no-match or empty source yields `nihil`
-(the result type is `T ∪ nihil`). The `ubi` predicate tail is owned by this
-head and never shares the reduce/scan `fixum`/`varia` binder tail.
-`primus_quem` claims only the expression-head position immediately followed
-by `(`; elsewhere the spelling stays an ordinary identifier. An optional
-`apud` coordinate clause binds per-axis indices as in `itera ex`.
-
-`reducta via <op> ex source [apud [coords]] [pro key | pro [key, …]] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, or `numeratio`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
+`reducta via <op> ex source [apud [coords]] [pro key | pro [key, …]] ([filum f] (fixum | varia) x { redde term } | vel identity)?` is the general reduction form. The optional tail is either a body (with an optional `filum`) or a bodiless identity; without either, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, `numeratio`, or `prima`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `apud [coords]` binds one integer coordinate per source axis. A body is claimed only when `(fixum | varia) IDENTIFIER '{'` follows, so a declaration such as `fixum numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `redde` term per element. Without a body, each source element is the term. `filum f` requires a body and a kernel context; it retains the existing sum path, while other `filum` operators fail closed by name until their lowering is implemented. Without `filum`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2970,6 +2977,11 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 | `argmaxima`, `argminima` | numeric scalar | rank-one coordinate `numerus`; higher-rank `iuncta<numerus, …>` with one coordinate per axis; `∪ nihil` unless statically non-empty; plain coordinate result with `vel` | `nihil` or the supplied coordinate identity |
 | `omnia`, `quilibet` | `bivalens` | `bivalens` | `verum`, `falsum` |
 | `numeratio` | `bivalens` | `numerus`, the number of true terms | `0` |
+| `prima` | `bivalens` predicate, required body | the first element whose predicate holds: `T ∪ nihil`, always optional | `nihil` |
+
+`prima` (en `first`) takes a required body that is the predicate over the element and yields the first element in row-major order for which it holds, or `nihil` for an empty source or no match. Evaluation is total: the predicate runs on every element, including those after the first match, and a predicate error is never turned into `nihil`. It takes no `pro` group (`reducta_group_op_unsupported`) and no `vel` identity, and a source that is not a tensor or matrix, like every reduction source, is refused; first-match over lists is not a reduction source. `prima` is the one reduction operator whose result is always optional, even over a statically non-empty source. On `@ radix lane "air"` it is admitted over a statically bounded source only (`reducta_first_unbounded_source`), forward-only: it never becomes an AIR tensor op, so reverse AD stays closed.
+
+**List predicate methods.** `xs.all(pred)`, `xs.any(pred)` and `xs.find(pred)` (la `omnia`, `quilibet`, `reperta`) are list methods that take a closure, not reduction operators. They evaluate the predicate left to right in list order, once per element, and stop at the first decisive element: the first false for `all`, the first true for `any`, the first true for `find`. No element after the decisive one is visited, so a predicate side effect or error after it never runs; this is the opposite of the tensor `reduce via first`, which runs the predicate on every element. `all` is `true` and `any` is `false` for an empty list. `find` returns `T ∪ none` (la `T ∪ nihil`): the first element for which the predicate holds, or `none` when no element matches or the list is empty. The result stays optional even for a bounded list whose minimum size is at least one, because a match is not guaranteed. `xs.first()` (la `primus`) is unchanged, and `find` on a regex (la `inventa`) is a different method found by the receiver type.
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
@@ -3184,9 +3196,7 @@ grammar-level query expression. `textus`, `numerus`, `fractus`, `lista<T>`,
 `tabula<K,V>`, and `copia<T>` are compiler-owned core types; their method
 surfaces are not Norma declarations.
 
-`prima` and `ultima` are ordinary method names, not transform keywords. `ubi` is
-the owned predicate-tail introducer of the `primus_quem` first-match expression
-(see Special Expressions), not collection syntax.
+`prima` and `ultima` are ordinary method names, not transform keywords.
 
 `ordina(key)` (D1.7) sorts a `lista` in place by a key selector; `ordinata(key)`
 returns a new sorted `lista` and leaves the receiver untouched. The zero-argument

@@ -43,16 +43,16 @@ fn bounded_lista_pairs_the_live_length_not_the_capacity() {
     // length of 2 (the capacity used to be iterated, reading out of bounds).
     let source = r"
 incipit {
-    varia lista<f32, 4> a ← vacua
+    varia lista<f32, magnitudo 4> a ← vacua
     a.appende(1.0)
     a.appende(2.0)
-    varia lista<f32, 4> b ← vacua
+    varia lista<f32, magnitudo 4> b ← vacua
     b.appende(4.0)
     b.appende(5.0)
-    sit lista<f32, 4> sum ← a + b
+    sit lista<f32, magnitudo 4> sum ← a + b
     nota sum
     nota sum.longitudo()
-    sit lista<f32, 4> scaled ← 10.0 - a
+    sit lista<f32, magnitudo 4> scaled ← 10.0 - a
     nota scaled
     nota scaled.longitudo()
 }
@@ -67,16 +67,16 @@ fn bounded_lista_length_mismatch_is_fatal_even_under_a_handler() {
     // ruling of 2026-10-08). `runner_failure` panics on success, so reaching
     // the assertion already proves the handler did not run.
     let source = r#"
-functio pair(lista<f32, 4> x, lista<f32, 4> y) → numerus ⇥ textus {
-    sit lista<f32, 4> total ← x + y
+functio pair(lista<f32, magnitudo 4> x, lista<f32, magnitudo 4> y) → numerus ⇥ textus {
+    sit lista<f32, magnitudo 4> total ← x + y
     redde total.longitudo()
 }
 
 incipit {
-    varia lista<f32, 4> a ← vacua
+    varia lista<f32, magnitudo 4> a ← vacua
     a.appende(1.0)
     a.appende(2.0)
-    varia lista<f32, 4> c ← vacua
+    varia lista<f32, magnitudo 4> c ← vacua
     c.appende(1.0)
     c.appende(2.0)
     c.appende(3.0)
@@ -227,10 +227,10 @@ incipit {
 fn lista_comparison_pairs_the_live_length_and_fails_on_a_mismatch() {
     let bounded = r"
 incipit {
-    varia lista<numerus, 4> a ← vacua
+    varia lista<numerus, magnitudo 4> a ← vacua
     a.appende(1)
     a.appende(7)
-    sit lista<bivalens, 4> mask ← a ≥ 2
+    sit lista<bivalens, magnitudo 4> mask ← a ≥ 2
     nota mask
     nota mask.longitudo()
 }

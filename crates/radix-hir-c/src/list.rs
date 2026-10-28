@@ -27,7 +27,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// The capacity of a bounded list type (`list<int, 8>`), peeling aliases.
+    /// The capacity of a bounded list type (`list<int, size 8>`), peeling aliases.
     /// `None` for an unbounded list, or a capacity not known at compile time.
     fn list_capacity(&self, ty: radix_types::TypeId) -> Option<u64> {
         match self.types.get(ty) {
@@ -42,7 +42,7 @@ impl Emitter<'_> {
         }
     }
 
-    /// Whether a type is a bounded list (`list<T, N>`), peeling aliases.
+    /// Whether a type is a bounded list (`list<T, size N>`), peeling aliases.
     pub(crate) fn is_bounded_type(&self, ty: radix_types::TypeId) -> bool {
         match self.types.get(ty) {
             radix_types::Type::Alias(_, inner) => self.is_bounded_type(*inner),
@@ -578,7 +578,6 @@ impl Emitter<'_> {
         entry: &radix_intrinsics::MethodIntrinsic,
         args: &[HirCallArg],
     ) -> Result<Operand, CodegenError> {
-        let suffix = elem.suffix();
         let inner = Inner::from_ty(elem.ty())
             .ok_or_else(|| unsupported("list element without an optional form"))?;
         let mut effect = list.effect;
@@ -623,14 +622,35 @@ impl Emitter<'_> {
                     | MirCollectionOp::ReverseInPlace
             );
         let prelude = self.sequence(&mut operands);
-        let o = |at: usize| operands[at].text.clone();
         self.support.need(Helper::List(elem, ListOp::At));
         self.need_class(Ty::Opt(inner));
-        let operand = match op {
+        let operand = self.list_query_read(elem, inner, op, entry, &operands)?;
+        let text = wrap(&prelude, &operand.text);
+        let value = operand.value;
+        let text = if value == Value::Truth && !prelude.is_empty() {
+            format!("({text})")
+        } else {
+            text
+        };
+        Ok(Operand::new(text, value).with_effect(effect))
+    }
+
+    /// Emit optional end, indexed, removed, and extremum reads.
+    fn list_query_read(
+        &mut self,
+        elem: Elem,
+        inner: Inner,
+        op: MirCollectionOp,
+        entry: &radix_intrinsics::MethodIntrinsic,
+        operands: &[Operand],
+    ) -> Result<Operand, CodegenError> {
+        let suffix = elem.suffix();
+        let o = |at: usize| operands[at].text.clone();
+        Ok(match op {
             MirCollectionOp::First => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_get({}, 0, &{slot})", o(0));
-                self.optional_call(elem, inner, &slot, call)
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::Last => {
                 let slot = format!("faber_o{}", self.temps);
@@ -638,22 +658,22 @@ impl Emitter<'_> {
                     "faber_list_{suffix}_get({0}, ({0})->len - 1, &{slot})",
                     o(0)
                 );
-                self.optional_call(elem, inner, &slot, call)
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::Index if entry.return_kind == IntrinsicReturnKind::OptionInner => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_get({}, {}, &{slot})", o(0), o(1));
-                self.optional_call(elem, inner, &slot, call)
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::RemoveFirst => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_remove_first({}, &{slot})", o(0));
-                self.optional_call(elem, inner, &slot, call)
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::RemoveLast => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_remove_last({}, &{slot})", o(0));
-                self.optional_call(elem, inner, &slot, call)
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::ArgMax | MirCollectionOp::ArgMin if elem == Elem::Int => {
                 let which = if op == MirCollectionOp::ArgMax {
@@ -672,6 +692,20 @@ impl Emitter<'_> {
                 self.need_class(Ty::Opt(Inner::Int));
                 Operand::new(text, Value::Opt(Inner::Int))
             }
+            _ => return self.list_query_transform(elem, op, operands),
+        })
+    }
+
+    /// Emit membership, ordering, slicing, and aggregate list queries.
+    fn list_query_transform(
+        &mut self,
+        elem: Elem,
+        op: MirCollectionOp,
+        operands: &[Operand],
+    ) -> Result<Operand, CodegenError> {
+        let suffix = elem.suffix();
+        let o = |at: usize| operands[at].text.clone();
+        Ok(match op {
             MirCollectionOp::Contains => Operand::new(
                 format!("(faber_list_{suffix}_contains({}, {}))", o(0), o(1)),
                 Value::Truth,
@@ -745,15 +779,7 @@ impl Emitter<'_> {
                 Operand::new(format!("faber_list_i64_sum({})", o(0)), Value::Exact)
             }
             _ => return Err(unsupported("list method outside the subset")),
-        };
-        let text = wrap(&prelude, &operand.text);
-        let value = operand.value;
-        let text = if value == Value::Truth && !prelude.is_empty() {
-            format!("({text})")
-        } else {
-            text
-        };
-        Ok(Operand::new(text, value).with_effect(effect))
+        })
     }
 
     /// An optional element read: `call` fills the slot named `slot` and says
@@ -763,7 +789,7 @@ impl Emitter<'_> {
         elem: Elem,
         inner: Inner,
         slot: &str,
-        call: String,
+        call: &str,
     ) -> Operand {
         self.temps += 1;
         let c_type = elem.c_type();

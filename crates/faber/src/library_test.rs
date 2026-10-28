@@ -64,6 +64,23 @@ fn configure_library_home_flag_wins_over_manifest() {
 }
 
 #[test]
+fn configure_library_home_makes_a_relative_flag_absolute() {
+    let _guard = env_guard();
+    let _configured = ConfiguredHomeReset::clear();
+
+    configure_library_home(Some(Path::new("../relative-home")), None);
+
+    let resolved = resolved_library_home().expect("configured home");
+    assert!(resolved.path.is_absolute(), "{:?}", resolved.path);
+    assert_eq!(
+        resolved.path,
+        std::env::current_dir()
+            .expect("current directory")
+            .join("../relative-home")
+    );
+}
+
+#[test]
 fn configure_library_home_reads_manifest_paths_key() {
     let _guard = env_guard();
     let _configured = ConfiguredHomeReset::clear();

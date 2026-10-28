@@ -189,28 +189,7 @@ pub(crate) fn c_int64(value: i64) -> String {
 impl Emitter<'_> {
     pub(crate) fn expr(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
         match &expr.kind {
-            HirExpressionKind::Path(def_id) => {
-                // A named function used as a value is its C function pointer.
-                if let Some(function) = self.functions.get(def_id) {
-                    let name = function.name.clone();
-                    let Some(ty) = expr.ty else {
-                        return Err(unsupported("function value without a resolved type"));
-                    };
-                    let Ty::Func(id) = classify(self.types, ty)? else {
-                        return Err(unsupported("function value of another class"));
-                    };
-                    return Ok(Operand::new(name, Value::Func(id)));
-                }
-                let operand = self.path(*def_id)?;
-                // Typecheck narrows the type of a read the guard proved
-                // present; the cell is still the optional.
-                if let (Value::Opt(inner), Some(ty)) = (operand.value, expr.ty)
-                    && crate::ty::read_class(self.types, ty) == Some(inner.ty())
-                {
-                    return Ok(Self::narrow_read(&operand, inner));
-                }
-                Ok(operand)
-            }
+            HirExpressionKind::Path(def_id) => self.path_expression(expr, *def_id),
             HirExpressionKind::OptionalChain(subject, kind) => {
                 self.optional_member(expr, subject, kind)
             }
@@ -227,49 +206,7 @@ impl Emitter<'_> {
                     }
                 }
             }
-            HirExpressionKind::Literal(literal) => {
-                // `{ "k": v }` ascribed to a map is a JSON object: build the
-                // map, not a `valor`.
-                if let HirLiteral::JsonValor(value) = literal
-                    && let Some(Ty::Map(k, v)) =
-                        expr.ty.map(|ty| classify(self.types, ty)).transpose()?
-                {
-                    return self.map_json_literal(k, v, value);
-                }
-                // An integer literal typed as a float is that float (`1` in a
-                // `float` slot is `1.0`); typecheck admits no other crossing.
-                let float_class = expr.ty.and_then(|ty| classify(self.types, ty).ok());
-                let as_float = matches!(float_class, Some(Ty::Float | Ty::Float32));
-                let as_float32 = matches!(float_class, Some(Ty::Float32));
-                let as_decimal = expr.ty.is_some_and(|ty| {
-                    classify(self.types, ty).is_ok_and(|class| class == Ty::Decimal)
-                });
-                match literal {
-                    HirLiteral::Nil => self.none_value(expr),
-                    HirLiteral::Int(value) if as_decimal => self.decimal_int_literal(*value),
-                    HirLiteral::FloatText { text, .. } if as_decimal => {
-                        self.decimal_text_literal(*text)
-                    }
-                    // An `f32` literal is the front end's folded binary32
-                    // value; carry it as a `float` cell.
-                    HirLiteral::Float(value) | HirLiteral::FloatText { value, .. }
-                        if as_float32 =>
-                    {
-                        #[expect(clippy::cast_possible_truncation)]
-                        Ok(self.float_literal32(*value as f32))
-                    }
-                    HirLiteral::Int(value) if as_float => {
-                        if as_float32 {
-                            #[expect(clippy::cast_precision_loss)]
-                            Ok(self.float_literal32(*value as f32))
-                        } else {
-                            #[expect(clippy::cast_precision_loss)]
-                            Ok(self.float_literal(*value as f64))
-                        }
-                    }
-                    _ => self.literal(literal),
-                }
-            }
+            HirExpressionKind::Literal(literal) => self.typed_literal(expr, literal),
             HirExpressionKind::Binary(op, left, right) => self.binary(*op, left, right, expr.ty),
             HirExpressionKind::Unary(op, operand) => self.unary(*op, operand),
             HirExpressionKind::Conversio {
@@ -337,6 +274,86 @@ impl Emitter<'_> {
                 let text = format!("(__extension__ ({{ {name} = {}; {name}; }}))", value.text);
                 Ok(Operand::new(text, Value::from(class)).with_effect(true))
             }
+            _ => self.compound_expression(expr),
+        }
+    }
+
+    /// A path read, including function values and guard-narrowed optionals.
+    fn path_expression(
+        &mut self,
+        expr: &HirExpression,
+        def_id: DefId,
+    ) -> Result<Operand, CodegenError> {
+        // A named function used as a value is its C function pointer.
+        if let Some(function) = self.functions.get(&def_id) {
+            let name = function.name.clone();
+            let Some(ty) = expr.ty else {
+                return Err(unsupported("function value without a resolved type"));
+            };
+            let Ty::Func(id) = classify(self.types, ty)? else {
+                return Err(unsupported("function value of another class"));
+            };
+            return Ok(Operand::new(name, Value::Func(id)));
+        }
+        let operand = self.path(def_id)?;
+        // Typecheck narrows the type of a read the guard proved
+        // present; the cell is still the optional.
+        if let (Value::Opt(inner), Some(ty)) = (operand.value, expr.ty)
+            && crate::ty::read_class(self.types, ty) == Some(inner.ty())
+        {
+            return Ok(Self::narrow_read(&operand, inner));
+        }
+        Ok(operand)
+    }
+
+    /// A literal interpreted at its resolved numeric or collection type.
+    fn typed_literal(
+        &mut self,
+        expr: &HirExpression,
+        literal: &HirLiteral,
+    ) -> Result<Operand, CodegenError> {
+        // `{ "k": v }` ascribed to a map is a JSON object: build the
+        // map, not a `valor`.
+        if let HirLiteral::JsonValor(value) = literal
+            && let Some(Ty::Map(k, v)) = expr.ty.map(|ty| classify(self.types, ty)).transpose()?
+        {
+            return self.map_json_literal(k, v, value);
+        }
+        // An integer literal typed as a float is that float (`1` in a
+        // `float` slot is `1.0`); typecheck admits no other crossing.
+        let float_class = expr.ty.and_then(|ty| classify(self.types, ty).ok());
+        let as_float = matches!(float_class, Some(Ty::Float | Ty::Float32));
+        let as_float32 = matches!(float_class, Some(Ty::Float32));
+        let as_decimal = expr
+            .ty
+            .is_some_and(|ty| classify(self.types, ty).is_ok_and(|class| class == Ty::Decimal));
+        match literal {
+            HirLiteral::Nil => self.none_value(expr),
+            HirLiteral::Int(value) if as_decimal => Ok(self.decimal_int_literal(*value)),
+            HirLiteral::FloatText { text, .. } if as_decimal => self.decimal_text_literal(*text),
+            // An `f32` literal is the front end's folded binary32
+            // value; carry it as a `float` cell.
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } if as_float32 =>
+            {
+                #[expect(clippy::cast_possible_truncation)]
+                Ok(self.float_literal32(*value as f32))
+            }
+            HirLiteral::Int(value) if as_float => {
+                if as_float32 {
+                    #[expect(clippy::cast_precision_loss)]
+                    Ok(self.float_literal32(*value as f32))
+                } else {
+                    #[expect(clippy::cast_precision_loss)]
+                    Ok(self.float_literal(*value as f64))
+                }
+            }
+            _ => self.literal(literal),
+        }
+    }
+
+    /// Emit compound values, collection operations, and calls.
+    fn compound_expression(&mut self, expr: &HirExpression) -> Result<Operand, CodegenError> {
+        match &expr.kind {
             HirExpressionKind::Scriptum(template, args) => self.template(*template, args),
             HirExpressionKind::Si {
                 cond,
@@ -372,30 +389,7 @@ impl Emitter<'_> {
                 if !type_args.is_empty() || arm.is_some() {
                     return Err(unsupported("generic or propagating method call"));
                 }
-                let class = receiver.ty.map(|ty| classify(self.types, ty)).transpose()?;
-                if let Some(Ty::Genus(_)) = class {
-                    let receiver = self.expr(receiver)?;
-                    return self.genus_method(receiver, *method, args);
-                }
-                if let (Some(Ty::Float | Ty::Float32), Some(receiver_ty)) = (class, receiver.ty) {
-                    let receiver = self.expr(receiver)?;
-                    return self.float_method(receiver, receiver_ty, *method, args);
-                }
-                if let (Some(Ty::Int | Ty::Sized(_)), Some(receiver_ty)) = (class, receiver.ty) {
-                    let receiver = self.expr(receiver)?;
-                    return self.int_method(receiver, receiver_ty, *method, args);
-                }
-                if let (Some(Ty::Text), Some(receiver_ty)) = (class, receiver.ty) {
-                    let receiver = self.expr(receiver)?;
-                    return self.text_method(receiver, receiver_ty, *method, args);
-                }
-                if let Some(Ty::Set(_)) = class {
-                    return self.set_method(receiver, *method, args);
-                }
-                if let Some(Ty::Map(..)) = class {
-                    return self.map_method(receiver, *method, args);
-                }
-                self.list_method(expr.ty, receiver, *method, args)
+                self.method_expression(expr, receiver, *method, args)
             }
             HirExpressionKind::Sort {
                 direction,
@@ -433,25 +427,7 @@ impl Emitter<'_> {
                 source,
                 target,
                 entries: None,
-            } => {
-                let class = classify(self.types, *target)?;
-                if Self::is_none_literal(source) {
-                    return self.none_of(class);
-                }
-                // `[1, 2, 3] ∷ list<int>`: the literal's own type is bounded
-                // by its length; the ascription makes it growable.
-                let literal = matches!(
-                    source.kind,
-                    HirExpressionKind::Array(_) | HirExpressionKind::Vacua
-                );
-                let widen =
-                    literal && matches!(class, Ty::List(_)) && !self.is_bounded_type(*target);
-                let before = self.unbounded_literals;
-                self.unbounded_literals = before || widen;
-                let value = self.expr(source);
-                self.unbounded_literals = before;
-                self.settle(value?, class)
-            }
+            } => self.ascribed_expression(source, *target),
             // `x is none` / `x not is none`.
             HirExpressionKind::TypeCheck {
                 positive,
@@ -477,6 +453,64 @@ impl Emitter<'_> {
             HirExpressionKind::Ad { route, opener } => self.ad_route(*route, opener.as_deref()),
             other => Err(unsupported(construct_name(other))),
         }
+    }
+
+    /// Emit a type-ascribed value, widening list literals when requested.
+    fn ascribed_expression(
+        &mut self,
+        source: &HirExpression,
+        target: radix_types::TypeId,
+    ) -> Result<Operand, CodegenError> {
+        let class = classify(self.types, target)?;
+        if Self::is_none_literal(source) {
+            return self.none_of(class);
+        }
+        // `[1, 2, 3] ∷ list<int>`: the literal's own type is bounded
+        // by its length; the ascription makes it growable.
+        let literal = matches!(
+            source.kind,
+            HirExpressionKind::Array(_) | HirExpressionKind::Vacua
+        );
+        let widen = literal && matches!(class, Ty::List(_)) && !self.is_bounded_type(target);
+        let before = self.unbounded_literals;
+        self.unbounded_literals = before || widen;
+        let value = self.expr(source);
+        self.unbounded_literals = before;
+        self.settle(value?, class)
+    }
+
+    /// Dispatch a method call by the receiver class.
+    fn method_expression(
+        &mut self,
+        expr: &HirExpression,
+        receiver: &HirExpression,
+        method: radix_lexer::Symbol,
+        args: &[radix_hir::HirCallArg],
+    ) -> Result<Operand, CodegenError> {
+        let class = receiver.ty.map(|ty| classify(self.types, ty)).transpose()?;
+        if let Some(Ty::Genus(_)) = class {
+            let receiver = self.expr(receiver)?;
+            return self.genus_method(receiver, method, args);
+        }
+        if let (Some(Ty::Float | Ty::Float32), Some(receiver_ty)) = (class, receiver.ty) {
+            let receiver = self.expr(receiver)?;
+            return self.float_method(receiver, receiver_ty, method, args);
+        }
+        if let (Some(Ty::Int | Ty::Sized(_)), Some(receiver_ty)) = (class, receiver.ty) {
+            let receiver = self.expr(receiver)?;
+            return self.int_method(receiver, receiver_ty, method, args);
+        }
+        if let (Some(Ty::Text), Some(receiver_ty)) = (class, receiver.ty) {
+            let receiver = self.expr(receiver)?;
+            return self.text_method(receiver, receiver_ty, method, args);
+        }
+        if let Some(Ty::Set(_)) = class {
+            return self.set_method(receiver, method, args);
+        }
+        if let Some(Ty::Map(..)) = class {
+            return self.map_method(receiver, method, args);
+        }
+        self.list_method(expr.ty, receiver, method, args)
     }
 
     /// `c ✓ a ✗ b`, and `if` in value position: C's `?:`, which also runs
@@ -749,97 +783,8 @@ impl Emitter<'_> {
                     Omission::Omitted => (None, None),
                 },
             };
-            let shared = matches!(param, Ty::List(_) | Ty::Genus(_));
             let pointer = pointees.get(index).copied().unwrap_or(false);
-            match marker {
-                // `ref` / `mut` alias the caller's pointer: a list or a genus
-                // always has one, and a scalar parameter (one this signature
-                // spelled as a pointer) borrows the caller's cell. `copy`
-                // (deep) and `own` (transfer) apply to any value; a scalar
-                // copies by assignment either way.
-                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
-                    if !shared && !pointer =>
-                {
-                    return Err(unsupported(
-                        "access marker on an argument that is not a list or genus",
-                    ));
-                }
-                Some(radix_hir::HirArgMarker::Axis) => {
-                    return Err(unsupported(
-                        "access marker on an argument that is not a list or genus",
-                    ));
-                }
-                _ => {}
-            }
-            let Some(expr) = expr else {
-                if pointer {
-                    // An omitted `optional` slot: the callee reads a none cell.
-                    // A compound literal's address lives for the call.
-                    let none = self.none_of(*param)?;
-                    operands.push(Operand::new(format!("(&{})", none.text), Value::Void));
-                    continue;
-                }
-                operands.push(self.none_of(*param)?);
-                continue;
-            };
-            // A `ref`/`mut` scalar parameter takes the address of the caller's
-            // cell (or the pointer a borrowing parameter already holds).
-            if pointer {
-                if matches!(
-                    marker,
-                    Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
-                ) {
-                    operands.push(Operand::new(self.caller_address(expr)?, Value::Void));
-                    continue;
-                }
-                // A `ref` parameter called with a value has no caller cell:
-                // the runner has nothing to write back, so a compound literal
-                // at block scope — which lives for the whole block — is the
-                // exact view.
-                let class = *param;
-                let value = self.expr(expr)?;
-                let operand = self.settle(value, class)?;
-                if operand.value != Value::from(class) {
-                    return Err(unsupported("value stored without a store check"));
-                }
-                let c_type = self.c_type(class)?;
-                let address = match class {
-                    Ty::Opt(_) => format!("(&{})", operand.text),
-                    _ => format!("(&(({c_type}){{ {} }}))", operand.text),
-                };
-                operands.push(Operand::new(address, Value::Void));
-                continue;
-            }
-            let mut operand = self.expr(expr)?;
-            // `copy x` at the call site deep-duplicates before the call (R7).
-            if marker == Some(radix_hir::HirArgMarker::Copy) {
-                operand = self.copy_value(operand)?;
-            }
-            // An argument carries no store node in HIR, but the runner checks
-            // it as a store and names it `argument`; the C target does the same.
-            if let Ty::Sized(width) = param {
-                let width = *width;
-                if matches!(operand.value, Value::Int | Value::Exact)
-                    && operand.stored != Some(*param)
-                {
-                    operand = self.store_sized(&operand, width, "\"argument\"");
-                }
-            } else if operand.value == Value::Exact && *param == Ty::Int {
-                if operand.constant.is_some() {
-                    return Err(unsupported("integer constant beyond i64"));
-                }
-                operand.text = self.store_exact(&operand, "\"argument\"");
-                operand.value = Value::Int;
-                operand.narrow = None;
-            }
-            // A present value passed to an optional parameter is wrapped.
-            if matches!(param, Ty::Opt(_)) {
-                operand = self.settle(operand, *param)?;
-            }
-            if operand.value != Value::from(*param) {
-                return Err(unsupported("value stored without a store check"));
-            }
-            operands.push(operand);
+            operands.push(self.invoke_argument(*param, pointer, expr, marker)?);
         }
         let prelude = self.sequence(&mut operands);
         let channel = err.map(|_| {
@@ -872,7 +817,118 @@ impl Emitter<'_> {
             _ => {}
         }
         let has_channel = channel.is_some();
-        let text = if let Some(channel) = channel.as_deref() {
+        let text = self.invoke_channel(&prelude, call, value, channel.as_deref());
+        // A boolean result carries its own parentheses like every truth operand.
+        let text = if value == Value::Truth && prelude.is_empty() && !has_channel {
+            format!("({text})")
+        } else {
+            text
+        };
+        Ok(Operand::new(text, value).with_effect(true))
+    }
+
+    /// Lower one call argument, including omitted slots and borrowed cells.
+    fn invoke_argument(
+        &mut self,
+        param: Ty,
+        pointer: bool,
+        expr: Option<&HirExpression>,
+        marker: Option<radix_hir::HirArgMarker>,
+    ) -> Result<Operand, CodegenError> {
+        let shared = matches!(param, Ty::List(_) | Ty::Genus(_));
+        match marker {
+            // `ref` / `mut` alias the caller's pointer: a list or a genus
+            // always has one, and a scalar parameter (one this signature
+            // spelled as a pointer) borrows the caller's cell. `copy`
+            // (deep) and `own` (transfer) apply to any value; a scalar
+            // copies by assignment either way.
+            Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+                if !shared && !pointer =>
+            {
+                return Err(unsupported(
+                    "access marker on an argument that is not a list or genus",
+                ));
+            }
+            Some(radix_hir::HirArgMarker::Axis) => {
+                return Err(unsupported(
+                    "access marker on an argument that is not a list or genus",
+                ));
+            }
+            _ => {}
+        }
+        let Some(expr) = expr else {
+            if pointer {
+                // An omitted `optional` slot: the callee reads a none cell.
+                // A compound literal's address lives for the call.
+                let none = self.none_of(param)?;
+                return Ok(Operand::new(format!("(&{})", none.text), Value::Void));
+            }
+            return self.none_of(param);
+        };
+        // A `ref`/`mut` scalar parameter takes the address of the caller's
+        // cell (or the pointer a borrowing parameter already holds).
+        if pointer {
+            if matches!(
+                marker,
+                Some(radix_hir::HirArgMarker::Ref | radix_hir::HirArgMarker::Mut)
+            ) {
+                return Ok(Operand::new(self.caller_address(expr)?, Value::Void));
+            }
+            // A `ref` parameter called with a value has no caller cell:
+            // the runner has nothing to write back, so a compound literal
+            // at block scope — which lives for the whole block — is the
+            // exact view.
+            let class = param;
+            let value = self.expr(expr)?;
+            let operand = self.settle(value, class)?;
+            if operand.value != Value::from(class) {
+                return Err(unsupported("value stored without a store check"));
+            }
+            let c_type = self.c_type(class)?;
+            let address = match class {
+                Ty::Opt(_) => format!("(&{})", operand.text),
+                _ => format!("(&(({c_type}){{ {} }}))", operand.text),
+            };
+            return Ok(Operand::new(address, Value::Void));
+        }
+        let mut operand = self.expr(expr)?;
+        // `copy x` at the call site deep-duplicates before the call (R7).
+        if marker == Some(radix_hir::HirArgMarker::Copy) {
+            operand = self.copy_value(operand)?;
+        }
+        // An argument carries no store node in HIR, but the runner checks
+        // it as a store and names it `argument`; the C target does the same.
+        if let Ty::Sized(width) = param {
+            if matches!(operand.value, Value::Int | Value::Exact) && operand.stored != Some(param) {
+                operand = self.store_sized(&operand, width, "\"argument\"");
+            }
+        } else if operand.value == Value::Exact && param == Ty::Int {
+            if operand.constant.is_some() {
+                return Err(unsupported("integer constant beyond i64"));
+            }
+            operand.text = self.store_exact(&operand, "\"argument\"");
+            operand.value = Value::Int;
+            operand.narrow = None;
+        }
+        // A present value passed to an optional parameter is wrapped.
+        if matches!(param, Ty::Opt(_)) {
+            operand = self.settle(operand, param)?;
+        }
+        if operand.value != Value::from(param) {
+            return Err(unsupported("value stored without a store check"));
+        }
+        Ok(operand)
+    }
+
+    /// Wrap a call with its error channel and propagation handler.
+    fn invoke_channel(
+        &mut self,
+        prelude: &str,
+        call: String,
+        value: Value,
+        channel: Option<&str>,
+    ) -> String {
+        if let Some(channel) = channel {
             let caller_has_channel = self
                 .current
                 .and_then(|current| self.functions.get(&current))
@@ -903,15 +959,8 @@ impl Emitter<'_> {
                 )
             }
         } else {
-            wrap(&prelude, &call)
-        };
-        // A boolean result carries its own parentheses like every truth operand.
-        let text = if value == Value::Truth && prelude.is_empty() && !has_channel {
-            format!("({text})")
-        } else {
-            text
-        };
-        Ok(Operand::new(text, value).with_effect(true))
+            wrap(prelude, &call)
+        }
     }
 
     /// C leaves the order of function arguments, and of the two operands of a
@@ -1009,7 +1058,7 @@ impl Emitter<'_> {
     }
 
     /// A `d64` integer literal: an exact carrier at scale 0.
-    fn decimal_int_literal(&mut self, value: u64) -> Result<Operand, CodegenError> {
+    fn decimal_int_literal(&mut self, value: u64) -> Operand {
         self.support.need(Helper::Decimal);
         let text = if let Ok(narrow) = i64::try_from(value) {
             self.support.need_ints();
@@ -1018,10 +1067,7 @@ impl Emitter<'_> {
             self.support.need(Helper::Types);
             format!("(faber_i128)UINT64_C({value})")
         };
-        Ok(Operand::new(
-            format!("faber_dec_int({text})"),
-            Value::Decimal,
-        ))
+        Operand::new(format!("faber_dec_int({text})"), Value::Decimal)
     }
 
     /// A `d64` decimal literal, carried exactly as its digit text (the
@@ -2109,7 +2155,7 @@ impl Emitter<'_> {
                 let at = self.text_literal(&self.store_position(site))?;
                 Ok(self.store_sized(&value, width, &at))
             }
-            (Ty::Bits(width), Value::Int | Value::Exact) => Self::store_bits(value, width),
+            (Ty::Bits(width), Value::Int | Value::Exact) => Self::store_bits(&value, width),
             // A modular word reduces modulo 2^W at the store; a saturating
             // word clamps. Both are total (they never trap).
             (Ty::Modular(width), Value::Int | Value::Exact) => {
@@ -2173,7 +2219,7 @@ impl Emitter<'_> {
     /// Store an integer value in a raw-bits cell. C's unsigned conversion is
     /// modulo 2^N, but a folded out-of-range value is a rejected lowering, not
     /// a constant that this backend silently masks.
-    fn store_bits(value: Operand, width: BitsWidth) -> Result<Operand, CodegenError> {
+    fn store_bits(value: &Operand, width: BitsWidth) -> Result<Operand, CodegenError> {
         let class = Ty::Bits(width);
         let (low, high) = int_width_of_bits(width).range();
         if value
@@ -2277,7 +2323,7 @@ impl Emitter<'_> {
                 {
                     return Ok(value);
                 }
-                Self::store_bits(value, width)
+                Self::store_bits(&value, width)
             }
             Ty::Modular(width) => {
                 if value.stored == Some(class) || !matches!(value.value, Value::Int | Value::Exact)
@@ -2420,8 +2466,9 @@ impl Emitter<'_> {
         if let Some(&index) = self.text_literal_index.get(&source) {
             return Ok(format!("faber_L{index}.s"));
         }
-        let bytes = decoded.len() as i64;
-        let cps = decoded.chars().count() as i64;
+        // Reinterpret the count bits, preserving the original signed-cast semantics.
+        let bytes = (decoded.len() as u64).cast_signed();
+        let cps = (decoded.chars().count() as u64).cast_signed();
         let index = self.text_literals.len();
         self.text_literals.push((source.clone(), bytes, cps));
         self.text_literal_index.insert(source, index);
@@ -2513,7 +2560,6 @@ pub(crate) fn construct_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Reduction { .. } => "reduction",
         HirExpressionKind::Scan { .. } => "scan",
         HirExpressionKind::Sort { .. } => "sort expression",
-        HirExpressionKind::FirstMatch { .. } => "first-match selection",
         HirExpressionKind::Intervallum { .. } => "range value",
         HirExpressionKind::Assign(..) => "assignment",
         HirExpressionKind::ConversioAssign { .. } => "conversion assignment",

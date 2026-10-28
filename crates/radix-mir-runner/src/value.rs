@@ -754,6 +754,18 @@ impl TensorValue {
         Self::try_contiguous_typed(self.data.clone_storage(), self.shape.clone())
     }
 
+    /// [`Self::value_at`] for an index the checker proved inside the tensor
+    ///: a dense row-major tensor reads its slot without the
+    /// logical-extent comparison. `None` only when the host copy is
+    /// unavailable (or a wrong proof named a slot outside the storage).
+    #[must_use]
+    pub fn value_at_proven(&self, logical_index: usize) -> Option<Value> {
+        if self.is_dense_row_major() {
+            return self.read_physical(logical_index);
+        }
+        self.value_at(logical_index)
+    }
+
     #[must_use]
     pub fn value_at(&self, logical_index: usize) -> Option<Value> {
         if self.is_dense_row_major() {
@@ -3120,6 +3132,18 @@ pub fn scalar_text_index(text: &str, index: usize, span: Span) -> Result<Value, 
         ascii1_from_scalar(ch, span)
     } else {
         Ok(Value::Str(ch.to_string()))
+    }
+}
+
+/// The position a proven index names. The checker showed `0 <= index`, so the
+/// sign is not tested; `None` only for a value that is not an integer, which
+/// keeps the checked read.
+#[must_use]
+pub(crate) fn proven_position(index: &Value) -> Option<usize> {
+    match index {
+        Value::Int(value) => Some(*value as usize),
+        Value::UInt(value) => usize::try_from(*value).ok(),
+        _ => None,
     }
 }
 

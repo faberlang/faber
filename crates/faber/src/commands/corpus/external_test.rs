@@ -231,3 +231,25 @@ fn package_product_is_classified_against_the_recipe_extension() {
         PackageProduct::Modules(vec![modules.join("000-a.wat"), modules.join("001-b.wat")])
     );
 }
+
+/// The `llvm` lane builds through the product command: a `product = true`
+/// recipe parses, and carries the product build as its one emit-and-link step
+/// (no `prepare`, no hand-written `build`).
+#[test]
+fn product_recipe_parses_and_names_the_product_target() {
+    let recipe: crate::commands::corpus::SuiteTarget = toml::from_str(
+        "emit = \"llvm-host\"\nextension = \"ll\"\nproduct = true\nrun = [\"{artifact}\"]\n",
+    )
+    .expect("product recipe parses");
+    assert!(recipe.product);
+    assert_eq!(recipe.emit.as_deref(), Some("llvm-host"));
+    assert!(recipe.prepare.is_empty() && recipe.build.is_empty());
+
+    let plain: crate::commands::corpus::SuiteTarget =
+        toml::from_str("emit = \"go\"\nextension = \"go\"\nrun = [\"{artifact}\"]\n")
+            .expect("plain recipe parses");
+    assert!(
+        !plain.product,
+        "a recipe is not a product lane unless it says so"
+    );
+}

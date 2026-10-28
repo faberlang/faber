@@ -750,6 +750,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Expression | `maxima` | maximum reduction operator (en `max`) |
 # | Expression | `minima` | minimum reduction operator (en `min`) |
 # | Expression | `numeratio` | count reduction operator (en `count`) |
+# | Expression | `prima` | first-match reduction operator (en `first`; contextual) |
 # | Expression | `ordinata` | sort expression head (en `sort`; contextual) |
 # | Expression | `ascendens` | ascending sort direction (en `asc`; contextual) |
 # | Expression | `descendens` | descending sort direction (en `desc`; contextual) |
@@ -768,8 +769,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Objects | `iuncta` | tuple type/constructor |
 # | Objects | `ratio` | named-field aggregate type/constructor |
 # | Objects | `praefixum` | prefix expression |
-# | Grammar | `primus_quem` | first-match selection head |
-# | Grammar | `ubi` | first-match predicate tail |
 # | Conversion | `via` | convert-hint clause, reduction operator clause, scan operator clause or sort direction clause (contextual) |
 # | Type | `copy` | copy ownership |
 # | Type | `de` | borrow / for-in keys |
@@ -1274,7 +1273,7 @@ type_head       := IDENTIFIER | 'modulus'
 # is its own type (`width_type_sugar`); only the policy words `modulus`,
 # `saturatus` and `exactus` wrap a marker (`modulus<u32>`).
 type_arguments  := '<' type_argument (',' type_argument)* '>'
-type_argument   := labeled_type_argument | range_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument   := labeled_type_argument | range_argument | sized_range_argument | type_annotation | NATURAL | '[' figura_list? ']'
 labeled_type_argument := IDENTIFIER ':' type_annotation
 # A range argument is the second argument of a store policy: the range refines
 # the explicit width inside which a store applies the policy
@@ -1284,8 +1283,13 @@ labeled_type_argument := IDENTIFIER ':' type_annotation
 # (`range_bound_required`). The half-open `‥` holds the low end up to, not
 # including, the high end; the inclusive `…` holds both. `∞` and `-∞` mean no
 # bound on that side. The policy word is mandatory: `u8<0‥8>` is
-# `ranged_policy_word_required`.
+# `ranged_policy_word_required`. The same slot is the second argument of `lista`
+# (`lista<T, magnitudo 1…∞>`): a list size range, trapping only, with no policy
+# word; there the range follows the `magnitudo` marker (`sized_range_argument`),
+# because a bare range bounds a value and a list's bound is a count. A bare
+# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`.
 range_argument  := range_bound range_glyph range_bound
+sized_range_argument := 'magnitudo' range_argument
 range_glyph     := '‥' | '…'
 range_bound     := '-'? NATURAL | '-'? '∞' | 'magnitudo'? IDENTIFIER
 width_type_sugar := WIDTH_MARKER | LISTA_WIDTH_SUGAR
@@ -1361,7 +1365,7 @@ negated_number := '-' NUMBER
 # Type arguments name a generic member type (`casu lista<numerus>`). `discerne`
 # matches a closed set only (a union's members, an enum's variants), so a type
 # pattern that is not a member of the scrutinee's closed set — a length-shaped
-# collection (`lista<T, 4>`) or a numeric width (`u32` over `numerus`) — parses
+# collection (`lista<T, magnitudo 4>`) or a numeric width (`u32` over `numerus`) — parses
 # but is rejected (`SEM010 discerne_pattern_not_in_closed_set`).
 type_pattern := IDENTIFIER type_arguments? ut_pattern?
 ut_pattern  := ('ut' IDENTIFIER) | (('sit' | 'varia') pattern_binding (',' pattern_binding)*)
@@ -1551,7 +1555,6 @@ regex_literal := REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
 primary := IDENTIFIER | literal | regex_literal | 'ego'
          | array_literal | json_literal | typed_constructor | iuncta_expr
          | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr
-         | first_match_expr
          | reducta_expr
          | scan_expr
          | sort_expr
@@ -1640,18 +1643,14 @@ qualified_ident := IDENTIFIER ('.' IDENTIFIER)*
 praefixum_expr := 'praefixum' block_stmt
 scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
 lege_expr      := 'lege' 'lineam'?
-# Dedicated first-match selection: total over a bounded source, first-live
-# selection, `T ∪ nihil` for no-match/empty. The `ubi` predicate tail is owned
-# by this head — never the reduce/scan `fixum`/`varia` binder tail.
-first_match_expr := 'primus_quem' '(' expression apud_clause? ',' 'ubi' IDENTIFIER block_stmt ')'
 # General shaped-source reduction. `via` is mandatory; the operator is one of
-# the nine locale-pack words below. Grouping is contextual, and the optional
+# the ten locale-pack words below. Grouping is contextual, and the optional
 # tail is either a body (with an optional `filum`) or a bodiless identity.
 # The body is claimed only by `(fixum | varia) IDENTIFIER '{'`, so a following
 # declaration remains a separate statement. `reducta` and its operator words
 # stay ordinary identifiers outside their grammar slots.
 reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio'
+reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio' | 'prima'
 reducta_group := 'pro' expression
 reducta_body := ('sit' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression

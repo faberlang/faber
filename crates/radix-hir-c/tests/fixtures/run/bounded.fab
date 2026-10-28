@@ -9,7 +9,7 @@ main {
     xs.append(4)
     xs.append(5)
     print xs, xs.length()
-    mut list<int, 8> ys ← empty
+    mut list<int, size 8> ys ← empty
     ys.append(1)
     ys.append(2)
     print ys
@@ -18,7 +18,7 @@ main {
     for from [10, 20, 30] let x {
         print x
     }
-    mut list<int, 3> full ← [1, 2, 3]
+    mut list<int, size 3> full ← [1, 2, 3]
     print full
     full.append(4)
     print "unreachable"

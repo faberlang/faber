@@ -1,0 +1,68 @@
++++
+term = "reducta-first"
+explains = ["reducta-first"]
+kind = "concept"
+grammar = ["reducta_expr", "reducta_op", "reducta_body", "apud_clause"]
+category = "reduction"
+canonical = true
+summary = "First-match reduction: reducta via prima ex <tensor> sit x { redde <predicate> } yields the first live element (row-major) whose predicate holds, `nihil` for no match and empty sources."
+syntax = "reducta via prima ex <source> [apud [coords]] sit <binder> { redde <predicate> }"
+related = ["nihil", "summa"]
+locale = "la"
++++
+
+# =============================================================================
+# reducta via prima — total first-match selection over a tensor or matrix
+# =============================================================================
+#
+# What this teaches:
+#   • `prima` joins the reduction operators beside summa, factum, maxima,
+#     minima, argmaxima, argminima, omnia, quilibet and numeratio; the body is
+#     the predicate, exactly as for numeratio, quilibet and omnia
+#   • `T ∪ nihil` — no match and an empty source give `nihil`, never an error;
+#     the result is optional even over a statically non-empty source
+#   • total evaluation — the predicate runs for EVERY element, the ones after
+#     the first match included; selection is first-live in row-major order,
+#     never an early exit
+#   • a predicate error rides the error channel and is never turned into `nihil`
+#
+# Common mistakes:
+#   • `reducta via prima` over a `lista` — a reduction source is a tensor or
+#     matrix
+#   • expecting an index — the result is the element
+#   • expecting early exit — the predicate still runs after the first match
+#
+# See also: reducta, nihil, numeratio, quilibet, omnia
+# =============================================================================
+
+# First-live — with matches at 5.0 and 3.0, the FIRST live element wins.
+functio elige(tf32[3] xs) → fractus ∪ nihil {
+    redde reducta via prima ex xs sit x { redde x ≻ 2.0 }
+}
+
+# No-match — no live element yields `nihil`, never an error.
+functio elige_nullum(tf32[2] xs) → fractus ∪ nihil {
+    redde reducta via prima ex xs sit x { redde x ≻ 9.0 }
+}
+
+# Empty source — a statically zero-extent tensor yields `nihil`.
+functio elige_vacuum(tf32[0] xs) → fractus ∪ nihil {
+    redde reducta via prima ex xs sit x { redde x ≻ 0.0 }
+}
+
+# Matrix — row-major order; `apud [i, j]` binds the coordinates.
+functio elige_cellam(tf32[2, 2] m) → fractus ∪ nihil {
+    redde reducta via prima ex m apud [i, j] sit x { redde x ≻ 1.0 }
+}
+
+incipit {
+    sit tf32[3] xs ← [1.0, 5.0, 3.0] ↦ tf32[3]
+    nota elige(xs)
+    sit tf32[2] ys ← [1.0, 2.0] ↦ tf32[2]
+    nota elige_nullum(ys)
+    sit tf32[0] vacua_tensor ← vacua
+    nota elige_vacuum(vacua_tensor)
+    sit lista<f32> flat ← [0.5, 2.0, 3.0, 4.0]
+    sit tf32[2, 2] m ← flat ↦ tf32[2, 2]
+    nota elige_cellam(m)
+}

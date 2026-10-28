@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 526,
-    "analyzable": 530
+    "capable": 539,
+    "analyzable": 543
   },
   "terms": [
     {
@@ -18,8 +18,8 @@
     {
       "term": "!.",
       "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "![",
@@ -36,14 +36,14 @@
     {
       "term": "?(",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "?.",
       "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "?[",
@@ -484,6 +484,12 @@
       "analyzable": 2
     },
     {
+      "term": "list<T, size lo‥hi>",
+      "rule": "operator-group",
+      "capable": 3,
+      "analyzable": 3
+    },
+    {
       "term": "list<b8>",
       "rule": "keyword",
       "capable": 3,
@@ -492,8 +498,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 16,
-      "analyzable": 16
+      "capable": 18,
+      "analyzable": 18
     },
     {
       "term": "manifest",
@@ -688,12 +694,6 @@
       "analyzable": 1
     },
     {
-      "term": "primus_quem",
-      "rule": "concept",
-      "capable": 2,
-      "analyzable": 2
-    },
-    {
       "term": "privata",
       "rule": "keyword",
       "capable": 1,
@@ -744,6 +744,12 @@
     {
       "term": "reddet",
       "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "reducta-first",
+      "rule": "concept",
       "capable": 1,
       "analyzable": 1
     },
@@ -1074,8 +1080,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 42,
-      "analyzable": 43
+      "capable": 43,
+      "analyzable": 44
     },
     {
       "term": "⇇",
@@ -1086,8 +1092,8 @@
     {
       "term": "⇐",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "⇒",
@@ -1104,8 +1110,8 @@
     {
       "term": "⇥",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "∈",
@@ -1134,8 +1140,8 @@
     {
       "term": "∴",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "∷",

@@ -125,6 +125,10 @@ abi_string_family! {
         SYMBOL_ASSERT_MESSAGE = "__faber_rt_v1_assert_message",
         SYMBOL_FATAL = "__faber_rt_v1_fatal",
         SYMBOL_FATAL_OPAQUE = "__faber_rt_v1_fatal_opaque",
+        // `(ctx, message slice, kind: i32) -> !`: a Faber-raised failure. The
+        // host prints the trap line for `kind` and exits with its sysexits
+        // class (`TRAP_KIND_*`), like the runner.
+        SYMBOL_TRAP = "__faber_rt_v1_trap",
         SYMBOL_FORMAT_I64 = "__faber_rt_v1_format_i64",
         SYMBOL_FORMAT_I1 = "__faber_rt_v1_format_i1",
         SYMBOL_FORMAT_I64_I64 = "__faber_rt_v1_format_i64_i64",
@@ -484,6 +488,17 @@ pub const VALOR_CLASS_GENUS: u32 = 10;
 pub const VALOR_ORIGIN_TENSOR: u64 = 1;
 
 abi_enum_family! {
+    TRAP_KIND_ROWS: type FaberRtTrapKindV1 = i32 {
+        // `error: <message>`, exit 70 (a check the program broke: index, store).
+        TRAP_KIND_PROGRAM_LOGIC = 0,
+        // `error: <message>`, exit 65 (a value that could not be converted).
+        TRAP_KIND_CONVERSION = 1,
+        // `abort: <message>`, exit 70 (an explicit abort: a `nonnull` on none).
+        TRAP_KIND_ABORT = 2,
+    }
+}
+
+abi_enum_family! {
     INSTANS_PRECISION_ROWS: type FaberRtInstansPrecisionV1 = u32 {
         INSTANS_PRECISION_SECONDS = 0,
         INSTANS_PRECISION_MILLIS = 1,
@@ -526,6 +541,10 @@ pub const STATUS_CODES: &[(&str, i32)] = &[
     // failable channel fires (`iace` throw / `⇥` propagation / `fac`/`cape`
     // recovery).
     ("STATUS_FALLIBLE", 5),
+    // A well-formed value that does not fit the target width (a text integer
+    // parse past the cell's range). `STATUS_INVALID_ARGUMENT` stays the
+    // malformed-input status.
+    ("STATUS_OUT_OF_RANGE", 6),
 ];
 
 abi_diagnostics! {

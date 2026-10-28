@@ -728,6 +728,19 @@ fn the_go_sermo_rows_spell_as_the_flat_rt_names() {
         (&SERMO_READ_TEXT, "rt.SermoReadText"),
         (&SERMO_READ_NUMERUS, "rt.SermoReadNumerus"),
         (&SERMO_DRAIN, "rt.SermoDrain"),
+        (&SERMO_READ_VALUE, "rt.SermoReadValue"),
+        (&SERMO_READ_VALUE_RESULT, "rt.SermoReadValueResult"),
+        (&SERMO_READ_BOOL, "rt.SermoReadBool"),
+        (&SERMO_READ_BOOL_RESULT, "rt.SermoReadBoolResult"),
+        (&SERMO_READ_FLOAT, "rt.SermoReadFloat"),
+        (&SERMO_READ_FLOAT_RESULT, "rt.SermoReadFloatResult"),
+        (&SERMO_READ_BYTES, "rt.SermoReadBytes"),
+        (&SERMO_READ_BYTES_RESULT, "rt.SermoReadBytesResult"),
+        (&SERMO_READ_STRINGS, "rt.SermoReadStrings"),
+        (&SERMO_READ_STRINGS_RESULT, "rt.SermoReadStringsResult"),
+        (&SERMO_READ_AS, "rt.SermoReadAs"),
+        (&SERMO_READ_AS_RESULT, "rt.SermoReadAsResult"),
+        (&SERMO_DRAIN_RESULT, "rt.SermoDrainResult"),
     ] {
         assert_eq!(spell_any(Target::HirGo, row), spelled);
         match row.name {

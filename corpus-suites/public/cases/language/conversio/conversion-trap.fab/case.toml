@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/conversio/conversion-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "conversio/conversion-trap.fab"
+category = "conversion"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 65
+stdout = "stdout.expected"
+stderr_contains = "conversion failed"
+check_only = false

@@ -10,7 +10,13 @@
 //! returns the failure text on its error channel and any other function ends
 //! the run with `error: <text>`.
 
-use super::*;
+use radix_mir::MirTypeCheckOp;
+
+use super::{
+    BitsWidth, Decline, FloatCC, FunctionLower, InstBuilder, IntCC, Lowered, MemFlagsData,
+    MirConversion, MirOperand, MirType, NumericWidth, Primitive, Rep, TrapCode, Type, TypeId,
+    TypeTable, Value, Variable, abi, rep_of, resolve, trap_text, types,
+};
 
 /// How an integer cell treats an out-of-range value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,40 +175,29 @@ pub(crate) fn numeric_conversion(
             IntPolicy::Trap | IntPolicy::Saturate => true,
             IntPolicy::Wrap => to.width != NumericWidth::U64,
         },
-        (Num::Int(_) | Num::Bool | Num::Float(_), Num::Float(_)) => true,
-        (Num::Float(_) | Num::Text, Num::Int(to)) => {
+        (Num::Int(_) | Num::Bool | Num::Float(_) | Num::Text | Num::Dec, Num::Float(_))
+        | (Num::Text | Num::Float(_) | Num::Int(_), Num::Bool)
+        | (Num::Text | Num::Int(_), Num::Char)
+        | (Num::Text, Num::Regex)
+        | (Num::Float(_) | Num::Text | Num::Dec, Num::Dec)
+        | (
+            Num::Float(_) | Num::Bool | Num::Text | Num::Char | Num::Nil | Num::Ins(_) | Num::Inf,
+            Num::Dyn,
+        )
+        | (Num::Dyn, Num::Bool | Num::Text | Num::Inf)
+        | (Num::Text | Num::Ins(_) | Num::Dyn, Num::Ins(_)) => true,
+        (Num::Float(_) | Num::Text | Num::Dec | Num::Inf, Num::Int(to)) => {
             to.policy == IntPolicy::Trap && carrier_exact(to)
         }
-        (Num::Text | Num::Float(_) | Num::Int(_), Num::Bool) => true,
         (Num::Bool | Num::Char, Num::Int(to)) => to.policy == IntPolicy::Trap,
-        (Num::Text, Num::Float(_)) => true,
-        // A letter is a one-letter text: digits and code points convert both
-        // ways, and a text converts when it holds exactly one letter.
-        (Num::Text | Num::Int(_), Num::Char) => true,
-        // A pattern compiles once, in the conversion, and fails when rejected.
-        (Num::Text, Num::Regex) => true,
-        // A decimal is exact: integers, floats and texts convert in with a
-        // range check, and out by the `via` rounding (half-even by default).
-        (Num::Int(from), Num::Dec) => from.policy == IntPolicy::Trap && carrier_exact(from),
-        (Num::Float(_) | Num::Text, Num::Dec) | (Num::Dec, Num::Float(_)) => true,
-        (Num::Dec, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
-        (Num::Dec, Num::Dec) => true,
+        // Decimal, open-data, instant and unbounded-integer targets take an
+        // integer only when its trapping cell fits the carrier.
+        (Num::Int(from), Num::Dec | Num::Dyn | Num::Ins(_) | Num::Inf) => {
+            from.policy == IntPolicy::Trap && carrier_exact(from)
+        }
         // Open data boxes a scalar and unboxes by its tag; a mismatch fails.
-        (Num::Int(from), Num::Dyn) => from.policy == IntPolicy::Trap && carrier_exact(from),
-        (Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => true,
         (Num::Dyn, Num::Int(to)) => to.policy == IntPolicy::Trap && to.width == NumericWidth::I64,
         (Num::Dyn, Num::Float(width)) => width == NumericWidth::F64,
-        (Num::Dyn, Num::Bool | Num::Text) => true,
-        (Num::Nil, Num::Dyn) => true,
-        // An instant parses from text, reads an epoch integer, changes
-        // precision, and boxes into and unboxes from open data.
-        (Num::Text | Num::Ins(_) | Num::Dyn, Num::Ins(_)) | (Num::Ins(_), Num::Dyn) => true,
-        (Num::Int(from), Num::Ins(_)) => from.policy == IntPolicy::Trap && carrier_exact(from),
-        // An inf takes any carried integer and narrows with a range check; open
-        // data boxes it and unboxes an integer or inf payload.
-        (Num::Int(from), Num::Inf) => from.policy == IntPolicy::Trap && carrier_exact(from),
-        (Num::Inf, Num::Int(to)) => to.policy == IntPolicy::Trap && carrier_exact(to),
-        (Num::Inf, Num::Dyn) | (Num::Dyn, Num::Inf) => true,
         // A signed integer or an unsigned one below 64 bits reads and writes
         // a same-width pattern; a u64 pattern would leave the carrier.
         (Num::Int(from), Num::Bits(width)) => {
@@ -480,38 +475,39 @@ pub(crate) fn sequence_conversion(
             | Type::BoundedArray { .. }
             | Type::BoundedOcteti { .. }
             | Type::Primitive(Primitive::Octeti),
-        ) => {
-            let to = &match target_type {
-                Type::Array(to) | Type::BoundedArray { element: to, .. } => *to,
-                _ => byte_element(table)?,
-            };
-            let from = list_element(table, source)?;
-            let capacity = match target_type {
-                Type::BoundedArray { capacity, .. } | Type::BoundedOcteti { capacity } => {
-                    match table.get_index(*capacity) {
-                        radix_types::IndexExpr::Literal(bound) => Some(*bound),
-                        _ => return None,
-                    }
-                }
-                _ => None,
-            };
-            if same_type(table, from, *to) {
-                rep_ok(*to).then_some(Seq::Copy { capacity })
-            } else if bits_unsigned_pair(table, from, *to) {
-                let rep = rep_of(table, MirType::semantic(*to)).ok()?;
-                let tag = match rep {
-                    Rep::Int => abi::TAG_INT,
-                    Rep::Bits(width) => {
-                        abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3)
-                    }
-                    _ => return None,
-                };
-                Some(Seq::Retag { tag, capacity })
-            } else {
-                None
+        ) => sequence_copy(table, source, target_type),
+        _ => None,
+    }
+}
+
+fn sequence_copy(table: &TypeTable, source: TypeId, target_type: &Type) -> Option<Seq> {
+    let rep_ok = |id: TypeId| rep_of(table, MirType::semantic(id)).is_ok();
+    let to = &match target_type {
+        Type::Array(to) | Type::BoundedArray { element: to, .. } => *to,
+        _ => byte_element(table)?,
+    };
+    let from = list_element(table, source)?;
+    let capacity = match target_type {
+        Type::BoundedArray { capacity, .. } | Type::BoundedOcteti { capacity } => {
+            match table.get_index(*capacity) {
+                radix_types::IndexExpr::Literal(bound) => Some(*bound),
+                _ => return None,
             }
         }
         _ => None,
+    };
+    if same_type(table, from, *to) {
+        rep_ok(*to).then_some(Seq::Copy { capacity })
+    } else if bits_unsigned_pair(table, from, *to) {
+        let rep = rep_of(table, MirType::semantic(*to)).ok()?;
+        let tag = match rep {
+            Rep::Int => abi::TAG_INT,
+            Rep::Bits(width) => abi::TAG_BITS + i64::from(width.bits().trailing_zeros() - 3),
+            _ => return None,
+        };
+        Some(Seq::Retag { tag, capacity })
+    } else {
+        None
     }
 }
 
@@ -524,6 +520,8 @@ enum Failure {
     /// A message text already built.
     Message(Value),
 }
+
+type SequenceValue = (Value, Option<(Value, Failure)>, Rep);
 
 impl FunctionLower<'_, '_> {
     /// Lower an explicit numeric conversion into `variable`.
@@ -679,146 +677,19 @@ impl FunctionLower<'_, '_> {
                 )
             }
             Seq::Rewidth { from, to, kind } => {
-                let big = conversion
-                    .params
-                    .iter()
-                    .find_map(|param| match self.state.input.interner.resolve(*param) {
-                        "be" | "Be" => Some(1),
-                        "le" | "Le" => Some(0),
-                        _ => None,
-                    })
-                    .ok_or_else(|| Decline::new("list regroup without a byte order"))?;
-                let from = self.builder.ins().iconst(types::I32, i64::from(from));
-                let to = self.builder.ins().iconst(types::I32, i64::from(to));
-                let flags = self.builder.ins().iconst(types::I32, big | (kind << 1));
-                let regrouped = self
-                    .call_runtime(&abi::LIST_REWIDTH, &[value, from, to, flags])?
-                    .ok_or_else(|| Decline::new("regroup result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let failed = self.builder.ins().icmp(IntCC::Equal, regrouped, zero);
-                (
-                    regrouped,
-                    Some((failed, Failure::Static("bits list length mismatch"))),
-                    Rep::List,
-                )
+                self.sequence_rewidth(conversion, value, from, to, kind)?
             }
             Seq::ReadScalar {
                 bytes,
                 signed,
                 float,
-            } => {
-                let big = conversion
-                    .params
-                    .iter()
-                    .find_map(|param| match self.state.input.interner.resolve(*param) {
-                        "be" | "Be" => Some(1),
-                        "le" | "Le" => Some(0),
-                        _ => None,
-                    })
-                    .ok_or_else(|| Decline::new("byte read without a byte order"))?;
-                let flags = big | if signed { 2 } else { 0 } | if float { 4 } else { 0 };
-                let width = self.builder.ins().iconst(types::I32, i64::from(bytes));
-                let flags = self.builder.ins().iconst(types::I32, flags);
-                let bits = self
-                    .call_runtime(&abi::LIST_READ_SCALAR, &[value, width, flags])?
-                    .ok_or_else(|| Decline::new("byte read result"))?;
-                let length = self
-                    .call_runtime(&abi::LIST_LEN, &[value])?
-                    .ok_or_else(|| Decline::new("length result"))?;
-                let need = self.builder.ins().iconst(types::I64, i64::from(bytes));
-                let wrong = self.builder.ins().icmp(IntCC::NotEqual, length, need);
-                let failure = Some((
-                    wrong,
-                    Failure::Static(trap_text::BYTES_ENDIAN_WIDTH_MISMATCH),
-                ));
-                if float {
-                    let float = self
-                        .builder
-                        .ins()
-                        .bitcast(types::F64, MemFlagsData::new(), bits);
-                    (float, failure, Rep::Float)
-                } else {
-                    (bits, failure, Rep::Int)
-                }
-            }
+            } => self.sequence_read_scalar(conversion, value, bytes, signed, float)?,
             Seq::WriteScalar { bytes, float } => {
-                let big = conversion
-                    .params
-                    .iter()
-                    .find_map(|param| match self.state.input.interner.resolve(*param) {
-                        "be" | "Be" => Some(1),
-                        "le" | "Le" => Some(0),
-                        _ => None,
-                    })
-                    .ok_or_else(|| Decline::new("byte write without a byte order"))?;
-                let bits = if float {
-                    self.builder
-                        .ins()
-                        .bitcast(types::I64, MemFlagsData::new(), value)
-                } else {
-                    value
-                };
-                let width = self.builder.ins().iconst(types::I32, i64::from(bytes));
-                let flags = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, big | if float { 4 } else { 0 });
-                (
-                    self.call_runtime(&abi::SCALAR_BYTES, &[bits, width, flags])?
-                        .ok_or_else(|| Decline::new("byte write result"))?,
-                    None,
-                    Rep::List,
-                )
+                self.sequence_write_scalar(conversion, value, bytes, float)?
             }
             Seq::Release => (value, None, Rep::Text),
-            Seq::BoundText { capacity } => {
-                let length = self
-                    .call_runtime(&abi::TEXT_LEN, &[value])?
-                    .ok_or_else(|| Decline::new("length result"))?;
-                let bound = self.builder.ins().iconst(
-                    types::I64,
-                    i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
-                );
-                let over = self
-                    .builder
-                    .ins()
-                    .icmp(IntCC::SignedGreaterThan, length, bound);
-                (
-                    value,
-                    Some((
-                        over,
-                        Failure::Static("text to bounded text conversion failed"),
-                    )),
-                    Rep::Text,
-                )
-            }
-            Seq::Pack { capacity } => {
-                let radix = conversion
-                    .params
-                    .iter()
-                    .find_map(|param| match self.state.input.interner.resolve(*param) {
-                        "hex" | "Hex" => Some(16),
-                        "bin" | "Bin" => Some(2),
-                        "oct" | "Oct" => Some(8),
-                        _ => None,
-                    })
-                    .ok_or_else(|| Decline::new("ascii pack without a radix"))?;
-                let width = self.builder.ins().iconst(
-                    types::I64,
-                    i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
-                );
-                let radix = self.builder.ins().iconst(types::I32, radix);
-                let packed = self
-                    .call_runtime(&abi::TEXT_PACK, &[value, width, radix])?
-                    .ok_or_else(|| Decline::new("pack result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let failed = self.builder.ins().icmp(IntCC::Equal, packed, zero);
-                (
-                    packed,
-                    Some((failed, Failure::Static("ascii_pack_width_overflow"))),
-                    Rep::Text,
-                )
-            }
+            Seq::BoundText { capacity } => self.sequence_bound_text(value, capacity)?,
+            Seq::Pack { capacity } => self.sequence_pack(conversion, value, capacity)?,
             Seq::Copy { capacity } => {
                 let start = self.builder.ins().iconst(types::I64, 0);
                 let end = self.builder.ins().iconst(types::I64, i64::MAX);
@@ -832,6 +703,182 @@ impl FunctionLower<'_, '_> {
         let converted = self.finish_conversion(converted, failed, recovery, want, region)?;
         self.builder.def_var(variable, converted);
         Ok(())
+    }
+
+    fn sequence_rewidth(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+        from: u32,
+        to: u32,
+        kind: i64,
+    ) -> Lowered<SequenceValue> {
+        Ok({
+            let big = conversion
+                .params
+                .iter()
+                .find_map(|param| match self.state.input.interner.resolve(*param) {
+                    "be" | "Be" => Some(1),
+                    "le" | "Le" => Some(0),
+                    _ => None,
+                })
+                .ok_or_else(|| Decline::new("list regroup without a byte order"))?;
+            let from = self.builder.ins().iconst(types::I32, i64::from(from));
+            let to = self.builder.ins().iconst(types::I32, i64::from(to));
+            let flags = self.builder.ins().iconst(types::I32, big | (kind << 1));
+            let regrouped = self
+                .call_runtime(&abi::LIST_REWIDTH, &[value, from, to, flags])?
+                .ok_or_else(|| Decline::new("regroup result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let failed = self.builder.ins().icmp(IntCC::Equal, regrouped, zero);
+            (
+                regrouped,
+                Some((failed, Failure::Static("bits list length mismatch"))),
+                Rep::List,
+            )
+        })
+    }
+
+    fn sequence_read_scalar(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+        bytes: u32,
+        signed: bool,
+        float: bool,
+    ) -> Lowered<SequenceValue> {
+        Ok({
+            let big = conversion
+                .params
+                .iter()
+                .find_map(|param| match self.state.input.interner.resolve(*param) {
+                    "be" | "Be" => Some(1),
+                    "le" | "Le" => Some(0),
+                    _ => None,
+                })
+                .ok_or_else(|| Decline::new("byte read without a byte order"))?;
+            let flags = big | if signed { 2 } else { 0 } | if float { 4 } else { 0 };
+            let width = self.builder.ins().iconst(types::I32, i64::from(bytes));
+            let flags = self.builder.ins().iconst(types::I32, flags);
+            let bits = self
+                .call_runtime(&abi::LIST_READ_SCALAR, &[value, width, flags])?
+                .ok_or_else(|| Decline::new("byte read result"))?;
+            let length = self
+                .call_runtime(&abi::LIST_LEN, &[value])?
+                .ok_or_else(|| Decline::new("length result"))?;
+            let need = self.builder.ins().iconst(types::I64, i64::from(bytes));
+            let wrong = self.builder.ins().icmp(IntCC::NotEqual, length, need);
+            let failure = Some((
+                wrong,
+                Failure::Static(trap_text::BYTES_ENDIAN_WIDTH_MISMATCH),
+            ));
+            if float {
+                let float = self
+                    .builder
+                    .ins()
+                    .bitcast(types::F64, MemFlagsData::new(), bits);
+                (float, failure, Rep::Float)
+            } else {
+                (bits, failure, Rep::Int)
+            }
+        })
+    }
+
+    fn sequence_write_scalar(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+        bytes: u32,
+        float: bool,
+    ) -> Lowered<SequenceValue> {
+        Ok({
+            let big = conversion
+                .params
+                .iter()
+                .find_map(|param| match self.state.input.interner.resolve(*param) {
+                    "be" | "Be" => Some(1),
+                    "le" | "Le" => Some(0),
+                    _ => None,
+                })
+                .ok_or_else(|| Decline::new("byte write without a byte order"))?;
+            let bits = if float {
+                self.builder
+                    .ins()
+                    .bitcast(types::I64, MemFlagsData::new(), value)
+            } else {
+                value
+            };
+            let width = self.builder.ins().iconst(types::I32, i64::from(bytes));
+            let flags = self
+                .builder
+                .ins()
+                .iconst(types::I32, big | if float { 4 } else { 0 });
+            (
+                self.call_runtime(&abi::SCALAR_BYTES, &[bits, width, flags])?
+                    .ok_or_else(|| Decline::new("byte write result"))?,
+                None,
+                Rep::List,
+            )
+        })
+    }
+
+    fn sequence_bound_text(&mut self, value: Value, capacity: u64) -> Lowered<SequenceValue> {
+        Ok({
+            let length = self
+                .call_runtime(&abi::TEXT_LEN, &[value])?
+                .ok_or_else(|| Decline::new("length result"))?;
+            let bound = self.builder.ins().iconst(
+                types::I64,
+                i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
+            );
+            let over = self
+                .builder
+                .ins()
+                .icmp(IntCC::SignedGreaterThan, length, bound);
+            (
+                value,
+                Some((
+                    over,
+                    Failure::Static("text to bounded text conversion failed"),
+                )),
+                Rep::Text,
+            )
+        })
+    }
+
+    fn sequence_pack(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+        capacity: u64,
+    ) -> Lowered<SequenceValue> {
+        Ok({
+            let radix = conversion
+                .params
+                .iter()
+                .find_map(|param| match self.state.input.interner.resolve(*param) {
+                    "hex" | "Hex" => Some(16),
+                    "bin" | "Bin" => Some(2),
+                    "oct" | "Oct" => Some(8),
+                    _ => None,
+                })
+                .ok_or_else(|| Decline::new("ascii pack without a radix"))?;
+            let width = self.builder.ins().iconst(
+                types::I64,
+                i64::try_from(capacity).map_err(|_| Decline::new("capacity"))?,
+            );
+            let radix = self.builder.ins().iconst(types::I32, radix);
+            let packed = self
+                .call_runtime(&abi::TEXT_PACK, &[value, width, radix])?
+                .ok_or_else(|| Decline::new("pack result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let failed = self.builder.ins().icmp(IntCC::Equal, packed, zero);
+            (
+                packed,
+                Some((failed, Failure::Static("ascii_pack_width_overflow"))),
+                Rep::Text,
+            )
+        })
     }
 
     /// The failure of a list longer than a bounded capacity, if there is one.
@@ -870,358 +917,536 @@ impl FunctionLower<'_, '_> {
     ) -> Lowered<(Value, Option<(Value, Failure)>)> {
         Ok(match (plan.source, plan.target) {
             (Num::Int(from), Num::Int(to)) => self.int_to_int(from, to, value),
-            (Num::Int(_), Num::Float(width)) => {
-                let widened = if width == NumericWidth::F32 {
-                    // Rounded once, nearest-even, straight from the integer.
-                    let narrow = self.builder.ins().fcvt_from_sint(types::F32, value);
-                    self.builder.ins().fpromote(types::F64, narrow)
-                } else {
-                    self.builder.ins().fcvt_from_sint(types::F64, value)
-                };
-                (widened, None)
-            }
+            (Num::Int(_), Num::Float(width)) => self.convert_int_float(value, width),
             (Num::Bool, Num::Float(_)) => {
                 let wide = self.builder.ins().uextend(types::I64, value);
                 (self.builder.ins().fcvt_from_sint(types::F64, wide), None)
             }
             (Num::Bool, Num::Int(_)) => (self.builder.ins().uextend(types::I64, value), None),
             (Num::Float(_), Num::Float(_)) | (Num::Nil, Num::Dyn) => (value, None),
-            (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value)?,
+            (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value),
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
             (Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => {
-                let rep = match plan.source {
-                    Num::Int(_) => Rep::Int,
-                    Num::Float(_) => Rep::Float,
-                    Num::Bool => Rep::Bool,
-                    Num::Char => Rep::Char,
-                    _ => Rep::Text,
-                };
-                (self.wrap_some(value, rep)?, None)
+                self.box_numeric_scalar(plan, value)?
             }
             (Num::Dyn, target)
                 if matches!(target, Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text) =>
             {
-                let (tag, rep, message) = match target {
-                    Num::Int(_) => (abi::TAG_INT, Rep::Int, "valor to numerus conversion failed"),
-                    Num::Float(_) => (
-                        abi::TAG_FLOAT,
-                        Rep::Float,
-                        "valor to fractus conversion failed",
-                    ),
-                    Num::Bool => (
-                        abi::TAG_BOOL,
-                        Rep::Bool,
-                        "valor to bivalens conversion failed",
-                    ),
-                    _ => (
-                        abi::TAG_TEXT,
-                        Rep::Text,
-                        "valor to textus conversion failed",
-                    ),
-                };
-                let wanted = self.builder.ins().iconst(types::I32, tag);
-                let has = self
-                    .call_runtime(&abi::UNION_HAS_TAG, &[value, wanted])?
-                    .ok_or_else(|| Decline::new("tag test result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let bits = self
-                    .call_runtime(&abi::OPT_BITS_OR, &[value, zero])?
-                    .ok_or_else(|| Decline::new("payload result"))?;
-                let mut extracted = self.element_value(bits, rep);
-                let mut has = has;
-                // A float also takes an integer payload, widened.
-                if rep == Rep::Float {
-                    let int_tag = self.builder.ins().iconst(types::I32, abi::TAG_INT);
-                    let is_int = self
-                        .call_runtime(&abi::UNION_HAS_TAG, &[value, int_tag])?
-                        .ok_or_else(|| Decline::new("tag test result"))?;
-                    let widened = self.builder.ins().fcvt_from_sint(types::F64, bits);
-                    extracted = self.builder.ins().select(is_int, widened, extracted);
-                    has = self.builder.ins().bor(has, is_int);
-                }
-                let one = self.builder.ins().iconst(types::I8, 1);
-                let failed = self.builder.ins().bxor(has, one);
-                (extracted, Some((failed, Failure::Static(message))))
+                self.unbox_numeric_scalar(value, target)?
             }
-            (Num::Text, Num::Ins(code)) => {
-                let code = self.builder.ins().iconst(types::I32, code);
-                let instant = self
-                    .call_runtime(&abi::INS_PARSE, &[value, code])?
-                    .ok_or_else(|| Decline::new("instant result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
-                (
-                    instant,
-                    Some((
-                        failed,
-                        Failure::Static("textus to instans conversion failed"),
-                    )),
-                )
-            }
-            (Num::Int(_), Num::Ins(code)) => {
-                let code = self.builder.ins().iconst(types::I32, code);
-                let instant = self
-                    .call_runtime(&abi::INS_FROM_EPOCH, &[value, code])?
-                    .ok_or_else(|| Decline::new("instant result"))?;
-                (instant, None)
-            }
-            (Num::Ins(_), Num::Ins(code)) => {
-                let code = self.builder.ins().iconst(types::I32, code);
-                let instant = self
-                    .call_runtime(&abi::INS_RETAG, &[value, code])?
-                    .ok_or_else(|| Decline::new("instant result"))?;
-                (instant, None)
-            }
-            (Num::Ins(_), Num::Dyn) => {
-                let boxed = self
-                    .call_runtime(&abi::INS_BOX, &[value])?
-                    .ok_or_else(|| Decline::new("open data result"))?;
-                (boxed, None)
-            }
-            (Num::Dyn, Num::Ins(code)) => {
-                let code = self.builder.ins().iconst(types::I32, code);
-                let instant = self
-                    .call_runtime(&abi::INS_UNBOX, &[value, code])?
-                    .ok_or_else(|| Decline::new("instant result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
-                (
-                    instant,
-                    Some((
-                        failed,
-                        Failure::Static("valor to instans conversion failed"),
-                    )),
-                )
-            }
-            (Num::Int(_), Num::Inf) => {
-                let big = self
-                    .call_runtime(&abi::INF_INT, &[value])?
-                    .ok_or_else(|| Decline::new("inf result"))?;
-                (big, None)
-            }
-            (Num::Inf, Num::Int(to)) => {
-                let low = self.builder.ins().iconst(types::I64, to.low);
-                let high = self.builder.ins().iconst(types::I64, to.high);
-                let integer = self
-                    .call_runtime(&abi::INF_TO_INT, &[value, low, high])?
-                    .ok_or_else(|| Decline::new("inf integer result"))?;
-                let status = self.parse_status()?;
-                let zero = self.builder.ins().iconst(types::I32, 0);
-                let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
-                (integer, Some((failed, Failure::Code(status))))
-            }
-            (Num::Inf, Num::Dyn) => {
-                let boxed = self
-                    .call_runtime(&abi::INF_BOX, &[value])?
-                    .ok_or_else(|| Decline::new("open data result"))?;
-                (boxed, None)
-            }
-            (Num::Dyn, Num::Inf) => {
-                let big = self
-                    .call_runtime(&abi::INF_UNBOX, &[value])?
-                    .ok_or_else(|| Decline::new("inf result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let failed = self.builder.ins().icmp(IntCC::Equal, big, zero);
-                (
-                    big,
-                    Some((
-                        failed,
-                        Failure::Static("valor to numerus conversion failed"),
-                    )),
-                )
-            }
+            (Num::Text, Num::Ins(code)) => self.convert_text_ins(value, code)?,
+            (Num::Int(_), Num::Ins(code)) => self.convert_int_ins(value, code)?,
+            (Num::Ins(_), Num::Ins(code)) => self.convert_ins_ins(value, code)?,
+            (Num::Ins(_), Num::Dyn) => self.convert_ins_dyn(value)?,
+            (Num::Dyn, Num::Ins(code)) => self.convert_dyn_ins(value, code)?,
+            (Num::Int(_), Num::Inf) => self.convert_int_inf(value)?,
+            (Num::Inf, Num::Int(to)) => self.convert_inf_int(value, to)?,
+            (Num::Inf, Num::Dyn) => self.convert_inf_dyn(value)?,
+            (Num::Dyn, Num::Inf) => self.convert_dyn_inf(value)?,
             (Num::Int(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_INT, value)?,
             (Num::Float(_), Num::Dec) => self.decimal_in(&abi::DEC_FROM_FLOAT, value)?,
             (Num::Text, Num::Dec) => self.decimal_in(&abi::DEC_FROM_TEXT, value)?,
             // The same width: the value lands at scale 8, or fails out of range.
-            (Num::Dec, Num::Dec) => {
-                let stored = self
-                    .call_runtime(&abi::DEC_STORE, &[value])?
-                    .ok_or_else(|| Decline::new("decimal store result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let failed = self.builder.ins().icmp(IntCC::Equal, stored, zero);
-                (
-                    stored,
-                    Some((
-                        failed,
-                        Failure::Static("textus to numerus conversion out of range"),
-                    )),
-                )
-            }
-            (Num::Dec, Num::Float(width)) => {
-                let narrow = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, i64::from(width != NumericWidth::F64));
-                let float = self
-                    .call_runtime(&abi::DEC_TO_FLOAT, &[value, narrow])?
-                    .ok_or_else(|| Decline::new("decimal float result"))?;
-                (float, None)
-            }
-            (Num::Dec, Num::Int(to)) => {
-                let mode = match self.rounding_mode_or(&conversion.params, Rounding::HalfEven) {
-                    Rounding::Floor => 0,
-                    Rounding::Ceil => 1,
-                    Rounding::HalfEven => 2,
-                    Rounding::Trunc => 3,
-                };
-                let mode = self.builder.ins().iconst(types::I32, mode);
-                let low = self.builder.ins().iconst(types::I64, to.low);
-                let high = self.builder.ins().iconst(types::I64, to.high);
-                let integer = self
-                    .call_runtime(&abi::DEC_TO_INT, &[value, mode, low, high])?
-                    .ok_or_else(|| Decline::new("decimal integer result"))?;
-                let status = self.parse_status()?;
-                let zero = self.builder.ins().iconst(types::I32, 0);
-                let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
-                (integer, Some((failed, Failure::Code(status))))
-            }
-            (Num::Text, Num::Regex) => {
-                let program = self
-                    .call_runtime(&abi::REGEX_COMPILE, &[value])?
-                    .ok_or_else(|| Decline::new("regex result"))?;
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let failed = self.builder.ins().icmp(IntCC::Equal, program, zero);
-                let message = self
-                    .call_runtime(&abi::REGEX_ERROR, &[])?
-                    .ok_or_else(|| Decline::new("regex error result"))?;
-                (program, Some((failed, Failure::Message(message))))
-            }
-            (Num::Text, Num::Char) => {
-                let letter = self
-                    .call_runtime(&abi::CHAR_FROM_TEXT, &[value])?
-                    .ok_or_else(|| Decline::new("letter result"))?;
-                self.letter_or_failure(letter)
-            }
-            (Num::Int(_), Num::Char) => {
-                let symbol = if self.has_code_point_hint(&conversion.params) {
-                    &abi::CHAR_FROM_CODE
-                } else {
-                    &abi::CHAR_FROM_DIGIT
-                };
-                let letter = self
-                    .call_runtime(symbol, &[value])?
-                    .ok_or_else(|| Decline::new("letter result"))?;
-                self.letter_or_failure(letter)
-            }
-            (Num::Char, Num::Int(_)) => {
-                if self.has_code_point_hint(&conversion.params) {
-                    let code = self
-                        .call_runtime(&abi::CHAR_CODE, &[value])?
-                        .ok_or_else(|| Decline::new("code point result"))?;
-                    (code, None)
-                } else {
-                    let digit = self
-                        .call_runtime(&abi::CHAR_DIGIT, &[value])?
-                        .ok_or_else(|| Decline::new("digit result"))?;
-                    let zero = self.builder.ins().iconst(types::I64, 0);
-                    let failed = self.builder.ins().icmp(IntCC::SignedLessThan, digit, zero);
-                    (
-                        digit,
-                        Some((
-                            failed,
-                            Failure::Static("littera to numerus conversion failed"),
-                        )),
-                    )
-                }
-            }
-            (Num::Text, Num::Float(_)) => {
-                let parsed = self
-                    .call_runtime(&abi::PARSE_F64, &[value])?
-                    .ok_or_else(|| Decline::new("parse result"))?;
-                let status = self.parse_status()?;
-                let zero = self.builder.ins().iconst(types::I32, 0);
-                let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
-                (parsed, Some((failed, Failure::Code(status))))
-            }
+            (Num::Dec, Num::Dec) => self.convert_dec_dec(value)?,
+            (Num::Dec, Num::Float(width)) => self.convert_dec_float(value, width)?,
+            (Num::Dec, Num::Int(to)) => self.convert_dec_int(conversion, value, to)?,
+            (Num::Text, Num::Regex) => self.convert_text_regex(value)?,
+            (Num::Text, Num::Char) => self.convert_text_char(value)?,
+            (Num::Int(_), Num::Char) => self.convert_int_char(conversion, value)?,
+            (Num::Char, Num::Int(_)) => self.convert_char_int(conversion, value)?,
+            (Num::Text, Num::Float(_)) => self.convert_text_float(value)?,
             (Num::Int(_), Num::Bool) => {
                 let zero = self.builder.ins().iconst(types::I64, 0);
                 (self.builder.ins().icmp(IntCC::NotEqual, value, zero), None)
             }
-            (Num::Float(_), Num::Bool) => {
-                let zero = self.builder.ins().f64const(0.0);
-                (
-                    self.builder.ins().fcmp(FloatCC::NotEqual, value, zero),
-                    None,
-                )
+            (Num::Float(_), Num::Bool) => self.convert_float_bool(value),
+            (Num::Text, Num::Bool) => self.convert_text_bool(value)?,
+            (Num::Int(_), Num::Bits(width)) => (self.mask_pattern(value, width), None),
+            (Num::Bits(width), Num::Int(to)) => self.convert_bits_int(value, to, width),
+            (Num::Float(NumericWidth::F16), Num::Bits(_)) => self.convert_float_bits_half(value)?,
+            (Num::Bits(_), Num::Float(NumericWidth::F16)) => self.convert_bits_float_half(value)?,
+            (Num::Float(_), Num::Bits(width)) => self.convert_float_bits(value, width),
+            (Num::Bits(width), Num::Float(_)) => self.convert_bits_float(value, width),
+            _ => return Err(Decline::new("explicit numeric conversion")),
+        })
+    }
+
+    fn convert_int_float(
+        &mut self,
+        value: Value,
+        width: NumericWidth,
+    ) -> (Value, Option<(Value, Failure)>) {
+        {
+            let widened = if width == NumericWidth::F32 {
+                // Rounded once, nearest-even, straight from the integer.
+                let narrow = self.builder.ins().fcvt_from_sint(types::F32, value);
+                self.builder.ins().fpromote(types::F64, narrow)
+            } else {
+                self.builder.ins().fcvt_from_sint(types::F64, value)
+            };
+            (widened, None)
+        }
+    }
+
+    fn box_numeric_scalar(
+        &mut self,
+        plan: Plan,
+        value: Value,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let rep = match plan.source {
+                Num::Int(_) => Rep::Int,
+                Num::Float(_) => Rep::Float,
+                Num::Bool => Rep::Bool,
+                Num::Char => Rep::Char,
+                _ => Rep::Text,
+            };
+            (self.wrap_some(value, rep)?, None)
+        })
+    }
+
+    fn unbox_numeric_scalar(
+        &mut self,
+        value: Value,
+        target: Num,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let (tag, rep, message) = match target {
+                Num::Int(_) => (abi::TAG_INT, Rep::Int, "valor to numerus conversion failed"),
+                Num::Float(_) => (
+                    abi::TAG_FLOAT,
+                    Rep::Float,
+                    "valor to fractus conversion failed",
+                ),
+                Num::Bool => (
+                    abi::TAG_BOOL,
+                    Rep::Bool,
+                    "valor to bivalens conversion failed",
+                ),
+                _ => (
+                    abi::TAG_TEXT,
+                    Rep::Text,
+                    "valor to textus conversion failed",
+                ),
+            };
+            let wanted = self.builder.ins().iconst(types::I32, tag);
+            let has = self
+                .call_runtime(&abi::UNION_HAS_TAG, &[value, wanted])?
+                .ok_or_else(|| Decline::new("tag test result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let bits = self
+                .call_runtime(&abi::OPT_BITS_OR, &[value, zero])?
+                .ok_or_else(|| Decline::new("payload result"))?;
+            let mut extracted = self.element_value(bits, rep);
+            let mut has = has;
+            // A float also takes an integer payload, widened.
+            if rep == Rep::Float {
+                let int_tag = self.builder.ins().iconst(types::I32, abi::TAG_INT);
+                let is_int = self
+                    .call_runtime(&abi::UNION_HAS_TAG, &[value, int_tag])?
+                    .ok_or_else(|| Decline::new("tag test result"))?;
+                let widened = self.builder.ins().fcvt_from_sint(types::F64, bits);
+                extracted = self.builder.ins().select(is_int, widened, extracted);
+                has = self.builder.ins().bor(has, is_int);
             }
-            (Num::Text, Num::Bool) => {
-                let parsed = self
-                    .call_runtime(&abi::TEXT_PARSE_BOOL, &[value])?
-                    .ok_or_else(|| Decline::new("text parse result"))?;
-                let zero = self.builder.ins().iconst(types::I8, 0);
+            let one = self.builder.ins().iconst(types::I8, 1);
+            let failed = self.builder.ins().bxor(has, one);
+            (extracted, Some((failed, Failure::Static(message))))
+        })
+    }
+
+    fn convert_text_ins(
+        &mut self,
+        value: Value,
+        code: i64,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let code = self.builder.ins().iconst(types::I32, code);
+            let instant = self
+                .call_runtime(&abi::INS_PARSE, &[value, code])?
+                .ok_or_else(|| Decline::new("instant result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
+            (
+                instant,
+                Some((
+                    failed,
+                    Failure::Static("textus to instans conversion failed"),
+                )),
+            )
+        })
+    }
+
+    fn convert_int_ins(
+        &mut self,
+        value: Value,
+        code: i64,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let code = self.builder.ins().iconst(types::I32, code);
+            let instant = self
+                .call_runtime(&abi::INS_FROM_EPOCH, &[value, code])?
+                .ok_or_else(|| Decline::new("instant result"))?;
+            (instant, None)
+        })
+    }
+
+    fn convert_ins_ins(
+        &mut self,
+        value: Value,
+        code: i64,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let code = self.builder.ins().iconst(types::I32, code);
+            let instant = self
+                .call_runtime(&abi::INS_RETAG, &[value, code])?
+                .ok_or_else(|| Decline::new("instant result"))?;
+            (instant, None)
+        })
+    }
+
+    fn convert_ins_dyn(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let boxed = self
+                .call_runtime(&abi::INS_BOX, &[value])?
+                .ok_or_else(|| Decline::new("open data result"))?;
+            (boxed, None)
+        })
+    }
+
+    fn convert_dyn_ins(
+        &mut self,
+        value: Value,
+        code: i64,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let code = self.builder.ins().iconst(types::I32, code);
+            let instant = self
+                .call_runtime(&abi::INS_UNBOX, &[value, code])?
+                .ok_or_else(|| Decline::new("instant result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let failed = self.builder.ins().icmp(IntCC::Equal, instant, zero);
+            (
+                instant,
+                Some((
+                    failed,
+                    Failure::Static("valor to instans conversion failed"),
+                )),
+            )
+        })
+    }
+
+    fn convert_int_inf(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let big = self
+                .call_runtime(&abi::INF_INT, &[value])?
+                .ok_or_else(|| Decline::new("inf result"))?;
+            (big, None)
+        })
+    }
+
+    fn convert_inf_int(
+        &mut self,
+        value: Value,
+        to: IntKind,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let low = self.builder.ins().iconst(types::I64, to.low);
+            let high = self.builder.ins().iconst(types::I64, to.high);
+            let integer = self
+                .call_runtime(&abi::INF_TO_INT, &[value, low, high])?
+                .ok_or_else(|| Decline::new("inf integer result"))?;
+            let status = self.parse_status()?;
+            let zero = self.builder.ins().iconst(types::I32, 0);
+            let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+            (integer, Some((failed, Failure::Code(status))))
+        })
+    }
+
+    fn convert_inf_dyn(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let boxed = self
+                .call_runtime(&abi::INF_BOX, &[value])?
+                .ok_or_else(|| Decline::new("open data result"))?;
+            (boxed, None)
+        })
+    }
+
+    fn convert_dyn_inf(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let big = self
+                .call_runtime(&abi::INF_UNBOX, &[value])?
+                .ok_or_else(|| Decline::new("inf result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let failed = self.builder.ins().icmp(IntCC::Equal, big, zero);
+            (
+                big,
+                Some((
+                    failed,
+                    Failure::Static("valor to numerus conversion failed"),
+                )),
+            )
+        })
+    }
+
+    fn convert_dec_dec(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let stored = self
+                .call_runtime(&abi::DEC_STORE, &[value])?
+                .ok_or_else(|| Decline::new("decimal store result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let failed = self.builder.ins().icmp(IntCC::Equal, stored, zero);
+            (
+                stored,
+                Some((
+                    failed,
+                    Failure::Static("textus to numerus conversion out of range"),
+                )),
+            )
+        })
+    }
+
+    fn convert_dec_float(
+        &mut self,
+        value: Value,
+        width: NumericWidth,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let narrow = self
+                .builder
+                .ins()
+                .iconst(types::I32, i64::from(width != NumericWidth::F64));
+            let float = self
+                .call_runtime(&abi::DEC_TO_FLOAT, &[value, narrow])?
+                .ok_or_else(|| Decline::new("decimal float result"))?;
+            (float, None)
+        })
+    }
+
+    fn convert_dec_int(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+        to: IntKind,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let mode = match self.rounding_mode_or(&conversion.params, Rounding::HalfEven) {
+                Rounding::Floor => 0,
+                Rounding::Ceil => 1,
+                Rounding::HalfEven => 2,
+                Rounding::Trunc => 3,
+            };
+            let mode = self.builder.ins().iconst(types::I32, mode);
+            let low = self.builder.ins().iconst(types::I64, to.low);
+            let high = self.builder.ins().iconst(types::I64, to.high);
+            let integer = self
+                .call_runtime(&abi::DEC_TO_INT, &[value, mode, low, high])?
+                .ok_or_else(|| Decline::new("decimal integer result"))?;
+            let status = self.parse_status()?;
+            let zero = self.builder.ins().iconst(types::I32, 0);
+            let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+            (integer, Some((failed, Failure::Code(status))))
+        })
+    }
+
+    fn convert_text_regex(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let program = self
+                .call_runtime(&abi::REGEX_COMPILE, &[value])?
+                .ok_or_else(|| Decline::new("regex result"))?;
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let failed = self.builder.ins().icmp(IntCC::Equal, program, zero);
+            let message = self
+                .call_runtime(&abi::REGEX_ERROR, &[])?
+                .ok_or_else(|| Decline::new("regex error result"))?;
+            (program, Some((failed, Failure::Message(message))))
+        })
+    }
+
+    fn convert_text_char(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let letter = self
+                .call_runtime(&abi::CHAR_FROM_TEXT, &[value])?
+                .ok_or_else(|| Decline::new("letter result"))?;
+            self.letter_or_failure(letter)
+        })
+    }
+
+    fn convert_int_char(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let symbol = if self.has_code_point_hint(&conversion.params) {
+                &abi::CHAR_FROM_CODE
+            } else {
+                &abi::CHAR_FROM_DIGIT
+            };
+            let letter = self
+                .call_runtime(symbol, &[value])?
+                .ok_or_else(|| Decline::new("letter result"))?;
+            self.letter_or_failure(letter)
+        })
+    }
+
+    fn convert_char_int(
+        &mut self,
+        conversion: &MirConversion,
+        value: Value,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            if self.has_code_point_hint(&conversion.params) {
+                let code = self
+                    .call_runtime(&abi::CHAR_CODE, &[value])?
+                    .ok_or_else(|| Decline::new("code point result"))?;
+                (code, None)
+            } else {
+                let digit = self
+                    .call_runtime(&abi::CHAR_DIGIT, &[value])?
+                    .ok_or_else(|| Decline::new("digit result"))?;
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let failed = self.builder.ins().icmp(IntCC::SignedLessThan, digit, zero);
                 (
-                    self.builder.ins().icmp(IntCC::NotEqual, parsed, zero),
+                    digit,
                     Some((
-                        self.builder.ins().icmp(IntCC::SignedLessThan, parsed, zero),
-                        Failure::Static("text to bivalens conversion failed"),
+                        failed,
+                        Failure::Static("littera to numerus conversion failed"),
                     )),
                 )
             }
-            (Num::Int(_), Num::Bits(width)) => (self.mask_pattern(value, width), None),
-            (Num::Bits(width), Num::Int(to)) => {
-                let read = self.extend_pattern(value, width, signed_width(to.width));
-                if to.width == NumericWidth::U64 {
-                    // A pattern with the top bit set is a u64 the i64 carrier
-                    // cannot hold: refuse it by name at run time.
-                    let zero = self.builder.ins().iconst(types::I64, 0);
-                    let beyond = self.builder.ins().icmp(IntCC::SignedLessThan, read, zero);
-                    return Ok((
-                        read,
-                        Some((
-                            beyond,
-                            Failure::Static(
-                                "u64 value beyond 2^63 is not carried by the clif target",
-                            ),
-                        )),
-                    ));
-                }
-                (read, None)
-            }
-            (Num::Float(NumericWidth::F16), Num::Bits(_)) => {
-                let pattern = self
-                    .call_runtime(&abi::F16_TO_BITS, &[value])?
-                    .ok_or_else(|| Decline::new("f16 pattern result"))?;
-                (pattern, None)
-            }
-            (Num::Bits(_), Num::Float(NumericWidth::F16)) => {
-                let float = self
-                    .call_runtime(&abi::F16_FROM_BITS, &[value])?
-                    .ok_or_else(|| Decline::new("f16 value result"))?;
-                (float, None)
-            }
-            (Num::Float(_), Num::Bits(width)) => {
-                let pattern = if width == BitsWidth::B32 {
-                    let narrow = self.builder.ins().fdemote(types::F32, value);
-                    let bits = self
-                        .builder
-                        .ins()
-                        .bitcast(types::I32, MemFlagsData::new(), narrow);
-                    self.builder.ins().uextend(types::I64, bits)
-                } else {
-                    self.builder
-                        .ins()
-                        .bitcast(types::I64, MemFlagsData::new(), value)
-                };
-                (pattern, None)
-            }
-            (Num::Bits(width), Num::Float(_)) => {
-                let float = if width == BitsWidth::B32 {
-                    let bits = self.builder.ins().ireduce(types::I32, value);
-                    let narrow = self
-                        .builder
-                        .ins()
-                        .bitcast(types::F32, MemFlagsData::new(), bits);
-                    self.builder.ins().fpromote(types::F64, narrow)
-                } else {
-                    self.builder
-                        .ins()
-                        .bitcast(types::F64, MemFlagsData::new(), value)
-                };
-                (float, None)
-            }
-            _ => return Err(Decline::new("explicit numeric conversion")),
         })
+    }
+
+    fn convert_text_float(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let parsed = self
+                .call_runtime(&abi::PARSE_F64, &[value])?
+                .ok_or_else(|| Decline::new("parse result"))?;
+            let status = self.parse_status()?;
+            let zero = self.builder.ins().iconst(types::I32, 0);
+            let failed = self.builder.ins().icmp(IntCC::NotEqual, status, zero);
+            (parsed, Some((failed, Failure::Code(status))))
+        })
+    }
+
+    fn convert_float_bool(&mut self, value: Value) -> (Value, Option<(Value, Failure)>) {
+        {
+            let zero = self.builder.ins().f64const(0.0);
+            (
+                self.builder.ins().fcmp(FloatCC::NotEqual, value, zero),
+                None,
+            )
+        }
+    }
+
+    fn convert_text_bool(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let parsed = self
+                .call_runtime(&abi::TEXT_PARSE_BOOL, &[value])?
+                .ok_or_else(|| Decline::new("text parse result"))?;
+            let zero = self.builder.ins().iconst(types::I8, 0);
+            (
+                self.builder.ins().icmp(IntCC::NotEqual, parsed, zero),
+                Some((
+                    self.builder.ins().icmp(IntCC::SignedLessThan, parsed, zero),
+                    Failure::Static("text to bivalens conversion failed"),
+                )),
+            )
+        })
+    }
+
+    fn convert_bits_int(
+        &mut self,
+        value: Value,
+        to: IntKind,
+        width: BitsWidth,
+    ) -> (Value, Option<(Value, Failure)>) {
+        {
+            let read = self.extend_pattern(value, width, signed_width(to.width));
+            if to.width == NumericWidth::U64 {
+                // A pattern with the top bit set is a u64 the i64 carrier
+                // cannot hold: refuse it by name at run time.
+                let zero = self.builder.ins().iconst(types::I64, 0);
+                let beyond = self.builder.ins().icmp(IntCC::SignedLessThan, read, zero);
+                return (
+                    read,
+                    Some((
+                        beyond,
+                        Failure::Static("u64 value beyond 2^63 is not carried by the clif target"),
+                    )),
+                );
+            }
+            (read, None)
+        }
+    }
+
+    fn convert_float_bits_half(
+        &mut self,
+        value: Value,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let pattern = self
+                .call_runtime(&abi::F16_TO_BITS, &[value])?
+                .ok_or_else(|| Decline::new("f16 pattern result"))?;
+            (pattern, None)
+        })
+    }
+
+    fn convert_bits_float_half(
+        &mut self,
+        value: Value,
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        Ok({
+            let float = self
+                .call_runtime(&abi::F16_FROM_BITS, &[value])?
+                .ok_or_else(|| Decline::new("f16 value result"))?;
+            (float, None)
+        })
+    }
+
+    fn convert_float_bits(
+        &mut self,
+        value: Value,
+        width: BitsWidth,
+    ) -> (Value, Option<(Value, Failure)>) {
+        {
+            let pattern = if width == BitsWidth::B32 {
+                let narrow = self.builder.ins().fdemote(types::F32, value);
+                let bits = self
+                    .builder
+                    .ins()
+                    .bitcast(types::I32, MemFlagsData::new(), narrow);
+                self.builder.ins().uextend(types::I64, bits)
+            } else {
+                self.builder
+                    .ins()
+                    .bitcast(types::I64, MemFlagsData::new(), value)
+            };
+            (pattern, None)
+        }
+    }
+
+    fn convert_bits_float(
+        &mut self,
+        value: Value,
+        width: BitsWidth,
+    ) -> (Value, Option<(Value, Failure)>) {
+        {
+            let float = if width == BitsWidth::B32 {
+                let bits = self.builder.ins().ireduce(types::I32, value);
+                let narrow = self
+                    .builder
+                    .ins()
+                    .bitcast(types::F32, MemFlagsData::new(), bits);
+                self.builder.ins().fpromote(types::F64, narrow)
+            } else {
+                self.builder
+                    .ins()
+                    .bitcast(types::F64, MemFlagsData::new(), value)
+            };
+            (float, None)
+        }
     }
 
     /// A letter result: null is the failure.
@@ -1344,7 +1569,7 @@ impl FunctionLower<'_, '_> {
         conversion: &MirConversion,
         to: IntKind,
         value: Value,
-    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+    ) -> (Value, Option<(Value, Failure)>) {
         let mode = self.rounding_mode(&conversion.params);
         let rounded = match mode {
             Rounding::Floor => self.builder.ins().floor(value),
@@ -1364,13 +1589,13 @@ impl FunctionLower<'_, '_> {
         let one = self.builder.ins().iconst(types::I8, 1);
         let failed = self.builder.ins().bxor(fits, one);
         let converted = self.builder.ins().fcvt_to_sint_sat(types::I64, rounded);
-        Ok((
+        (
             converted,
             Some((
                 failed,
                 Failure::Static("fractus to numerus conversion out of range"),
             )),
-        ))
+        )
     }
 
     fn rounding_mode(&self, params: &[radix_lexer::Symbol]) -> Rounding {
@@ -1463,10 +1688,11 @@ impl FunctionLower<'_, '_> {
                 let length = self
                     .call_runtime(&abi::TEXT_LEN, &[message])?
                     .ok_or_else(|| Decline::new("text length result"))?;
-                let bytes = self
-                    .builder
-                    .ins()
-                    .iadd_imm_s(message, abi::TEXT_HEADER as i64);
+                let bytes = self.builder.ins().iadd_imm_s(
+                    message,
+                    i64::try_from(abi::TEXT_HEADER)
+                        .map_err(|_| Decline::new("text header offset"))?,
+                );
                 let reference = self.runtime_ref(&abi::TRAP_CONVERSION)?;
                 self.builder.ins().call(reference, &[bytes, length]);
                 self.builder.ins().trap(TrapCode::unwrap_user(1));

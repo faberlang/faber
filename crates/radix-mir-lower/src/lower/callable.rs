@@ -97,8 +97,15 @@ impl FunctionBuilder<'_> {
             return None;
         }
         let value_ty = expr.ty?;
+        // WHY: a named function bound into an optional function type
+        // (`let Op ∪ none f ← shout`) is typed at the store's option type; the
+        // function value is the present payload.
         let signature = match self.normalized_type(value_ty) {
             Type::Func(signature) => signature.clone(),
+            Type::Option(inner) => match self.normalized_type(*inner) {
+                Type::Func(signature) => signature.clone(),
+                _ => return None,
+            },
             _ => return None,
         };
         let span = expr.span;
@@ -463,6 +470,8 @@ impl FunctionBuilder<'_> {
             diagnostic_at_out_of_range: context.diagnostic_at_out_of_range,
             diagnostic_slice_out_of_range: context.diagnostic_slice_out_of_range,
             diagnostic_take_out_of_range: context.diagnostic_take_out_of_range,
+            diagnostic_ranged_push_past_maximum: context.diagnostic_ranged_push_past_maximum,
+            diagnostic_ranged_remove_below_minimum: context.diagnostic_ranged_remove_below_minimum,
             fault_delivery: context.fault_delivery,
             function_errors: Arc::clone(&context.function_errors),
             function_params: Arc::clone(&context.function_params),
@@ -473,6 +482,7 @@ impl FunctionBuilder<'_> {
             shape_functions: Arc::clone(&context.shape_functions),
             call_size_bindings: Arc::clone(&context.call_size_bindings),
             shape_stores: Arc::clone(&context.shape_stores),
+            proven_indexes: Arc::clone(&context.proven_indexes),
             function_size_bindings: Arc::clone(&context.function_size_bindings),
             function_async: Arc::clone(&context.function_async),
             function_generator: Arc::clone(&context.function_generator),

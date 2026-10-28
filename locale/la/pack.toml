@@ -158,8 +158,6 @@ variandum = "variandum"
 reddet = "reddet"
 tacebit = "tacebit"
 vacua = "vacua"
-primus_quem = "primus_quem"
-ubi = "ubi"
 # Prefix-scan expression surface. These clause words are shared verbatim by
 # all reader packs; `scan` is the industry term used by the source contract.
 scan = "scan"
@@ -180,6 +178,7 @@ numeratio = "numeratio"
 quilibet = "quilibet"
 argmaxima = "argmaxima"
 argminima = "argminima"
+prima = "prima"
 # Sort expression surface (`ordinata via Dir ex source`).
 ordinata = "ordinata"
 ascendens = "ascendens"
@@ -211,7 +210,7 @@ instans = "instans"
 objectum = "objectum"
 quidlibet = "quidlibet"
 lista = "lista"
-# Proposed bounded forms (not shipped): lista<T, N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, lista<T, magnitudo lo‥hi>, textus<N>, ascii<N>.
 tabula = "tabula"
 # tabulae (ledger, an insertion-ordered map) is one letter from tabula (map) on purpose:
 # "two shades of the same thing" (Roman account books were tabulae). Not a typo;
@@ -985,7 +984,7 @@ help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8>
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "a convert hint does not follow the target in angle brackets"
-help = "write the hint as a via clause after the target: `{lista}<b8, 16> via Le`"
+help = "write the hint as a via clause after the target: `{lista}<b8, {magnitudo} 16> via Le`"
 
 [diagnostics.PARSE030.issues.conditional_nested]
 message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
@@ -1489,7 +1488,7 @@ help = "use _ for a monomorphic hole or a concrete union type"
 
 [diagnostics.SEM008.issues.lista_arity]
 message = "{lista} requires one type parameter"
-help = "use {lista}<T>; lista<T, N> is proposed, not yet shipped"
+help = "use {lista}<T>, {lista}<T, {magnitudo} N> or {lista}<T, {magnitudo} lo‥hi>"
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "tabula requires two type parameters"
@@ -1546,6 +1545,30 @@ help = "latitudine integra utere, ut u8 aut i32; latitudines fractae, decimales 
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "nucleum modum condendi cum ambitu nondum adhibere potest ({site}); nucleum nullum ambitum applicat"
 help = "in nucleo latitudine nuda utere et ambitum in hospite applica"
+
+[diagnostics.SEM008.issues.nucleum_unbounded_list_size]
+message = "nucleum listam sine summo magnitudinis adhibere non potest ({site}); omnes sedes usque ad maximum evolvit"
+help = "da listae magnitudinem finitam constantem, ut {lista}<int, {magnitudo} 1…8>"
+
+[diagnostics.SEM008.issues.ranged_list_bound_not_constant]
+message = "finis ambitus longitudinis listae numerus integer non negativus litteralis aut ∞ esse debet"
+help = "scribe utrumque finem ut numerum integrum litteralem, ut {lista}<int, {magnitudo} 1‥8>; finis nominatus aut magnitudinis nondum paratur"
+
+[diagnostics.SEM008.issues.ranged_list_range_empty]
+message = "ambitus longitudinis listae nullam longitudinem tenet"
+help = "finis infimus infra summum in lo‥hi esse debet, aut non supra eum in lo…hi"
+
+[diagnostics.SEM008.issues.ranged_list_bound_negative]
+message = "finis ambitus longitudinis listae negativus esse non potest"
+help = "longitudo numerus est: ambitum a 0 aut supra incipe"
+
+[diagnostics.SEM008.issues.ranged_list_policy_word]
+message = "ambitus longitudinis listae verbum modi condendi non accipit"
+help = "scribe ambitum in lista, ut {lista}<int, {magnitudo} 1…8>; semper trahit, et saturatus, exactus et modulus latitudinem numeri accipiunt"
+
+[diagnostics.SEM008.issues.list_count_needs_size]
+message = "numerus listae post `{magnitudo}` scribitur"
+help = "scribe `{lista}<int, {magnitudo} 4>` pro quattuor elementis ad summum, aut `{lista}<int, {magnitudo} 1…8>` pro ambitu; ambitus nudus valorem terminat, non numerum"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
@@ -1821,7 +1844,7 @@ help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as 
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
-help = "textus<N>, ascii<N>, and {lista}<b8, N> are proposed bounded forms, not yet shipped"
+help = "textus<N>, ascii<N>, and {lista}<b8, {magnitudo} N> are bounded forms, spelled with their own type words"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -2203,6 +2226,10 @@ help = "exsecutore MIR aut emissore fontis Faber utere, aut tabula ({tabula}), d
 message = "modus condendi cum ambitu in hoc proposito nondum sustinetur"
 help = "exsecutore MIR, proposito Rust aut emissore fontis Faber utere, donec hoc propositum ambitus applicet"
 
+[diagnostics.SEM010.issues.ranged_list_target_unsupported]
+message = "ambitus longitudinis listae in hoc proposito nondum sustinetur"
+help = "exsecutore MIR, proposito Rust aut emissore fontis Faber utere, donec hoc propositum ambitus listarum applicet"
+
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "folium {leaf} in hoc proposito non adhibetur"
 help = "utere proposito rust aut exsecutore MIR, aut omitte vocationem {route}"
@@ -2273,7 +2300,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.tensor_edge_policy_marker_not_runtime_value]
 message = "tensor edge-policy markers are type arguments, not runtime values"
-help = "use clampa, reflexa, or involuta only as the type argument to limes"
+help = "use clampa, reflexa, or involuta only as the type argument to {limes}"
 
 [diagnostics.SEM010.issues.array_element_type_mismatch]
 message = "array element type mismatch"
@@ -2782,6 +2809,10 @@ help = "rotunda quemque elementum per ambitum vel methodum rotundandi scalarem; 
 [diagnostics.SEM011.issues.generic_type_arg_bound]
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"
 help = "declare `{implet} {contract}` on the type, or call with a type that does"
+
+[diagnostics.SEM011.issues.ranged_list_length_out_of_range]
+message = "longitudo huius listae extra ambitum longitudinis iacet"
+help = "da litterali longitudinem intra ambitum, aut listam per ↦ aedifica et per ⊥ recipe"
 
 [diagnostics.SEM011.issues.ordering_operands_differ]
 message = "ordered operands have different types"
@@ -3381,18 +3412,18 @@ help = "include both element type and shape in the tensor type argument"
 
 [diagnostics.SEM011.issues.tensor_shift_nullable_source_unsupported]
 message = "disloco requirit elementa tensoris non-nulla et non potest novum motum super view nondum resolutum creare"
-help = "resolve pending edges with limes<Policy>() or tensor coalescing before another shift"
+help = "resolve pending edges with {limes}<Policy>() or tensor coalescing before another shift"
 
 [diagnostics.SEM011.issues.tensor_edge_view_requires_resolution]
-message = "tensor motus nondum resolutus a limes aut tensor coalescing tantum consumi potest"
-help = "resolve the edge view with limes<Policy>() or coalesce its optional edge cells"
+message = "tensor motus nondum resolutus a {limes} aut tensor coalescing tantum consumi potest"
+help = "resolve the edge view with {limes}<Policy>() or coalesce its optional edge cells"
 
 [diagnostics.SEM011.issues.tensor_limes_requires_shifted_view]
-message = "limes requirit tensoris view motus nondum resolutum"
-help = "call shift(offsets) before limes<Policy>()"
+message = "{limes} requirit tensoris view motus nondum resolutum"
+help = "call shift(offsets) before {limes}<Policy>()"
 
 [diagnostics.SEM011.issues.tensor_limes_policy_invalid]
-message = "limes requirit rationem marginis propriam aut genus sine campis instantiarum validum"
+message = "{limes} requirit rationem marginis propriam aut genus sine campis instantiarum validum"
 help = "provide remap(vector<int, R>) -> vector<int, R> and an optional transform(vector<int, R>, T) -> T method"
 
 [diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]
@@ -3661,7 +3692,7 @@ help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEv
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
-help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, N> targets take a hint"
+help = "drop the via clause; only numeric, ascii, littera, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "a float or decimal does not convert to an integer without naming the rounding"
@@ -4451,6 +4482,10 @@ help = "keep `@ radix lane \"air\"` functions in the accepted pure subset"
 message = "@ radix lane \"{lane}\" respuit hanc operationem integram: exitus exactus fortasse extra [-2^63, 2^64 - 1] exit, et AIR nullam captionem habet"
 help = "operandum ad minorem integrum typum coarcta ut regula intervalli exitum capere probet, vel arithmeticam muta"
 
+[diagnostics.SEM059.issues.air_unbounded_list_size]
+message = "@ radix lane \"{lane}\" listam sine summo magnitudinis respuit: AD retrorsum omnes sedes usque ad maximum evolvit"
+help = "da listae magnitudinem finitam constantem, ut {lista}<int, {magnitudo} 1…8>, vel listam extra viam move"
+
 [diagnostics.SEM059.issues.air_unbounded_integer]
 message = "@ radix lane \"{lane}\" integrum infinitum `inf` respuit: AIR integrum in acervo repraesentare non potest"
 help = "in functionibus AIR integrum terminatum adhibe, vel valorem `inf` extra viam move"
@@ -4507,13 +4542,9 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: expression statements are outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
-[diagnostics.SEM059.issues.first_match_expression_unsupported]
-message = "@ radix lane \"{lane}\" rejects this function body: first-match expressions with coordinate bindings are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
-
-[diagnostics.SEM059.issues.first_match_unbounded_source]
-message = "@ radix lane \"{lane}\" rejects this function body: the source of a first-match expression has no statically known extent, which the v1 AIR subset requires"
-help = "use a literal array, a concrete `intervallum` range, or a source with a static shape (a fully shaped tensor or matrix, or a bounded array) as the first-match source"
+[diagnostics.SEM059.issues.reducta_first_unbounded_source]
+message = "@ radix lane \"{lane}\" rejects this function body: the source of a first-match reduction has no statically known extent, which the v1 AIR subset requires"
+help = "use a source with a static shape (a fully shaped tensor or matrix) as the `reducta via prima` source"
 
 [diagnostics.SEM059.issues.generator_function]
 message = "@ radix lane \"{lane}\" rejects this function body: generator functions are outside the v1 AIR subset"
@@ -5241,18 +5272,6 @@ message = "expected ']' after the non-null index expression"
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "expected ')' after the non-null call arguments"
 
-[diagnostics.PARSE001.issues.first_match_start]
-message = "expected '(' after 'primus_quem'"
-
-[diagnostics.PARSE001.issues.first_match_source_separator]
-message = "expected ',' after the first-match source"
-
-[diagnostics.PARSE001.issues.first_match_predicate_tail]
-message = "expected the 'ubi' predicate tail"
-
-[diagnostics.PARSE001.issues.first_match_end]
-message = "expected ')' after the first-match predicate"
-
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "expected a closing brace after the constructor fields"
 
@@ -5389,11 +5408,11 @@ help = "llvm-host nativum tantum in aarch64 vel x86_64 macOS et Linux aedificat;
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host instrumenta LLVM cohaerentia (llvm-as et clang eiusdem versionis) requirit: {reason}"
-help = "LLVM ita instrue ut llvm-as et clang in PATH sint, aut LLVM_HOME ad praefixum LLVM pone"
+help = "LLVM ita instrue ut llvm-as et clang in PATH sint"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "archivum runtime faber-host-llvm praesto non est ({cause}): {detail}"
-help = "cura ut cargo instructum sit et in PATH (aut CARGO positum) et fontes runtime adsint, deinde iterum aedifica"
+help = "cura ut cargo instructum sit et in PATH et fontes runtime adsint, deinde iterum aedifica"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "archivum runtime faber-host-llvm identitatis verificationem non superavit: {detail}"
@@ -5436,3 +5455,6 @@ message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
 
 [diagnostics.INFO001.issues.not_placed]
 message = "kernel `{kernel}` is not placed on the {device} device: {reason}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"

@@ -211,6 +211,7 @@ impl Validator<'_, '_> {
                 let element_ty = match self.type_kind(aggregate.ty) {
                     Type::Array(inner)
                     | Type::BoundedArray { element: inner, .. }
+                    | Type::RangedArray { element: inner, .. }
                     | Type::Queue(inner)
                     | Type::BoundedQueue { element: inner, .. }
                     | Type::Stack(inner)
@@ -252,6 +253,7 @@ impl Validator<'_, '_> {
                                 let spread_element = match self.type_kind(value_ty) {
                                     Type::Array(inner)
                                     | Type::BoundedArray { element: inner, .. }
+                                    | Type::RangedArray { element: inner, .. }
                                         if matches!(aggregate.kind, MirAggregateKind::Array) =>
                                     {
                                         Some(MirType::semantic(*inner))

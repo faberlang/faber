@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/operatores/trapping-word.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/trapping-word.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

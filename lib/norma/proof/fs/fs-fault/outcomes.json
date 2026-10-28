@@ -15,14 +15,20 @@
     "go": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "leaf_unsupported_on_target",
-      "reason": "The Go lane carries no `solum:*` fs port yet, so `faber build -t go` fails closed with the `leaf_unsupported_on_target` issue at the leaf gate and this package is never lowered to Go. Re-measure this row when that port lands."
+      "diagnostic_contains": "package_go_codegen_failed",
+      "reason": "The Go package emit of this entry fails closed with `package_go_codegen_failed` and no further message; the entry matches on the `IoFault` union inside a `catch` (`case NotFound let path`), the likeliest cause, but it is not isolated; the emitter unit is open."
     },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "the fs leaf is not supported on the ts target",
       "reason": "The Node port of the fs leaf (`solum:*`) has not landed, and TypeScript declares a leaf whole or not at all, so the emitter refuses any program that reaches a `solum` route (leaf_unsupported_on_target)."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "the fs leaf is not supported on the llvm-text target",
+      "reason": "The llvm-host target serves no fs leaf yet: its leaf gate refuses a program that reaches a fs route by name, before any LLVM is emitted."
     }
   }
 }

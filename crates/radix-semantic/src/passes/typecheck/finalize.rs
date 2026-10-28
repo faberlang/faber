@@ -336,7 +336,9 @@ impl TypeChecker<'_> {
         };
         let ty = self.canonicalize_type(ty);
         let element = match self.types.get(ty) {
-            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
+            Type::Array(element)
+            | Type::BoundedArray { element, .. }
+            | Type::RangedArray { element, .. } => *element,
             _ => return,
         };
         if self.is_infer(element) {

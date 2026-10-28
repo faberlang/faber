@@ -9,7 +9,15 @@
 //! one-element runtime list; the binding's slot holds the cell and every read
 //! or write of it goes through the `SharedCell` projection.
 
-use super::*;
+use radix_mir::{MirClosureValue, MirOperand};
+
+use super::{
+    AbiParam, Decline, FuncId, FunctionBuilder, FunctionBuilderContext, FunctionLower, InstBuilder,
+    Lowered, MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCaptureMode,
+    MirClosureEnvironment, MirClosureEnvironmentId, MirFunction, MirFunctionId, MirPlace,
+    MirPlaceBase, MirStatement, MirStatementKind, MirTempId, MirType, Module, ModuleState, Rep,
+    Slot, Type, Value, abi, cranelift_error, param_value_type, rep_of, resolve, types,
+};
 
 /// The environment of a closure body, when `function` is one.
 fn environment_of(
@@ -149,6 +157,53 @@ impl FunctionLower<'_, '_> {
             .call_runtime(&abi::LIST_GET, &[object, one])?
             .ok_or_else(|| Decline::new("function environment"))?;
         Ok((code, environment))
+    }
+
+    /// Call the function object `object` of function type `ty`; the result and
+    /// its representation, when the function returns one.
+    pub(super) fn indirect_call_value(
+        &mut self,
+        object: Value,
+        ty: MirType,
+        args: &[MirOperand],
+    ) -> Lowered<Option<(Value, Rep)>> {
+        let (pointer, environment) = self.function_parts(object)?;
+        let table = self.state.input.types;
+        let Type::Func(signature) = resolve(table, ty.semantic_id()) else {
+            return Err(Decline::new("call of a non-function"));
+        };
+        let flags = self.type_address_flags(signature);
+        let mut abi_signature = self.state.module.make_signature();
+        abi_signature.params.push(AbiParam::new(types::I64));
+        let mut wanted = Vec::with_capacity(signature.params.len());
+        for (position, param) in signature.params.iter().enumerate() {
+            let rep = rep_of(table, MirType::semantic(param_value_type(table, param.ty)))?;
+            let Some(cl) = rep.cl_type() else {
+                return Err(Decline::new("unit parameter"));
+            };
+            let cl = if flags.get(position).copied().unwrap_or(false) {
+                types::I64
+            } else {
+                cl
+            };
+            abi_signature.params.push(AbiParam::new(cl));
+            wanted.push(rep);
+        }
+        let result_rep = rep_of(table, MirType::semantic(signature.ret))?;
+        if let Some(cl) = result_rep.cl_type() {
+            abi_signature.returns.push(AbiParam::new(cl));
+        }
+        let mut values = Vec::with_capacity(args.len() + 1);
+        values.push(environment);
+        let returns = self.call_arguments(&flags, args, &wanted, &mut values)?;
+        let signature_ref = self.builder.import_signature(abi_signature);
+        let call = self
+            .builder
+            .ins()
+            .call_indirect(signature_ref, pointer, &values);
+        self.read_back_arguments(args, &returns)?;
+        let results = self.builder.inst_results(call).to_vec();
+        Ok(results.first().map(|result| (*result, result_rep)))
     }
 
     /// A call whose result lands in a projected place (a shared cell's

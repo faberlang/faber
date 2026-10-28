@@ -6,17 +6,17 @@
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf gate or bits gate runs, so no C code is produced. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
     },
-    "go": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "undefined: text",
-      "reason": "The Go package emitter does not yet carry a namespace binding for the `norma:text` module this proof imports, so the generated `main.go` calls `text.*` with no such package-level identifier and `go build` stops with `undefined: text`. Re-measure this row when the Go package emitter lowers that module binding."
-    },
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
       "diagnostic_contains": "ts_trap_expression_unsupported",
       "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
+    },
+    "llvm": {
+      "outcome": "known-fail",
+      "phase": "build",
+      "diagnostic_contains": "code generation failed: unsupported-mir-shape:try_call destination type",
+      "reason": "MIR code generation fails before any LLVM is emitted: unsupported-mir-shape:try_call destination type."
     }
   }
 }

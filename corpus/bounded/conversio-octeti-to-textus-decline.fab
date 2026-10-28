@@ -3,14 +3,14 @@ term = "list<b8>"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
 category = "conversion"
-summary = "Decline: bounded list<b8, N> cannot convert directly to unbounded textus."
-syntax = "list<b8, N> ↦ textus"
+summary = "Decline: bounded list<b8, size N> cannot convert directly to unbounded textus."
+syntax = "list<b8, size N> ↦ textus"
 related = ["↦", "list<b8>", "textus"]
 locale = "en"
 +++
 
 # =============================================================================
-# bounded list<b8, N> to textus — unsupported conversion decline
+# bounded list<b8, size N> to textus — unsupported conversion decline
 # =============================================================================
 #
 # What this teaches:
@@ -21,6 +21,6 @@ locale = "en"
 #   • assuming byte decoding is the same as a bounded-width copy — decoding
 #     needs an explicit list<b8>/textus library route, not this conversion.
 
-fn widen(list<b8, 8> raw) → string {
+fn widen(list<b8, size 8> raw) → string {
     return raw ↦ string
 }

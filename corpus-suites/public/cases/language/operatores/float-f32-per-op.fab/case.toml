@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/operatores/float-f32-per-op.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/float-f32-per-op.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

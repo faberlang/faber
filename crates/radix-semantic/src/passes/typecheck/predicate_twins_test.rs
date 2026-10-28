@@ -56,3 +56,88 @@ functio bad(lista<numerus> xs) → bivalens {
         "argument_type_mismatch",
     );
 }
+
+#[test]
+fn reperta_returns_the_option_of_the_element_type() {
+    let unit = analyze_ok_la(
+        r"incipit {
+    sit lista<numerus> xs ← vacua
+    sit numerus ∪ nihil hit ← xs.reperta(numerus d ∴ d ≻ 10)
+    nota hit
+}",
+    );
+    let tys = entry_local_tys(&unit);
+    assert_eq!(tys.len(), 2, "one lista and one search result");
+    let Type::Option(inner) = unit.types.get(tys[1]) else {
+        panic!(
+            "reperta must return an option, got {:?}",
+            unit.types.get(tys[1])
+        );
+    };
+    assert!(matches!(
+        unit.types.get(*inner),
+        Type::Primitive(Primitive::Numerus)
+    ));
+}
+
+#[test]
+fn reperta_on_a_bounded_list_stays_optional() {
+    // A bounded list with a minimum size of one still has no guaranteed match.
+    crate::test_support::assert_accepts_la(
+        r"functio check(lista<numerus, magnitudo 1…4> xs) → numerus ∪ nihil {
+    redde xs.reperta(numerus d ∴ d ≻ 10)
+}",
+    );
+    assert_rejects_with_issue_la(
+        r"functio check(lista<numerus, magnitudo 1…4> xs) → numerus {
+    redde xs.reperta(numerus d ∴ d ≻ 10)
+}",
+        "optional_into_plain_cell",
+    );
+}
+
+#[test]
+fn reperta_rejects_a_non_bool_callback_like_the_other_predicate_rows() {
+    assert_rejects_with_issue_la(
+        r"functio numeric(numerus d) → numerus {
+    redde d
+}
+
+functio bad(lista<numerus> xs) → numerus ∪ nihil {
+    redde xs.reperta(numeric)
+}",
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn list_reperta_and_regex_inventa_resolve_by_receiver_type() {
+    // The regex `inventa` keeps its `match ∪ nihil` result next to the list
+    // search; neither method is looked up under the other's receiver.
+    crate::test_support::assert_accepts_la(
+        r#"incipit {
+    sit lista<numerus> xs ← vacua
+    sit numerus ∪ nihil hit ← xs.reperta(numerus d ∴ d ≻ 10)
+    sit regex re ← "[0-9]+" ↦ regex
+    sit _ found ← re.inventa("ab 42")
+    nota hit
+    nota found
+}"#,
+    );
+    assert_rejects_with_issue_la(
+        r#"incipit {
+    sit regex re ← "[0-9]+" ↦ regex
+    sit _ bad ← re.reperta("ab 42")
+    nota bad
+}"#,
+        "unknown_method",
+    );
+    assert_rejects_with_issue_la(
+        r"incipit {
+    sit lista<numerus> xs ← vacua
+    sit _ bad ← xs.inventa(numerus d ∴ d ≻ 10)
+    nota bad
+}",
+        "unknown_method",
+    );
+}

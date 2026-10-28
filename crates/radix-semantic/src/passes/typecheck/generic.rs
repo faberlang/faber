@@ -1729,6 +1729,7 @@ fn collect_type_param_symbols(
         | Type::Matrix(element, _)
         | Type::Sparsa(element, _)
         | Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => collect(*element, seen_types, symbols),
         Type::Func(signature) => {
