@@ -16,7 +16,6 @@ use radix::program::manifest::ManifestTarget;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RecipeFile {
@@ -124,7 +123,10 @@ pub(crate) fn require_tool(argv: &[String]) -> Result<PathBuf, Diagnostic> {
 }
 
 /// [`require_tool`] against an explicit `PATH` value.
-pub(crate) fn require_tool_on(argv: &[String], path: Option<&OsStr>) -> Result<PathBuf, Diagnostic> {
+pub(crate) fn require_tool_on(
+    argv: &[String],
+    path: Option<&OsStr>,
+) -> Result<PathBuf, Diagnostic> {
     let Some(tool) = argv.first() else {
         return Err(recipe_error("the TypeScript recipe has an empty command"));
     };
