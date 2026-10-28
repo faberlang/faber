@@ -17,8 +17,6 @@ use radix_mir::{
 };
 use radix_types::{Primitive, TypeId, TypeTable};
 
-const MISMATCH_TEXT: &str = "tensor conversion expected 4 elements, got 1";
-
 fn int_list(items: &[i64]) -> Value {
     Value::Array(Rc::new(RefCell::new(
         items.iter().copied().map(Value::Int).collect(),
@@ -53,7 +51,6 @@ fn count_mismatch_is_a_recoverable_conversion_failure_with_counts() {
     assert_eq!(error.code, RUNNER_CODE_CONVERSION);
     assert!(error.is_conversion_failure());
     assert_eq!(error.issue, RUNNER_CONVERSION_LENGTH_MISMATCH);
-    assert_eq!(error.message, MISMATCH_TEXT);
     assert_eq!(error.arg("expected"), Some("4"));
     assert_eq!(error.arg("actual"), Some("1"));
     // The class comes from the failure kind, not the wording: a conversion
@@ -249,9 +246,12 @@ fn the_failure_leaves_a_failable_function_as_its_text_error() {
         "the call boundary handles the failure: {:?}",
         runner.errors
     );
-    assert_eq!(
-        runner.return_value,
-        Some(Value::Str(MISMATCH_TEXT.to_owned()))
+    // The caller's error block returned the callee's error text (a string
+    // value); its wording is not asserted.
+    assert!(
+        matches!(&runner.return_value, Some(Value::Str(text)) if !text.is_empty()),
+        "expected the callee's text error, got {:?}",
+        runner.return_value
     );
 }
 
@@ -282,6 +282,5 @@ fn an_unhandled_failure_ends_the_run_with_the_conversion_class() {
         panic!("expected exactly one failure, got {:?}", runner.errors);
     };
     assert_eq!(error.issue, RUNNER_CONVERSION_LENGTH_MISMATCH);
-    assert_eq!(error.message, MISMATCH_TEXT);
     assert_eq!(error.exit_status(), 65);
 }

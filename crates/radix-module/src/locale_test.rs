@@ -2696,6 +2696,52 @@ fn installed_packs_own_the_import_record_field_words() {
     assert_eq!(rendered.help.as_deref(), Some("use `from` for this file's reader locale"));
 }
 
+/// PARSE050 `import_privata_removed` names the removed marker and the
+/// re-export keyword through the pack's own `[keywords]` rows: en says
+/// `private`/`public`, la says `privata`/`publica`, and the packs that own
+/// the row name their own words. The parser passes no `keyword` argument,
+/// so the pack rows own the words.
+#[test]
+fn import_privata_removed_names_the_pack_marker_words() {
+    for locale in ["en", "la", "hi", "th-TH"] {
+        let pack = installed_pack(locale);
+        let owned = owned_pack(locale);
+        let marker = owned
+            .keywords
+            .get("privata")
+            .unwrap_or_else(|| panic!("{locale} must own the [keywords] row privata"))
+            .canonical
+            .clone();
+        let reexport = owned
+            .keywords
+            .get("publica")
+            .unwrap_or_else(|| panic!("{locale} must own the [keywords] row publica"))
+            .canonical
+            .clone();
+        let diagnostic = parse_diagnostic(
+            ParseErrorKind::ImportInvalid,
+            vec![diagnostic_arg("issue", "import_privata_removed")],
+        );
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} PARSE050.import_privata_removed should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} PARSE050.import_privata_removed row should exist"));
+        let text = format!("{} {}", rendered.message, rendered.help.unwrap_or_default());
+        assert!(text.contains(&marker), "{locale} must name the marker {marker}: {text}");
+        assert!(text.contains(&reexport), "{locale} must name {reexport}: {text}");
+        if locale == "en" {
+            for latin in ["publica", "privata"] {
+                assert!(
+                    !text
+                        .split(|c: char| !c.is_alphanumeric())
+                        .any(|word| word == latin),
+                    "en PARSE050.import_privata_removed must not quote the Latin {latin}: {text}"
+                );
+            }
+        }
+    }
+}
+
 /// The three `ratio`/`promissum` type-syntax rows and the PARSE002
 /// declaration-block comma row (corpus coverage I3, batch 4) are owned and
 /// rendered by every installed pack, with the placeholders each template names.
