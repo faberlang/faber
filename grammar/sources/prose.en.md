@@ -731,11 +731,20 @@ results by storing into a `wrapping<W>` slot before dividing, shifting right or
 comparing. Within one policy
 family a store into a narrower width applies the slot's policy
 (`wrapping<u32>` into `wrapping<u8>` reduces); crossing policy families needs
-`↦`. A constant stored with `←` follows the slot's policy
+`↦` (superseded 2026-10-27 by ruling 51, ruled and not yet built: a value read
+from any cell is a number and the destination's policy applies to the exact
+value whatever the source's policy; `docs/design/numeric-model.md` section 8,
+*Store policy belongs to the destination*; until it is built the compiler still
+refuses a store from another policy). A constant stored with `←` follows the slot's policy
 (`saturating<u8> w ← 300` is 255, `wrapping<u8> w ← -1` is 255, and a trapping
 slot's certain trap is a compile error); a constant in an `=` position
 (a `fixum T X = e` constant at module level, in a block or as a `genus` member, field
-default, enum member) must fit `W` whatever the policy. Literals in `modulus<W>` and `saturatus<W>` slots must fit `W`.
+default, enum member) must fit `W` whatever the policy; a construction field
+written with `=` is the same fact (ruling 51, not yet built for named constants
+and construction fields). Under ruling 51 a compile-time-known value (a literal,
+a named constant or an expression made only of those) is checked
+at the store at compile time: a misfit into a trapping cell is a compile error and
+a `modulus<W>` or `saturatus<W>` cell applies its policy.
 The unbounded integer `inf` (D11.5) is a type (see its subsection below), so a
 bounded expression still obeys the 64-bit range above and an `inf` slot never
 applies a size policy.
@@ -793,7 +802,9 @@ type or a `size` argument by the range glyph after its first bound.
   mix implicitly: a plain integer reaches a `saturating` or `wrapping` ranged
   cell through `↦`, which reduces or clamps and cannot fail, exactly as for the
   unranged words; `↦` into a `trapping` ranged cell is a checked narrowing and is
-  failable.
+  failable. (Superseded 2026-10-27 by ruling 51, ruled and not yet built: a value
+  of any policy stores into a ranged cell and the destination range applies, so
+  `↦` is not needed there, though it stays legal.)
 - **Where it is built.** The MIR runner and the Rust target apply a range;
   the Faber source emitter keeps the authored form (`faber format` prints a
   range half-open); every other target and every kernel refuse the type by name
@@ -895,7 +906,9 @@ any integer type.
 different number families with no `↦` and compare the true mathematical values
 (`i64 ≺ f64` is exact even above 2⁵³; NaN compares false). `≈`/`≉` compute in
 the float operand's width. `≡`/`≢` stay structural and exact-type, so
-`1 ≡ 1.0` is rejected. A comparison stores nothing, so the family-crossing rule
+`1 ≡ 1.0` is rejected. (Ruling 51, 2026-10-27, ruled and not yet built: between
+integers of any width and policy `≡`/`≢` compare by exact value, as `≺` does;
+across number families they are unchanged.) A comparison stores nothing, so the family-crossing rule
 does not reach it.
 
 **Conversion.** `↦` is the checked, recoverable form (D1.11: `∷` states only
@@ -965,14 +978,17 @@ author writes `inf` in a slot or converts with `↦ inf`. Its rules in full:
   may (the MIR runner has a configurable bit-length ceiling).
 - **Comparison and keys.** `≺ ≻ ≤ ≥ ≅ ≇` compare exact mathematical values
   against any integer width, `d64` or float (±∞ order beyond every integer);
-  `≡ ≢` stay exact-type (`inf ≡ i64` is rejected). An `inf` value is hashable
+  `≡ ≢` stay exact-type (`inf ≡ i64` is rejected; superseded for integers by
+  ruling 51, ruled and not yet built: they compare by exact value). An `inf` value is hashable
   and totally ordered, so it is a valid `tabula` key and `copia` element.
 - **Stores.** A store into an `inf` slot is total and emits no check. A store
   from an `inf` value into a bounded trapping slot is an implicit checked
   narrowing: it traps (`implicit_store_out_of_range`, never `⇥`), unless a
   constant is proven to fit. `inf` is in the trapping family, so a store into a
   `wrapping<W>` or `saturating<W>` slot needs `↦`, which reduces or clamps the
-  exact value and cannot fail. `saturating<u64> hi; hi ↑` at the bound still
+  exact value and cannot fail (superseded 2026-10-27 by ruling 51, ruled and not
+  yet built: an `inf` value is a number and a `wrapping<W>` or `saturating<W>`
+  slot reduces or clamps it with no `↦`; `↦` stays legal). `saturating<u64> hi; hi ↑` at the bound still
   traps; the clamp is written `((hi ↦ inf) + 1) ↦ saturating<u64>`.
 - **Conversion `↦`.** Any bounded integer, including a word, converts to `inf`
   and never fails. `inf ↦` a trapping width is a magnitude-checked narrowing and
