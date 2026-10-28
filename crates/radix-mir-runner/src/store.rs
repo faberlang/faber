@@ -20,6 +20,10 @@ use radix_types::{FloatPolicy, NumericWidth, Primitive, Type, TypeId};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// An integer slot's policy, width and, for a ranged cell, its inclusive range
+/// (`None`: the whole width).
+type IntegerSlot = (SlotPolicy, NumericWidth, Option<(i128, i128)>);
+
 /// Stable identity of a failed implicit store: distinct from arithmetic
 /// overflow (ruling 5).
 pub const RUNNER_ISSUE_IMPLICIT_STORE_TRAP: &str = "implicit_store_out_of_range";
@@ -282,10 +286,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// Policy, width and, for a ranged cell, the inclusive range of an integer
     /// slot (`None` range: the whole width).
-    fn integer_slot(
-        &self,
-        target: TypeId,
-    ) -> Option<(SlotPolicy, NumericWidth, Option<(i128, i128)>)> {
+    fn integer_slot(&self, target: TypeId) -> Option<IntegerSlot> {
         let mut target = target;
         while let Type::Alias(_, inner) = self.types.get(target) {
             target = *inner;
