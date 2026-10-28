@@ -890,15 +890,44 @@ fn session_dispatcher(
     let slab_origins = std::mem::take(&mut image.slab_origins);
     let write_maps = std::mem::take(&mut image.write_maps);
     let fusions = std::mem::take(&mut image.fusions);
-    let units = image.kernels.into_iter().map(|(_, unit)| unit).collect();
+    let units: Vec<radix_mir::KernelUnit> =
+        image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher_start = Instant::now();
     let fused_entries = fusions.iter().map(|fused| fused.entry.clone()).collect();
-    let dispatcher = SessionKernelDispatcher::with_fused_entries(
+    /// The row layout of every record (fixed-layout genus) element type the
+    /// kernel units bind as a tensor resource.
+    fn record_layouts(
+        units: &[radix_mir::KernelUnit],
+        validation: &radix_mir::MirValidationContext<'_>,
+    ) -> std::collections::HashMap<
+        radix_types::TypeId,
+        std::sync::Arc<radix_mir_runner::dense::RecordLayout>,
+    > {
+        let types = validation.types.as_table();
+        let mut records = std::collections::HashMap::new();
+        for resource in units.iter().flat_map(|unit| &unit.resources) {
+            let ty = resource.version.element_ty.semantic_id();
+            if matches!(types.get(ty), radix_types::Type::Struct(_))
+                && !records.contains_key(&ty)
+                && let Ok(layout) = radix_mir_runner::dense::RecordLayout::resolve(ty, validation)
+            {
+                records.insert(ty, std::sync::Arc::new(layout));
+            }
+        }
+        records
+    }
+
+    // gpu-reset Q02: a tensor of fixed-layout records binds as typed row
+    // bytes; each record element type the kernels name gets its row layout
+    // from the layout law (a type with no layout stays unsupported by name).
+    let records = record_layouts(&units, validated.validation());
+    let dispatcher = SessionKernelDispatcher::with_fused_entries_and_records(
         session,
         image.artifact,
         units,
         fused_entries,
         validated.validation().types.as_table(),
+        records,
     )
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
     let module_compile_ns = dispatcher_start.elapsed().as_nanos() as u64;
