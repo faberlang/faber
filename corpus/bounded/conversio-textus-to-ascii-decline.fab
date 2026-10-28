@@ -3,8 +3,8 @@ term = "textus"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
 category = "conversion"
-summary = "Decline: bounded textus<N> cannot convert directly to ascii<M>."
-syntax = "textus<N> ↦ ascii<M>"
+summary = "Decline: bounded textus<magnitudo N> cannot convert directly to ascii<size M>."
+syntax = "textus<magnitudo N> ↦ ascii<size M>"
 related = ["↦", "textus", "ascii"]
 locale = "en"
 +++
@@ -21,6 +21,6 @@ locale = "en"
 #   • assuming every textus value is ASCII-safe without an explicit narrowing
 #     check.
 
-fn narrow(string<8> raw) → ascii<4> {
-    return raw ↦ ascii<4>
+fn narrow(string<size 8> raw) → ascii<size 4> {
+    return raw ↦ ascii<size 4>
 }

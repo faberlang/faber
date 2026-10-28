@@ -20,7 +20,7 @@ locale = "en"
 #   • Chars and ascii texts are quoted inside a composite too: a `char` is
 #     single-quoted (`c = 'q'`) and every `ascii` is double-quoted like a
 #     textus (`a = "abc"`, and a one-character `u = "q"` the same, since
-#     `ascii<1>` is text and not the char type); the declared type decides the
+#     `ascii<size 1>` is text and not the char type); the declared type decides the
 #     quotes, never the length. At the top level `print 'q'` shows `q`.
 #   • An absent optional field prints `nihil`; a present one prints its bare
 #     value (`opt = 3`); booleans print `verum` and `falsum`.

@@ -337,13 +337,13 @@ fn receivers_for_type_maps_semantic_families() {
     );
     assert_eq!(
         lookup_method_for_type(&bounded_ascii, "longitudo", 0)
-            .expect("ascii<N>.longitudo")
+            .expect("ascii<magnitudo N>.longitudo")
             .faber_name,
         "longitudo"
     );
     assert_eq!(
         lookup_method_for_type(&bounded_textus, "appende", 1)
-            .expect("textus<N>.appende")
+            .expect("textus<magnitudo N>.appende")
             .faber_name,
         "appende"
     );

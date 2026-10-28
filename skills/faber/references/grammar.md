@@ -354,8 +354,8 @@ Sized numerics are **bare markers**: `i8`…`i64`, `u8`…`u64`, `f16`, `bf16`, 
 Collections and buffers:
 
 - `list<T>`, `map<K,V>`, `set<T>`, `queue<T>`, `stack<T>` (la `lista`, `tabula`, `copia`)
-- bounded capacity forms take a `NATURAL` (or `_` to infer); a list writes its count after `size` (`list<T, size N>`, bare `list<T, N>` is retired), the others still write it bare: `queue<T, N>`, `stack<T, N>`,
-  `string<N>`, `ascii<N>`; capacities are compile-time values today (run-time capacities and
+- bounded capacity forms take a `NATURAL` (or `_` to infer, which stays bare) written after `size` (la `magnitudo`): `list<T, size N>`, `queue<T, size N>`, `stack<T, size N>`,
+  `string<size N>`, `ascii<size N>`; the bare `list<T, N>` is `SEM008 list_count_needs_size` and the bare `queue<T, N>`, `stack<T, N>`, `string<N>`, `ascii<N>` are `SEM008 capacity_needs_size`; capacities are compile-time values today (run-time capacities and
   extents are admitted, not shipped)
 - `promise<T>`, `iterator<T>` (la `promissum`, `cursor`)
 - `tensor<T, Figura>`, `sparsa<T, Figura>` — shaped buffers

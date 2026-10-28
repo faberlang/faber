@@ -1632,7 +1632,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - A call-site argument list (`callTypeArgs`) carries each explicit size argument behind the `size` marker (la `ขนาด`), the way the call echoes `แกน` and `mut`/`เป็นเจ้าของ`/`สำเนา`: `take<size 2, size 2>(a)`, `construct<int, size [4]>(xs)`, `f<size n>(x)`. The grammar still parses the bare forms (a natural, a bracketed shape, a dimension term such as `n + 1`) so the checker can name the missing marker: a bare natural, shape, dimension term or caller `size` name in a call list is `SEM057 size_marker_required`, and a `size` argument on a callee that declares no `size` parameter is `SEM057 size_marker_unexpected` (one past the declared `size` parameters is an arity miss, `wrong_number_of_type_arguments`). The list binds by marker: a `size` argument binds the next `size` parameter of the callee and an unmarked argument the next type parameter, the two cursors advancing independently, so `mk<int, size 4>(xs)` binds `fn mk<T, size N>` and a list of only `size` arguments (`construct<size [4]>(xs)`) leaves every type to inference. The operand decides the binding time: `size 4` and `size [2, 3]` are compile-time witnesses and a shape travels as one argument (`tensor.construct<int, size [4]>(xs)`, checked against its store as a scalar size is: `tensor<int, [5]>` is `SEM010 incompatible_tensor_index`); `size n` of an in-scope integer stays the run-time extent described above, checked at its store; `size D` of a caller `size` parameter forwards it. A shape inside a call list holds natural literals only: a `_` hole, a name, a run-time lift or a nested term in it is `size_shape_dimension_unsupported`, and `size [..]` outside a call's list is `size_shape_outside_call_args`. An unmarked name or `_` stays a type there; the callee decides which type parameter it binds.
-- Applied `NATURAL` arguments are `ขนาด` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, ขนาด N>` (the `ขนาด` marker is required on a list), `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
+- Applied `NATURAL` arguments are `ขนาด` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, ขนาด N>`, `queue<T, ขนาด N>`, `stack<T, ขนาด N>`, `textus<ขนาด N>`, `ascii<ขนาด N>`. The `ขนาด` marker is required on all five: a bare `queue<T, N>`, `stack<T, N>`, `textus<N>` or `ascii<N>` is retired by name (`SEM008 capacity_needs_size`; a bare list count is `SEM008 list_count_needs_size`). The `_` hole stays bare. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
 - **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `ผ่านทาง` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
@@ -1676,9 +1676,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | Faber      | Meaning |
 | ---------- | ------- |
 | `textus`   | Unicode string |
-| `textus<N>` | shipped; bounded Unicode string; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `textus<ขนาด N>` | shipped; bounded Unicode string; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `ascii`    | ASCII-only string |
-| `ascii<N>` | shipped; bounded ASCII string; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `ascii<ขนาด N>` | shipped; bounded ASCII string; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `littera`  | en `char`; one Unicode scalar value (D10.1–10.2): a 4-byte value that never allocates (Rust `char`, Go `rune`). Element of `textus` / `ascii` iteration and of `textus[i]` / `ascii[i]` indexing. Grapheme clusters are norma library work, not this type. |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
@@ -1694,7 +1694,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `ignotum`  | unknown |
 
 Bare `textus` / `ascii` remain the unbounded productions. The
-shipped forms `textus<N>` and `ascii<N>` take
+shipped forms `textus<ขนาด N>` and `ascii<ขนาด N>` take
 one `ขนาด` / `NATURAL` applied argument. That `N` is capacity, not a
 width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
 `textus<_>`, `lista<T, _>`) is a capacity hole: the form stays
@@ -1712,9 +1712,9 @@ compile time.
 **A byte string is `lista<b8>`**: the list of raw
 bytes; it is not a list of numbers, so `lista<b8>` converts to `lista<u8>`
 only with an explicit `↦` and never widens to `lista<int>` or `lista<b16>`.
-`ascii<1>` is an ordinary ASCII string of
+`ascii<ขนาด 1>` is an ordinary ASCII string of
 length one (the type of `'x'`), not a separate character type; it widens
-implicitly `ascii<1> → littera → textus` (D10.5), so `s[i] ≡ '\n'` keeps
+implicitly `ascii<ขนาด 1> → littera → textus` (D10.5), so `s[i] ≡ '\n'` keeps
 working across the chain.
 
 A sized numeric type is written as its **bare width marker** (not a user type parameter): `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64`, `inf` (the integer family) and `f16`, `bf16`, `f32`, `f64` (the float family). The three policy words wrap a marker and keep their `<W>` argument:
@@ -2160,9 +2160,9 @@ matrix and the numeric model; this file states only the language.
 | `lista<T>`     | array    |
 | `lista<T, ขนาด N>`  | shipped; bounded array; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker (a bare `lista<T, N>` is `SEM008 list_count_needs_size`). `lista<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `queue<T>`     | shipped; unbounded FIFO queue |
-| `queue<T, N>`  | shipped; bounded FIFO queue; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `queue<T, ขนาด N>`  | shipped; bounded FIFO queue; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `stack<T>`     | shipped; unbounded LIFO stack |
-| `stack<T, N>`  | shipped; bounded LIFO stack; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `stack<T, ขนาด N>`  | shipped; bounded LIFO stack; `N` is a `ขนาด` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `tabula<K,V>`  | map      |
 | `tabulae<K,V>` | ledger: a map that keeps its entries in insertion order (en `ledger`); `tabula` and `tabulae` sit one letter apart on purpose, "two shades of the same thing" (Roman account books were `tabulae`). Parses and type-checks in every type slot a map is accepted; every operation on a ledger value is refused (`ledger_operation_not_implemented`) until the operations land. |
 | `copia<T>`     | set      |
@@ -2565,7 +2565,7 @@ only the parts that make sense: `[fill][align][sign][0][width][.precision][kind]
   strftime-style patterns (norma work, if ever).
 - **Left out on purpose:** thousands separators (country-aware, so library
   work, not this operator) and computed specs (D2.2).
-- **Split from `↦`:** `↦ ascii<N> ผ่านทาง Hex` is exact conversion — fixed width,
+- **Split from `↦`:** `↦ ascii<ขนาด N> ผ่านทาง Hex` is exact conversion — fixed width,
   fails if the value does not fit; `¶` is display — width is a minimum that
   grows to fit, and never fails.
 - **No word twin:** `¶` is the same glyph in every locale, like `✓ ✗`.
@@ -2576,7 +2576,7 @@ only the parts that make sense: `[fill][align][sign][0][width][.precision][kind]
 
 **Edge-case outputs (D2.7):** `NaN` / `∞` / `-∞` print as `NaN`, `∞`, `-∞`
 (precision does not apply); a negative number in hex/bin/oct prints sign plus
-digits (`-42 ¶ "x"` = `-2a`), not two's complement (`↦ ascii<N> ผ่านทาง Hex` stays
+digits (`-42 ¶ "x"` = `-2a`), not two's complement (`↦ ascii<ขนาด N> ผ่านทาง Hex` stays
 the strict tool and rejects negatives); `textus` width counts `littera`
 (characters), not screen columns (an emoji with a skin-tone modifier counts as
 2; screen-width alignment is library work); `instans` outside years 0–9999
@@ -2606,7 +2606,7 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 - `"22" ↦ numerus` → Rust: `"22".parse::<i64>().unwrap()`
 - `"bad" ↦ numerus ⊥ 0` → Rust: `"bad".parse::<i64>().unwrap_or(0)`
 - `42 ↦ textus` → Rust: `42.to_string()`
-- `n ↦ ascii<N> ผ่านทาง Hex|Bin|Oct` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
+- `n ↦ ascii<ขนาด N> ผ่านทาง Hex|Bin|Oct` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
 - `n ↦ ascii<_> ผ่านทาง Hex|Bin|Oct` — shipped for const-foldable numerus sources; the hole is solved to the source digit count. Runtime sources leave the hole unsolved and require explicit `N`.
 
 **The `ผ่านทาง` clause (D11.9).** A convert hint is a clause on the conversion, not a type argument: `"ff" ↦ i32 ผ่านทาง Hex`, `65 ↦ littera ผ่านทาง Code`, `lista<b8>[0‥2] ↦ u16 ผ่านทาง Le ↦ b16 ↦ f16 ↦ f32`. The grammar is `conversio_expr := '↦' type_annotation via_clause? inline_default?` and `via_clause := 'ผ่านทาง' IDENTIFIER`.

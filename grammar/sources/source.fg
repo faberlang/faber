@@ -1287,7 +1287,9 @@ labeled_type_argument := IDENTIFIER ':' type_annotation
 # (`lista<T, magnitudo 1…∞>`): a list size range, trapping only, with no policy
 # word; there the range follows the `magnitudo` marker (`sized_range_argument`),
 # because a bare range bounds a value and a list's bound is a count. A bare
-# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`.
+# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`, and a bare
+# `queue<T, 4>`, `stack<T, 4>`, `textus<4>` or `ascii<4>` is `capacity_needs_size`:
+# a capacity is written after `magnitudo`.
 range_argument  := range_bound range_glyph range_bound
 sized_range_argument := 'magnitudo' range_argument
 range_glyph     := '‥' | '…'

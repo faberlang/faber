@@ -49,8 +49,9 @@ impl super::FaberCodegen<'_> {
         }
     }
 
-    /// A list count spelled after the `size` marker: `size 4` for the maximum
-    /// length. The `_` hole stays bare (its own need moves it).
+    /// A bounded head's count spelled after the `size` marker: `size 4` for the
+    /// maximum length of a list, queue, stack or string. The `_` hole stays
+    /// bare (its own need moves it).
     pub(super) fn list_count_to_faber(
         &self,
         capacity: IndexId,

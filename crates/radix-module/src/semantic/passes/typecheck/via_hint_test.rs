@@ -161,21 +161,21 @@ const ROWS: &[Row] = &[
     },
     Row {
         name: "ascii Hex",
-        frame: "functio f(u32 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u32 n) → ascii<magnitudo 8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Hex>",
-        via: "↦ ascii<8> via Hex",
+        via: "↦ ascii<magnitudo 8> via Hex",
     },
     Row {
         name: "ascii Bin",
-        frame: "functio f(u8 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u8 n) → ascii<magnitudo 8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Bin>",
-        via: "↦ ascii<8> via Bin",
+        via: "↦ ascii<magnitudo 8> via Bin",
     },
     Row {
         name: "ascii Oct",
-        frame: "functio f(u16 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u16 n) → ascii<magnitudo 8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Oct>",
-        via: "↦ ascii<8> via Oct",
+        via: "↦ ascii<magnitudo 8> via Oct",
     },
     Row {
         name: "ascii solved hole",

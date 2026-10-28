@@ -184,8 +184,8 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
 }",
         ),
         (
-            "ascii<8>",
-            r"functio visit(ascii<8> xs) → vacuum {
+            "ascii<magnitudo 8>",
+            r"functio visit(ascii<magnitudo 8> xs) → vacuum {
   itera ex xs sit c {
     nota c
   }
@@ -193,8 +193,8 @@ fn lowers_scalar_bounded_buffers_to_live_prefix_static_splits() {
 }",
         ),
         (
-            "textus<8>",
-            r"functio visit(textus<8> xs) → vacuum {
+            "textus<magnitudo 8>",
+            r"functio visit(textus<magnitudo 8> xs) → vacuum {
   itera ex xs sit c {
     nota c
   }
@@ -242,7 +242,7 @@ fn scalar_bounded_buffers_capacity_above_ten_stay_unsupported() {
     let unit = analyze_source(
         &session(),
         "bounded-itera.fab",
-        r"functio big(textus<11> xs) → vacuum {
+        r"functio big(textus<magnitudo 11> xs) → vacuum {
   itera ex xs sit c {
     nota c
   }

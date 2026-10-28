@@ -199,7 +199,7 @@ instans = "لحظة"
 objectum = "كائن"
 quidlibet = "مهما"
 lista = "قائمة"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "جدول"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "دفتر"
@@ -799,7 +799,7 @@ help = "سمِّ التلميح مباشرة بعد via، مثل `x ↦ u32 via 
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "تلميح التحويل ليس معامل نوع"
-help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`، `ascii<8> via Hex`، `littera via Code`"
+help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`، `ascii<{magnitudo} 8> via Hex`، `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "تلميح التحويل لا يتبع الهدف بين قوسين زاويين"
@@ -1245,6 +1245,10 @@ help = "اكتب النطاق على القائمة، مثل {lista}<int, {magni
 message = "يُكتب عدد عناصر القائمة بعد `{magnitudo}`"
 help = "اكتب `{lista}<int, {magnitudo} 4>` لأربعة عناصر على الأكثر، أو `{lista}<int, {magnitudo} 1…8>` لنطاق؛ النطاق المجرد يحدّ قيمة لا عددًا"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "تُكتب السعة بعد `{magnitudo}`"
+help = "اكتب `{queue}<int, {magnitudo} 4>` أو `{stack}<int, {magnitudo} 4>` أو `{textus}<{magnitudo} 8>` أو `{ascii}<{magnitudo} 8>` لسعة بهذا القدر على الأكثر؛ الرقم المجرد ليس سعة"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
 help = "أصلح بنية AST للتخفيض"
@@ -1271,11 +1275,11 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue يتطلب معامل نوع واحدا أو اثنين"
-help = "استخدم queue<T> أو queue<T, N>"
+help = "استخدم queue<T> أو queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack يتطلب معامل نوع واحدا أو اثنين"
-help = "استخدم stack<T> أو stack<T, N>"
+help = "استخدم stack<T> أو stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "{discerne} {casu} يتطلب نمطا"
@@ -1443,7 +1447,7 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type لا يقبل parameters"
-help = "textus<N> و ascii<N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
+help = "textus<{magnitudo} N> و ascii<{magnitudo} N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace لا يصدر qualified type"

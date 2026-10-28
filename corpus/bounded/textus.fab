@@ -4,34 +4,34 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "conversio_expr", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
 category = "text"
 canonical = false
-summary = "Bounded textus<N>: scalar capacity N; longitudo is len; equality ignores spare slots."
-syntax = "textus<N>"
+summary = "Bounded textus<magnitudo N>: scalar capacity N; longitudo is len; equality ignores spare slots."
+syntax = "textus<magnitudo N>"
 related = ["longitudo", "appende", "accipe", "sectio", "vacua", "ascii"]
 locale = "en"
 +++
 # =============================================================================
-# textus<N> — bounded Unicode buffer (BB-8R)
+# textus<magnitudo N> — bounded Unicode buffer (BB-8R)
 # =============================================================================
 #
-# Latin spelling: textus<8>
-# English surface: string<8>
+# Latin spelling: textus<magnitudo 8>
+# English surface: string<size 8>
 #
 # What this teaches:
-#   • `textus<N>` is a distinct type from unbounded `textus`.
+#   • `textus<magnitudo N>` is a distinct type from unbounded `textus`.
 #   • `N` counts Unicode scalars; `longitudo` is runtime `len`.
 #   • Two values with the same prefix compare equal (`≡`).
 #
 # Common mistakes:
 #   • Counting UTF-8 bytes as `N` — capacity is scalars.
-#   • Assigning a bare `textus` into `textus<N>` without `↦`.
+#   • Assigning a bare `textus` into `textus<magnitudo N>` without `↦`.
 #
-# See also: lista<numerus, magnitudo N>, ascii<N>, list<b8, size N>
+# See also: lista<numerus, magnitudo N>, ascii<size N>, list<b8, size N>
 # =============================================================================
 
 main {
     let string raw ← "ab"
-    let string<8> a ← raw ↦ string<8>
-    let string<8> b ← raw ↦ string<8>
+    let string<size 8> a ← raw ↦ string<size 8>
+    let string<size 8> b ← raw ↦ string<size 8>
     let int n ← a.length()
     let bool vacant ← a.is_empty()
     print n

@@ -648,14 +648,14 @@ fn bounded_ascii_and_textus_resolve_physical_byte_aggregates_with_length_member(
     };
     let textus_layout = table
         .layout_for_type(MirType::semantic(textus_ty))
-        .expect("textus<16> layout fact");
+        .expect("textus<magnitudo 16> layout fact");
     assert_eq!(
         textus_layout.kind,
         expected(MirAggregateFamily::BoundedTextus)
     );
     let ascii_layout = table
         .layout_for_type(MirType::semantic(ascii_ty))
-        .expect("ascii<16> layout fact");
+        .expect("ascii<magnitudo 16> layout fact");
     assert_eq!(
         ascii_layout.kind,
         expected(MirAggregateFamily::BoundedAscii)

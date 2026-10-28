@@ -235,7 +235,7 @@ fn textus_to_lista_of_bits_stays_accepted() {
 #[test]
 fn bounded_lista_to_bounded_textus_conversio_rejects() {
     test_support::assert_rejects_with_issue_la(
-        "incipit {\n  sit lista<numerus> base ← [1, 2]\n  sit lista<numerus, magnitudo 8> raw ← base ↦ lista<numerus, magnitudo 8>\n  sit textus<8> out ← raw ↦ textus<8>\n}",
+        "incipit {\n  sit lista<numerus> base ← [1, 2]\n  sit lista<numerus, magnitudo 8> raw ← base ↦ lista<numerus, magnitudo 8>\n  sit textus<magnitudo 8> out ← raw ↦ textus<magnitudo 8>\n}",
         "lista_to_textus_unsupported",
     );
 }
@@ -243,7 +243,7 @@ fn bounded_lista_to_bounded_textus_conversio_rejects() {
 #[test]
 fn bounded_textus_conversio_accepts_inline_recovery() {
     test_support::assert_accepts_la(
-        "functio s(textus<4> t) → textus {\n  redde t ↦ textus ⊥ \"fallback\"\n}",
+        "functio s(textus<magnitudo 4> t) → textus {\n  redde t ↦ textus ⊥ \"fallback\"\n}",
     );
 }
 

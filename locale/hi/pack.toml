@@ -199,7 +199,7 @@ instans = "क्षण"
 objectum = "वस्तु"
 quidlibet = "कुछभी"
 lista = "सूची"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "तालिका"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "बही"
@@ -799,7 +799,7 @@ help = "via के ठीक बाद संकेत का नाम लि�
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "रूपांतरण संकेत कोई प्रकार तर्क नहीं है"
-help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "रूपांतरण संकेत लक्ष्य के बाद कोणीय कोष्ठकों में नहीं आता"
@@ -1257,6 +1257,10 @@ help = "रेंज सूची पर लिखें, जैसे {lista}<i
 message = "सूची की गिनती `{magnitudo}` के बाद लिखी जाती है"
 help = "अधिकतम 4 तत्वों के लिए `{lista}<int, {magnitudo} 4>` लिखें, या रेंज के लिए `{lista}<int, {magnitudo} 1…8>`; केवल रेंज मान को सीमित करती है, गिनती को नहीं"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "क्षमता `{magnitudo}` के बाद लिखी जाती है"
+help = "इतनी अधिकतम क्षमता के लिए `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` या `{ascii}<{magnitudo} 8>` लिखें; केवल संख्या क्षमता नहीं है"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -1283,11 +1287,11 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue को एक या दो type parameters चाहिए"
-help = "queue<T> या queue<T, N> का उपयोग करें"
+help = "queue<T> या queue<T, {magnitudo} N> का उपयोग करें"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack को एक या दो type parameters चाहिए"
-help = "stack<T> या stack<T, N> का उपयोग करें"
+help = "stack<T> या stack<T, {magnitudo} N> का उपयोग करें"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu के लिए pattern आवश्यक है"
@@ -1455,7 +1459,7 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type parameters स्वीकार नहीं कर सकता"
-help = "textus<N>, ascii<N>, और {lista}<b8, {magnitudo} N> shipped bounded forms हैं"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N>, और {lista}<b8, {magnitudo} N> shipped bounded forms हैं"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type namespace द्वारा export नहीं किया गया है"

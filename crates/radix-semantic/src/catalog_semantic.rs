@@ -355,7 +355,7 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
             semantic_keyword_shadowing_help(args)
         }
         SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
-            Some("convert to textus<N> for O(1) indexing or iterate scalars".to_owned())
+            Some("convert to textus<size N> for O(1) indexing or iterate scalars".to_owned())
         }
         SemanticErrorKind::Warning(WarningKind::TypeTestMemberAbsent) => {
             Some("narrow with a member the union declares, or fix the tested type".to_owned())
@@ -379,7 +379,7 @@ fn semantic_missing_type_annotation_help(args: &[DiagnosticArg]) -> Option<Strin
     match arg_value(args, "issue")? {
         "cannot_infer_tensor_shape" => Some("provide a concrete tensor or sparsa shape".to_owned()),
         "bounded_capacity_unsolved" => {
-            Some("write a concrete N (ascii<8>) or give the hole a bounded witness".to_owned())
+            Some("write a concrete N (ascii<size 8>) or give the hole a bounded witness".to_owned())
         }
         "marker_width_unsolved" => {
             Some("write a concrete marker (i32) or give the hole a same-family witness".to_owned())
@@ -495,7 +495,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint".to_owned())
         }
         "ascii_format_hint_not_capacity" => {
-            Some("write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width".to_owned())
+            Some("write ascii<size N> via Hex, ascii<size N> via Bin, or ascii<size N> via Oct with N as digit width".to_owned())
         }
         "ascii_pack_width_overflow" => {
             Some("increase N or convert the source to a width whose digit count fits".to_owned())
@@ -672,6 +672,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::LIST_COUNT_NEEDS_SIZE => Some(
             "write list<int, size 4> for at most 4 elements, or list<int, size 1…8> for a range; a bare range bounds a value, not a count".to_owned(),
         ),
+        WidthLowerIssue::CAPACITY_NEEDS_SIZE => Some(
+            "write the capacity after size: queue<int, size 4>, stack<int, size 4>, string<size 8> or ascii<size 8>".to_owned(),
+        ),
         "ranged_list_length_out_of_range" => Some(
             "give the literal a length inside the range, or build the list with `↦` and recover with `⊥`".to_owned(),
         ),
@@ -693,11 +696,11 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "ascii_literal_unescaped_control" => Some("escape control characters in ascii literals".to_owned()),
         "ascii_literal_too_long" => Some(
-            "shorten the ascii<N> literal to fit its declared capacity, or use unbounded ascii"
+            "shorten the ascii<size N> literal to fit its declared capacity, or use unbounded ascii"
                 .to_owned(),
         ),
         "textus_literal_too_long" => Some(
-            "shorten the textus<N> literal to fit its declared capacity, or use unbounded textus"
+            "shorten the textus<size N> literal to fit its declared capacity, or use unbounded textus"
                 .to_owned(),
         ),
         "boolean_operands_required" => Some("use bivalens operands for this operator".to_owned()),
@@ -1458,7 +1461,7 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         },
         WarningKind::UnboundedTextusIndex => DiagnosticSpec {
             code: "WARN022",
-            help: Some("convert to textus<N> for O(1) indexing or iterate scalars"),
+            help: Some("convert to textus<size N> for O(1) indexing or iterate scalars"),
         },
         WarningKind::TypeTestMemberAbsent => DiagnosticSpec {
             code: "WARN023",

@@ -31,24 +31,36 @@ fn bounded_identity_distinct_from_bare_and_across_n() {
     let lista8 = types.bounded_array(numerus, n8);
     let lista = types.array(numerus);
 
-    assert!(!types.equals(ascii8, ascii), "ascii<8> ≠ ascii");
-    assert!(!types.equals(ascii8, ascii9), "ascii<8> ≠ ascii<9>");
-    assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<64>");
-    assert!(!types.equals(textus4, textus), "textus<4> ≠ textus");
+    assert!(!types.equals(ascii8, ascii), "ascii<magnitudo 8> ≠ ascii");
+    assert!(
+        !types.equals(ascii8, ascii9),
+        "ascii<magnitudo 8> ≠ ascii<magnitudo 9>"
+    );
+    assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<magnitudo 64>");
+    assert!(
+        !types.equals(textus4, textus),
+        "textus<magnitudo 4> ≠ textus"
+    );
     assert!(
         !types.equals(lista8, lista),
         "lista<numerus, magnitudo 8> ≠ lista<numerus>"
     );
-    assert!(types.is_assignable(ascii8, ascii64), "ascii<8> → ascii<64>");
+    assert!(
+        types.is_assignable(ascii8, ascii64),
+        "ascii<magnitudo 8> → ascii<magnitudo 64>"
+    );
     assert!(
         !types.is_assignable(ascii64, ascii8),
-        "ascii<64> ↛ ascii<8>"
+        "ascii<magnitudo 64> ↛ ascii<magnitudo 8>"
     );
-    assert!(types.is_assignable(ascii8, ascii9), "ascii<8> → ascii<9>");
+    assert!(
+        types.is_assignable(ascii8, ascii9),
+        "ascii<magnitudo 8> → ascii<magnitudo 9>"
+    );
     assert!(!types.is_assignable(ascii8, ascii));
     let n1 = intern_cap(&mut types, 1);
     let ascii1 = types.bounded_ascii(n1);
-    assert!(types.is_assignable(ascii1, ascii), "ascii<1> → ascii");
+    assert!(types.is_assignable(ascii1, ascii), "ascii<size 1> → ascii");
     assert!(matches!(types.get(lista), Type::Array(_)));
 }
 
@@ -109,13 +121,13 @@ fn resolve_alias(source: &str) -> (TypeTable, crate::TypeId) {
 
 #[test]
 fn resolve_interns_bounded_forms() {
-    let (types, ty) = resolve_alias("typus X = ascii<8>");
+    let (types, ty) = resolve_alias("typus X = ascii<magnitudo 8>");
     assert!(matches!(
         types.get(ty),
         Type::BoundedAscii { capacity } if matches!(types.get_index(*capacity), IndexExpr::Literal(8))
     ));
 
-    let (types, ty) = resolve_alias("typus X = textus<4>");
+    let (types, ty) = resolve_alias("typus X = textus<magnitudo 4>");
     assert!(matches!(
         types.get(ty),
         Type::BoundedTextus { capacity } if matches!(types.get_index(*capacity), IndexExpr::Literal(4))
@@ -142,7 +154,7 @@ fn resolve_interns_bounded_forms() {
 
 #[test]
 fn magnitudo_n_specializes_bounded_ascii() {
-    let mut parsed = parse(lex("typus X<magnitudo N> = ascii<N>"));
+    let mut parsed = parse(lex("typus X<magnitudo N> = ascii<magnitudo N>"));
     assert!(
         parsed.errors.is_empty(),
         "parse errors: {:?}",
@@ -164,14 +176,14 @@ fn magnitudo_n_specializes_bounded_ascii() {
             types.get(ty),
             Type::BoundedAscii { capacity } if matches!(types.get_index(*capacity), IndexExpr::Param(_))
         ),
-        "ascii<N> must intern as BoundedAscii {{ Param(N) }}, got {:?}",
+        "ascii<magnitudo N> must intern as BoundedAscii {{ Param(N) }}, got {:?}",
         types.get(ty)
     );
 }
 
 #[test]
 fn non_natural_n_rejects() {
-    let parsed = parse(lex("typus X = ascii<numerus>"));
+    let parsed = parse(lex("typus X = ascii<magnitudo numerus>"));
     assert!(
         parsed.errors.is_empty(),
         "parse errors: {:?}",

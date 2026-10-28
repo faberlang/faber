@@ -199,7 +199,7 @@ instans = "thời_điểm"
 objectum = "đối_tượng"
 quidlibet = "bất_kỳ"
 lista = "danh_sách"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "bảng"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "sổ_cái"
@@ -799,7 +799,7 @@ help = "ghi tên hint ngay sau via, như trong `x ↦ u32 via Hex`; các hint l�
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "hint chuyển đổi không phải là đối số kiểu"
-help = "viết hint thành mệnh đề via sau đích: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "viết hint thành mệnh đề via sau đích: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "hint chuyển đổi không đi theo sau đích trong ngoặc nhọn"
@@ -1245,6 +1245,10 @@ help = "viết phạm vi trên danh sách, ví dụ {lista}<int, {magnitudo} 1�
 message = "số phần tử của danh sách được viết sau `{magnitudo}`"
 help = "viết `{lista}<int, {magnitudo} 4>` cho tối đa 4 phần tử, hoặc `{lista}<int, {magnitudo} 1…8>` cho một phạm vi; phạm vi trần giới hạn một giá trị, không phải số lượng"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "sức chứa được viết sau `{magnitudo}`"
+help = "viết `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` hoặc `{ascii}<{magnitudo} 8>` cho sức chứa tối đa chừng đó; một con số trần không phải là sức chứa"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1271,11 +1275,11 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue yêu cầu một hoặc hai tham số kiểu"
-help = "dùng queue<T> hoặc queue<T, N>"
+help = "dùng queue<T> hoặc queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack yêu cầu một hoặc hai tham số kiểu"
-help = "dùng stack<T> hoặc stack<T, N>"
+help = "dùng stack<T> hoặc stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu yêu cầu một mẫu"
@@ -1443,7 +1447,7 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "kiểu nguyên thủy không thể nhận tham số"
-help = "textus<N>, ascii<N> và {lista}<b8, {magnitudo} N> là dạng bounded đã phát hành"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N> và {lista}<b8, {magnitudo} N> là dạng bounded đã phát hành"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "kiểu đủ điều kiện không được namespace xuất ra"

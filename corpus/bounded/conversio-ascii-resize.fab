@@ -4,20 +4,20 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "ascii<N> ↔ ascii<M> D7 resize: grow, shrink, and identity copies with ↦."
-syntax = "ascii<N> ↦ ascii<M>"
+summary = "ascii<size N> ↔ ascii<size M> D7 resize: grow, shrink, and identity copies with ↦."
+syntax = "ascii<size N> ↦ ascii<size M>"
 related = ["↦", "ascii"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — ascii<N> ↔ ascii<M> resize (grow / shrink / identity)
+# ↦ — ascii<size N> ↔ ascii<size M> resize (grow / shrink / identity)
 # =============================================================================
 #
 # What this teaches:
 #   • D7 resize — a bounded ascii converts to another capacity with `↦`;
 #     the initialized prefix is copied and overflow fails closed
-#   • All three directions are the same rule — grow (`ascii<4> ↦ ascii<8>`),
-#     shrink (`ascii<8> ↦ ascii<4>`), and identity (`ascii<8> ↦ ascii<8>`)
+#   • All three directions are the same rule — grow (`ascii<size 4> ↦ ascii<size 8>`),
+#     shrink (`ascii<size 8> ↦ ascii<size 4>`), and identity (`ascii<size 8> ↦ ascii<size 8>`)
 #     are each one explicit conversion
 #
 # Common mistakes:
@@ -28,7 +28,7 @@ locale = "en"
 # See also: ↦, ascii
 # =============================================================================
 
-# conversio — ascii<N> ↔ ascii<M> D7 resize
+# conversio — ascii<size N> ↔ ascii<size M> D7 resize
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' 'ascii' '<' capacity '>'
@@ -37,11 +37,11 @@ locale = "en"
 # runtime conversio (UnsupportedMir), so stdout stays unpinned.
 
 main {
-    let ascii<4> a ← 'ab'
-    let ascii<8> grown ← a ↦ ascii<8>
-    let ascii<8> b ← 'abcd'
-    let ascii<4> shrunk ← b ↦ ascii<4>
-    let ascii<8> same ← a ↦ ascii<8>
+    let ascii<size 4> a ← 'ab'
+    let ascii<size 8> grown ← a ↦ ascii<size 8>
+    let ascii<size 8> b ← 'abcd'
+    let ascii<size 4> shrunk ← b ↦ ascii<size 4>
+    let ascii<size 8> same ← a ↦ ascii<size 8>
     print grown
     print shrunk
     print same
