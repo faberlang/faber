@@ -707,7 +707,10 @@ impl super::FaberCodegen<'_> {
             // the glyph, the bounds as written and the `size` marker. The
             // resolved witness may be any list shape (`size 0…8` is a bounded
             // list, `size 0…∞` the plain one), so the authored range wins.
-            Type::Array(_) | Type::BoundedArray { .. } | Type::RangedArray { .. }
+            Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::BoundedOcteti { .. }
+            | Type::RangedArray { .. }
                 if form
                     .args
                     .iter()

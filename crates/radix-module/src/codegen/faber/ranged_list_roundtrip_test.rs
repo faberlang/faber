@@ -39,7 +39,7 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "fn f(list<int, size 4‥8> a, list<int, size 4…8> b, list<int, size 0…∞> c, list<int, size 4> d, list<int, size 0…8> e, list<int, size 1…∞> g, list<int, size 2‥3> h, list<int> i) → int {\n    return a.length() + b.length() + c.length() + d.length() + e.length() + g.length() + h.length() + i.length()\n}\n\nfn k<size N>(list<int, size N> xs) → int {\n    return xs.length()\n}\n\nmain {\n    let list<int, size 4‥8> a ← [1, 2, 3, 4]\n    let list<int, size 0…∞> c ← [1]\n    let list<int, size 4> d ← [1, 2, 3, 4]\n    print a\n    print c\n    print d\n}\n";
+const BODY: &str = "fn f(list<int, size 4‥8> a, list<int, size 4…8> b, list<int, size 0…∞> c, list<int, size 4> d, list<int, size 0…8> e, list<int, size 1…∞> g, list<int, size 2‥3> h, list<int> i, list<b8, size 0…8> j, list<b8, size 2‥6> m) → int {\n    return a.length() + b.length() + c.length() + d.length() + e.length() + g.length() + h.length() + i.length() + j.length() + m.length()\n}\n\nfn k<size N>(list<int, size N> xs) → int {\n    return xs.length()\n}\n\nmain {\n    let list<int, size 4‥8> a ← [1, 2, 3, 4]\n    let list<int, size 0…∞> c ← [1]\n    let list<int, size 4> d ← [1, 2, 3, 4]\n    print a\n    print c\n    print d\n}\n";
 
 fn en_source() -> String {
     format!("+++\nlocale = \"en\"\n+++\n{BODY}")
@@ -56,7 +56,9 @@ fn en_format_keeps_the_authored_range_spelling() {
         "list<int, size 0…8> e",
         "list<int, size 1…∞> g",
         "list<int, size 2‥3> h",
-        "list<int> i",
+        "list<int> i,",
+        "list<b8, size 0…8> j,",
+        "list<b8, size 2‥6> m)",
         "list<int, size N> xs",
         "let list<int, size 4‥8> a ← [1, 2, 3, 4]",
         "let list<int, size 0…∞> c ← [1]",

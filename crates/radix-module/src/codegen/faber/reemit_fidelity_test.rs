@@ -1665,12 +1665,12 @@ fn first_reduction_reemits_with_meaning_intact() {
 #[test]
 fn list_counts_re_emit_after_the_size_marker() {
     // Need: a list count is written after `magnitudo` (en `size`).
-    // The count and the range re-emit from the resolved type: `size N`, and
-    // the inclusive range `size lo…hi` / `size lo…∞` (the authored glyph is
-    // the formatter's d3f98601 mechanism, not built here).
+    // The count and the range keep their authored spelling: `size N`, the
+    // half-open `size 2‥5` and the inclusive `size 1…∞` (the authored range
+    // argument of d3f98601).
     let source = "functio f(lista<numerus, magnitudo 4> a, lista<numerus, magnitudo 2‥5> b, lista<numerus, magnitudo 1…∞> c) → numerus { redde 0 }\n";
     let emitted = assert_idempotent(source);
     assert!(emitted.contains("lista<numerus, magnitudo 4> a"), "{emitted}");
-    assert!(emitted.contains("lista<numerus, magnitudo 2…4> b"), "{emitted}");
+    assert!(emitted.contains("lista<numerus, magnitudo 2‥5> b"), "{emitted}");
     assert!(emitted.contains("lista<numerus, magnitudo 1…∞> c"), "{emitted}");
 }

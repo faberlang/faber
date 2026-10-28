@@ -1138,6 +1138,52 @@ fn validate_policy_range(
     Ok(())
 }
 
+/// The authored `size lo‥hi` range of a list form, checked
+/// against the resolved witness: the endpoints are constants and resolve to the
+/// witness's length bounds. The authored range is a presentation record; the
+/// witness stays the authority.
+fn validate_list_size_range(
+    range: &radix_hir::HirRangeArgument,
+    ty: &radix_types::Type,
+    types: &radix_types::TypeTableSnapshot,
+    site: &radix_hir::HirTypeSite,
+) -> Result<(), HirArtifactError> {
+    let endpoint = |bound: &radix_hir::HirRangeBound| match bound {
+        radix_hir::HirRangeBound::Literal(value) => value
+            .parse::<i128>()
+            .ok()
+            .map(radix_types::numeric_width::RangeEnd::Value),
+        radix_hir::HirRangeBound::Unbounded { negative: true } => {
+            Some(radix_types::numeric_width::RangeEnd::NegInf)
+        }
+        radix_hir::HirRangeBound::Unbounded { negative: false } => {
+            Some(radix_types::numeric_width::RangeEnd::PosInf)
+        }
+        radix_hir::HirRangeBound::Name { .. } => None,
+    };
+    let (Some(lo), Some(hi)) = (endpoint(&range.lo), endpoint(&range.hi)) else {
+        return Err(type_presentation_issue("list_range_not_constant", site));
+    };
+    let resolved = radix_types::numeric_width::resolve_ranged_list(lo, hi, range.inclusive)
+        .map_err(|_| type_presentation_issue("list_range_witness", site))?;
+    let witness = match ty {
+        radix_types::Type::Array(_) => (0, None),
+        radix_types::Type::RangedArray { min, max, .. } => (*min, *max),
+        radix_types::Type::BoundedArray { capacity, .. }
+        | radix_types::Type::BoundedOcteti { capacity } => {
+            match types.indices().get(capacity.0 as usize) {
+                Some(radix_types::IndexExpr::Literal(max)) => (0, Some(*max)),
+                _ => return Err(type_presentation_issue("list_range_witness", site)),
+            }
+        }
+        _ => return Err(type_presentation_issue("list_range_witness", site)),
+    };
+    if resolved != witness {
+        return Err(type_presentation_issue("list_range_witness", site));
+    }
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 fn validate_type_form(
     form: &radix_hir::HirTypeForm,
@@ -1284,8 +1330,19 @@ fn validate_type_form(
                     // authored as a list head over one raw-byte (`b8`) element
                     // argument; the capacity lives in the root witness, as for
                     // every bounded list.
-                    if level.0 != 0 || form.args.len() != 1 {
+                    // `size 0…8` keeps its authored range beside the element.
+                    let authored_range = if let [_, radix_hir::HirTypeFormArg::Range(range)] =
+                        form.args.as_slice()
+                    {
+                        Some(range)
+                    } else {
+                        None
+                    };
+                    if level.0 != 0 || (authored_range.is_none() && form.args.len() != 1) {
                         return Err(type_presentation_issue("bounded_octeti_shape", site));
+                    }
+                    if let Some(range) = authored_range {
+                        validate_list_size_range(range, ty, types, site)?;
                     }
                     let radix_hir::HirTypeFormArg::Type(child) = &form.args[0] else {
                         return Err(type_presentation_issue("type_argument_kind", site));
@@ -1323,7 +1380,10 @@ fn validate_type_form(
                     {
                         return Ok(());
                     }
-                    if form.args.len() != 1 {
+                    // `size 0…∞` keeps the authored range beside the element.
+                    if let [_, radix_hir::HirTypeFormArg::Range(range)] = form.args.as_slice() {
+                        validate_list_size_range(range, ty, types, site)?;
+                    } else if form.args.len() != 1 {
                         return Err(type_presentation_issue("array_argument_arity", site));
                     }
                     validate_type_arg(
@@ -1348,7 +1408,12 @@ fn validate_type_form(
                 }
                 radix_types::Type::BoundedArray { element, .. }
                 | radix_types::Type::RangedArray { element, .. } => {
-                    if level.0 != 0 || form.args.len() != 1 {
+                    if let [_, radix_hir::HirTypeFormArg::Range(range)] = form.args.as_slice() {
+                        validate_list_size_range(range, ty, types, site)?;
+                    } else if form.args.len() != 1 {
+                        return Err(type_presentation_issue("bounded_array_shape", site));
+                    }
+                    if level.0 != 0 {
                         return Err(type_presentation_issue("bounded_array_shape", site));
                     }
                     validate_type_arg(
