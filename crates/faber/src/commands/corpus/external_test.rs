@@ -389,7 +389,12 @@ fn stdout_line_replacements_preserve_unmapped_lines_and_invalid_bytes() {
 #[test]
 fn external_case_runs_emitted_source_and_applies_stdout_normalization() {
     let dir = tempfile::tempdir().expect("temporary external target");
-    let faber = PathBuf::from("printf");
+    // WHY: a stand-in for the `faber` binary whose `emit` prints fixed source on every
+    // platform; BSD printf rejects the extra operands of `printf emit -t ...`.
+    let faber = dir.path().join("fake-faber");
+    std::fs::write(&faber, "#!/bin/sh\nprintf emit\n").expect("write stand-in faber");
+    std::fs::set_permissions(&faber, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("mark stand-in faber executable");
     let mut test_case = case(Outcome::Pass, None);
     test_case.dir = dir.path().to_path_buf();
     test_case.input = dir.path().join("input.fab");
