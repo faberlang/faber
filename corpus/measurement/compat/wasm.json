@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 390,
-    "analyzable": 542
+    "capable": 389,
+    "analyzable": 541
   },
   "terms": [
     {
@@ -36,8 +36,8 @@
     {
       "term": "?(",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 2
+      "capable": 0,
+      "analyzable": 1
     },
     {
       "term": "?.",
