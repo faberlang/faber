@@ -129,9 +129,6 @@ fn package_mir_instantiates_forwarded_symbolic_size_callee() {
         },
     )
     .unwrap_or_else(|errors| {
-        panic!(
-            "symbolic size forwarding package must link and run, got {:?}",
-            errors
-        )
+        panic!("symbolic size forwarding package must link and run, got {errors:?}")
     });
 }

@@ -70,7 +70,7 @@ fn run_const_member_package_tests(src: &Path) -> Vec<String> {
         None,
         &crate::test_support::test_analysis_seams(),
     )
-    .unwrap_or_else(|diagnostics| panic!("analyze const-member package: {:?}", diagnostics));
+    .unwrap_or_else(|diagnostics| panic!("analyze const-member package: {diagnostics:?}"));
     let proba_path = src.join("main.proba");
     let (root_id, _) = package
         .node_by_path(&proba_path)
@@ -113,10 +113,7 @@ fn run_const_member_package_tests(src: &Path) -> Vec<String> {
         },
     )
     .unwrap_or_else(|diagnostics| {
-        panic!(
-            "const-member package must lower on the test-link lane: {:?}",
-            diagnostics
-        )
+        panic!("const-member package must lower on the test-link lane: {diagnostics:?}")
     })
 }
 

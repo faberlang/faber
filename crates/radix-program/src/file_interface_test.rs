@@ -562,7 +562,10 @@ fn extract_file_interface_carries_nondum_method_gates() {
             reason: None,
         }]
     );
-    assert!(gates("lege").is_empty());
+    assert_eq!(
+        gates("lege"),
+        [] as [radix_module::file_interface::InterfaceUnavailable; 0]
+    );
 }
 
 #[test]
