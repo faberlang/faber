@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/bounded/ascii-methods.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/ascii-methods.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -928,7 +928,7 @@ impl FunctionBuilder<'_> {
                 lowered_args.push(flat.clone());
                 continue;
             }
-            lowered_args.push(self.lower_call_arg_value(&arg.expr)?);
+            lowered_args.push(self.lower_collection_call_arg(op, index, &arg.expr)?);
         }
         // WHY: semantic expected-type unification can annotate a scalar
         // collection intrinsic with its nullable enclosing type at the call
@@ -5911,7 +5911,7 @@ impl FunctionBuilder<'_> {
         receiver.ty.is_some_and(|ty| {
             matches!(
                 self.types.get(self.method_receiver_payload_id(ty)),
-                Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. }
+                Type::Primitive(Primitive::Textus) | Type::BoundedTextus { .. } | Type::BoundedAscii { .. }
             )
         })
     }
