@@ -24,7 +24,6 @@ use super::cargo::{
     feature = "mir-wasm"
 ))]
 use super::discover_build_layout as discover_package_layout;
-#[cfg(feature = "hir-go")]
 #[cfg(feature = "hir-rust")]
 use super::manifest::FaberManifest;
 use super::manifest_build_target_for_input;

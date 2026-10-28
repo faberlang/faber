@@ -71,9 +71,12 @@ fn a_kernel_calling_an_imported_host_function_is_a_named_error() {
         .find(|error| error.code == Some("SEM008"))
         .unwrap_or_else(|| panic!("SEM008 expected, got {errors:?}"));
     assert!(
-        error.message.contains("host_mul"),
-        "the diagnostic names the callee: {}",
-        error.message
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "callee" && arg.value == "host_mul"),
+        "the diagnostic names the callee: {:?}",
+        error.args
     );
     assert!(
         error
