@@ -1,4 +1,4 @@
-//! Captured tensor elements from kernel calls, and the comparator that finds
+//! Captured tensor elements and scalar returns from kernel calls, and the comparator that finds
 //! the first divergence between two runs of one program (the C3 comparator).
 //!
 //! A run captures one [`KernelTraceRecord`] per source-level kernel call: a
@@ -105,6 +105,10 @@ pub struct KernelTraceRecord {
     pub physical_stages: Option<u32>,
     /// Tensors captured for this call, in argument order, then the return.
     pub tensors: Vec<TracedTensor>,
+    /// The call's scalar return (a number or a bool), when it returns one. A
+    /// returned tensor is in `tensors`; a call that returns nothing, or a
+    /// value with no numeric form, has no result here.
+    pub result: Option<TraceElement>,
 }
 
 /// Ordered kernel-call records captured from one run.
@@ -151,6 +155,19 @@ fn trace_value(value: Value) -> TraceElement {
         Value::UInt(value) => TraceElement::Exact(value),
         Value::Bool(value) => TraceElement::Exact(u64::from(value)),
         other => TraceElement::Text(format!("{other:?}")),
+    }
+}
+
+/// Capture a kernel call's scalar return: a float, an integer or a bool. A
+/// tensor return is traced as a tensor, and any other value (unit, text, a
+/// composite) is not part of the trace.
+#[must_use]
+pub fn traced_result(value: &Value) -> Option<TraceElement> {
+    match value {
+        Value::Float(_) | Value::Int(_) | Value::UInt(_) | Value::Bool(_) => {
+            Some(trace_value(value.clone()))
+        }
+        _ => None,
     }
 }
 
@@ -232,8 +249,17 @@ pub enum DivergenceDetail {
         /// The device run's kernel.
         device: String,
     },
-    /// The call's tensors do not line up (count, slot, role, shape or length).
+    /// The call's tensors do not line up (count, slot, role, shape or length),
+    /// or only one run returned a scalar.
     Layout(String),
+    /// The call's scalar return differs beyond the identical / conforming
+    /// rules.
+    Return {
+        /// The reference value.
+        reference: TraceElement,
+        /// The device value.
+        device: TraceElement,
+    },
     /// One element differs beyond the identical / conforming rules.
     Element {
         /// The tensor's slot.
@@ -328,6 +354,9 @@ impl fmt::Display for Divergence {
                 write!(f, ": reference ran `{reference}`, device ran `{device}`")
             }
             DivergenceDetail::Layout(message) => write!(f, ": {message}"),
+            DivergenceDetail::Return { reference, device } => {
+                write!(f, ": return value: reference {reference}, device {device}")
+            }
             DivergenceDetail::Element {
                 slot,
                 shape,
@@ -480,5 +509,35 @@ fn compare_record(
             }
         }
     }
-    None
+    compare_result(want, got, conforming)
+}
+
+/// Compare the scalar returns of one call: a float is identical, conforming
+/// or divergent by the same rules as a tensor element; an integer, bool or
+/// bit pattern must match exactly.
+fn compare_result(
+    want: &KernelTraceRecord,
+    got: &KernelTraceRecord,
+    conforming: &mut usize,
+) -> Option<DivergenceDetail> {
+    match (&want.result, &got.result) {
+        (None, None) => None,
+        (Some(reference), Some(device)) => match match_elements(reference, device, None) {
+            ElementMatch::Identical => None,
+            ElementMatch::Conforming => {
+                *conforming += 1;
+                None
+            }
+            ElementMatch::Differs => Some(DivergenceDetail::Return {
+                reference: reference.clone(),
+                device: device.clone(),
+            }),
+        },
+        (Some(_), None) => Some(DivergenceDetail::Layout(
+            "reference returned a scalar, device returned none".to_owned(),
+        )),
+        (None, Some(_)) => Some(DivergenceDetail::Layout(
+            "reference returned no scalar, device returned one".to_owned(),
+        )),
+    }
 }
