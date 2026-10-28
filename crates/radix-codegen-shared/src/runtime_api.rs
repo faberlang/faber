@@ -850,6 +850,12 @@ pub const SERMO_INSTALL_ROUTES: RuntimeItem = sermo_row("install_routes", Runtim
 pub const SERMO_AS_MEUS: RuntimeItem = sermo_row("as_meus", RuntimeKind::Fn);
 pub const SERMO_AS_TUUS: RuntimeItem = sermo_row("as_tuus", RuntimeKind::Fn);
 pub const SERMO_READ_TEXT: RuntimeItem = sermo_row("read_text", RuntimeKind::Fn);
+/// `sermo.read_text_result`: the non-trapping text reader, `(string, error)`; a
+/// terminal `error` frame is a `*FrameFault` (Go).
+pub const SERMO_READ_TEXT_RESULT: RuntimeItem = sermo_row("read_text_result", RuntimeKind::Fn);
+/// `sermo.fault_record`: the `{kind, path}` crossing record of a failed read, the
+/// dynamic value a `valor ↦ E` conversion row takes (Go).
+pub const SERMO_FAULT_RECORD: RuntimeItem = sermo_row("fault_record", RuntimeKind::Fn);
 pub const SERMO_READ_NUMERUS: RuntimeItem = sermo_row("read_numerus", RuntimeKind::Fn);
 pub const SERMO_DRAIN: RuntimeItem = sermo_row("drain", RuntimeKind::Fn);
 /// `sermo.read_line`: one process-wide stdin line as `string ∪ none` (Go).
@@ -1354,6 +1360,8 @@ pub const TABLE: &[RuntimeItem] = &[
     SERMO_AS_MEUS,
     SERMO_AS_TUUS,
     SERMO_READ_TEXT,
+    SERMO_READ_TEXT_RESULT,
+    SERMO_FAULT_RECORD,
     SERMO_READ_NUMERUS,
     SERMO_DRAIN,
     SERMO_READ_LINE,
