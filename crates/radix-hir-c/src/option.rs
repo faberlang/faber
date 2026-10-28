@@ -111,7 +111,7 @@ impl Emitter<'_> {
             list.text,
             at.text
         );
-        let operand = self.optional_call(elem, inner, &slot, call);
+        let operand = self.optional_call(elem, inner, &slot, &call);
         Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect))
     }
 
@@ -141,7 +141,7 @@ impl Emitter<'_> {
             "faber_map_{suffix}_get({}, {}, &{slot})",
             map.text, key.text
         );
-        let operand = self.optional_call(v, inner, &slot, call);
+        let operand = self.optional_call(v, inner, &slot, &call);
         if !optional_map {
             return Ok(
                 Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect)

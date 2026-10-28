@@ -303,7 +303,7 @@ impl Emitter<'_> {
             map.text,
             key.text
         );
-        let operand = self.optional_call(v, inner, &slot, call);
+        let operand = self.optional_call(v, inner, &slot, &call);
         Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(true))
     }
 
