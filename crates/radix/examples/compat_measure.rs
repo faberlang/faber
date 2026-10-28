@@ -100,7 +100,7 @@ fn faber_cell(session: &Session, file: &Path) -> String {
             if !unit
                 .diagnostics
                 .iter()
-                .any(|diagnostic| diagnostic.is_error()) =>
+                .any(radix::Diagnostic::is_error) =>
         {
             match classify_hir_coverage(HirCoverageTarget::Faber, &unit.hir, &unit.types) {
                 Lowerability::Capable => "capable".to_owned(),
