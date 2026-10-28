@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 464,
-    "analyzable": 534
+    "capable": 468,
+    "analyzable": 542
   },
   "terms": [
     {
@@ -18,8 +18,8 @@
     {
       "term": "!.",
       "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "![",
@@ -37,7 +37,7 @@
       "term": "?(",
       "rule": "operator-group",
       "capable": 1,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "?.",
@@ -1074,8 +1074,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 30,
-      "analyzable": 43
+      "capable": 31,
+      "analyzable": 44
     },
     {
       "term": "⇇",
@@ -1086,8 +1086,8 @@
     {
       "term": "⇐",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "⇒",
@@ -1104,8 +1104,8 @@
     {
       "term": "⇥",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "∈",
@@ -1135,7 +1135,7 @@
       "term": "∴",
       "rule": "operator-group",
       "capable": 1,
-      "analyzable": 1
+      "analyzable": 4
     },
     {
       "term": "∷",

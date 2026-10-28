@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 527,
-    "analyzable": 531
+    "capable": 535,
+    "analyzable": 539
   },
   "terms": [
     {
@@ -18,8 +18,8 @@
     {
       "term": "!.",
       "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "![",
@@ -36,8 +36,8 @@
     {
       "term": "?(",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "?.",
@@ -1074,8 +1074,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 42,
-      "analyzable": 43
+      "capable": 43,
+      "analyzable": 44
     },
     {
       "term": "⇇",
@@ -1086,8 +1086,8 @@
     {
       "term": "⇐",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "⇒",
@@ -1104,8 +1104,8 @@
     {
       "term": "⇥",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "∈",
@@ -1134,8 +1134,8 @@
     {
       "term": "∴",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "∷",
