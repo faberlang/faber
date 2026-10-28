@@ -103,7 +103,7 @@ fn sibling_generic_kernel_registers_with_ordered_use_site_bindings() {
                 });
 
             // Provider identity: the package product + the sibling module.
-            assert!(!registration.route.identity.product.is_empty());
+            assert_ne!(registration.route.identity.product, "");
             assert_eq!(
                 registration.route.identity.module_path,
                 vec!["nn".to_owned()]

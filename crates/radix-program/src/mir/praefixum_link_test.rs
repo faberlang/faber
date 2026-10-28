@@ -72,8 +72,10 @@ fn arg<'a>(diagnostic: &'a Diagnostic, name: &str) -> &'a str {
         .args
         .iter()
         .find(|argument| argument.name == name)
-        .map(|argument| argument.value.as_str())
-        .unwrap_or_else(|| panic!("expected arg {name}, got {:?}", diagnostic.args))
+        .map_or_else(
+            || panic!("expected arg {name}, got {:?}", diagnostic.args),
+            |argument| argument.value.as_str(),
+        )
 }
 
 /// The genus `DefId` of an expression whose declared type is a genus.
@@ -441,7 +443,7 @@ fn praefixum_link_method_that_prints_is_forbidden() {
 }
 
 /// Two sibling modules export a genus named `Box`; the receiver is `a.Box`, so
-/// the method home is `a` by receiver DefId and `b`'s different `get` body
+/// the method home is `a` by receiver `DefId` and `b`'s different `get` body
 /// (which would add 100) must not contaminate the evaluation.
 #[test]
 fn praefixum_link_method_homonym_genus_evaluates_in_its_own_home() {

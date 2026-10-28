@@ -262,10 +262,7 @@ fn package_links_monomorphized_field_assign_to_imported_nominal() {
         },
     )
     .unwrap_or_else(|errors| {
-        panic!(
-            "monomorphized field-assign seam must link, got {:?}",
-            errors
-        );
+        panic!("monomorphized field-assign seam must link, got {errors:?}",);
     });
 }
 

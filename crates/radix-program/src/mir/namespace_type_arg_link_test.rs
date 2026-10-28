@@ -220,12 +220,7 @@ fn package_mir_links_explicit_type_arg_namespace_call() {
             );
         },
     )
-    .unwrap_or_else(|errors| {
-        panic!(
-            "explicit type-arg namespace call must link, got {:?}",
-            errors
-        )
-    });
+    .unwrap_or_else(|errors| panic!("explicit type-arg namespace call must link, got {errors:?}",));
 }
 
 #[test]
@@ -273,12 +268,7 @@ fn package_mir_links_inferred_type_arg_namespace_call() {
             );
         },
     )
-    .unwrap_or_else(|errors| {
-        panic!(
-            "inferred type-arg namespace call must link, got {:?}",
-            errors
-        )
-    });
+    .unwrap_or_else(|errors| panic!("inferred type-arg namespace call must link, got {errors:?}",));
 }
 
 #[test]
@@ -314,10 +304,7 @@ fn package_mir_links_generic_caller_forwarding_type_args_to_namespace_callee() {
         },
     )
     .unwrap_or_else(|errors| {
-        panic!(
-            "generic namespace forwarding package must link and run, got {:?}",
-            errors
-        );
+        panic!("generic namespace forwarding package must link and run, got {errors:?}",);
     });
 }
 
@@ -481,12 +468,7 @@ fn package_mir_links_generic_failable_namespace_call() {
             );
         },
     )
-    .unwrap_or_else(|errors| {
-        panic!(
-            "failable type-arg namespace call must link, got {:?}",
-            errors
-        )
-    });
+    .unwrap_or_else(|errors| panic!("failable type-arg namespace call must link, got {errors:?}",));
 }
 
 const NORMA_FS_READ_FILE_MAIN: &str = r#"import from "norma:fs" fs
