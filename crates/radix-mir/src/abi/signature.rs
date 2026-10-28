@@ -158,8 +158,6 @@ fn is_gather_ids_param(
 /// stay per-resource.
 const RUNTIME_EXTENT_RESOURCE_NAME: &str = "runtime_extent";
 
-/// Build a runtime-extent count resource.
-///
 /// CXO F2: extents are `Vec`-capable from day one — one entry per extent
 /// channel, appended to `extra_inputs`; Wave 1 populates at most one. The
 /// binding is caller-assigned as the next free binding from the positional
@@ -547,7 +545,6 @@ fn scan_partial_type(
     Ok(scan.result_element_ty)
 }
 
-/// The partial layout of a grid reduction node.
 pub(crate) fn grid_reduce_partial_layout(
     filum: &crate::MirFilumReduceOp,
     validation: &MirValidationContext<'_>,
