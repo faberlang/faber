@@ -1737,7 +1737,13 @@ pub fn evaluate_function<H: Host + ?Sized>(
     runner.push_frame(function_id, MirBlockId(0));
     runner.run_until_depth(0);
     runner.close_all_frames();
-    if runner.steps_taken >= step_budget {
+    if runner
+        .errors
+        .iter()
+        .any(|error| error.issue == RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED)
+    {
+        // Completing on the last allowed block is valid; only an attempted
+        // visit beyond the budget records this issue.
         return Err(EvaluationFailure::StepLimit);
     }
     if !runner.errors.is_empty() {
