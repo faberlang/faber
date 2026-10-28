@@ -3475,6 +3475,86 @@ functio limes() → iuncta<numerus, numerus> {
 }
 
 #[test]
+fn interface_snapshot_preserves_callable_and_storage_types() {
+    // These signatures exercise portable type forms that cannot be inferred
+    // from ordinary nominal/primitive exports: closures, two-channel promises,
+    // atomics, and shaped sparse tensors.
+    let (program, interner) = super::parse_program_for_namespace_exports(
+        "producer.fab",
+        r#"+++
+locale = "la"
++++
+@ publica
+functio callback((numerus) → fractus handler) → numerus { redde 1 }
+
+@ publica
+functio pending(promissum<numerus ⇥ textus> value) → promissum<numerus ⇥ textus> { redde value }
+
+@ publica
+functio cells(atomic<numerus> cell, sparsa<fractus, [2, 3]> values) → fractus { redde 0.0 }
+"#,
+        Some(&la_locale_pack()),
+    )
+    .expect("parse producer source");
+    let interface = super::file_interface_for_program(&program, &interner, None);
+
+    let callback = interface.exports.get("callback").expect("callback export");
+    let crate::file_interface::FileExportKind::Function(callback) = &callback.kind else {
+        panic!("callback must export as a function");
+    };
+    let crate::file_interface::InterfaceTypeSnapshot::Func(handler) = &callback.params[0].ty else {
+        panic!("function-typed parameter must retain its callable signature");
+    };
+    assert_eq!(handler.params.len(), 1);
+    assert_eq!(
+        *handler.params[0].ty,
+        crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus)
+    );
+    assert_eq!(
+        *handler.ret,
+        crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Fractus)
+    );
+
+    let pending = interface.exports.get("pending").expect("pending export");
+    let crate::file_interface::FileExportKind::Function(pending) = &pending.kind else {
+        panic!("pending must export as a function");
+    };
+    let promise = crate::file_interface::InterfaceTypeSnapshot::PromissumFailable(
+        Box::new(crate::file_interface::InterfaceTypeSnapshot::Primitive(
+            crate::semantic::Primitive::Numerus,
+        )),
+        Box::new(crate::file_interface::InterfaceTypeSnapshot::Primitive(
+            crate::semantic::Primitive::Textus,
+        )),
+    );
+    assert_eq!(pending.params[0].ty, promise);
+    assert_eq!(*pending.ret, promise);
+
+    let cells = interface.exports.get("cells").expect("cells export");
+    let crate::file_interface::FileExportKind::Function(cells) = &cells.kind else {
+        panic!("cells must export as a function");
+    };
+    assert_eq!(
+        cells.params[0].ty,
+        crate::file_interface::InterfaceTypeSnapshot::Atomic(Box::new(
+            crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus),
+        ))
+    );
+    assert_eq!(
+        cells.params[1].ty,
+        crate::file_interface::InterfaceTypeSnapshot::Sparsa(
+            Box::new(crate::file_interface::InterfaceTypeSnapshot::Primitive(
+                crate::semantic::Primitive::Fractus,
+            )),
+            crate::file_interface::InterfaceIndexSnapshot::Tuple(vec![
+                crate::file_interface::InterfaceIndexSnapshot::Literal(2),
+                crate::file_interface::InterfaceIndexSnapshot::Literal(3),
+            ]),
+        )
+    );
+}
+
+#[test]
 fn converted_union_consumer_discernes_imported_variants() {
     // S1-U2 defect end-to-end: a consumer importing a provider `discretio`
     // must be able to match its variants (`casu provider.Union.Variant`) and
