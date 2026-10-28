@@ -6343,6 +6343,19 @@ fn tensor_slice_nd_validates_six_arg_form() {
     );
 }
 
+#[test]
+fn tensor_slice_nd_rejects_axis_length_different_from_receiver_rank() {
+    let mut types = TypeTable::new();
+    let program = tensor_slice_nd_program(&mut types, 3, 3, 3, 6);
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|message| message.contains("lists do not match receiver rank")),
+        "three axis entries cannot slice a rank-2 tensor, got: {errors:?}"
+    );
+}
+
 /// Both the operand count and the shared axis length are enforced.
 #[test]
 fn tensor_slice_nd_rejects_arity_and_length_mismatch() {
