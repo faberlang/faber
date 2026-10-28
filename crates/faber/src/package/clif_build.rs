@@ -114,12 +114,20 @@ pub fn link_executable(
             format!("failed to create '{}': {error}", out_dir.display()),
             "clif_link_failed",
         )
+        .with_arg(
+            crate::exit_status::CLASS_ARG,
+            crate::exit_status::CLASS_CANT_CREATE,
+        )
     })?;
     let object_path = out_dir.join(format!("{stem}.o"));
     fs::write(&object_path, object).map_err(|error| {
         issue(
             format!("failed to write '{}': {error}", object_path.display()),
             "clif_link_failed",
+        )
+        .with_arg(
+            crate::exit_status::CLASS_ARG,
+            crate::exit_status::CLASS_CANT_CREATE,
         )
     })?;
     let archive = ensure_runtime_archive(release)?;

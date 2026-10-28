@@ -226,7 +226,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
                 }
                 Err(err) => {
                     eprintln!("error: failed to serialize GPU reflection metadata: {err}");
-                    std::process::exit(1);
+                    faber_cli::exit_status::exit_software();
                 }
             };
             if let Some(path) = command.output {

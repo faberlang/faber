@@ -109,7 +109,7 @@ pub fn cmd_doc(command: &DocCommand) {
             Ok(json) => print!("{json}"),
             Err(err) => {
                 eprintln!("error: failed to serialize doc JSON: {err}");
-                std::process::exit(1);
+                faber_cli::exit_status::exit_software();
             }
         }
     } else {

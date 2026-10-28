@@ -26,7 +26,10 @@ pub struct FormatCommand {
 
 /// Effective wrap width for one file: `--width` > manifest `[format] width` >
 /// none. `Err(status)` means a diagnostic was already printed.
-pub(super) fn effective_width(command: &FormatCommand, path: &Path) -> Result<Option<NonZeroU32>, i32> {
+pub(super) fn effective_width(
+    command: &FormatCommand,
+    path: &Path,
+) -> Result<Option<NonZeroU32>, i32> {
     faber_cli::package::resolve_format_width(command.width, path).map_err(|diagnostic| {
         faber_cli::postprocess::print_diagnostics(
             &[(*diagnostic).clone()],
@@ -45,7 +48,7 @@ pub fn cmd_format(command: &FormatCommand) {
         let mut source = String::new();
         if let Err(err) = std::io::stdin().read_to_string(&mut source) {
             eprintln!("error: failed to read <stdin>: {err}");
-            std::process::exit(exit_status::FAILURE);
+            exit_status::exit_no_input();
         }
         let path = Path::new("<stdin>");
         // No package context on stdin: only the flag applies.
@@ -60,15 +63,15 @@ pub fn cmd_format(command: &FormatCommand) {
 
     let files = match resolve_format_paths(&command.paths) {
         Ok(files) => files,
-        Err(message) => {
+        Err((status, message)) => {
             eprintln!("error: {message}");
-            std::process::exit(exit_status::FAILURE);
+            std::process::exit(status);
         }
     };
 
     if files.is_empty() {
         eprintln!("error: no .fab files found to format");
-        std::process::exit(exit_status::FAILURE);
+        exit_status::exit_no_input();
     }
 
     // `--stdout` is tightened to EXACTLY ONE input file. Multiple files with
@@ -92,7 +95,7 @@ pub fn cmd_format(command: &FormatCommand) {
             Ok(source) => source,
             Err(err) => {
                 eprintln!("error: failed to read '{}': {err}", path.display());
-                tally.refuse(exit_status::FAILURE);
+                tally.refuse(exit_status::NO_INPUT);
                 continue;
             }
         };
@@ -159,7 +162,7 @@ pub fn cmd_format(command: &FormatCommand) {
         std::process::exit(tally.refusal_status);
     }
     if tally.write_failed > 0 {
-        std::process::exit(exit_status::FAILURE);
+        exit_status::exit_cant_create();
     }
 }
 
@@ -358,7 +361,7 @@ pub(super) fn format_single_doc(
     _width: Option<NonZeroU32>,
 ) -> Result<String, i32> {
     eprintln!("error: formatting requires a faber build with feature `hir-faber`");
-    Err(exit_status::FAILURE)
+    Err(exit_status::UNAVAILABLE)
 }
 
 #[cfg(not(feature = "hir-faber"))]
@@ -369,7 +372,7 @@ pub(super) fn convert_single_doc(
     _source: &str,
 ) -> Result<String, i32> {
     eprintln!("error: reader-locale conversion requires a faber build with feature `hir-faber`");
-    Err(exit_status::FAILURE)
+    Err(exit_status::UNAVAILABLE)
 }
 
 ///
@@ -409,7 +412,7 @@ pub(super) fn format_single_doc(
             radix::services::DiagnosticMode::Normal,
             None,
         );
-        return Err(exit_status::FAILURE);
+        return Err(exit_status::SOFTWARE);
     };
     let result = radix::module::driver::reemit_faber(&session, emit_pack, &name, source);
 
@@ -439,7 +442,14 @@ pub(super) fn format_single_doc(
                 Some(emit_pack),
             );
             if wrapped != output.code
-                && !wrap_preserves_program(path, source, &session, emit_pack, &output.code, &wrapped)
+                && !wrap_preserves_program(
+                    path,
+                    source,
+                    &session,
+                    emit_pack,
+                    &output.code,
+                    &wrapped,
+                )
             {
                 eprintln!(
                     "error: {}: wrapping at width {width} would change the program; nothing formatted",
@@ -645,13 +655,18 @@ pub(super) fn normalize_trailing_newline(text: &str) -> String {
     }
 }
 
-pub(super) fn resolve_convert_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
+/// A path argument that cannot be resolved to `.fab` files: the exit status
+/// that names the class (a path that does not exist is `NO_INPUT`; a file that
+/// is not a `.fab` file is a `USAGE` error) and the message.
+pub(super) type PathError = (i32, String);
+
+pub(super) fn resolve_convert_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, PathError> {
     resolve_format_paths(paths)
 }
 
-fn resolve_format_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
+fn resolve_format_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, PathError> {
     let roots: Vec<PathBuf> = if paths.is_empty() {
-        vec![std::env::current_dir().map_err(|err| err.to_string())?]
+        vec![std::env::current_dir().map_err(|err| (exit_status::NO_INPUT, err.to_string()))?]
     } else {
         paths.to_vec()
     };
@@ -662,12 +677,18 @@ fn resolve_format_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
             if is_fab_file(&root) {
                 files.push(root);
             } else {
-                return Err(format!("'{}' is not a .fab file", root.display()));
+                return Err((
+                    exit_status::USAGE,
+                    format!("'{}' is not a .fab file", root.display()),
+                ));
             }
         } else if root.is_dir() {
             collect_fab_files(&root, &mut files);
         } else {
-            return Err(format!("'{}' does not exist", root.display()));
+            return Err((
+                exit_status::NO_INPUT,
+                format!("'{}' does not exist", root.display()),
+            ));
         }
     }
 

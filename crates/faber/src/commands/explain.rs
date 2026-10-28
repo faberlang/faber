@@ -13,7 +13,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
                 Ok(json) => println!("{json}"),
                 Err(err) => {
                     eprintln!("error: {err}");
-                    std::process::exit(1);
+                    faber_cli::exit_status::exit_software();
                 }
             }
         } else {
@@ -34,7 +34,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
                 .collect::<Vec<_>>()
                 .join(", ");
             eprintln!("hint: available categories: {categories}");
-            std::process::exit(1);
+            faber_cli::exit_status::exit_usage();
         }
         return;
     }
@@ -82,7 +82,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
                     }
                     Err(err) => {
                         eprintln!("error: {err}");
-                        std::process::exit(1);
+                        faber_cli::exit_status::exit_software();
                     }
                 }
             }
@@ -93,11 +93,11 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
             Ok(None) => {
                 eprintln!("error: no diagnostic explanation found for '{term}'");
                 eprintln!("hint: check the diagnostic code and issue spelling");
-                std::process::exit(1);
+                faber_cli::exit_status::exit_usage();
             }
             Err(err) => {
                 eprintln!("error: failed to load diagnostic explanations: {err}");
-                std::process::exit(1);
+                faber_cli::exit_status::exit_software();
             }
         }
     }
@@ -106,7 +106,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
     let Some(lookup) = registry.lookup(&term) else {
         eprintln!("error: no explanation found for '{term}'");
         eprintln!("hint: run `faber explain --list`");
-        std::process::exit(1);
+        faber_cli::exit_status::exit_usage();
     };
 
     if args.json {
@@ -114,7 +114,7 @@ pub(super) fn cmd_explain(args: ExplainArgs) {
             Ok(json) => println!("{json}"),
             Err(err) => {
                 eprintln!("error: {err}");
-                std::process::exit(1);
+                faber_cli::exit_status::exit_software();
             }
         }
     } else {
@@ -127,7 +127,7 @@ fn load_registry() -> Registry {
         Ok(registry) => registry,
         Err(err) => {
             eprintln!("error: failed to load the embedded reference: {err}");
-            std::process::exit(1);
+            faber_cli::exit_status::exit_software();
         }
     }
 }

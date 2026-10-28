@@ -132,10 +132,16 @@ Exit statuses of the tool (not of the program it runs; a program's own exit
 code passes through): `0` success (warnings alone are success), `65` the source
 has error diagnostics (`check`, `build`, `run`, `test`, `emit`, `format`; a
 warning promoted by `--deny` / `--deny-warnings` counts), `64` bad
-command-line arguments (including an unknown `--deny` code), `78` a bad
-`faber.toml` key or a locale pack that fails to load, `1` only a failure with no
-known class (unreadable file, failed write, failing `faber test` cases,
-`faber format` drift). Branch on the status, not on stderr text.
+command-line arguments (including an unknown `--deny` code, and a
+`faber corpus --target` the suite has no recipe for), `66` an input file, path
+or stdin that cannot be read, `69` a feature, runner or target this binary was
+not built with, `70` an internal serialization or render failure, `73` an
+output file or directory that cannot be written, `78` a bad `faber.toml` key,
+a locale pack that fails to load, or a malformed `corpus.toml` / `case.toml`,
+`1` only a failure with no known class. Outcomes keep their own status:
+failing `faber test` cases and `faber format --check` drift exit `1`;
+`faber update --check` exits `0` current, `1` update available, `2` lookup
+error. Branch on the status, not on stderr text.
 
 Build from the repo, not from an installed binary, when behavior matters:
 installed `faber` binaries go stale and lag the grammar, which shows up as false

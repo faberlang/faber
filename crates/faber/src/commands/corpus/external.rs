@@ -1,8 +1,6 @@
 //! Suite-configured target toolchains and compiler inspection lanes.
 
-use super::{
-    Case, Outcome, SUITE_STEP_TIMEOUT, SuiteTarget, fail, ms, run_bounded, summary_status,
-};
+use super::{Case, Outcome, SUITE_STEP_TIMEOUT, SuiteTarget, ms, run_bounded, summary_status};
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -42,31 +40,32 @@ pub(super) fn execute(
         .chars()
         .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
     {
-        fail("target name must contain only letters, digits, '-' or '_'");
+        super::fail_usage("target name must contain only letters, digits, '-' or '_'");
     }
     let mode = recipe.mode.as_deref().unwrap_or("external");
     if !matches!(
         mode,
         "external" | "build" | "emit" | "roundtrip" | "mir" | "none"
     ) {
-        fail(&format!("unsupported target mode {mode}"));
+        super::fail_config(&format!("unsupported target mode {mode}"));
     }
     if matches!(mode, "external" | "emit") && recipe.emit.is_none() {
-        fail(&format!("[targets.{target}] requires emit"));
+        super::fail_config(&format!("[targets.{target}] requires emit"));
     }
     if mode == "external" && (recipe.extension.is_none() || recipe.run.is_empty()) {
-        fail(&format!("[targets.{target}] requires extension and run"));
+        super::fail_config(&format!("[targets.{target}] requires extension and run"));
     }
     if mode == "build" && (recipe.extension.is_none() || recipe.build.is_empty()) {
-        fail(&format!("[targets.{target}] requires extension and build"));
+        super::fail_config(&format!("[targets.{target}] requires extension and build"));
     }
     let workspace = suite.join("target/corpus").join(target);
     if cases
         .iter()
         .any(|case| !matches!(case.target.outcome, Outcome::NotApplicable))
     {
-        fs::create_dir_all(&workspace)
-            .unwrap_or_else(|error| fail(&format!("cannot create target workspace: {error}")));
+        fs::create_dir_all(&workspace).unwrap_or_else(|error| {
+            super::fail_cant_create(&format!("cannot create target workspace: {error}"))
+        });
     }
     if mode == "roundtrip" {
         execute_roundtrip(cases, target, discover_ms, started);
@@ -181,7 +180,7 @@ pub(super) fn execute(
 
 #[cfg(not(feature = "hir-faber"))]
 fn execute_roundtrip(_cases: &[Case], target: &str, _discover_ms: f64, _started: Instant) {
-    fail(&format!(
+    super::fail_unavailable(&format!(
         "[targets.{target}] roundtrip requires a faber build with feature `hir-faber`"
     ));
 }
@@ -455,26 +454,10 @@ fn run_case(
     if let Err(error) = fs::remove_dir_all(&case_dir)
         && error.kind() != std::io::ErrorKind::NotFound
     {
-        return result(
-            case,
-            target,
-            "fail",
-            "setup",
-            Some(format!("cannot clear case workspace: {error}")),
-            None,
-            started,
-        );
+        super::fail_cant_create(&format!("cannot clear case workspace: {error}"));
     }
     if let Err(error) = fs::create_dir_all(&case_dir) {
-        return result(
-            case,
-            target,
-            "fail",
-            "setup",
-            Some(format!("cannot create case workspace: {error}")),
-            None,
-            started,
-        );
+        super::fail_cant_create(&format!("cannot create case workspace: {error}"));
     }
     let extension = recipe.extension.as_deref().unwrap_or("txt");
     if !extension.chars().all(|ch| ch.is_ascii_alphanumeric()) {
@@ -1246,14 +1229,18 @@ fn prepare_files(recipe: &SuiteTarget, paths: &Paths<'_>, bytes: &[u8]) -> Resul
     for (relative, template) in &recipe.files {
         let path = super::relative_path(paths.case_dir, relative)?;
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            fs::create_dir_all(parent).map_err(|error| -> String {
+                super::fail_cant_create(&format!("cannot create {}: {error}", parent.display()))
+            })?;
         }
         write_if_changed(&path, expand(template, paths).as_bytes())?;
     }
     for (relative, template) in &recipe.links {
         let path = super::relative_path(paths.case_dir, relative)?;
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+            fs::create_dir_all(parent).map_err(|error| -> String {
+                super::fail_cant_create(&format!("cannot create {}: {error}", parent.display()))
+            })?;
         }
         let destination = PathBuf::from(expand(template, paths));
         if !destination.exists() {
@@ -1268,7 +1255,9 @@ fn prepare_files(recipe: &SuiteTarget, paths: &Paths<'_>, bytes: &[u8]) -> Resul
                 if old == destination {
                     continue;
                 }
-                fs::remove_file(&path).map_err(|error| error.to_string())?;
+                fs::remove_file(&path).map_err(|error| -> String {
+                    super::fail_cant_create(&format!("cannot replace {}: {error}", path.display()))
+                })?;
             }
             Ok(_) => {
                 return Err(format!(
@@ -1280,7 +1269,9 @@ fn prepare_files(recipe: &SuiteTarget, paths: &Paths<'_>, bytes: &[u8]) -> Resul
             Err(error) => return Err(error.to_string()),
         }
         #[cfg(unix)]
-        std::os::unix::fs::symlink(&destination, &path).map_err(|error| error.to_string())?;
+        std::os::unix::fs::symlink(&destination, &path).map_err(|error| -> String {
+            super::fail_cant_create(&format!("cannot link {}: {error}", path.display()))
+        })?;
         #[cfg(windows)]
         std::os::windows::fs::symlink_dir(&destination, &path)
             .map_err(|error| error.to_string())?;
@@ -1288,11 +1279,15 @@ fn prepare_files(recipe: &SuiteTarget, paths: &Paths<'_>, bytes: &[u8]) -> Resul
     Ok(())
 }
 
+/// Write a staged case file unless it already holds `bytes`. A file that
+/// cannot be written is an infrastructure failure of the corpus run, not a
+/// case outcome: it exits [`exit_status::CANT_CREATE`].
 fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<(), String> {
     match fs::read(path) {
         Ok(old) if old == bytes => Ok(()),
-        _ => fs::write(path, bytes)
-            .map_err(|error| format!("cannot write {}: {error}", path.display())),
+        _ => fs::write(path, bytes).map_err(|error| -> String {
+            super::fail_cant_create(&format!("cannot write {}: {error}", path.display()))
+        }),
     }
 }
 

@@ -130,7 +130,7 @@ pub fn print_diagnostics(
             Ok(rendered) => eprintln!("{rendered}"),
             Err(err) => {
                 eprintln!("error: failed to render reader-pack diagnostics: {err}");
-                std::process::exit(1);
+                crate::exit_status::exit_software();
             }
         },
         None => eprintln!(
@@ -157,7 +157,7 @@ fn ensure_artifact_parent(path: &Path) {
                 parent.display(),
                 err
             );
-            std::process::exit(1);
+            crate::exit_status::exit_cant_create();
         });
     }
 }
@@ -168,7 +168,7 @@ fn write_artifact_contents(path: &Path, contents: impl AsRef<[u8]>) {
         Err(err) if err.kind() == io::ErrorKind::BrokenPipe => {}
         Err(err) => {
             eprintln!("error: failed to write '{}': {}", path.display(), err);
-            std::process::exit(1);
+            crate::exit_status::exit_cant_create();
         }
     }
 }

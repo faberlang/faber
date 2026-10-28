@@ -147,7 +147,7 @@ pub(super) fn cmd_cost(args: CostArgs) {
                     Ok(json) => println!("{json}"),
                     Err(err) => {
                         eprintln!("error: failed to render cost JSON: {err}");
-                        std::process::exit(1);
+                        faber_cli::exit_status::exit_software();
                     }
                 }
             } else {

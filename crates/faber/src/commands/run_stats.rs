@@ -428,6 +428,22 @@ pub(crate) fn encode(artifact: &RunStatsArtifact) -> io::Result<String> {
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
+/// Exit for a statistics emission failure: [`exit_status::SOFTWARE`] when the
+/// artifact could not be serialized (`encode` marks that with a
+/// `serde_json::Error`), [`exit_status::CANT_CREATE`] when the file or stdout
+/// could not be written.
+pub(crate) fn exit_for_emit_error(what: &str, error: &io::Error) -> ! {
+    eprintln!("error: could not write {what}: {error}");
+    let serialization = error
+        .get_ref()
+        .is_some_and(|inner| inner.is::<serde_json::Error>());
+    std::process::exit(if serialization {
+        faber_cli::exit_status::SOFTWARE
+    } else {
+        faber_cli::exit_status::CANT_CREATE
+    });
+}
+
 /// Emit the requested file artifact and/or framed stdout artifact.
 ///
 /// The file is written first so a file-only failure cannot leave a misleading
