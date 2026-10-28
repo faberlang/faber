@@ -10,6 +10,11 @@
 //! `FABER_SPAN_STATS_FILE`); without the package variable the test skips, so
 //! it never runs by accident. `FABER_REQUIRE_CUDA` turns a missing device into
 //! a failure.
+//!
+//! Despite the name, any package runs here (the data-parallel training probe
+//! `acceptance/span-train-probe` does): `FABER_SPAN_STDOUT_FILE`, when set,
+//! receives every line the program printed, so two runs can be compared byte
+//! for byte.
 
 use super::run_stats::{self, ColdStartMetadata, DeviceMetadata, RunStatsArtifact};
 use faber_cli::package::mir::{CpuDeviceShape, run_package_on_device_session_shaped};
@@ -92,6 +97,11 @@ fn a2_at_two_private_partitions_writes_the_span_stats_file() {
     artifact.device = Some(DeviceMetadata::from_receipt(&run.device));
     let text = run_stats::encode(&artifact).expect("encode the artifact");
     std::fs::write(&stats_file, format!("{text}\n")).expect("write the stats file");
+    if let Some(stdout_file) = std::env::var_os("FABER_SPAN_STDOUT_FILE") {
+        let mut text = host.stdout_lines.join("\n");
+        text.push('\n');
+        std::fs::write(stdout_file, text).expect("write the stdout file");
+    }
     eprintln!(
         "span-int: wall_ms={wall_ms} stdout_lines={}",
         host.stdout_lines.len()
