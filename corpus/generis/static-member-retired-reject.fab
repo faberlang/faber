@@ -2,7 +2,7 @@
 term = "generis"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "type_annotation", "base_type", "incipit_stmt", "block_stmt", "nota_stmt"]
-category = "type"
+category = "generic"
 summary = "A class member of the type itself is const; the old static member word is retired."
 syntax = "class P { static int X = 3 }"
 related = ["fixum", "genus"]

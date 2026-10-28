@@ -2,7 +2,7 @@
 term = "bits"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "b16 and b32 act at their own width: ¬, shift edges (count 0, N-1, N, N+1), unsigned order, and a b64 xor chain."
 syntax = "¬ c | c ⇐ 1 | c ⇒ 15 | hi ≻ lo"

@@ -2,7 +2,7 @@
 term = "json"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "importa_decl", "importa_sugar", "named_import", "genus_decl", "genus_member", "field_decl", "annotation", "annotation_sugar", "braced_annotation", "annotation_name", "annotation_field_list", "annotation_field", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "json_literal", "json_member", "json_value", "json_object", "json_array", "json_string", "json_number", "conversio_expr", "fac_stmt", "cape_clause", "call_expr", "call_suffix", "member_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "format"
 canonical = true
 locale = "en"
 no_expected = "awaiting-ruling"

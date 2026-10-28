@@ -3,6 +3,8 @@ id = "corpus/si/else-if-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "si/else-if-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

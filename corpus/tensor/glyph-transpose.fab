@@ -2,7 +2,7 @@
 term = "ᵀ"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "expression", "call_expr", "member_suffix", "literal", "redde_stmt"]
-category = "arithmetic"
+category = "tensor"
 summary = "Postfix ᵀ transpose: rank-2 tensor [M,N] becomes [N,M]."
 syntax = "<rank-2 tensor expression>ᵀ"
 related = ["tensor", "matmul"]

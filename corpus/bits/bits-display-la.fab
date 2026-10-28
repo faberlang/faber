@@ -2,7 +2,7 @@
 term = "bits"
 kind = "display"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = true
 summary = "print shows a bits value as hex at its full width, alone or inside a list."
 syntax = "print x | print lista<b8>"

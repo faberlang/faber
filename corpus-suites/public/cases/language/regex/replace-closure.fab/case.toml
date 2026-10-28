@@ -3,6 +3,8 @@ id = "corpus/regex/replace-closure.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/replace-closure.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

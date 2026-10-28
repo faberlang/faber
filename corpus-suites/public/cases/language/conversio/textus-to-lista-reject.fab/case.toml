@@ -3,6 +3,8 @@ id = "corpus/conversio/textus-to-lista-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/textus-to-lista-reject.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

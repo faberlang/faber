@@ -3,6 +3,8 @@ id = "corpus/tensor/edge-shift-policies.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/edge-shift-policies.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

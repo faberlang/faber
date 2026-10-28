@@ -3,6 +3,8 @@ id = "corpus/ordo/enum-usage.fab"
 group = "language"
 input_root = "corpus"
 input = "ordo/enum-usage.fab"
+category = "variant"
+domain = "types"
 
 
 [expect]

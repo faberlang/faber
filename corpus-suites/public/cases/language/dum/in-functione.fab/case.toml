@@ -3,6 +3,8 @@ id = "corpus/dum/in-functione.fab"
 group = "language"
 input_root = "corpus"
 input = "dum/in-functione.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

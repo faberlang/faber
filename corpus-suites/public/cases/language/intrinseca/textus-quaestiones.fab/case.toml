@@ -3,6 +3,8 @@ id = "corpus/intrinseca/textus-quaestiones.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/textus-quaestiones.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

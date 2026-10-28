@@ -2,7 +2,7 @@
 term = "itera"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "itera_stmt", "itera_binding", "range_expr", "range_tail", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = true
 summary = "Range iteration is exact at the i64 edge; the step contract is checked at run time and a zero or negative step aborts."
 syntax = "for range <start>…<end> step <step> let <item> { <body> }"

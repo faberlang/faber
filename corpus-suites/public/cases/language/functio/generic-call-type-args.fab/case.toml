@@ -3,6 +3,8 @@ id = "corpus/functio/generic-call-type-args.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/generic-call-type-args.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

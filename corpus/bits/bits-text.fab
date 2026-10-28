@@ -2,7 +2,7 @@
 term = "bits"
 kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "conversio"
+category = "bits"
 canonical = true
 summary = "A lista<b8> converts to string as UTF-8, a lista<b16> as UTF-16 and a lista<b32> as UTF-32; the decode can fail and the encode cannot."
 syntax = "let string s ← list<b8> ↦ string ⊥ \"?\" | let list<b16> units ← s ↦ list<b16>"

@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/binder-ref-refused-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/binder-ref-refused-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

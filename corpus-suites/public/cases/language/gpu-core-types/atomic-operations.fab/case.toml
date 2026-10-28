@@ -3,6 +3,8 @@ id = "corpus/gpu-core-types/atomic-operations.fab"
 group = "language"
 input_root = "corpus"
 input = "gpu-core-types/atomic-operations.fab"
+category = "device"
+domain = "gpu"
 
 
 [expect]

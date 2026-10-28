@@ -3,6 +3,8 @@ id = "corpus/summa/varia-binder.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/varia-binder.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

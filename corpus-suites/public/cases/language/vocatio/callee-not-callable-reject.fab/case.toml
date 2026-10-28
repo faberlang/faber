@@ -3,6 +3,8 @@ id = "corpus/vocatio/callee-not-callable-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "vocatio/callee-not-callable-reject.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

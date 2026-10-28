@@ -2,7 +2,7 @@
 term = "!."
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "expression", "literal", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "non_null_suffix", "redde_stmt", "nota_stmt"]
-category = "non-null-chain"
+category = "type"
 canonical = false
 summary = "A method call through a non-null assertion: `value!.method(args)` calls the method on the asserted payload."
 syntax = "<expression>!.<method>(<args>)"

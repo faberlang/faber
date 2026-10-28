@@ -3,6 +3,8 @@ id = "corpus/integratio/arena-mixta.fab"
 group = "language"
 input_root = "corpus"
 input = "integratio/arena-mixta.fab"
+category = "integration"
+domain = "program"
 
 
 [expect]

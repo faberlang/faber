@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/const-mutating-receiver-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/const-mutating-receiver-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/tabula/tabula.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/tabula.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

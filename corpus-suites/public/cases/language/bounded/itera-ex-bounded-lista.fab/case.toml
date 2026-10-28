@@ -3,6 +3,8 @@ id = "corpus/bounded/itera-ex-bounded-lista.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/itera-ex-bounded-lista.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/genus/inferred-literals.fab"
 group = "language"
 input_root = "corpus"
 input = "genus/inferred-literals.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

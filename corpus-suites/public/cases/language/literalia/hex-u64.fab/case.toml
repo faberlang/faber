@@ -3,6 +3,8 @@ id = "corpus/literalia/hex-u64.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/hex-u64.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

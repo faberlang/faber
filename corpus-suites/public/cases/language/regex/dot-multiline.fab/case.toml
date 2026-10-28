@@ -3,6 +3,8 @@ id = "corpus/regex/dot-multiline.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/dot-multiline.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

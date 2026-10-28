@@ -3,6 +3,8 @@ id = "corpus/meta/nondum.fab"
 group = "language"
 input_root = "corpus"
 input = "meta/nondum.fab"
+category = "annotation"
+domain = "program"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/operandus/operandus.fab"
 group = "language"
 input_root = "corpus"
 input = "operandus/operandus.fab"
+category = "cli"
+domain = "program"
 
 args = ["input.txt", "extra.txt"]
 

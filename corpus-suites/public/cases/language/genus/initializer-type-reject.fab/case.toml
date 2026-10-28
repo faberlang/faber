@@ -3,6 +3,8 @@ id = "corpus/genus/initializer-type-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "genus/initializer-type-reject.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/tensor/decl.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/decl.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

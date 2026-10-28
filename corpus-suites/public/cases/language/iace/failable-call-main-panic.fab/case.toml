@@ -3,6 +3,8 @@ id = "corpus/iace/failable-call-main-panic.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/failable-call-main-panic.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

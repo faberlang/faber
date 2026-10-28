@@ -3,6 +3,8 @@ id = "corpus/regex/empty-match.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/empty-match.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "itera"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "expression", "literal", "array_literal", "itera_stmt", "assignment", "place", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "The varia loop binder: for from <collection> mut <item> { <body> } binds a fresh mutable slot per element."
 syntax = "for from <collection> mut <binder> { <body> }"

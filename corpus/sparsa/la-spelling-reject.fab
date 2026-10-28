@@ -2,7 +2,7 @@
 term = "sparsa"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "call_expr", "call_suffix", "argument_list", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "locale"
 canonical = false
 summary = "The Latin type word sparsa in an en file is a wrong-locale error (expect parse error)."
 syntax = "let sparsa<f32, [2, 3]> grid ← empty — rejected in an en file; write sparse<f32, [2, 3]>"

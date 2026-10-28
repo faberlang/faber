@@ -3,6 +3,8 @@ id = "corpus/lista/spread-source-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/spread-source-reject.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

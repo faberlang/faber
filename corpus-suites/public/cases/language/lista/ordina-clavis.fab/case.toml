@@ -3,6 +3,8 @@ id = "corpus/lista/ordina-clavis.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/ordina-clavis.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

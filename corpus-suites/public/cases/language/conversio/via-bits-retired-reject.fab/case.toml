@@ -3,6 +3,8 @@ id = "corpus/conversio/via-bits-retired-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/via-bits-retired-reject.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

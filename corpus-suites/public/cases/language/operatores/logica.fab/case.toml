@@ -3,6 +3,8 @@ id = "corpus/operatores/logica.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/logica.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

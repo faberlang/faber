@@ -3,6 +3,8 @@ id = "corpus/intervallum/algebra.fab"
 group = "language"
 input_root = "corpus"
 input = "intervallum/algebra.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

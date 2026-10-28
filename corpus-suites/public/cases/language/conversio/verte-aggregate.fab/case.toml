@@ -3,6 +3,8 @@ id = "corpus/conversio/verte-aggregate.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/verte-aggregate.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

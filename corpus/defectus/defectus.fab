@@ -2,7 +2,7 @@
 term = "defectus"
 kind = "operator"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "alternate_exit_clause", "redde_stmt", "si_stmt", "iace_stmt", "inline_default", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal"]
-category = "errors"
+category = "error"
 canonical = true
 summary = "Supplies a default value when a failable call fails: f(x) ⊥ v."
 syntax = "<failable call> ⊥ <default>"

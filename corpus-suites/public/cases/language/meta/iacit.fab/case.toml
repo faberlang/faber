@@ -3,6 +3,8 @@ id = "corpus/meta/iacit.fab"
 group = "language"
 input_root = "corpus"
 input = "meta/iacit.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

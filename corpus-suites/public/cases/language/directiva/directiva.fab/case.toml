@@ -3,6 +3,8 @@ id = "corpus/directiva/directiva.fab"
 group = "language"
 input_root = "corpus"
 input = "directiva/directiva.fab"
+category = "annotation"
+domain = "program"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "store rule"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "binding_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "arithmetic"
+category = "tensor"
 canonical = false
 summary = "Tensor intermediates are typed by the scalar range rule; the declared element width applies only at the store."
 syntax = "(a + b) / 2 | (tensor + scalar) / scalar"

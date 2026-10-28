@@ -3,6 +3,8 @@ id = "corpus/conversio/littera.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/littera.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

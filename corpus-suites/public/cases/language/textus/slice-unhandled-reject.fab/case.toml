@@ -3,6 +3,8 @@ id = "corpus/textus/slice-unhandled-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "textus/slice-unhandled-reject.fab"
+category = "text"
+domain = "text"
 
 
 [expect]

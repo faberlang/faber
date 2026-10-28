@@ -2,7 +2,7 @@
 term = "schema"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "schema_decl", "schema_column", "type_annotation", "owned_type", "base_type", "qualified_type", "block_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
-category = "declaration"
+category = "type"
 canonical = true
 summary = "Declares an application-owned relational heading (experimental)."
 syntax = "schema <Name> { columna <type> <name> ... }"

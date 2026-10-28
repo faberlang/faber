@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/const-share-into-var-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/const-share-into-var-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

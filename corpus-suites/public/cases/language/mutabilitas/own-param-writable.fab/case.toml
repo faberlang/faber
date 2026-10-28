@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/own-param-writable.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/own-param-writable.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

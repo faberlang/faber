@@ -2,7 +2,7 @@
 term = "!."
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "array_literal", "call_expr", "non_null_suffix", "nota_stmt"]
-category = "non-null-chain"
+category = "type"
 canonical = false
 summary = "Non-null assertion before member, index, or call access."
 syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<args>)"

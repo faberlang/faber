@@ -3,6 +3,8 @@ id = "corpus/bounded/ascii-methods.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/ascii-methods.fab"
+category = "text"
+domain = "text"
 
 
 [expect]

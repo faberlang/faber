@@ -3,6 +3,8 @@ id = "corpus/ceteri/ceteri.fab"
 group = "language"
 input_root = "corpus"
 input = "ceteri/ceteri.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

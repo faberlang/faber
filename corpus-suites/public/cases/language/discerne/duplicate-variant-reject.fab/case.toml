@@ -3,6 +3,8 @@ id = "corpus/discerne/duplicate-variant-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "discerne/duplicate-variant-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "membrum"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "array_literal", "json_literal", "json_member", "json_value", "json_number", "call_expr", "member_suffix", "optional_suffix", "expression", "literal", "nota_stmt"]
-category = "expression"
+category = "class"
 canonical = true
 summary = "Dot, bracket, chained, and optional member access expressions."
 syntax = "<expr>.<field> | <expr>[<index>] | <expr>?.<field>"

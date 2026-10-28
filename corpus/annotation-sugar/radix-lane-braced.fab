@@ -2,7 +2,7 @@
 term = "radix-lane"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "annotation", "braced_annotation", "annotation_name", "annotation_field_list", "annotation_field", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "call_expr", "call_suffix", "argument_list", "nota_stmt", "expression", "literal"]
-category = "lane"
+category = "kernel"
 canonical = true
 summary = "Braced canonical @ radix lane routing record for the Rust HIR-direct lane."
 syntax = "@ radix { lane = \"hir-direct\" }"

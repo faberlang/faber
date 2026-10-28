@@ -3,6 +3,8 @@ id = "corpus/operatores/inf-nul.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/inf-nul.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

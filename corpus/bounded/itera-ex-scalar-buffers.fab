@@ -2,7 +2,7 @@
 term = "itera-ex-scalar-buffers"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Value iteration over runtime-length list<b8, N> / ascii<N> / string<N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
 syntax = "for from list<b8, N> | ascii<N> | string<N> let x { }"

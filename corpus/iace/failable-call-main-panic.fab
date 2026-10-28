@@ -2,7 +2,7 @@
 term = "functio"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "si_stmt", "arm", "iace_stmt", "iace_expr", "comparison", "additive_expr", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "function"
+category = "error"
 canonical = false
 summary = "An unhandled failable call directly in main panics: exit code 1, the error value as the message."
 syntax = "<failable call>  (in main, outside fac/cape)"

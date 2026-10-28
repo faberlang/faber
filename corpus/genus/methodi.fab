@@ -2,7 +2,7 @@
 term = "genus"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "assignment", "place", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "class"
 canonical = false
 summary = "Genus methods using ego for field access."
 syntax = "genus <name> { functio <method>(<params>) → <type> { … ego.<field> … } }"

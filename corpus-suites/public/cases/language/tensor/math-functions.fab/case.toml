@@ -3,6 +3,8 @@ id = "corpus/tensor/math-functions.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/math-functions.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

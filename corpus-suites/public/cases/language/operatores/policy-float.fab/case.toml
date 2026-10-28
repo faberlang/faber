@@ -3,6 +3,8 @@ id = "corpus/operatores/policy-float.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/policy-float.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

@@ -457,9 +457,27 @@ pub struct CorpusArgs {
     #[arg(long, value_name = "PATH")]
     pub expected: Option<PathBuf>,
 
-    /// Only run suite cases whose id contains this substring
+    /// Only run suite cases whose id contains this substring. Selectors
+    /// --domain, --category, --case and --filter all add up: a case runs when
+    /// any one of them names it (union; nothing narrows or excludes)
     #[arg(long, value_name = "SUBSTRING")]
     pub filter: Option<String>,
+
+    /// Run every case in these domains (comma list; adds to the other selectors).
+    /// The suite's corpus.toml [domains] table defines them; a suite without one
+    /// rejects this flag
+    #[arg(long, value_name = "DOMAIN,...", value_delimiter = ',')]
+    pub domain: Vec<String>,
+
+    /// Run every case in these categories (comma list; adds to the other
+    /// selectors). A suite without a [domains] table rejects this flag
+    #[arg(long, value_name = "CATEGORY,...", value_delimiter = ',')]
+    pub category: Vec<String>,
+
+    /// Run these exact case ids (comma list; adds to the other selectors). An
+    /// unknown id is an error
+    #[arg(long = "case", value_name = "ID,...", value_delimiter = ',')]
+    pub case: Vec<String>,
 }
 
 /// Shared source-input grammar for phase inspection commands.

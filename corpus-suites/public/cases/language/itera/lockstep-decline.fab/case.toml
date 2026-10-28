@@ -3,6 +3,8 @@ id = "corpus/itera/lockstep-decline.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/lockstep-decline.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

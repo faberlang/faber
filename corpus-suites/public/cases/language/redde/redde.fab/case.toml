@@ -3,6 +3,8 @@ id = "corpus/redde/redde.fab"
 group = "language"
 input_root = "corpus"
 input = "redde/redde.fab"
+category = "jump"
+domain = "control"
 
 
 [expect]

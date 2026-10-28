@@ -3,6 +3,8 @@ id = "corpus/discretio/discretio.fab"
 group = "language"
 input_root = "corpus"
 input = "discretio/discretio.fab"
+category = "variant"
+domain = "types"
 
 
 [expect]

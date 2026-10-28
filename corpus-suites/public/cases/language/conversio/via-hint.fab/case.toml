@@ -3,6 +3,8 @@ id = "corpus/conversio/via-hint.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/via-hint.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

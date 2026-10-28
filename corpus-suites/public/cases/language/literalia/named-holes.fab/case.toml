@@ -3,6 +3,8 @@ id = "corpus/literalia/named-holes.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/named-holes.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

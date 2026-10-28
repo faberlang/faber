@@ -2,7 +2,7 @@
 term = "iace"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "si_stmt", "arm", "iace_stmt", "iace_expr", "equality", "equality_tail", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "errors"
+category = "error"
 summary = "A call to a ⇥ function with no handler is rejected: do/catch, capta, a ⊥ default, or a ⇥ on the caller."
 syntax = "fn h() → int { return f(1) }  (f is → int ⇥ string)"
 related = ["functio", "⇥", "iace", "cape"]

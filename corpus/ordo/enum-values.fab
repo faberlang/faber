@@ -2,7 +2,7 @@
 term = "ordo"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "expression", "unary_expr", "literal", "member_suffix", "nota_stmt"]
-category = "type"
+category = "variant"
 canonical = false
 summary = "Enum member values: implicit increment after an explicit value, gaps, and hex/binary/underscore literals."
 syntax = "enum <N> { a = 5, b }"

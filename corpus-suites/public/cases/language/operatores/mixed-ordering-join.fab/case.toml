@@ -3,6 +3,8 @@ id = "corpus/operatores/mixed-ordering-join.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/mixed-ordering-join.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

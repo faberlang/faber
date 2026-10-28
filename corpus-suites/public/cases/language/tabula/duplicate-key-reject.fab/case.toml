@@ -3,6 +3,8 @@ id = "corpus/tabula/duplicate-key-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/duplicate-key-reject.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

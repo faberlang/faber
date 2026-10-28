@@ -3,6 +3,8 @@ id = "corpus/literalia/regex.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/regex.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

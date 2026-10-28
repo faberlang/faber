@@ -3,6 +3,8 @@ id = "corpus/immutata/immutata.fab"
 group = "language"
 input_root = "corpus"
 input = "immutata/immutata.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

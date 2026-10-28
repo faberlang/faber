@@ -2,7 +2,7 @@
 term = "summa"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "cast_expr", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "multiplicative_expr", "additive_expr", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = true
 summary = "Returns the sum of numeric list elements."
 syntax = "<lista>.sum()"

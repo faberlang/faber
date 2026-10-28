@@ -3,6 +3,8 @@ id = "corpus/gpu-core-types/matrix-register.fab"
 group = "language"
 input_root = "corpus"
 input = "gpu-core-types/matrix-register.fab"
+category = "device"
+domain = "gpu"
 
 
 [expect]

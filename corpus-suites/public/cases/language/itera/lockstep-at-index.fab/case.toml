@@ -3,6 +3,8 @@ id = "corpus/itera/lockstep-at-index.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/lockstep-at-index.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

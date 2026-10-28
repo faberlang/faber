@@ -3,6 +3,8 @@ id = "corpus/incipit/salve-munde.fab"
 group = "language"
 input_root = "corpus"
 input = "incipit/salve-munde.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

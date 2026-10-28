@@ -3,6 +3,8 @@ id = "corpus/aspect/air-aspect-admit.fab"
 group = "language"
 input_root = "corpus"
 input = "aspect/air-aspect-admit.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

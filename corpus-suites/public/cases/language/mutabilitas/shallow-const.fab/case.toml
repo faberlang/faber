@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/shallow-const.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/shallow-const.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/variandum/variandum.fab"
 group = "language"
 input_root = "corpus"
 input = "variandum/variandum.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

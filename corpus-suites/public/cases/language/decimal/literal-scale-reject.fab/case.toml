@@ -3,6 +3,8 @@ id = "corpus/decimal/literal-scale-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/literal-scale-reject.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

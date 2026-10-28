@@ -3,6 +3,8 @@ id = "corpus/lista/methodi-copiae.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/methodi-copiae.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

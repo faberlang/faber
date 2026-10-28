@@ -3,6 +3,8 @@ id = "corpus/si/secus.fab"
 group = "language"
 input_root = "corpus"
 input = "si/secus.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

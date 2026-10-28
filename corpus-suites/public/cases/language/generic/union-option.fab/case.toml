@@ -3,6 +3,8 @@ id = "corpus/generic/union-option.fab"
 group = "language"
 input_root = "corpus"
 input = "generic/union-option.fab"
+category = "generic"
+domain = "types"
 
 
 [expect]

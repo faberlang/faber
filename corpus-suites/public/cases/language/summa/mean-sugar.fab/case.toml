@@ -3,6 +3,8 @@ id = "corpus/summa/mean-sugar.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/mean-sugar.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

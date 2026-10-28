@@ -2,7 +2,7 @@
 term = "textus"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "text"
 canonical = false
 summary = "A text slice outside main with no handler is refused: the window reports on the error channel."
 syntax = "fn f(string s) → string { return s.slice(0, 1) }  — rejected"

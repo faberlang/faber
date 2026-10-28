@@ -3,6 +3,8 @@ id = "corpus/vide/vide.fab"
 group = "language"
 input_root = "corpus"
 input = "vide/vide.fab"
+category = "console"
+domain = "io"
 
 
 [expect]

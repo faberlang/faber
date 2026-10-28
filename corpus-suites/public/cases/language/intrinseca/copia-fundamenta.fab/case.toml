@@ -3,6 +3,8 @@ id = "corpus/intrinseca/copia-fundamenta.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/copia-fundamenta.fab"
+category = "set"
+domain = "collections"
 
 
 [expect]

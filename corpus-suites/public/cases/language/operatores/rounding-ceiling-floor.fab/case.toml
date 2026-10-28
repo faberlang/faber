@@ -3,6 +3,8 @@ id = "corpus/operatores/rounding-ceiling-floor.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/rounding-ceiling-floor.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/vector/lift-scalar.fab"
 group = "language"
 input_root = "corpus"
 input = "vector/lift-scalar.fab"
+category = "vector"
+domain = "tensors"
 
 
 [expect]

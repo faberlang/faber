@@ -3,6 +3,8 @@ id = "corpus/schema/schema.fab"
 group = "language"
 input_root = "corpus"
 input = "schema/schema.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

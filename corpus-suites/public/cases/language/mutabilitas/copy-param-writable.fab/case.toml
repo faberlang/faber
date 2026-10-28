@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/copy-param-writable.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/copy-param-writable.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

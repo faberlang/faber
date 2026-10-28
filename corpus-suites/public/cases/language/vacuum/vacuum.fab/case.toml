@@ -3,6 +3,8 @@ id = "corpus/vacuum/vacuum.fab"
 group = "language"
 input_root = "corpus"
 input = "vacuum/vacuum.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

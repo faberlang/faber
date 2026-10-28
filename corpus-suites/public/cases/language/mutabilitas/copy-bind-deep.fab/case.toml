@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/copy-bind-deep.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/copy-bind-deep.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

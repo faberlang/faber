@@ -3,6 +3,8 @@ id = "corpus/summa/summa-ex-retired.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/summa-ex-retired.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "lista"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Decline: unequal exact bounds on literal elementwise operands reject during typecheck."
 syntax = "[a, b] + [c]"

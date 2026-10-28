@@ -2,7 +2,7 @@
 term = "requirit"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "requirit_stmt", "equality", "equality_tail", "expression", "literal", "incipit_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "Require always names its payload with throw; the missing particle is refused by name."
 syntax = "require <cond>"

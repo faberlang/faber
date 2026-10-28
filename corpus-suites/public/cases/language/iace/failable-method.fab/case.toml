@@ -3,6 +3,8 @@ id = "corpus/iace/failable-method.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/failable-method.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

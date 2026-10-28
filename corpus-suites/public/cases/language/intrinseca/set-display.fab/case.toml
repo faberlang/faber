@@ -3,6 +3,8 @@ id = "corpus/intrinseca/set-display.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/set-display.fab"
+category = "set"
+domain = "collections"
 
 
 [expect]

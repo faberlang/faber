@@ -3,6 +3,8 @@ id = "corpus/si/then-elif-forms.fab"
 group = "language"
 input_root = "corpus"
 input = "si/then-elif-forms.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

@@ -8,6 +8,8 @@ use std::time::Duration;
 fn case(outcome: Outcome, phase: Option<&str>) -> Case {
     Case {
         id: "case".to_owned(),
+        category: None,
+        domain: None,
         dir: PathBuf::new(),
         input: PathBuf::new(),
         args: Vec::new(),

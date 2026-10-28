@@ -3,6 +3,8 @@ id = "corpus/custodi/guard-in-loop.fab"
 group = "language"
 input_root = "corpus"
 input = "custodi/guard-in-loop.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

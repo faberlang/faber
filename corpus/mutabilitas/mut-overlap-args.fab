@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "functio_decl", "param_list", "parameter", "func_modifier", "argument_list", "argument"]
-category = "type"
+category = "binding"
 summary = "MU-4 red: the same value passed to two mut parameters conflicts."
 syntax = "fn swap(mut list<int> a, mut list<int> b); swap(xs, xs)"
 related = ["mut"]

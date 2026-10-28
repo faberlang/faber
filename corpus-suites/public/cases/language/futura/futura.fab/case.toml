@@ -3,6 +3,8 @@ id = "corpus/futura/futura.fab"
 group = "language"
 input_root = "corpus"
 input = "futura/futura.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

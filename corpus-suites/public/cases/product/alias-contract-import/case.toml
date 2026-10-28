@@ -3,6 +3,8 @@ id = "product/alias-contract-import"
 group = "product"
 input_root = "product"
 input = "alias-contract-import"
+category = "package"
+domain = "program"
 
 
 [expect]

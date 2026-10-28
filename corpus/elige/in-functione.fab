@@ -2,7 +2,7 @@
 term = "elige"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "elige_stmt", "casu_elige_clause", "ceterum_clause", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "Early returns from elige inside functions."
 syntax = "elige <expression> { casu … redde … }"

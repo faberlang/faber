@@ -3,6 +3,8 @@ id = "corpus/implendum/conformance-signature-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "implendum/conformance-signature-reject.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

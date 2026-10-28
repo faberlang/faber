@@ -3,6 +3,8 @@ id = "corpus/typus/alias-cycle-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "typus/alias-cycle-reject.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

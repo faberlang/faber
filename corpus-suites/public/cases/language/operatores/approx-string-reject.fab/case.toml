@@ -3,6 +3,8 @@ id = "corpus/operatores/approx-string-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/approx-string-reject.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

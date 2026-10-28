@@ -3,6 +3,8 @@ id = "corpus/mone/mone.fab"
 group = "language"
 input_root = "corpus"
 input = "mone/mone.fab"
+category = "console"
+domain = "io"
 
 
 [expect]

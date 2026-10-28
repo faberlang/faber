@@ -3,6 +3,8 @@ id = "corpus/tensor/store-overflow-trap.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/store-overflow-trap.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

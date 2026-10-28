@@ -2,7 +2,7 @@
 term = "lista"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "call_expr", "call_suffix", "member_suffix", "fac_stmt", "cape_clause", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Three reads of one element on a list and a text: c[i] dies when missing, c.accipe(i) gives none, c.apud(i) reports on the error channel."
 syntax = "<collection>[<index>] | <collection>.accipe(<index>) | <collection>.apud(<index>)"

@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/alias-on-bind.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/alias-on-bind.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

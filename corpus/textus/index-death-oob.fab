@@ -2,7 +2,7 @@
 term = "textus"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "register"
+category = "text"
 canonical = false
 summary = "A scalar text index past the last character kills the run where it is evaluated; it never trims or wraps."
 syntax = "s[i]"

@@ -3,6 +3,8 @@ id = "corpus/postpara/postpara.fab"
 group = "language"
 input_root = "corpus"
 input = "postpara/postpara.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

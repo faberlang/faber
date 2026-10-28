@@ -2,7 +2,7 @@
 term = "ᵀ"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "transpose_suffix", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "arithmetic"
+category = "tensor"
 summary = "ᵀ composes as postfix sugar: aᵀ materializes, a · aᵀ contracts, and aᵀᵀ returns the original."
 syntax = "<rank-2 tensor expression>ᵀ"
 related = ["tensor", "matmul"]

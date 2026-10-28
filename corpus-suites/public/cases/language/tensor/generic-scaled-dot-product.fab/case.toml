@@ -3,6 +3,8 @@ id = "corpus/tensor/generic-scaled-dot-product.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/generic-scaled-dot-product.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

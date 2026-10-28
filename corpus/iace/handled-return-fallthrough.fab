@@ -2,7 +2,7 @@
 term = "functio"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "fac_stmt", "cape_clause", "fixum_decl", "type_annotation", "owned_type", "base_type", "comparison", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "scriptum_expr", "nota_stmt"]
-category = "function"
+category = "error"
 canonical = false
 summary = "In a ⇥ function, `fac { … redde … } cape err { }` returns only when the body succeeds; a handler that does not itself leave continues with the code after the block."
 syntax = "fac { <body with redde> } cape <name> { <handler> }  (in a ⇥ function)"

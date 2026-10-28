@@ -2,7 +2,7 @@
 term = "cape"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "fac_stmt", "cape_clause", "si_stmt", "iace_stmt", "expression", "comparison", "additive_expr", "literal", "nota_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "A panic at the end of a do body is fatal and the catch cannot run."
 syntax = "do { … panic e } catch name { … }"

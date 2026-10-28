@@ -3,6 +3,8 @@ id = "corpus/futurum/futurum.fab"
 group = "language"
 input_root = "corpus"
 input = "futurum/futurum.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

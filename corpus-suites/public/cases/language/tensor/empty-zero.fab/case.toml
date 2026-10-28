@@ -3,6 +3,8 @@ id = "corpus/tensor/empty-zero.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/empty-zero.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/operatores/gate-law-totality.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/gate-law-totality.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

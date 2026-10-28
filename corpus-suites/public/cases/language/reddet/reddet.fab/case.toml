@@ -3,6 +3,8 @@ id = "corpus/reddet/reddet.fab"
 group = "language"
 input_root = "corpus"
 input = "reddet/reddet.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

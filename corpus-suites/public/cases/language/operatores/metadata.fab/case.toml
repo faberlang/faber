@@ -3,6 +3,8 @@ id = "corpus/operatores/metadata.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/metadata.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

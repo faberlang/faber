@@ -2,7 +2,7 @@
 term = "sparge"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "return_clause", "redde_stmt", "incipit_stmt", "fixum_decl", "binding_decl", "assignment", "array_literal", "array_element", "array_element_list", "argument_list", "argument", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Every spread form: twice, empty, inline literal, mixed with positionals, self-alias, and a whole-argument call spread."
 syntax = "sparge <expression>"

@@ -3,6 +3,8 @@ id = "corpus/privata/privata.fab"
 group = "language"
 input_root = "corpus"
 input = "privata/privata.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

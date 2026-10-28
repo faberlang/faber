@@ -3,6 +3,8 @@ id = "corpus/functio/fn-value-closure-capture-mut.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/fn-value-closure-capture-mut.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

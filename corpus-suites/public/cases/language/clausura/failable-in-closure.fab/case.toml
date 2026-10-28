@@ -3,6 +3,8 @@ id = "corpus/clausura/failable-in-closure.fab"
 group = "language"
 input_root = "corpus"
 input = "clausura/failable-in-closure.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

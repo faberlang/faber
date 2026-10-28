@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/ref-optional-cursor.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/ref-optional-cursor.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

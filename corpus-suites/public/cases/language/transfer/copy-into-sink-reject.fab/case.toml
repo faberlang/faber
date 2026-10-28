@@ -3,6 +3,8 @@ id = "corpus/transfer/copy-into-sink-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "transfer/copy-into-sink-reject.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

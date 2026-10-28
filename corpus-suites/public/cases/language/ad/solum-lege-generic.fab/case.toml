@@ -3,6 +3,8 @@ id = "corpus/ad/solum-lege-generic.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/solum-lege-generic.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

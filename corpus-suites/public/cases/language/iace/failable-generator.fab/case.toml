@@ -3,6 +3,8 @@ id = "corpus/iace/failable-generator.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/failable-generator.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

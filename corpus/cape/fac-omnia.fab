@@ -2,7 +2,7 @@
 term = "fac"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "si_stmt", "iace_stmt", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
-category = "control-flow"
+category = "error"
 canonical = false
 summary = "Marks a fac attempt as covering all cases: a surface marker that keeps plain fac semantics."
 syntax = "fac omnia <block> cape <name> <block>"

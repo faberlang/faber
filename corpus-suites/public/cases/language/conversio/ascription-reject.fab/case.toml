@@ -3,6 +3,8 @@ id = "corpus/conversio/ascription-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/ascription-reject.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

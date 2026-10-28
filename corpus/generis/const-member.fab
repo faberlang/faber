@@ -2,7 +2,7 @@
 term = "class constant use"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "functio_method_decl", "type_annotation", "base_type", "functio_decl", "param_list", "parameter", "return_clause", "const_init", "si_stmt", "arm", "redde_stmt", "incipit_stmt", "expression", "literal", "member_suffix", "call_expr", "call_suffix", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A class constant takes a folded expression, and any function reads it through the type name."
 syntax = "const <type> <NAME> = <expression>"

@@ -3,6 +3,8 @@ id = "corpus/proba/proba.fab"
 group = "language"
 input_root = "corpus"
 input = "proba/proba.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

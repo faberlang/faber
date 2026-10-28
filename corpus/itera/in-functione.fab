@@ -2,7 +2,7 @@
 term = "itera"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "type_annotation", "owned_type", "base_type", "qualified_type", "return_clause", "fixum_decl", "hole_type", "array_literal", "assignment", "place", "itera_stmt", "si_stmt", "arm", "comparison", "equality", "equality_tail", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = true
 summary = "Starts a for-each iteration statement."
 syntax = "itera <mode> <expression> <binding> <block>"

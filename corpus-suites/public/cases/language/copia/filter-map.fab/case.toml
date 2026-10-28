@@ -3,6 +3,8 @@ id = "corpus/copia/filter-map.fab"
 group = "language"
 input_root = "corpus"
 input = "copia/filter-map.fab"
+category = "set"
+domain = "collections"
 
 
 [expect]

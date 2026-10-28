@@ -3,6 +3,8 @@ id = "corpus/annotation-sugar/verte-braced.fab"
 group = "language"
 input_root = "corpus"
 input = "annotation-sugar/verte-braced.fab"
+category = "annotation"
+domain = "program"
 
 
 [expect]

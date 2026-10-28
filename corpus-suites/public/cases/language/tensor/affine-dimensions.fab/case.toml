@@ -3,6 +3,8 @@ id = "corpus/tensor/affine-dimensions.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/affine-dimensions.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

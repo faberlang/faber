@@ -3,6 +3,8 @@ id = "corpus/figendum/figendum.fab"
 group = "language"
 input_root = "corpus"
 input = "figendum/figendum.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

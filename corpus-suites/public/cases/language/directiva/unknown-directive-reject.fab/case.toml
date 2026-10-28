@@ -3,6 +3,8 @@ id = "corpus/directiva/unknown-directive-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "directiva/unknown-directive-reject.fab"
+category = "annotation"
+domain = "program"
 
 
 [expect]

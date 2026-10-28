@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/mut-shared-conflict.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/mut-shared-conflict.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

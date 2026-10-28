@@ -3,6 +3,8 @@ id = "corpus/regex/reject-lookaround.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/reject-lookaround.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

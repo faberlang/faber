@@ -3,6 +3,8 @@ id = "corpus/vector/infer.fab"
 group = "language"
 input_root = "corpus"
 input = "vector/infer.fab"
+category = "vector"
+domain = "tensors"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/intervallum/conversio.fab"
 group = "language"
 input_root = "corpus"
 input = "intervallum/conversio.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

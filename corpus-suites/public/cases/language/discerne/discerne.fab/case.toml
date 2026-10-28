@@ -3,6 +3,8 @@ id = "corpus/discerne/discerne.fab"
 group = "language"
 input_root = "corpus"
 input = "discerne/discerne.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

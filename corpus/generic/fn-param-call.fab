@@ -2,7 +2,7 @@
 term = "generic"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "function_type", "type_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "itera_stmt", "compact_clausura_expr", "clausura_signature", "clausura_params", "clausura_param", "clausura_joint", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A function-typed generic parameter called in argument position infers its result"
 syntax = "fn f<T, U>((T) → U g, list<T> xs) → list<U>"

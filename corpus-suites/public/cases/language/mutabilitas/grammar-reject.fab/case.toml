@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/grammar-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/grammar-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

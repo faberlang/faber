@@ -2,7 +2,7 @@
 term = "discerne duplicate variant"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "Decline: each union variant is matched at most once, so a second case for the same variant is rejected with SEM042:duplicate_variant."
 syntax = "discerne <Shape> { case Circle let r … case Circle let r … } — rejected; merge the arms"

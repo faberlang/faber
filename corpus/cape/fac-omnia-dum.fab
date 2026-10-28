@@ -2,7 +2,7 @@
 term = "fac"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "dum_stmt", "cape_clause", "si_stmt", "iace_stmt", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
-category = "control-flow"
+category = "error"
 canonical = false
 summary = "fac omnia … dum: a caught error ends the loop"
 syntax = "fac omnia <block> cape <name> <block> dum <cond>"

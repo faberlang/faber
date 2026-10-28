@@ -3,6 +3,8 @@ id = "corpus/format/format.fab"
 group = "language"
 input_root = "corpus"
 input = "format/format.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/transfer/sink-into-rule-3-item-type-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "transfer/sink-into-rule-3-item-type-reject.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

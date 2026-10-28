@@ -3,6 +3,8 @@ id = "corpus/genus/inferred-constructor-map.fab"
 group = "language"
 input_root = "corpus"
 input = "genus/inferred-constructor-map.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

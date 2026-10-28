@@ -3,6 +3,8 @@ id = "corpus/annotation-sugar/nondum-call-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "annotation-sugar/nondum-call-reject.fab"
+category = "annotation"
+domain = "program"
 
 
 [expect]

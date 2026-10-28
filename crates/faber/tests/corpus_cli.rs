@@ -1469,3 +1469,138 @@ fn corpus_embedded_only_rust_builds_against_materialized_runtime() {
     assert_eq!(summary["passed"], 1);
     assert_eq!(summary["failed"], 0);
 }
+
+/// A three-case runner suite: `cases/{a,b,c}` with the given `corpus.toml` extras
+/// and per-case manifest extras (`category`/`domain` lines).
+fn selection_suite(suite_extra: &str, tags: [&str; 3]) -> tempfile::TempDir {
+    let temp = tempfile::tempdir().expect("temporary suite");
+    fs::write(
+        temp.path().join("corpus.toml"),
+        format!(
+            "version = 1\ncases_dir = \"cases\"\n\n[expectations.check.runner]\noutcome = \"pass\"\n{suite_extra}"
+        ),
+    )
+    .expect("write suite manifest");
+    for (name, tag) in ["a", "b", "c"].into_iter().zip(tags) {
+        let case = temp.path().join("cases").join(name);
+        fs::create_dir_all(&case).expect("create case directory");
+        fs::copy(smoke_case(), case.join("main.fab")).expect("copy source");
+        fs::write(
+            case.join("case.toml"),
+            format!(
+                "version = 1\ngroup = \"check\"\ninput = \"main.fab\"\n{tag}\n[expect]\ncheck_only = true\n"
+            ),
+        )
+        .expect("write case manifest");
+    }
+    temp
+}
+
+fn tagged_selection_suite() -> tempfile::TempDir {
+    selection_suite(
+        "\n[domains]\nd1 = [\"alpha\", \"beta\"]\nd2 = [\"gamma\"]\n",
+        [
+            "category = \"alpha\"\n",
+            "category = \"beta\"\ndomain = \"d1\"\n",
+            "category = \"gamma\"\n",
+        ],
+    )
+}
+
+/// Run the suite with selector arguments; the status and the ids of the cases it ran.
+fn selected(suite: &std::path::Path, selectors: &[&str]) -> (Option<i32>, Vec<String>) {
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["corpus", "--target", "runner"])
+        .args(selectors)
+        .arg(suite)
+        .output()
+        .expect("run corpus selection");
+    let mut ids: Vec<String> = records(&output.stdout)
+        .iter()
+        .filter(|row| row["type"] == "case")
+        .map(|row| row["case"].as_str().expect("case id").to_owned())
+        .collect();
+    ids.sort();
+    (output.status.code(), ids)
+}
+
+fn strings(items: &[&str]) -> Vec<String> {
+    items.iter().map(|item| (*item).to_owned()).collect()
+}
+
+#[test]
+fn corpus_selection_cli_selectors_union_and_every_domain_selects_the_suite() {
+    let suite = tagged_selection_suite();
+    let path = suite.path();
+    assert_eq!(selected(path, &[]), (Some(0), strings(&["a", "b", "c"])));
+    assert_eq!(
+        selected(path, &["--domain", "d1"]),
+        (Some(0), strings(&["a", "b"]))
+    );
+    assert_eq!(
+        selected(path, &["--domain", "d2", "--case", "a"]),
+        (Some(0), strings(&["a", "c"]))
+    );
+    assert_eq!(
+        selected(path, &["--category", "beta,gamma"]),
+        (Some(0), strings(&["b", "c"]))
+    );
+    assert_eq!(
+        selected(path, &["--filter", "c", "--category", "alpha"]),
+        (Some(0), strings(&["a", "c"]))
+    );
+    assert_eq!(
+        selected(path, &["--domain", "d1,d2"]),
+        (Some(0), strings(&["a", "b", "c"]))
+    );
+}
+
+#[test]
+fn corpus_selection_cli_refuses_unknown_names_with_the_usage_status() {
+    let suite = tagged_selection_suite();
+    let path = suite.path();
+    for selectors in [
+        ["--case", "a,zzz"],
+        ["--domain", "zzz"],
+        ["--category", "zzz"],
+    ] {
+        assert_eq!(selected(path, &selectors), (Some(64), Vec::new()));
+    }
+}
+
+#[test]
+fn corpus_selection_cli_domain_and_category_need_a_domain_table() {
+    let suite = selection_suite("", ["", "", ""]);
+    let path = suite.path();
+    assert_eq!(selected(path, &["--domain", "d1"]), (Some(64), Vec::new()));
+    assert_eq!(
+        selected(path, &["--category", "alpha"]),
+        (Some(64), Vec::new())
+    );
+    assert_eq!(
+        selected(path, &["--case", "b", "--filter", "c"]),
+        (Some(0), strings(&["b", "c"]))
+    );
+}
+
+#[test]
+fn corpus_selection_cli_loader_rejects_tags_outside_the_partition() {
+    let untagged = selection_suite(
+        "\n[domains]\nd1 = [\"alpha\"]\n",
+        [
+            "category = \"alpha\"\n",
+            "category = \"alpha\"\n",
+            "category = \"beta\"\n",
+        ],
+    );
+    assert_eq!(selected(untagged.path(), &[]).0, Some(1));
+    let disagreeing = selection_suite(
+        "\n[domains]\nd1 = [\"alpha\"]\nd2 = [\"beta\"]\n",
+        [
+            "category = \"alpha\"\n",
+            "category = \"alpha\"\ndomain = \"d2\"\n",
+            "category = \"beta\"\n",
+        ],
+    );
+    assert_eq!(selected(disagreeing.path(), &[]).0, Some(1));
+}

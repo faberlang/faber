@@ -2,7 +2,7 @@
 term = "nondum"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "nondum_functio_decl", "nondum_annotation", "param_list", "parameter", "return_clause", "type_annotation", "base_type", "qualified_type", "incipit_stmt", "block_stmt", "nota_stmt", "expression", "call_expr", "call_suffix", "argument_list", "argument", "literal"]
-category = "availability"
+category = "annotation"
 summary = "A function marked not yet for this target is declared but not callable."
 syntax = "@ unstable \"pending\" then a signature-only fn; calling it is refused"
 related = ["nondum", "annotation-sugar"]

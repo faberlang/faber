@@ -3,6 +3,8 @@ id = "corpus/conversio/lista-tensor-padded-main.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/lista-tensor-padded-main.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

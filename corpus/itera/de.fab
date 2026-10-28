@@ -2,7 +2,7 @@
 term = "de"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "expression", "literal", "itera_stmt", "nota_stmt"]
-category = "iteration"
+category = "loop"
 canonical = true
 summary = "Introduces borrowed iteration or borrowed parameters."
 syntax = "de <expression>"

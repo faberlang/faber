@@ -3,6 +3,8 @@ id = "corpus/octeti/octeti.fab"
 group = "language"
 input_root = "corpus"
 input = "octeti/octeti.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

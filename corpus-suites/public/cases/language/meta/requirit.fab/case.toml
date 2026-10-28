@@ -3,6 +3,8 @@ id = "corpus/meta/requirit.fab"
 group = "language"
 input_root = "corpus"
 input = "meta/requirit.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

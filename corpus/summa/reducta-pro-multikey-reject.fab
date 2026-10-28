@@ -2,7 +2,7 @@
 term = "reducta"
 kind = "reject"
 grammar = ["reducta_expr", "reducta_op", "reducta_group", "reducta_body", "reducta_identity"]
-category = "collection"
+category = "reduction"
 summary = "A grouped reduction's key list must have one key per axis of the expected result."
 syntax = "reducta via <op> ex <tensor> apud [i] pro [key, key] sit x { redde term }"
 related = ["reducta", "pro", "summa", "tensor"]

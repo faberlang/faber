@@ -3,6 +3,8 @@ id = "corpus/operatores/bitwise.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/bitwise.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "ad"
 kind = "endpoint"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "ad_expr", "ad_opener", "conversio_expr", "expression", "literal", "adfirma_stmt"]
-category = "conversio"
+category = "endpoint"
 canonical = false
 summary = "ad sermo materialization can drain a stream as vacuum."
 syntax = "ad 'runtime:echo' (payload) ↦ vacuum"

@@ -3,6 +3,8 @@ id = "corpus/octeti/literal-invalid-char-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "octeti/literal-invalid-char-reject.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/dum/conditio-complexa.fab"
 group = "language"
 input_root = "corpus"
 input = "dum/conditio-complexa.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

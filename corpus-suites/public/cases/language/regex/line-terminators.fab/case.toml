@@ -3,6 +3,8 @@ id = "corpus/regex/line-terminators.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/line-terminators.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

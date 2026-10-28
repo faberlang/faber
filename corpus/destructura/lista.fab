@@ -2,7 +2,7 @@
 term = "ex"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "array_destruct", "array_pattern", "array_pattern_element", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "array_literal", "argument_list", "argument", "assignment", "expr_stmt", "nota_stmt"]
-category = "destructuring"
+category = "binding"
 canonical = true
 summary = "Extracts fields from a value into local bindings."
 syntax = "ex <expression> <sit|varia> <field> [, ...] [ceteri <ident>]"

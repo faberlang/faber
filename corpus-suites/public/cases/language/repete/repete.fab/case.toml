@@ -3,6 +3,8 @@ id = "corpus/repete/repete.fab"
 group = "language"
 input_root = "corpus"
 input = "repete/repete.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

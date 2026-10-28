@@ -3,6 +3,8 @@ id = "corpus/transfer/transfer.fab"
 group = "language"
 input_root = "corpus"
 input = "transfer/transfer.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

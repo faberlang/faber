@@ -3,6 +3,8 @@ id = "corpus/operatores/wrapping-store-rule.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/wrapping-store-rule.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

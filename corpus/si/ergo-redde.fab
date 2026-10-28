@@ -2,7 +2,7 @@
 term = "ergo"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "si_stmt", "arm", "ergo_joint", "secus_clause", "else_arm", "itera_stmt", "incipit_stmt", "fixum_decl", "hole_type", "array_literal", "argument_list", "argument", "call_expr", "call_suffix", "comparison", "equality", "equality_tail", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = true
 summary = "Introduces a compact statement consequent."
 syntax = "<head> ergo <statement>"

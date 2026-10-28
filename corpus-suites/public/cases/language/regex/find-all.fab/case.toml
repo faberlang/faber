@@ -3,6 +3,8 @@ id = "corpus/regex/find-all.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/find-all.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

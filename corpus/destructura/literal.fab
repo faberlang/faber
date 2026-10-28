@@ -2,7 +2,7 @@
 term = "valor"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "expression", "literal", "json_literal", "json_member", "json_value", "json_object", "json_number", "json_string", "nota_stmt"]
-category = "type"
+category = "binding"
 canonical = true
 summary = "JSON-shaped dynamic value literal for open object-shaped data."
 syntax = "valor"

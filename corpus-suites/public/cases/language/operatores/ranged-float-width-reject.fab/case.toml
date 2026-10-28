@@ -3,6 +3,8 @@ id = "corpus/operatores/ranged-float-width-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/ranged-float-width-reject.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

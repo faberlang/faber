@@ -2,7 +2,7 @@
 term = "lista"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "member_suffix", "range_expr", "range_tail", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = true
 summary = "A list range index copies the window between the bounds; an index past the end is checked at run time and aborts."
 syntax = "xs[<start>‥<end>]"

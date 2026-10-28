@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/var-retired-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/var-retired-reject.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "custodi"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "custodi_stmt", "si_guard_clause", "redde_stmt", "expression", "literal", "incipit_stmt", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument", "sit_decl", "assignment", "place", "itera_stmt", "dum_stmt", "perge_stmt", "rumpe_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "A guard block holding continue and break inside a loop, and early returns in a function."
 syntax = "guard { … continue|break|return … }"

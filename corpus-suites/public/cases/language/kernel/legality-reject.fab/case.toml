@@ -3,6 +3,8 @@ id = "corpus/kernel/legality-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "kernel/legality-reject.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

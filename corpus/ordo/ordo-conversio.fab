@@ -2,7 +2,7 @@
 term = "ordo-conversio"
 kind = "conversio"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "ordo_decl", "enum_member", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "conversio_expr", "inline_default", "expression", "unary_expr", "literal", "member_suffix", "nota_stmt"]
-category = "conversion"
+category = "variant"
 canonical = true
 summary = "An ordo converts to its number and name, and a number converts back to a member."
 syntax = "<ordo-value> ↦ int | <ordo-value> ↦ string | <int-expression> ↦ <Ordo> [⊥ <default>]"

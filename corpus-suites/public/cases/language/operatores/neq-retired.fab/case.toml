@@ -3,6 +3,8 @@ id = "corpus/operatores/neq-retired.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/neq-retired.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

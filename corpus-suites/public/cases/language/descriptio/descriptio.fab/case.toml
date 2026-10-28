@@ -3,6 +3,8 @@ id = "corpus/descriptio/descriptio.fab"
 group = "language"
 input_root = "corpus"
 input = "descriptio/descriptio.fab"
+category = "cli"
+domain = "program"
 
 
 [expect]

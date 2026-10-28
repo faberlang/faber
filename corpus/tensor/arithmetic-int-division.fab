@@ -2,7 +2,7 @@
 term = "⊘"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal", "nota_stmt"]
-category = "arithmetic"
+category = "tensor"
 canonical = true
 summary = "Tensor division semantics: floored integer ⊘, / and %, exact ÷ into float, IEEE float division by zero."
 syntax = "<expression> ⊘ <expression> | <expression> ÷ <expression>"

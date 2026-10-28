@@ -3,6 +3,8 @@ id = "corpus/tensor/method-errors.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/method-errors.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

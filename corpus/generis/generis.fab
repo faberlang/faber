@@ -2,7 +2,7 @@
 term = "class constant"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "genus_field_decl", "genus_const_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A class member that belongs to the type itself is a compile-time constant: const T X = e."
 syntax = "const <type> <NAME> = <expression>"

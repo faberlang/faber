@@ -2,7 +2,7 @@
 term = "discerne variant arity"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "Decline: a variant pattern must bind every field the variant declares; `Rect { int w; int h }` bound as `case Rect let w` leaves `h` unbound and rejects with SEM013:variant_pattern_arity_mismatch."
 syntax = "case Rect let w — rejected; bind every variant field: case Rect let w, h"

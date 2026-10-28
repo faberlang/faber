@@ -3,6 +3,8 @@ id = "corpus/integratio/fluxus-cede.fab"
 group = "language"
 input_root = "corpus"
 input = "integratio/fluxus-cede.fab"
+category = "integration"
+domain = "program"
 
 
 [expect]

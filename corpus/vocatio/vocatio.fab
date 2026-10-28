@@ -2,7 +2,7 @@
 term = "vocatio"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "array_literal", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "expression"
+category = "function"
 canonical = true
 summary = "Function, method, chained, and sparge spread call expressions."
 syntax = "<name>(<args>) | <expr>.<method>(<args>) | <name>(sparge <lista>)"

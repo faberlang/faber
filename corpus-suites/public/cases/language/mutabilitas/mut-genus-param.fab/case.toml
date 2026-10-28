@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/mut-genus-param.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/mut-genus-param.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

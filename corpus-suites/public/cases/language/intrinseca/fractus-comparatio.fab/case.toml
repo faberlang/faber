@@ -3,6 +3,8 @@ id = "corpus/intrinseca/fractus-comparatio.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/fractus-comparatio.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

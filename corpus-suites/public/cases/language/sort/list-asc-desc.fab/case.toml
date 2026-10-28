@@ -3,6 +3,8 @@ id = "corpus/sort/list-asc-desc.fab"
 group = "language"
 input_root = "corpus"
 input = "sort/list-asc-desc.fab"
+category = "sort"
+domain = "collections"
 
 
 [expect]

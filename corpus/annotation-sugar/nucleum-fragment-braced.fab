@@ -2,7 +2,7 @@
 term = "nucleum"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_braced", "nucleum_field_list", "nucleum_field", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "lane"
+category = "kernel"
 canonical = false
 summary = "Braced @ nucleum { fragment = verum } record sets the fragment modifier on the nucleum annotation."
 syntax = "@ nucleum { fragment = verum }"

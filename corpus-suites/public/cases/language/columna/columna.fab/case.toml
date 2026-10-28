@@ -3,6 +3,8 @@ id = "corpus/columna/columna.fab"
 group = "language"
 input_root = "corpus"
 input = "columna/columna.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

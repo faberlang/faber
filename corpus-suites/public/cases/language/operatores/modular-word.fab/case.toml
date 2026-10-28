@@ -3,6 +3,8 @@ id = "corpus/operatores/modular-word.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/modular-word.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

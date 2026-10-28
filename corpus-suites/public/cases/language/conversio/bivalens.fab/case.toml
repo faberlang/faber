@@ -3,6 +3,8 @@ id = "corpus/conversio/bivalens.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/bivalens.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

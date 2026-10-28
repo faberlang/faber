@@ -3,6 +3,8 @@ id = "corpus/gpu-core-types/f16-bf16-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "gpu-core-types/f16-bf16-reject.fab"
+category = "device"
+domain = "gpu"
 
 
 [expect]

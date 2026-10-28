@@ -3,6 +3,8 @@ id = "corpus/scalar/finite-nan.fab"
 group = "language"
 input_root = "corpus"
 input = "scalar/finite-nan.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/genus/nested-mutation.fab"
 group = "language"
 input_root = "corpus"
 input = "genus/nested-mutation.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

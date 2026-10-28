@@ -3,6 +3,8 @@ id = "corpus/scriptum/template-repeated-hole.fab"
 group = "language"
 input_root = "corpus"
 input = "scriptum/template-repeated-hole.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

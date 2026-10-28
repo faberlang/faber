@@ -3,6 +3,8 @@ id = "corpus/ordo/ordo-conversio.fab"
 group = "language"
 input_root = "corpus"
 input = "ordo/ordo-conversio.fab"
+category = "variant"
+domain = "types"
 
 
 [expect]
