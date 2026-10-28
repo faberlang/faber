@@ -1,11 +1,10 @@
-//! Control-flow and alternate-exit lowering for MIR functions.
+//! Control-flow, iteration, reduction, and alternate-exit lowering for MIR functions.
 //!
-//! This module turns expression-level control constructs into explicit MIR
-//! blocks and terminators. It owns the contracts for `si`, `dum`, `rumpe`,
-//! `perge`, `iace`, and `cape`: each construct either wires concrete CFG edges
-//! or reports an unsupported lowering diagnostic. Value-producing control flow
-//! writes into a destination place so branch arms join through storage rather
-//! than through an implicit expression stack.
+//! This module lowers HIR control constructs, iteration, reductions, and
+//! alternate-exit paths into explicit MIR blocks and terminators, or reports an
+//! unsupported-lowering diagnostic. Value-producing control flow writes into a
+//! destination place so branch arms join through storage rather than through an
+//! implicit expression stack.
 //!
 //! ERROR HANDLING
 //! ==============
