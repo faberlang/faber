@@ -742,9 +742,15 @@ impl FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let base = self.lower_expr_value(object)?;
-        let link = self.lower_optional_chain_link(base.clone(), chain)?;
         let ty = self.expr_ty(expr)?;
-        Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Chain { base, link }), ty, expr.span))
+        let operands_effect_free = match chain {
+            HirOptionalChainKind::Member(_) => true,
+            HirOptionalChainKind::Index(index) => index.is_effect_free_operand(),
+            HirOptionalChainKind::Call(args) => args.iter().all(|arg| arg.expr.is_effect_free_operand()),
+        };
+        self.lower_option_chain_guarded(&base, object.ty, operands_effect_free, ty, expr.span, |this| {
+            this.lower_optional_chain_link(base.clone(), chain)
+        })
     }
 
     fn lower_optional_chain_link(

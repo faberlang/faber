@@ -700,7 +700,12 @@ impl<'a> ClifCapability<'a> {
             MirValueKind::Option(MirOptionOp::Chain { link, .. })
                 if !matches!(
                     link,
-                    MirOptionChainLink::Field(_) | MirOptionChainLink::Index(_)
+                    MirOptionChainLink::Field(_)
+                        | MirOptionChainLink::Index(_)
+                        | MirOptionChainLink::Call {
+                            callee: MirCallee::Value(_),
+                            ..
+                        }
                 ) =>
             {
                 Some(Gap::Subset("optional chain".to_owned()))

@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 537,
-    "analyzable": 541
+    "capable": 539,
+    "analyzable": 543
   },
   "terms": [
     {
@@ -36,14 +36,14 @@
     {
       "term": "?(",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "?.",
       "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "?[",

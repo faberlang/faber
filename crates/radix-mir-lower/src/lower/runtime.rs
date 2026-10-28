@@ -3362,22 +3362,18 @@ impl FunctionBuilder<'_> {
             // `a?.method(args)`: chain base becomes arg 0 of the genus method,
             // receiver-first exactly like the genus branch of lower_method_call_on_receiver.
             let base = self.lower_expr_value(object)?;
-            let mut call_args = Vec::with_capacity(args.len() + 1);
-            call_args.push(base.clone());
-            call_args.extend(self.lower_hir_call_args(args)?);
-            self.emit_call_shape_check(expr.id, &call_args, 1, expr.span)?;
             let ty = self.expr_ty(expr)?;
-            return Some(self.assign_temp(
-                MirValueKind::Option(MirOptionOp::Chain {
-                    base,
-                    link: MirOptionChainLink::Call {
-                        callee: MirCallee::definition_with_type_args(target.def_id, Vec::new()),
-                        args: call_args,
-                    },
-                }),
-                ty,
-                expr.span,
-            ));
+            let operands_effect_free = args.iter().all(|arg| arg.expr.is_effect_free_operand());
+            return self.lower_option_chain_guarded(&base, object.ty, operands_effect_free, ty, expr.span, |this| {
+                let mut call_args = Vec::with_capacity(args.len() + 1);
+                call_args.push(base.clone());
+                call_args.extend(this.lower_hir_call_args(args)?);
+                this.emit_call_shape_check(expr.id, &call_args, 1, expr.span)?;
+                Some(MirOptionChainLink::Call {
+                    callee: MirCallee::definition_with_type_args(target.def_id, Vec::new()),
+                    args: call_args,
+                })
+            });
         }
 
         // Callable value: a local binding or non-path expression. Positional args,
