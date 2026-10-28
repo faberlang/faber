@@ -99,7 +99,7 @@ compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_bl
 # [044] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
 # [045] fac_block
-fac_block ::= 'करो' block_stmt cape_clause?
+fac_block ::= 'करो' fac_modifier? block_stmt cape_clause?
 # [046] clausura_legacy_expr
 clausura_legacy_expr ::= 'समापन' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 # [047] clausura_params
@@ -547,50 +547,52 @@ proba_modifier ::= 'अपेक्षित_विफलता' | 'छोड़
 # [268] praepara_block
 praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सभी'? block_stmt
 # [269] fac_stmt
-fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [270] IDENTIFIER
+fac_stmt ::= 'करो' fac_modifier? block_stmt cape_clause? ('जबतक' expression)?
+# [270] fac_modifier
+fac_modifier ::= 'सभी' | 'उपकरण'
+# [271] IDENTIFIER
 IDENTIFIER ::=
-# [271] NUMBER
+# [272] NUMBER
 NUMBER ::=
-# [272] NATURAL
+# [273] NATURAL
 NATURAL ::=
-# [273] STRING
+# [274] STRING
 STRING ::=
-# [274] ASCII_STRING
+# [275] ASCII_STRING
 ASCII_STRING ::=
-# [275] BACKTICK_STRING
+# [276] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [276] OCTETI_STRING
+# [277] OCTETI_STRING
 OCTETI_STRING ::=
-# [277] REGEX_TYPE_WORD
+# [278] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [278] REGEX_BODY
+# [279] REGEX_BODY
 REGEX_BODY ::=
-# [279] NEWLINE
+# [280] NEWLINE
 NEWLINE ::=
-# [280] WIDTH_MARKER
+# [281] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [281] LISTA_WIDTH_SUGAR
+# [282] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [282] TENSOR_WIDTH_SUGAR
+# [283] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [283] SPARSA_WIDTH_SUGAR
+# [284] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [284] VECTOR_WIDTH_SUGAR
+# [285] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [285] MATRIX_WIDTH_SUGAR
+# [286] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [286] FRONTMATTER_DELIMITER
+# [287] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [287] TOML_LINES
+# [288] TOML_LINES
 TOML_LINES ::=
-# [288] ANNOTATION_NAME
+# [289] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [289] ANNOTATION_FIELD_NAME
+# [290] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [290] NON_NEWLINE_TOKEN
+# [291] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [291] NO_NEWLINE
+# [292] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -889,6 +891,7 @@ NO_NEWLINE ::=
 | [`proba_modifier`](#proba-modifier) | `#परीक्षण-modifier` | live |
 | [`praepara_block`](#praepara-block) | `#पूर्वतैयार-block` | live |
 | [`fac_stmt`](#fac-stmt) | `#करो-stmt` | live |
+| [`fac_modifier`](#fac-modifier) | `#करो-modifier` | live |
 
 ## Lexicon Appendix {#lexicon}
 
@@ -995,6 +998,7 @@ productions. It is not a second keyword authority.
 | Annotation | `लेन` | `@ radix` compiler-lane directive |
 | Builtin | `पढ़ो` | read |
 | Builtin | `पंक्ति` | line |
+| Control | `उपकरण` | device region modifier after `करो` (en `device`); contextual |
 | Declarations | `आकार` | size/index generic parameter |
 | Expression | `अधिकतम` | maximum reduction operator (en `max`) |
 | Testing | `मापो` | benchmark |
@@ -3261,6 +3265,9 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `करो { ... }` is the explicit `do` block and executes its body once.
 - `करो { ... } जबतक condition` is the post-test loop form; postfix `जबतक` attaches only to `करो`, not arbitrary preceding blocks.
 - `पकड़ो` is an attachment shared by several structured forms, not a semantic mode owned by `करो`. A plain `करो` is often used when an otherwise unattached block needs a local handler: `करो { ... } पकड़ो err { ... }`.
+- The modifier slot directly after `करो` holds `सभी` (en `do all`) or `उपकरण` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- `करो सभी { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `पकड़ो` once, at the block's exit (or, with a `जबतक` tail, at each back edge).
+- `करो उपकरण { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `करो सभी` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `जबतक` / `दोहराओ सीमा` loops are unchanged. Captures are classified by writes (a captured `में` scalar or genus is device state). The block's own `पकड़ो` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `जबतक` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `करो उपकरण` (`fac_machina_nested`), a `लौटाओ` / `तोड़ो` / `जारी` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `धागा` loop or `समेटो` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `करो सभी`, so every device route is unchanged.
 
 ---
 
@@ -3272,7 +3279,6 @@ typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `करो सभी { … } पकड़ो e { … }` (en `do all`) | admitted (FLD K1); `करो सभी` is `PARSE001` |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `मिलाओ` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |

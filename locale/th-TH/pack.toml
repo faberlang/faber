@@ -101,6 +101,7 @@ axis = "แกน"
 lege = "อ่าน"
 lineam = "บรรทัด"
 omnia = "ทั้งหมด"
+machina = "อุปกรณ์"
 scriptum = "จารึก"
 sparge = "กระจาย"
 ut = "ในชื่อ"
@@ -724,6 +725,10 @@ help = "ใช้ {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "ในลูป '{fac}' ต้องเขียน '{cape}' ก่อน '{dum}'"
 help = "เขียนตัวจัดการก่อนเงื่อนไข: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "บล็อก '{fac}' รับคำปรับได้หนึ่งคำ ไม่ใช้ '{omnia}' ร่วมกับ '{machina}'"
+help = "'{machina}' ส่งมอบข้อผิดพลาดทั้งหมดหนึ่งครั้งเมื่อจบบล็อกอยู่แล้ว ให้ตัด '{omnia}' ออก"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "เครื่องหมายจุลภาคไม่ใช้คั่นหัวข้อของ '{discerne}' อีกต่อไป"
@@ -1604,6 +1609,26 @@ help = "ใช้ f32 สำหรับค่าทศนิยมของเ�
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "การเก็บค่าที่มีความกว้าง {width} อาจ trap ในเคอร์เนล nucleum"
 help = "พิสูจน์ว่าการเก็บค่าอยู่ในช่วง หรือใช้เซลล์แบบ wrapping หรือ saturating"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "ขอบเขต '{fac} {machina}' ต้องไม่ซ้อน '{fac} {machina}' อีกชั้น"
+help = "เก็บขอบเขตอุปกรณ์ไว้หนึ่งชั้นและเรียก kernel จากในนั้นโดยตรง"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' ออกจากขอบเขต '{fac} {machina}' ขอบเขตนี้ยังไม่มีคำสำหรับออก"
+help = "จบขอบเขตก่อนแล้วค่อยตัดสินใจ หรือย้ายการออกไปนอกบล็อก"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "ลูป lane ('{construct}') ตรงในขอบเขต '{fac} {machina}' ยังไม่ได้สร้าง"
+help = "เรียก kernel จากขอบเขตสำหรับงานแบบขนาน"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "ขอบเขต '{fac} {machina}' ยังจัดสรร tensor ไม่ได้ ({construct})"
+help = "จัดสรร tensor ก่อนขอบเขตแล้วใช้ภายใน"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' ในขอบเขต '{fac} {machina}' อ่านค่าที่คำนวณบนอุปกรณ์ การควบคุมลูปบนอุปกรณ์ยังไม่ได้สร้าง"
+help = "ให้เงื่อนไข ขอบเขต และอาร์กิวเมนต์สเกลาร์ใช้ค่าที่รู้ก่อนขอบเขต และอ่านผลจากอุปกรณ์หลังขอบเขต"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "ความกว้างจำนวนเต็ม {width} เกินความกว้างของเคอร์เนล nucleum ที่รองรับ"
