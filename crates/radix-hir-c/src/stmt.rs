@@ -54,12 +54,10 @@ impl Emitter<'_> {
         Ok(())
     }
 
-    fn indent(&self) -> String {
-        "    ".repeat(self.depth)
-    }
-
     pub(crate) fn line(&self, out: &mut String, text: &str) {
-        out.push_str(&self.indent());
+        for _ in 0..self.depth {
+            out.push_str("    ");
+        }
         out.push_str(text);
         out.push('\n');
     }
