@@ -1937,10 +1937,15 @@ impl MirKernelSignature {
                 .map(|(position, _)| *position)
                 .collect(),
         };
+        // The single positional-input arm reads its input as a tensor device
+        // view: a lone scalar input (`seed(mut w, i32 salt)`) is a count-one
+        // resource and takes the multi-input arm like every scalar beside
+        // tensors.
         let single_tensor_input = match inputs.as_slice() {
             [input]
                 if extra_outputs.is_empty()
-                    && genus_param_layout(input.ty, validation)?.is_none() =>
+                    && genus_param_layout(input.ty, validation)?.is_none()
+                    && !Self::is_kernel_scalar_input(input.ty, validation)? =>
             {
                 Some(input)
             }

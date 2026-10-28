@@ -1168,6 +1168,172 @@ fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
         .expect("the reordered program passes the shared semantic gate");
 }
 
+// ── Need: a host loop's in-place update is a loop carry, not a
+//    cycle ────────────────────────────────────────────────────────────────
+
+/// A host `Call` statement of `callee` with bare-local arguments whose result
+/// lands in `destination`.
+fn host_call_into(callee: u32, args: &[u32], destination: u32) -> MirStatement {
+    let mut call = host_call(callee, args);
+    if let MirStatementKind::Call {
+        destination: slot, ..
+    } = &mut call.kind
+    {
+        *slot = Some(MirPlace::local(MirLocalId(destination)));
+    }
+    call
+}
+
+/// The host-loop shape of an in-place weight update: elementwise kernels
+/// DECLARED `upd(y) → w` first and `fwd(w) → y` second, and a host `main`
+/// whose body is `y = fwd(w)` then `w = upd(y)`. With `looped` the body sits in
+/// a loop (`bb0 → bb1 ⇄ bb2`, exit `bb3`); without it the body runs once.
+fn in_place_update_functions(
+    types: &mut TypeTable,
+    interner: &mut Interner,
+    looped: bool,
+) -> Vec<MirFunction> {
+    let r4 = rank1_tensor_ty(types, 4);
+    let kernel = |interner: &mut Interner,
+                  id: u32,
+                  name: &str,
+                  input: &'static str,
+                  output: &'static str| {
+        device_function(
+            id,
+            interner,
+            name,
+            &[(0, input, r4), (1, output, r4)],
+            &[0],
+            vec![collection_statement(
+                MirCollectionOp::TensorMul,
+                &[0, 0],
+                1,
+                r4,
+            )],
+            Some(MirOperand::Place(MirPlace::local(MirLocalId(1)))),
+            Vec::new(),
+            r4,
+            true,
+        )
+    };
+    let upd = kernel(interner, 1, "upd", "y_in", "w_out");
+    let fwd = kernel(interner, 2, "fwd", "w_in", "y_out");
+    let mut main = device_function(
+        3,
+        interner,
+        "main",
+        &[(20, "w", r4), (21, "y", r4)],
+        &[],
+        vec![host_call_into(2, &[20], 21), host_call_into(1, &[21], 20)],
+        None,
+        Vec::new(),
+        vacuum_ty(types),
+        false,
+    );
+    if looped {
+        let goto = |target: u32| MirTerminator {
+            kind: MirTerminatorKind::Goto(MirBlockId(target)),
+            span: span(),
+        };
+        let block = |id: u32, statements: Vec<MirStatement>, terminator: MirTerminator| MirBlock {
+            id: MirBlockId(id),
+            statements,
+            terminator,
+            span: span(),
+        };
+        let body = std::mem::take(&mut main.blocks[0].statements);
+        main.blocks = vec![
+            block(0, Vec::new(), goto(1)),
+            block(
+                1,
+                Vec::new(),
+                MirTerminator {
+                    kind: MirTerminatorKind::Branch {
+                        condition: MirOperand::Constant(crate::MirConstant::Bool(true)),
+                        then_block: MirBlockId(2),
+                        else_block: MirBlockId(3),
+                    },
+                    span: span(),
+                },
+            ),
+            block(2, body, goto(1)),
+            block(
+                3,
+                Vec::new(),
+                MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: span(),
+                },
+            ),
+        ];
+    }
+    vec![upd, fwd, main]
+}
+
+fn build_in_place_update(
+    looped: bool,
+) -> Result<(DeviceProgram, DeviceSemantics), super::DeviceProgramBuildError> {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let functions = in_place_update_functions(&mut types, &mut interner, looped);
+    let validated = validated(&types, functions);
+    build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .map(|(program, semantics, _)| (program, semantics))
+}
+
+/// `fwd(w, y)` then `upd(y, w)` in a host loop: `fwd` reads the `w` that `upd`
+/// wrote one iteration earlier. That edge is the loop carry, so the launch
+/// sequence is the call order (`fwd` before `upd`), although `upd` is declared
+/// first, and only the in-iteration `y` edge remains.
+#[test]
+fn an_in_place_update_in_a_host_loop_is_a_loop_carry_not_a_cycle() {
+    let (program, semantics) = build_in_place_update(true).expect("a loop-carried update builds");
+    // fwd is declared second (kernel 1, launch id 2) and runs first.
+    assert_eq!(
+        program
+            .launches
+            .iter()
+            .map(|launch| (launch.id.0, launch.kernel_index))
+            .collect::<Vec<_>>(),
+        vec![(2, 1), (1, 0)],
+        "the launch sequence follows the host call order"
+    );
+    assert_eq!(semantics.roots, vec![crate::device_program::LaunchId(2)]);
+    assert_eq!(
+        semantics
+            .dependencies
+            .iter()
+            .map(|edge| (edge.producer.0, edge.consumer.0))
+            .collect::<Vec<_>>(),
+        vec![(2, 1)],
+        "only the in-iteration y edge orders a launch: {:?}",
+        semantics.dependencies
+    );
+    program
+        .validate_with_semantics(&semantics)
+        .expect("the loop-carried program passes the shared semantic gate");
+}
+
+/// The same two calls run once, with no loop, carry nothing: the `w` edge is
+/// not a loop carry and the cycle still fails closed.
+#[test]
+fn the_same_calls_outside_a_loop_still_fail_as_a_cycle() {
+    let error = build_in_place_update(false).expect_err("straight-line code has no carry");
+    assert!(
+        error.to_string().contains("contains a cycle"),
+        "named refusal: {error}"
+    );
+}
+
 // ── DPSC-U4a gap 2 + 4 fixtures: a minimal training program (forward loss,
 //    generated companion, train_step) mirroring the faber S5-U5 oracle ────
 
@@ -2318,6 +2484,14 @@ fn lane_two_scalars_interleave_with_tensors() {
 #[test]
 fn lane_two_inputs_with_a_scalar_between() {
     assert_declared_order("isim");
+}
+
+/// A kernel whose only input is a scalar (`seed(mut w, i32 salt)`) is a
+/// count-one input beside the `mut` tensor, not a tensor device view.
+#[test]
+fn lane_output_with_only_a_scalar_input() {
+    assert_declared_order("ms");
+    assert_declared_order("sm");
 }
 
 #[test]
