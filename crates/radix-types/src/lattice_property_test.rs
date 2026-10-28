@@ -319,7 +319,9 @@ fn octeti_u8_lista_bridge_is_outside_subtype_transitivity() {
     let lista_numerus = table.array(numerus);
 
     assert!(table.is_assignable(octeti, lista_u8));
-    assert!(table.is_assignable(lista_u8, lista_numerus));
+    // Type arguments are invariant (ruling 21 row 25): `lista<u8>` is not a
+    // `lista<numerus>`, so the bridge cannot chain into a wider element.
+    assert!(!table.is_assignable(lista_u8, lista_numerus));
     assert!(!table.is_assignable(octeti, lista_numerus));
 }
 

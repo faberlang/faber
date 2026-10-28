@@ -316,7 +316,7 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         "Tensor.laminatio/4" => (None, vec!["axis 0".into(), el.clone(), "r".into(), "r".into()]),
         "Tensor.crux_entropia/1" => (None, vec!["r".into()]),
         // Matrix-vector application takes a conformable vector operand.
-        "Matrix.applica/1" => (Some("matrix<fractus, [2, 2]> r, vf32[2] v".to_string()), vec!["v".into()]),
+        "Matrix.applica/1" => (Some("matrix<fractus, [2, 2]> r, vf64[2] v".to_string()), vec!["v".into()]),
         // Same-width swizzle mask (width 3 receiver).
         "Vector.swizzle/1" => (None, vec!["\"xyz\"".into()]),
         "Tensor.pone/2" | "Sparsa.pone/2" => (None, vec![idx, el]),

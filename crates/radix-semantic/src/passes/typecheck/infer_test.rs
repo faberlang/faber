@@ -428,7 +428,7 @@ fn check_expr_early_return_restores_pending_conversion() {
 }
 
 // The Applied arm delegates its paired-argument walk to `unify_applied_args`:
-// type slots unify structurally, size slots stay equal at an absent boundary,
+// type slots unify invariantly, size slots stay equal at an absent boundary,
 // and a kind mismatch fails the join with the caller's issue.
 #[test]
 fn unify_applied_args_pairs_type_and_size_slots() {
@@ -449,9 +449,16 @@ fn unify_applied_args_pairs_type_and_size_slots() {
         ))
     };
     let left = applied(&mut checker, radix_types::AppliedArg::Type(numerus));
-    let right = applied(&mut checker, radix_types::AppliedArg::Type(fractus));
+    let same = applied(&mut checker, radix_types::AppliedArg::Type(numerus));
+    let other = applied(&mut checker, radix_types::AppliedArg::Type(fractus));
 
-    let joined = checker.unify_join(left, right, span, "test");
+    // Type arguments are invariant: a different argument is a mismatch, not a
+    // join to the wider one.
+    checker.unify_join(left, other, span, "test");
+    assert!(!checker.errors.is_empty());
+    checker.errors.clear();
+
+    let joined = checker.unify_join(left, same, span, "test");
     assert!(checker.errors.is_empty(), "{:?}", checker.errors);
     let resolved = checker.resolve_inferred_type(joined);
     assert!(

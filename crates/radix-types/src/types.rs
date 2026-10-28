@@ -1818,8 +1818,12 @@ impl TypeTable {
             // valor, so octeti widens to valor too.
             (Type::Primitive(Primitive::Octeti), Type::Primitive(Primitive::Valor)) => true,
 
-            // Structural assignability: applied types are invariant; collections
-            // and aggregates are element-covariant.
+            // Structural assignability: type-argument positions are invariant
+            // everywhere (ruling 21 row 25, ruling 51 A7). A container of one
+            // element type never stands in for a container of another, because
+            // the shared storage would be written through the wrong policy.
+            // Fresh literals are not affected: their elements are stores into
+            // the expected element type and are typed before they get here.
 
             // Applied: generic application is invariant (type args are structural).
             (Type::Applied(_, _), Type::Applied(_, _)) => self.equals(from, to),
@@ -1829,7 +1833,7 @@ impl TypeTable {
                     && from_elems
                         .iter()
                         .zip(to_elems.iter())
-                        .all(|(f, t)| self.is_assignable(*f, *t))
+                        .all(|(f, t)| self.equals(*f, *t))
             }
 
             // Steps are part of the type identity: assigning across steps is a
@@ -1844,37 +1848,34 @@ impl TypeTable {
             | (Type::Promissum(from_elem), Type::Promissum(to_elem))
             | (Type::Cursor(from_elem), Type::Cursor(to_elem))
             | (Type::Queue(from_elem), Type::Queue(to_elem))
-            | (Type::Stack(from_elem), Type::Stack(to_elem)) => {
-                self.is_assignable(*from_elem, *to_elem)
-            }
+            | (Type::Stack(from_elem), Type::Stack(to_elem)) => self.equals(*from_elem, *to_elem),
 
             // Infallible promissum<T> widens to promissum<T ⇥ E> (numquam bottom).
             (Type::PromissumFailable(ft, fe), Type::PromissumFailable(tt, te)) => {
-                self.is_assignable(*ft, *tt) && self.is_assignable(*fe, *te)
+                self.equals(*ft, *tt) && self.equals(*fe, *te)
             }
-            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => self.is_assignable(*ft, *tt),
+            (Type::Promissum(ft), Type::PromissumFailable(tt, _te)) => self.equals(*ft, *tt),
             // Failable promises do not narrow to infallible (erases the alternate channel).
             (Type::PromissumFailable(_, _), Type::Promissum(_)) => false,
 
             (Type::AsyncCursor(fi, fe), Type::AsyncCursor(ti, te)) => {
-                self.is_assignable(*fi, *ti) && self.is_assignable(*fe, *te)
+                self.equals(*fi, *ti) && self.equals(*fe, *te)
             }
 
             (Type::Map(from_key, from_val), Type::Map(to_key, to_val))
             | (Type::Ledger(from_key, from_val), Type::Ledger(to_key, to_val)) => {
-                self.is_assignable(*from_key, *to_key) && self.is_assignable(*from_val, *to_val)
+                self.equals(*from_key, *to_key) && self.equals(*from_val, *to_val)
             }
 
-            // Indexed containers: element-covariant, shape/width invariant.
+            // Indexed containers: element, shape and width all invariant.
             (Type::Tensor(from_elem, from_shape), Type::Tensor(to_elem, to_shape))
             | (Type::Vector(from_elem, from_shape), Type::Vector(to_elem, to_shape))
             | (Type::Matrix(from_elem, from_shape), Type::Matrix(to_elem, to_shape))
             | (Type::Sparsa(from_elem, from_shape), Type::Sparsa(to_elem, to_shape)) => {
-                self.is_assignable(*from_elem, *to_elem)
-                    && self.index_equals(*from_shape, *to_shape)
+                self.equals(*from_elem, *to_elem) && self.index_equals(*from_shape, *to_shape)
             }
 
-            // Bounded buffers: element-covariant, capacity invariant except
+            // Bounded buffers: element invariant, capacity invariant except
             // for ascii's directional widening rule. Bare primitives are not
             // assignable to or from bounded forms (D4/D5); the one-byte char
             // carrier is the sole implicit bridge into bare ascii (D17).
@@ -1887,7 +1888,7 @@ impl TypeTable {
                     element: to_elem,
                     capacity: to_cap,
                 },
-            ) => self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
+            ) => self.equals(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
             (
                 Type::BoundedQueue {
                     element: from_elem,
@@ -1907,7 +1908,7 @@ impl TypeTable {
                     element: to_elem,
                     capacity: to_cap,
                 },
-            ) => self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
+            ) => self.equals(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
             (
                 Type::BoundedTextus { capacity: from_cap },
                 Type::BoundedTextus { capacity: to_cap },

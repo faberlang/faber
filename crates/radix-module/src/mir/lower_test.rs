@@ -7725,7 +7725,7 @@ fn copia_filtrata_and_mappata_walk_on_the_runner() {
     let lines = run_lines(
         "sit copia<numerus> s ← [1, 2, 3]\n\
          sit copia<numerus> f ← s.filtrata(numerus x ∴ x ≻ 1)\n\
-         sit copia<numerus> m ← s.mappata(numerus x ∴ x % 2)\n\
+         sit copia<numerus> m ← s.mappata(numerus x → numerus ∴ x % 2)\n\
          nota ordinata via ascendens ex f\n\
          nota ordinata via ascendens ex m",
     )

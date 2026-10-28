@@ -1287,6 +1287,10 @@ mod ascription_optional_slot_test;
 mod element_relaxation_test;
 
 #[cfg(test)]
+#[path = "type_argument_invariance_test.rs"]
+mod type_argument_invariance_test;
+
+#[cfg(test)]
 #[path = "equality_exact_types_test.rs"]
 mod equality_exact_types_test;
 
