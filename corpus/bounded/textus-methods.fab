@@ -1,0 +1,47 @@
++++
+term = "textus"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "conversio_expr", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
+category = "type"
+canonical = false
+summary = "Methods on a bounded string<N> receiver: query, transform, slice, split and replace."
+syntax = "string<N> s; s.starts_with(p) | s.replace(x, y) | s.split(sep)"
+related = ["textus", "ascii", "longitudo", "sectio"]
+locale = "en"
++++
+# =============================================================================
+# string<N> — text methods on a bounded receiver
+# =============================================================================
+#
+# What this teaches:
+#   • A bounded `string<N>` receiver takes the whole text method surface:
+#     length, is_empty, slice, uppercase, lowercase, trim, contains,
+#     starts_with, ends_with, replace and split.
+#   • `N` counts Unicode scalars, so `length` and `slice` count scalars, not
+#     bytes; the accented letter below is one scalar.
+#   • Methods that return text return unbounded `string`.
+#   • An ASCII argument widens to `string` implicitly.
+#
+# Common mistakes:
+#   • Counting UTF-8 bytes for `slice` bounds — they are scalar positions.
+#
+# See also: string<N>, ascii<N>, ascii-methods
+# =============================================================================
+
+main {
+    let string raw ← " Héllo "
+    let string<16> s ← raw ↦ string<16>
+
+    print s.length(), s.is_empty()
+    print s.slice(1, 4)
+    print s.uppercase()
+    print s.lowercase()
+    print s.trim()
+    print s.contains("éll"), s.contains('ll')
+    print s.starts_with(" H"), s.starts_with(' H')
+    print s.ends_with("o "), s.ends_with('x')
+    print s.replace("l", "L")
+    print s.replace('l', 'L')
+    print s.split("l")
+    print s.split('l')
+}

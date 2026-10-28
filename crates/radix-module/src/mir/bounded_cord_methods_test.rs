@@ -2,10 +2,17 @@
 //! `string<N>`) widen the receiver to `textus` at the lowering seam, the same
 //! copy a `↦ textus` conversion performs. The checker already resolves these
 //! intrinsics for cord receivers; MIR validation requires the unbounded textus.
+//!
+//! ASCII-typed arguments of the text predicates, `split` and `replace` take the
+//! same seam: bare `ascii` and `ascii<1>` widen implicitly to `textus` (the
+//! checker's rule) and are retyped at lowering; `ascii<N>` with `N > 1` is
+//! refused at check as `argument_type_mismatch`, never reaching MIR validation.
 
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, run_source};
+
+const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 
 fn run(body: &str) -> (Vec<String>, Vec<(String, String)>) {
     let session = Session::new(
@@ -86,4 +93,70 @@ fn bounded_cord_textus_range_window_reads_a_textus_window() {
 #[test]
 fn bounded_cord_ascii_range_window_reads_a_textus_window() {
     assert_eq!(ok("sit ascii<8> a ← 'abc'\nnota a[0‥2]"), ["ab"]);
+}
+
+fn frontend_rejection(body: &str) -> String {
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirTypeScript)
+            .with_latin_locale(),
+    );
+    let source = format!("incipit {{\n{body}\n}}\n");
+    let mut host = BufferHost::default();
+    let Err(RunSourceError::Frontend(diagnostics)) = run_source(&session, "bounded-cord.fab", &source, &mut host)
+    else {
+        panic!("{body}: must be refused at check");
+    };
+    format!("{diagnostics:?}")
+}
+
+#[test]
+fn bounded_cord_ascii_literal_arguments_widen_to_textus() {
+    let prelude = "sit ascii<16> a ← ' Hello '\n";
+    assert_eq!(ok(&format!("{prelude}nota a.initium(' H')")), ["verum"]);
+    assert_eq!(ok(&format!("{prelude}nota a.finis('o ')")), ["verum"]);
+    assert_eq!(ok(&format!("{prelude}nota a.muta('l', 'L')")), [" HeLLo "]);
+    assert_eq!(ok(&format!("{prelude}nota a.divide('l').longitudo()")), ["3"]);
+}
+
+#[test]
+fn bounded_cord_ascii_variable_arguments_widen_to_textus() {
+    let prelude = "sit ascii<16> a ← ' Hello '\nsit ascii p ← ' H'\nsit ascii<1> l ← 'l'\nsit ascii<1> u ← 'L'\n";
+    assert_eq!(ok(&format!("{prelude}nota a.initium(p)")), ["verum"]);
+    assert_eq!(ok(&format!("{prelude}nota a.finis(p)")), ["falsum"]);
+    assert_eq!(ok(&format!("{prelude}nota a.muta(l, u)")), [" HeLLo "]);
+    assert_eq!(ok(&format!("{prelude}nota a.divide(l).longitudo()")), ["3"]);
+}
+
+#[test]
+fn textus_receiver_ascii_arguments_widen_to_textus() {
+    let prelude = "sit textus s ← \"hello\"\nsit ascii p ← 'he'\n";
+    assert_eq!(ok(&format!("{prelude}nota s.initium('he')")), ["verum"]);
+    assert_eq!(ok(&format!("{prelude}nota s.initium(p)")), ["verum"]);
+    assert_eq!(ok(&format!("{prelude}nota s.muta(p, 'J')")), ["Jllo"]);
+}
+
+#[test]
+fn bounded_ascii_argument_over_one_is_refused_at_check() {
+    for call in ["initium(p)", "finis(p)", "muta(p, p)", "divide(p)"] {
+        let text = frontend_rejection(&format!("sit ascii<16> a ← ' Hello '\nsit ascii<4> p ← 'll'\nnota a.{call}"));
+        assert!(text.contains(ISSUE_ARGUMENT_TYPE_MISMATCH), "{call}: {text}");
+    }
+}
+
+#[test]
+fn bounded_cord_ascii_slice_out_of_range_aborts_like_textus() {
+    // The runner host aborts by panicking; both receivers report the same reason.
+    let abort_reason = |body: &str| {
+        let body = body.to_owned();
+        let payload = std::panic::catch_unwind(move || run(&body)).expect_err("out-of-range slice must abort");
+        payload
+            .downcast_ref::<String>()
+            .cloned()
+            .unwrap_or_else(|| "<non-string panic>".to_owned())
+    };
+    let ascii = abort_reason("sit ascii<8> a ← 'abc'\nnota a.sectio(2, 9)");
+    let textus = abort_reason("sit textus<8> s ← \"abc\" ↦ textus<8>\nnota s.sectio(2, 9)");
+    assert!(ascii.contains("slice_out_of_range"), "{ascii}");
+    assert_eq!(ascii, textus);
 }

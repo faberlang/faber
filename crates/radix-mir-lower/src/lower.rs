@@ -4316,6 +4316,80 @@ impl<'a> FunctionBuilder<'a> {
         ))
     }
 
+    /// Lower argument `index` (receiver excluded) of a collection runtime call.
+    /// The text operands the MIR validator requires to be exactly `textus`
+    /// (`starts_with`/`ends_with`/`split` separator, `replace` pair) widen
+    /// from the ASCII family first.
+    pub(super) fn lower_collection_call_arg(
+        &mut self,
+        op: MirCollectionOp,
+        index: usize,
+        arg: &HirExpression,
+    ) -> Option<MirOperand> {
+        let lowered = self.lower_call_arg_value(arg)?;
+        let text_operand = match op {
+            MirCollectionOp::StartsWith | MirCollectionOp::EndsWith | MirCollectionOp::Split => index == 0,
+            MirCollectionOp::Replace => index < 2,
+            _ => false,
+        };
+        if text_operand {
+            self.widen_text_argument(lowered, arg)
+        } else {
+            Some(lowered)
+        }
+    }
+
+    /// Widen an ASCII-family text argument to the `textus` carrier the MIR
+    /// text rows require. The checker admits bare `ascii` and `ascii<1>` where
+    /// `textus` is expected (implicit ASCII widening) and retypes the argument
+    /// expression to the parameter, so the operand's own carrier is read from
+    /// MIR. Bare `ascii` is retyped the way `let string t ← x` retypes it; a
+    /// bounded cord takes the `↦ textus` copy.
+    fn widen_text_argument(&mut self, operand: MirOperand, expr: &HirExpression) -> Option<MirOperand> {
+        let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
+        let carrier = self.operand_carrier_ty(&operand);
+        match carrier.map(|ty| self.normalized_type(ty.semantic_id())) {
+            Some(Type::Primitive(Primitive::Ascii)) => {
+                Some(self.assign_temp(MirValueKind::Operand(operand), textus, expr.span))
+            }
+            Some(Type::BoundedTextus { .. } | Type::BoundedAscii { .. }) => {
+                let source_ty = carrier?;
+                Some(self.runtime_call_value(
+                    MirIntrinsic::Convert(MirConversion {
+                        store: None,
+                        flavor: MirConversionFlavor::Runtime,
+                        source_ty,
+                        target_ty: textus,
+                        params: Vec::new(),
+                        recovery: None,
+                        struct_defaults: Vec::new(),
+                    }),
+                    vec![operand],
+                    textus,
+                    expr.span,
+                ))
+            }
+            _ => Some(operand),
+        }
+    }
+
+    /// The carrier type of a lowered operand when it is a constant, a temp, or
+    /// a projection-free local. `None` for operands whose type is not recorded
+    /// on the builder.
+    fn operand_carrier_ty(&self, operand: &MirOperand) -> Option<MirType> {
+        match operand {
+            MirOperand::Constant(MirConstant::Ascii(_)) => {
+                Some(MirType::semantic(self.types.primitive(Primitive::Ascii)))
+            }
+            MirOperand::Temp(temp) => self.temps.iter().find(|t| t.id == *temp).map(|t| t.ty),
+            MirOperand::Place(place) if place.projections.is_empty() => match place.base {
+                MirPlaceBase::Local(local) => self.locals.iter().find(|l| l.id == local).map(|l| l.ty),
+                MirPlaceBase::Temp(temp) => self.temps.iter().find(|t| t.id == temp).map(|t| t.ty),
+            },
+            _ => None,
+        }
+    }
+
     /// Lower an `ordo` ordering comparison by converting both operands to their
     /// declared discriminants and comparing the integers.
     fn lower_ordo_order_compare(
