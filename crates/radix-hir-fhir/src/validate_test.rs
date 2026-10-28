@@ -94,6 +94,42 @@ fn decode_accepts_def_sites_inside_parameter_default() {
 }
 
 #[test]
+fn decode_checks_cli_argument_defaults() {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let ty = types.intern(Type::Error);
+    artifact.types = types.snapshot();
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.cli_args = Some(HirParam {
+        def_id: DefId(USER_DEF_ID_BASE + 1),
+        name: Symbol(0),
+        ty,
+        mode: HirParamMode::Owned,
+        optional: false,
+        sponte: false,
+        default: Some(HirExpression {
+            id: HirId(1),
+            kind: HirExpressionKind::Path(DefId(999_999)),
+            ty: None,
+            span: Span::default(),
+        }),
+        span: Span::default(),
+    });
+
+    let err = crate::decode(&crate::encode(&artifact).expect("encode artifact"))
+        .expect_err("a CLI argument default's dangling definition must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+        ),
+        "CLI argument defaults must be checked as expressions: {err:?}"
+    );
+}
+
+#[test]
 fn generic_applied_arg_preserves_index_kind() {
     let mut types = radix_types::TypeTable::new();
     let base = types.intern(radix_types::Type::Param(radix_lexer::Symbol(10)));
