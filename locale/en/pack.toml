@@ -6039,3 +6039,6 @@ message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
 
 [diagnostics.INFO001.issues.not_placed]
 message = "kernel `{kernel}` is not placed on the {device} device: {reason}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"

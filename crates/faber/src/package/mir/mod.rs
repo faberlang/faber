@@ -394,6 +394,28 @@ pub struct DeviceRunReceipt {
     pub host_blocked_ns: u64,
     /// How much of the launch time the runtime could measure.
     pub gpu_timing: DeviceGpuTiming,
+    /// The avoidable cross-partition syncs the spanned run's calls implied
+    /// (the planner audit's classification; the counters are in
+    /// `runtime.span`). Empty on an unspanned device.
+    pub span_avoidable: Vec<SpanAvoidable>,
+}
+
+/// One planner-audit classification: the entry's syncs of `kind` are
+/// avoidable for this reason. A dispatcher fact; the spanning runtime only
+/// counts the syncs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpanAvoidable {
+    /// The launched entry.
+    pub entry: String,
+    /// The sync kind the class describes (`own-write-gather`,
+    /// `partials-all-gather`, `first-broadcast`, `fault-combine`).
+    pub kind: &'static str,
+    /// The class: `unbounded-read`, `fusable-with-previous`, `first-fallback`
+    /// or `fault-combine-per-launch`.
+    pub avoidable: &'static str,
+    /// The class's data: the missing read set, the entry a reduction would
+    /// fuse into, or the fallback reason.
+    pub detail: Option<String>,
 }
 
 /// The result of an in-process device run: the discovery receipt line that was
@@ -746,6 +768,17 @@ impl DeviceRunPhases {
             host_encode_ns: self.dispatcher.host_encode_ns,
             host_blocked_ns: self.dispatcher.host_blocked_ns,
             gpu_timing,
+            span_avoidable: self
+                .dispatcher
+                .span_avoidable
+                .iter()
+                .map(|(entry, class)| SpanAvoidable {
+                    entry: entry.clone(),
+                    kind: class.kind().as_str(),
+                    avoidable: class.name(),
+                    detail: class.detail(),
+                })
+                .collect(),
         }
     }
 }

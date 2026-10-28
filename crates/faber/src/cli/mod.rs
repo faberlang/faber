@@ -606,7 +606,9 @@ pub struct CheckArgs {
     /// (`cpu`, `metal` or `cuda`): a single-lane kernel, a kernel the device
     /// runs as one sequential call, a kernel it cannot place, and with
     /// `--partitions` a kernel that will not split across the partitions.
-    /// The rows are `info` advice (INFO001), never errors; the package is
+    /// With `--device cuda --partitions N` (N above 1) it also prints the
+    /// planner audit: each kernel whose cross-partition syncs are avoidable,
+    /// and why. The rows are `info` advice (INFO001), never errors; the package is
     /// lowered and its device image built as `faber run --device` builds it,
     /// and nothing runs. Needs a file or package path
     #[arg(
@@ -617,8 +619,8 @@ pub struct CheckArgs {
     )]
     pub device: Option<DeviceChoice>,
 
-    /// With `--device cpu` or `--device metal`: the partition count of the
-    /// one spanned logical device to advise for (default 1), as
+    /// With `--device`: the partition count of the one spanned logical
+    /// device to advise for (default 1), as
     /// `faber run --partitions N`
     #[arg(
         long = "partitions",
