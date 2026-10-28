@@ -1,7 +1,7 @@
 //! Tests for instans precision parsing and assignability.
 //!
 //! These tests prove that named precision markers (ms, us, ns) parse to the
-//! correct InstansPrecision variant and that precision assignability rules
+//! correct `InstansPrecision` variant and that precision assignability rules
 //! between ranks behave as expected.
 
 use super::instans_precision::{

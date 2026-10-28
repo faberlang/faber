@@ -1,7 +1,7 @@
 //! Tests for literal index extraction from figura expressions.
 //!
-//! These tests prove that i64s_from_literal_index correctly extracts rank-0
-//! and tuple literal index values from interned IndexExpr entries.
+//! These tests prove that `i64s_from_literal_index` correctly extracts rank-0
+//! and tuple literal index values from interned `IndexExpr` entries.
 
 use super::i64s_from_literal_index;
 use crate::{TypeTable, index::IndexExpr};

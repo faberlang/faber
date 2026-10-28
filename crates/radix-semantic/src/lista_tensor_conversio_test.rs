@@ -2,7 +2,7 @@
 //!
 //! These tests prove that rectangular list literals resolve to tensor shapes
 //! and that irregular or type-mismatched lists produce the expected
-//! ListaToTensorError diagnostics.
+//! `ListaToTensorError` diagnostics.
 
 use super::lista_tensor_conversio::{
     ListaToTensorError, ListaToTensorShape, RectangularListaLiteralError,

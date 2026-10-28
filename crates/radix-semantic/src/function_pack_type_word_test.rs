@@ -27,7 +27,7 @@ fn has_issue(result: &test_support::AnalyzedFixture, issue: &str) -> bool {
     })
 }
 
-const EN_FN: &str = r#"
+const EN_FN: &str = r"
 fn tensor(int x) → int {
     return x + 1
 }
@@ -39,9 +39,9 @@ fn dim(tensor<f32, [2]> t) → int {
 fn caller() → int {
     return tensor(3)
 }
-"#;
+";
 
-const LA_FN: &str = r#"
+const LA_FN: &str = r"
 functio tensor(numerus x) → numerus {
     redde x + 1
 }
@@ -53,7 +53,7 @@ functio dim(tensor<f32, [2]> t) → numerus {
 functio caller() → numerus {
     redde tensor(3)
 }
-"#;
+";
 
 #[test]
 fn en_function_may_share_a_pack_type_word() {
