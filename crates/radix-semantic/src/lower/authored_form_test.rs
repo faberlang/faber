@@ -201,7 +201,7 @@ fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
             HirTypeFormArg::Type(child) => child
                 .label
                 .map(|symbol| fixture.interner.resolve(symbol).to_owned()),
-            HirTypeFormArg::Size(_) | HirTypeFormArg::Name(_) => None,
+            HirTypeFormArg::Size(_) | HirTypeFormArg::Name(_) | HirTypeFormArg::Range(_) => None,
         })
         .collect();
     assert_eq!(labels, vec![Some("gx".to_owned()), Some("gw".to_owned())]);

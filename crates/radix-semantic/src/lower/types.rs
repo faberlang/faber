@@ -34,7 +34,10 @@ use crate::{
 };
 use handroll::FxHashMap;
 use radix_diagnostics::DiagnosticArg;
-use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
+use radix_syntax::{
+    FiguraExpr, GenericArgExpr, GenericParamKind, Ident, RangeBoundExpr, RangeKind, TypeExpr,
+    TypeExprKind,
+};
 use radix_types::{
     AppliedArg, BuiltinTensorEdgePolicy, compose_index_affine_constant, divide_index_exact,
     evaluate_index_dimension,
@@ -348,12 +351,43 @@ impl Lowerer<'_> {
                 None => radix_hir::HirTypeFormHead::Semantic(expr.form),
             },
         };
-        let args = match &expr.kind {
+        let mut args = match &expr.kind {
             TypeExprKind::Func(_) | TypeExprKind::Union(_) | TypeExprKind::Intersection(_) => {
                 Vec::new()
             }
             _ => frame.args,
         };
+        // Range endpoints and the inclusive/exclusive glyph do not contribute
+        // to the resolved type's child tree. Keep the source argument beside
+        // the witness so the formatter can re-emit the authored surface.
+        if let TypeExprKind::Named(_, params) = &expr.kind {
+            args.extend(params.iter().filter_map(|param| {
+                let GenericArgExpr::Range(range) = param else {
+                    return None;
+                };
+                let bound = |bound: &RangeBoundExpr| match bound {
+                    RangeBoundExpr::Literal { value, .. } => {
+                        radix_hir::HirRangeBound::Literal(value.to_string())
+                    }
+                    RangeBoundExpr::Unbounded { negative, .. } => {
+                        radix_hir::HirRangeBound::Unbounded {
+                            negative: *negative,
+                        }
+                    }
+                    RangeBoundExpr::Name { name, lifted, .. } => radix_hir::HirRangeBound::Name {
+                        name: name.name,
+                        lifted: *lifted,
+                    },
+                };
+                Some(radix_hir::HirTypeFormArg::Range(
+                    radix_hir::HirRangeArgument {
+                        lo: bound(&range.lo),
+                        hi: bound(&range.hi),
+                        inclusive: matches!(range.kind, RangeKind::Inclusive),
+                    },
+                ))
+            }));
+        }
         radix_hir::HirTypeForm {
             ty,
             head,

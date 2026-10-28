@@ -497,6 +497,30 @@ fn load_unit_for(source: &str) -> Result<AnalyzedModule, HirArtifactError> {
 }
 
 #[test]
+fn authored_policy_range_survives_the_fhir_round_trip() {
+    let loaded = load_unit_for(concat!(
+        "+++\nlocale = \"en\"\n+++\n",
+        "fn bounded() → int {\n",
+        "    let trapping<i32, -∞‥8> value ← 1\n",
+        "    return 0\n",
+        "}\n",
+    ))
+    .expect("ranged-policy artifact must load");
+    let authored = loaded
+        .presentation
+        .authored_types
+        .iter()
+        .find(|authored| matches!(authored.form.args.as_slice(), [radix_hir::HirTypeFormArg::Range(_)]))
+        .expect("range spelling remains in the authored HIR form");
+    let [radix_hir::HirTypeFormArg::Range(range)] = authored.form.args.as_slice() else {
+        unreachable!("the filter selected a single range argument");
+    };
+    assert_eq!(range.lo, radix_hir::HirRangeBound::Unbounded { negative: true });
+    assert_eq!(range.hi, radix_hir::HirRangeBound::Literal("8".to_owned()));
+    assert!(!range.inclusive);
+}
+
+#[test]
 fn comptime_module_constant_survives_the_fhir_round_trip() {
     let source = concat!(
         "+++\nlocale = \"en\"\n+++\n\n",

@@ -38,27 +38,27 @@ fn reemit(source: &str, to: &str) -> String {
         .code
 }
 
-const BODY: &str = "fn f(int p) → int {\n    let saturating<u32, 0‥8> a ← 20\n    let trapping<i32, -2‥3> b ← 2\n    let wrapping<u8, 3‥9> c ← 12\n    let saturating<i32, -∞‥8> d ← 99\n    let saturating<u8, 0…255> e ← 7\n    print a\n    print b\n    print c\n    print d\n    print e\n    return p\n}\n\nmain {\n    print f(1)\n}\n";
+const BODY: &str = "fn f(int p) → int {\n    let saturating<u32, 0‥8> a ← 20\n    let trapping<i32, -2‥3> b ← 2\n    let wrapping<u8, 3‥9> c ← 12\n    let saturating<i32, -∞‥8> d ← 99\n    let saturating<u8, 0…255> e ← 7\n    let wrapping<i32, -∞…∞> f ← 0\n    print a\n    print b\n    print c\n    print d\n    print e\n    print f\n    return p\n}\n\nmain {\n    print f(1)\n}\n";
 
 fn en_source() -> String {
     format!("+++\nlocale = \"en\"\n+++\n{BODY}")
 }
 
 #[test]
-fn en_format_keeps_every_range_and_prints_it_half_open() {
+fn en_format_keeps_the_authored_range_glyph_and_unbounded_ends() {
     let formatted = reemit(&en_source(), "en");
     assert!(formatted.contains("let saturating<u32, 0‥8> a ← 20\n"), "{formatted}");
     assert!(formatted.contains("let trapping<i32, -2‥3> b ← 2\n"), "{formatted}");
     assert!(formatted.contains("let wrapping<u8, 3‥9> c ← 12\n"), "{formatted}");
-    // `-∞‥8` holds everything below 8; the width's own low end is the bound
-    // the format prints (the infinity is "no bound", not a distinct type).
-    assert!(formatted.contains("let saturating<i32, -2147483648‥8> d ← 99\n"), "{formatted}");
+    assert!(formatted.contains("let saturating<i32, -∞‥8> d ← 99\n"), "{formatted}");
+    assert!(formatted.contains("let saturating<u8, 0…255> e ← 7\n"), "{formatted}");
+    assert!(formatted.contains("let wrapping<i32, -∞…∞> f ← 0\n"), "{formatted}");
 }
 
 #[test]
-fn a_whole_width_range_prints_as_the_existing_spelling() {
+fn a_whole_width_range_keeps_its_authored_spelling() {
     let formatted = reemit(&en_source(), "en");
-    assert!(formatted.contains("let saturating<u8> e ← 7\n"), "{formatted}");
+    assert!(formatted.contains("let saturating<u8, 0…255> e ← 7\n"), "{formatted}");
 }
 
 #[test]

@@ -2699,6 +2699,32 @@ pub enum HirTypeFormArg {
     Size(IndexId),
     /// Authored generic name argument (e.g. `lista<numerus>`).
     Name(Symbol),
+    /// Authored range argument of a ranged integer store policy. Unlike a
+    /// resolved `Type::RangedInt`, this retains the written glyph and bounds.
+    Range(HirRangeArgument),
+}
+
+/// Source spelling of a range argument on a store-policy type.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirRangeArgument {
+    pub lo: HirRangeBound,
+    pub hi: HirRangeBound,
+    /// `true` for the inclusive `…` glyph, `false` for half-open `‥`.
+    pub inclusive: bool,
+}
+
+/// One authored endpoint of a store-policy range.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirRangeBound {
+    /// The authored decimal spelling of an integer endpoint.
+    Literal(String),
+    Unbounded {
+        negative: bool,
+    },
+    Name {
+        name: Symbol,
+        lifted: bool,
+    },
 }
 
 /// Authored source path for one resolved enum or union variant.

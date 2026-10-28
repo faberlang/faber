@@ -727,7 +727,10 @@ pub struct FunctionProvenanceTableWire {
 /// named-field codec had no wire form for them, so a unit holding one could
 /// not be written. Every `i128` field now rides the extension and reads back
 /// only from it; schema-v56 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 57;
+/// Version 58 adds authored ranged-policy arguments to `HirTypeFormArg`, so
+/// formatters and loaded HIR preserve the range glyph, infinity endpoints, and
+/// inclusive/exclusive spelling; schema-v57 artifacts fail closed.
+pub const SCHEMA_VERSION: u32 = 58;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

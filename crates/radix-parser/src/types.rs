@@ -210,8 +210,9 @@ impl Parser {
         // `wrapping<inf>` / `saturating<inf>` denote bare `inf` (ruling 32);
         // the level keeps which policy word the author wrote (ruling 49).
         if let TypeExprKind::Named(head, args) = &kind
-            && let [arg] = args.as_slice()
-            && self.generic_arg_is_inf_marker(arg)
+            && args
+                .first()
+                .is_some_and(|arg| self.generic_arg_is_inf_marker(arg))
         {
             match self.interner.resolve(head.name) {
                 "modulus" => form = TypeFormLevel::WRAPPING_INF,
