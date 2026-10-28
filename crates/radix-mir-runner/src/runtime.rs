@@ -2224,23 +2224,23 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let value = self.eval_operand(value, span)?;
         let (start, end, inclusive, step) = interval_parts(&interval, span)?;
         let step = interval_step(step.as_ref(), span)?;
-        let item = numeric_as_f64(&value, span)?;
-        let start_number = numeric_as_f64(&start, span)?;
-        let end_number = numeric_as_f64(&end, span)?;
-        let ascending = start_number <= end_number;
+        let ascending =
+            interval_numeric_ordering(&start, &end, span)?.is_some_and(std::cmp::Ordering::is_le);
+        let item_from_start = interval_numeric_ordering(&value, &start, span)?;
+        let item_from_end = interval_numeric_ordering(&value, &end, span)?;
         let on_window = if ascending {
-            item >= start_number
+            item_from_start.is_some_and(std::cmp::Ordering::is_ge)
                 && if inclusive {
-                    item <= end_number
+                    item_from_end.is_some_and(std::cmp::Ordering::is_le)
                 } else {
-                    item < end_number
+                    item_from_end.is_some_and(std::cmp::Ordering::is_lt)
                 }
         } else {
-            item <= start_number
+            item_from_start.is_some_and(std::cmp::Ordering::is_le)
                 && if inclusive {
-                    item >= end_number
+                    item_from_end.is_some_and(std::cmp::Ordering::is_ge)
                 } else {
-                    item > end_number
+                    item_from_end.is_some_and(std::cmp::Ordering::is_gt)
                 }
         };
         if !on_window {
@@ -6298,7 +6298,6 @@ fn shape_element(
     }
 }
 
-/// `tensor_flat_offset` over an index already validated by `index_cells_arg`
 /// Two non-negative coordinates from an index already validated by
 /// `index_cells_arg` (every cell a non-negative `Value::Int`); `None` for any
 /// other rank, or for a coordinate beyond the `u8` row/column extent.
@@ -6334,6 +6333,23 @@ fn tensor_flat_offset_cells(shape: &[i64], index: &[Value]) -> Option<usize> {
 
 fn interval_value(start: Value, end: Value, inclusive: bool) -> Value {
     Value::Tuple(vec![start, end, Value::Bool(inclusive)])
+}
+
+/// Three-way interval ordering without rounding integer carriers through `f64`.
+fn interval_numeric_ordering(
+    left: &Value,
+    right: &Value,
+    span: Span,
+) -> Result<Option<std::cmp::Ordering>, RunnerError> {
+    let is_numeric =
+        |value: &Value| matches!(value, Value::Int(_) | Value::UInt(_) | Value::Float(_));
+    if !is_numeric(left) || !is_numeric(right) {
+        return Err(RunnerError::internal(
+            span,
+            "tensor numeric element type mismatch",
+        ));
+    }
+    Ok(super::exact_int::cmp_numeric(left, right))
 }
 
 /// F-082: whether interval bounds run backwards (`start > end`).
@@ -6512,10 +6528,6 @@ fn interval_parts(
     ))
 }
 
-#[expect(
-    clippy::float_cmp,
-    reason = "a closed interval keeps a single point, so equal endpoints compare exactly"
-)]
 fn interval_intersection(
     left: &Value,
     right: &Value,
@@ -6523,28 +6535,24 @@ fn interval_intersection(
 ) -> Result<Option<Value>, RunnerError> {
     let (left_start, left_end, left_inclusive, _step) = interval_parts(left, span)?;
     let (right_start, right_end, right_inclusive, _step) = interval_parts(right, span)?;
-    let left_start_number = numeric_as_f64(&left_start, span)?;
-    let right_start_number = numeric_as_f64(&right_start, span)?;
-    let left_end_number = numeric_as_f64(&left_end, span)?;
-    let right_end_number = numeric_as_f64(&right_end, span)?;
-    let start = if left_start_number >= right_start_number {
+    let start_order = interval_numeric_ordering(&left_start, &right_start, span)?;
+    let end_order = interval_numeric_ordering(&left_end, &right_end, span)?;
+    let start = if start_order.is_some_and(std::cmp::Ordering::is_ge) {
         left_start
     } else {
         right_start
     };
-    let (end, inclusive) = if left_end_number < right_end_number {
+    let (end, inclusive) = if end_order == Some(std::cmp::Ordering::Less) {
         (left_end, left_inclusive)
-    } else if right_end_number < left_end_number {
+    } else if end_order == Some(std::cmp::Ordering::Greater) {
         (right_end, right_inclusive)
     } else {
         (left_end, left_inclusive && right_inclusive)
     };
-    let start_number = numeric_as_f64(&start, span)?;
-    let end_number = numeric_as_f64(&end, span)?;
-    Ok(
-        (start_number < end_number || (inclusive && start_number == end_number))
-            .then(|| interval_value(start, end, inclusive)),
-    )
+    let bounds_order = interval_numeric_ordering(&start, &end, span)?;
+    Ok((bounds_order.is_some_and(std::cmp::Ordering::is_lt)
+        || (inclusive && bounds_order == Some(std::cmp::Ordering::Equal)))
+    .then(|| interval_value(start, end, inclusive)))
 }
 
 fn interval_union_value(
@@ -6554,10 +6562,9 @@ fn interval_union_value(
 ) -> Result<Option<Value>, RunnerError> {
     let (left_start, left_end, left_inclusive, _step) = interval_parts(left, span)?;
     let (right_start, right_end, right_inclusive, _step) = interval_parts(right, span)?;
-    let left_start_number = numeric_as_f64(&left_start, span)?;
-    let right_start_number = numeric_as_f64(&right_start, span)?;
+    let start_order = interval_numeric_ordering(&left_start, &right_start, span)?;
     let (start, first_end, first_inclusive, second_start, second_end, second_inclusive) =
-        if left_start_number <= right_start_number {
+        if start_order.is_some_and(std::cmp::Ordering::is_le) {
             (
                 left_start,
                 left_end,
@@ -6576,14 +6583,15 @@ fn interval_union_value(
                 left_inclusive,
             )
         };
-    if numeric_as_f64(&second_start, span)? > numeric_as_f64(&first_end, span)? {
+    if interval_numeric_ordering(&second_start, &first_end, span)?
+        .is_some_and(std::cmp::Ordering::is_gt)
+    {
         return Ok(None);
     }
-    let first_end_number = numeric_as_f64(&first_end, span)?;
-    let second_end_number = numeric_as_f64(&second_end, span)?;
-    let (end, inclusive) = if second_end_number > first_end_number {
+    let end_order = interval_numeric_ordering(&first_end, &second_end, span)?;
+    let (end, inclusive) = if end_order.is_some_and(std::cmp::Ordering::is_lt) {
         (second_end, second_inclusive)
-    } else if first_end_number > second_end_number {
+    } else if end_order.is_some_and(std::cmp::Ordering::is_gt) {
         (first_end, first_inclusive)
     } else {
         (first_end, first_inclusive || second_inclusive)
