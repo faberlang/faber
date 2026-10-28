@@ -130,6 +130,35 @@ fn decode_checks_cli_argument_defaults() {
 }
 
 #[test]
+fn decode_accepts_synthesized_backward_companion_identity() {
+    use crate::artifact::{RadixBackwardWire, RadixLaneEntryWire, RadixLaneWire};
+    let mut artifact = stub_artifact();
+    artifact.radix_lanes.push(RadixLaneEntryWire {
+        def_id: DefId(0),
+        lane: RadixLaneWire::Air,
+        backward: Some(RadixBackwardWire {
+            companion_name: Symbol(0),
+            companion_def_id: DefId(radix_types::COMPANION_DEF_ID_FLAG),
+            selected_params: None,
+        }),
+    });
+    decode(&encode(&artifact).expect("encode artifact"))
+        .expect("a companion identity is synthesized, not declared in the artifact");
+
+    let backward = artifact.radix_lanes[0].backward.as_mut().expect("backward");
+    backward.companion_def_id = DefId(999_999);
+    let err = decode(&encode(&artifact).expect("encode artifact"))
+        .expect_err("a companion identity outside the companion family must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+        ),
+        "{err:?}"
+    );
+}
+
+#[test]
 fn generic_applied_arg_preserves_index_kind() {
     let mut types = radix_types::TypeTable::new();
     let base = types.intern(radix_types::Type::Param(radix_lexer::Symbol(10)));
