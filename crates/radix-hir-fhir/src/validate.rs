@@ -1199,7 +1199,7 @@ fn validate_type_form(
                         || !inf_word_ok
                         || (!form.args.is_empty()
                             && !(range_arg
-                                && matches!(level.0, 2 | 3 | 4)
+                                && matches!(level.0, 2..=4)
                                 && *prim == radix_types::Primitive::Numerus))
                     {
                         return Err(type_presentation_issue("numeric_level_or_arity", site));
