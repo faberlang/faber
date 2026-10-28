@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 514
+    "analyzable": 520
   },
   "terms": [
     {
@@ -427,7 +427,7 @@
       "term": "importa",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 11
+      "analyzable": 14
     },
     {
       "term": "in",
@@ -889,7 +889,7 @@
       "term": "tensor",
       "rule": "type",
       "capable": 0,
-      "analyzable": 25
+      "analyzable": 26
     },
     {
       "term": "textus",
@@ -1051,7 +1051,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 41
+      "analyzable": 43
     },
     {
       "term": "⇇",

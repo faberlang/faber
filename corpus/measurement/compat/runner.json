@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 456,
-    "analyzable": 514
+    "capable": 459,
+    "analyzable": 520
   },
   "terms": [
     {
@@ -426,8 +426,8 @@
     {
       "term": "importa",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 11
+      "capable": 9,
+      "analyzable": 14
     },
     {
       "term": "in",
@@ -889,7 +889,7 @@
       "term": "tensor",
       "rule": "type",
       "capable": 24,
-      "analyzable": 25
+      "analyzable": 26
     },
     {
       "term": "textus",
@@ -1050,8 +1050,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 41,
-      "analyzable": 41
+      "capable": 42,
+      "analyzable": 43
     },
     {
       "term": "⇇",

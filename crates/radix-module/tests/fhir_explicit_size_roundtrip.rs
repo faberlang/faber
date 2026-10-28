@@ -111,15 +111,17 @@ fn rust_emit_never_spells_a_size_or_shape_as_a_type() {
         !rust.contains("size 4"),
         "a size argument must not reach the Rust turbofish:\n{rust}"
     );
-    // The mixed and whole-shape calls keep only their type argument; the
-    // shape-only call has nothing left to spell.
+    // The mixed and whole-shape calls keep only their type argument in the
+    // turbofish; the shape-only call has nothing left to spell. A
+    // shape-returning generic takes its shape at run time (a value argument),
+    // never as a type.
     assert!(
         rust.contains("make::<i64>(l_data.clone())"),
         "mixed call keeps the type only:\n{rust}"
     );
     assert!(
-        rust.contains("shaped::<i64>(l_data.clone())"),
-        "shape call keeps the type only:\n{rust}"
+        rust.contains("shaped::<i64>(l_data.clone(), &[Some(2), Some(2)])"),
+        "shape call keeps the type only in the turbofish and passes its shape at run time:\n{rust}"
     );
     assert!(
         rust.contains("make(l_data.clone())"),
