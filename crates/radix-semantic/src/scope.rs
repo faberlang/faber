@@ -4377,7 +4377,7 @@ impl Resolver {
             .file_interfaces
             .iter()
             .map(|(&ns, imported)| {
-                let exports = imported
+                let mut exports: Vec<_> = imported
                     .exports
                     .iter()
                     .map(|(&member, export)| {
@@ -4428,6 +4428,8 @@ impl Resolver {
                         (member, snapshot)
                     })
                     .collect();
+                // The export map is a hash map; the wire order must not be.
+                exports.sort_by_key(|(member, _)| member.0);
                 let mut unavailable: Vec<_> = imported
                     .unavailable
                     .iter()
