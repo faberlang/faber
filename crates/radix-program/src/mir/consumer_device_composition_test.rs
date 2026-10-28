@@ -6,7 +6,7 @@
 //! leaf-tail union of the consumer units' own device roles/launch entries
 //! with the imported routes (design ruling 2026-08-27, audit `25749061`).
 //!
-//! Both-path parity (done_when (h)): the composition outcome is proven
+//! Both-path parity (`done_when` (h)): the composition outcome is proven
 //! through both analysis entry paths that can produce device facts — the
 //! library-interface path (`library.rs`, cached `program_export_surface`,
 //! the `b73f39671` mirror-repair seam) where the imported instance arrives
@@ -156,10 +156,13 @@ fn deep_chain_library(depth: usize) -> String {
         if level == 0 {
             source.push_str("@ kernel\n@ public\nfn step_0<size M>(tensor<f32, [M]> a) → tensor<f32, [M]> {\n    return a\n}\n");
         } else {
-            source.push_str(&format!(
+            use std::fmt::Write as _;
+            write!(
+                source,
                 "@ kernel\n@ public\nfn step_{level}<size M>(tensor<f32, [M]> a) → tensor<f32, [M]> {{\n    let tensor<f32, [M]> out ← step_{}(a)\n    return out\n}}\n",
                 level - 1
-            ));
+            )
+            .unwrap();
         }
     }
     source
@@ -275,7 +278,7 @@ fn call_site_count(function: &MirFunction) -> usize {
 }
 
 /// The imported-instance composition outcome through the library-interface
-/// analysis path (done_when (a), (d), (h) library leg): the consumer-local
+/// analysis path (`done_when` (a), (d), (h) library leg): the consumer-local
 /// kernel's imported call composes at the seam, the imported public Kernel
 /// instance registers launchable and stays a program symbol (the union
 /// prevents pruning), and no call site survives in the consumer caller.
@@ -377,7 +380,7 @@ fn library_import_composes_consumer_local_kernel_caller() {
     });
 }
 
-/// The package-own analysis entry path (done_when (h) package-own leg): the
+/// The package-own analysis entry path (`done_when` (h) package-own leg): the
 /// imported instance comes from a package SIBLING unit (no library, no
 /// KPC-WIRE route — the role and launch entry arrive through the consumer
 /// collection and the source-rewrite join), and the composition outcome is
@@ -487,7 +490,7 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
     });
 }
 
-/// done_when (b): a consumer-local private kernel helper's imported call
+/// `done_when` (b): a consumer-local private kernel helper's imported call
 /// composes at the seam while producing no launch row. Rule 12.7 forbids a
 /// host call into a private kernel, so the helper is reached through a public
 /// kernel wrapper (`solo_entry`): the imported-instance call and the private
@@ -566,7 +569,7 @@ fn private_kernel_helper_composes_without_launch_row() {
     });
 }
 
-/// done_when (c): host callers of imported instances are never composed —
+/// `done_when` (c): host callers of imported instances are never composed —
 /// the host call site survives the seam untouched while the instance still
 /// registers launchable (spike3/tier shape).
 #[test]
@@ -628,7 +631,7 @@ fn host_caller_of_imported_instance_is_never_composed() {
     });
 }
 
-/// done_when (e): a consumer-local caller whose imported chain cycles fails
+/// `done_when` (e): a consumer-local caller whose imported chain cycles fails
 /// closed at the seam with the same named identity imported-instance callers
 /// hit — `nucleum_fragment_cycle` (the self-recursive imported template is
 /// the one library shape whose chain reaches the seam; the two-template
@@ -660,7 +663,7 @@ fn consumer_local_cycle_fails_closed_with_named_identity() {
     );
 }
 
-/// done_when (e) budget clause — named boundary: the depth-budget identity
+/// `done_when` (e) budget clause — named boundary: the depth-budget identity
 /// (`nucleum_fragment_expansion`, observed/limit args) is unreachable
 /// through this seam today because an imported depth CHAIN needs a library
 /// template whose body calls another generic template, and that source

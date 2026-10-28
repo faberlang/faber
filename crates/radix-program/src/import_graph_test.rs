@@ -66,7 +66,7 @@ fn resolve_import_local_relative_module() {
 
     match resolve_import(&package, &resolver, &from_file, "./lib") {
         ImportResolution::Local(target) => {
-            assert!(target.ends_with("lib.fab"), "target: {target:?}")
+            assert!(target.ends_with("lib.fab"), "target: {target:?}");
         }
         other => panic!("expected local resolution, got {other:?}"),
     }
@@ -88,7 +88,7 @@ fn resolve_import_local_source_root_form() {
 
     match resolve_import(&package, &resolver, &from_file, "math") {
         ImportResolution::Local(target) => {
-            assert!(target.ends_with("src/math.fab"), "target: {target:?}")
+            assert!(target.ends_with("src/math.fab"), "target: {target:?}");
         }
         other => panic!("expected local resolution, got {other:?}"),
     }
@@ -110,7 +110,7 @@ fn resolve_import_local_parent_import_inside_package_resolves() {
 
     match resolve_import(&package, &resolver, &from_file, "../b") {
         ImportResolution::Local(target) => {
-            assert!(target.ends_with("b.fab"), "target: {target:?}")
+            assert!(target.ends_with("b.fab"), "target: {target:?}");
         }
         other => panic!("expected in-package parent import to resolve, got {other:?}"),
     }
@@ -129,7 +129,7 @@ fn resolve_import_local_parent_escape_rejected() {
 
     match resolve_import(&package, &resolver, &from_file, "../outside") {
         ImportResolution::Error(diag) => {
-            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}")
+            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}");
         }
         other => panic!("expected parent-escape rejection, got {other:?}"),
     }
@@ -149,7 +149,7 @@ fn resolve_import_bare_escape_rejected() {
 
     match resolve_import(&package, &resolver, &from_file, "a/../../outside") {
         ImportResolution::Error(diag) => {
-            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}")
+            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}");
         }
         other => panic!("expected bare-escape rejection, got {other:?}"),
     }
@@ -171,7 +171,7 @@ fn resolve_import_local_symlink_escape_rejected() {
 
     match resolve_import(&package, &resolver, &from_file, "./link") {
         ImportResolution::Error(diag) => {
-            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}")
+            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}");
         }
         other => panic!("expected symlink-escape rejection, got {other:?}"),
     }
@@ -359,7 +359,7 @@ fn resolve_import_proba_specifier_is_forbidden() {
 
     match resolve_import(&package, &resolver, &from_file, "helpers.proba") {
         ImportResolution::Error(diag) => {
-            assert_eq!(diag.issue(), Some("proba_import_forbidden"))
+            assert_eq!(diag.issue(), Some("proba_import_forbidden"));
         }
         other => panic!("expected proba-import error, got {other:?}"),
     }
@@ -378,7 +378,7 @@ fn resolve_import_proba_local_target_is_forbidden() {
     // rejected before any local resolution runs.
     match resolve_import(&package, &resolver, &from_file, "./helpers.proba") {
         ImportResolution::Error(diag) => {
-            assert_eq!(diag.issue(), Some("proba_import_forbidden"))
+            assert_eq!(diag.issue(), Some("proba_import_forbidden"));
         }
         other => panic!("expected proba-import error, got {other:?}"),
     }
@@ -394,7 +394,7 @@ fn resolve_import_kernel_import_is_script_mode_only() {
 
     match resolve_import(&package, &resolver, &from_file, "faber:kernel") {
         ImportResolution::Error(diag) => {
-            assert_eq!(diag.issue(), Some("kernel_import_script_mode_only"))
+            assert_eq!(diag.issue(), Some("kernel_import_script_mode_only"));
         }
         other => panic!("expected kernel-import error, got {other:?}"),
     }
@@ -410,7 +410,7 @@ fn resolve_import_library_resolve_error_is_diagnostic() {
 
     match resolve_import(&package, &resolver, &from_file, "prov:mod") {
         ImportResolution::Error(diag) => {
-            assert_eq!(diag.issue(), Some("missing_library_home"))
+            assert_eq!(diag.issue(), Some("missing_library_home"));
         }
         other => panic!("expected library resolve error, got {other:?}"),
     }
@@ -446,7 +446,7 @@ fn resolve_template_import_rejects_traversal_in_rest() {
 
     match resolve_import(&package, &resolver, &from_file, "§gnu/inner.fab") {
         ImportResolution::Local(target) => {
-            assert!(target.ends_with("inner.fab"), "target: {target:?}")
+            assert!(target.ends_with("inner.fab"), "target: {target:?}");
         }
         other => panic!("expected escaping base with clean rest to resolve, got {other:?}"),
     }
@@ -479,8 +479,7 @@ fn detect_import_cycles_reports_cycle_with_diagnostic() {
         diagnostics
             .iter()
             .any(|diag| diag.issue() == Some("package_import_cycle")),
-        "expected an import-cycle diagnostic, got {:?}",
-        diagnostics
+        "expected an import-cycle diagnostic, got {diagnostics:?}"
     );
     let _ = fs::remove_dir_all(&root);
 }

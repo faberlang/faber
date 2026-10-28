@@ -19,7 +19,7 @@ use crate::test_support::test_analysis_seams;
 #[test]
 fn package_result_python_modules_start_empty() {
     let result = compile_failure(vec![]);
-    assert!(result.python_modules.is_empty());
+    assert_eq!(result.python_modules, [] as [(String, String); 0]);
 }
 
 /// Minimal emission seams for the Rust emission tests: no product manifest
@@ -300,7 +300,7 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("policy.fab"),
-        r#"
+        r"
 @ public
 class ZeroGhost {
     @ public
@@ -308,7 +308,7 @@ class ZeroGhost {
         return [0] ↦ vector<int, 1>
     }
 }
-"#,
+",
     )
     .expect("write policy");
     for (module, function) in [("consumer_a", "resolve_a"), ("consumer_b", "resolve_b")] {
