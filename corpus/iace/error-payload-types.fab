@@ -1,0 +1,82 @@
++++
+term = "⇥"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "si_stmt", "iace_stmt", "fac_stmt", "cape_clause", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
+category = "error"
+summary = "A failable function's error channel carries an int, a bool or a class value, and the handler reads the payload."
+syntax = "fn f(…) → T ⇥ E"
+related = ["⇥", "throw", "catch", "functio-fallibilis"]
+locale = "en"
++++
+# =============================================================================
+# ⇥ — A failable function's error channel carries an int, a bool or a class value, and the handler reads the payload.
+# =============================================================================
+#
+# What this teaches:
+#   • `⇥ E` names the payload type, and `throw` carries a value of that
+#     type: `⇥ int`, `⇥ bool` and `⇥ Failure` all work
+#   • A `do … catch err` handler receives the payload as `err` with its
+#     own type: an `int` adds, a `bool` tests, a class value reads its
+#     fields
+#   • A call that does not fail still returns its normal value, and the
+#     handler does not run
+#
+# Common mistakes:
+#   • Expecting the payload to be a string: `⇥ E` is any type, and the
+#     handler sees that type
+#   • Using `⇥ value` for a fallback: a fallback is `⊥ value` on the call
+#
+# See also: functio-fallibilis, failable-method, iace
+# =============================================================================
+
+class Failure {
+    let string reason
+    let int code
+}
+
+fn check_int(int n) → int ⇥ int {
+    if n ≺ 0 then throw n * 100
+    return n + 1
+}
+
+fn check_bool(int n) → int ⇥ bool {
+    if n ≡ 0 then throw true
+    return 10 / n
+}
+
+fn check_class(int n) → int ⇥ Failure {
+    if n ≻ 5 then throw Failure { reason = "too big", code = n }
+    return n * 2
+}
+
+main {
+    do {
+        print check_int(4)
+        print check_int(-3)
+        print "not reached"
+    }
+    catch err {
+        print "int payload: §"(err + 1)
+    }
+    do {
+        print check_bool(5)
+        print check_bool(0)
+        print "not reached"
+    }
+    catch err {
+        if err {
+            print "bool payload: true"
+        }
+        else {
+            print "bool payload: false"
+        }
+    }
+    do {
+        print check_class(3)
+        print check_class(9)
+        print "not reached"
+    }
+    catch err {
+        print "class payload: §, §"(err.reason, err.code)
+    }
+}

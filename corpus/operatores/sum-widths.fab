@@ -1,0 +1,46 @@
++++
+term = "sum"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "array_literal", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
+category = "arithmetic"
+summary = "A sum over a list is exact: `trapping`, `inf` and `u64` lists print their exact total, and a store into a slot that fits keeps it."
+syntax = "<list>.sum()"
+related = ["sum", "word-list-sum", "inf", "trapping"]
+locale = "en"
++++
+# =============================================================================
+# sum — A sum over a list is exact: `trapping`, `inf` and `u64` lists print their exact total, and a store into a slot that fits keeps it.
+# =============================================================================
+#
+# What this teaches:
+#   • `.sum()` over a `trapping<u8>` list is the exact total, 300 for 100
+#     + 100 + 100, and an unstored total prints as it is
+#   • A sum over an `inf` list has no limit, and a `u64` list sums values
+#     past the largest `i64` exactly
+#   • A total that fits the slot it is stored into is kept; the total that
+#     does not fit is the trap in sum-widths-trap
+#
+# Common mistakes:
+#   • Reading the trap as happening where the arithmetic is computed:
+#     arithmetic is exact, and only the store into the `trapping` slot
+#     checks
+#   • Expecting a `u64` sum to wrap at 2⁶⁴: it is exact, and the width
+#     limit is the store
+#
+# See also: sum-widths-trap, word-list-sum, inf
+# =============================================================================
+
+main {
+    let list<trapping<u8>> ts ← [100, 100, 100]
+    print ts.sum()
+    let list<trapping<u8>> small ← [100, 100]
+    let trapping<u8> kept ← small.sum()
+    print kept
+    let inf big ← 2 ⇐ 100
+    let list<inf> is ← [big, big, 1]
+    print is.sum()
+    let list<u64> us ← [9223372036854775807, 9223372036854775807]
+    print us.sum()
+    let u64 stored ← us.sum()
+    print stored
+}

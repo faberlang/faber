@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/ordo/map-key.fab"
+group = "language"
+input_root = "corpus"
+input = "ordo/map-key.fab"
+category = "map"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

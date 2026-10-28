@@ -1,0 +1,52 @@
++++
+term = "⇐"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "shift_expr", "unary_expr"]
+category = "arithmetic"
+summary = "A shift of a number is `x·2ⁿ` or `⌊x/2ⁿ⌋` for every count, including counts at and past the bit width."
+syntax = "<number> ⇐ <count> | <number> ⇒ <count>"
+related = ["⇐", "⇒", "bitwise", "bits-operations"]
+locale = "en"
++++
+# =============================================================================
+# ⇐ — A shift of a number is `x·2ⁿ` or `⌊x/2ⁿ⌋` for every count, including counts at and past the bit width.
+# =============================================================================
+#
+# What this teaches:
+#   • On a number the count is never masked: `1 ⇐ 8` on a `u8` is 256, and
+#     `1 ⇐ 32` on an `i32` is 4294967296
+#   • A right shift floors: `-1000 ⇒ 3` is -125, and any count past the
+#     width gives 0 for a non-negative value and -1 for a negative one
+#   • A `b8` is not a number: the same count acts at its own width, where
+#     `0x01 ⇐ 8` drops every bit and gives `0x00`
+#
+# Common mistakes:
+#   • Expecting the count to be taken modulo the bit width as in C: it is
+#     not
+#   • Expecting a shifted number to wrap at its width: a width limit
+#     applies only at a store, so wrapping is `wrapping<W>`
+#
+# See also: bitwise, bits-operations, modular-word
+# =============================================================================
+
+main {
+    let u8 byte ← 1
+    print byte ⇐ 7
+    print byte ⇐ 8
+    print byte ⇐ 9
+    let i32 word ← 1
+    print word ⇐ 31
+    print word ⇐ 32
+    print word ⇐ 40
+    let i32 big ← 1000
+    print big ⇒ 3
+    print big ⇒ 32
+    print big ⇒ 100
+    let i32 neg ← -1000
+    print neg ⇒ 3
+    print neg ⇒ 40
+    let b8 raw ← 0x01
+    print raw ⇐ 7
+    print raw ⇐ 8
+    print raw ⇒ 8
+}

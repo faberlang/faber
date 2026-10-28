@@ -1,0 +1,40 @@
++++
+term = "sum"
+kind = "method"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "array_literal", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
+category = "arithmetic"
+summary = "Storing a list sum into a `trapping<u8>` slot that it does not fit aborts the run at the store."
+syntax = "<list>.sum()"
+related = ["sum", "sum-widths", "trapping"]
+locale = "en"
++++
+# =============================================================================
+# sum — Storing a list sum into a `trapping<u8>` slot that it does not fit aborts the run at the store.
+# =============================================================================
+#
+# What this teaches:
+#   • The exact total of a `trapping<u8>` list is 300 and prints as 300:
+#     an unstored sum is only a number
+#   • The store `let trapping<u8> stored ← ts.sum()` is where the 300
+#     meets the width, and it aborts with "300 does not fit in `u8`"
+#   • The lines printed before the trap are kept; the line after it never
+#     runs
+#
+# Common mistakes:
+#   • Reading the trap as happening where the arithmetic is computed:
+#     arithmetic is exact, and only the store into the `trapping` slot
+#     checks
+#   • Expecting the trap to be recoverable with `do … catch`: an implicit
+#     store trap is not in the `⇥` error channel
+#
+# See also: sum-widths, store-sites-trap
+# =============================================================================
+
+main {
+    let list<trapping<u8>> ts ← [100, 100, 100]
+    print ts.sum()
+    print "before"
+    let trapping<u8> stored ← ts.sum()
+    print stored
+    print "after"
+}

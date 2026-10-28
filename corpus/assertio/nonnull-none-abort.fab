@@ -1,0 +1,47 @@
++++
+term = "!."
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "si_stmt", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix"]
+category = "type"
+summary = "A non-null assertion on a missing value aborts the run: stdout before it is printed, the run exits non-zero."
+syntax = "<expression>!.<name>"
+related = ["!.", "nonnulla", "sponte"]
+locale = "en"
++++
+# =============================================================================
+# !. — A non-null assertion on a missing value aborts the run: stdout before it is printed, the run exits non-zero.
+# =============================================================================
+#
+# What this teaches:
+#   • `x!.name` asserts that `x` is present and reads the member: a
+#     present value reads normally
+#   • A missing value is not recoverable: the assertion ends the run at
+#     the access, and the lines printed before it stay printed
+#   • Nothing after the failed assertion runs
+#
+# Common mistakes:
+#   • Expecting `x!.name` to give `none` on a missing receiver: that is
+#     `x?.name`; the assertion kills the run instead
+#   • Expecting the abort to be catchable with `do … catch`: it is not in
+#     the `⇥` error channel
+#
+# See also: nonnulla, non-null-method-call, optionalis
+# =============================================================================
+
+class Persona {
+    mut string nomen
+}
+
+fn find(bool present) → Persona ∪ none {
+    if present then return Persona { nomen = "Marcus" }
+    return null
+}
+
+main {
+    let Persona ∪ none here ← find(true)
+    print here!.nomen
+    let Persona ∪ none gone ← find(false)
+    print "before"
+    print gone!.nomen
+    print "after"
+}
