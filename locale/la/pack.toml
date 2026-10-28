@@ -1574,6 +1574,10 @@ help = "scribe `{lista}<int, {magnitudo} 4>` pro quattuor elementis ad summum, a
 message = "capacitas post `{magnitudo}` scribitur"
 help = "scribe `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` aut `{ascii}<{magnitudo} 8>` pro capacitate tot ad summum; numerus nudus capacitas non est"
 
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "numerus ordinum vectoris post `{magnitudo}` scribitur"
+help = "scribe `{vector}<f32, {magnitudo} 4>` pro quattuor ordinibus; brevis forma `vf32[4]` immutata manet"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
 help = "emenda structuram AST ad demittendum"
@@ -1988,7 +1992,7 @@ help = "foramen `_` in annotatione est, non in constructione"
 
 [diagnostics.SEM008.issues.constructor_register_extent_requires_literal]
 message = "latitudo vectoris vel dimensio matricis in constructione litteram numeri requirit"
-help = "scribe latitudinem numero, ut vector<f32, 4>"
+help = "scribe latitudinem numero, ut vector<f32, magnitudo 4>"
 
 [diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
 message = "dimensiones constructionis litteras, nomina magnitudinum, et sublatas scriptas admittunt"
@@ -2763,11 +2767,11 @@ message = "vector element type mismatch"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector requires element type and width; use vector<T, N>"
+message = "vector requires element type and width; use vector<T, magnitudo N>"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector requires a width; use vector<T, 4> or vf32[4]"
+message = "vector requires a width; use vector<T, magnitudo 4> or vf32[4]"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.tuple_index_out_of_bounds]
@@ -3432,7 +3436,7 @@ help = "call shift(offsets) before {limes}<Policy>()"
 
 [diagnostics.SEM011.issues.tensor_limes_policy_invalid]
 message = "{limes} requirit rationem marginis propriam aut genus sine campis instantiarum validum"
-help = "provide remap(vector<int, R>) -> vector<int, R> and an optional transform(vector<int, R>, T) -> T method"
+help = "provide remap(vector<int, magnitudo R>) -> vector<int, magnitudo R> and an optional transform(vector<int, magnitudo R>, T) -> T method"
 
 [diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]
 message = "tensoris disloco offsets eandem rationem habere debent atque tensor"

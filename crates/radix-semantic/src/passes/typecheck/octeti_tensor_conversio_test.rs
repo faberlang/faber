@@ -192,7 +192,7 @@ fn half_float_elements_are_unsupported() {
 #[test]
 fn vector_element_is_unsupported() {
     assert_rejects_with_issue_la(
-        "incipit { sit _ t ← |00 01 02 03| ↦ tensor<vector<f32, 4>, [2]> via Le }",
+        "incipit { sit _ t ← |00 01 02 03| ↦ tensor<vector<f32, magnitudo 4>, [2]> via Le }",
         ELEMENT,
     );
 }

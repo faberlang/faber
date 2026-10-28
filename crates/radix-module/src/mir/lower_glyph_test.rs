@@ -91,7 +91,7 @@ functio transpose(tensor<f32, [2, 3]> input) → tensor<f32, [3, 2]> {
 fn lowers_glyph_vector_dot_to_lane_mul_add() {
     let dump = dump_source(
         r"
-functio dot(vector<f32, 3> a, vector<f32, 3> b) → f32 {
+functio dot(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → f32 {
     redde a · b
 }
 ",
@@ -123,7 +123,7 @@ functio product(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2
 fn lowers_glyph_matrix_applica_to_cell_lane_mul_add() {
     let dump = dump_source(
         r"
-functio apply(matrix<f32, [2, 2]> m, vector<f32, 2> v) → vector<f32, 2> {
+functio apply(matrix<f32, [2, 2]> m, vector<f32, magnitudo 2> v) → vector<f32, magnitudo 2> {
     redde m · v
 }
 ",
@@ -203,7 +203,7 @@ fn lowers_glyph_tensor_dot_to_tensor_matmul_collection_op() {
 fn lowers_glyph_vector_cross_to_lane_mul_sub() {
     let dump = dump_source(
         r"
-functio cross(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+functio cross(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<f32, magnitudo 3> {
     redde a × b
 }
 ",
@@ -224,7 +224,7 @@ functio cross(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
 fn lowers_glyph_vector_outer_to_matrix_cells() {
     let dump = dump_source(
         r"
-functio outer(vector<f32, 3> a, vector<f32, 2> b) → matrix<f32, [3, 2]> {
+functio outer(vector<f32, magnitudo 3> a, vector<f32, magnitudo 2> b) → matrix<f32, [3, 2]> {
     redde a ⊗ b
 }
 ",
@@ -290,7 +290,7 @@ fn rejects_glyph_tensor_tensor_product_kronecker() {
 fn lowers_glyph_vector_hadamard_to_lane_mul() {
     let dump = dump_source(
         r"
-functio elementwise(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+functio elementwise(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<f32, magnitudo 3> {
     redde a ⊙ b
 }
 ",
@@ -393,7 +393,7 @@ fn lowers_glyph_vector_matrix_dot_to_lane_cell_mul_add() {
     // a width-2 vector, one 3-term sum per matrix column.
     let dump = dump_source(
         r"
-functio vecmat(vector<f32, 3> v, matrix<f32, [3, 2]> m) → vector<f32, 2> {
+functio vecmat(vector<f32, magnitudo 3> v, matrix<f32, [3, 2]> m) → vector<f32, magnitudo 2> {
     redde v · m
 }
 ",
@@ -421,7 +421,7 @@ fn rejects_glyph_vector_matrix_dot_inner_dimension_mismatch_at_typecheck() {
         &session,
         "test.fab",
         r"
-functio vecmat(vector<f32, 4> v, matrix<f32, [3, 2]> m) → vector<f32, 2> {
+functio vecmat(vector<f32, magnitudo 4> v, matrix<f32, [3, 2]> m) → vector<f32, magnitudo 2> {
     redde v · m
 }
 ",

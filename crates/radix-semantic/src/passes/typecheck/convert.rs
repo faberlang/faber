@@ -1755,8 +1755,8 @@ impl TypeChecker<'_> {
 
     /// CTFP-1 register-class rows. Register-in windows
     /// (`octeti<N> ↦ vector<T, N/width>`), register-out
-    /// (`vector<T, N> ↦ lista<T>` / `↦ octeti<N>`), and element bridges
-    /// (`vector<T, N> ↦ vector<U, N>`). v1 window elements are u16/u32 only;
+    /// (`vector<T, size N> ↦ lista<T>` / `↦ octeti<N>`), and element bridges
+    /// (`vector<T, size N> ↦ vector<U, size N>`). v1 window elements are u16/u32 only;
     /// every window needs a static byte length with `widths × count = N` and a
     /// `Be`/`Le` hint. Out-of-set bridges and wrong widths fail closed.
     fn check_register_conversio(
@@ -2663,7 +2663,7 @@ impl TypeChecker<'_> {
         Some(self.error_type)
     }
 
-    /// CTFP-1: non-literal `lista<T, magnitudo N> ↦ vector<T, N>` — a bounded lista with
+    /// CTFP-1: non-literal `lista<T, magnitudo N> ↦ vector<T, size N>` — a bounded lista with
     /// a literal capacity that exactly matches the vector width materializes
     /// into the register; unbounded `lista<T>` stays literal-only.
     fn check_bounded_lista_to_vector_conversio(

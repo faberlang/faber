@@ -434,7 +434,7 @@ incipit {
 #[test]
 fn generic_applied_arg_accepts_local_size_alias() {
     accepts(
-        r"typus Box<magnitudo N> = vector<f32, N>
+        r"typus Box<magnitudo N> = vector<f32, magnitudo N>
 functio keep<magnitudo N>(Box<N> value) → Box<N> {
     redde value
 }
@@ -449,7 +449,7 @@ incipit { tacet }",
 #[test]
 fn generic_applied_arg_accepts_ordered_type_and_size_args() {
     accepts(
-        r"typus Box<T, magnitudo N> = vector<T, N>
+        r"typus Box<T, magnitudo N> = vector<T, magnitudo N>
 functio concrete(Box<fractus, 3> value) → Box<fractus, 3> {
     redde value
 }
@@ -461,7 +461,7 @@ incipit { tacet }",
 #[test]
 fn generic_applied_arg_rejects_kind_swap() {
     rejects_with_issue(
-        r"typus Box<magnitudo N> = vector<f32, N>
+        r"typus Box<magnitudo N> = vector<f32, magnitudo N>
 functio wrong(Box<textus> value) → Box<textus> {
     redde value
 }
@@ -474,7 +474,7 @@ incipit { tacet }",
 #[test]
 fn generic_applied_arg_rejects_wrong_arity() {
     rejects_with_issue(
-        r"typus Box<magnitudo N> = vector<f32, N>
+        r"typus Box<magnitudo N> = vector<f32, magnitudo N>
 functio wrong(Box<3, 4> value) → Box<3, 4> {
     redde value
 }

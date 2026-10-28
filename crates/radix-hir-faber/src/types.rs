@@ -1243,10 +1243,16 @@ impl super::FaberCodegen<'_> {
         figura: IndexId,
         surface: &impl KeywordSurface,
     ) -> String {
-        format!(
-            "{}<{child}, {}>",
-            surface.type_surface(TypeBindingKind::TensorFamily(kind)),
+        // The vector long form writes its lane count after the `size` marker
+        //; the other heads take a bracketed extent.
+        let extent = if matches!(kind, TensorFamilyKind::Vector) {
+            self.vector_width_to_faber(figura, surface)
+        } else {
             self.format_figura(figura, surface)
+        };
+        format!(
+            "{}<{child}, {extent}>",
+            surface.type_surface(TypeBindingKind::TensorFamily(kind)),
         )
     }
 

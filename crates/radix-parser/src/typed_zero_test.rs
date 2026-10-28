@@ -44,14 +44,14 @@ fn long_form_zero_is_a_value_expression() {
         "sit tensor<f32, [2, 3]> a ← tensor<f32, [2, 3]> {}"
     ));
     assert!(init_is_construct(
-        "sit vector<f32, 4> v ← vector<f32, 4> {}"
+        "sit vector<f32, magnitudo 4> v ← vector<f32, magnitudo 4> {}"
     ));
     assert!(init_is_construct(
         "sit matrix<f32, [2, 2]> m ← matrix<f32, [2, 2]> {}"
     ));
     // A vector-element tensor.
     assert!(init_is_construct(
-        "sit tensor<vector<f32, 4>, [8]> a ← tensor<vector<f32, 4>, [8]> {}"
+        "sit tensor<vector<f32, magnitudo 4>, [8]> a ← tensor<vector<f32, magnitudo 4>, [8]> {}"
     ));
 }
 
@@ -66,7 +66,7 @@ fn bare_form_is_retired_with_a_named_diagnostic() {
     for source in [
         "sit tf32[2] a ← tf32[2]",
         "sit tensor<f32, [2]> a ← tensor<f32, [2]>",
-        "sit vector<f32, 4> v ← vector<f32, 4>",
+        "sit vector<f32, magnitudo 4> v ← vector<f32, magnitudo 4>",
     ] {
         let result = parse_source(source);
         assert!(

@@ -30,7 +30,7 @@ fn accepted_in_en(source: &str) {
 #[test]
 fn vector_added_then_multiply_chain_checks() {
     accepted_in_en(
-        "fn t(vector<f32, 4> a, vector<f32, 4> b, vector<f32, 4> c) → vector<f32, 4> {
+        "fn t(vector<f32, size 4> a, vector<f32, size 4> b, vector<f32, size 4> c) → vector<f32, size 4> {
     return a.added(b).multiplied(c)
 }",
     );
@@ -39,7 +39,7 @@ fn vector_added_then_multiply_chain_checks() {
 #[test]
 fn vector_subtract_then_multiply_chain_checks() {
     accepted_in_en(
-        "fn t(vector<f32, 4> a, vector<f32, 4> b) → vector<f32, 4> {
+        "fn t(vector<f32, size 4> a, vector<f32, size 4> b) → vector<f32, size 4> {
     return a.subtracted(b).multiplied(b)
 }",
     );
@@ -57,7 +57,7 @@ fn vector_chain_through_alias_spelling_checks() {
 #[test]
 fn vector_chain_ending_in_a_scalar_result_checks() {
     accepted_in_en(
-        "fn t(vector<f32, 4> a, vector<f32, 4> b) → f32 {
+        "fn t(vector<f32, size 4> a, vector<f32, size 4> b) → f32 {
     return a.added(b).multiplied(b).dot(a)
 }",
     );
@@ -95,7 +95,7 @@ fn unknown_method_after_a_chained_receiver_is_still_rejected() {
     let mut config = crate::PassConfig::for_target(Target::HirRust);
     config.locale_pack = Some(en_pack());
     let result = crate::test_support::analyze_source_with_config(
-        "fn t(vector<f32, 4> a, vector<f32, 4> b) → vector<f32, 4> {
+        "fn t(vector<f32, size 4> a, vector<f32, size 4> b) → vector<f32, size 4> {
     return a.added(b).nonexistent(b)
 }",
         config,

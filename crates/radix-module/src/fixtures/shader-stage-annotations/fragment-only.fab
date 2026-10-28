@@ -5,7 +5,7 @@ locale = "en"
 import from "zqstage:stage" stage
 
 @ Fragment { }
-fn shade(vector<f32, 3> color) → vector<f32, 4> {
-    let vector<f32, 4> result ← [color[0], color[1], color[2], 1.0] ↦ vector<f32, 4>
+fn shade(vector<f32, size 3> color) → vector<f32, size 4> {
+    let vector<f32, size 4> result ← [color[0], color[1], color[2], 1.0] ↦ vector<f32, size 4>
     return result
 }

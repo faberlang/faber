@@ -1082,7 +1082,7 @@ impl TypeTable {
         self.intern(Type::Tensor(element, shape))
     }
 
-    /// Allocate a `vector<T, N>` semantic register vector.
+    /// Allocate a `vector<T, size N>` semantic register vector.
     pub fn vector_with_width(&mut self, element: TypeId, width: IndexId) -> TypeId {
         self.intern(Type::Vector(element, width))
     }
@@ -2113,7 +2113,7 @@ pub enum Type {
     /// `tensor<T, Figura>` fixed-length container; element type unrestricted under indexed-types stance.
     Tensor(TypeId, IndexId),
 
-    /// `vector<T, N>` register-class numeric vector; width is a single dimension.
+    /// `vector<T, size N>` register-class numeric vector; width is a single dimension.
     Vector(TypeId, IndexId),
 
     /// `matrix<T, [R, C]>` register-class numeric matrix; shape is exactly two dimensions.

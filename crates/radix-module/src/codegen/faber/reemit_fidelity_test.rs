@@ -640,7 +640,7 @@ fn littera_code_via_clause_round_trips() {
 fn register_target_via_clause_round_trips() {
     // A register target keeps its hint in the clause, not as a bracketed tail.
     let code = assert_idempotent(
-        "functio out(vector<u32, 4> v) → lista<b8, magnitudo 16> {\n    redde v ↦ lista<b8, magnitudo 16> via Le\n}\n",
+        "functio out(vector<u32, magnitudo 4> v) → lista<b8, magnitudo 16> {\n    redde v ↦ lista<b8, magnitudo 16> via Le\n}\n",
     );
     assert!(
         code.contains("↦ lista<b8, magnitudo 16> via Le"),
@@ -771,7 +771,7 @@ fn scalar_math_and_vector_lift_survive_reemission() {
     // operators keep their operand order and parentheses (`s - v` is not
     // `v - s`; `-(v * s)` is not `(-v) * s`).
     let code = assert_idempotent(
-        "functio f(f32 x, vector<f32, 3> v) → vector<f32, 3> {\n    redde x.radix() - (v * x.sinus()) / x\n}\nfunctio g(f32 x, vector<f32, 3> v) → vector<f32, 3> {\n    redde -(v + x)\n}\n",
+        "functio f(f32 x, vector<f32, magnitudo 3> v) → vector<f32, magnitudo 3> {\n    redde x.radix() - (v * x.sinus()) / x\n}\nfunctio g(f32 x, vector<f32, magnitudo 3> v) → vector<f32, magnitudo 3> {\n    redde -(v + x)\n}\n",
     );
     assert!(
         code.contains("x.radix()") && code.contains("x.sinus()"),

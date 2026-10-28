@@ -1261,6 +1261,10 @@ help = "เขียน `{lista}<int, {magnitudo} 4>` สำหรับไม�
 message = "ความจุเขียนหลัง `{magnitudo}`"
 help = "เขียน `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` หรือ `{ascii}<{magnitudo} 8>` สำหรับความจุไม่เกินจำนวนนั้น; ตัวเลขเปล่า ๆ ไม่ใช่ความจุ"
 
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "จำนวนเลนของเวกเตอร์เขียนหลัง `{magnitudo}`"
+help = "เขียน `{vector}<f32, {magnitudo} 4>` สำหรับสี่เลน; รูปย่อ `vf32[4]` ไม่เปลี่ยน"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -2206,11 +2210,11 @@ message = "ชนิดสมาชิกเวกเตอร์ไม่ตร
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector ต้องมีชนิดสมาชิกและความกว้าง ใช้ vector<T, N>"
+message = "vector ต้องมีชนิดสมาชิกและความกว้าง ใช้ vector<T, ขนาด N>"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector ต้องมีความกว้าง ใช้ vector<T, 4> หรือ vf32[4]"
+message = "vector ต้องมีความกว้าง ใช้ vector<T, ขนาด 4> หรือ vf32[4]"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]

@@ -32,6 +32,10 @@ mod ranged_list_roundtrip_test;
 mod capacity_roundtrip_test;
 
 #[cfg(test)]
+#[path = "vector_width_roundtrip_test.rs"]
+mod vector_width_roundtrip_test;
+
+#[cfg(test)]
 #[path = "module_constant_roundtrip_test.rs"]
 mod module_constant_roundtrip_test;
 

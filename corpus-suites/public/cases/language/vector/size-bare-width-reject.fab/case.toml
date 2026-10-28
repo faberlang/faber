@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/vector/size-bare-width-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "vector/size-bare-width-reject.fab"
+category = "vector"
+domain = "tensors"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "vector_width_needs_size"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "vector_width_needs_size"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "vector_width_needs_size"

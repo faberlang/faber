@@ -1261,6 +1261,10 @@ help = "अधिकतम 4 तत्वों के लिए `{lista}<int, {
 message = "क्षमता `{magnitudo}` के बाद लिखी जाती है"
 help = "इतनी अधिकतम क्षमता के लिए `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` या `{ascii}<{magnitudo} 8>` लिखें; केवल संख्या क्षमता नहीं है"
 
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "सदिश की लेन गिनती `{magnitudo}` के बाद लिखी जाती है"
+help = "चार लेन के लिए `{vector}<f32, {magnitudo} 4>` लिखें; संक्षिप्त रूप `vf32[4]` अपरिवर्तित है"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -2206,11 +2210,11 @@ message = "vector तत्व का प्रकार मेल नहीं 
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector के लिए तत्व प्रकार और चौड़ाई आवश्यक हैं; vector<T, N> का उपयोग करें"
+message = "vector के लिए तत्व प्रकार और चौड़ाई आवश्यक हैं; vector<T, आकार N> का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector के लिए चौड़ाई आवश्यक है; vector<T, 4> या vf32[4] का उपयोग करें"
+message = "vector के लिए चौड़ाई आवश्यक है; vector<T, आकार 4> या vf32[4] का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]

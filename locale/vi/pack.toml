@@ -1249,6 +1249,10 @@ help = "viết `{lista}<int, {magnitudo} 4>` cho tối đa 4 phần tử, hoặc
 message = "sức chứa được viết sau `{magnitudo}`"
 help = "viết `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` hoặc `{ascii}<{magnitudo} 8>` cho sức chứa tối đa chừng đó; một con số trần không phải là sức chứa"
 
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "số làn của vectơ được viết sau `{magnitudo}`"
+help = "viết `{vector}<f32, {magnitudo} 4>` cho bốn làn; dạng rút gọn `vf32[4]` không đổi"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
 help = "sửa cấu trúc AST để hạ mức"
@@ -2194,11 +2198,11 @@ message = "kiểu phần tử vector không khớp"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector yêu cầu kiểu phần tử và độ rộng; dùng vector<T, N>"
+message = "vector yêu cầu kiểu phần tử và độ rộng; dùng vector<T, kích_thước N>"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector yêu cầu độ rộng; dùng vector<T, 4> hoặc vf32[4]"
+message = "vector yêu cầu độ rộng; dùng vector<T, kích_thước 4> hoặc vf32[4]"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]

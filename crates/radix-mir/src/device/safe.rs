@@ -751,7 +751,7 @@ impl<'a> DeviceSafeClassifier<'a> {
     /// (`<base>_f<field>`), so it needs no memory layout and is admitted when
     /// every declared field type is itself a value type the lane form admits
     /// — `resolve_struct_layout` is not used here because a scalarized value
-    /// has no layout and A2's `Geo` (`vector<f32, 3>` fields) would be refused
+    /// has no layout and A2's `Geo` (`vector<f32, size 3>` fields) would be refused
     /// by the parameter layout law.
     fn check_genus_local_type(&mut self, ty: MirType) {
         let Type::Struct(def_id) = self.types.get(ty.semantic_id()).clone() else {

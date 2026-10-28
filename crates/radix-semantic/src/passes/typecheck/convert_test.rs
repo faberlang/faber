@@ -2704,7 +2704,7 @@ fn tensor_family_conversio_tensor_to_vector_accepts() {
     test_support::assert_accepts_la(
         r"incipit {
   sit tf32[3] t ← vacua
-  sit vector<f32, 3> v ← t ↦ vector<f32, 3>
+  sit vector<f32, magnitudo 3> v ← t ↦ vector<f32, magnitudo 3>
   nota v
 }",
     );
@@ -2714,7 +2714,7 @@ fn tensor_family_conversio_tensor_to_vector_accepts() {
 fn tensor_family_conversio_vector_to_tensor_accepts() {
     test_support::assert_accepts_la(
         r"incipit {
-  sit vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+  sit vector<f32, magnitudo 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
   sit tf32[3] t ← v ↦ tf32[3]
   nota t
 }",
@@ -2748,7 +2748,7 @@ fn tensor_family_conversio_width_mismatch_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
   sit tf32[4] t ← vacua
-  sit vector<f32, 3> v ← t ↦ vector<f32, 3>
+  sit vector<f32, magnitudo 3> v ← t ↦ vector<f32, magnitudo 3>
   nota v
 }",
         "tensor_shape_mismatch",
@@ -2760,7 +2760,7 @@ fn tensor_family_conversio_element_mismatch_rejects() {
     test_support::assert_rejects_with_issue_la(
         r"incipit {
   sit tu32[3] t ← vacua
-  sit vector<f32, 3> v ← t ↦ vector<f32, 3>
+  sit vector<f32, magnitudo 3> v ← t ↦ vector<f32, magnitudo 3>
   nota v
 }",
         "tensor_element_mismatch",

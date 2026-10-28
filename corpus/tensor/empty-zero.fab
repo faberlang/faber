@@ -38,9 +38,9 @@ main {
     let tf32[2, 3] grid ← empty
     print grid.shape()
     print grid[[1, 2]]
-    let tensor<vector<f32, 4>, [2]> lanes ← empty
+    let tensor<vector<f32, size 4>, [2]> lanes ← empty
     print lanes.shape()
-    let vector<f32, 4> v ← empty
+    let vector<f32, size 4> v ← empty
     print v[3]
     let mf32[2, 2] m ← empty
     print m

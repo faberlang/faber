@@ -342,7 +342,7 @@ main {}",
         "copy_into_target_not_tensor",
     );
     assert_rejects(
-        r"fn t(mut vector<f32, 4> target, vector<f32, 4> source) → void {
+        r"fn t(mut vector<f32, size 4> target, vector<f32, size 4> source) → void {
     target ⇇ source
 }
 main {}",
