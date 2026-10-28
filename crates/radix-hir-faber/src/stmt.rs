@@ -28,7 +28,7 @@ use radix_hir::{
 use radix_lexer::{Symbol, TokenKind};
 
 impl super::FaberCodegen<'_> {
-    /// Print ` omnia` after `fac` when the synthesized `fac … dum` loop block
+    /// Print ` omnia` or ` machina` after `fac` when the synthesized `fac … dum` loop block
     /// carries the authored marker.
     pub(super) fn write_fac_omnia_marker(
         &self,
@@ -36,12 +36,13 @@ impl super::FaberCodegen<'_> {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        if matches!(
-            loop_block.breakable,
-            Some(radix_hir::HirBreakableKind::FacOmniaLoop)
-        ) {
+        if let Some(kind) = loop_block
+            .breakable
+            .filter(|kind| kind.is_loop_marker())
+            .and_then(radix_hir::HirBreakableKind::fac_modifier_key)
+        {
             writer.write(" ");
-            writer.write(surface.contextual_keyword("omnia"));
+            writer.write(surface.contextual_keyword(kind));
         }
     }
 

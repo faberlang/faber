@@ -530,7 +530,7 @@ fn walk_clausura_fac_walks_catch_binding_and_body() {
             ret: None,
             err: None,
             body: ClausuraBody::Fac(FacStmt {
-                omnia: false,
+                modifier: crate::FacModifier::None,
                 body: test_block(),
                 catch: Some(CapeClause {
                     binding: test_ident(1),

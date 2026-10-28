@@ -507,15 +507,12 @@ impl super::FaberCodegen<'_> {
                 // the block, not the enclosing loop. Dropping the keyword
                 // would change what `rumpe`/`perge` target (D8.9).
                 if let Some(kind) = block.breakable
-                    && matches!(
-                        kind,
-                        radix_hir::HirBreakableKind::Fac | radix_hir::HirBreakableKind::FacOmnia
-                    )
+                    && kind.is_scope()
                 {
                     writer.write(surface.contextual_keyword("fac"));
-                    if matches!(kind, radix_hir::HirBreakableKind::FacOmnia) {
+                    if let Some(modifier) = kind.fac_modifier_key() {
                         writer.write(" ");
-                        writer.write(surface.contextual_keyword("omnia"));
+                        writer.write(surface.contextual_keyword(modifier));
                     }
                     writer.write(" ");
                 }
@@ -1831,19 +1828,20 @@ impl super::FaberCodegen<'_> {
 
         // `fac omnia` rides the synthetic `Block` tail the same way
         // `write_fac_body` unwraps it; the handler keyword follows the body.
-        let omnia = body.statements.is_empty()
-            && matches!(
-                body.expr.as_deref().map(|expr| &expr.kind),
-                Some(HirExpressionKind::Block(inner))
-                    if matches!(
-                        inner.breakable,
-                        Some(radix_hir::HirBreakableKind::FacOmnia)
-                    )
-            );
+        let modifier = if body.statements.is_empty() {
+            match body.expr.as_deref().map(|expr| &expr.kind) {
+                Some(HirExpressionKind::Block(inner)) => inner
+                    .breakable
+                    .and_then(radix_hir::HirBreakableKind::fac_modifier_key),
+                _ => None,
+            }
+        } else {
+            None
+        };
         writer.write(surface.contextual_keyword("fac"));
-        if omnia {
+        if let Some(modifier) = modifier {
             writer.write(" ");
-            writer.write(surface.contextual_keyword("omnia"));
+            writer.write(surface.contextual_keyword(modifier));
         }
         writer.writeln(" {");
         writer.indented(|writer| {

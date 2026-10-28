@@ -898,14 +898,52 @@ pub enum HirBreakableKind {
     /// the loop keeps plain `fac … dum` semantics in every backend and the
     /// marker only lets the re-emitter print `omnia`.
     FacOmniaLoop,
+    /// `fac machina { }` (en `do device`) try body: a checked device-resident
+    /// region. It is a breakable scope like [`Fac`] and lowers exactly as
+    /// [`FacOmnia`] in V0.
+    FacMachina,
+    /// Marker on the synthesized loop block of `fac machina { } … dum cond`;
+    /// like [`HirBreakableKind::FacOmniaLoop`] it is not a breakable scope.
+    FacMachinaLoop,
 }
 
 impl HirBreakableKind {
     /// Whether the block is a breakable scope that `rumpe` exits (every kind
-    /// except the loop-marker [`HirBreakableKind::FacOmniaLoop`]).
+    /// except the loop markers [`HirBreakableKind::FacOmniaLoop`] and
+    /// [`HirBreakableKind::FacMachinaLoop`]).
     #[must_use]
     pub fn is_scope(self) -> bool {
-        !matches!(self, Self::FacOmniaLoop)
+        !matches!(self, Self::FacOmniaLoop | Self::FacMachinaLoop)
+    }
+
+    /// Latin keyword key of the modifier the authored `fac` carried, for the
+    /// re-emitter (`omnia` or `machina`); `None` for a plain `fac`.
+    #[must_use]
+    pub fn fac_modifier_key(self) -> Option<&'static str> {
+        match self {
+            Self::Fac => None,
+            Self::FacOmnia | Self::FacOmniaLoop => Some("omnia"),
+            Self::FacMachina | Self::FacMachinaLoop => Some("machina"),
+        }
+    }
+
+    /// Whether launches inside the block defer their faults to the block's
+    /// exit (`omnia` and `machina` alike).
+    #[must_use]
+    pub fn defers_faults(self) -> bool {
+        self.fac_modifier_key().is_some()
+    }
+
+    /// Whether the block is a device region (`fac machina`).
+    #[must_use]
+    pub fn is_device_region(self) -> bool {
+        matches!(self, Self::FacMachina | Self::FacMachinaLoop)
+    }
+
+    /// Whether the kind is one of the synthesized loop-block markers.
+    #[must_use]
+    pub fn is_loop_marker(self) -> bool {
+        !self.is_scope()
     }
 }
 

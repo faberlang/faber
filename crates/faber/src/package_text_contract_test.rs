@@ -265,24 +265,7 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
         .iter()
         .filter(|diag| diag.code == Some("SEM010"))
         .collect();
-    if !sem010.is_empty() {
-        let issue_sem010 = diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
-        assert!(
-            !issue_sem010.is_empty(),
-            "missing initializer_annotation_mismatch fact for {locale}: {sem010:?}"
-        );
-        for diag in issue_sem010 {
-            assert!(
-                pack.render_diagnostic_text(diag)
-                    .expect("SEM010 template should render")
-                    .is_some()
-            );
-            assert_plain_render_contract(
-                &render_plain(diag, &pack),
-                "error[SEM010:initializer_annotation_mismatch]",
-            );
-        }
-    } else {
+    if sem010.is_empty() {
         let sem001: Vec<_> = diagnostics
             .iter()
             .filter(|diag| diag.code == Some("SEM001"))
@@ -305,6 +288,23 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
             assert_plain_render_contract(
                 &render_plain(diag, &pack),
                 "error[SEM001:unknown_identifier]",
+            );
+        }
+    } else {
+        let issue_sem010 = diagnostics_with_issue(&sem010, ISSUE_INITIALIZER_ANNOTATION_MISMATCH);
+        assert!(
+            !issue_sem010.is_empty(),
+            "missing initializer_annotation_mismatch fact for {locale}: {sem010:?}"
+        );
+        for diag in issue_sem010 {
+            assert!(
+                pack.render_diagnostic_text(diag)
+                    .expect("SEM010 template should render")
+                    .is_some()
+            );
+            assert_plain_render_contract(
+                &render_plain(diag, &pack),
+                "error[SEM010:initializer_annotation_mismatch]",
             );
         }
     }

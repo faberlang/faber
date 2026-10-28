@@ -5282,3 +5282,7 @@ mod wgsl_stage_annotation_tests;
 #[cfg(test)]
 #[path = "codegen_analysis_test.rs"]
 mod codegen_analysis_tests;
+
+#[cfg(test)]
+#[path = "driver_behavior_test.rs"]
+mod driver_behavior_tests;
