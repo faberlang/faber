@@ -2,7 +2,7 @@
 locale = "en"
 term = "itera-reduce-source-reject-en"
 kind = "reject"
-category = "control-flow"
+category = "loop"
 grammar = ["itera_stmt", "reducta_expr"]
 canonical = false
 summary = "A bare reduce expression is refused as a loop source; bind it to a name first."

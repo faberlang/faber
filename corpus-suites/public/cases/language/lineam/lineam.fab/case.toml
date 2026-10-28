@@ -3,6 +3,8 @@ id = "corpus/lineam/lineam.fab"
 group = "language"
 input_root = "corpus"
 input = "lineam/lineam.fab"
+category = "console"
+domain = "io"
 
 
 [expect]

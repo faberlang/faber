@@ -3,6 +3,8 @@ id = "corpus/itera/varia-binder.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/varia-binder.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

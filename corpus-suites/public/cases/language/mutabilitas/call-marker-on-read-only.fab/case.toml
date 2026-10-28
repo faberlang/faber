@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/call-marker-on-read-only.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/call-marker-on-read-only.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

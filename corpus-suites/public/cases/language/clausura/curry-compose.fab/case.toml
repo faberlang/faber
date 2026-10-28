@@ -3,6 +3,8 @@ id = "corpus/clausura/curry-compose.fab"
 group = "language"
 input_root = "corpus"
 input = "clausura/curry-compose.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

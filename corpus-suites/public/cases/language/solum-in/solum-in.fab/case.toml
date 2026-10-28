@@ -3,6 +3,8 @@ id = "corpus/solum-in/solum-in.fab"
 group = "language"
 input_root = "corpus"
 input = "solum-in/solum-in.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

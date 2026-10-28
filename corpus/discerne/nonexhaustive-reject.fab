@@ -2,7 +2,7 @@
 term = "discerne nonexhaustive"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "Decline: a discerne over a union must name every variant or carry a default arm; omitting Dot is rejected with SEM040:missing_variants."
 syntax = "discerne <Shape> { case Circle let r … case Rect let w … } — rejected; add case Dot or a default arm"

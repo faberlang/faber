@@ -3,6 +3,8 @@ id = "corpus/lista/methodi-vacuum.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/methodi-vacuum.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

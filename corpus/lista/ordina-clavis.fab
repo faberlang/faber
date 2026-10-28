@@ -2,7 +2,7 @@
 term = "ordina"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "call_expr", "call_suffix", "member_suffix", "sort_expr", "sort_direction", "sort_body", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Sort a list by a key; equal keys keep their order."
 syntax = "sort via asc|desc from <lista> let x { return key } | <lista>.sort(<T x ∴ key>)"

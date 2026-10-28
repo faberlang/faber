@@ -3,6 +3,8 @@ id = "corpus/regex/reject-construct.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/reject-construct.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

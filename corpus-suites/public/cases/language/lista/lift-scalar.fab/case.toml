@@ -3,6 +3,8 @@ id = "corpus/lista/lift-scalar.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/lift-scalar.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/implet/implet-bound.fab"
 group = "language"
 input_root = "corpus"
 input = "implet/implet-bound.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

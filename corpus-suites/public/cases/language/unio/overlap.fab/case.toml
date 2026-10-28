@@ -3,6 +3,8 @@ id = "corpus/unio/overlap.fab"
 group = "language"
 input_root = "corpus"
 input = "unio/overlap.fab"
+category = "variant"
+domain = "types"
 
 
 [expect]

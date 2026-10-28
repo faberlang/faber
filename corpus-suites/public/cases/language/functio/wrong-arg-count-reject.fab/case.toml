@@ -3,6 +3,8 @@ id = "corpus/functio/wrong-arg-count-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "functio/wrong-arg-count-reject.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

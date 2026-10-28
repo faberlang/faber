@@ -2,7 +2,7 @@
 term = "vector"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "redde_stmt", "fixum_decl", "assignment", "place", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "dum_stmt", "comparison", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "register"
+category = "vector"
 canonical = false
 summary = "A run-time index on a vector selects one lane under a bounds check: v[i] reads lane i, and an index past the width traps like a lista index."
 syntax = "<vector>[<integer expression>]"

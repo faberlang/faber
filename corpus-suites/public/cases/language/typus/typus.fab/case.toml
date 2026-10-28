@@ -3,6 +3,8 @@ id = "corpus/typus/typus.fab"
 group = "language"
 input_root = "corpus"
 input = "typus/typus.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

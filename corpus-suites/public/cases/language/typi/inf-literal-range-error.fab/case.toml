@@ -3,6 +3,8 @@ id = "corpus/typi/inf-literal-range-error.fab"
 group = "language"
 input_root = "corpus"
 input = "typi/inf-literal-range-error.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

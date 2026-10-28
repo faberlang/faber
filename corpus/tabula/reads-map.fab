@@ -2,7 +2,7 @@
 term = "tabula"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "assignment", "place", "sort_expr", "fac_stmt", "cape_clause", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "map"
 canonical = false
 summary = "Three reads of one entry on a map: m[k] dies when the key is missing, m.get(k) gives none, m.at(k) reports on the error channel."
 syntax = "<map>[<key>] | <map>.get(<key>) | <map>.at(<key>)"

@@ -2,7 +2,7 @@
 term = "applications"
 kind = "pointer"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
-category = "application"
+category = "integration"
 canonical = true
 summary = "Points to the coreutils application exempla workspace."
 related = ["cli", "argumenta", "operandus", "exitus"]

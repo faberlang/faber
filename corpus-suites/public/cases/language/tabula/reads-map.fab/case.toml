@@ -3,6 +3,8 @@ id = "corpus/tabula/reads-map.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/reads-map.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

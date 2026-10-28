@@ -2,7 +2,7 @@
 term = "json"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "json_literal", "json_member", "json_value", "json_object", "json_string", "json_number", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "format"
 canonical = false
 summary = "A JSON object literal cannot repeat a key: the second occurrence rejects with SEM011:json_duplicate_key."
 syntax = "{ \"a\": 1, \"a\": 2 }"

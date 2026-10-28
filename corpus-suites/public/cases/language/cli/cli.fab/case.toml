@@ -3,6 +3,8 @@ id = "corpus/cli/cli.fab"
 group = "language"
 input_root = "corpus"
 input = "cli/cli.fab"
+category = "cli"
+domain = "program"
 
 args = ["greet", "Marcus"]
 

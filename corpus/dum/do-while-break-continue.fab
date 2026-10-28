@@ -2,7 +2,7 @@
 term = "dum"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "dum_stmt", "comparison", "additive_expr", "multiplicative_expr", "adfirma_stmt", "proba_stmt", "expression", "literal", "perge_stmt", "rumpe_stmt", "fac_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "A do-while loop that skips an iteration with continue and leaves with break."
 syntax = "do { … } while <condition>"

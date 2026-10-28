@@ -3,6 +3,8 @@ id = "corpus/errata/errata.fab"
 group = "language"
 input_root = "corpus"
 input = "errata/errata.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

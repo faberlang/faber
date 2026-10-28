@@ -2,7 +2,7 @@
 term = "·"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "arithmetic"
+category = "tensor"
 summary = "Glyph matmul: rank-2 inner product matrix · matrix contracts the inner dimension."
 syntax = "<expression> · <expression>"
 related = ["matrix", "vector", "tensor"]

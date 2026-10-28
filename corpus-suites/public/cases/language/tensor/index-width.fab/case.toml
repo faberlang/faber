@@ -3,6 +3,8 @@ id = "corpus/tensor/index-width.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/index-width.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

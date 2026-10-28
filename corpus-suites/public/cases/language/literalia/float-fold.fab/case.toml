@@ -3,6 +3,8 @@ id = "corpus/literalia/float-fold.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/float-fold.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/tabula/composite-key.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/composite-key.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

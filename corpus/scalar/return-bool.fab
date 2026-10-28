@@ -2,7 +2,7 @@
 term = "redde"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "expression", "literal"]
-category = "scalar"
+category = "function"
 canonical = true
 summary = "Functions returning boolean literals via redde verum and redde falsum."
 syntax = "redde <bool-literal>"

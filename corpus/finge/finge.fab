@@ -3,7 +3,7 @@ term = "finge"
 explains = ["finge"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "fixum_decl", "finge_expr", "qualified_ident", "field_list", "field_init", "field_key", "expression", "literal", "nota_stmt"]
-category = "object"
+category = "class"
 canonical = true
 summary = "Constructs a tagged union variant."
 syntax = "finge <variant> [{ <field> = <expr>, ... }] [∷ <type>]"

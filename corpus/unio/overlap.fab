@@ -2,7 +2,7 @@
 term = "∪"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_method_decl", "param_list", "parameter", "return_clause", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "redde_stmt", "incipit_stmt", "fixum_decl", "hole_type", "typed_constructor", "field_list", "field_init", "field_key", "assignment", "place", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "template_argument", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "variant"
 canonical = false
 summary = "Union overlap access: a method or field every member shares is usable on the union."
 syntax = "typus <name> = <genus> ∪ <genus>; <union>.<shared member>"

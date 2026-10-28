@@ -3,6 +3,8 @@ id = "corpus/bits/bits-bulk-hint-reject-la.fab"
 group = "language"
 input_root = "corpus"
 input = "bits/bits-bulk-hint-reject-la.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

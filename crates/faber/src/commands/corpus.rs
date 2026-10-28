@@ -10,6 +10,10 @@ mod gpu;
 mod runner_test;
 #[cfg(feature = "hir-rust")]
 mod rust;
+mod selection;
+#[cfg(test)]
+#[path = "corpus/selection_test.rs"]
+mod selection_test;
 
 use crate::cli::CorpusArgs;
 use faber_cli::package;
@@ -50,6 +54,13 @@ struct SuiteManifest {
     roots: BTreeMap<String, PathBuf>,
     #[serde(default)]
     expectations: BTreeMap<String, BTreeMap<String, TargetExpectation>>,
+    /// Domain name to its categories; the partition `--domain`/`--category` select by.
+    #[serde(default)]
+    domains: BTreeMap<String, Vec<String>>,
+    /// Category of each product package, which has no corpus frontmatter. The
+    /// generator reads it; the loader only checks the categories are in the table.
+    #[serde(default)]
+    product_categories: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -76,6 +87,7 @@ struct SuiteTarget {
 struct LoadedSuite {
     cases: Vec<Case>,
     recipe: Option<SuiteTarget>,
+    domains: Option<selection::DomainTable>,
 }
 
 #[derive(Deserialize)]
@@ -84,6 +96,8 @@ struct CaseManifest {
     version: u32,
     id: Option<String>,
     group: Option<String>,
+    category: Option<String>,
+    domain: Option<String>,
     input_root: Option<String>,
     input: PathBuf,
     #[serde(default)]
@@ -161,6 +175,8 @@ impl Outcome {
 
 struct Case {
     id: String,
+    category: Option<String>,
+    domain: Option<String>,
     dir: PathBuf,
     input: PathBuf,
     args: Vec<String>,
@@ -361,16 +377,27 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             fail("--expected applies only to a single input");
         }
         let mut suite = load_suite(&input, &args.target).unwrap_or_else(|message| fail(&message));
-        if let Some(filter) = args.filter.as_deref() {
-            suite.cases.retain(|case| case.id.contains(filter));
-            if suite.cases.is_empty() {
-                fail(&format!("no cases match filter {filter:?}"));
-            }
-        }
+        let selectors = selection::Selectors {
+            domains: args.domain.clone(),
+            categories: args.category.clone(),
+            cases: args.case.clone(),
+            filter: args.filter.clone(),
+        };
+        suite.cases = selection::select(suite.cases, suite.domains.as_ref(), &selectors)
+            .unwrap_or_else(|error| match error {
+                selection::SelectionError::Usage(message) => usage_fail(&message),
+                selection::SelectionError::Empty(message) => fail(&message),
+            });
         suite
     } else {
-        if args.filter.is_some() {
-            fail("--filter applies only to a suite");
+        let named = [
+            ("--filter", args.filter.is_some()),
+            ("--domain", !args.domain.is_empty()),
+            ("--category", !args.category.is_empty()),
+            ("--case", !args.case.is_empty()),
+        ];
+        if let Some((flag, _)) = named.iter().find(|(_, given)| *given) {
+            usage_fail(&format!("{flag} applies only to a suite"));
         }
         if args.target != "runner" {
             fail("non-runner targets require a suite with a target recipe");
@@ -381,6 +408,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
                     .unwrap_or_else(|message| fail(&message)),
             ],
             recipe: None,
+            domains: None,
         }
     };
     let discover_ms = ms(discovering);
@@ -558,6 +586,8 @@ fn single_case(input: &Path, explicit: Option<&Path>) -> Result<Case, String> {
     };
     Ok(Case {
         id: input.display().to_string(),
+        category: None,
+        domain: None,
         dir,
         input: input.to_path_buf(),
         args: Vec::new(),
@@ -610,10 +640,24 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     if manifests.is_empty() {
         return Err(format!("no case.toml files under {}", cases_root.display()));
     }
-    let cases = manifests
+    let mut cases = manifests
         .iter()
         .map(|path| load_case(path, &cases_root, target, &roots, &suite.expectations))
         .collect::<Result<Vec<_>, _>>()?;
+    let domains = selection::DomainTable::from_manifest(suite.domains)
+        .map_err(|message| format!("invalid {}: {message}", manifest_path.display()))?;
+    for (case_id, category) in &suite.product_categories {
+        if !domains
+            .as_ref()
+            .is_some_and(|table| table.has_category(category))
+        {
+            return Err(format!(
+                "invalid {}: product_categories {case_id}: category {category:?} is in no domain",
+                manifest_path.display()
+            ));
+        }
+    }
+    selection::DomainTable::tag_cases(domains.as_ref(), &mut cases)?;
     let recipe = if target == "runner" {
         None
     } else {
@@ -676,7 +720,11 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, String> {
     } else {
         None
     };
-    Ok(LoadedSuite { cases, recipe })
+    Ok(LoadedSuite {
+        cases,
+        recipe,
+        domains,
+    })
 }
 
 fn resolve_suite_roots(
@@ -951,6 +999,8 @@ fn load_case(
         .transpose()?;
     Ok(Case {
         id,
+        category: manifest.category.take(),
+        domain: manifest.domain.take(),
         dir: dir.to_path_buf(),
         input,
         args: expectation.args.clone().unwrap_or(manifest.args),
@@ -1381,6 +1431,15 @@ fn case_error(case: &Case, reason: String, started: Instant) -> Value {
 
 fn ms(started: Instant) -> f64 {
     (started.elapsed().as_secs_f64() * 1_000_000.0).round() / 1_000.0
+}
+
+/// A bad command-line argument: the same error record, exit status 64.
+fn usage_fail(message: &str) -> ! {
+    println!(
+        "{}",
+        json!({"schema": 1, "type": "error", "message": message})
+    );
+    std::process::exit(faber_cli::exit_status::USAGE);
 }
 
 fn fail(message: &str) -> ! {

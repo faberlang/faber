@@ -3,6 +3,8 @@ id = "corpus/itera/filum-break-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/filum-break-reject.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

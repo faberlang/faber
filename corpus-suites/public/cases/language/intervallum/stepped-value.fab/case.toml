@@ -3,6 +3,8 @@ id = "corpus/intervallum/stepped-value.fab"
 group = "language"
 input_root = "corpus"
 input = "intervallum/stepped-value.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

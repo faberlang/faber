@@ -3,6 +3,8 @@ id = "corpus/tensor/edge-policy-forwarding.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/edge-policy-forwarding.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

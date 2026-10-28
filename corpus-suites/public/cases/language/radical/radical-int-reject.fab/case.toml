@@ -3,6 +3,8 @@ id = "corpus/radical/radical-int-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "radical/radical-int-reject.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

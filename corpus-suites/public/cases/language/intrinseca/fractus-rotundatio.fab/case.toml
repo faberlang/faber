@@ -3,6 +3,8 @@ id = "corpus/intrinseca/fractus-rotundatio.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/fractus-rotundatio.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

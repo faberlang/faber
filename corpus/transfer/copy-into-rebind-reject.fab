@@ -2,7 +2,7 @@
 term = "⇇"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "assignment", "transfer", "expression", "ternary", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "incipit_stmt", "literal"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "A whole-tensor ← into a mut tensor parameter of a kernel is rejected."
 syntax = "rebind of a mut tensor parameter in a kernel"

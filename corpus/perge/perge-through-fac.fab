@@ -2,7 +2,7 @@
 term = "perge"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "itera_stmt", "itera_binding", "range_expr", "range_tail", "fac_stmt", "cape_clause", "si_stmt", "arm", "perge_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
-category = "transfer"
+category = "jump"
 canonical = false
 summary = "perge inside a fac block continues the enclosing loop without entering cape."
 syntax = "for range 0‥3 let i { do { if i ≡ 1 { continue } } catch err { } }"

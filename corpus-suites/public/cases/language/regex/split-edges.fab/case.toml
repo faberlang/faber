@@ -3,6 +3,8 @@ id = "corpus/regex/split-edges.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/split-edges.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

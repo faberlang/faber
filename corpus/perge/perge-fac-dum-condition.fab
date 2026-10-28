@@ -2,7 +2,7 @@
 term = "perge"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "si_stmt", "arm", "secus_clause", "perge_stmt", "inc_dec_stmt", "place", "comparison", "equality", "equality_tail", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "transfer"
+category = "jump"
 canonical = false
 summary = "perge in a fac … dum body tests the dum condition before the next iteration."
 syntax = "do { if skip { continue } } while cond"

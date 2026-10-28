@@ -3,6 +3,8 @@ id = "corpus/intervallum/bound-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "intervallum/bound-reject.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

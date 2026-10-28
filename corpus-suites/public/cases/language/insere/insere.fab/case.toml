@@ -3,6 +3,8 @@ id = "corpus/insere/insere.fab"
 group = "language"
 input_root = "corpus"
 input = "insere/insere.fab"
+category = "comptime"
+domain = "program"
 
 
 [expect]

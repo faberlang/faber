@@ -3,6 +3,8 @@ id = "corpus/tensor/view-lifetime.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/view-lifetime.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

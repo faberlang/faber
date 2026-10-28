@@ -3,6 +3,8 @@ id = "corpus/operatores/potentia-negative-exponent.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/potentia-negative-exponent.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

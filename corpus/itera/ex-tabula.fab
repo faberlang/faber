@@ -2,7 +2,7 @@
 term = "itera"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "itera_stmt", "expression", "literal", "nota_stmt"]
-category = "iteration"
+category = "loop"
 canonical = false
 summary = "Value iteration (`itera ex`) over tabula: the binder receives each value, never the key. Sort before printing — tabula order is unspecified (D19.2)."
 syntax = "for from <tabula> let <value> { <body> }"

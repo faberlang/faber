@@ -2,7 +2,7 @@
 term = "generic"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "generic_params", "generic_param", "variant", "variant_fields", "implendum_decl", "implendum_method_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "Generic discretio and implendum declarations."
 syntax = "discretio <name><T> { … } | implendum <name><T> { … }"

@@ -3,6 +3,8 @@ id = "corpus/iace/iace.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/iace.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

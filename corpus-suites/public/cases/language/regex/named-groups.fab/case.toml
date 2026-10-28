@@ -3,6 +3,8 @@ id = "corpus/regex/named-groups.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/named-groups.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

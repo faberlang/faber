@@ -3,6 +3,8 @@ id = "corpus/octeti/literal-odd-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "octeti/literal-odd-reject.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

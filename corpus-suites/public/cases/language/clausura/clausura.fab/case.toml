@@ -3,6 +3,8 @@ id = "corpus/clausura/clausura.fab"
 group = "language"
 input_root = "corpus"
 input = "clausura/clausura.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

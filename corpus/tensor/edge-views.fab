@@ -2,7 +2,7 @@
 term = "tensor edge view"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "implendum_decl", "implendum_method_decl", "genus_decl", "genus_member", "functio_method_decl", "generic_params", "generic_param", "contract_ref", "param_list", "parameter", "return_clause", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "call_type_args", "argument_list", "argument", "member_suffix", "vel_expr", "conversio_expr", "redde_stmt", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "Shifted tensor views resolve edges by an explicit policy or fused coalesce."
 related = ["tensor", "limes", "materialize"]

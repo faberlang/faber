@@ -3,6 +3,8 @@ id = "corpus/sort/bool-key.fab"
 group = "language"
 input_root = "corpus"
 input = "sort/bool-key.fab"
+category = "sort"
+domain = "collections"
 
 
 [expect]

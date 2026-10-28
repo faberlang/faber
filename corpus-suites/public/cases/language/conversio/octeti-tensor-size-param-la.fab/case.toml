@@ -3,6 +3,8 @@ id = "corpus/conversio/octeti-tensor-size-param-la.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/octeti-tensor-size-param-la.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

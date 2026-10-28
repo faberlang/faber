@@ -2,7 +2,7 @@
 term = "fs lege carpe hauri"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expr_stmt", "ad_expr", "ad_opener", "conversio_expr", "call_expr", "call_suffix", "call_type_args", "member_suffix", "argument_list", "argument", "array_literal", "expression", "literal", "adfirma_stmt", "equality_tail", "nota_stmt"]
-category = "ad"
+category = "endpoint"
 canonical = true
 summary = "fs file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (list<b8>)."
 syntax = "charta.read_file<textus>(via) | call 'solum:carpe' (via) ↦ lista<textus> | call 'solum:hauri' (via) ↦ list<b8>"

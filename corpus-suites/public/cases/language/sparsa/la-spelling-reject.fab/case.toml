@@ -3,6 +3,8 @@ id = "corpus/sparsa/la-spelling-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "sparsa/la-spelling-reject.fab"
+category = "locale"
+domain = "locales"
 
 
 [expect]

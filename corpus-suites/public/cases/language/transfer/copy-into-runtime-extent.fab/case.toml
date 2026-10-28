@@ -3,6 +3,8 @@ id = "corpus/transfer/copy-into-runtime-extent.fab"
 group = "language"
 input_root = "corpus"
 input = "transfer/copy-into-runtime-extent.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

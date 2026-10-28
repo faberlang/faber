@@ -3,6 +3,8 @@ id = "corpus/praefixum/praefixum-self-error.fab"
 group = "language"
 input_root = "corpus"
 input = "praefixum/praefixum-self-error.fab"
+category = "comptime"
+domain = "program"
 
 
 [expect]

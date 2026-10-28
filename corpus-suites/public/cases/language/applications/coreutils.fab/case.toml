@@ -3,6 +3,8 @@ id = "corpus/applications/coreutils.fab"
 group = "language"
 input_root = "corpus"
 input = "applications/coreutils.fab"
+category = "integration"
+domain = "program"
 
 
 [expect]

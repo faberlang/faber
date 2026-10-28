@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "expr_stmt", "call_expr", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "array_literal"]
-category = "type"
+category = "binding"
 summary = "An owned parameter forwarded to a mut parameter is mutated in place; the callee owns the value."
 syntax = "fn viaown(own list<int> xs) → int { poke(xs) }"
 related = ["lista"]

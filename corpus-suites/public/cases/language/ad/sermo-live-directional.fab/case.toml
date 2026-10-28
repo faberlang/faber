@@ -3,6 +3,8 @@ id = "corpus/ad/sermo-live-directional.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/sermo-live-directional.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

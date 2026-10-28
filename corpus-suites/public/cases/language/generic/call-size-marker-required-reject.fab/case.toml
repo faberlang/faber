@@ -3,6 +3,8 @@ id = "corpus/generic/call-size-marker-required-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "generic/call-size-marker-required-reject.fab"
+category = "generic"
+domain = "types"
 
 
 [expect]

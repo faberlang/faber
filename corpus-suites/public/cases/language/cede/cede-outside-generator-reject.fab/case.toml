@@ -3,6 +3,8 @@ id = "corpus/cede/cede-outside-generator-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "cede/cede-outside-generator-reject.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

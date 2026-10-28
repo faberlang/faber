@@ -3,6 +3,8 @@ id = "corpus/sort/ref-list-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "sort/ref-list-reject.fab"
+category = "sort"
+domain = "collections"
 
 
 [expect]

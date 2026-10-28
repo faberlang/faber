@@ -3,6 +3,8 @@ id = "corpus/iace/failable-no-handler-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/failable-no-handler-reject.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

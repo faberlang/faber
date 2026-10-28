@@ -2,7 +2,7 @@
 term = "generic union option"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "discretio_decl", "variant", "variant_fields", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "redde_stmt", "sit_decl", "hole_type", "finge_expr", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A generic union option: constructed variants matched through a generic function."
 syntax = "union Opt<T> { Some { T v }, Nada }"

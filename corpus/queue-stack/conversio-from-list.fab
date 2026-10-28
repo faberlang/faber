@@ -1,7 +1,7 @@
 +++
 term = "queue-stack"
 kind = "concept"
-category = "collection"
+category = "list"
 canonical = false
 locale = "en"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "conversio_expr", "expression", "literal", "nota_stmt"]

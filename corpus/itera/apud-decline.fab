@@ -2,7 +2,7 @@
 term = "itera"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "itera_stmt", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "apud coordinate iteration declines arity mismatch and unindexed iterables with structured issues."
 syntax = "for from <iterable> at [coords] let cell { }"

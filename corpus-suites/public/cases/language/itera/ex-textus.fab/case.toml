@@ -3,6 +3,8 @@ id = "corpus/itera/ex-textus.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/ex-textus.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

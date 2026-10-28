@@ -3,6 +3,8 @@ id = "corpus/postparabit/postparabit.fab"
 group = "language"
 input_root = "corpus"
 input = "postparabit/postparabit.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

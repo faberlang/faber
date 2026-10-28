@@ -3,6 +3,8 @@ id = "corpus/itera/ergo-body.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/ergo-body.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

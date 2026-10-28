@@ -3,6 +3,8 @@ id = "corpus/tensor/view-escape-decline.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/view-escape-decline.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

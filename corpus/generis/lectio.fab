@@ -2,7 +2,7 @@
 term = "class constant export"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_sugar", "annotation_name", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "type_annotation", "owned_type", "base_type", "literal", "incipit_stmt", "expression", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "Sibling module exporting a genus whose class constant an importer reads through the module and the type name."
 syntax = "@ public class <Type> { const <type> <NAME> = <expression> }"

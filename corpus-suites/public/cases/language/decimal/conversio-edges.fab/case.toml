@@ -3,6 +3,8 @@ id = "corpus/decimal/conversio-edges.fab"
 group = "language"
 input_root = "corpus"
 input = "decimal/conversio-edges.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

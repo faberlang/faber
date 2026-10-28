@@ -2,7 +2,7 @@
 term = "failable operand positions"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "redde_stmt", "iace_stmt", "si_stmt", "dum_stmt", "fac_stmt", "cape_clause", "genus_decl", "genus_member", "genus_field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "assignment", "ternary", "aut_expr", "et_expr", "equality", "comparison", "format_expr", "additive_expr", "place", "call_expr", "call_suffix", "argument_list", "argument", "primary", "typed_constructor", "field_list", "field_init", "scriptum_expr", "literal", "nota_stmt"]
-category = "errors"
+category = "error"
 canonical = false
 summary = "Failable calls leave an enclosing handler from short-circuit operands, a ternary, a loop condition, a struct initializer, or a template argument; statements after a catch still run."
 syntax = "risky() in a short-circuit operand | ternary | loop condition | struct initializer | template argument | do/catch"

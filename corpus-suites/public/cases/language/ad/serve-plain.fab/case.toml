@@ -3,6 +3,8 @@ id = "corpus/ad/serve-plain.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/serve-plain.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

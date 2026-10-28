@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/mut-forward-owned.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/mut-forward-owned.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

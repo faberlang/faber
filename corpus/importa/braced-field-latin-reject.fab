@@ -2,7 +2,7 @@
 term = "importa"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_record", "import_field_list", "import_field", "ex_field", "nota_stmt", "expression", "literal"]
-category = "package"
+category = "locale"
 canonical = false
 summary = "The Latin record field word ex in an en file is a wrong-locale error (expect parse error)."
 syntax = "import { ex = \"norma:text\" } — rejected in an en file; write from"

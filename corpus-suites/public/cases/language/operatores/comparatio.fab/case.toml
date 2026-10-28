@@ -3,6 +3,8 @@ id = "corpus/operatores/comparatio.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/comparatio.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

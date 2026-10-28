@@ -3,6 +3,8 @@ id = "corpus/tensor/glyph-transpose-rank1-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/glyph-transpose-rank1-reject.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

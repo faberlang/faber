@@ -3,6 +3,8 @@ id = "corpus/fixum/fixum.fab"
 group = "language"
 input_root = "corpus"
 input = "fixum/fixum.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

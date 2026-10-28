@@ -3,6 +3,8 @@ id = "corpus/ceterum/ceterum.fab"
 group = "language"
 input_root = "corpus"
 input = "ceterum/ceterum.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

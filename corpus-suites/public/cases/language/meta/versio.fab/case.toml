@@ -3,6 +3,8 @@ id = "corpus/meta/versio.fab"
 group = "language"
 input_root = "corpus"
 input = "meta/versio.fab"
+category = "cli"
+domain = "program"
 
 
 [expect]

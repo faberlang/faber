@@ -3,6 +3,8 @@ id = "corpus/conversio/word-recovery-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/word-recovery-reject.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

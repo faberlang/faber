@@ -2,7 +2,7 @@
 term = "vector"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "redde_stmt", "fixum_decl", "assignment", "array_literal", "conversio_expr", "call_expr", "call_suffix", "member_suffix", "non_null_suffix", "argument_list", "argument", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "register"
+category = "vector"
 canonical = false
 summary = "A constant index on a vector reads one lane: v[k] is the k-th lane, at any element type."
 syntax = "<vector>[<constant>] | <optional vector>![<constant>]"

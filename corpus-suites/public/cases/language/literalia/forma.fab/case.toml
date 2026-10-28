@@ -3,6 +3,8 @@ id = "corpus/literalia/forma.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/forma.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "rumpe"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "rumpe_stmt"]
-category = "transfer"
+category = "jump"
 canonical = false
 summary = "compile error when rumpe has no enclosing breakable block"
 related = ["fac", "dum"]

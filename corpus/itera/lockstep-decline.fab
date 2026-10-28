@@ -2,7 +2,7 @@
 term = "itera"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "itera_stmt", "itera_binding", "apud_clause", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = false
 summary = "Lockstep declines: source/binder arity, at-coordinate cardinality, and statically known unequal lengths fail closed."
 syntax = "for from <a>, <b> let <x> { }"

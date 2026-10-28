@@ -2,7 +2,7 @@
 term = "intervallum"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "locale"
 canonical = false
 summary = "The Latin type word intervallum in an en file is a wrong-locale error (expect parse error)."
 syntax = "let intervallum<int> r ← 1 ‥ 3 — rejected in an en file; write range<int>"

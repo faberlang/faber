@@ -3,6 +3,8 @@ id = "corpus/protecta/protecta.fab"
 group = "language"
 input_root = "corpus"
 input = "protecta/protecta.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

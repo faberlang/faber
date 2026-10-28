@@ -2,7 +2,7 @@
 term = "class constant read"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "genus_field_decl", "genus_const_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "incipit_stmt", "expression", "literal", "member_suffix", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A class constant is read through the type name; its initializer may be a literal, a comptime body, or an embed."
 syntax = "<Type>.<field>"

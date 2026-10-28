@@ -2,7 +2,7 @@
 term = "generic class"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "genus_field_decl", "functio_method_decl", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "typed_constructor", "field_list", "field_init", "field_key", "sit_decl", "incipit_stmt", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A generic class carries a type parameter through its field, methods, and constructor, and nests or infers in the usual way."
 syntax = "class Box<T> { mut T v; fn get() → T } | let Box<int> b ← Box { v = 6 }"

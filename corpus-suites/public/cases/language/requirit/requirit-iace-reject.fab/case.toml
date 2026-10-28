@@ -3,6 +3,8 @@ id = "corpus/requirit/requirit-iace-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "requirit/requirit-iace-reject.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

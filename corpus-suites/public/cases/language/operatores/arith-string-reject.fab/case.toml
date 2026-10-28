@@ -3,6 +3,8 @@ id = "corpus/operatores/arith-string-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/arith-string-reject.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

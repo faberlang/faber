@@ -2,7 +2,7 @@
 term = "primus_quem"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "shape_suffix", "redde_stmt", "first_match_expr", "optional_suffix", "expression", "literal"]
-category = "lane"
+category = "kernel"
 canonical = false
 summary = "AIR-lane admission rows for primus_quem: Route T literal array, Route M static tensor shape, and Route M zero-extent (empty → nihil)."
 syntax = "@ radix lane \"air\"; primus_quem(<bounded source>, ubi <binder> { <predicate> })"

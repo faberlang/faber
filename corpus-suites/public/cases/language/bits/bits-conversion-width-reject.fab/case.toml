@@ -3,6 +3,8 @@ id = "corpus/bits/bits-conversion-width-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "bits/bits-conversion-width-reject.fab"
+category = "bits"
+domain = "numerics"
 
 
 [expect]

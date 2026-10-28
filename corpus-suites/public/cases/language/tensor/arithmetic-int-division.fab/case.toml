@@ -3,6 +3,8 @@ id = "corpus/tensor/arithmetic-int-division.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/arithmetic-int-division.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

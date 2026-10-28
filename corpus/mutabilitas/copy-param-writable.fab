@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "expr_stmt", "call_expr", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "argument_list", "argument", "array_literal", "assignment"]
-category = "type"
+category = "binding"
 summary = "A copy parameter is a duplicate the callee may write; the caller's value is unchanged."
 syntax = "fn fill(copy list<int> xs) → int { xs.append(9) }"
 related = ["lista"]

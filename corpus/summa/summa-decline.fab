@@ -2,7 +2,7 @@
 term = "summa"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "reducta_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
-category = "collection"
+category = "reduction"
 summary = "Reducta sum declines: filum placement outside @ nucleum, K % 32 ≠ 0 tails, and non-scalar terms fail closed."
 syntax = "reducta via summa ex <tensor> apud [coords] filum f sit s { redde <term> }"
 related = ["summa", "filum", "nucleum", "apud", "tensor"]

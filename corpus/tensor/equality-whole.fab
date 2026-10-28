@@ -2,7 +2,7 @@
 term = "tensor"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "redde_stmt", "incipit_stmt", "fixum_decl", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "equality", "comparison", "expression", "literal", "nota_stmt"]
-category = "comparison"
+category = "tensor"
 canonical = true
 summary = "≡ and ≢ compare whole tensors and give one yes/no; ≅ and ≇ give a per-element mask, and a mask reduces to one answer."
 syntax = "a ≡ b | a ≢ b | a ≅ b | reduce via all from mask"

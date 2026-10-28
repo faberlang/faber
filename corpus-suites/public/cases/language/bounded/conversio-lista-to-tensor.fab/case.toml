@@ -3,6 +3,8 @@ id = "corpus/bounded/conversio-lista-to-tensor.fab"
 group = "language"
 input_root = "corpus"
 input = "bounded/conversio-lista-to-tensor.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

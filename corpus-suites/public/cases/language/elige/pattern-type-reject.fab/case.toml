@@ -3,6 +3,8 @@ id = "corpus/elige/pattern-type-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "elige/pattern-type-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

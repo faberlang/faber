@@ -2,7 +2,7 @@
 term = "air-aspect-decline"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "binding_decl", "itera_stmt", "range_expr", "range_tail", "redde_stmt", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "lane"
+category = "kernel"
 canonical = false
 summary = "Shapes the aspect report declines: a non-literal itera ab range emits no unroll-equivalence obligation, and a binary-arithmetic return leaves the scalar/let/call purity subset."
 syntax = "itera ab <runtime range>; return <a + b>"

@@ -3,6 +3,8 @@ id = "corpus/incipit/functionibus.fab"
 group = "language"
 input_root = "corpus"
 input = "incipit/functionibus.fab"
+category = "function"
+domain = "functions"
 
 
 [expect]

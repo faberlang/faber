@@ -3,6 +3,8 @@ id = "corpus/tensor/textus.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/textus.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

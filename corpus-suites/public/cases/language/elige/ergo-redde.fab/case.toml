@@ -3,6 +3,8 @@ id = "corpus/elige/ergo-redde.fab"
 group = "language"
 input_root = "corpus"
 input = "elige/ergo-redde.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/destructura/objectum.fab"
 group = "language"
 input_root = "corpus"
 input = "destructura/objectum.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

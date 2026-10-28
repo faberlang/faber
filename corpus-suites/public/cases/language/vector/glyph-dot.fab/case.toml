@@ -3,6 +3,8 @@ id = "corpus/vector/glyph-dot.fab"
 group = "language"
 input_root = "corpus"
 input = "vector/glyph-dot.fab"
+category = "vector"
+domain = "tensors"
 
 
 [expect]

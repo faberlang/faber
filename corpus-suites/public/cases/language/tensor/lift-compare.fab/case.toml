@@ -3,6 +3,8 @@ id = "corpus/tensor/lift-compare.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/lift-compare.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

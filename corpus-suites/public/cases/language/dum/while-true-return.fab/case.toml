@@ -3,6 +3,8 @@ id = "corpus/dum/while-true-return.fab"
 group = "language"
 input_root = "corpus"
 input = "dum/while-true-return.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

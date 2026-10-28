@@ -3,6 +3,8 @@ id = "corpus/unio/unio.fab"
 group = "language"
 input_root = "corpus"
 input = "unio/unio.fab"
+category = "variant"
+domain = "types"
 
 
 [expect]

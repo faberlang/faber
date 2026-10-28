@@ -3,6 +3,8 @@ id = "corpus/ad/async-tempus-dormiet.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/async-tempus-dormiet.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

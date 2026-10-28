@@ -3,6 +3,8 @@ id = "corpus/tensor/glyph-outer.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/glyph-outer.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

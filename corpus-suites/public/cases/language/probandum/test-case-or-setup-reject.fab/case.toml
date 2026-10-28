@@ -3,6 +3,8 @@ id = "corpus/probandum/test-case-or-setup-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "probandum/test-case-or-setup-reject.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

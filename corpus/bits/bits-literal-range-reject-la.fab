@@ -2,7 +2,7 @@
 term = "bits"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt"]
-category = "type"
+category = "bits"
 canonical = false
 summary = "A literal too wide for a bits cell is refused."
 syntax = "sit b8 x ← 0x1ff — rejected"

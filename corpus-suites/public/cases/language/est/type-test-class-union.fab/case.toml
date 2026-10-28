@@ -3,6 +3,8 @@ id = "corpus/est/type-test-class-union.fab"
 group = "language"
 input_root = "corpus"
 input = "est/type-test-class-union.fab"
+category = "logic"
+domain = "control"
 
 
 [expect]

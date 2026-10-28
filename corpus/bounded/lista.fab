@@ -2,7 +2,7 @@
 term = "lista"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Bounded lista<T, N>: length plus N slots; longitudo is len; appende overflow is an alternate exit."
 syntax = "lista<T, N>"

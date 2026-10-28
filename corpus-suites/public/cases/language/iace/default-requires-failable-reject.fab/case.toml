@@ -3,6 +3,8 @@ id = "corpus/iace/default-requires-failable-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "iace/default-requires-failable-reject.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

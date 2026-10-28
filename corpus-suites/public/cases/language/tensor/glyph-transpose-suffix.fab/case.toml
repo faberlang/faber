@@ -3,6 +3,8 @@ id = "corpus/tensor/glyph-transpose-suffix.fab"
 group = "language"
 input_root = "corpus"
 input = "tensor/glyph-transpose-suffix.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

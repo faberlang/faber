@@ -3,6 +3,8 @@ id = "corpus/kernel/inf-param-error.fab"
 group = "language"
 input_root = "corpus"
 input = "kernel/inf-param-error.fab"
+category = "kernel"
+domain = "gpu"
 
 
 [expect]

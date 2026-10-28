@@ -3,6 +3,8 @@ id = "corpus/literalia/infinity.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/infinity.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

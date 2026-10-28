@@ -2,7 +2,7 @@
 term = "itera"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "array_literal", "itera_stmt", "itera_binding", "expression", "literal", "nota_stmt"]
-category = "control-flow"
+category = "loop"
 canonical = true
 summary = "Lockstep walk of two lists with two binders."
 syntax = "for from <lista>, <lista> let <left>, <right> { }"

@@ -3,6 +3,8 @@ id = "corpus/keyword-as-ident/value-literal-shadow.fab"
 group = "language"
 input_root = "corpus"
 input = "keyword-as-ident/value-literal-shadow.fab"
+category = "identifier"
+domain = "program"
 
 
 [expect]

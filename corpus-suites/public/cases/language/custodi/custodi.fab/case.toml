@@ -3,6 +3,8 @@ id = "corpus/custodi/custodi.fab"
 group = "language"
 input_root = "corpus"
 input = "custodi/custodi.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

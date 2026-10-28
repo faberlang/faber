@@ -3,6 +3,8 @@ id = "corpus/omnia/default-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "omnia/default-reject.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "numeric-operator-methods"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "expr_stmt", "unary_expr"]
-category = "intrinseca"
+category = "arithmetic"
 canonical = false
 summary = "Receiver operator methods emit glyphs; imperativus mutates varia."
 syntax = "x.added(y) | acc.add(y)"

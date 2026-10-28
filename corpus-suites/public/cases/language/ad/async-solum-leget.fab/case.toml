@@ -3,6 +3,8 @@ id = "corpus/ad/async-solum-leget.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/async-solum-leget.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "vector"
 kind = "kernel"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "redde_stmt", "additive_expr", "expression", "literal"]
-category = "gpu"
+category = "vector"
 summary = "nucleum kernel baseline for vector GPU emit"
 locale = "en"
 +++

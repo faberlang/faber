@@ -2,7 +2,7 @@
 term = "textus"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "fac_stmt", "cape_clause", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "text"
 canonical = false
 summary = "A text window s.slice(a, b) reports an end past the length, a negative bound or a start past the end on the error channel; it never clamps."
 syntax = "s.slice(<start>, <end>) ⊥ <default> | do { s.slice(<start>, <end>) } catch err { }"

@@ -2,7 +2,7 @@
 term = "reducta"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "expression", "reducta_expr"]
-category = "collection"
+category = "reduction"
 summary = "The reducta head requires a via clause that names one of its closed operators."
 syntax = "reducta via <op> ex <tensor>"
 related = ["reducta", "via", "summa", "tensor"]

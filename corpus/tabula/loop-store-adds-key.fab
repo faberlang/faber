@@ -2,7 +2,7 @@
 term = "tabula"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "itera_stmt", "expression", "literal", "nota_stmt"]
-category = "collections"
+category = "map"
 canonical = false
 summary = "A bracket store in a loop over the same map may update existing keys; it may not add one."
 syntax = "for from <map> at [<key>] let <value> { <map>[<key>] ← <value> }"

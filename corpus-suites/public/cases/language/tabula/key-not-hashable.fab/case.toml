@@ -3,6 +3,8 @@ id = "corpus/tabula/key-not-hashable.fab"
 group = "language"
 input_root = "corpus"
 input = "tabula/key-not-hashable.fab"
+category = "map"
+domain = "collections"
 
 
 [expect]

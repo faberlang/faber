@@ -2,7 +2,7 @@
 term = "discerne"
 kind = "feature"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "pattern_binding", "ut_pattern", "redde_stmt", "sit_decl", "finge_expr", "field_list", "field_init", "field_key", "cast_expr", "incipit_stmt", "expression", "multiplicative_expr", "literal", "nota_stmt", "call_expr", "call_suffix", "argument_list", "argument"]
-category = "control-flow"
+category = "branch"
 canonical = false
 summary = "`case A as a` aliases the whole matched variant value, not one payload field; the alias has the union type and can be passed on as such."
 syntax = "case <Variant> as <alias> { ... }"

@@ -3,6 +3,8 @@ id = "corpus/adfirma/in-functione.fab"
 group = "language"
 input_root = "corpus"
 input = "adfirma/in-functione.fab"
+category = "testing"
+domain = "program"
 
 
 [expect]

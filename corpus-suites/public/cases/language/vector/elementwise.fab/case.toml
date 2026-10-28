@@ -3,6 +3,8 @@ id = "corpus/vector/elementwise.fab"
 group = "language"
 input_root = "corpus"
 input = "vector/elementwise.fab"
+category = "vector"
+domain = "tensors"
 
 
 [expect]

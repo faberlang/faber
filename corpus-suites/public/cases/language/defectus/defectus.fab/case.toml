@@ -3,6 +3,8 @@ id = "corpus/defectus/defectus.fab"
 group = "language"
 input_root = "corpus"
 input = "defectus/defectus.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

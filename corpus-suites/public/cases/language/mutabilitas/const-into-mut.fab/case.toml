@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/const-into-mut.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/const-into-mut.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

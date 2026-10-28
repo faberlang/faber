@@ -2,7 +2,7 @@
 term = "generic call size argument incomplete"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "size_param_list", "size_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "incipit_stmt", "fixum_decl", "redde_stmt", "call_expr", "call_suffix", "call_type_args", "call_type_arg", "call_size_arg", "dimension_tail", "argument_list", "argument", "expression", "literal"]
-category = "type"
+category = "generic"
 canonical = false
 summary = "A call-site dimension term needs a natural number after its operator: `2 +` is not a size argument."
 syntax = "take<2 +>(grid)"

@@ -3,6 +3,8 @@ id = "corpus/lista/range-index.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/range-index.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

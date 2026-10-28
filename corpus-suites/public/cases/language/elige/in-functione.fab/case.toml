@@ -3,6 +3,8 @@ id = "corpus/elige/in-functione.fab"
 group = "language"
 input_root = "corpus"
 input = "elige/in-functione.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

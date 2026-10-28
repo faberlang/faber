@@ -3,6 +3,8 @@ id = "corpus/conversio/narrowing-cape.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/narrowing-cape.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

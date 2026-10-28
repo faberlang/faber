@@ -3,6 +3,8 @@ id = "corpus/itera/loop-shape-reject-list-remove-first.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/loop-shape-reject-list-remove-first.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

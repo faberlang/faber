@@ -2,7 +2,7 @@
 term = "nondum"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "nondum_functio_decl", "nondum_annotation", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "incipit_stmt", "expression", "literal", "nota_stmt"]
-category = "availability"
+category = "annotation"
 canonical = false
 summary = "A free function marked @ nondum may omit its body; any use of it is refused."
 syntax = "@ nondum [target] [reason] <signature>"

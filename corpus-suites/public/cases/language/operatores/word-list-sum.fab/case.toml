@@ -3,6 +3,8 @@ id = "corpus/operatores/word-list-sum.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/word-list-sum.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

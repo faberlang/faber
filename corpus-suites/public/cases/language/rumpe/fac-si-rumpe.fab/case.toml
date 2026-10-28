@@ -3,6 +3,8 @@ id = "corpus/rumpe/fac-si-rumpe.fab"
 group = "language"
 input_root = "corpus"
 input = "rumpe/fac-si-rumpe.fab"
+category = "jump"
+domain = "control"
 
 
 [expect]

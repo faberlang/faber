@@ -3,6 +3,8 @@ id = "corpus/discerne/nonexhaustive-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "discerne/nonexhaustive-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/lista/methodi-mutatio.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/methodi-mutatio.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

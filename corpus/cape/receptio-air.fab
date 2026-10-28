@@ -2,7 +2,7 @@
 term = "cape"
 kind = "annotation"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "si_stmt", "cape_clause", "secus_clause", "elige_stmt", "casu_elige_clause", "ceterum_clause", "fac_stmt", "iace_stmt", "conversio_expr", "fixum_decl", "binding_decl", "redde_stmt", "expression", "literal", "nota_stmt"]
-category = "lane"
+category = "kernel"
 canonical = false
 summary = "AIR Tier 0.5 admission rows for locally-resolved handlers: per-arm si/secus/sin cape, whole-construct fac/elige cape, and the inline-recovery conversio slice lower to existing union/If/Match dataflow — no new AIR node."
 syntax = "@ radix lane \"air\"; si <cond> { iace } cape <err> { redde <outer value> } secus { … }"

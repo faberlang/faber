@@ -2,7 +2,7 @@
 term = "matrix"
 kind = "method"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "redde_stmt", "fixum_decl", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "unary_expr", "multiplicative_expr", "additive_expr", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "tensor"
 canonical = false
 summary = "A scalar operator against a matrix: + - * / % ÷ with the scalar on either side, unary minus, and ÷ ⤒ ⤓ between two matrices."
 syntax = "m * s | s * m | m / s | s - m | m + 1.0 | -m | m ÷ s | m ⤒ s | m ⤒ n"

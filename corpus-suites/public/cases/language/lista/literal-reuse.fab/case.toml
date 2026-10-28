@@ -3,6 +3,8 @@ id = "corpus/lista/literal-reuse.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/literal-reuse.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

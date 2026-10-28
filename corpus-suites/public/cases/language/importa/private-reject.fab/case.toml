@@ -3,6 +3,8 @@ id = "corpus/importa/private-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/private-reject.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/keyword-as-ident/print-call.fab"
 group = "language"
 input_root = "corpus"
 input = "keyword-as-ident/print-call.fab"
+category = "identifier"
+domain = "program"
 
 
 [expect]

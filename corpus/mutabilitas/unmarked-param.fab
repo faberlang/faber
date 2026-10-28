@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix"]
-category = "type"
+category = "binding"
 summary = "MU-1 baseline narrowed by tcs1: param mutation lands through an `in` param (D-8; summa-proof.fab out shape)."
 syntax = "fn poke(mut list<int> xs)"
 related = ["lista", "cuda"]

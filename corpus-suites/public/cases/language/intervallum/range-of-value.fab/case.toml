@@ -3,6 +3,8 @@ id = "corpus/intervallum/range-of-value.fab"
 group = "language"
 input_root = "corpus"
 input = "intervallum/range-of-value.fab"
+category = "range"
+domain = "collections"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/annotation-sugar/unknown-contract-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "annotation-sugar/unknown-contract-reject.fab"
+category = "annotation"
+domain = "program"
 
 
 [expect]

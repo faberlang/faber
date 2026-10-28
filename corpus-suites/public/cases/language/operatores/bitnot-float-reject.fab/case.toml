@@ -3,6 +3,8 @@ id = "corpus/operatores/bitnot-float-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/bitnot-float-reject.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

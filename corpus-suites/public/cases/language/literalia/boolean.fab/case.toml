@@ -3,6 +3,8 @@ id = "corpus/literalia/boolean.fab"
 group = "language"
 input_root = "corpus"
 input = "literalia/boolean.fab"
+category = "literal"
+domain = "text"
 
 
 [expect]

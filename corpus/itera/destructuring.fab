@@ -2,7 +2,7 @@
 term = "ex"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "expression", "literal", "array_literal", "typed_constructor", "field_list", "field_init", "itera_stmt", "pattern", "pattern_binding", "array_pattern", "array_pattern_element", "object_pattern", "ut_pattern", "expr_stmt", "nota_stmt"]
-category = "destructuring"
+category = "binding"
 canonical = true
 summary = "Extracts fields from a value into local bindings."
 syntax = "for from <collection> let|mut <pattern> { ... }"

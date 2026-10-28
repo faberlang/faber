@@ -3,6 +3,8 @@ id = "corpus/vector/swizzle.fab"
 group = "language"
 input_root = "corpus"
 input = "vector/swizzle.fab"
+category = "vector"
+domain = "tensors"
 
 
 [expect]

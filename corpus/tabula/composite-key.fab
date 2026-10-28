@@ -2,7 +2,7 @@
 term = "tabula"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "map"
 canonical = false
 summary = "A composite-key tabula keys by `iuncta`: lookup `m[[k1, k2]]`, iteration `at [k1, k2]`."
 syntax = "tabula<iuncta<K1, K2>, V>"

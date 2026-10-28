@@ -3,6 +3,8 @@ id = "corpus/ego/ego.fab"
 group = "language"
 input_root = "corpus"
 input = "ego/ego.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

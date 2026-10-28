@@ -3,6 +3,8 @@ id = "corpus/genus/unknown-field-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "genus/unknown-field-reject.fab"
+category = "class"
+domain = "types"
 
 
 [expect]

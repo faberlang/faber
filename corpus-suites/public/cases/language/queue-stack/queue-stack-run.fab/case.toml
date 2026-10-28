@@ -3,6 +3,8 @@ id = "corpus/queue-stack/queue-stack-run.fab"
 group = "language"
 input_root = "corpus"
 input = "queue-stack/queue-stack-run.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

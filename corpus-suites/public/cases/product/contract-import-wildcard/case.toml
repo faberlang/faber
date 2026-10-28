@@ -3,6 +3,8 @@ id = "product/contract-import-wildcard"
 group = "product"
 input_root = "product"
 input = "contract-import-wildcard"
+category = "package"
+domain = "program"
 
 
 [expect]

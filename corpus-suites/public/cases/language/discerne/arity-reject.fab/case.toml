@@ -3,6 +3,8 @@ id = "corpus/discerne/arity-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "discerne/arity-reject.fab"
+category = "branch"
+domain = "control"
 
 
 [expect]

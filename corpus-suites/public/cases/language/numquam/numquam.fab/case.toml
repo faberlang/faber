@@ -3,6 +3,8 @@ id = "corpus/numquam/numquam.fab"
 group = "language"
 input_root = "corpus"
 input = "numquam/numquam.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

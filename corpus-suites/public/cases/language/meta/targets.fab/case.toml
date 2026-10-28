@@ -3,6 +3,8 @@ id = "corpus/meta/targets.fab"
 group = "language"
 input_root = "corpus"
 input = "meta/targets.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

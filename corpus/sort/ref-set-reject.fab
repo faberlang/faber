@@ -2,7 +2,7 @@
 locale = "la"
 term = "sort-ref-set-reject"
 kind = "reject"
-category = "collection"
+category = "sort"
 grammar = ["sort_expr", "sort_direction", "sort_body"]
 canonical = false
 summary = "ref sorts map keys and is refused on a set."

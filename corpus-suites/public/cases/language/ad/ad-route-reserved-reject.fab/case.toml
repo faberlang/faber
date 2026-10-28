@@ -3,6 +3,8 @@ id = "corpus/ad/ad-route-reserved-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/ad-route-reserved-reject.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

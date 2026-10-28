@@ -3,6 +3,8 @@ id = "corpus/regex/anchors.fab"
 group = "language"
 input_root = "corpus"
 input = "regex/anchors.fab"
+category = "regex"
+domain = "text"
 
 
 [expect]

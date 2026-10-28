@@ -2,7 +2,7 @@
 term = "lista"
 kind = "existing-home"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
-category = "collection"
+category = "list"
 canonical = false
 summary = "Elementwise + and - between numeric lists, and + - * / against a scalar on either side."
 syntax = "<numeric-list> (+ | -) <numeric-list> | <numeric-list> (+ | - | * | /) <scalar> | <scalar> (+ | - | * | /) <numeric-list>"

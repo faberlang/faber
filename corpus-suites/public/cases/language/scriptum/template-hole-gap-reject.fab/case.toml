@@ -3,6 +3,8 @@ id = "corpus/scriptum/template-hole-gap-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "scriptum/template-hole-gap-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

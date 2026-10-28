@@ -3,6 +3,8 @@ id = "corpus/mutabilitas/call-marker.fab"
 group = "language"
 input_root = "corpus"
 input = "mutabilitas/call-marker.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

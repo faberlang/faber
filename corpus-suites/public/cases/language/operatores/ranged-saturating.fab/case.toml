@@ -3,6 +3,8 @@ id = "corpus/operatores/ranged-saturating.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/ranged-saturating.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

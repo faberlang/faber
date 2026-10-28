@@ -3,6 +3,8 @@ id = "corpus/type-hole-union/type-hole-union.fab"
 group = "language"
 input_root = "corpus"
 input = "type-hole-union/type-hole-union.fab"
+category = "variant"
+domain = "types"
 
 
 [expect]

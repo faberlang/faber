@@ -3,6 +3,8 @@ id = "corpus/importa/braced-fields-la.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/braced-fields-la.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

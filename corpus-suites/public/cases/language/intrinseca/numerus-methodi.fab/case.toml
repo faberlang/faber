@@ -3,6 +3,8 @@ id = "corpus/intrinseca/numerus-methodi.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/numerus-methodi.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

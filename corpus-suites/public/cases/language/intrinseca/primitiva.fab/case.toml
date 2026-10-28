@@ -3,6 +3,8 @@ id = "corpus/intrinseca/primitiva.fab"
 group = "language"
 input_root = "corpus"
 input = "intrinseca/primitiva.fab"
+category = "type"
+domain = "types"
 
 
 [expect]

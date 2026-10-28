@@ -3,6 +3,8 @@ id = "corpus/operatores/textus-ascii-order-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/textus-ascii-order-reject.fab"
+category = "comparison"
+domain = "numerics"
 
 
 [expect]

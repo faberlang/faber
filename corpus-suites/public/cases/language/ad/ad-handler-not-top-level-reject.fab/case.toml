@@ -3,6 +3,8 @@ id = "corpus/ad/ad-handler-not-top-level-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "ad/ad-handler-not-top-level-reject.fab"
+category = "endpoint"
+domain = "io"
 
 
 [expect]

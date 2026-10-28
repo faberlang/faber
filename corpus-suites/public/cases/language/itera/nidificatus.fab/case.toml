@@ -3,6 +3,8 @@ id = "corpus/itera/nidificatus.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/nidificatus.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

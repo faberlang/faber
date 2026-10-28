@@ -2,7 +2,7 @@
 term = "type-hole-union"
 kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "hole_type", "redde_stmt", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "type_pattern", "pattern_binding", "ceterum_clause", "si_stmt", "ergo_joint", "member_suffix", "proba_stmt", "adfirma_stmt", "fixum_decl", "assignment", "place", "array_literal", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
-category = "types"
+category = "variant"
 canonical = true
 summary = "The `_` hole infers one inhabitant type; the `∪` hole infers a finite union; `T ∪ nihil` stays a single optional inhabitant."
 syntax = "sit _ x ← value; sit ∪ x ← a; x ← b; sit lista<∪> xs ← [a, b]"

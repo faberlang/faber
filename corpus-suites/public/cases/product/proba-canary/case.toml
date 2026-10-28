@@ -3,6 +3,8 @@ id = "product/proba-canary"
 group = "product"
 input_root = "product"
 input = "proba-canary"
+category = "testing"
+domain = "program"
 
 
 [expect]

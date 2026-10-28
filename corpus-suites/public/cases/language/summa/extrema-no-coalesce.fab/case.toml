@@ -3,6 +3,8 @@ id = "corpus/summa/extrema-no-coalesce.fab"
 group = "language"
 input_root = "corpus"
 input = "summa/extrema-no-coalesce.fab"
+category = "reduction"
+domain = "collections"
 
 
 [expect]

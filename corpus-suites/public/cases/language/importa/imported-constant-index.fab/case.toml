@@ -3,6 +3,8 @@ id = "corpus/importa/imported-constant-index.fab"
 group = "language"
 input_root = "corpus"
 input = "importa/imported-constant-index.fab"
+category = "package"
+domain = "program"
 
 
 [expect]

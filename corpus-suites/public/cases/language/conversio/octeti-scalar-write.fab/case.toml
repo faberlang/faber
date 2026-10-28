@@ -3,6 +3,8 @@ id = "corpus/conversio/octeti-scalar-write.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/octeti-scalar-write.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

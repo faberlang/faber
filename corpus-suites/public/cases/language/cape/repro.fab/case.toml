@@ -3,6 +3,8 @@ id = "corpus/cape/repro.fab"
 group = "language"
 input_root = "corpus"
 input = "cape/repro.fab"
+category = "error"
+domain = "control"
 
 
 [expect]

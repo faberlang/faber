@@ -3,6 +3,8 @@ id = "corpus/itera/range-product-n2.fab"
 group = "language"
 input_root = "corpus"
 input = "itera/range-product-n2.fab"
+category = "loop"
+domain = "control"
 
 
 [expect]

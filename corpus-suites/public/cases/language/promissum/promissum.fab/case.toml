@@ -3,6 +3,8 @@ id = "corpus/promissum/promissum.fab"
 group = "language"
 input_root = "corpus"
 input = "promissum/promissum.fab"
+category = "async"
+domain = "functions"
 
 
 [expect]

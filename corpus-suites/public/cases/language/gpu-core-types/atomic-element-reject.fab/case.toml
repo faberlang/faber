@@ -3,6 +3,8 @@ id = "corpus/gpu-core-types/atomic-element-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "gpu-core-types/atomic-element-reject.fab"
+category = "device"
+domain = "gpu"
 
 
 [expect]

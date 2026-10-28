@@ -3,6 +3,8 @@ id = "corpus/lista/optional-literal.fab"
 group = "language"
 input_root = "corpus"
 input = "lista/optional-literal.fab"
+category = "list"
+domain = "collections"
 
 
 [expect]

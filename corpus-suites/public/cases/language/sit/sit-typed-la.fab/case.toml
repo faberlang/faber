@@ -3,6 +3,8 @@ id = "corpus/sit/sit-typed-la.fab"
 group = "language"
 input_root = "corpus"
 input = "sit/sit-typed-la.fab"
+category = "binding"
+domain = "types"
 
 
 [expect]

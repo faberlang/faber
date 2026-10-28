@@ -3,6 +3,8 @@ id = "corpus/operatores/saturating-word.fab"
 group = "language"
 input_root = "corpus"
 input = "operatores/saturating-word.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

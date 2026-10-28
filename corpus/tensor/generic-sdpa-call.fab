@@ -2,7 +2,7 @@
 term = "tensor-shape-generic"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "fixum_decl", "redde_stmt", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "incipit_stmt"]
-category = "type"
+category = "tensor"
 canonical = false
 summary = "Call-site implicit binding: scaled_dot_product binds B, D from concrete [2, 8] arguments."
 syntax = "sit tensor<f32, [2, 8]> ctx ← scaled_dot_product(qb, kb, vb, scale)"

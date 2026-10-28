@@ -3,6 +3,8 @@ id = "corpus/scriptum/template-arity-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "scriptum/template-arity-reject.fab"
+category = "format"
+domain = "text"
 
 
 [expect]

@@ -3,6 +3,8 @@ id = "corpus/transfer/copy-into-field.fab"
 group = "language"
 input_root = "corpus"
 input = "transfer/copy-into-field.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

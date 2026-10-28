@@ -2,7 +2,7 @@
 term = "cape"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "dum_stmt", "itera_stmt", "cape_clause", "si_stmt", "iace_stmt", "fac_stmt", "redde_stmt", "expression", "literal", "nota_stmt"]
-category = "lane"
+category = "kernel"
 canonical = false
 summary = "cape AIR decline rows: whole-loop dum/itera cape stays out under the loop-spectrum causes, a rethrow from a recovery arm declines (rethrow_in_recovery)."
 syntax = "dum <cond> { … } cape <err> { … }"

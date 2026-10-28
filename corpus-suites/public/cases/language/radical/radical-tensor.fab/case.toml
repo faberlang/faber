@@ -3,6 +3,8 @@ id = "corpus/radical/radical-tensor.fab"
 group = "language"
 input_root = "corpus"
 input = "radical/radical-tensor.fab"
+category = "arithmetic"
+domain = "numerics"
 
 
 [expect]

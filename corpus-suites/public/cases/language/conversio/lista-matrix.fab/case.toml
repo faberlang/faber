@@ -3,6 +3,8 @@ id = "corpus/conversio/lista-matrix.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/lista-matrix.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]

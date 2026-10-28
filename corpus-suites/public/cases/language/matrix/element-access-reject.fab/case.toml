@@ -3,6 +3,8 @@ id = "corpus/matrix/element-access-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "matrix/element-access-reject.fab"
+category = "tensor"
+domain = "tensors"
 
 
 [expect]

@@ -2,7 +2,7 @@
 term = "mutabilitas"
 kind = "concept"
 grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "value_marker", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "place", "literal", "array_literal", "expr_stmt", "call_expr", "member_suffix", "nota_stmt"]
-category = "type"
+category = "binding"
 summary = "E9: a plain bind aliases a container; copy deep-duplicates it, nested elements included."
 syntax = "mut map<string, int> n ← m; mut map<string, int> o ← copy m"
 related = ["fixum", "lista", "tabula", "copia"]

@@ -3,6 +3,8 @@ id = "corpus/conversio/num-to-bytes-reject.fab"
 group = "language"
 input_root = "corpus"
 input = "conversio/num-to-bytes-reject.fab"
+category = "conversion"
+domain = "numerics"
 
 
 [expect]
