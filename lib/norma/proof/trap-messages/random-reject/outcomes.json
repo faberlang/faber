@@ -8,10 +8,11 @@
       }
     },
     "rust": {
-      "outcome": "known-fail",
-      "phase": "run",
-      "diagnostic_contains": "failable call failed",
-      "reason": "The runner reports the random-argument trap as a clean nonzero exit with `error: InvalidArgument`; the generated Rust executable converts the same rejected argument into a panic (thread 'main' panicked at ...: failable call failed: \"InvalidArgument\", exit 101) instead of printing the trap diagnostic, so the rust lane's stderr is not the product error surface. The runner target passes; rust-target coverage for this new leaf is owned by phase 3 of the corpus coverage campaign."
+      "outcome": "pass",
+      "expect": {
+        "exit": 70,
+        "stderr_contains": "InvalidArgument"
+      }
     },
     "clif": {
       "outcome": "known-fail",
