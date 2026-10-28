@@ -259,7 +259,10 @@ mod imported {
             "{IMPORT}functio helper() → numerus {{\n    redde ns.f()\n}}\n\
              fixum numerus A = praefixum {{\n    redde 1 + 2\n}}\n"
         ));
-        assert!(references(&fixture, "A").is_empty());
+        assert_eq!(
+            references(&fixture, "A"),
+            [] as [crate::passes::praefixum::ImportedReference; 0]
+        );
     }
 
     #[test]
@@ -269,7 +272,10 @@ mod imported {
              redde 3\n    }}\n}}\n\
              functio sume(Cista c) → numerus {{\n    redde c.ter()\n}}\n"
         ));
-        assert!(references(&fixture, "sume").is_empty());
+        assert_eq!(
+            references(&fixture, "sume"),
+            [] as [crate::passes::praefixum::ImportedReference; 0]
+        );
     }
 
     /// Answers `Effect { "scribe" }` for the member `g`, `Pure` otherwise.

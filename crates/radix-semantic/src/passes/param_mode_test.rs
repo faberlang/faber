@@ -12,12 +12,11 @@ use crate::{SemanticMutability, Type};
 fn first_clausura_params(hir: &radix_hir::HirModule) -> &Vec<radix_hir::HirParam> {
     let entry = hir.entry.as_ref().expect("entry block");
     for stmt in &entry.statements {
-        if let radix_hir::HirStatementKind::Local(local) = &stmt.kind {
-            if let Some(init) = &local.init {
-                if let radix_hir::HirExpressionKind::Clausura(params, _, _, _) = &init.kind {
-                    return params;
-                }
-            }
+        if let radix_hir::HirStatementKind::Local(local) = &stmt.kind
+            && let Some(init) = &local.init
+            && let radix_hir::HirExpressionKind::Clausura(params, _, _, _) = &init.kind
+        {
+            return params;
         }
     }
     panic!("expected a clausura in the entry block")

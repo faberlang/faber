@@ -988,7 +988,7 @@ fn mutating_method_call_counts_as_mutation_for_unnecessary_varia() {
     // A user method that changes `ego` needs a `varia` receiver binding (the
     // checker rejects it on `fixum`), so the lint must not advise `fixum`.
     let result = crate::test_support::analyze_source(
-        r#"
+        r"
 genus Contador {
     varia numerus n
     functio cresce() → vacuum { ego.n ← ego.n + 1 }
@@ -997,7 +997,7 @@ incipit {
     varia Contador k ← Contador { n = 1 }
     k.cresce()
 }
-"#,
+",
     );
     let diagnostics = result.diagnostics.clone();
     assert!(
@@ -1098,7 +1098,10 @@ fn en_config() -> crate::PassConfig {
 fn en_unnecessary_varia_count(source: &str) -> usize {
     let result = crate::test_support::analyze_source_with_config(source, en_config());
     assert!(
-        !result.diagnostics.iter().any(|diag| diag.is_error()),
+        !result
+            .diagnostics
+            .iter()
+            .any(super::super::error::SemanticError::is_error),
         "en fixture must be error-free: {:?}",
         result.diagnostics
     );
@@ -1135,10 +1138,10 @@ const ORDINA_CLAVIS_EXEMPLAR: &str = include_str!(concat!(
 ));
 
 fn strip_frontmatter(raw: &str) -> &str {
-    if let Some(rest) = raw.strip_prefix("+++") {
-        if let Some(end) = rest.find("+++") {
-            return &rest[end + 3..];
-        }
+    if let Some(rest) = raw.strip_prefix("+++")
+        && let Some(end) = rest.find("+++")
+    {
+        return &rest[end + 3..];
     }
     raw
 }
