@@ -877,7 +877,7 @@ impl CliBuilder<'_> {
                         form: radix_syntax::TypeFormLevel::LONG,
                         iuncta_label: None,
                     },
-                    GenericArgExpr::Size(_) => {
+                    GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => {
                         self.error(span, ISSUE_UNSUPPORTED_TYPE_SHAPE);
                         return CliType::Textus;
                     }

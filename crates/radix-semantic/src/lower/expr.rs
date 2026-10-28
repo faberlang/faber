@@ -2504,6 +2504,7 @@ fn call_arg_unmarked_size_span(
             radix_syntax::FiguraExpr::Lift(_) | radix_syntax::FiguraExpr::Infer,
         ) => None,
         GenericArgExpr::Size(_) => Some(lowerer.current_span),
+        GenericArgExpr::Range(_) => None,
         GenericArgExpr::Type(ty) => {
             let name = call_arg_bare_name(arg)?;
             let is_natural =
@@ -2699,7 +2700,7 @@ fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
             form: radix_syntax::TypeFormLevel::LONG,
             iuncta_label: None,
         }),
-        GenericArgExpr::Size(_) => None,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -2791,6 +2792,6 @@ fn conversio_hint_symbol(arg: &GenericArgExpr) -> Option<radix_lexer::Symbol> {
             TypeExprKind::Named(ident, _) => Some(ident.name),
             _ => None,
         },
-        GenericArgExpr::Size(_) => None,
+        GenericArgExpr::Size(_) | GenericArgExpr::Range(_) => None,
     }
 }

@@ -3462,7 +3462,7 @@ impl FunctionBuilder<'_> {
             Type::SizedNumeric(Primitive::Numerus, width) => width.integer_range().is_some() || width.is_decimal(),
             // A `wrapping` / `saturating` parameter takes the constant at its
             // own word type (ruling 12: a constant in a slot takes its type).
-            Type::ModularWord(_) | Type::SaturatingWord(_) => true,
+            Type::ModularWord(_) | Type::SaturatingWord(_) | Type::RangedInt { .. } => true,
             _ => false,
         };
         Some(if sized {
@@ -4193,6 +4193,7 @@ impl FunctionBuilder<'_> {
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_) => true,
             // Option payloads render as a bare value (`display_option`
@@ -4228,6 +4229,7 @@ impl FunctionBuilder<'_> {
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)
             | Type::Array(_)
@@ -4634,18 +4636,30 @@ impl FunctionBuilder<'_> {
     /// conversion that would range-check.
     fn fold_word_store_constant(&self, source: &HirExpression, target: TypeId) -> Option<MirOperand> {
         let value = radix_semantic::passes::const_int_value(source)?;
-        let (width, saturating) = match self.normalized_type(target) {
-            Type::ModularWord(width) => (*width, false),
-            Type::SaturatingWord(width) => (*width, true),
+        // A ranged cell folds into its own range; a trapping one is judged by
+        // the checker (the constant fits or the store is refused), so it never
+        // reaches here.
+        let (width, saturating, lo, hi) = match self.normalized_type(target) {
+            Type::ModularWord(width) => {
+                let (lo, hi) = width.integer_range()?;
+                (*width, false, lo, hi)
+            }
+            Type::SaturatingWord(width) => {
+                let (lo, hi) = width.integer_range()?;
+                (*width, true, lo, hi)
+            }
+            Type::RangedInt { policy: radix_types::IntPolicy::Wrapping, width, lo, hi } => (*width, false, *lo, *hi),
+            Type::RangedInt { policy: radix_types::IntPolicy::Saturating, width, lo, hi } => (*width, true, *lo, *hi),
             _ => return None,
         };
-        let (lo, hi) = width.integer_range()?;
         let folded = if saturating {
             value.clamp(lo, hi)
         } else {
             lo + (value - lo).rem_euclid(hi - lo + 1)
         };
-        Some(MirOperand::Constant(if lo >= 0 {
+        // The constant is surfaced in the carrier of the width: unsigned
+        // widths hold `UInt`, signed widths `Int`.
+        Some(MirOperand::Constant(if width.integer_range()?.0 >= 0 {
             MirConstant::UInt(u64::try_from(folded).ok()?)
         } else {
             MirConstant::Int(i64::try_from(folded).ok()?)

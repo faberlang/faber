@@ -28,6 +28,8 @@ mod insere_node_test;
 #[cfg(test)]
 mod ordo_order_test;
 #[cfg(test)]
+mod ranged_int_test;
+#[cfg(test)]
 mod test_support;
 #[cfg(test)]
 mod widen_node_test;

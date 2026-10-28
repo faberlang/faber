@@ -1,0 +1,29 @@
++++
+term = "‥"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A range that holds no value is refused: `5‥5` is empty, `5…5` holds exactly 5."
+syntax = "saturating<u32, 5‥5> — rejected"
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_policy_range_empty"
++++
+# =============================================================================
+# ‥ — an empty range holds no value
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • The half-open `5‥5` stops before the value it starts at, so no value is
+#     inside it. The inclusive `5…5` holds exactly 5.
+#
+# Common mistakes:
+#   • Reading `lo‥hi` as inclusive; `‥` is half open, `…` is inclusive.
+
+main {
+    let saturating<u32, 5‥5> x ← 1
+    print x
+}

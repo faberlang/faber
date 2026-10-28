@@ -1,0 +1,28 @@
++++
+term = "trapping<W, lo‥hi>"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A store outside a trapping range aborts and names the range: the trap is the store's, never the arithmetic's."
+syntax = "let trapping<i32, -2‥3> boom ← big — traps when big is outside -2‥3"
+related = ["trapping<W, lo‥hi>", "numerus-overflow"]
+locale = "en"
++++
+# =============================================================================
+# trapping<W, lo‥hi> — the trap names the range
+# =============================================================================
+# This exemplum intentionally aborts. `big` is 3, one past the half-open range
+# -2‥3, so the store into `boom` fails with
+# "3 does not fit in `trapping<i32, -2‥3>`" and the program never prints it.
+# Everything before the store runs: reading `big` and printing it is exact.
+
+main {
+    let i32 ok ← 2
+    let trapping<i32, -2‥3> a ← ok
+    print a
+    let i32 big ← 3
+    print big
+    let trapping<i32, -2‥3> boom ← big
+    print boom
+}

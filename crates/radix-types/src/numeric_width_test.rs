@@ -593,3 +593,190 @@ fn policy_float_saturating_keeps_the_decimal_rejection() {
     assert_eq!(reported, vec![WidthLowerIssue::SaturatingWordUnsupported]);
     assert_eq!(reported[0].issue(), "unsupported_saturating_word_width");
 }
+
+// ── Ranged store policies ────────────────────────────────────
+
+mod ranged_int {
+    use crate::numeric_width::{RangeEnd, WidthLowerIssue, resolve_ranged_int};
+    use crate::{IntPolicy, NumericWidth, Primitive, Type, TypeTable};
+
+    fn range(
+        width: NumericWidth,
+        lo: i128,
+        hi: i128,
+        inclusive: bool,
+    ) -> Result<(i128, i128), WidthLowerIssue> {
+        resolve_ranged_int(width, RangeEnd::Value(lo), RangeEnd::Value(hi), inclusive)
+    }
+
+    #[test]
+    fn half_open_holds_the_low_end_up_to_but_not_the_high_end() {
+        assert_eq!(range(NumericWidth::U32, 0, 8, false), Ok((0, 7)));
+        assert_eq!(range(NumericWidth::I32, -2, 3, false), Ok((-2, 2)));
+    }
+
+    #[test]
+    fn inclusive_holds_both_ends() {
+        assert_eq!(range(NumericWidth::U32, 0, 7, true), Ok((0, 7)));
+        assert_eq!(range(NumericWidth::U8, 0, 255, true), Ok((0, 255)));
+    }
+
+    #[test]
+    fn infinity_is_no_bound_on_that_side_only() {
+        let u32_full = NumericWidth::U32.integer_range().unwrap();
+        assert_eq!(
+            resolve_ranged_int(
+                NumericWidth::U32,
+                RangeEnd::Value(0),
+                RangeEnd::PosInf,
+                false
+            ),
+            Ok((0, u32_full.1))
+        );
+        let i32_full = NumericWidth::I32.integer_range().unwrap();
+        assert_eq!(
+            resolve_ranged_int(
+                NumericWidth::I32,
+                RangeEnd::NegInf,
+                RangeEnd::Value(8),
+                false
+            ),
+            Ok((i32_full.0, 7))
+        );
+        // `∞` as a low end and `-∞` as a high end are outside any width.
+        assert_eq!(
+            resolve_ranged_int(
+                NumericWidth::I32,
+                RangeEnd::PosInf,
+                RangeEnd::Value(8),
+                false
+            ),
+            Err(WidthLowerIssue::RangedOutsideWidth)
+        );
+        assert_eq!(
+            resolve_ranged_int(
+                NumericWidth::I32,
+                RangeEnd::Value(0),
+                RangeEnd::NegInf,
+                false
+            ),
+            Err(WidthLowerIssue::RangedOutsideWidth)
+        );
+    }
+
+    #[test]
+    fn an_empty_range_is_refused() {
+        assert_eq!(
+            range(NumericWidth::U32, 5, 5, false),
+            Err(WidthLowerIssue::RangedEmpty)
+        );
+        assert_eq!(
+            range(NumericWidth::U32, 5, 3, true),
+            Err(WidthLowerIssue::RangedEmpty)
+        );
+        // `5…5` holds exactly 5.
+        assert_eq!(range(NumericWidth::U32, 5, 5, true), Ok((5, 5)));
+    }
+
+    #[test]
+    fn a_range_must_fit_the_width() {
+        assert_eq!(
+            range(NumericWidth::U8, 0, 300, false),
+            Err(WidthLowerIssue::RangedOutsideWidth)
+        );
+        assert_eq!(
+            range(NumericWidth::I8, -200, 5, false),
+            Err(WidthLowerIssue::RangedOutsideWidth)
+        );
+        assert_eq!(range(NumericWidth::U8, 0, 256, false), Ok((0, 255)));
+    }
+
+    #[test]
+    fn unsigned_widths_refuse_a_negative_low_end() {
+        assert_eq!(
+            range(NumericWidth::U8, -1, 5, false),
+            Err(WidthLowerIssue::RangedUnsignedNegative)
+        );
+        assert_eq!(
+            range(NumericWidth::U64, -3, 5, false),
+            Err(WidthLowerIssue::RangedUnsignedNegative)
+        );
+    }
+
+    #[test]
+    fn float_decimal_and_inf_widths_take_no_range() {
+        for width in [
+            NumericWidth::F32,
+            NumericWidth::F64,
+            NumericWidth::D64,
+            NumericWidth::Inf,
+        ] {
+            assert_eq!(
+                range(width, 0, 8, false),
+                Err(WidthLowerIssue::RangedWidthUnsupported),
+                "{width:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_whole_width_is_the_plain_form_it_abbreviates() {
+        let mut types = TypeTable::new();
+        let (lo, hi) = NumericWidth::U8.integer_range().unwrap();
+        let trapping = types.ranged_int(IntPolicy::Trapping, NumericWidth::U8, lo, hi);
+        assert_eq!(
+            trapping,
+            types.sized_numeric(Primitive::Numerus, NumericWidth::U8)
+        );
+        let saturating = types.ranged_int(IntPolicy::Saturating, NumericWidth::U8, lo, hi);
+        assert_eq!(
+            saturating,
+            types.intern(Type::SaturatingWord(NumericWidth::U8))
+        );
+        let wrapping = types.ranged_int(IntPolicy::Wrapping, NumericWidth::U8, lo, hi);
+        assert_eq!(wrapping, types.intern(Type::ModularWord(NumericWidth::U8)));
+    }
+
+    #[test]
+    fn a_narrower_range_is_its_own_type_and_reads_as_its_width() {
+        let mut types = TypeTable::new();
+        let cell = types.ranged_int(IntPolicy::Saturating, NumericWidth::U32, 0, 7);
+        let again = types.ranged_int(IntPolicy::Saturating, NumericWidth::U32, 0, 7);
+        assert_eq!(cell, again, "interning is structural");
+        let other = types.ranged_int(IntPolicy::Saturating, NumericWidth::U32, 0, 8);
+        assert_ne!(cell, other);
+        assert_eq!(
+            types.ranged_int_parts(cell),
+            Some((IntPolicy::Saturating, NumericWidth::U32, 0, 7))
+        );
+        let base = types.ranged_int_base(cell);
+        assert_eq!(base, types.intern(Type::SaturatingWord(NumericWidth::U32)));
+        assert_eq!(types.ranged_int_base_existing(cell), base);
+    }
+
+    #[test]
+    fn a_ranged_cell_is_assignable_only_where_its_range_is_contained() {
+        let mut types = TypeTable::new();
+        let small = types.ranged_int(IntPolicy::Saturating, NumericWidth::U32, 0, 4);
+        let large = types.ranged_int(IntPolicy::Saturating, NumericWidth::U32, 0, 9);
+        let plain = types.intern(Type::SaturatingWord(NumericWidth::U32));
+        assert!(types.is_assignable(small, large), "contained range");
+        assert!(
+            !types.is_assignable(large, small),
+            "wider range needs a store"
+        );
+        assert!(
+            types.is_assignable(small, plain),
+            "a ranged cell reads as its width"
+        );
+        assert!(
+            !types.is_assignable(plain, small),
+            "the width needs a store"
+        );
+        let wrapping = types.ranged_int(IntPolicy::Wrapping, NumericWidth::U32, 0, 9);
+        assert!(
+            !types.is_assignable(small, wrapping),
+            "policy families never mix"
+        );
+    }
+}

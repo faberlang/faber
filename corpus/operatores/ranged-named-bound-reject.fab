@@ -1,0 +1,36 @@
++++
+term = "‥"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A range end is a literal integer or ∞ for now: a named or run-time bound is refused by name."
+syntax = "saturating<u32, 0‥n> — rejected"
+related = ["saturating<W, lo‥hi>", "trapping<W, lo‥hi>", "wrapping<W, lo‥hi>"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:ranged_policy_bound_not_constant"
++++
+# =============================================================================
+# ‥ — a range end is a literal integer or ∞
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • The checker can only prove that a range fits its width when both ends are
+#     known at check time. A name or a `size` extent as an end parses and is
+#     refused by name, so the form can arrive later without changing what is
+#     legal today.
+#
+# Common mistakes:
+#   • Writing the extent of a run-time buffer as an end (`0‥n`); spell the
+#     literal end, or keep the value in a wider cell and check it explicitly.
+
+fn bound(int n) → void {
+    let saturating<u32, 0‥n> x ← 1
+    print x
+}
+
+main {
+    bound(8)
+}

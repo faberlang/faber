@@ -547,6 +547,7 @@ fn type_contains_param(
         | Type::Bits(_)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
+        | Type::RangedInt { .. }
         | Type::PolicyFloat(_, _)
         | Type::SizedInstans(_)
         | Type::Struct(_)

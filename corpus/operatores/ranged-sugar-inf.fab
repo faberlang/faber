@@ -1,0 +1,32 @@
++++
+term = "‥"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "range_argument", "range_glyph", "range_bound", "width_type_sugar", "conversio_expr", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "inf is trapping<inf, -∞…∞>: no bound on either side, so the range spelling is the bare inf type."
+syntax = "trapping<inf, -∞…∞>"
+related = ["ranged-sugar", "inf", "trapping<W, lo‥hi>"]
+locale = "en"
++++
+# =============================================================================
+# trapping<inf, -∞…∞> — the unbounded integer written with its range
+# =============================================================================
+#
+# What this teaches:
+#   • \`inf\` has no bound on either side, so \`-∞…∞\` writes exactly that and the
+#     result is the bare \`inf\` type: no conversion, no check.
+#   • \`∞\` and \`-∞\` mean "no bound on this side" in a range; they are never an
+#     integer value. A finite end on \`inf\` (\`trapping<inf, 0…∞>\`) is refused.
+#
+# Common mistakes:
+#   • Writing a finite range on \`inf\` to bound it; use a bounded width.
+#
+# See also: inf, ranged-sugar
+# =============================================================================
+
+main {
+    let trapping<inf, -∞…∞> big ← 18446744073709551616
+    let inf same ← big
+    print same
+}

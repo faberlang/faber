@@ -369,6 +369,12 @@ pub enum InterfaceTypeSnapshot {
     Bits(radix_types::BitsWidth),
     ModularWord(NumericWidth),
     SaturatingWord(NumericWidth),
+    RangedInt {
+        policy: radix_types::IntPolicy,
+        width: NumericWidth,
+        lo: i128,
+        hi: i128,
+    },
     PolicyFloat(FloatPolicy, NumericWidth),
     SizedInstans(InstansPrecision),
     Option(Box<InterfaceTypeSnapshot>),
@@ -911,6 +917,17 @@ fn snapshot_interface_type_inner(
         Type::Bits(width) => Ok(InterfaceTypeSnapshot::Bits(*width)),
         Type::ModularWord(width) => Ok(InterfaceTypeSnapshot::ModularWord(*width)),
         Type::SaturatingWord(width) => Ok(InterfaceTypeSnapshot::SaturatingWord(*width)),
+        Type::RangedInt {
+            policy,
+            width,
+            lo,
+            hi,
+        } => Ok(InterfaceTypeSnapshot::RangedInt {
+            policy: *policy,
+            width: *width,
+            lo: *lo,
+            hi: *hi,
+        }),
         Type::PolicyFloat(policy, width) => Ok(InterfaceTypeSnapshot::PolicyFloat(*policy, *width)),
         Type::SizedInstans(precision) => Ok(InterfaceTypeSnapshot::SizedInstans(*precision)),
         Type::Option(inner) => Ok(InterfaceTypeSnapshot::Option(Box::new(
@@ -1251,6 +1268,12 @@ fn import_interface_type_inner(
         InterfaceTypeSnapshot::SaturatingWord(width) => {
             Ok(types.intern(Type::SaturatingWord(*width)))
         }
+        InterfaceTypeSnapshot::RangedInt {
+            policy,
+            width,
+            lo,
+            hi,
+        } => Ok(types.ranged_int(*policy, *width, *lo, *hi)),
         InterfaceTypeSnapshot::PolicyFloat(policy, width) => {
             Ok(types.intern(Type::PolicyFloat(*policy, *width)))
         }

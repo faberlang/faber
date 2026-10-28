@@ -27,6 +27,11 @@ pub(super) const FAMILY_TRAPPING_FLOAT: &str = "trapping<float>";
 /// its device lowering is not built (N7e D6, temporary refusal).
 pub(super) const FAMILY_SATURATING_FLOAT: &str = "saturating<float>";
 
+/// Family label of a ranged integer cell (`saturating<u32, 0‥W>`): admitted on
+/// the host, but a kernel does not apply a range yet (series 4/5 of need
+/// d5d00916 build kernels over range facts).
+pub(super) const FAMILY_RANGED_INT: &str = "ranged policy";
+
 /// First host-only family found inside `ty`, or `None` when the whole type is
 /// legal in a kernel.
 pub(super) fn host_only_family(
@@ -83,6 +88,7 @@ impl Walk<'_> {
             // trap); `saturating<float>` is a temporary refusal.
             Type::PolicyFloat(FloatPolicy::Trapping, _) => Some(FAMILY_TRAPPING_FLOAT),
             Type::PolicyFloat(FloatPolicy::Saturating, _) => Some(FAMILY_SATURATING_FLOAT),
+            Type::RangedInt { .. } => Some(FAMILY_RANGED_INT),
             Type::Struct(def) => self.nominal(*def, false),
             Type::Enum(def) => self.nominal(*def, true),
             Type::Applied(base, args) => self.family(*base).or_else(|| {

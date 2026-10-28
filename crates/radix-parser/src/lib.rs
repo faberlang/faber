@@ -2079,3 +2079,7 @@ mod expected_issue_test;
 #[cfg(test)]
 #[path = "emitted_issue_rows_test.rs"]
 mod emitted_issue_rows_test;
+
+#[cfg(test)]
+#[path = "range_argument_test.rs"]
+mod range_argument_test;

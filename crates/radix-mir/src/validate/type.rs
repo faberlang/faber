@@ -860,6 +860,7 @@ impl Validator<'_, '_> {
             | Type::ModularWord(_)
             | Type::Bits(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)
             | Type::Intervallum(..)
@@ -978,6 +979,13 @@ impl Validator<'_, '_> {
                     (None, None) => false,
                 }
             }
+            // A constant landing in a ranged cell is already folded into its
+            // range; the cell holds exactly [lo, hi].
+            Type::RangedInt { lo, hi, .. } => match (signed, unsigned) {
+                (Some(v), _) => (*lo..=*hi).contains(&i128::from(v)),
+                (_, Some(v)) => (*lo..=*hi).contains(&i128::from(v)),
+                (None, None) => false,
+            },
             Type::Primitive(Primitive::Numerus) => {
                 signed.is_some() || unsigned.is_some_and(|v| i64::try_from(v).is_ok())
             }

@@ -1344,6 +1344,10 @@ help = "write the shape with {sugar} width sugar brackets"
 message = "`{form}` is a retired numeric type spelling"
 help = "write `{bare}`, not `{form}`; a width marker is its own type"
 
+[diagnostics.PARSE040.issues.range_bound_required]
+message = "a range needs both ends"
+help = "write both ends, such as 0‥8 or 0…7, with ∞ or -∞ for no bound on a side"
+
 [diagnostics.PARSE040.issues.iuncta_arity_exceeded]
 message = "iuncta arity {count} exceeds maximum of 16; use a class instead"
 help = "reduce the iuncta arity to 16 or fewer, or declare a class for more fields"
@@ -1795,6 +1799,38 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping width must be a bare width marker"
 help = "use a bare width marker such as u8 or i64"
+
+[diagnostics.SEM008.issues.ranged_policy_word_required]
+message = "a range needs a store policy word; a bare width marker takes no range"
+help = "write the policy word first, such as saturating<u32, 0‥8>, trapping<i32, -2‥3> or wrapping<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
+message = "a range end must be an integer literal or ∞"
+help = "write both ends as integer literals, such as 0‥8; a named or size end is not built yet"
+
+[diagnostics.SEM008.issues.ranged_policy_arity]
+message = "a ranged store policy takes the width and then one range"
+help = "write policy<W, lo‥hi>, such as saturating<u32, 0‥8>"
+
+[diagnostics.SEM008.issues.ranged_policy_range_empty]
+message = "the range holds no value"
+help = "the low end must be below the high end of lo‥hi, or not above it for lo…hi"
+
+[diagnostics.SEM008.issues.ranged_policy_range_outside_width]
+message = "a range end lies outside the width"
+help = "keep both ends inside the width; ∞ is only a high end and -∞ only a low end"
+
+[diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
+message = "an unsigned width cannot have a negative low end"
+help = "start the range at 0, or use a signed width such as i32"
+
+[diagnostics.SEM008.issues.ranged_policy_width_unsupported]
+message = "a ranged store policy needs a bounded integer width"
+help = "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet"
+
+[diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
+message = "a kernel cannot use a ranged store policy yet ({site}); a kernel applies no range"
+help = "use the plain width in the kernel and apply the range on the host"
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' conflicts with written posture '{written_posture}'"
@@ -2503,6 +2539,10 @@ help = "declare the type only; use a map ({tabula}) until the ledger operations 
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "the ledger type is not supported on this target yet"
 help = "use the MIR runner or the Faber source emitter, or a map ({tabula}), until this target carries a ledger"
+
+[diagnostics.SEM010.issues.ranged_policy_target_unsupported]
+message = "the ranged store policy is not supported on this target yet"
+help = "use the MIR runner, the Rust target or the Faber source emitter until this target applies ranges"
 
 [diagnostics.SEM010.issues.leaf_unsupported_on_target]
 message = "the {leaf} leaf is not supported on this target"

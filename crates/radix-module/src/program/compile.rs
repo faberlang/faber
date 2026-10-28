@@ -2352,7 +2352,7 @@ fn interface_type_from_generic_arg(
             };
             interface_type_from_type_expr(&ty, interner, type_params, nominal_kinds, ctx)
         }
-        radix_syntax::GenericArgExpr::Size(_) => None,
+        radix_syntax::GenericArgExpr::Size(_) | radix_syntax::GenericArgExpr::Range(_) => None,
     }
 }
 
@@ -2363,7 +2363,7 @@ fn generic_arg_bare_name(arg: &radix_syntax::GenericArgExpr) -> Option<radix_syn
             TypeExprKind::Named(name, params) if params.is_empty() => Some(name.clone()),
             _ => None,
         },
-        radix_syntax::GenericArgExpr::Size(_) => None,
+        radix_syntax::GenericArgExpr::Size(_) | radix_syntax::GenericArgExpr::Range(_) => None,
     }
 }
 

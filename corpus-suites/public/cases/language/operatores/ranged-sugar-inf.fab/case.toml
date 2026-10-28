@@ -1,0 +1,10 @@
+version = 1
+id = "corpus/operatores/ranged-sugar-inf.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/ranged-sugar-inf.fab"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

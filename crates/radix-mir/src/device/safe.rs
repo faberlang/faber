@@ -498,6 +498,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             )
             | Type::SizedInstans(_)
             | Type::SaturatingWord(_)
+            | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedNumeric(_, _) => {
                 self.record_policy(format!("device host value type {semantic:?}"));

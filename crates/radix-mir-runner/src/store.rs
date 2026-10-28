@@ -118,11 +118,25 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 _ => None,
             };
         }
-        let (policy, width) = self.integer_slot(target)?;
+        let (policy, width, ranged) = self.integer_slot(target)?;
         // Ruling 38: an `inf` beyond the 64-bit carriers fits no bounded
         // slot. A trapping slot traps with the store identity (value, type,
         // position); the policy words reduce/clamp the exact value.
         if let Value::Magnus(big) = value {
+            if let Some((lo, hi)) = ranged {
+                return Some(match policy {
+                    SlotPolicy::Trapping => Err(self.ranged_store_trap(
+                        site,
+                        big.to_string(),
+                        big.is_negative(),
+                        width,
+                        (lo, hi),
+                        span,
+                    )),
+                    SlotPolicy::Wrapping => Ok(ranged_big_wrap(big, width, lo, hi)),
+                    SlotPolicy::Saturating => Ok(ranged_big_clamp(big, width, lo, hi)),
+                });
+            }
             return Some(match policy {
                 SlotPolicy::Trapping => {
                     Err(self.store_trap(site, big.to_string(), big.is_negative(), width, span))
@@ -132,17 +146,37 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             });
         }
         let exact = int_value(value)?;
-        // `integer_slot` never yields `inf` (no range), so this is always `Some`.
-        let (lo, hi) = width.integer_range()?;
+        // A ranged cell applies its policy to its own range; a plain cell to
+        // its width. `integer_slot` never yields `inf` (no range), so the
+        // width range is always `Some`.
+        let (lo, hi) = match ranged {
+            Some(range) => range,
+            None => width.integer_range()?,
+        };
         Some(match policy {
             SlotPolicy::Trapping => {
                 if (lo..=hi).contains(&exact) {
                     exact_carrier(exact, width).ok_or_else(|| {
                         self.store_trap(site, exact.to_string(), exact < 0, width, span)
                     })
+                } else if ranged.is_some() {
+                    Err(self.ranged_store_trap(
+                        site,
+                        exact.to_string(),
+                        exact < 0,
+                        width,
+                        (lo, hi),
+                        span,
+                    ))
                 } else {
                     Err(self.store_trap(site, exact.to_string(), exact < 0, width, span))
                 }
+            }
+            SlotPolicy::Wrapping if ranged.is_some() => {
+                Ok(ranged_carrier(ranged_wrap(exact, lo, hi), width))
+            }
+            SlotPolicy::Saturating if ranged.is_some() => {
+                Ok(ranged_carrier(exact.clamp(lo, hi), width))
             }
             SlotPolicy::Wrapping => Ok(modular_word_result(exact, width)),
             SlotPolicy::Saturating => Ok(saturating_word_result(exact, width)),
@@ -246,22 +280,58 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         })
     }
 
-    fn integer_slot(&self, target: TypeId) -> Option<(SlotPolicy, NumericWidth)> {
+    /// Policy, width and, for a ranged cell, the inclusive range of an integer
+    /// slot (`None` range: the whole width).
+    fn integer_slot(
+        &self,
+        target: TypeId,
+    ) -> Option<(SlotPolicy, NumericWidth, Option<(i128, i128)>)> {
         let mut target = target;
         while let Type::Alias(_, inner) = self.types.get(target) {
             target = *inner;
         }
         match self.types.get(target) {
-            Type::Primitive(Primitive::Numerus) => Some((SlotPolicy::Trapping, NumericWidth::I64)),
+            Type::Primitive(Primitive::Numerus) => {
+                Some((SlotPolicy::Trapping, NumericWidth::I64, None))
+            }
             // Deliberate: no store slot for `inf` (ruling 38: a store into an
             // `inf` slot is total, nothing to check).
             Type::SizedNumeric(Primitive::Numerus, width) if width.integer_range().is_some() => {
-                Some((SlotPolicy::Trapping, *width))
+                Some((SlotPolicy::Trapping, *width, None))
             }
-            Type::ModularWord(width) => Some((SlotPolicy::Wrapping, *width)),
-            Type::SaturatingWord(width) => Some((SlotPolicy::Saturating, *width)),
+            Type::ModularWord(width) => Some((SlotPolicy::Wrapping, *width, None)),
+            Type::SaturatingWord(width) => Some((SlotPolicy::Saturating, *width, None)),
+            Type::RangedInt {
+                policy,
+                width,
+                lo,
+                hi,
+            } => Some((
+                match policy {
+                    radix_types::IntPolicy::Trapping => SlotPolicy::Trapping,
+                    radix_types::IntPolicy::Wrapping => SlotPolicy::Wrapping,
+                    radix_types::IntPolicy::Saturating => SlotPolicy::Saturating,
+                },
+                *width,
+                Some((*lo, *hi)),
+            )),
             _ => None,
         }
+    }
+
+    /// A value outside a trapping ranged cell: the store identity names the
+    /// range, `trapping<i32, -2‥3>`, instead of the bare width.
+    fn ranged_store_trap(
+        &self,
+        site: &HirStoreSite,
+        value: String,
+        negative: bool,
+        width: NumericWidth,
+        (lo, hi): (i128, i128),
+        span: Span,
+    ) -> RunnerError {
+        let ty = format!("trapping<{}, {lo}‥{}>", width.rust_type(), hi + 1);
+        self.store_trap_in(site, value, negative, &ty, width.is_unsigned_int(), span)
     }
 
     fn store_trap(
@@ -272,7 +342,25 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         width: NumericWidth,
         span: Span,
     ) -> RunnerError {
-        let ty = width.rust_type();
+        self.store_trap_in(
+            site,
+            value,
+            negative,
+            width.rust_type(),
+            width.is_unsigned_int(),
+            span,
+        )
+    }
+
+    fn store_trap_in(
+        &self,
+        site: &HirStoreSite,
+        value: String,
+        negative: bool,
+        ty: &str,
+        unsigned: bool,
+        span: Span,
+    ) -> RunnerError {
         let slot = site.slot.map(|slot| self.interner.resolve(slot).to_owned());
         let position = match (site.kind, &slot) {
             (HirStoreKind::Declaration, Some(slot)) => format!("declaration of `{slot}`"),
@@ -305,7 +393,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 format!("{}..{}", from.start, from.end),
             ));
         }
-        if negative && width.is_unsigned_int() {
+        if negative && unsigned {
             message.push_str(" (a negative value cannot be stored in an unsigned slot)");
         }
         RunnerError {
@@ -382,4 +470,52 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             _ => None,
         }
     }
+}
+
+/// The representative of `exact` in `lo‥=hi`: the ring of `hi - lo + 1`
+/// values starting at `lo` (a `wrapping<W, lo‥hi>` store).
+pub(crate) fn ranged_wrap(exact: i128, lo: i128, hi: i128) -> i128 {
+    lo + (exact - lo).rem_euclid(hi - lo + 1)
+}
+
+/// Surface a value already inside a ranged cell in the carrier of its width:
+/// `UInt` at `u64`, `Int` at every other width.
+pub(crate) fn ranged_carrier(value: i128, width: NumericWidth) -> Value {
+    if width == NumericWidth::U64 {
+        Value::UInt(u64::try_from(value).unwrap_or(0))
+    } else {
+        Value::Int(i64::try_from(value).unwrap_or(0))
+    }
+}
+
+/// `inf` beyond the 64-bit carriers reduced into a wrapping ranged cell.
+pub(crate) fn ranged_big_wrap(
+    big: &handroll::Magnus,
+    width: NumericWidth,
+    lo: i128,
+    hi: i128,
+) -> Value {
+    let lo_m = handroll::Magnus::from_i128(lo);
+    let span = handroll::Magnus::from_i128(hi - lo + 1);
+    let offset = (big - &lo_m)
+        .mod_floor(&span)
+        .ok()
+        .and_then(|offset| offset.to_i128())
+        .unwrap_or(0);
+    ranged_carrier(lo + offset, width)
+}
+
+/// `inf` beyond the 64-bit carriers clamped into a saturating ranged cell.
+pub(crate) fn ranged_big_clamp(
+    big: &handroll::Magnus,
+    width: NumericWidth,
+    lo: i128,
+    hi: i128,
+) -> Value {
+    let clamped = match big.to_i128() {
+        Some(exact) => exact.clamp(lo, hi),
+        None if big.is_negative() => lo,
+        None => hi,
+    };
+    ranged_carrier(clamped, width)
 }

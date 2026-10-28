@@ -972,6 +972,7 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
             let form = arg_value(args, "form")?;
             Some(format!("`{form}` is a retired numeric type spelling"))
         }
+        "range_bound_required" => Some("a range needs both ends".to_owned()),
         _ => None,
     }
 }
@@ -1019,6 +1020,9 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
                 "write `{bare}`, not `{form}`; a width marker is its own type"
             ))
         }
+        "range_bound_required" => Some(
+            "write both ends, such as 0‥8 or 0…7, with ∞ or -∞ for no bound on a side".to_owned(),
+        ),
         _ => None,
     }
 }

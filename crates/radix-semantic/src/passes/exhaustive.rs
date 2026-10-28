@@ -206,6 +206,7 @@ fn is_value_subject(ty: TypeId, types: &TypeTable) -> bool {
         Type::SizedNumeric(..)
         | Type::ModularWord(_)
         | Type::SaturatingWord(_)
+        | Type::RangedInt { .. }
         | Type::PolicyFloat(..)
         | Type::SizedInstans(_)
         | Type::BoundedTextus { .. }

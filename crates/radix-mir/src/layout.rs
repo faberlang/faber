@@ -610,6 +610,8 @@ fn layout_kind_for_type(
         // named arm or errors loudly; nothing reaches `OpaqueHandle` silently.
         Type::SizedNumeric(prim, width) => sized_numeric_layout(*prim, *width),
         Type::ModularWord(width) | Type::SaturatingWord(width) => int_layout(*width),
+        // A ranged integer is stored in its width; the range is a store rule.
+        Type::RangedInt { width, .. } => int_layout(*width),
         // A bN is an unsigned N-bit scalar with the size and alignment of uN.
         Type::Bits(width) => bits_layout(*width),
         // N7E-3 (D2): a policy-float cell has the layout of the bare float of
