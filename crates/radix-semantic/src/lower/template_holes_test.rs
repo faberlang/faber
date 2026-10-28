@@ -660,7 +660,7 @@ fn mixed_hole_warnings(source: &str) -> Vec<String> {
             err.args
                 .iter()
                 .find(|arg| arg.name == "reads")
-                .map(|arg| arg.value.to_string())
+                .map(|arg| arg.value.clone())
                 .unwrap_or_default()
         })
         .collect()
@@ -709,5 +709,5 @@ incipit {
     nota c
 }
 "#;
-    assert!(mixed_hole_warnings(source).is_empty());
+    assert_eq!(mixed_hole_warnings(source), [] as [String; 0]);
 }

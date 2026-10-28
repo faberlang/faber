@@ -1,6 +1,6 @@
 //! Tests for Faber type formatting and rendering.
 //!
-//! These tests prove that format_faber_type produces correct surface syntax
+//! These tests prove that `format_faber_type` produces correct surface syntax
 //! for tensor, indexed, numeric, and collection types.
 
 use super::format_faber_type;

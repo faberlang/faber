@@ -1,6 +1,6 @@
 //! Tests for semantic error and warning diagnostics.
 //!
-//! These tests prove that SemanticError and SemanticErrorKind produce
+//! These tests prove that `SemanticError` and `SemanticErrorKind` produce
 //! correctly structured diagnostics, that warnings are non-fatal, and
 //! that diagnostic arguments serialize correctly.
 
@@ -16,7 +16,7 @@ fn warnings_are_non_fatal_semantic_diagnostics() {
     );
 
     assert!(!warning.is_error());
-    assert!(warning.args.is_empty());
+    assert_eq!(warning.args, []);
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn hard_semantic_diagnostics_are_fatal() {
     let error = SemanticError::structured(SemanticErrorKind::TypeMismatch, Span::default());
 
     assert!(error.is_error());
-    assert!(error.args.is_empty());
+    assert_eq!(error.args, []);
 }
 
 #[test]

@@ -178,10 +178,10 @@ impl HirVisitor for FindSi {
 struct CollectIfEq(Vec<u64>);
 impl HirVisitor for CollectIfEq {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Si { cond, .. } = &expr.kind {
-            if let Some(value) = cond_lane_literal(cond) {
-                self.0.push(value);
-            }
+        if let HirExpressionKind::Si { cond, .. } = &expr.kind
+            && let Some(value) = cond_lane_literal(cond)
+        {
+            self.0.push(value);
         }
         walk_expr(self, expr);
     }

@@ -1,7 +1,7 @@
 //! Tests for definite-assignment initialization states.
 //!
-//! These tests prove that InitState variants (Assigned, Unassigned,
-//! MaybeAssigned) correctly report their initialization status and
+//! These tests prove that `InitState` variants (Assigned, Unassigned,
+//! `MaybeAssigned`) correctly report their initialization status and
 //! that state transitions follow the expected lattice.
 
 use super::InitState;

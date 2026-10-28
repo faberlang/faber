@@ -1,8 +1,8 @@
 //! Tests for index expression interning and variable identity.
 //!
-//! These tests prove that IndexExpr values are interned as distinct IndexIds,
-//! that IndexVars track identity correctly, and that tuple and literal
-//! expressions round-trip through the TypeTable.
+//! These tests prove that `IndexExpr` values are interned as distinct `IndexIds`,
+//! that `IndexVars` track identity correctly, and that tuple and literal
+//! expressions round-trip through the `TypeTable`.
 
 use super::{IndexExpr, IndexVar};
 use crate::{Primitive, Type, TypeTable};

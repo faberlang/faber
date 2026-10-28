@@ -83,14 +83,14 @@ fn local_class_arm_lowers_as_type_pattern() {
     // Control: the file-local genus keeps checking green (the parser's
     // prescan already routed this arm to a type pattern).
     assert_accepts(
-        r#"genus Circle { varia numerus radius }
+        r"genus Circle { varia numerus radius }
 
 functio area(Circle ∪ nihil u) → numerus {
     discerne u {
         casu Circle sit c { redde c.radius }
         casu nihil { redde 0 }
     }
-}"#,
+}",
     );
 }
 
@@ -149,14 +149,14 @@ fn non_qualifier_leading_path_still_fails_closed() {
     // A leading path that is not a real qualifier must never bind the local
     // `Eventum.Ictus` (CG2-R07 fail-closed arm).
     assert_rejects_with_issue(
-        r#"discretio Eventum { Ictus, Sonitus }
+        r"discretio Eventum { Ictus, Sonitus }
 
 functio describe(Eventum e) → numerus {
     discerne e {
         casu missing.Eventum.Ictus { redde 1 }
         casu Eventum.Sonitus { redde 2 }
     }
-}"#,
+}",
         "unknown_variant",
     );
 }

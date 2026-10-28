@@ -1,8 +1,8 @@
 //! Tests for index expression unification.
 //!
-//! These tests prove that IndexUnifier correctly unifies index expressions
+//! These tests prove that `IndexUnifier` correctly unifies index expressions
 //! (literals, variables, tuples) and reports unification failures with the
-//! expected IndexUnifyError variants.
+//! expected `IndexUnifyError` variants.
 
 use super::{IndexUnifier, IndexUnifyError};
 use crate::TypeTable;

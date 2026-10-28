@@ -1,8 +1,8 @@
 //! Tests for numeric width parsing, sugar-marker mapping, and width errors.
 //!
 //! These tests prove that width markers (f32, i64, etc.) map to the correct
-//! NumericWidth variant and family (Fractus/Numerus), and that invalid
-//! or mismatched widths produce WidthError diagnostics.
+//! `NumericWidth` variant and family (Fractus/Numerus), and that invalid
+//! or mismatched widths produce `WidthError` diagnostics.
 
 use super::numeric_width::{
     NumericWidth, WidthError, is_numeric_width_type_sugar, lista_sugar_width_marker,

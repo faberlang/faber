@@ -160,6 +160,20 @@ incipit {
 
 #[test]
 fn generic_rope_method_argument_is_specialized_with_the_instance() {
+    struct FindRope {
+        dim: Option<TypeId>,
+    }
+    impl HirVisitor for FindRope {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::MethodCall(_, _, generic_args, _, _) = &expr.kind
+                && self.dim.is_none()
+                && generic_args.len() == 1
+            {
+                self.dim = Some(generic_args[0]);
+            }
+            walk_expr(self, expr);
+        }
+    }
     let fixture = analyze_source_for_target_la(
         r#"
 @ radix lane "air"
@@ -188,20 +202,6 @@ incipit {
         })
         .next()
         .expect("one concrete generic-rope instance");
-    struct FindRope {
-        dim: Option<TypeId>,
-    }
-    impl HirVisitor for FindRope {
-        fn visit_expr(&mut self, expr: &HirExpression) {
-            if let HirExpressionKind::MethodCall(_, _, generic_args, _, _) = &expr.kind
-                && self.dim.is_none()
-                && generic_args.len() == 1
-            {
-                self.dim = Some(generic_args[0]);
-            }
-            walk_expr(self, expr);
-        }
-    }
     let mut find = FindRope { dim: None };
     find.visit_function(concrete);
     assert!(

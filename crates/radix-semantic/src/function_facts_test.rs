@@ -1,6 +1,6 @@
 //! Tests for function fact analysis and capture modes.
 //!
-//! These tests prove that FunctionFactTable correctly identifies capture
+//! These tests prove that `FunctionFactTable` correctly identifies capture
 //! modes (delegated, inherited, excluded), resolves function facts across
 //! calls, and reports fact conflicts.
 
@@ -95,7 +95,7 @@ fn function_fact_default_does_not_fail() {
     assert!(!fact.is_generator);
     assert!(!fact.requires_await);
     assert!(fact.call_edges.is_empty());
-    assert!(fact.captures.is_empty());
+    assert_eq!(fact.captures, []);
     assert!(fact.param_modes.is_empty());
     assert!(fact.err_ty.is_none());
 }
@@ -423,7 +423,7 @@ fn function_captures(source: &str, wanted: &str) -> Vec<CaptureFact> {
 #[test]
 fn mutating_closure_capture_records_mutate_mode() {
     let captures = function_captures(
-        r#"
+        r"
 functio counter() → () → numerus {
     varia numerus c ← 0
     redde () → numerus ∴ fac {
@@ -432,7 +432,7 @@ functio counter() → () → numerus {
     }
 }
 incipit { }
-"#,
+",
         "counter",
     );
     assert_eq!(captures.len(), 1, "closure captures c: {captures:?}");
@@ -442,7 +442,7 @@ incipit { }
 #[test]
 fn mutating_loop_binder_capture_records_mutate_mode() {
     let captures = function_captures(
-        r#"
+        r"
 functio loops() → numerus {
     varia numerus total ← 0
     itera ex [1, 2, 3] varia v {
@@ -455,7 +455,7 @@ functio loops() → numerus {
     redde total
 }
 incipit { }
-"#,
+",
         "loops",
     );
     assert_eq!(
@@ -469,7 +469,7 @@ incipit { }
 #[test]
 fn moved_out_closure_capture_records_consume_mode() {
     let captures = function_captures(
-        r#"
+        r"
 functio eat(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()
 }
@@ -478,7 +478,7 @@ functio demo() → vacuum {
     sit _ f ← () → vacuum ∴ eat(own a)
 }
 incipit { }
-"#,
+",
         "demo",
     );
     assert_eq!(
@@ -494,13 +494,13 @@ incipit { }
 #[test]
 fn read_only_closure_capture_records_read_mode() {
     let captures = function_captures(
-        r#"
+        r"
 functio peek() → () → numerus {
     varia numerus n ← 1
     redde () → numerus ∴ n
 }
 incipit { }
-"#,
+",
         "peek",
     );
     assert_eq!(captures.len(), 1, "closure captures n: {captures:?}");
@@ -512,7 +512,7 @@ incipit { }
 #[test]
 fn write_outside_closure_leaves_read_capture_intact() {
     let captures = function_captures(
-        r#"
+        r"
 functio mixed() → () → numerus {
     varia numerus n ← 1
     sit _ peek ← () → numerus ∴ n
@@ -520,7 +520,7 @@ functio mixed() → () → numerus {
     redde peek
 }
 incipit { }
-"#,
+",
         "mixed",
     );
     assert_eq!(captures.len(), 1, "closure captures n: {captures:?}");
@@ -534,7 +534,7 @@ incipit { }
 #[test]
 fn loop_binder_used_only_outside_closures_is_not_a_capture() {
     let captures = function_captures(
-        r#"
+        r"
 functio loose() → numerus {
     varia numerus t ← 0
     itera ex [1, 2] varia v {
@@ -543,7 +543,7 @@ functio loose() → numerus {
     redde t
 }
 incipit { }
-"#,
+",
         "loose",
     );
     assert!(captures.is_empty(), "no closure, no captures: {captures:?}");
@@ -552,12 +552,12 @@ incipit { }
 #[test]
 fn parameter_captured_by_closure_records_read_capture() {
     let captures = function_captures(
-        r#"
+        r"
 functio wraps(numerus m) → () → numerus {
     redde () → numerus ∴ m
 }
 incipit { }
-"#,
+",
         "wraps",
     );
     assert_eq!(captures.len(), 1, "closure captures m: {captures:?}");
@@ -570,13 +570,13 @@ fn method_call_on_capture_inside_closure_records_mutate_mode() {
     // captured name inside the referencing closure counts as a mutate —
     // fail closed, matching the shared capture analysis.
     let captures = function_captures(
-        r#"
+        r"
 functio prober() → () → numerus {
     varia lista<numerus> xs ← [1]
     redde () → numerus ∴ xs.longitudo()
 }
 incipit { }
-"#,
+",
         "prober",
     );
     assert_eq!(captures.len(), 1, "closure captures xs: {captures:?}");
@@ -586,7 +586,7 @@ incipit { }
 #[test]
 fn closure_local_used_only_inside_its_own_closure_is_not_a_capture() {
     let captures = function_captures(
-        r#"
+        r"
 functio outer() → () → numerus {
     redde () → numerus ∴ fac {
         varia numerus only ← 7
@@ -594,7 +594,7 @@ functio outer() → () → numerus {
     }
 }
 incipit { }
-"#,
+",
         "outer",
     );
     assert!(
@@ -606,7 +606,7 @@ incipit { }
 #[test]
 fn closure_local_captured_by_nested_closure_records_mutate_mode() {
     let captures = function_captures(
-        r#"
+        r"
 functio nest() → () → () → numerus {
     redde () → () → numerus ∴ fac {
         varia numerus inner ← 5
@@ -617,7 +617,7 @@ functio nest() → () → () → numerus {
     }
 }
 incipit { }
-"#,
+",
         "nest",
     );
     assert_eq!(
@@ -633,7 +633,7 @@ fn closure_match_arm_binder_is_not_a_capture() {
     // A binder introduced by a `discerne` arm belongs to the closure body,
     // so reading it is not a capture; only the enclosing local is.
     let captures = function_captures(
-        r#"
+        r"
 functio matcher() → (numerus ∪ textus) → numerus {
     sit numerus extra ← 2
     redde (numerus ∪ textus u) → numerus ∴ fac {
@@ -649,7 +649,7 @@ functio matcher() → (numerus ∪ textus) → numerus {
     }
 }
 incipit { }
-"#,
+",
         "matcher",
     );
     assert_eq!(
@@ -690,14 +690,14 @@ incipit { }
 #[test]
 fn entry_row_captures_stay_empty() {
     let fixture = crate::test_support::analyze_ok(
-        r#"
+        r"
 functio helper() → numerus {
     redde 1
 }
 incipit {
     sit _ f ← () → numerus ∴ helper()
 }
-"#,
+",
     );
     let hir = fixture.result.hir.as_ref().expect("typed HIR");
     let table = analyze_function_facts(hir, &fixture.result.types);
