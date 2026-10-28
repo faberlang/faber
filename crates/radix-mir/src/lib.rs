@@ -60,6 +60,8 @@ pub mod vector_expand;
 pub mod visit;
 
 #[cfg(test)]
+mod control_test;
+#[cfg(test)]
 mod device_copy_into_test;
 mod figura;
 #[cfg(test)]
