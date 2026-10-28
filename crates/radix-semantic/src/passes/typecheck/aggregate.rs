@@ -619,7 +619,11 @@ impl TypeChecker<'_> {
                 }
             };
             let ty = if spread {
-                if has_expected_element {
+                // Only a literal operand is built for the slot. Any other
+                // operand is an existing list: its elements are copied into
+                // this literal as stores, so the list itself is not assigned
+                // to `lista<expected>` (type arguments are invariant).
+                if has_expected_element && matches!(expr.kind, HirExpressionKind::Array(_)) {
                     let expected_array = self.types.array(expected_elem);
                     self.check_expr_with_expected(expr, Some(expected_array))
                 } else {
@@ -636,15 +640,25 @@ impl TypeChecker<'_> {
                 // Exact-bound literals intern as `BoundedArray`; spreading
                 // one extracts its element just like an unbounded lista
                 // (mirrors `check_verte_array_target`).
-                if let Type::Array(inner) = self.types.get(self.resolve_inferred_type(ty)) {
-                    *inner
-                } else if let Type::BoundedArray { element, .. } =
-                    self.types.get(self.resolve_inferred_type(ty))
+                let spread_element =
+                    if let Type::Array(inner) = self.types.get(self.resolve_inferred_type(ty)) {
+                        *inner
+                    } else if let Type::BoundedArray { element, .. } =
+                        self.types.get(self.resolve_inferred_type(ty))
+                    {
+                        *element
+                    } else {
+                        self.invalid_operand_types(ISSUE_ARRAY_SPREAD_REQUIRES_LISTA, expr.span);
+                        self.error_type
+                    };
+                // Each copied element is a store into the declared element type.
+                if has_expected_element
+                    && spread_element != self.error_type
+                    && self.types.is_assignable(spread_element, expected_elem)
                 {
-                    *element
+                    expected_elem
                 } else {
-                    self.invalid_operand_types(ISSUE_ARRAY_SPREAD_REQUIRES_LISTA, expr.span);
-                    self.error_type
+                    spread_element
                 }
             } else {
                 ty

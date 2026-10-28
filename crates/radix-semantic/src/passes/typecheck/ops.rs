@@ -1371,6 +1371,17 @@ impl TypeChecker<'_> {
         rhs: &mut HirExpression,
         expected: Option<TypeId>,
     ) -> TypeId {
+        let result = self.check_binary_unadopted(op, lhs, rhs, expected);
+        self.adopt_expected_lift_element(result, expected)
+    }
+
+    fn check_binary_unadopted(
+        &mut self,
+        op: HirBinOp,
+        lhs: &mut HirExpression,
+        rhs: &mut HirExpression,
+        expected: Option<TypeId>,
+    ) -> TypeId {
         match op {
             HirBinOp::Add => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);

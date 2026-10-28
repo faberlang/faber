@@ -991,7 +991,7 @@ fn optional_chain_no_longer_reports_lowering_stub() {
   varia lista<numerus> nums = [1, 2, 3]
 }
 
-functio id(textus x) → textus {
+functio id(textus x) → textus ∪ nihil {
   redde x
 }
 
@@ -1016,7 +1016,7 @@ fn rust_output_emits_option_map_and_and_then_for_optional_chain() {
   varia textus name = "Anon"
 }
 
-functio id(textus x) → textus {
+functio id(textus x) → textus ∪ nihil {
   redde x
 }
 

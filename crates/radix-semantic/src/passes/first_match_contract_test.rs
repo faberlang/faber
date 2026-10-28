@@ -174,7 +174,7 @@ fn filtrata_primus_composition_is_not_air_admitted_end_to_end() {
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio keep(fractus x) → bivalens {
+functio keep(f32 x) → bivalens {
     redde x ≻ 0.0
 }
 

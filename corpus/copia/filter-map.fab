@@ -29,7 +29,7 @@ main {
     let set<int> res ← [1, 2, 3, 4, 5]
     let set<int> magni ← res.filter(int x ∴ x ≻ 2)
     print sort via asc from magni
-    let set<int> paria ← res.map(int x ∴ x % 2)
+    let set<int> paria ← res.map(int x → int ∴ x % 2)
     print sort via asc from paria
     print magni.length()
 }

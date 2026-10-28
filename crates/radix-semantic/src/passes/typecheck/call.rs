@@ -2513,8 +2513,9 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// R1 asks for the same element type, not a widening one: the tensor
-    /// assignment relation is element-covariant, so an exact check follows it.
+    /// R1 asks for the same element type, not a widening one. Tensor element
+    /// types are invariant in assignment, and this check reads the two element
+    /// types directly so a copy never depends on that relation.
     fn require_exact_tensor_element(
         &mut self,
         value_ty: TypeId,
