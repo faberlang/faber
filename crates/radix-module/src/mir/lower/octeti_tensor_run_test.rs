@@ -146,3 +146,43 @@ fn real_file_range_loads_as_record_tensor_and_misaligned_range_is_catchable() {
     .expect("the failure is caught");
     assert_eq!(host.stdout_lines, ["caught"]);
 }
+
+/// A field store through a record tensor element reaches the tensor (need
+/// d43ea3d1): a record row decodes to a fresh value on every read, so the
+/// store writes the changed element back. The compound `↑`, a store inside a
+/// kernel-shaped loop and an untouched neighbour row all agree.
+const FIELD_WRITE_THROUGH: &str = r#"+++
+locale = "en"
++++
+
+class Cell {
+    mut i16 n
+    let list<i8, size 4> values
+}
+
+fn bump(mut tensor<Cell, [2]> cs) → void {
+    for range 0‥2 let i {
+        cs[[i]].n ← 9 + i
+    }
+}
+
+main {
+    let list<b8> raw ← [0x01, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x00, 0x05, 0x06, 0x07, 0x08]
+    mut tensor<Cell, [2]> cells ← raw ↦ tensor<Cell, [2]> via Le
+    print cells[[0]].n
+    bump(mut cells)
+    print cells[[0]].n
+    print cells[[1]].n
+    cells[[1]].n ↑
+    print cells[[1]].n
+    print cells[[1]].values[2]
+}
+"#;
+
+#[test]
+fn field_store_through_a_record_tensor_element_writes_back() {
+    let mut host = BufferHost::default();
+    run_source(&session(), "record-field-write.fab", FIELD_WRITE_THROUGH, &mut host)
+        .expect("a field store through a record tensor element runs");
+    assert_eq!(host.stdout_lines, ["1", "9", "10", "11", "7"]);
+}
