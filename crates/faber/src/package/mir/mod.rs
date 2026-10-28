@@ -385,8 +385,13 @@ pub struct DeviceRunReceipt {
     pub uploaded_bytes: u64,
     /// Bytes device-to-host across every read.
     pub downloaded_bytes: u64,
-    /// Host time spent encoding launches, in nanoseconds.
+    /// Host time spent encoding launches, in nanoseconds, excluding
+    /// `host_blocked_ns`.
     pub host_encode_ns: u64,
+    /// Host time blocked in commit-and-wait calls inside the launch-encode
+    /// window, in nanoseconds; GPU wait, not host work. A subset of
+    /// `runtime.blocking_wait_ns`.
+    pub host_blocked_ns: u64,
     /// How much of the launch time the runtime could measure.
     pub gpu_timing: DeviceGpuTiming,
 }
@@ -730,6 +735,7 @@ impl DeviceRunPhases {
             uploaded_bytes: dispatcher.transfers.uploaded_bytes,
             downloaded_bytes: dispatcher.transfers.downloaded_bytes,
             host_encode_ns: dispatcher.host_encode_ns,
+            host_blocked_ns: dispatcher.host_blocked_ns,
             gpu_timing,
         }
     }

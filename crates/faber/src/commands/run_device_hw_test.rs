@@ -122,6 +122,7 @@ fn fixed_multi_kernel_fixture_verifies_counts_on_the_fake_runtime() {
     assert!(device.module_compile_ns > 0);
     assert!(device.execution_ns > 0);
     assert!(device.host_encode_ns > 0);
+    assert!(device.host_blocked_ns.is_some());
 }
 
 #[test]
@@ -204,4 +205,5 @@ fn fixed_multi_kernel_fixture_reports_the_product_receipt_on_metal() {
     assert!(device.module_compile_ns > 0);
     assert!(device.execution_ns > 0);
     assert!(device.host_encode_ns > 0);
+    assert!(device.host_blocked_ns.is_some());
 }
