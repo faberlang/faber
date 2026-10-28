@@ -394,6 +394,28 @@ pub struct DeviceRunReceipt {
     pub host_blocked_ns: u64,
     /// How much of the launch time the runtime could measure.
     pub gpu_timing: DeviceGpuTiming,
+    /// The avoidable cross-partition syncs the spanned run's calls implied
+    /// (the planner audit's classification; the counters are in
+    /// `runtime.span`). Empty on an unspanned device.
+    pub span_avoidable: Vec<SpanAvoidable>,
+}
+
+/// One planner-audit classification: the entry's syncs of `kind` are
+/// avoidable for this reason. A dispatcher fact; the spanning runtime only
+/// counts the syncs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpanAvoidable {
+    /// The launched entry.
+    pub entry: String,
+    /// The sync kind the class describes (`own-write-gather`,
+    /// `partials-all-gather`, `first-broadcast`, `fault-combine`).
+    pub kind: &'static str,
+    /// The class: `unbounded-read`, `fusable-with-previous`, `first-fallback`
+    /// or `fault-combine-per-launch`.
+    pub avoidable: &'static str,
+    /// The class's data: the missing read set, the entry a reduction would
+    /// fuse into, or the fallback reason.
+    pub detail: Option<String>,
 }
 
 /// The result of an in-process device run: the discovery receipt line that was
@@ -676,6 +698,11 @@ fn open_device_session(
             DeviceImageBackend::MetalSpanned
         }
         DeviceClass::Backend(DeviceBackend::Metal) => DeviceImageBackend::Metal,
+        // A CUDA device spanning several partitions takes the lane-range
+        // image too (rule 18).
+        DeviceClass::Backend(DeviceBackend::Cuda) if receipt.partitions > 1 => {
+            DeviceImageBackend::CudaSpanned
+        }
         DeviceClass::Backend(DeviceBackend::Cuda) => DeviceImageBackend::Cuda,
         DeviceClass::Cpu => DeviceImageBackend::Cpu,
     };
@@ -741,6 +768,17 @@ impl DeviceRunPhases {
             host_encode_ns: self.dispatcher.host_encode_ns,
             host_blocked_ns: self.dispatcher.host_blocked_ns,
             gpu_timing,
+            span_avoidable: self
+                .dispatcher
+                .span_avoidable
+                .iter()
+                .map(|(entry, class)| SpanAvoidable {
+                    entry: entry.clone(),
+                    kind: class.kind().as_str(),
+                    avoidable: class.name(),
+                    detail: class.detail(),
+                })
+                .collect(),
         }
     }
 }
@@ -773,7 +811,11 @@ fn session_dispatcher(
         session, backend, ..
     } = admitted;
     let image_start = Instant::now();
-    let cuda_libdevice = if backend == super::device::DeviceImageBackend::Cuda {
+    let cuda = matches!(
+        backend,
+        super::device::DeviceImageBackend::Cuda | super::device::DeviceImageBackend::CudaSpanned
+    );
+    let cuda_libdevice = if cuda {
         super::resolve_cuda_libdevice(input).map_err(|diagnostic| vec![*diagnostic])?
     } else {
         None
@@ -880,16 +922,18 @@ fn session_dispatcher(
             })
             .collect(),
     );
-    dispatcher
-        .borrow_mut()
-        .set_scalars_by_buffer(backend == super::device::DeviceImageBackend::Cuda);
+    dispatcher.borrow_mut().set_scalars_by_buffer(cuda);
     dispatcher.borrow_mut().set_extents(extents);
     dispatcher
         .borrow_mut()
         .set_empty_reductions(empty_reductions);
     dispatcher.borrow_mut().set_write_maps(write_maps);
     dispatcher.borrow_mut().set_reduce_fusions(fusions);
-    if backend == super::device::DeviceImageBackend::MetalSpanned {
+    if matches!(
+        backend,
+        super::device::DeviceImageBackend::MetalSpanned
+            | super::device::DeviceImageBackend::CudaSpanned
+    ) {
         dispatcher.borrow_mut().set_span(lane_ranges);
     }
     dispatcher.borrow_mut().set_backward_functions(backward);

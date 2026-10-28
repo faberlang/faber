@@ -4175,3 +4175,9 @@ help = "ตอนนี้ '⇇' คัดลอกค่าด้านขว�
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking contract ต้องประกาศ `sink(T) → vacuum ⇥ E` และ `flush() → vacuum ⇥ E` อย่างละหนึ่งเมธอด โดยมี type parameter เดียว"
 help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink(T res) → vacuum ⇥ E` และ `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "เคอร์เนล `{kernel}` ทำงานแบบอนุกรมบนอุปกรณ์ {device}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "เคอร์เนล `{kernel}`: {kind} ข้าม {partitions} พาร์ติชันสามารถหลีกเลี่ยงได้: {avoidable} ({reason})"

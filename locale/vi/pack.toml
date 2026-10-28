@@ -4163,3 +4163,9 @@ help = "'⇇' hiện sao chép các giá trị ở vế phải vào vùng lưu t
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "hợp đồng sinking phải khai báo chính xác `sink(T) → vacuum ⇥ E` và `flush() → vacuum ⇥ E` với một tham số kiểu"
 help = "khai báo `{implendum} Sink<T>` với `{functio} sink(T res) → vacuum ⇥ E` và `{functio} flush() → vacuum ⇥ E`"
+
+[diagnostics.INFO001]
+message = "kernel `{kernel}` chạy tuần tự trên thiết bị {device}"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "kernel `{kernel}`: {kind} của nó trên {partitions} phân vùng có thể tránh được: {avoidable} ({reason})"

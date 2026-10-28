@@ -4175,3 +4175,9 @@ help = "'⇇' अब दाईं ओर के मानों को बाई
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "sinking contract में एक type parameter पर ठीक `sink(T) → vacuum ⇥ E` और `flush() → vacuum ⇥ E` घोषित होना चाहिए"
 help = "`{implendum} Sink<T>` में `{functio} sink(T res) → vacuum ⇥ E` और `{functio} flush() → vacuum ⇥ E` घोषित करें"
+
+[diagnostics.INFO001]
+message = "कर्नेल `{kernel}` {device} डिवाइस पर क्रमिक रूप से चलता है"
+
+[diagnostics.INFO001.issues.avoidable_sync]
+message = "कर्नेल `{kernel}`: {partitions} विभाजनों के पार इसका {kind} टाला जा सकता है: {avoidable} ({reason})"
