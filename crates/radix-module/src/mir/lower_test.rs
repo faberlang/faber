@@ -3627,7 +3627,8 @@ functio maybe(Persona ∪ nihil p) → textus ∪ nihil {
 }
 ",
     );
-    assert!(chain_dump.contains("option chain(_0, .sym#"));
+    // The receiver is captured into a temp before the guard.
+    assert!(chain_dump.contains("option chain(%0, .sym#"), "{chain_dump}");
 
     let non_null_dump = dump_source(
         r"
