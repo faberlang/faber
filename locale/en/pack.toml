@@ -3893,15 +3893,15 @@ help = "provide one constructor element per vector lane"
 
 [diagnostics.SEM013.issues.wrong_number_of_arguments]
 message = "wrong number of arguments"
-help = "adjust the number of arguments"
+help = "Match the number of values to the function or operation's parameters"
 
 [diagnostics.SEM013.issues.wrong_number_of_type_arguments]
 message = "wrong number of type arguments"
-help = "adjust the number of type arguments"
+help = "Match the explicit type arguments to the generic parameters declared by the function or type"
 
 [diagnostics.SEM013.issues.iuncta_construction_arity_mismatch]
 message = "iuncta construction has {actual} elements but type has {expected}"
-help = "match the element count to the iuncta type arity"
+help = "Make the number of values in the `{iuncta}` match its declared type"
 
 [diagnostics.SEM014]
 message = "missing type annotation"
@@ -3917,7 +3917,7 @@ help = "add an explicit type annotation"
 
 [diagnostics.SEM014.issues.cannot_infer_empty_list_element_type]
 message = "cannot infer the element type of an empty list"
-help = "declare a list<T> local initialized with empty, or ascribe [] to list<T> before converting it"
+help = "Give the empty list an element type, for example `{lista}<T> items ← []`"
 
 [diagnostics.SEM014.issues.cannot_infer_expression_type]
 message = "cannot infer expression type"
@@ -3953,15 +3953,15 @@ help = "ensure built-in frame types are registered before typechecking"
 
 [diagnostics.SEM014.issues.vacua_requires_declared_type]
 message = "empty requires an explicit declared type"
-help = "add a declared collection type for empty"
+help = "Declare the collection type, for example `{lista}<T> items ← {vacua}`"
 
 [diagnostics.SEM014.issues.bounded_capacity_unsolved]
 message = "bounded capacity could not be inferred"
-help = "write a concrete N ({ascii}<{magnitudo} 8>) or give the hole a bounded witness"
+help = "Write a concrete capacity, such as `{lista}<T, {magnitudo} 4>`, or use a literal or bounded value that supplies it"
 
 [diagnostics.SEM014.issues.marker_width_unsolved]
 message = "numeric width marker could not be inferred"
-help = "write a concrete marker (i32) or give the hole a same-family witness"
+help = "Write the marker explicitly, such as `{modulus}<u32>`, or provide a same-family value to infer the width"
 
 [diagnostics.SEM015]
 message = "invalid cast"
@@ -3977,7 +3977,7 @@ help = "remove the recovery arm from this range clamp"
 
 [diagnostics.SEM016.issues.intervallum_target_not_range]
 message = "range conversio target must be a range value"
-help = "convert to a range value"
+help = "Use a range expression as the target, such as `x ↦ 0‥10`"
 
 [diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
 message = "range clamp requires matching bound types"
@@ -3985,31 +3985,31 @@ help = "make the source and target bound element types match"
 
 [diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
 message = "sermo materialization target is not supported; expected {vacuum}, {valor}, scalar (int, float, bool, string, ascii, {lista}<b8>, instant), or {lista}<T>"
-help = "choose a supported sermo materialization target"
+help = "Use a supported channel target, such as `{valor}`, `{lista}<T>`, or a scalar type"
 
 [diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
 message = "range materialize requires matching {lista} element type"
-help = "make the source and target bound element types match"
+help = "Use a list element type that matches the range's bound type"
 
 [diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
 message = "range materialize requires matching tensor element type"
-help = "make the source and target bound element types match"
+help = "Use a tensor element type that matches the range's bound type"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_required]
 message = "vector materialization requires a {lista} literal source"
-help = "use a valid conversion or provide an inline default with `⊥`"
+help = "Use a list literal or a bounded list whose capacity matches the vector width"
 
 [diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
 message = "{lista} to vector conversio requires matching element types"
-help = "use a valid conversion or provide an inline default with `⊥`"
+help = "Make the list element type match the vector element type"
 
 [diagnostics.SEM016.issues.lista_to_vector_literal_width]
 message = "{lista} to vector conversio requires a literal vector width"
-help = "use a valid conversion or provide an inline default with `⊥`"
+help = "Use a literal vector width; a bounded list's capacity must match it"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "matrix materialization requires a lista source with matching element type"
-help = "materialize a lista of matrix cells with `↦ matrix<T, [R, C]>`; a literal source needs a literal shape"
+help = "Convert a flat list with matching elements to `matrix<T, [R, C]>`; literal sources need literal dimensions"
 
 [diagnostics.SEM016.issues.valor_to_regex_unsupported]
 message = "{valor} to regex conversion has no default pattern; use `{valor} ↦ string ↦ regex`"
@@ -4017,23 +4017,23 @@ help = "convert {valor} to string before converting to regex"
 
 [diagnostics.SEM016.issues.valor_to_cursor_boundary]
 message = "{valor} to cursor conversion crosses the eager/lazy boundary; materialize via `{valor} ↦ {lista}` then `{lista} ↦ cursor`"
-help = "materialize the cursor through {lista} before crossing the boundary"
+help = "Convert `{valor}` to `{lista}`, then convert the list to an iterator"
 
 [diagnostics.SEM016.issues.valor_to_promissum_boundary]
 message = "{valor} to promissum conversion crosses the async/sync boundary; {valor} is synchronous — wrap the producer in `@ futura`"
-help = "resolve or wrap the async value explicitly"
+help = "Make the producer an `{fiet}` function and use its returned promise"
 
 [diagnostics.SEM016.issues.promissum_to_valor_boundary]
 message = "promissum to {valor} conversion crosses the async/sync boundary; bind the resolved value with `↢` before boxing"
-help = "resolve or wrap the async value explicitly"
+help = "Bind the result with `↢`, then convert the resolved value to `{valor}`"
 
 [diagnostics.SEM016.issues.cursor_to_valor_boundary]
 message = "cursor to {valor} conversion crosses the eager/lazy boundary; materialize via `cursor ↦ {lista}` then `{lista} ↦ {valor}`"
-help = "materialize the cursor through {lista} before crossing the boundary"
+help = "Convert the iterator to `{lista}`, then convert that list to `{valor}`"
 
 [diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
 message = "conversion to {lista}<b8> from int, float, or bool is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
-help = "use chorda or explicit byte conversion helpers"
+help = "Choose a 16-, 32-, or 64-bit number and convert it to `{lista}<b8, {magnitudo} N>` with `{via} Le` or `{via} Be`; set N to its byte width"
 
 [diagnostics.SEM016.issues.bits_conversion_width_mismatch]
 message = "a bN converts only to a number or bits type of the same width"
@@ -4045,15 +4045,15 @@ help = "remove the via clause; a same-width bN conversion keeps the bit pattern 
 
 [diagnostics.SEM016.issues.bits_via_clause_required]
 message = "a bits list conversion that changes the bit width needs a via Le or via Be clause"
-help = "write the byte order with the conversion, such as lista<b8> ↦ lista<u16> via Le; a same-width conversion takes no clause"
+help = "Write the byte order with the conversion, such as `{lista}<b8> ↦ {lista}<u16> {via} Le`; a same-width conversion takes no clause"
 
 [diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
 message = "conversion from {lista}<b8> to int is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
-help = "use chorda or explicit byte conversion helpers"
+help = "Select a fixed-width target and an exact byte window, for example `bytes[0‥4] ↦ u32 {via} Le`"
 
 [diagnostics.SEM016.issues.octeti_endian_width_mismatch]
 message = "{lista}<b8> endian conversion requires a window whose length matches the target width (2, 4, or 8 bytes)"
-help = "use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64"
+help = "Use a window of 2, 4, or 8 bytes for a 16-, 32-, or 64-bit integer, or a 32- or 64-bit float"
 
 [diagnostics.SEM016.issues.ascii_format_hint_not_capacity]
 message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<{magnitudo} N> via Hex|Bin|Oct"
