@@ -1,7 +1,7 @@
 +++
 term = "air-struct-literal"
 kind = "annotation"
-grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "main_decl", "print_stmt", "expression"]
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "incipit_stmt", "nota_stmt", "expression"]
 category = "kernel"
 canonical = false
 summary = "An AIR-lane function returns a genus literal built from a parameter."

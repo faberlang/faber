@@ -1,6 +1,7 @@
 +++
 term = "modulus<u64>"
 kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "width_type_sugar", "bitwise_xor_expr", "shift_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
 category = "arithmetic"
 summary = "A wrapping<u64> store reduces a compound xor-and-multiply expression at the store."
 syntax = "(z ⊻ (z ⇒ 30)) * m"
