@@ -2273,11 +2273,11 @@ help = "remove the type arguments; string-template applications take value argum
 
 [diagnostics.SEM008.issues.top_level_initializer]
 message = "top-level variable declaration requires initializer"
-help = "fix the AST construct for lowering"
+help = "Give every module-level {fixum}, {sit}, or {varia} binding an initializer"
 
 [diagnostics.SEM008.issues.top_level_identifier_binding]
 message = "top-level variable requires an identifier binding"
-help = "fix the AST construct for lowering"
+help = "Use one name for a module-level binding; destructure inside {incipit} or a function"
 
 [diagnostics.SEM008.issues.top_level_statement_beside_entry]
 message = "executable top-level statement beside the entry point is not run"
@@ -2285,15 +2285,15 @@ help = "move it into the entry block, or remove the entry block to make the file
 
 [diagnostics.SEM008.issues.type_name_not_type]
 message = "type name does not refer to a type"
-help = "fix the AST construct for lowering"
+help = "Use a declared type name here, not a value or function name"
 
 [diagnostics.SEM008.issues.union_only_nihil]
 message = "union type cannot consist only of '{nihil}'"
-help = "fix the AST construct for lowering"
+help = "Add a non-{nihil} member, as in `string ∪ {nihil}`"
 
 [diagnostics.SEM008.issues.undefined_name]
 message = "undefined name in lowering"
-help = "fix the AST construct for lowering"
+help = "Declare or import the name before using it, and check its spelling"
 
 [diagnostics.SEM008.issues.unfillable_template_hole]
 message = "named template hole '{label}' is not filled"
@@ -2301,39 +2301,39 @@ help = "provide a labeled actual for each named hole, or call the template by po
 
 [diagnostics.SEM008.issues.unhandled_statement_kind]
 message = "unhandled statement kind in lowering"
-help = "fix the AST construct for lowering"
+help = "This statement could not be lowered; try a supported form or report the compiler error"
 
 [diagnostics.SEM008.issues.unknown_finge_variant]
 message = "unknown variant in finge expression"
-help = "fix the AST construct for lowering"
+help = "Use a declared variant name; qualify it with its union or module when needed"
 
 [diagnostics.SEM008.issues.unknown_interface]
 message = "unknown interface in gens declaration"
-help = "fix the AST construct for lowering"
+help = "Name a declared {implendum} in the type-parameter bound or {genus} {implet} list"
 
 [diagnostics.SEM008.issues.unknown_lowering_error]
 message = "HIR lowering failed"
-help = "fix the AST construct for lowering"
+help = "This expression could not be lowered; try a supported form or report the compiler error"
 
 [diagnostics.SEM008.issues.constructor_requires_extent_type]
 message = "construction applies to extent-bearing tensor types"
-help = "spell the shape, as in tf32[2, 3]"
+help = "Use an extent-bearing type such as `tf32[2, 3] {}`; write a scalar zero as a value"
 
 [diagnostics.SEM008.issues.constructor_extent_requires_term]
 message = "a constructor extent must name a size or a literal"
-help = "the `_` hole belongs in the annotation, not the constructor"
+help = "Use a literal or a {magnitudo} name here; reserve `_` for an inferred type annotation"
 
 [diagnostics.SEM008.issues.constructor_register_extent_requires_literal]
 message = "a vector width or matrix extent in a constructor must be a literal"
-help = "spell the width as a number, as in vector<f32, size 4>"
+help = "Use a literal vector width or matrix extent, as in `vf32[4] {}`"
 
 [diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
 message = "constructor extents admit literals, size names, and spelled size lifts"
-help = "affine extent terms in constructors are not supported yet"
+help = "Use a literal or a single {magnitudo} name for each extent, not an arithmetic expression"
 
 [diagnostics.SEM008.issues.unknown_namespace]
 message = "unknown namespace"
-help = "fix the AST construct for lowering"
+help = "Use a declared or imported module name before the dot in a qualified type"
 
 [diagnostics.SEM008.issues.unknown_template_hole_label]
 message = "unknown template hole label '{label}'"
@@ -2341,11 +2341,11 @@ help = "use a label declared as §{label} in the template"
 
 [diagnostics.SEM008.issues.unknown_type_lowering_error]
 message = "type lowering failed"
-help = "fix the AST construct for lowering"
+help = "This type could not be lowered; try a supported type form or report the compiler error"
 
 [diagnostics.SEM008.issues.unknown_tuple_element_label]
 message = "unknown tuple element label"
-help = "use a label declared on the iuncta annotation, or index by position"
+help = "Use a label declared in the {iuncta} type, or index the tuple by position"
 
 [diagnostics.SEM008.issues.annotation_extent_bare_value_name]
 message = "value name {name} cannot occupy an annotation extent"
@@ -2357,55 +2357,55 @@ help = "write `size w` to use the value as a size witness"
 
 [diagnostics.SEM008.issues.generic_call_size_shape_unsupported]
 message = "generic call size or shape argument is unsupported"
-help = "use a constant, a size name, or a value written `size w`"
+help = "Pass a literal or a size name, or a shape of natural numbers, after `{magnitudo}`"
 
 [diagnostics.SEM008.issues.unknown_type_name]
 message = "unknown type name"
-help = "fix the AST construct for lowering"
+help = "Use a declared or imported type name, and check its spelling"
 
 [diagnostics.SEM008.issues.vector_width_single_dim]
 message = "vector width must be a single dimension"
-help = "fix the AST construct for lowering"
+help = "Give the vector one width, as in `vector<f32, size 4>` or `vf32[4]`"
 
 [diagnostics.SEM008.issues.width_marker_params]
 message = "width marker cannot accept parameters"
-help = "fix the AST construct for lowering"
+help = "Write the width marker bare, for example `u32`, without type arguments"
 
 [diagnostics.SEM008.issues.modular_word_width_required]
 message = "{modulus} type requires exactly one unsigned integer width"
-help = "write the {modulus} type as {modulus}<u8>, {modulus}<u16>, {modulus}<u32>, or {modulus}<u64>"
+help = "Pass exactly one integer width, such as `{modulus}<i32>` or `{modulus}<u32>`"
 
 [diagnostics.SEM008.issues.modular_word_width_shape]
 message = "{modulus} width must be a bare unsigned width marker"
-help = "use a bare unsigned width marker such as u32"
+help = "Use one bare integer width marker, such as `i32` or `u32`, inside `{modulus}<...>`"
 
 [diagnostics.SEM008.issues.unsupported_modular_word_width]
 message = "{modulus} width must be an unsigned integer width"
-help = "use an unsigned modular word width: {modulus}<u8>, {modulus}<u16>, {modulus}<u32>, or {modulus}<u64>"
+help = "Use a supported integer width such as `i32` or `u32` for `{modulus}`"
 
 [diagnostics.SEM008.issues.modular_word_unsigned_width_required]
 message = "{modulus} width cannot be a float width"
-help = "use an unsigned integer width marker such as u32"
+help = "Use an integer width such as `i32` or `u32`; floating-point widths are not modular words"
 
 [diagnostics.SEM008.issues.unsupported_saturating_word_width]
 message = "{saturatus} width must be an integer width"
-help = "use an integer width for {saturatus}: i8, i16, i32, i64, u8, u16, u32, or u64"
+help = "Use an integer width such as `i32` or a supported float width such as `f32` for {saturatus}"
 
 [diagnostics.SEM008.issues.unsupported_trapping_word_width]
 message = "{exactus} width must be an integer width or d64"
-help = "use an integer width or d64 for {exactus}: i8, i16, i32, i64, u8, u16, u32, u64, or d64"
+help = "Use an integer, decimal, or supported float width such as `i32`, `d64`, or `f32` for {exactus}"
 
 [diagnostics.SEM008.issues.itera_binder_pattern_unsupported]
 message = "iteration binder pattern is not supported"
-help = "bind a plain name"
+help = "Use a plain name for each range or lockstep source; destructuring works in a single-source loop"
 
 [diagnostics.SEM008.issues.itera_filum_requires_single_source]
 message = "filum iteration requires a single source"
-help = "iterate one filum source"
+help = "Use {filum} with a single-source loop"
 
 [diagnostics.SEM008.issues.itera_lockstep_binder_pattern_unsupported]
 message = "lockstep binder pattern is not supported"
-help = "bind plain names"
+help = "Bind one plain name for each lockstep source"
 
 [diagnostics.SEM008.issues.empty_intersection_type]
 message = "intersection type has no operands"
@@ -2413,7 +2413,7 @@ help = "list at least one operand type"
 
 [diagnostics.SEM008.issues.intersection_primitive_operand]
 message = "intersection operand is a primitive type"
-help = "intersect only genus or interface types"
+help = "Use nominal types such as {genus}, {implendum}, or {ordo} as intersection operands, not primitive types"
 
 [diagnostics.SEM008.issues.scalar_access_marker]
 message = "scalar type takes no access marker"
@@ -2421,7 +2421,7 @@ help = "remove the access marker"
 
 [diagnostics.SEM008.issues.bounded_capacity_not_natural]
 message = "bounded capacity is not a natural number"
-help = "use a natural number or a size name"
+help = "Use a natural number or a declared {magnitudo} parameter for the capacity"
 
 [diagnostics.SEM008.issues.qualified_type_middle_not_namespace]
 message = "qualified type path segment is not a namespace"
