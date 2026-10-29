@@ -530,6 +530,41 @@ fn canonical_revalidation_rejects_swapped_same_typed_sites() {
 }
 
 #[test]
+fn optional_union_over_function_alias_keeps_the_alias_spelling() {
+    // This uses the neighboring optional-call-flatten exemplar's English
+    // function-alias and local-binding syntax. Reconciliation may flatten the
+    // alias witness to its function payload, but the authored `Op ∪ none`
+    // stays named.
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("en pack should load");
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack.clone()),
+    );
+    let emit = |source: &str| {
+        let result = reemit_faber(&session, &pack, "optional-alias.fab", source);
+        assert!(
+            result.success(),
+            "optional function alias should re-emit: {:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+                .collect::<Vec<_>>()
+        );
+        result.output.expect("successful output").code
+    };
+    let source = "type Op = (int) → int ∪ none\n\nfn maybe(int x) → int ∪ none {\n    return null\n}\n\nmain {\n    let Op ∪ none f ← maybe\n}\n";
+    let first = emit(source);
+    assert!(
+        first.contains("let Op ∪ none f"),
+        "optional function alias must retain its authored spelling:\n{first}"
+    );
+    assert_eq!(emit(&first), first, "optional alias output must be idempotent");
+}
+
+#[test]
 fn canonical_revalidation_rejects_analysis_errors() {
     let latin = crate::locale::latin_locale_pack();
     let session = Session::new(
