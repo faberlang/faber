@@ -1,0 +1,27 @@
++++
+term = "bounded list append at capacity"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "genus_decl", "genus_member", "genus_field_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "array_literal", "assignment", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "Appending through a class field to a bounded list already at capacity aborts."
+syntax = "holder.row.append(item)"
+related = ["lista", "append", "genus"]
+locale = "en"
++++
+# =============================================================================
+# bounded list append at capacity — a bounded field traps on overflow
+# =============================================================================
+# A bounded list stored in a mutable field keeps its capacity when reached
+# through that field projection. The append aborts before the next statement.
+
+class Holder {
+    mut list<int, size 1> row
+}
+
+main {
+    mut Holder holder ← Holder { row = [1] }
+    print "before"
+    holder.row.append(2)
+    print "after"
+}

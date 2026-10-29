@@ -1,0 +1,23 @@
++++
+term = "bounded list append at capacity"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "array_literal", "assignment", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "Appending to a bounded list already at capacity aborts with a capacity trap."
+syntax = "xs.append(item)"
+related = ["lista", "append"]
+locale = "en"
++++
+# =============================================================================
+# bounded list append at capacity — an indexed bounded row traps on overflow
+# =============================================================================
+# A list nested in a growable list retains its own bound when projected by
+# index. Appending when that row is full is a run-time capacity trap.
+
+main {
+    mut list<list<int, size 1>> rows ← [[1]]
+    print "before"
+    rows[0].append(2)
+    print "after"
+}
