@@ -657,6 +657,140 @@ fn zero_argument_non_u8_array_form_fails_closed() {
     }
 }
 
+/// Artifact with one declared local whose finalized type is `witness(element)`
+/// and whose authored form is an `ImportedAlias` head spelled `decl.Quad`.
+fn imported_alias_artifact(
+    witness: impl FnOnce(&mut TypeTable, radix_types::TypeId) -> radix_types::TypeId,
+    path: Vec<Symbol>,
+    args: Vec<radix_hir::HirTypeFormArg>,
+) -> crate::artifact::HirArtifact {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let element_ty = types.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16));
+    let alias_ty = witness(&mut types, element_ty);
+    let local_def = DefId(USER_DEF_ID_BASE + 20);
+    artifact.interner = vec![
+        "main".to_owned(),
+        "test".to_owned(),
+        "b".to_owned(),
+        "decl".to_owned(),
+        "Quad".to_owned(),
+    ];
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Local(radix_hir::HirLocal {
+                def_id: local_def,
+                name: Symbol(2),
+                ty: Some(alias_ty),
+                init: None,
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: None,
+                size_decl: false,
+                size_static: false,
+            }),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    artifact.types = types.snapshot();
+    artifact.presentation.authored_types = vec![radix_hir::HirAuthoredTypeUse {
+        site: radix_hir::HirTypeSite {
+            owner: radix_hir::HirOwnerRef::Def(local_def),
+            slot: radix_hir::HirTypeSlot::Declared,
+        },
+        form: radix_hir::HirTypeForm {
+            ty: alias_ty,
+            head: radix_hir::HirTypeFormHead::ImportedAlias { path },
+            args,
+            label: None,
+        },
+    }];
+    artifact
+}
+
+#[test]
+fn imported_alias_head_over_collection_bodies_round_trips() {
+    // An imported alias reaches the importer as its resolved body, so the
+    // head names the authored path and the witness is the whole presentation,
+    // whatever shape the body has (a sized list is the case the corpus hit).
+    let bodies: [fn(&mut TypeTable, radix_types::TypeId) -> radix_types::TypeId; 3] = [
+        |types, element| types.array(element),
+        |types, element| {
+            let capacity = types.intern_index(radix_types::IndexExpr::Literal(4));
+            types.bounded_array(element, capacity)
+        },
+        |types, element| types.ranged_array(element, 1, Some(8)),
+    ];
+    for body in bodies {
+        let artifact = imported_alias_artifact(body, vec![Symbol(3), Symbol(4)], Vec::new());
+        let decoded =
+            crate::decode(&crate::encode(&artifact).expect("encode imported-alias artifact"))
+                .expect("an imported alias head over a collection body must validate");
+        let authored = &decoded.presentation.authored_types[0].form;
+        assert_eq!(
+            authored.head,
+            radix_hir::HirTypeFormHead::ImportedAlias {
+                path: vec![Symbol(3), Symbol(4)]
+            }
+        );
+    }
+}
+
+#[test]
+fn imported_alias_head_fails_closed_on_arguments_and_path() {
+    let array = |types: &mut TypeTable, element| types.array(element);
+    let child = |element| {
+        radix_hir::HirTypeFormArg::Type(Box::new(radix_hir::HirTypeForm {
+            ty: element,
+            head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+            args: Vec::new(),
+            label: None,
+        }))
+    };
+    let with_arguments = imported_alias_artifact(
+        array,
+        vec![Symbol(3), Symbol(4)],
+        vec![child(radix_types::TypeId(0))],
+    );
+    let err = crate::decode(&crate::encode(&with_arguments).expect("encode"))
+        .expect_err("an imported alias head carries no authored arguments");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "imported_alias_arguments",
+                ..
+            }
+        ),
+        "{err:?}"
+    );
+
+    let empty_path = imported_alias_artifact(array, Vec::new(), Vec::new());
+    let err = crate::decode(&crate::encode(&empty_path).expect("encode"))
+        .expect_err("an imported alias head names a path");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::InvalidPresentation {
+                issue: "empty_imported_alias_path",
+                ..
+            }
+        ),
+        "{err:?}"
+    );
+
+    let dangling = imported_alias_artifact(array, vec![Symbol(99)], Vec::new());
+    crate::decode(&crate::encode(&dangling).expect("encode"))
+        .expect_err("an imported alias path symbol must exist in the interner");
+}
+
 /// Artifact with one declared local whose finalized type is the bounded byte
 /// buffer `list<b8, 8>` ([`Type::BoundedOcteti`]); the authored form is a
 /// semantic head at `level` carrying the `args` built from the interned
