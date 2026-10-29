@@ -149,7 +149,7 @@ fn octeti_tensor_runtime_extent_without_shape_operand_is_internal() {
     let err = convert_extents(vec![0_u8; 24], F32, runtime_extents(), None, "Le", None)
         .expect_err("no shape operand");
     assert_eq!(err.code, "runner_internal");
-    assert_eq!(err.issue, "octeti_tensor_shape_operand_missing");
+    assert_eq!(err.issue, "list_b8_to_tensor_shape_operand_missing");
 }
 
 #[test]
@@ -476,10 +476,10 @@ mod record {
     const ROW: usize = 34;
     const HEAD: Symbol = Symbol(100_000);
     const SLOTS: Symbol = Symbol(99_999);
-    const ISSUE_OVERFLOW: &str = "runner_octeti_record_tensor_overflow";
-    const ISSUE_MISALIGNED: &str = "runner_octeti_record_tensor_misaligned";
-    const ISSUE_TRUNCATED: &str = "runner_octeti_record_tensor_truncated";
-    const ISSUE_TRAILING: &str = "runner_octeti_record_tensor_trailing_bytes";
+    const ISSUE_OVERFLOW: &str = "runner_list_b8_to_tensor_record_overflow";
+    const ISSUE_MISALIGNED: &str = "runner_list_b8_to_tensor_record_misaligned";
+    const ISSUE_TRUNCATED: &str = "runner_list_b8_to_tensor_record_truncated";
+    const ISSUE_TRAILING: &str = "runner_list_b8_to_tensor_record_trailing_bytes";
 
     /// The IEEE half bits of the small multiples of 0.5 the fixtures use.
     fn half_bits(value: f32) -> u16 {
@@ -759,7 +759,7 @@ mod record {
     #[test]
     fn record_tensor_is_little_endian_only() {
         let err = load(1, rows(1), "Be", None).expect_err("Be");
-        assert_eq!(err.issue, "octeti_tensor_record_big_endian");
+        assert_eq!(err.issue, "list_b8_to_tensor_record_big_endian");
     }
 
     #[test]
@@ -778,7 +778,7 @@ mod record {
             None,
         )
         .expect_err("f64 field has no device layout");
-        assert_eq!(err.issue, "octeti_tensor_record_layout_refused");
+        assert_eq!(err.issue, "list_b8_to_tensor_record_layout_refused");
     }
 
     /// A bounded range of a real file loads as record rows: the tensor's host

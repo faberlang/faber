@@ -2844,7 +2844,7 @@ help = "استخدم chorda أو explicit byte conversion helpers"
 message = "conversion من {lista}<b8> إلى {fractus} غير محدد (IEEE width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
 help = "استخدم chorda أو explicit byte conversion helpers"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
 message = "يقرأ tensor السجلات بياناته وفق تخطيط السجل little-endian؛ اكتب `via Le` وليس `via Be`"
 help = "اكتب {lista}<b8> ↦ tensor<Record, [n]> via Le؛ لعنصر السجل ترتيب بايتات واحد يحدده تخطيطه"
 

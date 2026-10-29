@@ -64,12 +64,12 @@ const ISSUE_TEXTUS_LITERAL_TOO_LONG: &str = "textus_literal_too_long";
 const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
-const ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
-const ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED: &str = "octeti_to_tensor_element_unsupported";
-const ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH: &str = "octeti_to_tensor_length_mismatch";
-const ISSUE_OCTETI_TO_TENSOR_RECORD_BIG_ENDIAN: &str = "octeti_to_tensor_record_big_endian";
-const ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED: &str = "tensor_to_octeti_unspecified";
-const ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED: &str = "tensor_to_octeti_element_unsupported";
+const ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED: &str = "list_b8_to_tensor_unspecified";
+const ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED: &str = "list_b8_to_tensor_element_unsupported";
+const ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH: &str = "list_b8_to_tensor_length_mismatch";
+const ISSUE_OCTETI_TO_TENSOR_RECORD_BIG_ENDIAN: &str = "list_b8_to_tensor_record_big_endian";
+const ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED: &str = "tensor_to_list_b8_unspecified";
+const ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED: &str = "tensor_to_list_b8_element_unsupported";
 // decimal-widths D2 (wildcard audit): the conversio `via` hints are
 // integer-family machinery. Radix text parse (Hex/Bin/Oct), endian unpack
 // (Be/Le) all reject decimal targets/sources with named teaching issues

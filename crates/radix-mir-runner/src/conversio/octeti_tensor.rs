@@ -34,17 +34,17 @@ use std::sync::Arc;
 
 /// Stable issue for a target with run-time extents that arrived without its
 /// shape operand: lowering always supplies one, so this is an invariant break.
-const SHAPE_OPERAND_MISSING_ISSUE: &str = "octeti_tensor_shape_operand_missing";
+const SHAPE_OPERAND_MISSING_ISSUE: &str = "list_b8_to_tensor_shape_operand_missing";
 
 /// Stable issues of the record-element row. The first four are recoverable
 /// conversion failures (`⊥`, `fac/cape`, `⇥`); the last two are invariant
 /// breaks the checker and the layout law make unreachable from checked source.
-pub(crate) const RECORD_OVERFLOW_ISSUE: &str = "runner_octeti_record_tensor_overflow";
-pub(crate) const RECORD_MISALIGNED_ISSUE: &str = "runner_octeti_record_tensor_misaligned";
-pub(crate) const RECORD_TRUNCATED_ISSUE: &str = "runner_octeti_record_tensor_truncated";
-pub(crate) const RECORD_TRAILING_ISSUE: &str = "runner_octeti_record_tensor_trailing_bytes";
-const RECORD_LAYOUT_REFUSED_ISSUE: &str = "octeti_tensor_record_layout_refused";
-const RECORD_BIG_ENDIAN_ISSUE: &str = "octeti_tensor_record_big_endian";
+pub(crate) const RECORD_OVERFLOW_ISSUE: &str = "runner_list_b8_to_tensor_record_overflow";
+pub(crate) const RECORD_MISALIGNED_ISSUE: &str = "runner_list_b8_to_tensor_record_misaligned";
+pub(crate) const RECORD_TRUNCATED_ISSUE: &str = "runner_list_b8_to_tensor_record_truncated";
+pub(crate) const RECORD_TRAILING_ISSUE: &str = "runner_list_b8_to_tensor_record_trailing_bytes";
+const RECORD_LAYOUT_REFUSED_ISSUE: &str = "list_b8_to_tensor_record_layout_refused";
+const RECORD_BIG_ENDIAN_ISSUE: &str = "list_b8_to_tensor_record_big_endian";
 
 /// Elements that decode into boxed `Values` (no `DenseKind`).
 #[derive(Clone, Copy)]
@@ -103,7 +103,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     /// extents; a literal target reads its dims from the type instead.
     ///
     /// A wrong byte length is the recoverable `runner_conversion` failure with
-    /// issue `runner_octeti_tensor_length_mismatch` (`⊥`, `fac/cape`, `⇥`
+    /// issue `runner_list_b8_to_tensor_length_mismatch` (`⊥`, `fac/cape`, `⇥`
     /// route through [`Runner::recover_or_fail`] exactly like the scalar row).
     pub(crate) fn convert_octeti_to_tensor(
         &mut self,
