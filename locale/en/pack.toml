@@ -3729,15 +3729,15 @@ help = "index {lista} values with int"
 
 [diagnostics.SEM011.issues.indexing_requires_array_or_map]
 message = "indexing requires array or map"
-help = "index only {lista}, map, tensor, string, or ignotum values"
+help = "index only {lista}, map, tensor, string, or {ignotum} values"
 
 [diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
 message = "tensor index vector requires {lista} of integer elements"
-help = "use {lista} of supported integer index elements"
+help = "pass a {lista} whose elements are integers"
 
 [diagnostics.SEM011.issues.tensor_scalar_index_rank]
 message = "tensor scalar index requires rank-1; use a {lista}<integer> for rank-N"
-help = "use a scalar index only on rank-1 tensors"
+help = "for rank-N tensors, pass a {lista} of integer coordinates, such as grid[[row, column]]"
 
 [diagnostics.SEM011.issues.tensor_bracket_index_integer_or_lista]
 message = "tensor bracket index requires an integer or {lista}<integer>"
@@ -3757,11 +3757,11 @@ help = "use numeric tensor or sparse element types"
 
 [diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
 message = "{op} on a {kind} is not admitted yet"
-help = "compare with an ordering or exact comparison, or compare the elements in tooling"
+help = "use exact comparisons such as ≅ or ≇; approximate tensor comparisons are not supported yet"
 
 [diagnostics.SEM011.issues.tensor_lift_decimal_element_unsupported]
 message = "elementwise operators on tensors do not support decimal elements yet"
-help = "convert the elements to a float or integer type with a conversion first"
+help = "convert the tensor with ↦ to a supported float or integer element type first"
 
 [diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
 message = "matrix arithmetic requires numeric element types"
@@ -3769,35 +3769,35 @@ help = "use numeric matrix element types"
 
 [diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
 message = "tensor receiver method structa is retired; use the data ↦ tensor conversion"
-help = "write data ↦ tensor<T, figura>"
+help = "convert with `data ↦ tensor<f32, [2, 2]>`, giving the complete tensor type"
 
 [diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
 message = "tensor receiver creata does not accept type arguments; use tensor.creata<CompleteTensorType>(fill)"
-help = "call tensor.creata<CompleteTensorType>(fill) for static construction"
+help = "call `tensor.creata<tf32[2, 2]>(fill)` for static construction"
 
 [diagnostics.SEM011.issues.tensor_strue_retired]
 message = "tensor receiver method from_flat is retired; use the ↦ conversion"
-help = "write flat ↦ tensor<T, figura>"
+help = "write `flat ↦ tensor<f32, [2, 2]>` to convert flat data to a tensor"
 
 [diagnostics.SEM011.issues.tensor_crea_retired]
 message = "tensor receiver method create is retired; use the type-expression constructor"
-help = "bind the constructor first: let tf32[2, 2] a ← the type tf32[2, 2] followed by empty braces"
+help = "build a typed zero at its declaration, for example: `{sit} tf32[2, 2] a ← tf32[2, 2] {{}`"
 
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)"
-help = "use tensor.structa<CompleteTensorType>(data)"
+help = "use `tensor.structa<tf32[2, 2]>(data)`"
 
 [diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
 message = "tensor.creata requires a complete tensor type argument; use tensor.creata<CompleteTensorType>(fill)"
-help = "provide a complete tensor type argument"
+help = "pass a complete type, such as `tensor.creata<tf32[2]>(fill)`"
 
 [diagnostics.SEM011.issues.tensor_formata_complete_type_arg_required]
 message = "formata requires a complete tensor type argument; use grid.formata<CompleteTensorType>()"
-help = "provide a complete tensor type argument"
+help = "pass a complete type, such as `grid.formata<tf32[2, 3]>()` for a six-element tensor"
 
 [diagnostics.SEM011.issues.tensor_formata_forbids_value_args]
 message = "formata does not accept value arguments; use grid.forma(shape) for runtime reshape"
-help = "use grid.forma(shape) for runtime reshape"
+help = "use `grid.{forma}(shape)` for a runtime reshape"
 
 [diagnostics.SEM011.issues.tensor_type_arg_incomplete]
 message = "tensor type argument must be a complete tensor type such as tf32[2, 2] or tensor<int, [4]>"
@@ -3805,19 +3805,19 @@ help = "include both element type and shape in the tensor type argument"
 
 [diagnostics.SEM011.issues.tensor_shift_nullable_source_unsupported]
 message = "shift requires non-nullable tensor elements and cannot shift an unresolved edge view"
-help = "resolve pending edges with {limes}<Policy>() or tensor coalescing before another shift"
+help = "before another shift, resolve an edge view with `{limes}<{clampa}>()` or coalesce nullable elements with `{vel}`"
 
 [diagnostics.SEM011.issues.tensor_edge_view_requires_resolution]
 message = "an unresolved shifted tensor can only be consumed by {limes} or tensor coalescing"
-help = "resolve the edge view with {limes}<Policy>() or coalesce its optional edge cells"
+help = "resolve it with `{limes}<{clampa}>()` or coalesce nullable elements with `{vel}`"
 
 [diagnostics.SEM011.issues.tensor_limes_requires_shifted_view]
 message = "{limes} requires an unresolved shifted tensor view"
-help = "call shift(offsets) before {limes}<Policy>()"
+help = "call `source.{disloco}([1]).{limes}<{clampa}>()`"
 
 [diagnostics.SEM011.issues.tensor_limes_policy_invalid]
 message = "{limes} needs a builtin edge policy or a valid zero-field policy class"
-help = "provide remap(vector<int, size R>) -> vector<int, size R> and an optional transform(vector<int, size R>, T) -> T method"
+help = "use a built-in policy such as `{clampa}`, `{involuta}`, or `{reflexa}`, or define a zero-field policy class with a `remap` method and optional `transform`"
 
 [diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]
 message = "tensor shift offsets must match the tensor rank"
@@ -3841,7 +3841,7 @@ help = "'⇜' delivers an item to a 'Sink<T>' value; tensors, vectors and matric
 
 [diagnostics.SEM011.issues.failable_call_conversion_absent]
 message = "failable call has no conversion to the error type"
-help = "add a conversion from the failure type to the declared error type"
+help = "declare a direct `@ {conversio}` from the failure type to the declared error type"
 
 [diagnostics.SEM011.issues.tensor_bracket_index_decimal_rejected]
 message = "decimal values are not valid tensor bracket indices"
@@ -3849,11 +3849,11 @@ help = "index the tensor with an integer"
 
 [diagnostics.SEM011.issues.tensor_media_decimal_rejected]
 message = "decimal values are not valid tensor media operands"
-help = "use a non-decimal numeric type"
+help = "use `{media}()` with a tensor whose elements are integers or floats"
 
 [diagnostics.SEM011.issues.tensor_shape_hole_requires_shape_argument]
 message = "a shape hole requires a shape argument"
-help = "provide the shape in the constructor call"
+help = "use `_` only as an inferred extent in a tensor shape argument; write actual list elements and indices"
 
 [diagnostics.SEM012]
 message = "not callable"
@@ -3865,7 +3865,7 @@ help = "call a function, closure, or callable value"
 
 [diagnostics.SEM012.issues.transfer_sink_retired]
 message = "'sink ⇇ value' (a callable on the left) was retired"
-help = "'⇇' now copies the values of its right side into the existing tensor storage on its left; call the function directly instead"
+help = "call the function as `function(value)`; for output use `{nota} value` or send to a sink with `sink ⇜ value`"
 
 [diagnostics.SEM013]
 message = "wrong arity"
