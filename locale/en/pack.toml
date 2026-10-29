@@ -2773,11 +2773,11 @@ help = "declare {method} on {genus} with the signature {contract} gives it"
 
 [diagnostics.SEM010.issues.implet_requires_implendum]
 message = "{implet} must name an {implendum} (a contract)"
-help = "name an {implendum} declaration after {implet}"
+help = "Declare the contract with {implendum}, then list its name in the {implet} clause"
 
 [diagnostics.SEM010.issues.initializer_annotation_mismatch]
 message = "initializer does not match annotation"
-help = "make the expression type match the expected type"
+help = "change the annotation or initializer so the value has the declared type; use `↦` for an intentional conversion"
 
 [diagnostics.SEM010.issues.optional_into_plain_cell]
 message = "{found} may be none and cannot be stored in a cell of type {expected}"
@@ -2785,7 +2785,7 @@ help = "give a default with `coalesce`, narrow with `if x is not none` first, or
 
 [diagnostics.SEM010.issues.float_constant_inexact]
 message = "float constant is not exactly representable"
-help = "write a float literal, or a constant the float type holds exactly"
+help = "use a value exactly representable by the target {fractus}, or convert explicitly with `↦` if rounding is intended"
 
 [diagnostics.SEM010.issues.float_constant_out_of_range]
 message = "float constant is outside the finite range of the float type"
@@ -2797,7 +2797,7 @@ help = "write a shift count of zero or more"
 
 [diagnostics.SEM010.issues.potentia_exponent_negative]
 message = "an integer power cannot have a negative exponent"
-help = "write an exponent of zero or more, or use a `fractus` base for a fractional power"
+help = "Use a {fractus} base when you need a negative exponent; integer powers require an exponent of zero or more"
 
 [diagnostics.SEM010.issues.integer_quotient_to_float_requires_true_division]
 message = "integer quotient cannot be a float implicitly"
@@ -2805,11 +2805,11 @@ help = "divide with `÷` to get a float quotient, or convert an operand explicit
 
 [diagnostics.SEM010.issues.store_constant_out_of_range]
 message = "constant {value} does not fit {slot}"
-help = "write a value the slot holds"
+help = "choose a wider slot or a value that fits; if reduction or clamping is intended, use a `{modulus}<W>` or `{saturatus}<W>` slot"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
 message = "integer literal is outside the numerus range"
-help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
+help = "For a value above {numerus} but no greater than `u64`, use a `u64` slot; for larger integers, use `inf`"
 
 [diagnostics.SEM010.issues.bits_literal_out_of_range]
 message = "literal does not fit in the bits width"
@@ -2821,39 +2821,39 @@ help = "convert the integer explicitly with `↦`"
 
 [diagnostics.SEM010.issues.incompatible_return_types]
 message = "incompatible return types"
-help = "make the expression type match the expected type"
+help = "make every returned value have the same type, converting values explicitly with `↦` where needed"
 
 [diagnostics.SEM010.issues.intervallum_bound_required]
 message = "range bound type must be int or instant"
-help = "make the expression type match the expected type"
+help = "Use {numerus} or {instans} bounds; sized {numerus} and {instans} types also work"
 
 [diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
 message = "range clamp operand type mismatch"
-help = "make the expression type match the expected type"
+help = "Use the same numeric type for the value and both range bounds; convert the value with `↦` first if needed"
 
 [diagnostics.SEM010.issues.intra_requires_intervallum_range]
 message = "intra requires a range"
-help = "make the expression type match the expected type"
+help = "Use `∈` or `∉` with a range on the right, such as `value ∈ 0‥10`"
 
 [diagnostics.SEM010.issues.incompatible_tensor_index]
 message = "index shapes are incompatible"
-help = "make the expression type match the expected type"
+help = "Match the tensor ranks and their corresponding dimensions"
 
 [diagnostics.SEM010.issues.invalid_cast]
 message = "invalid cast"
-help = "make the expression type match the expected type"
+help = "Use `↦` for a runtime conversion; `∷` only asserts a type the expression already has"
 
 [diagnostics.SEM010.issues.itera_ab_source_requires_range]
 message = "{itera} ab source must be a range expression"
-help = "make the expression type match the expected type"
+help = "Use {itera} {ab} start‥end for a range; use {itera} {ex} source to iterate a collection"
 
 [diagnostics.SEM010.issues.itera_apud_arity_mismatch]
 message = "{apud} coordinate count must equal the iterable rank"
-help = "make the expression type match the expected type"
+help = "Give {apud} one name for each index component of the source, such as one per tensor axis or two for a matrix"
 
 [diagnostics.SEM010.issues.itera_apud_requires_ex]
 message = "{apud} coordinates require {ex} iteration"
-help = "make the expression type match the expected type"
+help = "Use {itera} {ex} source {apud} [index] to bind coordinates while iterating values"
 
 [diagnostics.SEM010.issues.itera_apud_requires_indexed_iterable]
 message = "{apud} requires an indexed iterable: {lista}, {tabula}, tensor, or matrix"
@@ -2861,63 +2861,63 @@ help = "iterate this source without {apud}; its values have no index to name"
 
 [diagnostics.SEM010.issues.tabula_key_not_hashable]
 message = "{tabula} key type is not hashable"
-help = "use a key without {fractus} values or mutable collections: {textus}, {numerus}, {iuncta}, or a {genus} of those"
+help = "use hashable keys such as {textus}, {numerus}, or {iuncta} with hashable parts; avoid {fractus}, {json}, regexes, and mutable collections"
 
 [diagnostics.SEM010.issues.copia_element_not_hashable]
 message = "{copia} element type is not hashable"
-help = "use an element without {fractus} values or mutable collections: {textus}, {numerus}, {iuncta}, or a {genus} of those"
+help = "use hashable elements such as {textus}, {numerus}, or {iuncta} with hashable parts; avoid {fractus}, {json}, regexes, and mutable collections"
 
 [diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
 message = "{apud} requires a tensor or matrix iterable"
-help = "make the expression type match the expected type"
+help = "Remove {apud} or use a tensor or matrix; coordinate binding needs a shaped source"
 
 [diagnostics.SEM010.issues.itera_source_not_iterable]
 message = "{itera} source is not iterable"
-help = "expose a method that returns a cursor and iterate that"
+help = "Add a method that returns a cursor, then use {itera} {ex} cursor to iterate it"
 
 [diagnostics.SEM010.issues.json_map_key_must_be_textus]
 message = "JSON map key must be string"
-help = "make the expression type match the expected type"
+help = "Use {textus} as the map key type for a JSON object"
 
 [diagnostics.SEM010.issues.json_nested_value_requires_valor]
 message = "nested JSON value requires map value type {valor}"
-help = "make the expression type match the expected type"
+help = "Use {valor} as the map value type when entries contain nested objects or arrays"
 
 [diagnostics.SEM010.issues.json_value_type_mismatch]
 message = "JSON value does not match map value type"
-help = "make the expression type match the expected type"
+help = "Choose a map value type that accepts each JSON value, such as {valor} for mixed values"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_call_arg]
 message = "live {tuus} cursor values cannot be passed as function arguments yet"
-help = "make the expression type match the expected type"
+help = "Keep the cursor local and consume it with {itera} {ex}; pass yielded frames to the function instead"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_return]
 message = "live {tuus} cursor values cannot be returned from functions yet"
-help = "make the expression type match the expected type"
+help = "Consume the cursor inside the function and return data, not the live cursor"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_struct]
 message = "live {tuus} cursor values cannot be stored in structures yet"
-help = "make the expression type match the expected type"
+help = "Consume the cursor locally and store the yielded frames, not the live cursor"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_reassign]
 message = "live {tuus} cursor locals cannot be reassigned yet"
-help = "make the expression type match the expected type"
+help = "Create a new local for another cursor; do not assign a new cursor to a live cursor local"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_copy]
 message = "live {tuus} cursor values cannot be copied or moved between locals yet"
-help = "make the expression type match the expected type"
+help = "Use the original cursor directly with {itera} {ex}; do not copy it into another local"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_conversio]
 message = "live {tuus} cursor values cannot be converted through aggregate conversio yet"
-help = "make the expression type match the expected type"
+help = "Iterate the cursor locally and convert or store its yielded items, not the cursor itself"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_direct_initializer]
 message = "tuus.cursor() is only supported as a direct local initializer"
-help = "make the expression type match the expected type"
+help = "Use `cursor()` only as a local initializer, then consume that local with {itera} {ex}"
 
 [diagnostics.SEM010.issues.live_tuus_cursor_value]
 message = "live {tuus} cursor values cannot be used as expressions yet"
-help = "make the expression type match the expected type"
+help = "Use the live cursor only as the source of {itera} {ex}; do not print or otherwise use it as a value"
 
 [diagnostics.SEM010.issues.map_index_type_mismatch]
 message = "map index type mismatch"
