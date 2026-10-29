@@ -1274,13 +1274,17 @@ impl super::FaberCodegen<'_> {
                     writer.write(")");
                 }
             }
-            HirExpressionKind::TypeCheck { positive, expr, ty } => {
+            HirExpressionKind::TypeCheck {
+                positive,
+                expr: operand,
+                ty,
+            } => {
                 // Precedence matches `HirBinOp::Is` (4) — both spell `est`
                 // and bind at the same relational level. Negation is the
                 // infix `<expr> non est <ty>` spelling; a prefix `non`
                 // re-parses as `(non expr) est ty` and fails the boolean
                 // operand gate.
-                self.write_expr_prec(expr, 4, names, surface, writer);
+                self.write_expr_prec(operand, 4, names, surface, writer);
                 writer.write(" ");
                 if !*positive {
                     writer.write(surface.contextual_keyword("non"));
@@ -1296,6 +1300,8 @@ impl super::FaberCodegen<'_> {
                     writer
                         .write(surface.type_surface(TypeBindingKind::Primitive(Primitive::Nihil)));
                 } else {
+                    // The target type occurrence belongs to this TypeCheck
+                    // node, rather than the operand's expression site.
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Hir(expr.id),
                         slot: HirTypeSlot::TypeCheckTarget,
