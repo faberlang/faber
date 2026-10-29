@@ -5127,7 +5127,19 @@ help = "`{rumpe}` ciclum `{filum}` sistere non potest: semitae seorsum currunt. 
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` ex ciclo `{filum}` exire non potest"
-help = "`{redde}` ex ciclo `{filum}` exire non potest: semitae seorsum currunt. Unum valorem ex semitis capere: `{reducta}`; ad terminum sistere: terminum prius computa et usque ad eum itera."
+help = "`{redde} {filum}` hanc semitam ex quavis altitudine finit; `{perge}` idem in summo semitae gradu facit."
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` tantum intra corpus cicli semitarum valet"
+help = "`{redde} {filum}` tantum intra corpus cicli `{filum}` utere"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` valorem non accipit"
+help = "valorem dele; semitae per repositoria sua eventus tradunt"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "`{redde} {filum}` in corpore interiore semitam circumdantem finire non potest"
+help = "in ipso corpore semitae utere, non in clausura vel reductione interiore"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "corpus reductionis vocare potest tantum intrinseca machinae, fragmenta, et adiutores nuclei privatos: {reason}"

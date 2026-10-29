@@ -5581,7 +5581,22 @@ help = "`{rumpe}` cannot stop other `{filum}` lanes. Use `{perge}` to skip the r
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` cannot leave a `{filum}` loop"
-help = "`{redde}` cannot leave the function from a `{filum}` lane. Use `{perge}` to skip the rest of this lane; use `{reducta}` to combine lane results, or compute a cutoff before looping."
+help = "`{redde}` cannot leave the function from a `{filum}` lane. Use `{redde} {filum}` to end this lane from any depth, or `{perge}` at its top level; use `{reducta}` to combine lane results, or compute a cutoff before looping."
+
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` is valid only inside a thread-lane loop body"
+help = "use `{redde} {filum}` only inside an `{itera} ... {filum}` loop body"
+
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` takes no value"
+help = "remove the value; lanes deliver results through their stores"
+
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "`{redde} {filum}` in a nested body cannot end the enclosing lane"
+help = "use `{redde} {filum}` in the lane body itself, not in a nested closure or reduction body"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "a reduction body can call only device intrinsics, fragments and private kernel helpers: {reason}"

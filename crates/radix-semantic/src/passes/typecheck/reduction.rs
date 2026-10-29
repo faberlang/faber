@@ -791,6 +791,11 @@ impl ReductionBodyState {
                     self.walk_expr(checker, value);
                 }
             }
+            HirStatementKind::ReddeFilum(value) => {
+                if let Some(value) = value {
+                    self.walk_expr(checker, value);
+                }
+            }
             HirStatementKind::Expr(expr) => self.walk_expr(checker, expr),
             HirStatementKind::Rumpe => checker.error_issue(
                 SemanticErrorKind::TypeMismatch,

@@ -3878,7 +3878,19 @@ help = "`{rumpe}` `{filum}` लूप को रोक नहीं सकता
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` `{filum}` लूप से बाहर नहीं निकल सकता"
-help = "`{redde}` `{filum}` लूप से बाहर नहीं निकल सकता: लेन स्वतंत्र रूप से चलती हैं। लेनों से एक मान पाने के लिए `{reducta}` का उपयोग करें; किसी सीमा पर रुकने के लिए पहले सीमा की गणना करें और उसी तक लूप चलाएँ।"
+help = "`{redde} {filum}` किसी भी गहराई से इस लेन को समाप्त करता है, और `{perge}` ऐसा केवल लेन के शीर्ष स्तर पर करता है।"
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` केवल थ्रेड-लेन लूप के भीतर मान्य है"
+help = "इसे केवल `{filum}` लूप के शरीर के भीतर उपयोग करें"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` कोई मान नहीं लेता"
+help = "मान हटाएँ; लेन अपने स्टोर के माध्यम से परिणाम देती हैं"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "नेस्टेड बॉडी में `{redde} {filum}` बाहरी लेन समाप्त नहीं कर सकता"
+help = "इसे लेन बॉडी में उपयोग करें, नेस्टेड क्लोज़र या रिडक्शन बॉडी में नहीं"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "रिडक्शन का मुख्य भाग केवल डिवाइस इंट्रिंसिक, फ्रैगमेंट और निजी कर्नेल सहायकों को बुला सकता है: {reason}"

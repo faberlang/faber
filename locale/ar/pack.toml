@@ -4010,7 +4010,19 @@ help = "لا يمكن لـ `{rumpe}` إيقاف حلقة `{filum}`: المسار
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "لا يمكن لـ `{redde}` مغادرة حلقة `{filum}`"
-help = "لا يمكن لـ `{redde}` مغادرة حلقة `{filum}`: المسارات تعمل باستقلال. للحصول على قيمة واحدة من المسارات استخدم `{reducta}`؛ وللتوقف عند حدّ، احسب الحدّ أولاً ثم كرّر حتى بلوغه."
+help = "يُنهي `{redde} {filum}` هذا المسار من أي عمق، ويُنهي `{perge}` المسار عند مستواه الأعلى."
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "لا يصح `{redde} {filum}` إلا داخل جسم حلقة مسارات"
+help = "استخدم `{redde} {filum}` داخل جسم حلقة `{filum}` فقط"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "لا يأخذ `{redde} {filum}` قيمة"
+help = "احذف القيمة؛ تنشر المسارات نتائجها عبر مخازنها"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "لا يستطيع `{redde} {filum}` داخل جسم متداخل إنهاء المسار الخارجي"
+help = "استخدم `{redde} {filum}` في جسم المسار نفسه، لا في إغلاق أو جسم اختزال متداخل"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "يمكن لجسم الاختزال استدعاء الدوال الجوهرية للجهاز والمقاطع والمساعدات الخاصة بالنواة فقط: {reason}"

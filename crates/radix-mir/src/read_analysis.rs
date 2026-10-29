@@ -112,6 +112,7 @@ pub(crate) fn terminator_read_locals(terminator: &MirTerminatorKind) -> Vec<MirL
             push_operand_list_locals(args, &mut read);
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -260,6 +261,7 @@ pub(crate) fn terminator_read_slots(terminator: &MirTerminatorKind) -> Vec<MirPl
             push_operand_list_slots(args, &mut read);
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -699,6 +701,7 @@ fn terminator_reads_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> boo
                 || operand_list_reads_temp(args, temp)
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => false,
         MirTerminatorKind::Branch { condition, .. } => operand_reads_temp(condition, temp),

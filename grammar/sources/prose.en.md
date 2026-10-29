@@ -1187,6 +1187,7 @@ prefer sugar. Choose per module or file.
 - `itera ex...sit`/`itera ex...varia` = for-of (values)
 - `itera de...sit`/`itera de...varia` = for-in (keys)
 - `itera ab range sit/varia i` = range iteration (e.g. `itera ab 0‥10 per 2 sit i { nota i }`; `per` belongs to the range expression)
+- In an `itera ... filum` lane body, `redde filum` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `redde` stays forbidden there; `redde filum` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `perge` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `per`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down

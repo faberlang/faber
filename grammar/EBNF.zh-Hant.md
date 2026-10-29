@@ -325,7 +325,7 @@ extract_field ::= IDENTIFIER ('作為' IDENTIFIER)?
 # [157] ceteri_field
 ceteri_field ::= '其餘' IDENTIFIER
 # [158] redde_stmt
-redde_stmt ::= '傳回' expression?
+redde_stmt ::= '傳回' ('執行緒' expression? | expression?)
 # [159] reddet_stmt
 reddet_stmt ::= '等返' expression
 # [160] tacebit_stmt
@@ -2285,6 +2285,7 @@ prefer sugar. Choose per module or file.
 - `遍歷 取自...設為`/`遍歷 取自...變值` = for-of (values)
 - `遍歷 從...設為`/`遍歷 從...變值` = for-in (keys)
 - `遍歷 範圍 range 設為/變值 i` = range iteration (e.g. `遍歷 範圍 0‥10 每 2 設為 i { 註記 i }`; `每` belongs to the range expression)
+- In an `遍歷 ... 執行緒` lane body, `傳回 執行緒` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `傳回` stays forbidden there; `傳回 執行緒` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `繼續` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `每`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down

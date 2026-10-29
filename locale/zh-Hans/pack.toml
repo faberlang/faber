@@ -3910,7 +3910,19 @@ help = "`{rumpe}` 不能停止 `{filum}` 循环：各通道相互独立运行。
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` 不能离开 `{filum}` 循环"
-help = "`{redde}` 不能离开 `{filum}` 循环：各通道相互独立运行。要从各通道得到一个值，请用 `{reducta}`；要在某个界限处停止，请先算出该界限，再循环到该界限。"
+help = "`{redde} {filum}` 可从任意深度结束当前通道；`{perge}` 仅在通道顶层执行此操作。"
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` 仅在通道循环体内有效"
+help = "仅在 `{filum}` 循环体内使用 `{redde} {filum}`"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` 不接受值"
+help = "删除该值；各通道通过自己的存储传递结果"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "嵌套主体中的 `{redde} {filum}` 不能结束外层通道"
+help = "在通道主体本身使用，不要在嵌套闭包或归约主体中使用"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "归约体只能调用设备内建函数、片段和私有内核辅助函数：{reason}"

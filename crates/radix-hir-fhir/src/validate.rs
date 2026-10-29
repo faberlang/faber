@@ -2088,7 +2088,9 @@ fn collect_stmt_expr_defs(
                 collect_expr_defs(init, registry);
             }
         }
-        HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
+        HirStatementKind::Expr(expr)
+        | HirStatementKind::Redde(Some(expr))
+        | HirStatementKind::ReddeFilum(Some(expr)) => {
             collect_expr_defs(expr, registry);
         }
         HirStatementKind::IncDec(inc) => {
@@ -2103,7 +2105,8 @@ fn collect_stmt_expr_defs(
         HirStatementKind::Rumpe
         | HirStatementKind::Perge
         | HirStatementKind::Tacet
-        | HirStatementKind::Redde(None) => {}
+        | HirStatementKind::Redde(None)
+        | HirStatementKind::ReddeFilum(None) => {}
     }
 }
 
@@ -2523,7 +2526,9 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
         for stmt in &block.statements {
             registry.insert(stmt.id);
             match &stmt.kind {
-                HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
+                HirStatementKind::Expr(expr)
+                | HirStatementKind::Redde(Some(expr))
+                | HirStatementKind::ReddeFilum(Some(expr)) => {
                     collect_expr(expr, registry);
                 }
                 HirStatementKind::IncDec(inc) => collect_expr(&inc.target, registry),
@@ -2541,7 +2546,8 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 HirStatementKind::Rumpe
                 | HirStatementKind::Perge
                 | HirStatementKind::Tacet
-                | HirStatementKind::Redde(None) => {}
+                | HirStatementKind::Redde(None)
+                | HirStatementKind::ReddeFilum(None) => {}
             }
         }
         if let Some(ref expr) = block.expr {
@@ -3606,7 +3612,9 @@ pub(crate) fn validate_referential_integrity(
                         validate_expr(init, checks)?;
                     }
                 }
-                HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
+                HirStatementKind::Expr(expr)
+                | HirStatementKind::Redde(Some(expr))
+                | HirStatementKind::ReddeFilum(Some(expr)) => {
                     validate_expr(expr, checks)?;
                 }
                 HirStatementKind::IncDec(inc) => {
@@ -3621,7 +3629,8 @@ pub(crate) fn validate_referential_integrity(
                 HirStatementKind::Rumpe
                 | HirStatementKind::Perge
                 | HirStatementKind::Tacet
-                | HirStatementKind::Redde(None) => {}
+                | HirStatementKind::Redde(None)
+                | HirStatementKind::ReddeFilum(None) => {}
             }
         }
         if let Some(ref expr) = block.expr {

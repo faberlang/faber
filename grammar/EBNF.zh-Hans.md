@@ -325,7 +325,7 @@ extract_field ::= IDENTIFIER ('作为' IDENTIFIER)?
 # [157] ceteri_field
 ceteri_field ::= '其余' IDENTIFIER
 # [158] redde_stmt
-redde_stmt ::= '返回' expression?
+redde_stmt ::= '返回' ('线程' expression? | expression?)
 # [159] reddet_stmt
 reddet_stmt ::= '等返' expression
 # [160] tacebit_stmt
@@ -2285,6 +2285,7 @@ prefer sugar. Choose per module or file.
 - `遍历 取自...设`/`遍历 取自...变量` = for-of (values)
 - `遍历 借自...设`/`遍历 借自...变量` = for-in (keys)
 - `遍历 范围 range 设/变量 i` = range iteration (e.g. `遍历 范围 0‥10 步 2 设 i { 显示 i }`; `步` belongs to the range expression)
+- In an `遍历 ... 线程` lane body, `返回 线程` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `返回` stays forbidden there; `返回 线程` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `继续` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `步`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down

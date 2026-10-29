@@ -1701,6 +1701,7 @@ fn remap_terminator(terminator: &MirTerminator, alpha: &mut Alpha, ids: &mut IdG
             MirTerminatorKind::Return(operand) => {
                 MirTerminatorKind::Return(operand.as_ref().map(|operand| alpha.operand(operand, ids)))
             }
+            MirTerminatorKind::ReturnThread => MirTerminatorKind::ReturnThread,
             MirTerminatorKind::ReturnError(operand) => MirTerminatorKind::ReturnError(alpha.operand(operand, ids)),
             MirTerminatorKind::TryCall { destination, callee, args, ok_block, error_place, error_block } => {
                 MirTerminatorKind::TryCall {
@@ -1866,7 +1867,10 @@ fn visit_successors(kind: &MirTerminatorKind, mut visit: impl FnMut(MirBlockId))
             visit(*ok_block);
             visit(*error_block);
         }
-        MirTerminatorKind::Return(_) | MirTerminatorKind::ReturnError(_) | MirTerminatorKind::Unreachable => {}
+        MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnThread
+        | MirTerminatorKind::ReturnError(_)
+        | MirTerminatorKind::Unreachable => {}
     }
 }
 

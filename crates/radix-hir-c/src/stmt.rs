@@ -80,6 +80,7 @@ impl Emitter<'_> {
             HirStatementKind::Local(local) => self.local(out, local),
             HirStatementKind::Expr(expr) => self.expr_statement(out, expr),
             HirStatementKind::Redde(value) => self.redde(out, value.as_ref()),
+            HirStatementKind::ReddeFilum(_) => Err(unsupported("return_thread_lowering_pending")),
             HirStatementKind::Rumpe => self.loop_jump(out, "break;"),
             HirStatementKind::Perge => self.loop_jump(out, "continue;"),
             HirStatementKind::Tacet => Ok(()),

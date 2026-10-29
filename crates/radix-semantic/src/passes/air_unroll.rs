@@ -483,7 +483,9 @@ fn rewrite_nested_stmt(
                 );
             }
         }
-        HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
+        HirStatementKind::Expr(expr)
+        | HirStatementKind::Redde(Some(expr))
+        | HirStatementKind::ReddeFilum(Some(expr)) => {
             rewrite_nested_expr(
                 presentation,
                 expr,
@@ -532,6 +534,7 @@ fn rewrite_nested_stmt(
             }
         }
         HirStatementKind::Redde(None)
+        | HirStatementKind::ReddeFilum(None)
         | HirStatementKind::Rumpe
         | HirStatementKind::Perge
         | HirStatementKind::Tacet
@@ -1680,6 +1683,7 @@ impl BodyDecline<'_> {
                 }
             }
             HirStatementKind::Redde(_)
+            | HirStatementKind::ReddeFilum(_)
             | HirStatementKind::Rumpe
             | HirStatementKind::Perge
             | HirStatementKind::Custodi(_) => self.reject(CAUSA_UNSUPPORTED_CONTROL),

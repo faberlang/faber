@@ -148,6 +148,7 @@ pub(super) fn remap_terminator_text_symbols(
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }

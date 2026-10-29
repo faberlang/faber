@@ -1635,6 +1635,11 @@ impl BodyFacts<'_> {
                     }
                 }
             }
+            HirStatementKind::ReddeFilum(value) => {
+                if let Some(value) = value {
+                    self.evaluate(value);
+                }
+            }
             HirStatementKind::IncDec(inc_dec) => {
                 let target_range = self.evaluate(&inc_dec.target);
                 let delta = match inc_dec.op {

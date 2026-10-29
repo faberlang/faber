@@ -2213,6 +2213,7 @@ fn rewrite_terminator_constants(
                 && cases.iter_mut().all(|case| rewrite(&mut case.value))
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => true,
     }

@@ -260,7 +260,7 @@ pub fn walk_stmt<V: HirVisitor>(visitor: &mut V, stmt: &HirStatement) {
     match &stmt.kind {
         HirStatementKind::Local(local) => visitor.visit_local(local),
         HirStatementKind::Expr(expr) => visitor.visit_expr(expr),
-        HirStatementKind::Redde(value) => {
+        HirStatementKind::Redde(value) | HirStatementKind::ReddeFilum(value) => {
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
@@ -895,7 +895,7 @@ pub fn walk_stmt_mut<V: HirVisitorMut>(visitor: &mut V, stmt: &mut HirStatement)
     match &mut stmt.kind {
         HirStatementKind::Local(local) => visitor.visit_local_mut(local),
         HirStatementKind::Expr(expr) => visitor.visit_expr_mut(expr),
-        HirStatementKind::Redde(value) => {
+        HirStatementKind::Redde(value) | HirStatementKind::ReddeFilum(value) => {
             if let Some(expr) = value {
                 visitor.visit_expr_mut(expr);
             }

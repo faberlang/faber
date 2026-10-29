@@ -193,6 +193,7 @@ pub(super) fn rewrite_terminator_sources(
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }

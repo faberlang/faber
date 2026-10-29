@@ -333,6 +333,7 @@ impl Graph {
 fn terminator_name(kind: &MirTerminatorKind) -> &'static str {
     match kind {
         MirTerminatorKind::Return(_) => "return",
+        MirTerminatorKind::ReturnThread => "return_thread",
         MirTerminatorKind::ReturnError(_) => "return_error",
         MirTerminatorKind::TryCall { .. } => "try_call",
         MirTerminatorKind::Goto(_) => "goto",

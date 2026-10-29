@@ -328,6 +328,7 @@ fn successors(kind: &MirTerminatorKind) -> Vec<crate::MirBlockId> {
             .chain(std::iter::once(*default))
             .collect(),
         MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::ReturnError(_)
         | MirTerminatorKind::Unreachable => Vec::new(),
     }

@@ -372,6 +372,7 @@ fn collect_terminator_aggregate_defs(terminator: &MirTerminator, variants: &mut 
         }
         MirTerminatorKind::Switch { value, .. } => collect_operand_variant_defs(value, variants),
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -3533,6 +3534,7 @@ fn rewrite_terminator_variant_defs(
             rewrite_operand_variant_defs(value, variant_remap);
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -4219,6 +4221,7 @@ pub(super) fn shift_terminator_ids(terminator: &mut MirTerminator, offset: u32) 
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -4836,6 +4839,7 @@ fn remap_terminator_function_ids(
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -4977,6 +4981,7 @@ fn scan_terminator_references(terminator: &MirTerminator, scan: &mut MirReferenc
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }

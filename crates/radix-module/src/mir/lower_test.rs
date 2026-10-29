@@ -8047,3 +8047,27 @@ fn missing_array_row_is_a_named_lowering_error_not_a_dropped_statement() {
     );
     assert!(builder.errors.is_empty(), "the happy path pushes nothing");
 }
+
+#[test]
+fn thread_return_is_refused_at_mir_lowering_by_name_until_lane_lowering_lands() {
+    let unit = analyze(
+        r"
+@ nucleum
+@ publica
+functio k(in tensor<f32, [4]> out, de tensor<f32, [4]> src) → vacuum {
+    itera ex src apud [i] filum lane sit value {
+        redde filum
+    }
+}
+",
+    );
+    let errors = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
+        .expect_err("`redde filum` must not be mislowered");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "return_thread_lowering_pending"),
+        "{:?}",
+        errors.iter().map(|error| &error.issue).collect::<Vec<_>>()
+    );
+}
