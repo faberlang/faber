@@ -4,7 +4,7 @@
 //! A proba case is one program execution, and a session dispatcher tears its
 //! session down when the program ends, so each case runs on its own CPU
 //! session: the same image, dispatcher and worker pool `faber run --device
-//! cpu` builds, opened without printing the discovery receipt.
+//! cpu` builds, opened without reporting the discovery receipt.
 
 use super::{
     CpuDeviceShape, cpu_device_registry, default_cpu_workers, lowered_declares_kernels,
