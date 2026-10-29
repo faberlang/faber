@@ -512,6 +512,7 @@ fn box_valid(Box<3> box) → bool {
 
 @ public
 fn box_contains(Box<3> box, vector<f32, size 3> point) → bool {
+    if not box_valid(box) then return false
     let f32 px ← point.dot(basis3(0))
     let f32 py ← point.dot(basis3(1))
     let f32 pz ← point.dot(basis3(2))
@@ -526,6 +527,7 @@ fn box_contains(Box<3> box, vector<f32, size 3> point) → bool {
 
 @ public
 fn box_intersects(Box<3> a, Box<3> b) → bool {
+    if not box_valid(a) or not box_valid(b) then return false
     let f32 amaxx ← a.maxima.dot(basis3(0))
     let f32 amaxy ← a.maxima.dot(basis3(1))
     let f32 amaxz ← a.maxima.dot(basis3(2))
@@ -561,6 +563,7 @@ fn box_center(Box<3> box) → vector<f32, size 3> ∪ none {
 
 @ public
 fn box_contains_box(Box<3> box, Box<3> other) → bool {
+    if not box_valid(other) then return false
     return box_contains(box, other.minima) and box_contains(box, other.maxima)
 }
 
