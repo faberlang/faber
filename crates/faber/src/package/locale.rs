@@ -95,6 +95,26 @@ pub fn config_with_locale(
     Ok((config, diagnostic_pack))
 }
 
+/// Build the code and diagnostic config for the non-package `faber build` lane.
+///
+/// The caller uses this when a CLI locale option is present; `config_with_locale`
+/// makes `--locale` explicit so it overrides source frontmatter, while the
+/// development locale root keeps workspace packs available during compilation.
+///
+/// # Errors
+///
+/// Returns locale resolution errors from [`config_with_locale`].
+pub(super) fn single_file_build_config_with_locale(
+    target: Target,
+    input: &Path,
+    cli_locale: Option<&str>,
+    cli_diagnostics_locale: Option<&str>,
+) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
+    let (config, diagnostic_pack) =
+        config_with_locale(target, input, cli_locale, cli_diagnostics_locale)?;
+    Ok((config.with_dev_locale_root(), diagnostic_pack))
+}
+
 /// Resolve the pack used for diagnostic message rendering.
 ///
 /// Chain: `--diagnostics-locale` → code pack → none (catalog English).

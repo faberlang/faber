@@ -88,6 +88,31 @@ fn direct_default_config_uses_english_pack() {
 }
 
 #[test]
+fn single_file_build_cli_locale_overrides_frontmatter_code_locale() {
+    let root = temp_dir("faber-single-file-build-locale");
+    let entry = root.join("main.fab");
+    fs::write(&entry, "+++\nlocale = \"en\"\n+++\nmain {}\n").expect("source");
+
+    // HirGo uses the single-file compiler lane for .fab inputs. Its build
+    // config must nevertheless make an explicit --locale authoritative over
+    // the source's frontmatter locale.
+    assert!(!super::super::cmd::use_package_compiler(
+        Target::HirGo,
+        &entry,
+        false
+    ));
+    let (config, diagnostic_pack) =
+        single_file_build_config_with_locale(Target::HirGo, &entry, Some("la"), None)
+            .expect("single-file locale config");
+    let code_pack = config.locale_pack.expect("code pack");
+    assert_eq!(code_pack.metadata.id, "la");
+    assert!(config.locale_pack_explicit);
+    assert_eq!(diagnostic_pack.expect("diagnostic pack").metadata.id, "la");
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn diagnostics_locale_defaults_to_code_pack() {
     let (_root, entry) = temp_package_entry();
     let (config, diagnostic_pack) =
