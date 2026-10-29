@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/lista/mut-list-element-alias-field.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/mut-list-element-alias-field.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

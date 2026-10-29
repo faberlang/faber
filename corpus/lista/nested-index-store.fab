@@ -1,0 +1,25 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "genus_decl", "genus_member", "field_decl", "typed_constructor", "field_list", "field_init", "field_key", "assignment", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A store through a record field and then a list index, box.items[i] ← v, updates the list held in the field."
+syntax = "box.items[index] ← value"
+related = ["lista", "genus"]
+locale = "en"
++++
+# =============================================================================
+# nested-index-store — store through a field and then an index.
+# =============================================================================
+
+class Box {
+    mut list<int> xs
+}
+
+main {
+    mut Box b ← Box { xs = [0, 0] }
+    b.xs[1] ← 5
+    print b.xs[1]
+    print b.xs[0]
+}
