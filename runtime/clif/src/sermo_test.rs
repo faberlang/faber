@@ -193,7 +193,7 @@ fn unsupported_route_opens_no_handle() {
 
 #[test]
 fn clock_routes_reply_with_an_integer() {
-    for route in ["tempus:nunc", "tempus:monotonicum"] {
+    for route in ["tempus:nunc", "tempus:monotonicum", "tempus:activum"] {
         let mut conversation = Conversation::open(route);
         let nanos = conversation.int().expect("a clock route replies numerus");
         assert!(nanos >= 0, "{route} replied {nanos}");
