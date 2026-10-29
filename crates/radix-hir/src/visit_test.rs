@@ -889,5 +889,7 @@ fn mutable_statement_walk_rewrites_return_and_guard_children() {
     marker.visit_block_mut(&mut block);
     let mut collector = ExprCollector { seen: Vec::new() };
     collector.visit_block(&block);
-    assert_eq!(collector.seen, vec![99, 99, 99]);
+    // The return value and the guard condition are rewritten; the guard body's
+    // tail is `Vacua`, which the marker leaves alone and the collector ignores.
+    assert_eq!(collector.seen, vec![99, 99]);
 }
