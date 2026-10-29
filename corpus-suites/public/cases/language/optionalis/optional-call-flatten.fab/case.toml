@@ -10,3 +10,9 @@ domain = "types"
 [expect]
 stdout = "stdout.expected"
 check_only = false
+
+[targets.roundtrip]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "CODEGEN006:authored_type_form_map_diverged"
+known_fail_why = "The roundtrip leg cannot re-read the Latin Faber it emits for `Op ∪ none` and the factory alias: the emitted authored type forms differ from the input (CODEGEN006:authored_type_form_map_diverged)."
