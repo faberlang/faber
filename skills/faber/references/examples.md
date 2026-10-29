@@ -115,6 +115,16 @@ Paths are under `corpus/` unless noted.
 | collection intrinsics | `intrinseca/` |
 | tensors / device types | `tensor/`, `vector/`, `sparsa/`, `gpu-core-types/` |
 | kernels | `kernel/` |
+| kernel tiers and device regions | `kernel/tier.fab`, `kernel/tier-la.fab`, `kernel/region.fab`, `kernel/region-reject.fab` |
+| lane-local return placement (execution still pending) | `itera/filum-return-thread.fab` (intentional rejection); grammar `redde_stmt` |
+| list length ranges and destination-sized short literals | `lista/ranged-length.fab`, `lista/ranged-short-literal.fab`, `genus/ranged-list-field-literal.fab` |
+| first matching tensor or matrix element | `summa/reducta-first-en.fab`, `summa/reducta-first-decline.fab` |
+| list search and whole-list append | `lista/find-optional-element.fab`, `lista/methodi-extende.fab`, `lista/methodi-extende-reject.fab` |
+| ranged integer store policies | `operatores/ranged-saturating.fab`, `operatores/ranged-trapping.fab`, `operatores/ranged-wrapping.fab` |
+| tensor rank, norm and English edge policies | `tensor/rank-norm.fab`, `tensor/edge-shift-policies.fab` |
+| locale-sealed record imports | `importa/braced-field-latin-reject.fab`, `importa/braced-field-english-reject-la.fab` |
+| mixed template-hole warning | `scriptum/template-mixed-holes.fab` |
+| callable console output | `importa/selective-import-console-print.fab` |
 | sized numerics (bare `i32`, `u8`, `f32`) | `typi/sized-numerus.fab`; retired wrappers and `inf` rejects in `typi/*-error.fab` |
 | unbounded integer `inf` | `lista/literal-reuse.fab`, `typi/inf-literal-range-error.fab` |
 | conversions (`↦`, `↤`, `via` hint) | `conversio/conversio.fab`, `conversio/via-hint.fab`, `assignatio/conversio-assign.fab` |
@@ -155,6 +165,8 @@ Some exempla ship a `.expected` sidecar next to the `.fab` file.
 A single corpus file checks and runs through the product binary (`faber check <file>`, `faber run <file>`; probe: `typi/sized-numerus.fab` output equals its `.expected`). Package fixtures run through `faber`.
 
 To validate the corpus, run `faber corpus corpus-suites/public --target runner` from the repo root.
+
+Narrow corpus work with `--domain`, `--category`, `--case` or `--filter`; the selectors add together (a case runs if any selector names it). Domain and category selection need a suite that declares domains, and an unknown exact case ID is an error. Ordered scans are described by `scan_expr` in `grammar/EBNF.md`; there is no `corpus/scan/` path.
 
 ## Corpus sidecars
 

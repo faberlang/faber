@@ -12,7 +12,7 @@ the `faber` binary: `en` (product default), `la`, `zh-Hans`, `zh-Hant`, `hi`,
 `ar`, `th-TH`, `vi`. Every one is a full source-reader pack (keywords, types,
 `[llm]`, diagnostic templates); none is diagnostics-only. Each file is read in
 exactly one locale: the packs are sealed, so a Latin keyword inside an `en` or
-`zh-Hans` file is rejected, and no shipped pack sets `fallback` or `inherits`.
+`zh-Hans` file is rejected, and no shipped pack declares inheritance or a non-empty fallback list (the Latin pack explicitly sets `fallback = []`).
 
 Differences that matter when writing source:
 
@@ -125,10 +125,10 @@ faber convert <file> --from en --to la --stdout   # force the source pack
 ```
 
 `--locale` needs a package path or a `.fab` file; it is rejected for stdin.
-`faber check -` (stdin) has no package context: with no frontmatter it reads
-**Latin**, not `en` (probe: `main { print "ok" }` fails on stdin, the same
-program with the Latin entry word `incipit` (en `main`) passes), so give stdin documents a frontmatter `locale`.
-`faber check <file>` without frontmatter or manifest reads `en`.
+`faber check -` (stdin) has no package context and, with no frontmatter, reads
+English (`en`); Latin stdin must declare `locale = "la"` in frontmatter. A file
+without frontmatter or a manifest locale also reads `en`, and
+`RADIX_DEFAULT_CODE_LOCALE` is removed.
 
 `--to` is required and fails closed listing the embedded pack locales for
 unknown values (`faber check --locale zz` fails the same way). Conversion is the HIR round-trip: parse → analyze → re-emit under the
@@ -256,6 +256,12 @@ The diagnostics locale selects message templates. On `faber`, use
 code pack's templates render. Probe: `faber check f.fab
 --diagnostics-locale zh-Hans` renders `PARSE040` in Chinese for an `en` file.
 
+`faber explain` also has a reader-surface locale for terms, syntax, search, listing
+and cross-references: `faber explain fn` or `faber explain list` in English;
+`--locale <id>` overrides the package `[locale]`, and outside a package the reader
+is `en`. A term from another locale gets a hint naming the reader's spelling, not
+a silent alias. `--diagnostics-locale` controls diagnostic prose independently.
+
 Never infer source syntax from the language of an error message. A Latin source
 surface can have English diagnostics, and a build can select diagnostic prose
 independently from its code surface (the `la` pack's own diagnostic prose is
@@ -363,13 +369,7 @@ the Latin `@ nucleum` is `PARSE018:wrong_locale_annotation`; a `zh-Hans`
 (an unregistered annotation name). The shared-field annotation is `@ shared` in
 `en`; every other pack spells it `@ commune`.
 
-Closure-modifier spellings are sealed the same way. The signature slot after
-the closure parameters admits only the selected pack's declared spelling —
-`kernel` in an `en` file, `nucleum` under `la` — with no cross-pack fallback
-(an `en` file with the Latin `nucleum` is a plain `PARSE001`), and a second
-modifier in the slot is `PARSE019` duplicate modifier, not an alias. The same
-sealing law covers the `@ kernel` (la `@ nucleum`) named-function annotation
-above; the closure modifier is its expression-form twin.
+Closures have no signature-modifier slot: do not put `kernel`, `nucleum` or `libera` after closure parameters (it is a parse error). A closure inside a kernel needs no modifier; kernel legality comes from the enclosing `@ kernel` (la `@ nucleum`) declaration and the kernel checker. Annotation spellings stay locale-sealed as above.
 
 ### `[diagnostics.*]`
 

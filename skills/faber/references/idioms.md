@@ -5,8 +5,9 @@ Use this file when the task is about writing Faber naturally rather than merely 
 Locale convention: prose names constructs by their en spellings (`class`, `const`, `return`);
 the stable Latin key appears as a short `(la ...)` gloss where a reader will meet it in the corpus,
 in diagnostics, or in `faber explain`.
-Every fenced code block below is written in the **en** reader surface and was checked with
-`faber check` or `faber run`; a file with no `+++` frontmatter and no manifest `[locale]` reads as
+Code blocks below use the **en** reader surface. A `fab` fence is a complete unit that passes
+`faber check`; a `text` fence is a ✗/✓ pair, a schematic or a fragment that needs surrounding
+declarations. A file with no `+++` frontmatter and no manifest `[locale]` reads as
 en, and a Latin file needs `+++ locale = "la" +++`. Spellings come from
 `locale/en/pack.toml` and `locale/la/pack.toml`; never mix them in one file.
 
@@ -37,6 +38,11 @@ Prefer:
 - a comment on its own line: `#` must be the first non-whitespace token, and `code # note` is `LEX007 inline_hash_after_code`
 - `async` / `generator` / `async_generator` (la `fiet` / `fiunt` / `fient`) for new async and stream code
 - the long type spellings (`list<f32>`, `tensor<f32, [2, 2]>`) in general code; the width sugar (`lf32`, `tf32[2, 2]`, bare `f32`) belongs in numeric and tensor code. Match the surrounding file
+- capacity facts with `size`: `list<T, size N>`, `queue<T, size N>`, `stack<T, size N>`, `string<size N>`, `ascii<size N>`, `vector<f32, size 4>` (bare counts there are retired `SEM008`; bracketed shapes, `vf32[4]` and `_` holes are unchanged; explicit generic call sizes too: `mk<int, size 4>(xs)`). `list<T, size N>` is at most N elements; `size lo‥hi` is a half-open length range (`size lo…hi` includes `hi`); growth past the maximum or removal below the minimum reports on `⇥`, and a minimum of one or more makes `first()` / `last()` non-optional. A short list literal takes its destination's capacity (also in class fields); an over-long literal is refused. Sized and ranged lists keep their size contract across import and export
+- no byte type words: `bytes`, `octeti`, `byte` and `octetus` are gone with no aliases; use `list<b8>` / `list<b8, size N>`, `b8` for raw byte bits and `u8` for a numeric byte
+- a newline ends a bare `return`; a returned expression must begin on the `return` line
+- no mixing plain and numbered template holes: it stays legal but warns `WARN035 mixed_plain_numbered_template_holes`, and plain holes count from argument 0 independently of numbered ones; number every hole
+- record-form import fields are locale-sealed: en `from`, `visibility`, `name`, `as`, `all`, as in `import { from = "norma:text", name = text, as = t }`; another locale's field word is `PARSE050 wrong_locale_import_field`
 
 Avoid:
 
@@ -59,7 +65,7 @@ For command-line applications, prefer:
 - one clear `main` or `main args args` entry surface (la `incipit` / `incipit argumenta args`)
 - command functions with typed parameters and direct names
 - explicit validation before work begins
-- predictable `write`, `warn`, `debug`, or `print` output (la `scribe`, `mone`, `vide`, `nota`) instead of hidden side effects; `print` of a `class` (la `genus`) shows its construction literal (`Click { x = 1, y = "hello" }`), and formatting goes through `"Total: §"(value ¶ ".2")`; `sink ⇇ payload` is the typed-sink alternative that adds no formatting
+- predictable `write`, `warn`, `debug`, or `print` output (la `scribe`, `mone`, `vide`, `nota`) instead of hidden side effects; `print` of a `class` (la `genus`) shows its construction literal (`Click { x = 1, y = "hello" }`), and formatting goes through `"Total: §"(value ¶ ".2")`; the callable sink `sink ⇇ payload` is retired (`SEM012 transfer_sink_retired`)
 - a failable `↦` needs `⊥ default`, a catch, or an enclosing `⇥ E`; `main` is exempt and panics
 - small modules imported through canonical `import` forms (la `importa`)
 - concrete error paths using `do` / `catch`, `throw`, and `panic` (la `fac` / `cape`, `iace`, `mori`)
@@ -73,17 +79,32 @@ Before using CLI annotations or argument-binding forms, verify current support i
 
 `faber check` on `corpus/cli/cli.fab` is the proof that the current annotation spellings are legal.
 
-`faber run` is interpreted execution, always (single file, package, manifest, or
-archive) through the MIR runner; faber does not execute compiled artifacts.
-Build with `faber build -t <target>`; device packages execute through the host
-driver. Treat compiled-target execution as unsupported unless the host driver
-explicitly implements it.
+Without `--target`, `faber run` executes source through the MIR runner. For packages,
+`faber run --target go`, `--target ts` and `--target llvm-host` build and run the compiled
+program, forwarding its arguments, standard streams and exit status (TypeScript needs `tsc`
+and Node; Go and LLVM need their target tools; build settings live in `[target.go]`,
+`[target.ts]` and `[target.llvm-host]`). `faber run --target clif-jit` compiles and runs in
+memory, with the Cranelift target's language limits; `build` and `emit` refuse `clif-jit`.
+Use `faber build --target <target>` when the compiled output is wanted rather than an
+immediate run.
+
+### CLI contracts for scripts
+
+`check`, `build`, `run`, `test`, `emit`, `format` and `convert` show diagnostic message and help by default; use `--no-diagnostics` for compact text (`--diagnostics` is removed; JSON output is unchanged). Byte-list/tensor diagnostic filters use `list_b8_to_tensor_*` and `tensor_to_list_b8_*`, target-prefixed forms included; the old names have no aliases.
+
+`faber test --only-in NAME` is the flag (`--solum-in` is retired). Package kernel tests take `--device cpu --threads N` or sequential `--device reference`; Metal and CUDA are not served by `faber test`.
+
+Tool failure statuses are 64 bad arguments, 65 source errors, 66 missing input, 69 unavailable support, 70 internal failure, 73 unwritable output, 78 bad configuration; failed tests and formatting drift return 1 and a program's own status passes through. Runner and Cranelift traps use their failure class, and Rust traps no longer use panic status 101.
+
+`fmir-bin` is not a build target. `fmir` and `fmir-text` are image outputs, not inputs to `faber run`; run the source package. Release binaries include the LLVM host runtime, so the LLVM route needs LLVM tools but not Cargo. A relative `--library-home` resolves against the working directory.
+
+`faber format --width N` opts into wrapping at legal token boundaries (indentation counts; `[format] width = N` is the package default and the flag wins; unwrapped otherwise; an unbreakable string, comment or protected span may exceed the width). Formatting keeps authored range spellings.
 
 ## Package Style
 
 Package-aware work uses:
 
-- `faber.toml` for package authority; the accepted sections are the fields of `FaberManifest` in `crates/faber/src/package/manifest.rs` (`[package]`, `[paths]`, `[build]`, `[locale]`, `[library]`, `[device]`, `[product]`, `[target.*]`, `[dependencies]`, `[dispatch]`, `[check]`; unknown keys are rejected)
+- `faber.toml` for package authority; the accepted sections are the fields of `FaberManifest` in `crates/faber/src/package/manifest.rs` (`[package]`, `[paths]`, `[build]`, `[locale]`, `[library]`, `[device]`, `[product]`, `[target.*]`, `[dependencies]`, `[dispatch]`, `[check]`, `[format]`; unknown keys are rejected)
 - optional `+++` frontmatter on `.fab` files for `locale`, `group`, `sectio`, `[probanda]`, and package-facing metadata
 - `faber init`, `faber build`, `faber check`, `faber run`, `faber test`
 
@@ -93,7 +114,7 @@ Do not invent package manifest keys. Read a working package first, for example `
 
 Collection primitives (en `string`, `int`, `float`, `list<T>`, `map<K,V>`, `set<T>`; la `textus`, `numerus`, `fractus`, `lista<T>`, `tabula<K,V>`, `copia<T>`) are compiler-owned.
 
-User-facing `norma:*` modules live in `lib/norma/src/` (flat, English-spelled module names: `norma:fs`, `norma:text`, `norma:json`, `norma:console`, `norma:time`; `lib/norma/src/*.fab` is the module list). Optional libraries live in their own repos and are not universal stdlib. Generated-code runtime types live under `runtime/`.
+User-facing `norma:*` modules live in `lib/norma/src/` (flat, English-spelled module names: `norma:fs`, `norma:text`, `norma:json`, `norma:console`, `norma:time`; `lib/norma/src/*.fab` is the module list). `norma:console` also exports a callable, failable `print(string)` (`import from "norma:console" const print`), distinct from the `print` statement; `print(...)` with no function in scope is `SEM001 scribe_callee`. Optional libraries live in their own repos and are not universal stdlib. Generated-code runtime types live under `runtime/`.
 
 When calling methods such as `myList.append(x)` (la `appende`), check the live library source and the relevant Radix lowering path before assuming whether the method is native Faber, `call`-routed (la `ad`), deferred with `panic` (la `mori`), or runtime-backed.
 
@@ -215,7 +236,7 @@ Short form of the "Numeric model" in `grammar/EBNF.md`:
   `saturating<u8>` (la `saturatus<u8>`) clamps. Policy words keep their `<W>`; the bare marker is the
   canonical width spelling. A range refines the policy: `saturating<u32, 0‥8>` clamps into 0 to 7,
   `trapping<i32, -2‥3>` traps outside -2 to 2, `wrapping<u32, 0‥5>` wraps around 5 slots (`‥` half open,
-  `…` inclusive, both ends written, `∞` for no bound); the range applies at the store only.
+  `…` inclusive, both ends written, `∞` for no bound); the range applies at the store only. Cross-policy stores still need `↦` in 1.17 (do not remove those conversions), and ranged integer stores execute on the runner and Rust only; other executable targets and kernels refuse them by name.
 - `/` floors on integers and `%` takes the divisor's sign (`-7 / 2` is -4, `-7 % 2` is 1); `÷` is true
   division and yields a float. Writing `let f64 avg ← a / b` with integer operands is
   `integer_quotient_to_float_requires_true_division`; write `a ÷ b`.
@@ -269,6 +290,8 @@ The frontmatter `term` and `related` values are Latin registry keys, so `itera` 
 
 ## Semantic Tone
 
+Container and other type arguments are invariant: a named `list<u8>` is not a `list<int>` (convert with `↦ list<int>` or build a fresh destination; fresh literals, spreads and lifted results are built by element stores). A generic class method keeps its type parameters rigid, so handle or default `T ∪ none` before storing it in `T`. Integer guards, loop bounds and lengths can prove a list or text `at` / `slice` safe, so no handler is needed (mutation invalidates the proof). A function or module-level value may share a pack type word such as `list` or `tensor`. An optional call skips its arguments when the receiver is absent, captures the receiver before evaluating them, accepts `mut` arguments and flattens an optional result.
+
 Preserve visible distinctions:
 
 - `let` versus `mut` versus `ref` versus `const` (la `sit` / `varia` / `de` / `fixum`): write-once name, writable name, re-pointable read-only name, compile-time constant
@@ -306,7 +329,7 @@ method-call spellings (`a.matmul(b)` is the non-preferred spelling; prefer
 | `⊙` | elementwise | Hadamard product; operands unify shapes at typecheck |
 | `⊘` | elementwise divide | Hadamard divide; operands require identical shapes at typecheck |
 | `×` | cross product | 3-vector cross |
-| `ᵀ` | postfix transpose | rank-2 tensor only in v1; `[M,N] → [N,M]`, with rank-1 permanently declined because there is no row/column distinction (`glyph_transpose_operands_unsupported`) and rank-3+ deferred until a batched-transpose consumer; lowers through the existing `Transpose` plan |
+| `ᵀ` | postfix transpose | a matrix or a tensor of known rank 3 or more: `[M,N] → [N,M]`, batched tensors keep their leading axes and swap the last two; rank-1 is refused (`glyph_transpose_rank1_no_row_column_distinction`); execution stays subject to target and rank limits |
 
 The glyphs act on `tensor` / `vector` / `matrix` values (`vf32[3]`, `tf32[4]`, `matrix<f32, [2, 3]>`):
 
@@ -326,12 +349,16 @@ main {
 
 Scalar operators also lift elementwise over a `tensor` (`+ -` against a scalar or equal shape, `*`, `/`,
 `%`, `÷` by a scalar, `⤒ ⤓`, the comparisons, `✓ ✗` selects), so `a + b` and `a / 2.0` on `tf32[3]` need
-no loop. `tensor * tensor` is rejected (`numeric_operands_required`): write `⊙` for the elementwise
-product. See "Tensor lifting" in `grammar/EBNF.md`.
+no loop. `tensor * tensor` is rejected (`SEM011 tensor_multiply_requires_glyph`): write `⊙` for the elementwise
+product or `·` for contraction. `length()` is the element count, `rank()` the number of axes and `norm()` the Euclidean norm (`rank` and `norm` are spelled so in every locale); English edge policy is `.edge<clamp>()` (e.g. `base.shift([-1]).edge<clamp>()`), and Latin keeps `.limes<…>()`, so do not copy `limes` into an English file. See "Tensor lifting" in `grammar/EBNF.md`.
 
 ## Iteration and reduction — pick the construct, not the loop
 
 Before writing any loop, check whether a dedicated construct states the intent:
+- Ordered prefix results → `scan via`, not a manual accumulator: inside a kernel an inclusive sum is `scan via sum from xs at [i] thread lane let x { return x }` and an exclusive one adds `total exclusive` after `sum` (mode words `total inclusive` / `total exclusive`); grouping (`per`) and `order asc|desc` are available; lowers to the runner, Metal and CUDA. Shape: `scan_expr` in `grammar/EBNF.md` (no corpus exemplar).
+- First matching tensor or matrix element → `reduce via first from xs let x { return x ≻ 2.0 }`: always optional, row-major, the predicate runs for every element (a later error stays an error); it replaces `primus_quem` / `ubi`, and lists are not reduction sources.
+- First matching list element → `xs.find(pred)`: left to right, stops at the first match, returns an optional element (never nested; a found null and no match both read as null).
+- Append a whole list in place → `xs.extend(ys)`: the receiver must be an unbounded `mut list<T>` (bounded and ranged receivers are refused), order is kept, and `xs.extend(xs)` appends the originals once.
 - Element walk with coordinates → `for from x at [i]` (la `itera … apud`).
   Never hand-index with a counter loop when `at [...]` exists.
 - Lockstep walk of N aligned lists → `for from a, b let x, y`
@@ -392,7 +419,9 @@ Before writing any loop, check whether a dedicated construct states the intent:
   **After — dedicated best-index method:**
 
   ```fab
-  let int best ← xs.argmax() coalesce 0
+  fn best_index(list<f32> xs) → int {
+      return xs.argmax() coalesce 0
+  }
   ```
 
   `argmax()` and `argmin()` share the first-index tie law: among equal
@@ -426,23 +455,11 @@ retracted under schema 7 — a union is pure fields plus variants.)
 **Bad — wrapper family that replays the boundary mapping:**
 
 ```fab
-fn inspect_before() → string ⇥ BoundaryError {
-    do {
-        return read_wire()
-    }
-    catch err {
-        throw variant WireFailure {message = err.message, inner = err}
-    }
-}
-# WireError and BoundaryError are the unions declared in the Good block below.
-```
+union WireError {
+    @ shared
+    string message
 
-**Good — one declared conversion function plus direct propagation:**
-
-```fab
-@ conversion
-fn from_wire_error(WireError err) → BoundaryError {
-    return variant WireFailure {message = err.message, inner = err}
+    Invalid
 }
 
 union BoundaryError {
@@ -450,6 +467,46 @@ union BoundaryError {
     string message
 
     WireFailure { WireError inner }
+}
+
+fn read_wire() → string ⇥ WireError {
+    throw variant Invalid { message = "wire rejected" }
+}
+
+fn inspect_before() → string ⇥ BoundaryError {
+    do {
+        return read_wire()
+    }
+    catch err {
+        throw variant WireFailure { message = err.message, inner = err }
+    }
+}
+```
+
+**Good — one declared conversion function plus direct propagation:**
+
+```fab
+union WireError {
+    @ shared
+    string message
+
+    Invalid
+}
+
+union BoundaryError {
+    @ shared
+    string message
+
+    WireFailure { WireError inner }
+}
+
+@ conversion
+fn from_wire_error(WireError err) → BoundaryError {
+    return variant WireFailure { message = err.message, inner = err }
+}
+
+fn read_wire() → string ⇥ WireError {
+    throw variant Invalid { message = "wire rejected" }
 }
 
 fn inspect_after() → string ⇥ BoundaryError {
@@ -545,7 +602,7 @@ place of one of these is non-idiomatic.
   `glyph-elementwise.fab`, `glyph-hadamard-divide.fab`, `glyph-transpose.fab`
   (rank-dispatch WHY notes and expected outputs).
 - **Device form**: glyph operators are legal in `@ kernel` (la `@ nucleum`) bodies
-  and lower through the plan recipes — `out ← a · b` is the glyph spelling of
+  and lower through the plan recipes — `out ⇇ a · b` (a kernel `mut` tensor param is a device buffer, so `←` there is `SEM057`) is the glyph spelling of
   the tiled matmul recipe
   (likewise `⊗` `⊙` `×` and `ᵀ`). Kernel bodies are checked at
   `faber check` time for the host-free subset with named `nucleum_*`
@@ -556,9 +613,9 @@ place of one of these is non-idiomatic.
   (including tuple, optional and grouped results); host reductions keep `int`. Kernel launch requirements
   prove the coordinate extent and exact index arithmetic fit; an unproven
   tensor access still carries its runtime bounds guard and WARN033. A kernel may call
-  kernels, and a private kernel is not callable from host code. The GPU path is
-  not a product surface today, so prefer a corpus exemplar over a claim about
-  execution.
+  kernels, and a private kernel is not callable from host code. Device execution is a
+  product surface with target-specific admission: `faber run --device cpu --threads N <package>` runs kernels on CPU workers (`[device] threads` is the default; `--device reference` is sequential); Metal and CUDA are explicit device choices, not a promise that every operation is supported. `--partitions N` selects logical partitions on CPU or Metal and can span healthy CUDA GPUs (CUDA memory is still replicated). `faber check --device cpu|metal|cuda <package>` builds the device image without running it and reports informational `INFO001` advice. Prefer a corpus exemplar over a claim about execution.
+  Kernel values may use `i64`, `u64`, `wrapping<u64>`, `saturating<u64>` and `d64` (the old `nucleum_wide_integer` / `nucleum_d64` errors are retired; support is per target, Metal carries them; `f64` stays forbidden; decimal stores round half-even to eight fractional digits). `return thread` ends the current lane (no value; also from a nested loop), plain `return` cannot leave a lane, and a correct placement is check-only in 1.17 (`return_thread_lowering_pending`). `do all { … } catch err { … }` defers kernel fault delivery to the block exit; `do device { … } catch err { … }` also checks the block as a device-resident region (host effects, allocations and control flow reading device values are refused by name) and runs as `do all` in 1.17.
 - GEMV is the rank-1 case: `(N,K) · (K,) → (N,)` reads naturally as
   `output ← weights · input`.
 
@@ -705,10 +762,7 @@ reminders, not a second EBNF.
 - **Exemplar:** English device sources such as
   `corpus/vector/kernel.fab` use `@ kernel`
   (a la package would use `@ nucleum`); `references/locales.md` records the locale-diagnosis route.
-- **Kernel tiers:** `@ kernel` takes an optional tier word, `@ kernel relaxed` or
-  `@ kernel unsafe` (la `@ nucleum laxus` / `intutus`, provisional); `unsafe`
-  includes `relaxed`, and the default tier is IEEE-correct (`corpus/kernel/tier.fab`).
-  Tier words follow the file's locale like every other keyword.
+- **Kernel tiers:** `@ kernel` is the default tier: checked indexing and IEEE-correct float math (FMA contraction, reordered reductions and bounded library approximations allowed). `@ kernel relaxed` permits approximate division and square root, fast transcendentals, denormal flushing and float reassociation. `@ kernel unsafe` includes `relaxed` and may remove unproven index checks (out-of-range is then undefined). Source-written checks stay; integer and decimal results stay exact. la `@ nucleum laxus` / `@ nucleum intutus`; tier words follow the file's locale. `faber run --safe`, `faber build --safe` or `[device] safe = true` lowers every kernel to the default tier and never raises one. Metal selects precise or fast math by tier; CUDA does not yet, and `unsafe` does not yet remove index checks, so `--safe` is no precise-math guarantee on CUDA (`corpus/kernel/tier.fab`, `tier-la.fab`).
 - **Wrong form:** Do not copy `@ nucleum` (la) into an `en` file, or mix `@ shared`
   with a locale's other annotation spellings. Resolve the pack before judging
   an annotation; see `references/locales.md`.
