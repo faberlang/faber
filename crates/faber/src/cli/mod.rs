@@ -398,6 +398,14 @@ pub struct BuildArgs {
     #[arg(short = 't', long = "target", value_enum)]
     pub target: Option<FaberCliTarget>,
 
+    /// Run every kernel at the default tier, whatever its `@ kernel relaxed`
+    /// or `@ kernel unsafe` annotation says. It can only lower a tier. Use it
+    /// to check whether a relaxed or unsafe kernel changes answers, and for
+    /// release or verification builds. `[device] safe = true` in `faber.toml`
+    /// sets it for the package; no environment variable does.
+    #[arg(long)]
+    pub safe: bool,
+
     /// Output directory for generated files
     #[arg(short = 'o', long = "out-dir", default_value = ".")]
     pub out_dir: PathBuf,
@@ -801,6 +809,14 @@ pub struct RunArgs {
     /// proves placement and fail-closed admission, not a speedup.
     #[arg(long = "partitions", value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
     pub partitions: Option<u32>,
+
+    /// Run every kernel at the default tier, whatever its `@ kernel relaxed`
+    /// or `@ kernel unsafe` annotation says. It can only lower a tier. Use it
+    /// to check whether a relaxed or unsafe kernel changes answers, and for
+    /// release or verification builds. `[device] safe = true` in `faber.toml`
+    /// sets it for the package; no environment variable does.
+    #[arg(long)]
+    pub safe: bool,
 
     /// Emit diagnostic runner statistics after a package run.
     #[arg(long)]

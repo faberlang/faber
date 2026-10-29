@@ -1,0 +1,30 @@
++++
+term = "nucleum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "nucleum_modifier", "nucleum_tier", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "kernel"
+summary = "A kernel fragment takes no tier: it uses the tier of the entry that composes it."
+syntax = "@ kernel fragment relaxed"
+related = ["nucleum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE018:nucleum_tier_on_fragment"
++++
+# =============================================================================
+# nucleum — A kernel fragment takes no tier: it uses the tier of the entry that composes it.
+# =============================================================================
+#
+# What this teaches:
+#   • A kernel fragment takes no tier: it uses the tier of the entry that composes it.
+#
+# See also: nucleum
+# =============================================================================
+
+@ kernel fragment relaxed
+fn k(f32 x) → f32 {
+    return x
+}
+
+main {
+    print 1
+}

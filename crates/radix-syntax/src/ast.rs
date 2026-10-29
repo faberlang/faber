@@ -2098,6 +2098,73 @@ pub struct RadixLaneAnnotation {
     pub lane: Symbol,
 }
 
+/// The safety tier of a kernel (operator ruling 2026-10-28,
+/// `docs/factory/faber-language-decisions/kernel-math-tiers-ruling-2026-10-28.md`).
+///
+/// The tiers are ordered and cumulative: `Unsafe` includes everything
+/// `Relaxed` allows. They are one three-state choice, never independent
+/// flags. The identities are the Latin keyword keys (`laxus`, `intutus`);
+/// every reader locale spells them through its pack (en `relaxed` /
+/// `unsafe`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum KernelTier {
+    /// IEEE-correct float math with FMA contraction, reduction reordering and
+    /// published-bound transcendentals; unproven index checks stay.
+    #[default]
+    Default,
+    /// Adds approximate `/` and `sqrt`, fast transcendentals, flush-to-zero
+    /// and reassociation of ordinary float expressions.
+    Relaxed,
+    /// Adds removal of the index checks the compiler cannot prove.
+    Unsafe,
+}
+
+impl KernelTier {
+    /// The Latin keyword identity written in the HIR annotation and looked up
+    /// in the locale packs; `None` for the default tier, which has no word.
+    #[must_use]
+    pub const fn identity(self) -> Option<&'static str> {
+        match self {
+            Self::Default => None,
+            Self::Relaxed => Some("laxus"),
+            Self::Unsafe => Some("intutus"),
+        }
+    }
+
+    /// Resolve a keyword identity back to its tier.
+    #[must_use]
+    pub fn from_identity(identity: &str) -> Option<Self> {
+        match identity {
+            "laxus" => Some(Self::Relaxed),
+            "intutus" => Some(Self::Unsafe),
+            _ => None,
+        }
+    }
+
+    /// Stable lower-case name used by reports (`default`, `relaxed`,
+    /// `unsafe`); this is a report label, not a source spelling.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Relaxed => "relaxed",
+            Self::Unsafe => "unsafe",
+        }
+    }
+
+    /// Whether the tier allows relaxed float math (`Relaxed` and `Unsafe`).
+    #[must_use]
+    pub const fn allows_relaxed_math(self) -> bool {
+        !matches!(self, Self::Default)
+    }
+
+    /// Whether the tier allows dropping unproven index checks (`Unsafe`).
+    #[must_use]
+    pub const fn allows_unchecked_indexing(self) -> bool {
+        matches!(self, Self::Unsafe)
+    }
+}
+
 /// Structured `@ nucleum` annotation, with the optional `fragment` modifier.
 /// The modifier is typed data on this family, not an untyped annotation
 /// argument; `fragment` remains distinct from graphics `@ fragment`. The
@@ -2107,6 +2174,12 @@ pub struct NucleumAnnotation {
     /// True when the `fragment` modifier is present (`@ nucleum fragment` or
     /// `@ nucleum { fragment = verum }`).
     pub is_fragment: bool,
+    /// The kernel safety tier the author chose (`@ nucleum laxus`,
+    /// `@ nucleum intutus`); [`KernelTier::Default`] when no tier word is
+    /// written. Only the sugar form carries a tier, and never together with
+    /// `fragment`: a fragment composes into an entry and takes that entry's
+    /// tier.
+    pub tier: KernelTier,
     /// True when the braced record form (`@ nucleum { … }`) was authored;
     /// re-emission keeps the authored brace shape.
     pub braced: bool,

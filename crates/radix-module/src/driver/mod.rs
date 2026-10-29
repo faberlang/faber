@@ -4508,6 +4508,7 @@ fn analyze_semantic_program(input: SemanticAnalysisInput<'_>) -> Result<semantic
     pass_config.import_path_templates = session.config.import_path_templates.clone();
     pass_config.complexity_budget = session.config.complexity_budget;
     pass_config.kernel_complexity_budget = session.config.kernel_complexity_budget;
+    pass_config.deny_kernel_tiers = session.config.deny_kernel_tiers;
     pass_config.fold_literal_floats = !session.config.keep_authored_constants;
     pass_config.insere_files = insere_files;
     pass_config.source_text = Some(std::sync::Arc::from(body));

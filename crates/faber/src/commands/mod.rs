@@ -285,6 +285,7 @@ fn dispatch(command: Command) {
                 },
                 args.format,
                 args.linter,
+                args.safe,
             );
         }
         Command::Corpus(args) => cmd_corpus(&args),

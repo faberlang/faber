@@ -263,6 +263,7 @@ fn fixture_metadata(functions: &[MirFunction]) -> MirDeviceFunctionMetadataMap {
                     visibility: MirFunctionVisibility::Public,
                     origin: MirFunctionOrigin::Source,
                     lane_domain_local: None,
+                    tier: crate::device::KernelTier::Default,
                 },
             )
         })

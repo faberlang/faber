@@ -150,6 +150,8 @@ brevis = "संक्षिप्त"
 descriptio = "विवरण"
 longum = "विस्तृत"
 lane = "लेन"
+laxus = "शिथिल"
+intutus = "असुरक्षित"
 ubique = "वैश्विक"
 annotatio = "टीका"
 versio = "संस्करण"
@@ -705,6 +707,22 @@ help = "इस फ़ाइल की reader locale के लिए `@ {expecte
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "एक घोषणा में एक से अधिक `@ nucleum` annotation हैं"
 help = "एक ही nucleum annotation रखें"
+
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "`@ {nucleum}` एनोटेशन एक से अधिक स्तर बताता है"
+help = "`{laxus}` या `{intutus}` लिखें, या डिफ़ॉल्ट स्तर के लिए कुछ न लिखें"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` कर्नेल का स्तर नहीं है"
+help = "स्तर `{laxus}` और `{intutus}` हैं; डिफ़ॉल्ट स्तर के लिए कुछ न लिखें"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` कोई स्तर नहीं लेता"
+help = "खंड उस कर्नेल का स्तर अपनाता है जो उसे जोड़ता है; स्तर उसी कर्नेल पर लिखें"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "कर्नेल स्तर के लिए कर्नेल फ़ंक्शन चाहिए"
+help = "स्तर को `@ {nucleum}` फ़ंक्शन घोषणा पर लिखें, या हटा दें"
 
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "`@ nucleum` fragment ग्राफ़िक्स fragment annotation से टकराता है"

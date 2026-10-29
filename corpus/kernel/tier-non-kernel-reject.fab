@@ -1,0 +1,30 @@
++++
+term = "nucleum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "nucleum_modifier", "nucleum_tier", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
+category = "kernel"
+summary = "A kernel tier needs a kernel function: on any other declaration it is refused by name."
+syntax = "@ kernel relaxed class P { … }"
+related = ["nucleum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "PARSE018:nucleum_tier_non_kernel"
++++
+# =============================================================================
+# nucleum — A kernel tier needs a kernel function: on any other declaration it is refused by name.
+# =============================================================================
+#
+# What this teaches:
+#   • A kernel tier needs a kernel function: on any other declaration it is refused by name.
+#
+# See also: nucleum
+# =============================================================================
+
+@ kernel relaxed
+class P {
+    let int a
+}
+
+main {
+    print 1
+}

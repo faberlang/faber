@@ -35,6 +35,7 @@ fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
         device,
         threads: None,
         partitions: None,
+        safe: false,
         stats: false,
         stats_file: None,
         shuffle_seed: None,
@@ -596,6 +597,51 @@ device = "metal"
     assert_stats_device_run_follows_d4(&output, &stats_file);
 }
 
+// ── the kernel safe switch (operator ruling 2026-10-28) ──────────────────
+
+fn safe_package(label: &str, device_table: &str) -> PathBuf {
+    let dir = temp_dir(label);
+    std::fs::create_dir_all(dir.join("src")).expect("create src");
+    std::fs::write(dir.join("src/main.fab"), "main { print 1 }\n").expect("write entry");
+    std::fs::write(
+        dir.join("faber.toml"),
+        format!(
+            "[package]\nname = \"safe-switch\"\nversion = \"0.1.0\"\nedition = \"2026\"\n\n\
+             [paths]\nsource = \"src\"\nentry = \"main.fab\"\n\n[build]\nkind = \"bin\"\n\n{device_table}"
+        ),
+    )
+    .expect("write manifest");
+    dir
+}
+
+#[test]
+fn the_safe_flag_lowers_kernels_to_the_default_tier() {
+    let dir = safe_package("safe-flag", "");
+    let unsafe_config = script_package_config(&dir, None, None, false).expect("config");
+    assert!(!unsafe_config.deny_kernel_tiers);
+    let safe_config = script_package_config(&dir, None, None, true).expect("config");
+    assert!(safe_config.deny_kernel_tiers);
+}
+
+#[test]
+fn the_manifest_device_safe_key_lowers_kernels_to_the_default_tier() {
+    let on = safe_package("safe-manifest-on", "[device]\nsafe = true\n");
+    let config = script_package_config(&on, None, None, false).expect("config");
+    assert!(config.deny_kernel_tiers);
+
+    let off = safe_package("safe-manifest-off", "[device]\nsafe = false\n");
+    let config = script_package_config(&off, None, None, false).expect("config");
+    assert!(!config.deny_kernel_tiers);
+}
+
+#[test]
+fn the_safe_flag_can_only_lower_a_tier_never_raise_one() {
+    // `safe = false` in the manifest does not undo `--safe`.
+    let off = safe_package("safe-flag-over-manifest", "[device]\nsafe = false\n");
+    let config = script_package_config(&off, None, None, true).expect("config");
+    assert!(config.deny_kernel_tiers);
+}
+
 // ── run dispatch: the package-MIR runner with a selection ────────────────
 
 #[test]
@@ -630,7 +676,7 @@ fn run_single_file_under(
     arguments: Vec<String>,
 ) -> (Result<ExitCode, RunSourceError>, Vec<String>) {
     let source = std::fs::read_to_string(path).expect("read single-file source");
-    let config = script_package_config(path, None, None).expect("single-file config");
+    let config = script_package_config(path, None, None, false).expect("single-file config");
     let config = match selection.kernel_lowering() {
         radix::module::mir::KernelLowering::Host => config.with_host_kernels(),
         radix::module::mir::KernelLowering::Device => config,

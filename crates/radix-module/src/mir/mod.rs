@@ -120,6 +120,9 @@ mod reduction_access_marker_test;
 #[path = "device_value_join_test.rs"]
 mod device_value_join_test;
 #[cfg(test)]
+#[path = "kernel_tier_test.rs"]
+mod kernel_tier_test;
+#[cfg(test)]
 #[path = "lane_form_test.rs"]
 mod lane_form_test;
 

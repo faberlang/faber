@@ -298,6 +298,41 @@ impl HirAnnotation {
     }
 }
 
+impl HirAnnotation {
+    /// The safety tier of an `@ nucleum` annotation: the tier word the author
+    /// wrote, or [`KernelTier::Default`] for every other family and for an
+    /// annotation with no tier. Lowering records the tier as one `tier`
+    /// field holding its Latin keyword identity.
+    #[must_use]
+    pub fn kernel_tier(&self, interner: &radix_lexer::Interner) -> radix_syntax::KernelTier {
+        if interner.resolve(self.family) != "nucleum" {
+            return radix_syntax::KernelTier::Default;
+        }
+        self.fields
+            .iter()
+            .find_map(|field| match field.value {
+                HirAnnotationValue::Symbol(identity) if interner.resolve(field.name) == "tier" => {
+                    radix_syntax::KernelTier::from_identity(interner.resolve(identity))
+                }
+                _ => None,
+            })
+            .unwrap_or_default()
+    }
+}
+
+/// The declared kernel tier of a function from its annotations.
+#[must_use]
+pub fn kernel_tier_of(
+    annotations: &[HirAnnotation],
+    interner: &radix_lexer::Interner,
+) -> radix_syntax::KernelTier {
+    annotations
+        .iter()
+        .map(|annotation| annotation.kernel_tier(interner))
+        .max()
+        .unwrap_or_default()
+}
+
 fn annotation_brace_authored_default() -> bool {
     true
 }

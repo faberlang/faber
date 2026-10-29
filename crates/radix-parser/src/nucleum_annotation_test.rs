@@ -194,7 +194,7 @@ fn rejects_doubled_nucleum_braced() {
 #[test]
 fn rejects_unexpected_token_after_nucleum_sugar() {
     assert_parse_error_matches(
-        "@ nucleum ignotum\nfunctio k() → vacuum { }\n",
+        "@ nucleum 5\nfunctio k() → vacuum { }\n",
         ParseExpectation::Args(&[
             ("issue", "unexpected_annotation_token"),
             ("context", "@ nucleum"),
@@ -203,12 +203,75 @@ fn rejects_unexpected_token_after_nucleum_sugar() {
 }
 
 #[test]
+fn rejects_an_unknown_word_after_nucleum_as_an_unknown_tier() {
+    assert_parse_error_matches(
+        "@ nucleum ignotum\nfunctio k() → vacuum { }\n",
+        ParseExpectation::Args(&[("issue", "unknown_nucleum_tier"), ("name", "ignotum")]),
+    );
+}
+
+#[test]
 fn rejects_unexpected_token_after_nucleum_fragment_sugar() {
     assert_parse_error_matches(
-        "@ nucleum fragment ignotum\nfunctio h() → vacuum { }\n",
+        "@ nucleum fragment 5\nfunctio h() → vacuum { }\n",
         ParseExpectation::Args(&[
             ("issue", "unexpected_annotation_token"),
             ("context", "@ nucleum"),
         ]),
+    );
+}
+
+fn nucleum_tier(source: &str) -> radix_syntax::KernelTier {
+    let result = parse_ok(source);
+    let program = result.program.as_ref().expect("program");
+    match &program.statements[0].annotations[0].kind {
+        AnnotationKind::Nucleum(nucleum) => nucleum.tier,
+        other => panic!("unexpected annotation kind: {other:?}"),
+    }
+}
+
+#[test]
+fn nucleum_tier_words_parse_to_their_tier() {
+    use radix_syntax::KernelTier;
+    assert_eq!(
+        nucleum_tier("@ nucleum\nfunctio k() → vacuum { }\n"),
+        KernelTier::Default
+    );
+    assert_eq!(
+        nucleum_tier("@ nucleum laxus\nfunctio k() → vacuum { }\n"),
+        KernelTier::Relaxed
+    );
+    assert_eq!(
+        nucleum_tier("@ nucleum intutus\nfunctio k() → vacuum { }\n"),
+        KernelTier::Unsafe
+    );
+}
+
+#[test]
+fn a_second_tier_word_is_a_duplicate_tier() {
+    assert_parse_error_matches(
+        "@ nucleum laxus intutus\nfunctio k() → vacuum { }\n",
+        ParseExpectation::Args(&[("issue", "duplicate_nucleum_tier")]),
+    );
+}
+
+#[test]
+fn a_tier_beside_fragment_is_refused_in_either_order() {
+    for source in [
+        "@ nucleum fragment laxus\nfunctio k() → vacuum { }\n",
+        "@ nucleum laxus fragment\nfunctio k() → vacuum { }\n",
+    ] {
+        assert_parse_error_matches(
+            source,
+            ParseExpectation::Args(&[("issue", "nucleum_tier_on_fragment")]),
+        );
+    }
+}
+
+#[test]
+fn the_braced_form_takes_no_tier_field() {
+    assert_parse_error_matches(
+        "@ nucleum { laxus = verum }\nfunctio k() → vacuum { }\n",
+        ParseExpectation::Args(&[("issue", "invalid_nucleum_field")]),
     );
 }

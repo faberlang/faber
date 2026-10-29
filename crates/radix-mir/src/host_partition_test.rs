@@ -117,6 +117,7 @@ fn fixture_metadata(program: &MirProgram) -> MirDeviceFunctionMetadataMap {
                     visibility: MirFunctionVisibility::Private,
                     origin: MirFunctionOrigin::SyntheticKernelClosure,
                     lane_domain_local: None,
+                    tier: crate::device::KernelTier::Default,
                 },
             )
         })
@@ -895,6 +896,7 @@ fn synthetic_row(function_id: u32) -> (MirFunctionId, MirDeviceFunctionMetadata)
             visibility: MirFunctionVisibility::Private,
             origin: MirFunctionOrigin::SyntheticKernelClosure,
             lane_domain_local: None,
+            tier: crate::device::KernelTier::Default,
         },
     )
 }

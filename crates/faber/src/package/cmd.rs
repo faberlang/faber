@@ -161,7 +161,7 @@ fn report_diagnostics_and_exit(
 /// production to Cargo. Direct-file builds and non-Rust targets keep the legacy
 /// single-output behavior so package ergonomics do not change unrelated command
 /// paths.
-pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: bool) {
+pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: bool, safe: bool) {
     if let Some(message) = locale_without_package_error(
         command.locale.as_deref(),
         std::slice::from_ref(&command.input),
@@ -186,6 +186,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         deny_all_warnings: command.deny_warnings,
         deny_codes: command.deny_codes,
     };
+    let safe = super::resolve_safe_kernels(safe, &input_path);
     let (config, locale_pack) = if is_package {
         match config_with_locale(
             target,
@@ -206,6 +207,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         };
         let locale_pack = config.locale_pack.clone();
         (config, locale_pack)
+    };
+    let config = if safe {
+        config.with_safe_kernels()
+    } else {
+        config
     };
 
     if is_package && target == Target::MirScena {
@@ -1143,10 +1149,11 @@ fn print_device_advice(
     }
 }
 
-/// Print one `info` row per device region (`do device` / `fac machina`) of the
-/// checked package: the names the block shares with the code around it,
-/// classified by writes, its kernel call sites, and its host syncs. The rows
-/// are advice (`INFO001`) and never change the exit status.
+/// Print one `info` row per kernel (its tier) and one per device region (`do
+/// device` / `fac machina`) of the checked package. A region row names what
+/// the block shares with the code around it, classified by writes, its kernel
+/// call sites, and its host syncs. The rows are advice (`INFO001`) and never
+/// change the exit status.
 fn print_region_report(config: &radix::module::Config, input_path: &Path, mode: DiagnosticMode) {
     let Ok(package) = radix::program::analyze::analyze_package(
         config,
@@ -1158,6 +1165,20 @@ fn print_region_report(config: &radix::module::Config, input_path: &Path, mode: 
     let mut rows = Vec::new();
     for node in package.nodes.values() {
         let analysis = &node.analysis;
+        // One row per kernel with its tier: the author's `@ kernel relaxed`
+        // or `@ kernel unsafe`, or the default tier. Under `--safe` the
+        // analysis already reads every kernel as the default tier.
+        for kernel in &analysis.kernel_requirements.kernels {
+            let message = format!("kernel {}: {} tier", kernel.name, kernel.tier.label());
+            let mut row = radix::module::diagnostics::Diagnostic::new(
+                radix::module::diagnostics::Severity::Info,
+                message,
+            )
+            .with_phase(radix::module::diagnostics::DiagnosticPhase::Codegen)
+            .with_code("INFO001");
+            node.path.display().to_string().clone_into(&mut row.file);
+            rows.push(row);
+        }
         let regions = &analysis.kernel_requirements.regions;
         if regions.is_empty() {
             continue;

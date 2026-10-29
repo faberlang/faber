@@ -1971,6 +1971,10 @@ impl<'a> MirLowerer<'a> {
                     },
                     origin: MirFunctionOrigin::Source,
                     lane_domain_local,
+                    // The declared tier of the source kernel. The safe switch
+                    // already lowered it in analysis, so this is the
+                    // effective tier the emitters read.
+                    tier: radix_hir::kernel_tier_of(annotations, self.interner),
                 },
             );
         }

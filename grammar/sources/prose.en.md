@@ -283,6 +283,8 @@ construction literal (`Genus { field = value }`).
 braced `fragment = verum` / `falsum`), not a fused annotation name and not the
 graphics `@ fragment` stage. Standalone `@ fragment` is unchanged.
 
+A kernel runs at one of three ordered safety tiers (operator ruling 2026-10-28, `docs/factory/faber-language-decisions/kernel-math-tiers-ruling-2026-10-28.md`). `@ nucleum` is the default tier. `@ nucleum laxus` (en `@ kernel relaxed`) adds approximate `/` and `sqrt`, fast transcendentals, flush-to-zero and float reassociation. `@ nucleum intutus` (en `@ kernel unsafe`) includes `laxus` and also drops the index checks the compiler cannot prove, so an out-of-range access is undefined behaviour. The words are contextual and claimed only after `@ nucleum`, so `relaxed` and `unsafe` stay ordinary identifiers elsewhere. A second tier word is `duplicate_nucleum_tier`, an unknown word `unknown_nucleum_tier`, a tier on a `fragment` `nucleum_tier_on_fragment` (a fragment uses the tier of the entry that composes it), and a tier on anything but a kernel function `nucleum_tier_non_kernel`. The tier is sugar only; the braced form carries `fragment` alone. `faber run --safe`, `faber build --safe` and `safe = true` under `[device]` in `faber.toml` run every kernel at the default tier; they can only lower a tier and no environment variable controls them.
+
 The `lane` clause of the `nucleum` annotation (`@ nucleum lane "x"`, braced `@ nucleum { lane = "x" }`) was removed (K7): the compiler rejects it with `nucleum_lane_removed`, and `fragment` is the only modifier or field. `@ radix lane` is a different annotation and is unaffected.
 
 Braced annotation records (`@ futura { }`, `@ optio { binding = verbose, ... }`)

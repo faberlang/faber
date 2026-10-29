@@ -73,6 +73,7 @@ pub(super) fn cmd_run(args: RunArgs) {
             &input_path,
             args.locale.as_deref(),
             args.diagnostics_locale.as_deref(),
+            args.safe,
             &args.args,
         ),
         #[cfg(not(feature = "mir-llvm"))]
@@ -112,6 +113,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         &args.args,
         args.locale.as_deref(),
         args.diagnostics_locale.as_deref(),
+        args.safe,
         selection,
         cpu_device_shape(&args, workers),
         args.stats,
@@ -151,6 +153,7 @@ fn interpret_path(
     program_args: &[String],
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
+    safe: bool,
     selection: DeviceSelection,
     cpu: package::mir::CpuDeviceShape,
     stats: bool,
@@ -165,14 +168,18 @@ fn interpret_path(
                 exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
             }
         };
-        let config =
-            match script_package_config(archive.package_input(), locale, diagnostics_locale) {
-                Ok(config) => config,
-                Err(diagnostic) => {
-                    eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                    exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
-                }
-            };
+        let config = match script_package_config(
+            archive.package_input(),
+            locale,
+            diagnostics_locale,
+            safe,
+        ) {
+            Ok(config) => config,
+            Err(diagnostic) => {
+                eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
+            }
+        };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
         #[cfg(feature = "device-runtime")]
         if let Some(result) = try_device_session(
@@ -257,7 +264,7 @@ fn interpret_path(
     }
 
     if is_package_interpret_input(path) {
-        let config = match script_package_config(path, locale, diagnostics_locale) {
+        let config = match script_package_config(path, locale, diagnostics_locale, safe) {
             Ok(config) => config,
             Err(diagnostic) => {
                 super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
@@ -363,7 +370,7 @@ fn interpret_path(
         Err(err) => super::eprint_io_error(path, &err),
     };
 
-    let config = match script_package_config(path, locale, diagnostics_locale) {
+    let config = match script_package_config(path, locale, diagnostics_locale, safe) {
         Ok(config) => config,
         Err(diagnostic) => {
             super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
@@ -444,6 +451,7 @@ fn script_package_config(
     input: &Path,
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
+    safe: bool,
 ) -> Result<radix::module::driver::Config, Box<Diagnostic>> {
     package::config_with_locale(
         radix::module::Target::HirTypeScript,
@@ -451,7 +459,14 @@ fn script_package_config(
         locale,
         diagnostics_locale,
     )
-    .map(|(config, _)| config.with_dev_locale_root())
+    .map(|(config, _)| {
+        let config = config.with_dev_locale_root();
+        if package::resolve_safe_kernels(safe, input) {
+            config.with_safe_kernels()
+        } else {
+            config
+        }
+    })
 }
 
 /// Whether `path` routes through the package-MIR runner rather than the

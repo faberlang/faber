@@ -16,6 +16,7 @@ fn synthetic_row(parent: u32, ordinal: u32) -> MirDeviceFunctionMetadata {
         visibility: MirFunctionVisibility::Private,
         origin: MirFunctionOrigin::SyntheticKernelClosure,
         lane_domain_local: None,
+        tier: radix_mir::device::KernelTier::Default,
     }
 }
 

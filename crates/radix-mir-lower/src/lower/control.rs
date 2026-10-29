@@ -2459,6 +2459,7 @@ impl FunctionBuilder<'_> {
                 visibility: MirFunctionVisibility::Private,
                 origin: MirFunctionOrigin::SyntheticKernelClosure,
                 lane_domain_local: None,
+                tier: radix_mir::device::KernelTier::Default,
             },
         );
         Some(id)
@@ -2596,6 +2597,7 @@ impl FunctionBuilder<'_> {
                 visibility: MirFunctionVisibility::Private,
                 origin: MirFunctionOrigin::SyntheticKernelClosure,
                 lane_domain_local: None,
+                tier: radix_mir::device::KernelTier::Default,
             },
         );
         let declaration = MirFilumReduceOp {

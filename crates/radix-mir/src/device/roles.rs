@@ -5,6 +5,7 @@ use crate::{
     MirLocalId, MirProgram, MirSyntheticFunctionIdentity,
 };
 use handroll::FxHashMap;
+pub use radix_hir::KernelTier;
 use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
 use radix_lexer::Interner;
 
@@ -25,6 +26,12 @@ pub struct MirDeviceFunctionMetadata {
     /// shift view (`src.shift(s).limes<P>()`) carries no storage of its own,
     /// so a region over one records the view's base parameter.
     pub lane_domain_local: Option<MirLocalId>,
+    /// The kernel's effective safety tier (ruling 2026-10-28): what the
+    /// author declared, lowered to [`KernelTier::Default`] by the safe switch.
+    /// Device emitters read this to choose their math and index-check forms.
+    /// Source-less synthetic kernels (closures, scan steps, region
+    /// lowerings) carry [`KernelTier::Default`].
+    pub tier: KernelTier,
 }
 
 impl MirDeviceFunctionMetadata {
