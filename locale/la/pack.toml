@@ -5139,141 +5139,187 @@ help = "serva terminum purum: scribe tantum locales a corpore declaratos, et voc
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "expected '>' after type arguments"
+help = "Post argumenta generis adde `>` clausorium."
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "expected '(' before function type parameters"
+help = "Genus functionis per `(` ante genera parametrorum incipe."
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "expected ')' after function type parameters"
+help = "Indicem parametrorum per `)` claude ante sagittam reditus `→`."
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "expected '→' before the function return type"
+help = "Inter indicem parametrorum et genus reditus scribe `→`."
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "expected '<' after the numeric wrapper name"
+help = "Utere genere latitudinis simplici, ut `i32` aut `f32`; genera numerica iam `<...>` non accipiunt."
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "expected ':' after the tuple element label"
+help = "Inter titulum elementi iunctae et genus pone `:`, ut in `tuple<name: string>`."
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "expected ':' after the ratio element label"
+help = "Inter titulum campi rationis et genus pone `:`, ut in `record<name: string>`."
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "expected ']' after shape dimensions"
+help = "Dimensiones figurae `]` claude, ut in `tf32[2, 3]`."
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "expected ')' after the parenthesized shape"
+help = "Expressionem magnitudinis parenthesibus inclusam `)` claude, ut in `{magnitudo} (n + 1)`."
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "expected '←' after the awaited binding"
+help = "Post ligamen `{figendum}` aut `{variandum}`, ante expressionem futuri utere `←`."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "expected '[' to start the array binding pattern"
+help = "Ligamen ordinatum per `[` incipe, ut in `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "expected ']' to end the array binding pattern"
+help = "Ligamen ordinatum `]` claude, ut in `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "expected an opening brace for the object binding pattern"
+help = "Ligamen obiecti per `{{` incipe, ut in `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "expected a closing brace for the object binding pattern"
+help = "Ligamen obiecti `}` claude, ut in `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "expected '(' before function declaration parameters"
+help = "Parametra functionis parenthesibus post nomen scribe: `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "expected ')' after function declaration parameters"
+help = "Indicem parametrorum post ultimum parametrum claude, ut in `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "expected a closing brace after the class body"
+help = "Genus post membra eius claude, ut in `{genus} Name {{ {sit} int value }`."
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "expected an opening brace for the interface body"
+help = "Corpus interface per `{{` incipe, ut in `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "expected '(' before interface method parameters"
+help = "Parametra methodi interface parenthesibus scribe: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "expected ')' after interface method parameters"
+help = "Indicem parametrorum methodi post ultimum parametrum claude: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "expected a closing brace after the interface body"
+help = "Interfaciem post subscriptiones methodorum claude, ut in `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "expected '=' before the type alias value"
+help = "Alias generis per `=` scribe, ut in `{typus} Name = string`."
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "expected an opening brace for the schema body"
+help = "Corpus schematis per `{{` incipe, ut in `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "expected a closing brace after the schema body"
+help = "Schema post columnas claude, ut in `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "expected an opening brace for the enum body"
+help = "Corpus enumerationis per `{{` incipe, ut in `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "expected a closing brace after the enum body"
+help = "Enumerationem post membra eius claude, ut in `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "expected an opening brace for the union body"
+help = "Corpus unionis per `{{` incipe, ut in `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "expected a closing brace after the union variant fields"
+help = "Contentum variantis post campos claude, ut in `Circle {{ int radius }`."
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "expected a closing brace after the union body"
+help = "Unionem post variantes eius claude, ut in `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "expected an opening brace for the import record"
+help = "Tabulam importationis per `{{` incipe, ut in `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "expected '=' after the import field name"
+help = "Inter campum importationis et valorem pone `=`, ut in `{ex} = \"norma:console\"`."
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "expected a closing brace after the import record fields"
+help = "Tabulam importationis post campos claude, ut in `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "expected an opening brace for the probandum body"
+help = "Corpus cohortis probationum per `{{` incipe, ut in `{probandum} \"suite\" {{`."
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "expected a closing brace after the probandum body"
+help = "Cohortem probationum post probationes et praeparationis clausulas `}` claude."
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "expected an opening brace for the annotation fields"
+help = "Ad campos annotationem uncis inclusam utere, ut `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "expected '=' after the annotation field name"
+help = "Inter campum annotationis et valorem pone `=`, ut in `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "expected a closing brace after the annotation fields"
+help = "Annotationem uncis inclusam post campos claude, ut in `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "expected an opening brace for the nucleum annotation fields"
+help = "Utere optionibus nuclei uncis inclusis, ut `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "expected '=' after the nucleum annotation field name"
+help = "Inter optionem nuclei et valorem pone `=`, ut in `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "expected a closing brace after the nucleum annotation fields"
+help = "Optiones nuclei uncis inclusas post campos claude, ut in `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.block_start]
 message = "expected an opening brace for the block"
+help = "Partem post caput eius incipe, ut in `{si} ready {{ {tacet} }`."
 
 [diagnostics.PARSE001.issues.block_end]
 message = "expected a closing brace to end the block"
+help = "Partem post sententias eius `}` claude."
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "expected '>' after generic parameters"
+help = "Indicem parametrorum genericorum per `>` claude, ut in `{functio} identity<T>(T value)`."
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "expected '>' after contract type arguments"
+help = "Argumenta generis contractus per `>` claude, ut in `Contract<Type>`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "expected '[' after 'apud'"
+help = "Coordinatas iterationis uncis quadratis post `{apud}` pone, ut in `{itera} {ex} values {apud} [i] {sit} value`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "expected ']' after the 'apud' coordinates"
+help = "Indicem coordinatarum post nomina `]` claude."
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "vocabulum exspectabatur: '{keyword}'"
@@ -5281,36 +5327,47 @@ help = "scribe '{keyword}' hic"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "expected a reduction source after the reduction operator"
+help = "Post operatorium reductionis scribe `{ex} source`."
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "expected '{lege}' or '{lineam}'"
+help = "Utere `{lege}` ut omnia data legas, aut `{lineam}` ut unam lineam legas."
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "expected an opening brace for the elige body"
+help = "Scribe `{elige} value {{ ... }` cum casibus `{casu}` intus."
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "expected a closing brace after the elige cases"
+help = "Corpus `{elige}` post casus `{casu}` et casum optionalem `{ceterum}` claude."
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "expected an opening brace for the discerne body"
+help = "Scribe `{discerne} value {{ ... }` cum brachiis exemplarium `{casu}` intus."
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "expected a closing brace after the discerne arms"
+help = "Corpus `{discerne}` post brachia `{casu}` et brachium optionalem `{ceterum}` claude."
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "expected an opening brace for the custodi body"
+help = "Corpus per `{custodi} {{` incipe et unam vel plures clausulas `{si}` adde."
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "expected a closing brace after the custodi clauses"
+help = "Corpus `{custodi}` post clausulas `{si}` claude."
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "expected '✗' after the conditional value"
+help = "Inter valorem rami tunc et valorem rami alterius pone `✗`."
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "expected ')' after the call arguments"
+help = "Indicem argumentorum vocationis `)` claude."
 
 [diagnostics.PARSE001.issues.index_end]
 message = "expected ']' after the index expression"
+help = "Expressionem indicis `]` claude."
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "index unam tantum expressionem accipit; coordinatae separatae singula per axem non sunt"
@@ -5318,99 +5375,131 @@ help = "scribe coordinatas in lista unica, sicut m[[r, c]]"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "expected ']' after the gradient selectors"
+help = "Indicem selectorum uncis quadratis inclusum post elementa `]` claude."
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "expected ']' after the optional index expression"
+help = "Indicem optionalem ita finias: `value?[index]`."
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "expected ')' after the optional call arguments"
+help = "Vocationem optionalem ita finias: `value?(arguments)`."
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "expected ']' after the non-null index expression"
+help = "Indicem non nullum ita finias: `value![index]`."
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "expected ')' after the non-null call arguments"
+help = "Vocationem non nullam ita finias: `value!(arguments)`."
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "expected a closing brace after the constructor fields"
+help = "Campos constructoris post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "expected ']' after the inferred constructor elements"
+help = "Indicem elementorum constructoris illati `]` claude."
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "expected ']' after the array elements"
+help = "Litterale indicis post elementa `]` claude."
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "expected ')' after the parenthesized expression"
+help = "Expressionem parenthesibus inclusam `)` claude."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "expected '<' after 'ratio'"
+help = "Argumenta generis nominata post `record` scribe, ut in `record<label: Type>`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "expected '>' after the ratio type arguments"
+help = "Indicem argumentorum generis rationis ante campos per `>` claude."
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "expected an opening brace after the ratio type arguments"
+help = "Post argumenta generis rationis, campos per `{{` incipe."
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "expected a closing brace after the ratio fields"
+help = "Campos rationis post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "expected a closing brace after the typed constructor fields"
+help = "Campos constructoris typati post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "expected a closing brace after the finge fields"
+help = "Campos variantis post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "expected '<' after 'iuncta'"
+help = "Argumenta generis iunctae post `{iuncta}` scribe, ut in `{iuncta}<T, U>`."
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "expected '[' after the iuncta type arguments"
+help = "Post argumenta generis, indicem valorum iunctae uncis quadratis inclusum scribe."
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "expected ']' after the iuncta elements"
+help = "Indicem valorum iunctae `]` claude post elementa."
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "expected ')' after the closure parameters"
+help = "Indicem parametrorum per `)` claude ante subscriptionem optionalem et `∴`."
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "expected '∴' after the closure signature"
+help = "Post subscriptionem clausurae scribe `∴`, deinde expressionem aut partem `{fac}`."
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "expected ')' after the ad opener"
+help = "Expressionem apertoris optionalis post eius valorem `)` claude."
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "expected ':' after the argument label"
+help = "In vocatione formulae, inter titulum argumenti et valorem pone `:`."
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "expected ']' after the computed object key"
+help = "Clavem campi computatam `]` claude ante scribendum `= value`."
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "expected ':' after the JSON key"
+help = "Inter unamquamque clavem JSON inter virgulas et eius valorem pone `:`."
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "expected a closing brace after the JSON object"
+help = "Obiectum JSON post membra eius `}` claude."
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "expected ']' after the JSON array"
+help = "Indicem JSON post valores eius `]` claude."
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "expected a closing brace after the inferred constructor fields"
+help = "Constructorem illatum `}` claude."
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "expected '>' after the call type arguments"
+help = "Indicem argumentorum generis ante '(' vocationis per '>' claude."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "expected '<' before the constructor type arguments"
+help = "Ante argumenta generis constructoris adde '<'."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "expected '>' after the constructor type arguments"
+help = "Indicem argumentorum generis constructoris per '>' claude."
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "expected '(' after 'scriptum'"
+help = "Vocationem `{scriptum}` per '(' incipe."
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "expected ')' after the scriptum arguments"
+help = "Vocationem `{scriptum}` post argumenta per ')' claude."
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "nomen identificatoris exspectabatur"
@@ -5502,18 +5591,24 @@ message = "kernel `{kernel}` runs serialized on the {device} device"
 
 [diagnostics.INFO001.issues.single_lane]
 message = "kernel `{kernel}` runs on one lane"
+help = "Utere functione `@ {nucleum}` cum circuitu `{itera}` et clausula `{filum}`, cum unaquaeque via rem tractare debeat."
 
 [diagnostics.INFO001.issues.not_split]
 message = "kernel `{kernel}` runs on one of the {partitions} partitions: {reason}"
+help = "Causam inspice: divisio reticulum lineare viarum executionis, spatium viae, et scripturas intra spatium uniuscuiusque viae contentas requirit."
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
 message = "kernel `{kernel}`: whether it splits across the {partitions} partitions depends on run-time shapes"
+help = "Formas exsecutionis elige quae ordini viarum et scripturis eiusdem spatia congruentia praebent, ut divisio praedictibilis sit."
 
 [diagnostics.INFO001.issues.whole_call]
 message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
+help = "Ad opus independens singulorum elementorum, utere functione `@ {nucleum}` cum circuitu `{itera}` et clausula `{filum}`."
 
 [diagnostics.INFO001.issues.not_placed]
 message = "kernel `{kernel}` is not placed on the {device} device: {reason}"
+help = "Causam inspice et forma nuclei utere quam machina electa sustinet."
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
+help = "Sequere causam inspectionis ut dependentiam invenias. Lectiones et scripturas per partitiones divisas intra singulas vias contine, et dispositionibus bufferorum congruentibus utere ubi fieri potest."

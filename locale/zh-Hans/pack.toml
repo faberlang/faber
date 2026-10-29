@@ -3922,177 +3922,234 @@ help = "保持项为纯：只写入归约体声明的局部变量，只调用不
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "类型实参后需要 '>'"
+help = "在类型实参后添加闭合符号 `>`。"
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "函数类型的形参前需要 '('"
+help = "在参数类型前用 `(` 开始函数类型。"
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "函数类型的形参后需要 ')'"
+help = "在 `→` 返回箭头前用 `)` 闭合参数列表。"
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "函数返回类型前需要 '→'"
+help = "在参数列表和返回类型之间写 `→`。"
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "数值包装类型名后需要 '<'"
+help = "使用裸宽度类型，例如 `i32` 或 `f32`；数字类型不再使用 `<...>`。"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "元组元素标签后需要 ':'"
+help = "用 `:` 分隔元组类型标签和类型，例如 `tuple<name: string>`。"
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "ratio 元素标签后需要 ':'"
+help = "用 `:` 分隔记录字段标签和类型，例如 `record<name: string>`。"
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "形状维度后需要 ']'"
+help = "用 `]` 闭合形状维度，例如 `tf32[2, 3]`。"
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "括号内的形状后需要 ')'"
+help = "用 `)` 闭合括号中的大小表达式，例如 `{magnitudo} (n + 1)`。"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "等定/等变绑定后需要 '←'"
+help = "在 `{figendum}` 或 `{variandum}` 绑定后，在 future 表达式前使用 `←`。"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "数组绑定模式需要以 '[' 开始"
+help = "用 `[` 开始数组绑定，例如 `{sit} [first, second] ← values`。"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "数组绑定模式需要以 ']' 结束"
+help = "用 `]` 闭合数组绑定，例如 `{sit} [first, second] ← values`。"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "对象绑定模式需要以花括号开始"
+help = "用 `{{` 开始对象绑定，例如 `{sit} {{ name } ← value`。"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "对象绑定模式需要以 '}' 结束"
+help = "用 `}` 闭合对象绑定，例如 `{sit} {{ name } ← value`。"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "函数声明参数前需要 '('"
+help = "在函数名后用圆括号写参数：`{functio} greet(string name)`。"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "函数声明参数后需要 ')'"
+help = "最后一个参数后闭合参数列表，例如 `{functio} greet(string name)`。"
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "类体后需要 '}'"
+help = "成员后闭合类，例如 `{genus} Name {{ {sit} int value }`。"
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "interface 主体需要以花括号开始"
+help = "用 `{{` 开始接口主体，例如 `{implendum} Name {{ {functio} method() }`。"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "interface method 参数前需要 '('"
+help = "用圆括号书写接口方法参数：`{functio} method(string name)`。"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "interface method 参数后需要 ')'"
+help = "最后一个参数后闭合方法参数列表：`{functio} method(string name)`。"
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "interface 主体后需要 '}'"
+help = "方法签名后闭合接口，例如 `{implendum} Name {{ {functio} method() }`。"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "type alias 值前需要 '='"
+help = "用 `=` 书写类型别名，例如 `{typus} Name = string`。"
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "schema 主体需要以花括号开始"
+help = "用 `{{` 开始架构主体，例如 `{schema} Name {{ {columna} int id }`。"
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "schema 主体后需要 '}'"
+help = "列后闭合架构，例如 `{schema} Name {{ {columna} int id }`。"
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "enum 主体需要以花括号开始"
+help = "用 `{{` 开始枚举主体，例如 `{ordo} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "enum 主体后需要 '}'"
+help = "在成员后闭合枚举，例如 `{ordo} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "union 主体需要以花括号开始"
+help = "用 `{{` 开始联合体主体，例如 `{discretio} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "union variant 字段后需要 '}'"
+help = "字段后闭合变体载荷，例如 `Circle {{ int radius }`。"
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "union 主体后需要 '}'"
+help = "在变体后闭合联合体，例如 `{discretio} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "import record 需要以花括号开始"
+help = "用 `{{` 开始导入记录，例如 `{importa} {{ {ex} = \"norma:console\" }`。"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "导入字段名后需要 '='"
+help = "用 `=` 分隔导入字段和值，例如 `{ex} = \"norma:console\"`。"
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "import record 字段后需要 '}'"
+help = "字段后闭合导入记录，例如 `{importa} {{ {ex} = \"norma:console\" }`。"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "probandum 主体需要以花括号开始"
+help = "开始测试套件主体时使用 `{{`，例如 `{probandum} \"suite\" {{`。"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "probandum 主体后需要 '}'"
+help = "测试和 setup 钩子后用 `}` 闭合测试套件。"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "注解字段需要以花括号开始"
+help = "字段请使用带花括号的注解，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "注解字段名后需要 '='"
+help = "用 `=` 分隔注解字段和值，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "注解字段后需要 '}'"
+help = "字段后闭合带花括号的注解，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "nucleum 注解字段需要以花括号开始"
+help = "使用带花括号的内核选项，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "nucleum 注解字段名后需要 '='"
+help = "用 `=` 分隔内核选项和值，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "nucleum 注解字段后需要 '}'"
+help = "字段后闭合带花括号的内核选项，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.block_start]
 message = "代码块需要以花括号开始"
+help = "在头部后开始代码块，例如 `{si} ready {{ {tacet} }`。"
 
 [diagnostics.PARSE001.issues.block_end]
 message = "代码块需要以 '}' 结束"
+help = "语句后用 `}` 闭合代码块。"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "泛型参数后需要 '>'"
+help = "用 `>` 闭合泛型参数列表，例如 `{functio} identity<T>(T value)`。"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "contract 类型实参后需要 '>'"
+help = "用 `>` 闭合契约的类型实参，例如 `Contract<Type>`。"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "'apud' 后需要 '['"
+help = "在 `{apud}` 后用方括号写迭代坐标，例如 `{itera} {ex} values {apud} [i] {sit} value`。"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "'apud' 坐标后需要 ']'"
+help = "名称后用 `]` 闭合坐标列表。"
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "需要 '{keyword}'"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "reduction 运算符之后需要 reduction 源"
+help = "归约运算符后写 `{ex} source`。"
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "需要 '{lege}' 或 '{lineam}'"
+help = "使用 `{lege}` 读取全部输入，或使用 `{lineam}` 读取一行。"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige 主体需要以花括号开始"
+help = "写 `{elige} value {{ ... }`，并在其中放置 `{casu}` 分支。"
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "elige 分支后需要 '}'"
+help = "在 `{casu}` 分支和可选的 `{ceterum}` 分支后闭合 `{elige}` 主体。"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "discerne 主体需要以花括号开始"
+help = "写 `{discerne} value {{ ... }`，并在其中放置 `{casu}` 模式分支。"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "discerne 分支后需要 '}'"
+help = "在 `{casu}` 分支和可选的 `{ceterum}` 分支后闭合 `{discerne}` 主体。"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "custodi 主体需要以花括号开始"
+help = "用 `{custodi} {{` 开始主体，并添加一个或多个 `{si}` 子句。"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "custodi 子句后需要 '}'"
+help = "在 `{custodi}` 的 `{si}` 子句后闭合主体。"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "条件值后需要 '✗'"
+help = "在 then 值和 else 值之间放置 `✗`。"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "调用参数后需要 ')'"
+help = "用 `)` 闭合调用的实参列表。"
 
 [diagnostics.PARSE001.issues.index_end]
 message = "索引表达式后需要 ']'"
+help = "用 `]` 闭合索引表达式。"
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "索引括号只接受一个表达式；分开的坐标不是按轴的槽位"
@@ -4100,99 +4157,131 @@ help = "把坐标写成带括号的列表，例如 m[[r, c]]"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "gradient selector 列表后需要 ']'"
+help = "列表项后用 `]` 闭合方括号选择器列表。"
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "optional 索引表达式后需要 ']'"
+help = "将可选索引写完整：`value?[index]`。"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "optional 调用参数后需要 ')'"
+help = "将可选调用写完整：`value?(arguments)`。"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "non-null 索引表达式后需要 ']'"
+help = "将非空索引写完整：`value![index]`。"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null 调用参数后需要 ')'"
+help = "将非空调用写完整：`value!(arguments)`。"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合构造器字段。"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "推断 constructor 元素后需要 ']'"
+help = "用 `]` 闭合推断构造器的元素列表。"
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "数组元素后需要 ']'"
+help = "元素后用 `]` 闭合列表字面量。"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "括号内的表达式后需要 ')'"
+help = "用 `)` 闭合括号表达式。"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "'ratio' 后需要 '<'"
+help = "在 `record` 后写带标签的类型实参，例如 `record<label: Type>`。"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "ratio 类型实参后需要 '>'"
+help = "在字段前用 `>` 闭合记录类型实参。"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "ratio 类型实参后需要花括号"
+help = "记录类型实参后，用 `{{` 开始字段。"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "ratio 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合记录字段。"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "typed constructor 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合带类型的构造器字段。"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "finge 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合变体字段。"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "'iuncta' 后需要 '<'"
+help = "在 `{iuncta}` 后写元组类型实参，例如 `{iuncta}<T, U>`。"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "iuncta 类型实参后需要 '['"
+help = "类型实参后，用方括号写元组值列表。"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "iuncta 元素后需要 ']'"
+help = "元素后用 `]` 闭合元组值列表。"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "closure 参数后需要 ')'"
+help = "用 `)` 闭合参数列表，然后写可选签名和 `∴`。"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "closure 签名后需要 '∴'"
+help = "闭包签名后写 `∴`，再写表达式或 `{fac}` 代码块。"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "ad opener 后需要 ')'"
+help = "在可选的 opener 表达式的值后用 `)` 闭合。"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "参数标签后需要 ':'"
+help = "在模板调用中，用 `:` 分隔实参标签和值。"
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "computed key 后需要 ']'"
+help = "用 `]` 闭合计算字段键，然后写 `= value`。"
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "JSON key 后需要 ':'"
+help = "在每个带引号的 JSON 键和值之间放置 `:`。"
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "JSON object 后需要 '}'"
+help = "成员后用 `}` 闭合 JSON 对象。"
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "JSON array 后需要 ']'"
+help = "值后用 `]` 闭合 JSON 数组。"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "推断 constructor 字段后需要 '}'"
+help = "用 `}` 闭合推断构造器。"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "调用类型实参后需要 '>'"
+help = "在调用的 '(' 前用 '>' 闭合类型实参列表。"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "constructor 类型实参前需要 '<'"
+help = "在构造器的类型实参前添加 '<'。"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "constructor 类型实参后需要 '>'"
+help = "用 '>' 闭合构造器的类型实参列表。"
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "'scriptum' 后需要 '('"
+help = "用 '(' 开始 `{scriptum}` 调用。"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "scriptum 参数后需要 ')'"
+help = "参数后用 ')' 闭合 `{scriptum}` 调用。"
 
 # Package-layer rows. The PKG001 base row only holds issue rows: the renderer
 # shows a PKG001 diagnostic from the pack only when its own issue row exists.
@@ -4256,5 +4345,21 @@ help = "声明 `{implendum} Sink<T>`，并包含 `{functio} sink(T res) → vacu
 [diagnostics.INFO001]
 message = "内核 `{kernel}` 在 {device} 设备上串行运行"
 
+[diagnostics.INFO001.issues.single_lane]
+help = "当每个车道应处理一个项目时，使用 `@ {nucleum}` 函数，配合 `{itera}` 循环和 `{filum}` 子句。"
+
+[diagnostics.INFO001.issues.not_split]
+help = "检查原因：拆分需要线性车道网格、车道范围，以及限制在各自车道范围内的写入。"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+help = "选择运行时形状，使车道网格与其写入具有匹配范围，以便可预测地拆分。"
+
+[diagnostics.INFO001.issues.whole_call]
+help = "对于相互独立的逐项工作，使用 `@ {nucleum}` 函数，配合 `{itera}` 循环和 `{filum}` 子句。"
+
+[diagnostics.INFO001.issues.not_placed]
+help = "检查原因，并使用所选设备支持的内核形式。"
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "内核 `{kernel}`：其跨 {partitions} 个分区的 {kind} 是可以避免的：{avoidable}（{reason}）"
+help = "根据审计原因查找依赖。尽可能让分区读写保持在各自车道内，并使用匹配的缓冲区布局。"
