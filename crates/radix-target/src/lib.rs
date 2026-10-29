@@ -340,6 +340,15 @@ impl Target {
         matches!(self, Self::MirMetal | Self::MirWgsl)
     }
 
+    /// Whether this target's kernel emitter carries 64-bit integer and 128-bit
+    /// `d64` values (operator ruling 2026-10-28). Metal lowers them with MSL
+    /// `long`/`ulong`; WGSL and AMD refuse them by name until their emitters
+    /// emulate 64-bit lanes.
+    #[must_use]
+    pub fn supports_wide_kernel_values(self) -> bool {
+        matches!(self, Self::MirMetal)
+    }
+
     /// Whether this target applies a ranged store policy
     /// (`saturating|trapping|wrapping<W, lo‥hi>`, need) at the store.
     /// Every other target would read the cell as its bare width and silently

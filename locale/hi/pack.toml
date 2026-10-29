@@ -1594,10 +1594,6 @@ help = "लोअरिंग के लिए AST संरचना ठीक 
 message = "width marker पैरामीटर स्वीकार नहीं कर सकता"
 help = "लोअरिंग के लिए AST संरचना ठीक करें"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "nucleum कर्नेल में d64 समर्थित नहीं है"
-help = "समर्थित कर्नेल मान प्रकार का उपयोग करें"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "कर्नेल पूर्णांक extent {extent} पोर्टेबल श्रेणी में फिट होना सिद्ध नहीं है"
 help = "extent को पोर्टेबल पूर्णांक श्रेणी के मानों तक सीमित करें"
@@ -1629,10 +1625,6 @@ help = "tensor को क्षेत्र से पहले आवंटि�
 [diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
 message = "'{fac} {machina}' क्षेत्र में '{construct}' डिवाइस पर गणना किया मान पढ़ता है; डिवाइस-पक्ष लूप नियंत्रण अभी बना नहीं है"
 help = "शर्तें, सीमाएँ और स्केलर तर्क क्षेत्र से पहले ज्ञात मानों तक रखें, और डिवाइस परिणाम क्षेत्र के बाद पढ़ें"
-
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "पूर्णांक चौड़ाई {width} समर्थित nucleum कर्नेल चौड़ाई से अधिक है"
-help = "32 बिट से अधिक चौड़ाई वाला पूर्णांक उपयोग न करें"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "कर्नेल intermediate extent {extent} पोर्टेबल पूर्णांक श्रेणी से अधिक है"

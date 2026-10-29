@@ -1594,10 +1594,6 @@ help = "แก้ไขโครงสร้าง AST สำหรับกา�
 message = "width marker ไม่รับพารามิเตอร์"
 help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "d64 ไม่รองรับในเคอร์เนล nucleum"
-help = "ใช้ชนิดค่าของเคอร์เนลที่รองรับ"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "extent จำนวนเต็มของเคอร์เนล {extent} ไม่ได้รับการพิสูจน์ว่าอยู่ในช่วงที่ย้ายพอร์ตได้"
 help = "จำกัดค่า extent ให้อยู่ในช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
@@ -1629,10 +1625,6 @@ help = "จัดสรร tensor ก่อนขอบเขตแล้วใ�
 [diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
 message = "'{construct}' ในขอบเขต '{fac} {machina}' อ่านค่าที่คำนวณบนอุปกรณ์ การควบคุมลูปบนอุปกรณ์ยังไม่ได้สร้าง"
 help = "ให้เงื่อนไข ขอบเขต และอาร์กิวเมนต์สเกลาร์ใช้ค่าที่รู้ก่อนขอบเขต และอ่านผลจากอุปกรณ์หลังขอบเขต"
-
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "ความกว้างจำนวนเต็ม {width} เกินความกว้างของเคอร์เนล nucleum ที่รองรับ"
-help = "ใช้ความกว้างจำนวนเต็มไม่เกิน 32 บิต"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "extent ตัวกลางของเคอร์เนล {extent} เกินช่วงจำนวนเต็มที่ย้ายพอร์ตได้"

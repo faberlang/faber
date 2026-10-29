@@ -1626,10 +1626,6 @@ help = "修正用于 lowering 的 AST construct"
 message = "width marker 不能接受 parameters"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "nucleum kernel 中不支持 d64"
-help = "请使用受支持的 kernel value type"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "kernel integer extent {extent} 未被证明落在 portable range 内"
 help = "把 extent 限制在 portable integer range 内的取值"
@@ -1661,10 +1657,6 @@ help = "在区域之前分配 tensor，再在区域内使用"
 [diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
 message = "'{fac} {machina}' 区域中的 '{construct}' 读取了设备上计算的值；设备端循环控制尚未实现"
 help = "条件、边界和标量实参只用区域之前已知的值，并在区域之后读取设备结果"
-
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "integer width {width} 超出受支持的 nucleum kernel width"
-help = "使用不超过 32 bits 的 integer width"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "kernel intermediate extent {extent} 超出 portable integer range"
