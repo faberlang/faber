@@ -918,7 +918,10 @@ impl<'a> KernelBuilder<'a> {
                     )
                     .map_err(|detail| DeviceProgramBuildError::KernelAbi {
                         function: function.id,
-                        detail,
+                        detail: format!(
+                            "{detail}; {}",
+                            lane_kernel_call_context(function, self.program, self.interner)
+                        ),
                     })?
                     .or_else(|| single_lane_plan(function, self.validation))
                     .unwrap_or(CollectionKernelPlan::Elementwise),
@@ -2071,6 +2074,57 @@ fn semantic_facts(
         relations,
         initializations,
         observations: Vec::new(),
+    }
+}
+
+fn lane_kernel_call_context(
+    function: &MirFunction,
+    program: &crate::MirProgram,
+    interner: &Interner,
+) -> String {
+    let kernel_name = function
+        .name
+        .map(|name| interner.resolve(name).to_owned())
+        .unwrap_or_else(|| format!("function {}", function.id.0));
+    let targets_kernel = |callee: &MirCallee| match callee {
+        MirCallee::Function(id)
+        | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => *id == function.id,
+        MirCallee::Definition { source, .. } => function.source == Some(*source),
+        MirCallee::Closure(closure) => closure.function == function.id,
+        MirCallee::Value(_) => false,
+    };
+    let mut call_sites = Vec::new();
+    for caller in &program.functions {
+        let caller_name = caller
+            .name
+            .map(|name| interner.resolve(name).to_owned())
+            .unwrap_or_else(|| format!("function {}", caller.id.0));
+        for block in &caller.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::Call { callee, .. } = &statement.kind else {
+                    continue;
+                };
+                if targets_kernel(callee) {
+                    call_sites.push(format!(
+                        "`{kernel_name}` called from `{caller_name}` at bytes {}..{}",
+                        statement.span.start, statement.span.end
+                    ));
+                }
+            }
+            if let crate::MirTerminatorKind::TryCall { callee, .. } = &block.terminator.kind
+                && targets_kernel(callee)
+            {
+                call_sites.push(format!(
+                    "`{kernel_name}` called from `{caller_name}` at bytes {}..{}",
+                    block.terminator.span.start, block.terminator.span.end
+                ));
+            }
+        }
+    }
+    if call_sites.is_empty() {
+        format!("kernel `{kernel_name}`")
+    } else {
+        call_sites.join("; ")
     }
 }
 
