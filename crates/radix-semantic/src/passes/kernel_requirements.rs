@@ -3,12 +3,12 @@
 //! This pass records portable-device admission facts beside the typed HIR. It
 //! does not change Faber arithmetic or lower runtime checks. Exact integer
 //! intermediates must fit the host's 64-bit integer intermediate range
-//! (ruling 17) and `d64` intermediates the 128-bit carrier (ruling 19(e));
-//! the operator ruling of 2026-10-28 admits `i64`, `u64`, `wrapping<u64>`,
-//! `saturating<u64>` and `d64` as kernel values, so these widths are
-//! per-target capability facts in the report, never check errors. An
-//! implicit trapping store that is not proven safe remains an explicit
-//! option-F requirement.
+//! (ruling 17); a `d64` intermediate uses the 128-bit carrier and traps beyond
+//! it at run time (ruling 19(e)). The operator ruling of 2026-10-28 admits
+//! `i64`, `u64`, `wrapping<u64>`, `saturating<u64>` and `d64` as kernel values,
+//! so these widths are per-target capability facts in the report, never check
+//! errors. An implicit trapping store that is not proven safe remains an
+//! explicit option-F requirement.
 
 use crate::{
     NumericWidth, Primitive, ResolvedTensorEdgePolicy, Resolver, SemanticError, SemanticErrorKind,
@@ -193,8 +193,8 @@ pub enum KernelRequirementFailure {
 
 /// Issue: `f64` is not a kernel value.
 pub const ISSUE_F64: &str = "nucleum_f64";
-/// Issue: an exact intermediate exceeds the 64-bit integer intermediate range
-/// (or, for `d64`, the 128-bit carrier).
+/// Issue: an exact intermediate is provably beyond the 64-bit integer range
+/// or, for `d64`, a constant operation is provably beyond the 128-bit carrier.
 pub const ISSUE_WIDE_INTERMEDIATE: &str = "nucleum_wide_intermediate";
 /// Issue: an integer extent has no proof that it fits the envelope.
 pub const ISSUE_EXTENT_UNPROVEN: &str = "nucleum_extent_unproven";
@@ -1477,13 +1477,14 @@ const DEVICE_INTEGER_MAX: i128 = 4_294_967_295;
 /// integer intermediate must lie in it, on every target.
 const WIDE_INTEGER_MIN: i128 = -9_223_372_036_854_775_808;
 const WIDE_INTEGER_MAX: i128 = 18_446_744_073_709_551_615;
-/// The `d64` carrier is an `i128` mantissa (ruling 19(e)): a `d64`
-/// intermediate whose mantissa leaves it traps.
-const D64_CARRIER_MAX: u128 = i128::MAX as u128;
 /// Scale of a stored `d64`: an `i64` mantissa at 10⁻⁸.
 const D64_STORE_SCALE: u32 = 8;
-/// The largest mantissa magnitude of a stored `d64` (`|i64::MIN|`).
-const D64_STORE_MAGNITUDE: u128 = 1 << 63;
+
+#[derive(Debug, Clone, Copy)]
+enum D64Constant {
+    Value(i128, u32),
+    Overflow,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AbstractRange(Option<KernelValueRange>);
@@ -1505,21 +1506,6 @@ impl AbstractRange {
     }
 }
 
-/// Upper bound on a `d64` intermediate's mantissa magnitude at a decimal
-/// scale. `None` is a magnitude beyond `u128`.
-struct D64Bound {
-    scale: u32,
-    magnitude: Option<u128>,
-}
-
-impl D64Bound {
-    /// The mantissa magnitude re-expressed at a larger scale.
-    fn scaled_to(&self, scale: u32) -> Option<u128> {
-        self.magnitude?
-            .checked_mul(10u128.checked_pow(scale - self.scale)?)
-    }
-}
-
 fn is_d64_type(ty: Option<TypeId>, types: &TypeTable) -> bool {
     ty.is_some_and(|ty| {
         matches!(
@@ -1527,6 +1513,26 @@ fn is_d64_type(ty: Option<TypeId>, types: &TypeTable) -> bool {
             Type::SizedNumeric(_, NumericWidth::D64)
         )
     })
+}
+
+fn decimal_constant(value: i128) -> D64Constant {
+    value
+        .checked_mul(10i128.pow(D64_STORE_SCALE))
+        .map_or(D64Constant::Overflow, |value| {
+            D64Constant::Value(value, D64_STORE_SCALE)
+        })
+}
+
+fn scale_d64_constant(value: i128, from: u32, to: u32) -> Option<i128> {
+    value.checked_mul(10i128.checked_pow(to.checked_sub(from)?)?)
+}
+
+fn normalize_d64_constant(mut value: i128, mut scale: u32) -> D64Constant {
+    while scale > D64_STORE_SCALE && value % 10 == 0 {
+        value /= 10;
+        scale -= 1;
+    }
+    D64Constant::Value(value, scale)
 }
 
 struct BodyFacts<'a> {
@@ -2835,17 +2841,12 @@ impl BodyFacts<'_> {
         }
     }
 
-    /// A `d64` arithmetic result: every intermediate mantissa must fit the
-    /// 128-bit carrier (ruling 19(e)). The bound follows the exact
-    /// arithmetic: `+ -` align to the larger scale, `*` adds the scales, `/`
-    /// scales the numerator to the larger operand scale. A leaf is a stored
-    /// `d64` (an `i64` mantissa at scale 8).
+    /// A `d64` intermediate is admitted unless compile-time constants prove
+    /// that one of its carrier operations overflows. Bounds based on the full
+    /// stored `i64` range are deliberately not a refusal: the Metal helpers
+    /// propagate the carrier-overflow flag to the existing device fault slot.
     fn check_d64_intermediate(&mut self, expr: &HirExpression) {
-        let bound = self.d64_bound(expr);
-        if bound
-            .magnitude
-            .is_some_and(|magnitude| magnitude <= D64_CARRIER_MAX)
-        {
+        if !matches!(self.constant_d64(expr), Some(D64Constant::Overflow)) {
             return;
         }
         self.failures
@@ -2858,60 +2859,93 @@ impl BodyFacts<'_> {
             });
     }
 
-    fn d64_bound(&self, expr: &HirExpression) -> D64Bound {
-        let leaf = D64Bound {
-            scale: D64_STORE_SCALE,
-            magnitude: Some(D64_STORE_MAGNITUDE),
-        };
+    /// Evaluate only the constant subset needed to prove a `d64` carrier
+    /// overflow. `None` means the expression depends on a run-time value (or
+    /// uses an operation not folded here); it must be checked by the device.
+    fn constant_d64(&self, expr: &HirExpression) -> Option<D64Constant> {
         if !is_d64_type(expr.ty, self.types) {
-            // An integer operand of a `d64` operation is a scale-0 mantissa.
-            let magnitude = match self.peek_range(expr).0 {
-                Some(KernelValueRange {
-                    minimum: KernelRangeExpr::Constant(minimum),
-                    maximum: KernelRangeExpr::Constant(maximum),
-                }) => minimum.unsigned_abs().max(maximum.unsigned_abs()),
-                _ => WIDE_INTEGER_MAX.unsigned_abs(),
-            };
-            return D64Bound {
-                scale: 0,
-                magnitude: Some(magnitude),
-            };
+            return crate::passes::const_int_value(expr).map(|value| D64Constant::Value(value, 0));
         }
-        let HirExpressionKind::Binary(op, lhs, rhs) = &expr.kind else {
-            return match &expr.kind {
-                HirExpressionKind::Unary(HirUnOp::Neg, operand) => self.d64_bound(operand),
-                _ => leaf,
-            };
-        };
-        let (lhs, rhs) = (self.d64_bound(lhs), self.d64_bound(rhs));
-        match op {
-            HirBinOp::Add | HirBinOp::Sub => {
-                let scale = lhs.scale.max(rhs.scale);
-                D64Bound {
-                    scale,
-                    magnitude: lhs
-                        .scaled_to(scale)
-                        .zip(rhs.scaled_to(scale))
-                        .and_then(|(lhs, rhs)| lhs.checked_add(rhs)),
-                }
+        match &expr.kind {
+            HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => {
+                Some(decimal_constant(i128::from(*value)))
             }
-            HirBinOp::Mul => D64Bound {
-                scale: lhs.scale + rhs.scale,
-                magnitude: lhs
-                    .magnitude
-                    .zip(rhs.magnitude)
-                    .and_then(|(lhs, rhs)| lhs.checked_mul(rhs)),
-            },
-            HirBinOp::Div | HirBinOp::Mod => {
-                let scale = lhs.scale.max(rhs.scale);
-                D64Bound {
-                    scale,
-                    magnitude: lhs.magnitude.and_then(|numerator| {
-                        numerator.checked_mul(10u128.checked_pow(scale - lhs.scale + rhs.scale)?)
+            HirExpressionKind::Literal(radix_hir::HirLiteral::BigInt(_)) => {
+                crate::passes::const_int_value(expr).map(decimal_constant)
+            }
+            HirExpressionKind::Literal(radix_hir::HirLiteral::FloatText { text, .. }) => {
+                let (mantissa, exponent) = radix_types::numeric_width::decimal_text_to_scaled(
+                    self.interner.resolve(*text),
+                )?;
+                let shift = exponent.checked_add(i32::try_from(D64_STORE_SCALE).ok()?)?;
+                let scaled = if shift >= 0 {
+                    mantissa.checked_mul(10i128.checked_pow(u32::try_from(shift).ok()?)?)?
+                } else {
+                    let divisor = 10i128.checked_pow(shift.unsigned_abs())?;
+                    if mantissa % divisor != 0 {
+                        return None;
+                    }
+                    mantissa / divisor
+                };
+                Some(D64Constant::Value(scaled, D64_STORE_SCALE))
+            }
+            HirExpressionKind::Literal(radix_hir::HirLiteral::Float(_)) => None,
+            HirExpressionKind::Unary(HirUnOp::Neg, operand) => match self.constant_d64(operand)? {
+                D64Constant::Value(value, scale) => value
+                    .checked_neg()
+                    .map_or(Some(D64Constant::Overflow), |value| {
+                        Some(D64Constant::Value(value, scale))
                     }),
+                D64Constant::Overflow => Some(D64Constant::Overflow),
+            },
+            HirExpressionKind::Binary(op, lhs, rhs)
+                if matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul) =>
+            {
+                let lhs = self.constant_d64(lhs)?;
+                let rhs = self.constant_d64(rhs)?;
+                let (D64Constant::Value(lhs, lhs_scale), D64Constant::Value(rhs, rhs_scale)) =
+                    (lhs, rhs)
+                else {
+                    return Some(D64Constant::Overflow);
+                };
+                match op {
+                    HirBinOp::Add | HirBinOp::Sub => {
+                        let scale = lhs_scale.max(rhs_scale);
+                        let Some(lhs) = scale_d64_constant(lhs, lhs_scale, scale) else {
+                            return Some(D64Constant::Overflow);
+                        };
+                        let Some(rhs) = scale_d64_constant(rhs, rhs_scale, scale) else {
+                            return Some(D64Constant::Overflow);
+                        };
+                        let value = if *op == HirBinOp::Add {
+                            lhs.checked_add(rhs)
+                        } else {
+                            lhs.checked_sub(rhs)
+                        };
+                        Some(value.map_or(D64Constant::Overflow, |value| {
+                            normalize_d64_constant(value, scale)
+                        }))
+                    }
+                    HirBinOp::Mul => {
+                        let Some(scale) = lhs_scale.checked_add(rhs_scale) else {
+                            return Some(D64Constant::Overflow);
+                        };
+                        Some(lhs.checked_mul(rhs).map_or(D64Constant::Overflow, |value| {
+                            normalize_d64_constant(value, scale)
+                        }))
+                    }
+                    _ => unreachable!("the d64 constant operation was filtered above"),
                 }
             }
-            _ => leaf,
+            HirExpressionKind::Conversio { source, .. } => {
+                if is_d64_type(source.ty, self.types) {
+                    self.constant_d64(source)
+                } else {
+                    crate::passes::const_int_value(source).map(decimal_constant)
+                }
+            }
+            HirExpressionKind::Verte { source, .. } => self.constant_d64(source),
+            _ => None,
         }
     }
 

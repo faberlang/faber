@@ -1094,15 +1094,38 @@ main {}
 }
 
 #[test]
-fn d64_intermediate_beyond_the_128_bit_carrier_is_a_check_error() {
-    // Two i64 mantissas multiply to 126 bits; a third factor leaves the
-    // 128-bit carrier (ruling 19(e)).
+fn d64_kernel_carrier_bounds_defer_possible_overflow_to_runtime() {
     let fixture = analyze_en(
         r"
 @ kernel
 @ public
-fn product3(d64 a, d64 b, d64 c) → d64 {
-    return a * b * c
+fn decision_step(d64 dx, d64 dy, d64 dz) → d64 {
+    return dx * dx + dy * dy + dz * dz
+}
+
+@ kernel
+@ public
+fn product(d64 a, d64 b) → d64 {
+    return a * b
+}
+main {}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    for name in ["decision_step", "product"] {
+        let metal = target_row(&fixture, name, Target::MirMetal);
+        assert!(metal.admitted, "{name}: {:?}", metal.failures);
+    }
+}
+
+#[test]
+fn constant_d64_intermediate_proven_to_overflow_remains_a_check_error() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn constant_product() → d64 {
+    return 90000000000.0 * 90000000000.0 * 90000000000.0
 }
 main {}
 ",
@@ -1115,17 +1138,6 @@ main {}
         "{:?}",
         fixture.diagnostics
     );
-    for target in Target::DEVICE_TARGETS {
-        let row = target_row(&fixture, "product3", target);
-        assert!(
-            row.failures.iter().any(|failure| matches!(
-                failure,
-                KernelRequirementFailure::IntermediateOutOfRange { .. }
-            )),
-            "{target:?}: {:?}",
-            row.failures
-        );
-    }
 }
 
 #[test]
