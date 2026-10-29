@@ -12,14 +12,23 @@ locale = "en"
 # f64 — products round before a surrounding addition or subtraction
 # =============================================================================
 #
-# These factors multiply exactly to 1 - 2^-54. The nearest f64 product is 1,
-# so separate multiplication and subtraction return zero. A fused multiply-
-# subtract retains the low product bit and instead returns 2^-54.
+# The factors are 1 + 2^-27 and 1 - 2^-27, so they multiply exactly to
+# 1 - 2^-54. The nearest f64 product is 1, so a separate multiplication and
+# subtraction return zero. A fused multiply-subtract retains the low product
+# bit and instead returns 2^-54. The factors come out of a loop so that no
+# target's compiler can fold the expression to a constant: only a real
+# runtime multiply-subtract can fuse.
 
 main {
+    mut f64 e ← 1.0
+    mut int i ← 0
+    while i ≺ 27 {
+        e ← e / 2.0
+        i ← i + 1
+    }
     let f64 a ← 1.0
-    let f64 b ← 1.000000007450580596923828125
-    let f64 c ← 0.999999992549419403076171875
+    let f64 b ← 1.0 + e
+    let f64 c ← 1.0 - e
     let f64 result ← a - b * c
-    print result ¶ ".17e"
+    print result
 }
