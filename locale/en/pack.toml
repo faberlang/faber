@@ -685,7 +685,7 @@ help = "write the contract name in the implements clause"
 
 [diagnostics.PARSE001.issues.import_field_name]
 message = "an import field must be an identifier"
-help = "write a plain name for the imported field"
+help = "use a supported field name: {ex}, {visibilitas}, {nomen}, {ut}, or {omnia}"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "expected annotation name"
@@ -693,11 +693,11 @@ help = "add an annotation name after @"
 
 [diagnostics.PARSE001.issues.secus_si_else_if]
 message = "use '{sin}' for else-if"
-help = "replace secus {si} with {sin}"
+help = "write `{sin}` with the condition directly after it; do not combine `{secus}` with `{si}`"
 
 [diagnostics.PARSE001.issues.itera_mode]
 message = "expected {expected}"
-help = "choose one iteration mode before the iterable expression"
+help = "choose `{ex}`, `{de}`, or `{ab}` before the iterable expression"
 
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "expected {expected}"
@@ -705,7 +705,7 @@ help = "add let or mut before the binding name"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
 message = "itera de bindings are always fixed; use {expected}"
-help = "de binds an index or key, not a mutable element; use the let form"
+help = "use `let` for a `{de}` binder; this mode binds map keys, not mutable elements"
 
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "rest pattern already specified"
@@ -713,19 +713,19 @@ help = "keep only one '{keyword}' rest binding"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "expected test case or setup"
-help = "start the body item with '{proba}', '{probandum}', or '{setup}'"
+help = "start with `{proba}`, `{probandum}`, or a hook: `{praepara}`, `{praeparabit}`, `{postpara}`, or `{postparabit}`"
 
 [diagnostics.PARSE001.issues.test_modifier_integer]
 message = "expected integer after '{modifier}'"
-help = "put an integer literal after '{modifier}'"
+help = "write a non-negative integer literal after '{modifier}'"
 
 [diagnostics.PARSE001.issues.tensor_figura_after_element]
 message = "tensor requires a Figura shape after element type"
-help = "add a comma and Figura shape, such as tensor<T, []>"
+help = "add a comma and a shape, such as `tensor<T, [4]>`"
 
 [diagnostics.PARSE001.issues.sparsa_figura_after_element]
 message = "sparse requires a Figura shape after element type"
-help = "add a comma and Figura shape, such as sparse<T, []>"
+help = "add a comma and a shape, such as `sparse<T, [2, 3]>`"
 
 [diagnostics.PARSE001.issues.vector_width_after_element]
 message = "vector requires a width after element type"
@@ -741,7 +741,7 @@ help = "remove the extra type parameter; use atomic<T>"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} is no longer prefix predicate syntax"
-help = "rewrite with {replacement}"
+help = "compare with `≡` for `true` or `false`; use `is none` to test for null"
 
 [diagnostics.PARSE001.issues.membership_keyword_retired]
 message = "`{keyword}` is a retired membership operator; membership is spelled `{glyph}`"
@@ -749,19 +749,19 @@ help = "write `{glyph}` (or `∉` to negate) between the element and the collect
 
 [diagnostics.PARSE001.issues.equality_non_missing_est]
 message = "expected '{est}' after '{non}' in equality expression"
-help = "write identity negation as non est"
+help = "write identity negation as `not is`"
 
 [diagnostics.PARSE001.issues.est_non_spelling]
 message = "'est non' is not the identity negation spelling"
-help = "use non est for identity negation"
+help = "use `not is` for identity negation"
 
 [diagnostics.PARSE001.issues.closure_body_start]
 message = "expected ':' or block body after closure parameters"
-help = "add : for an expression body or a block body"
+help = "use `: expression` for an expression body, or `{ ... }` for a block body"
 
 [diagnostics.PARSE001.issues.ad_ascii_route]
 message = "expected ascii literal route after '{ad}'"
-help = "write the route as an ASCII literal after ad"
+help = "write the route as an ASCII string after `{ad}`, for example `{ad} 'module:route'`"
 
 [diagnostics.PARSE001.issues.json_quoted_key]
 message = "JSON keys must be quoted strings; use \"name\": value"
@@ -793,15 +793,15 @@ help = "write {reice} cond {iace} err"
 
 [diagnostics.PARSE001.issues.requirit_else_rejected]
 message = "'{secus}' is not the particle on {requirit}"
-help = "use '{iace}' for the recoverable payload"
+help = "write `{requirit} condition {iace} error` instead of using `{secus}`"
 
 [diagnostics.PARSE001.issues.reice_else_rejected]
 message = "'{secus}' is not the particle on {reice}"
-help = "use '{iace}' for the recoverable payload"
+help = "write `{reice} condition {iace} error` instead of using `{secus}`"
 
 [diagnostics.PARSE001.issues.adfirma_else_rejected]
 message = "'{secus}' is not the particle on {adfirma}"
-help = "use '{mori}' for the optional panic message"
+help = "write `{adfirma} condition {mori} message`; do not add a `{secus}` clause"
 
 [diagnostics.PARSE001.issues.adfirma_message_particle]
 message = "expected '{mori}' before the {adfirma} message"
@@ -809,11 +809,11 @@ help = "write {adfirma} cond {mori} message"
 
 [diagnostics.PARSE001.issues.size_declaration_assignment]
 message = "expected `←` with a value, or `=` with a natural-number literal, after the `{size_param}` name"
-help = "write `← <value>` for a runtime lift or `= <literal>` for a static size"
+help = "write `← <value>` for a runtime lift or `= <natural-number literal>` for a static size"
 
 [diagnostics.PARSE001.issues.item_list_missing_separator]
 message = "items in a list must be separated; a separator is missing before this item"
-help = "put a comma between items (`et` between patterns)"
+help = "add a comma between items (or `{et}` between patterns)"
 
 [diagnostics.PARSE001.issues.item_list_trailing_comma]
 message = "a list may not end with a comma before its closing delimiter"
@@ -833,11 +833,11 @@ help = "choose a value between −2^63 and 2^63−1"
 
 [diagnostics.PARSE002.issues.json_integer_overflow]
 message = "an integer in a json literal is outside the signed 64-bit range"
-help = "write the value as a float or a string"
+help = "to keep a large integer exact, parse the JSON text with `json.parse` instead"
 
 [diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
 message = "the `{modifier}` modifier integer is outside the signed 64-bit range"
-help = "choose a smaller value"
+help = "use a non-negative integer no larger than 2^63−1"
 
 [diagnostics.PARSE002.issues.declaration_block_comma]
 message = "commas do not separate members of a declaration block"
