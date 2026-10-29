@@ -75,6 +75,8 @@ mod aggregate;
 mod async_surface;
 mod callable;
 mod collection_higher_order;
+#[cfg(test)]
+mod control_test;
 
 mod context;
 mod control;
