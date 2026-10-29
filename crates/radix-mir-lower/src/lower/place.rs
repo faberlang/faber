@@ -149,48 +149,27 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
             return None;
         };
-        let step_value = match step.as_deref() {
-            Some(step) => radix_semantic::passes::const_int_value(step),
-            None => Some(1),
-        };
-        let (Some(start_value), Some(end_value), Some(step_value)) = (
-            radix_semantic::passes::const_int_value(start),
-            radix_semantic::passes::const_int_value(end),
-            step_value,
-        ) else {
-            self.errors
-                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
-            return None;
-        };
-        if step_value <= 0 {
-            self.errors
-                .push(MirError::unsupported(index.span, "vector bracket range needs literal bounds"));
-            return None;
-        }
-        let end_eff = if matches!(kind, HirRangeKind::Inclusive) {
-            end_value.saturating_add(1)
-        } else {
-            end_value
-        };
+        let lanes = self.literal_range_coordinates(
+            start,
+            end,
+            step.as_deref(),
+            matches!(kind, HirRangeKind::Inclusive),
+            index.span,
+            "vector bracket range needs literal bounds",
+            "vector bracket range lane out of range",
+        )?;
         let place = self.lower_projectable_place(object)?;
-        let mut items = Vec::new();
-        let mut lane = start_value;
-        while lane < end_eff {
-            let Ok(lane_index) = u8::try_from(lane) else {
-                self.errors
-                    .push(MirError::unsupported(index.span, "vector bracket range lane out of range"));
-                return None;
-            };
-            // WHY: the lane read is the same `VectorLane` projection a
-            // swizzle uses (`vector_lane_operand` is private to the runtime
-            // module; the projection is identical).
-            let mut lane_place = place.clone();
-            lane_place
-                .projections
-                .push(MirProjection::VectorLane(lane_index));
-            items.push(MirAggregateItem::Operand(MirOperand::Place(lane_place)));
-            lane += step_value;
-        }
+        let items = lanes
+            .into_iter()
+            .map(|lane| {
+                // WHY: the lane read is the same `VectorLane` projection a
+                // swizzle uses (`vector_lane_operand` is private to the runtime
+                // module; the projection is identical).
+                let mut lane_place = place.clone();
+                lane_place.projections.push(MirProjection::VectorLane(lane));
+                MirAggregateItem::Operand(MirOperand::Place(lane_place))
+            })
+            .collect();
         let ty = self.expr_ty(expr)?;
         Some(self.construct_temp(MirAggregateKind::Vector, MirAggregateFields::Ordered(items), ty, expr.span))
     }
@@ -557,42 +536,16 @@ impl FunctionBuilder<'_> {
     /// Enumerate the literal coordinates a matrix bracket slot keeps: a range
     /// slot expands start to end by step, an integer slot is one coordinate.
     fn matrix_slot_indices(&mut self, slot: &HirExpression, span: Span) -> Option<Vec<u8>> {
-        let mut indices = Vec::new();
         if let HirExpressionKind::Intervallum { start, end, step, kind } = &slot.kind {
-            let step_value = match step.as_deref() {
-                Some(step) => radix_semantic::passes::const_int_value(step),
-                None => Some(1),
-            };
-            let (Some(start_value), Some(end_value), Some(step_value)) = (
-                radix_semantic::passes::const_int_value(start),
-                radix_semantic::passes::const_int_value(end),
-                step_value,
-            ) else {
-                self.errors
-                    .push(MirError::unsupported(span, "matrix bracket range needs literal bounds"));
-                return None;
-            };
-            if step_value <= 0 {
-                self.errors
-                    .push(MirError::unsupported(span, "matrix bracket range needs literal bounds"));
-                return None;
-            }
-            let end_eff = if matches!(kind, HirRangeKind::Inclusive) {
-                end_value.saturating_add(1)
-            } else {
-                end_value
-            };
-            let mut coordinate = start_value;
-            while coordinate < end_eff {
-                let Ok(coordinate_u8) = u8::try_from(coordinate) else {
-                    self.errors
-                        .push(MirError::unsupported(span, "matrix bracket slot coordinate out of range"));
-                    return None;
-                };
-                indices.push(coordinate_u8);
-                coordinate += step_value;
-            }
-            return Some(indices);
+            return self.literal_range_coordinates(
+                start,
+                end,
+                step.as_deref(),
+                matches!(kind, HirRangeKind::Inclusive),
+                span,
+                "matrix bracket range needs literal bounds",
+                "matrix bracket slot coordinate out of range",
+            );
         }
         let Some(value) = radix_semantic::passes::const_int_value(slot) else {
             self.errors
@@ -604,7 +557,45 @@ impl FunctionBuilder<'_> {
                 .push(MirError::unsupported(span, "matrix bracket slot coordinate out of range"));
             return None;
         };
-        indices.push(value);
+        Some(vec![value])
+    }
+
+    /// Lower a statically bounded range to the vector lanes or matrix
+    /// coordinates it selects.
+    fn literal_range_coordinates(
+        &mut self,
+        start: &HirExpression,
+        end: &HirExpression,
+        step: Option<&HirExpression>,
+        inclusive: bool,
+        span: Span,
+        bounds_error: &'static str,
+        coordinate_error: &'static str,
+    ) -> Option<Vec<u8>> {
+        let step = step
+            .map(radix_semantic::passes::const_int_value)
+            .unwrap_or(Some(1));
+        let (Some(start), Some(end), Some(step)) = (
+            radix_semantic::passes::const_int_value(start),
+            radix_semantic::passes::const_int_value(end),
+            step,
+        ) else {
+            self.errors.push(MirError::unsupported(span, bounds_error));
+            return None;
+        };
+        let Some(coordinates) = enumerate_literal_range(start, end, step, inclusive) else {
+            self.errors.push(MirError::unsupported(span, bounds_error));
+            return None;
+        };
+        let mut indices = Vec::with_capacity(coordinates.len());
+        for coordinate in coordinates {
+            let Ok(coordinate) = u8::try_from(coordinate) else {
+                self.errors
+                    .push(MirError::unsupported(span, coordinate_error));
+                return None;
+            };
+            indices.push(coordinate);
+        }
         Some(indices)
     }
 
@@ -1016,6 +1007,28 @@ impl FunctionBuilder<'_> {
         self.types.nullable_inner(ty).map(MirType::semantic)
     }
 }
+
+/// Enumerate an ascending literal range, stopping safely when its next step
+/// would exceed the representable coordinate range.
+fn enumerate_literal_range(start: i128, end: i128, step: i128, inclusive: bool) -> Option<Vec<i128>> {
+    if step <= 0 {
+        return None;
+    }
+    let mut coordinates = Vec::new();
+    let mut coordinate = start;
+    while coordinate < end || (inclusive && coordinate == end) {
+        coordinates.push(coordinate);
+        let Some(next) = coordinate.checked_add(step) else {
+            break;
+        };
+        coordinate = next;
+    }
+    Some(coordinates)
+}
+
+#[cfg(test)]
+#[path = "place_test.rs"]
+mod place_test;
 
 /// Whether a tensor bracket index is a range or a slot list containing one:
 /// the forms that lower to `TensorSliceNd` rather than a coordinate read.
