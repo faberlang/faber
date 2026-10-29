@@ -7,6 +7,7 @@
 
 mod broadcast;
 mod contract;
+mod d64_fault;
 mod error;
 mod lane_index;
 mod launch;
@@ -21,6 +22,7 @@ mod types;
 
 pub use broadcast::*;
 pub use contract::*;
+pub use d64_fault::{D64_FAULT_TEXT, d64_fault_site, is_d64_type};
 pub use error::*;
 pub use lane_index::{
     IndexGuard, LaneIndexProof, LaneWriteMap, LaneWriteSelector, UnprovenIndex,

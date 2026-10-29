@@ -468,9 +468,11 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::PhysicalScalar,
         ),
-        // decimal-widths D1: decimals have no MIR scalar arm until D4/D5.
+        // Kernel-wide types ruling 2026-10-28: `numerus<d64>` is the `D64`
+        // scalar layout (an `i64` mantissa at scale 10^-8); `fractus<d64>` is
+        // not a type and stays a loud error.
         NumericWidth::D64 => (
-            SizedNumericOutcome::LoudError,
+            SizedNumericOutcome::PhysicalScalar,
             SizedNumericOutcome::LoudError,
         ),
         // inf track U4: `numerus<inf>` is the unsized `Magnus` scalar layout

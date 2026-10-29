@@ -1296,33 +1296,35 @@ fn device_safe_rejects_i16_device_view_element() {
 }
 
 #[test]
-fn device_safe_rejects_i64_device_view_element() {
+fn device_safe_admits_i64_device_view_element() {
+    // Kernel-wide types ruling 2026-10-28: 64-bit integers are kernel values.
     let mut types = TypeTable::new();
     let tensor_ty = rank1_tensor_type(&mut types, Primitive::Numerus, NumericWidth::I64);
     let program = tensor_view_return_program(tensor_ty);
-    let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
-        panic!("i64 device view element must reject");
-    };
-    assert!(
-        gaps.iter()
-            .any(|gap| gap.slug() == "missing-layout-fact" && gap.shape() == "kernel device view element i64"),
-        "expected i64 layout gap, got {gaps:?}"
-    );
+    if let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) {
+        assert!(
+            !gaps
+                .iter()
+                .any(|gap| gap.shape() == "kernel device view element i64"),
+            "i64 view element must not be a layout gap, got {gaps:?}"
+        );
+    }
 }
 
 #[test]
-fn device_safe_rejects_u64_device_view_element() {
+fn device_safe_admits_u64_device_view_element() {
+    // Kernel-wide types ruling 2026-10-28: 64-bit integers are kernel values.
     let mut types = TypeTable::new();
     let tensor_ty = rank1_tensor_type(&mut types, Primitive::Numerus, NumericWidth::U64);
     let program = tensor_view_return_program(tensor_ty);
-    let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
-        panic!("u64 device view element must reject");
-    };
-    assert!(
-        gaps.iter()
-            .any(|gap| gap.slug() == "missing-layout-fact" && gap.shape() == "kernel device view element u64"),
-        "expected u64 layout gap, got {gaps:?}"
-    );
+    if let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) {
+        assert!(
+            !gaps
+                .iter()
+                .any(|gap| gap.shape() == "kernel device view element u64"),
+            "u64 view element must not be a layout gap, got {gaps:?}"
+        );
+    }
 }
 
 #[test]

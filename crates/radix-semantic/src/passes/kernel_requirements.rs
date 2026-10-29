@@ -147,8 +147,9 @@ pub enum KernelRequirementFailure {
     /// The target's emitter does not carry this integer or `d64` width, or an
     /// expression needs a lane of that width. A capability refusal by name
     /// (never a check error): 64-bit integers and `d64` are kernel values
-    /// (ruling 2026-10-28), but WGSL and AMD refuse them until their emitters
-    /// emulate 64-bit lanes, and no target computes 64-bit arithmetic yet.
+    /// (ruling 2026-10-28). Metal carries them (`long` / `ulong` lanes, and
+    /// `d64` in a 128-bit carrier); WGSL and AMD refuse them until their
+    /// emitters emulate 64-bit lanes, and CUDA until its unit lands.
     UnsupportedIntegerWidth {
         span: Span,
         width: NumericWidth,
