@@ -493,23 +493,23 @@ help = "check the locale id is a valid reader locale directory name under the st
 
 [diagnostics.LOCALE003.issues.invalid_id]
 message = "frontmatter locale '{locale_id}' is not a valid locale identifier; locale ids must be simple directory names"
-help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+help = "Use a single directory name, not a path, for a locale pack under the configured reader-pack root."
 
 [diagnostics.LOCALE003.issues.no_root]
 message = "frontmatter declares locale '{locale_id}' but no language-pack root is configured"
-help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+help = "Configure the reader-pack root, then choose a locale directory beneath it."
 
 [diagnostics.LOCALE003.issues.outside_root]
 message = "frontmatter locale '{locale_id}' resolves outside the language-pack root"
-help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+help = "Check the locale directory and its symlinks; its pack must resolve inside the configured reader-pack root."
 
 [diagnostics.LOCALE003.issues.load_failed]
 message = "unknown reader locale '{locale_id}' in frontmatter: {detail}"
-help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+help = "Check that the locale directory contains a readable, valid `pack.toml`."
 
 [diagnostics.LOCALE003.issues.not_a_string]
 message = "frontmatter 'locale' key must be a string"
-help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+help = "Write `locale` as a quoted string, for example `locale = \"en\"`."
 
 [diagnostics.LOCALE003.issues.unresolved]
 message = "reader locale did not resolve for this source"
@@ -525,23 +525,23 @@ help = "close the string literal before the end of the line or file"
 
 [diagnostics.LEX001.issues.unterminated_ascii_literal]
 message = "unterminated ascii literal"
-help = "close the string literal before the end of the line or file"
+help = "Close the ASCII literal with `'` before the file ends."
 
 [diagnostics.LEX001.issues.newline_in_ascii_literal]
 message = "unterminated ascii literal (newline in literal)"
-help = "close the string literal before the end of the line or file"
+help = "ASCII literals are single-line; write `\\n` for a newline or close the literal before the line break."
 
 [diagnostics.LEX001.issues.unterminated_backtick_template_literal]
 message = "unterminated backtick template literal"
-help = "close the string literal before the end of the line or file"
+help = "Close the captured template with a backtick (`); it may span lines."
 
 [diagnostics.LEX001.issues.unterminated_octeti_literal]
 message = "unterminated {lista}<b8> literal"
-help = "close the string literal before the end of the line or file"
+help = "Close the byte literal with `|`; write its contents as pairs of hexadecimal digits."
 
 [diagnostics.LEX001.issues.unterminated_regex_literal]
 message = "unterminated regex literal"
-help = "close the regex literal before the end of the line or file"
+help = "Close the raw pattern with `/` before the line ends; escape a slash inside it as `\\/`."
 
 [diagnostics.LEX001.issues.empty_regex_literal]
 message = "empty regex literal; write a pattern between the slashes"
@@ -549,15 +549,15 @@ help = "write a pattern between the slashes"
 
 [diagnostics.LEX001.issues.unterminated_string_literal]
 message = "unterminated string literal"
-help = "close the string literal before the end of the line or file"
+help = "Close the text string with `\"` before the line ends, or use `«...»` for multiline text."
 
 [diagnostics.LEX001.issues.newline_in_string_literal]
 message = "unterminated string literal (newline in string)"
-help = "close the string literal before the end of the line or file"
+help = "Double-quoted text strings are single-line; write `\\n` for a newline or use `«...»` for multiline text."
 
 [diagnostics.LEX001.issues.unterminated_guillemet_block_string_literal]
 message = "unterminated guillemet block string literal"
-help = "close the string literal before the end of the line or file"
+help = "Close the block string with `»`; it can span lines."
 
 [diagnostics.LEX002]
 message = "invalid number literal"
@@ -565,31 +565,31 @@ help = "check numeric separators and base prefixes"
 
 [diagnostics.LEX002.issues.invalid_hexadecimal_number]
 message = "invalid hexadecimal number"
-help = "check numeric separators and base prefixes"
+help = "After `0x`, use hexadecimal digits (0–9, A–F in either case)."
 
 [diagnostics.LEX002.issues.invalid_binary_number]
 message = "invalid binary number"
-help = "check numeric separators and base prefixes"
+help = "After `0b`, use only the binary digits 0 and 1."
 
 [diagnostics.LEX002.issues.invalid_octal_number]
 message = "invalid octal number"
-help = "check numeric separators and base prefixes"
+help = "After `0o`, use only octal digits 0 through 7."
 
 [diagnostics.LEX002.issues.invalid_floating_point_number]
 message = "invalid floating-point number"
-help = "check numeric separators and base prefixes"
+help = "Write a decimal number such as `1.5` or `1.5e-3`; an exponent needs digits."
 
 [diagnostics.LEX002.issues.invalid_integer]
 message = "invalid integer"
-help = "check numeric separators and base prefixes"
+help = "Use decimal digits, optionally separated by `_`, or prefix a radix literal with `0x`, `0b`, or `0o`."
 
 [diagnostics.LEX002.issues.float_overflow]
 message = "float literal is too large; it overflows to infinity"
-help = "write a smaller magnitude, or scale the unit"
+help = "Choose a finite value within the floating-point range; reduce the magnitude or make a positive exponent smaller."
 
 [diagnostics.LEX002.issues.float_underflow]
 message = "float literal is too small; it underflows to zero"
-help = "write a larger magnitude, or scale the unit"
+help = "Increase the nonzero value or make its exponent less negative so it stays within the floating-point range."
 
 [diagnostics.LEX003]
 message = "invalid escape sequence"
@@ -605,7 +605,7 @@ help = "remove the character or escape it if it should be literal"
 
 [diagnostics.LEX004.issues.unexpected_character]
 message = "unexpected character: {char}"
-help = "remove the character or escape it if it should be literal"
+help = "If it is text, put it in a string literal; otherwise remove it or use the intended Faber spelling."
 
 [diagnostics.LEX004.issues.homoglyph_did_you_mean]
 message = "unexpected character: '{char}'; did you mean '{suggestion}'?"
@@ -617,15 +617,15 @@ help = "prefix comments with # instead of // or /* */"
 
 [diagnostics.LEX006.issues.c_style_line_comment]
 message = "C-style // comments are not valid in Faber; use # for line comments"
-help = "prefix comments with # instead of // or /* */"
+help = "Start the comment line with `#`; `//` is not a Faber line comment."
 
 [diagnostics.LEX006.issues.c_style_block_comment]
 message = "C-style /* */ block comments are not valid in Faber; use # for line comments"
-help = "prefix comments with # instead of // or /* */"
+help = "Faber has no block comments; put `#` at the start of each comment line."
 
 [diagnostics.LEX006.issues.unterminated_c_style_block_comment]
 message = "unterminated C-style block comment; Faber uses # for line comments"
-help = "prefix comments with # instead of // or /* */"
+help = "Faber has no block comments; rewrite the comment as lines beginning with `#`."
 
 [diagnostics.LEX007]
 message = "inline comments are not accepted"
@@ -645,11 +645,11 @@ help = "ensure the expected token is present in this position"
 
 [diagnostics.PARSE001.issues.ratio_field_list_hole_not_sole]
 message = "a `…` hole in a ratio field list must be the only element"
-help = "use at most one hole in the field list"
+help = "Use `{ratio}<*>` to infer the whole field list; do not combine `*` with named fields."
 
 [diagnostics.PARSE001.issues.ratio_type_arg_label_required]
 message = "a ratio type argument must be labeled"
-help = "write the label before the argument"
+help = "Write each `{ratio}` type argument as `field: type`, for example `name: int`."
 
 [diagnostics.PARSE001.issues.annotation_field_name]
 message = "an annotation field must be an identifier"
@@ -669,11 +669,11 @@ help = "remove the label from the spread argument"
 
 [diagnostics.PARSE001.issues.copy_into_value_expected]
 message = "a value is required after the copy-in operator `{operator}`"
-help = "write the source expression after `⇇`"
+help = "Write the source expression after `{operator}`."
 
 [diagnostics.PARSE001.issues.sink_into_item_expected]
 message = "an item is required after the sink-in operator `{operator}`"
-help = "write the item expression after `⇜`"
+help = "Write the item expression after `{operator}`."
 
 [diagnostics.PARSE001.issues.duplicate_tuple_element_label]
 message = "tuple element label `{label}` is used more than once"
@@ -685,7 +685,7 @@ help = "write the contract name in the implements clause"
 
 [diagnostics.PARSE001.issues.import_field_name]
 message = "an import field must be an identifier"
-help = "write a plain name for the imported field"
+help = "use a supported field name: {ex}, {visibilitas}, {nomen}, {ut}, or {omnia}"
 
 [diagnostics.PARSE001.issues.annotation_name]
 message = "expected annotation name"
@@ -693,11 +693,11 @@ help = "add an annotation name after @"
 
 [diagnostics.PARSE001.issues.secus_si_else_if]
 message = "use '{sin}' for else-if"
-help = "replace secus {si} with {sin}"
+help = "write `{sin}` with the condition directly after it; do not combine `{secus}` with `{si}`"
 
 [diagnostics.PARSE001.issues.itera_mode]
 message = "expected {expected}"
-help = "choose one iteration mode before the iterable expression"
+help = "choose `{ex}`, `{de}`, or `{ab}` before the iterable expression"
 
 [diagnostics.PARSE001.issues.mutability_marker]
 message = "expected {expected}"
@@ -713,19 +713,19 @@ help = "keep only one '{keyword}' rest binding"
 
 [diagnostics.PARSE001.issues.test_case_or_setup]
 message = "expected test case or setup"
-help = "start the body item with '{proba}', '{probandum}', or '{setup}'"
+help = "start with `{proba}`, `{probandum}`, or a hook: `{praepara}`, `{praeparabit}`, `{postpara}`, or `{postparabit}`"
 
 [diagnostics.PARSE001.issues.test_modifier_integer]
 message = "expected integer after '{modifier}'"
-help = "put an integer literal after '{modifier}'"
+help = "write a non-negative integer literal after '{modifier}'"
 
 [diagnostics.PARSE001.issues.tensor_figura_after_element]
 message = "tensor requires a Figura shape after element type"
-help = "add a comma and Figura shape, such as tensor<T, []>"
+help = "add a comma and a shape, such as `tensor<T, [4]>`"
 
 [diagnostics.PARSE001.issues.sparsa_figura_after_element]
 message = "sparse requires a Figura shape after element type"
-help = "add a comma and Figura shape, such as sparse<T, []>"
+help = "add a comma and a shape, such as `sparse<T, [2, 3]>`"
 
 [diagnostics.PARSE001.issues.vector_width_after_element]
 message = "vector requires a width after element type"
@@ -741,7 +741,7 @@ help = "remove the extra type parameter; use atomic<T>"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} is no longer prefix predicate syntax"
-help = "rewrite with {replacement}"
+help = "compare with `≡` for `true` or `false`; use `is none` to test for null"
 
 [diagnostics.PARSE001.issues.membership_keyword_retired]
 message = "`{keyword}` is a retired membership operator; membership is spelled `{glyph}`"
@@ -749,11 +749,11 @@ help = "write `{glyph}` (or `∉` to negate) between the element and the collect
 
 [diagnostics.PARSE001.issues.equality_non_missing_est]
 message = "expected '{est}' after '{non}' in equality expression"
-help = "write identity negation as non est"
+help = "write identity negation as `not is`"
 
 [diagnostics.PARSE001.issues.est_non_spelling]
 message = "'est non' is not the identity negation spelling"
-help = "use non est for identity negation"
+help = "use `not is` for identity negation"
 
 [diagnostics.PARSE001.issues.closure_body_start]
 message = "expected ':' or block body after closure parameters"
@@ -761,7 +761,7 @@ help = "add : for an expression body or a block body"
 
 [diagnostics.PARSE001.issues.ad_ascii_route]
 message = "expected ascii literal route after '{ad}'"
-help = "write the route as an ASCII literal after ad"
+help = "write the route as an ASCII string after `{ad}`, for example `{ad} 'module:route'`"
 
 [diagnostics.PARSE001.issues.json_quoted_key]
 message = "JSON keys must be quoted strings; use \"name\": value"
@@ -793,15 +793,15 @@ help = "write {reice} cond {iace} err"
 
 [diagnostics.PARSE001.issues.requirit_else_rejected]
 message = "'{secus}' is not the particle on {requirit}"
-help = "use '{iace}' for the recoverable payload"
+help = "write `{requirit} condition {iace} error` instead of using `{secus}`"
 
 [diagnostics.PARSE001.issues.reice_else_rejected]
 message = "'{secus}' is not the particle on {reice}"
-help = "use '{iace}' for the recoverable payload"
+help = "write `{reice} condition {iace} error` instead of using `{secus}`"
 
 [diagnostics.PARSE001.issues.adfirma_else_rejected]
 message = "'{secus}' is not the particle on {adfirma}"
-help = "use '{mori}' for the optional panic message"
+help = "write `{adfirma} condition {mori} message`; do not add a `{secus}` clause"
 
 [diagnostics.PARSE001.issues.adfirma_message_particle]
 message = "expected '{mori}' before the {adfirma} message"
@@ -809,11 +809,11 @@ help = "write {adfirma} cond {mori} message"
 
 [diagnostics.PARSE001.issues.size_declaration_assignment]
 message = "expected `←` with a value, or `=` with a natural-number literal, after the `{size_param}` name"
-help = "write `← <value>` for a runtime lift or `= <literal>` for a static size"
+help = "write `← <value>` for a runtime lift or `= <natural-number literal>` for a static size"
 
 [diagnostics.PARSE001.issues.item_list_missing_separator]
 message = "items in a list must be separated; a separator is missing before this item"
-help = "put a comma between items (`et` between patterns)"
+help = "add a comma between items (or `{et}` between patterns)"
 
 [diagnostics.PARSE001.issues.item_list_trailing_comma]
 message = "a list may not end with a comma before its closing delimiter"
@@ -833,11 +833,11 @@ help = "choose a value between −2^63 and 2^63−1"
 
 [diagnostics.PARSE002.issues.json_integer_overflow]
 message = "an integer in a json literal is outside the signed 64-bit range"
-help = "write the value as a float or a string"
+help = "to keep a large integer exact, parse the JSON text with `json.parse` instead"
 
 [diagnostics.PARSE002.issues.test_modifier_integer_out_of_range]
 message = "the `{modifier}` modifier integer is outside the signed 64-bit range"
-help = "choose a smaller value"
+help = "use a non-negative integer no larger than 2^63−1"
 
 [diagnostics.PARSE002.issues.declaration_block_comma]
 message = "commas do not separate members of a declaration block"
@@ -853,11 +853,11 @@ help = "use true, false, null, a string, a number, an object, or an array"
 
 [diagnostics.PARSE002.issues.expected_json_value]
 message = "expected JSON value"
-help = "provide a JSON value"
+help = "use true, false, null, a string, a number, an object, or an array"
 
 [diagnostics.PARSE002.issues.json_integer_underflow]
 message = "JSON integer literal underflows int"
-help = "use an int value within range"
+help = "write the value as a float or a string"
 
 [diagnostics.PARSE002.issues.expected_json_number_after_minus]
 message = "expected number after '-' in JSON"
@@ -869,7 +869,7 @@ help = "write a concrete type for the binding, e.g. 'let int x ↤ value'"
 
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
-help = "keep '←' for 'figendum'/'variandum' awaited bindings"
+help = "keep '←' for '{figendum}'/'{variandum}' awaited bindings"
 
 [diagnostics.PARSE002.issues.allocator_surface_removed]
 message = "'{keyword}' was removed; allocation is not a language surface"
@@ -881,7 +881,7 @@ help = "inheritance was removed; use a contract (`implements`) or composition"
 
 [diagnostics.PARSE002.issues.nexum_removed]
 message = "'nexum' was removed; change notification is a library pattern over '{ad}'"
-help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
+help = "remove `nexum`; declare `{sit} T name` for a read-only field or `{varia} T name` for a writable field"
 
 [diagnostics.PARSE002.issues.construction_spread_removed]
 message = "'{sparge}' is not valid in a construction literal"
@@ -897,7 +897,7 @@ help = "check declaration keywords and required parts"
 
 [diagnostics.PARSE010.issues.declaration_not_top_level]
 message = "declarations are top-level; {functio} and type declarations cannot appear inside a block"
-help = "use a closure, or a top-level function for recursion"
+help = "move the declaration to the top level; use a closure for local behavior or a top-level function for recursion"
 
 [diagnostics.PARSE010.issues.sum_type_function]
 message = "sum types are data only; a {functio} cannot be declared inside an {ordo} or {discretio}"
@@ -909,7 +909,7 @@ help = "write top-level functions that use {discerne} on the value, or use a {ge
 
 [diagnostics.PARSE010.issues.schema_inheritance]
 message = "a schema cannot attach sub, implet, or an interface"
-help = "keep schemas as plain relational headings"
+help = "remove that clause; schemas define columns only"
 
 [diagnostics.PARSE010.issues.schema_method]
 message = "a schema cannot declare a method"
@@ -925,7 +925,7 @@ help = "write `{sit} T {name} ← …` (or `{sit} _ {name} ← …` to infer the
 
 [diagnostics.PARSE010.issues.binding_type_slot_required]
 message = "a `{keyword}` declaration writes its type slot; `{name}` has none"
-help = "write `{keyword} T {name} ← …`, or `{keyword} _ {name} ← …` to infer the type"
+help = "add a type before `{name}` (`_` infers it); use `{sit}` or `{varia}` with `←`, or `{fixum}` with `=` for a constant"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "a `{keyword}` binder was retired"
@@ -973,11 +973,11 @@ help = "write `{varia} T name ← value` for a mutable binding, or `{fixum} T na
 
 [diagnostics.PARSE010.issues.compile_time_requires_name]
 message = "a compile-time constant binds one name; `=` cannot initialize a destructuring pattern"
-help = "write `{fixum} T name = value`, or destructure with `←`"
+help = "write `{fixum} T name = value` for one constant; destructure with `{sit}` or `{varia}` and `←`"
 
 [diagnostics.PARSE010.issues.field_modifier_repeated]
 message = "a field takes exactly one of {sit}, {varia} or {fixum}"
-help = "keep one modifier; a {fixum} member is already read-only"
+help = "keep one modifier: `{sit}` or `{varia}` for an instance field, `{fixum}` with `= value` for a type constant"
 
 [diagnostics.PARSE010.issues.field_modifier_missing]
 message = "a {genus} field must declare {sit}, {varia} or {fixum}"
@@ -985,7 +985,7 @@ help = "write `{varia} T name` to keep today's meaning (or {sit} when never reas
 
 [diagnostics.PARSE010.issues.module_declaration_misplaced]
 message = "a {regio} declaration must be the first declaration of the file, before any {importa}"
-help = "move `{regio} {name}` to the top of the file, directly after the frontmatter"
+help = "make `{regio} {name}` the first declaration, after the frontmatter if present"
 
 [diagnostics.PARSE010.issues.module_declaration_duplicate]
 message = "a file declares {regio} at most once"
@@ -1005,7 +1005,7 @@ help = "write `{fixum} {size_param} <name> ← value`; the binding never reassig
 
 [diagnostics.PARSE010.issues.size_static_requires_literal]
 message = "the static `=` form of a `{size_param}` declaration requires a natural-number literal"
-help = "write a literal after `=`, or store a runtime value with `←`"
+help = "write a natural-number literal after `=`, or store a run-time value with `←`"
 
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
@@ -1041,7 +1041,7 @@ help = "move type parameters before {size_param} parameters"
 
 [diagnostics.PARSE016.issues.removed_vel_generic_default]
 message = "'{keyword}' is the runtime optional-value spelling and is not valid in generic lists"
-help = "declare a generic default with {replacement}"
+help = "use `=` followed by a type or natural-number literal for the generic default"
 
 [diagnostics.PARSE016.issues.generic_default_not_trailing]
 message = "generic parameter {parameter} follows a defaulted parameter and must also declare a default"
@@ -1049,11 +1049,11 @@ help = "give {parameter} a default or move it before the first defaulted paramet
 
 [diagnostics.PARSE016.issues.generic_default_missing_value]
 message = "generic parameter {parameter} is missing a default value after '='"
-help = "expected {expected}"
+help = "write a type after `=` for a type parameter, or a natural-number literal after `=` for a `{magnitudo}` parameter"
 
 [diagnostics.PARSE016.issues.generic_default_wrong_class]
 message = "default for {sort} generic parameter {parameter} must be {expected}"
-help = "replace the default with {expected}"
+help = "write a type after `=` for a type parameter, or a natural-number literal after `=` for a `{magnitudo}` parameter"
 
 [diagnostics.PARSE017]
 message = "invalid modifier"
@@ -1065,7 +1065,7 @@ help = "add an annotation name after '@'"
 
 [diagnostics.PARSE018.issues.invalid_modifier]
 message = "invalid @ {annotation} modifier"
-help = "use a supported @ {annotation} modifier"
+help = "use a supported modifier for this annotation"
 
 [diagnostics.PARSE018.issues.empty_radix_typus_domain]
 message = "@ radix typus domain requires at least one allowed type"
@@ -1073,15 +1073,15 @@ help = "list at least one allowed type after in"
 
 [diagnostics.PARSE018.issues.expected_annotation_ident]
 message = "expected {context}"
-help = "add '{expected}' in this annotation position"
+help = "add the required keyword here, using this file's reader locale"
 
 [diagnostics.PARSE018.issues.unexpected_annotation_token]
 message = "unexpected token after {context}"
-help = "remove the trailing annotation token"
+help = "finish the annotation before the declaration; move the declaration to a new line or remove extra annotation text"
 
 [diagnostics.PARSE018.issues.nucleum_lane_removed]
 message = "the @ {nucleum} lane binding '{name}' was removed; a kernel never names its lane"
-help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i] {filum} f {fixum} v`"
+help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i] {filum} f {sit} v`"
 
 [diagnostics.PARSE018.issues.ad_annotation_route]
 message = "`@ {ad}` requires a single-quoted ASCII route"
@@ -1105,7 +1105,7 @@ help = "use `target = {functio}` in v1"
 
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "a declaration carries more than one `@ nucleum` annotation"
-help = "keep a single nucleum annotation"
+help = "keep a single `@ {nucleum}` annotation"
 
 [diagnostics.PARSE018.issues.duplicate_nucleum_tier]
 message = "the `@ {nucleum}` annotation names more than one tier"
@@ -1145,7 +1145,7 @@ help = "write the handler before the condition: {fac} … {cape} … {dum} …"
 
 [diagnostics.PARSE020.issues.fac_modifier_redundant]
 message = "a '{fac}' block takes one modifier word, not '{omnia}' and '{machina}' together"
-help = "'{machina}' already delivers every fault once at the block's exit; drop '{omnia}'"
+help = "keep only one modifier: `{omnia}` or `{machina}`"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "a comma no longer separates '{discerne}' subjects"
@@ -1205,7 +1205,7 @@ help = "write the zero as the type followed by empty braces"
 
 [diagnostics.PARSE030.issues.retired_null_value_spelling]
 message = "'nihil' is not the null value; the null value is '{replacement}'"
-help = "write '{replacement}' for the null value; 'nihil' names only the null type"
+help = "write '{replacement}' for the null value; '{nihil}' names only the null type"
 
 [diagnostics.PARSE030.issues.comparison_ascii_retired]
 message = "the ASCII `{operator}` is not a comparison operator; comparison is spelled `{glyph}`"
@@ -1225,15 +1225,15 @@ help = "write `{replacement}` for `{glyph}`; every negation glyph has the same n
 
 [diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
 message = "a sort or reduce expression cannot be a loop source"
-help = "bind it to a name first, then loop over the name: `let list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+help = "bind it to a name first, then loop over the name: `let list<int> ys ← sort via asc from xs`, then `for from ys let x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
-help = "use ⊥; vel is nullish coalescing only"
+help = "use ⊥; `{vel}` is only for nullish coalescing"
 
 [diagnostics.PARSE030.issues.conversio_via_missing_hint]
 message = "`via` needs a convert hint after it"
-help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, and Code"
+help = "add a valid hint after `via`, for example `x ↦ u32 via Hex`"
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "a convert hint is not a type argument"
@@ -1245,7 +1245,7 @@ help = "write the hint as a via clause after the target: `{lista}<b8, {magnitudo
 
 [diagnostics.PARSE030.issues.conditional_nested]
 message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
-help = "use '{si}'/'{sin}', '{discerne}', or a function that '{redde}'s each case"
+help = "move the choices into `{si}`/`{sin}` or `{discerne}` statements, or use a helper function that `{redde}`s each value"
 
 [diagnostics.PARSE030.issues.format_spec_not_literal]
 message = "the '¶' format spec must be a string literal"
@@ -1281,7 +1281,7 @@ help = "write a constant: `{fixum} T NAME = {praefixum}` followed by a block tha
 
 [diagnostics.PARSE030.issues.default_with_propagation]
 message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
-help = "keep the '⊥' default, or drop it and let the error propagate"
+help = "keep `⊥` for a fallback, or remove it and propagate the error from a function with a `⇥` error channel"
 
 [diagnostics.PARSE030.issues.default_requires_failable]
 message = "'⊥' default follows a failable call or a conversion '↦ T' or '↤'"
@@ -1301,7 +1301,7 @@ help = "write the compact closure body after ∴ as {fac_body}"
 
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "closure {fac} body cannot use '{dum}'"
-help = "remove {dum} from closure {fac} bodies"
+help = "put a `{dum}` loop inside the `{fac}` block instead of attaching it to the closure body"
 
 [diagnostics.PARSE030.issues.expression_too_long]
 message = "expression exceeds the parser limit of {limit} operators"
@@ -1361,11 +1361,11 @@ help = "use {lista}<...> for angle-bracket form"
 
 [diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
 message = "vector sugar uses bracket width"
-help = "write the width with vector sugar brackets"
+help = "use `vector<f32, size 4>` or the shorthand `vf32[4]`"
 
 [diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
 message = "{sugar} sugar uses bracket Figura"
-help = "write the shape with {sugar} width sugar brackets"
+help = "use square brackets for width sugar, not angle brackets"
 
 [diagnostics.PARSE040.issues.numeric_wrapper_retired]
 message = "`{form}` is a retired numeric type spelling"
@@ -1393,15 +1393,15 @@ help = "compare values with the equality family: `≡` (strict), `≅` (promoted
 
 [diagnostics.PARSE040.issues.nesting_too_deep]
 message = "source nests deeper than the parser limit of {limit}"
-help = "split the type into named bindings"
+help = "factor nested types into named type aliases"
 
 [diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
 message = "`∩` cannot follow a `∪` hole in a type"
-help = "write the union member before combining with `∩`"
+help = "a bare `∪` is a type hole; use concrete types before `∩`, such as `A ∩ B`"
 
 [diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
 message = "`∪` cannot follow a `∪` hole in a type"
-help = "remove the extra `∪` or write the member"
+help = "use bare `∪` by itself as a type hole, or write a member after a binary union: `A ∪ B`"
 
 [diagnostics.PARSE041]
 message = "invalid type annotation"
@@ -1445,7 +1445,7 @@ help = "drop the marker, or use {publica} to re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "could not infer import name from {path}"
-help = "spell {nomen} or an explicit alias for {path}"
+help = "provide a non-empty source path; if its name cannot be inferred, add an explicit binding after the path"
 
 [diagnostics.PARSE050.issues.import_target_unknown]
 message = "`{target}` is not a target name"
@@ -1469,7 +1469,7 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_identifier]
 message = "unknown identifier"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "declare or import the name before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "unknown identifier"
@@ -1477,7 +1477,7 @@ help = "`{spelling}` is the output statement, not a function: import the console
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "unknown record field"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "use a label declared in the {ratio} type; its fields are fixed by the type"
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "unknown variant"
@@ -1493,7 +1493,7 @@ help = "qualify the variant with its union name (e.g. A.X)"
 
 [diagnostics.SEM001.issues.name_not_value]
 message = "name does not denote a value"
-help = "use a value, or call the name if it is a function"
+help = "a type name alone is not a value; use a value binding or construct a value of that type"
 
 [diagnostics.SEM002]
 message = "undefined type"
@@ -1501,11 +1501,11 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.figura_unknown_index]
 message = "unknown index parameter in Figura"
-help = "declare the type or import it"
+help = "use a declared {magnitudo} parameter or a numeric literal for each shape dimension"
 
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "instant accepts only ms, us, or ns as a precision marker"
-help = "declare the type or import it"
+help = "use `ms`, `us`, or `ns` as the bare {instans} precision marker"
 
 [diagnostics.SEM002.issues.removed_decimal_width_d32]
 message = "d32 is not a type"
@@ -1513,15 +1513,15 @@ help = "d32 was removed; use d64, the only decimal width"
 
 [diagnostics.SEM002.issues.name_not_type]
 message = "name does not refer to a type"
-help = "declare the type or import it"
+help = "use a type name here, such as a {genus}, {ordo}, {discretio}, {implendum}, type alias, or type parameter"
 
 [diagnostics.SEM002.issues.precision_marker_params]
 message = "precision marker cannot accept parameters"
-help = "declare the type or import it"
+help = "write one bare precision marker: `ms`, `us`, or `ns`, with no type arguments"
 
 [diagnostics.SEM002.issues.precision_marker_shape]
 message = "precision marker must be a bare spelling such as ms or us"
-help = "declare the type or import it"
+help = "use one bare marker (`ms`, `us`, or `ns`), without brackets or parameters"
 
 [diagnostics.SEM002.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -1529,19 +1529,19 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
 message = "qualified type prefix must name a namespace"
-help = "declare the type or import it"
+help = "use a {regio} namespace as the prefix, or import the type by name"
 
 [diagnostics.SEM002.issues.schema_unknown_type]
 message = "column type names an unknown type"
-help = "declare the type or import it"
+help = "use a declared or imported type for this {columna}"
 
 [diagnostics.SEM002.issues.unknown_namespace]
 message = "unknown namespace"
-help = "declare the type or import it"
+help = "import the {regio} before using its name as a type prefix"
 
 [diagnostics.SEM002.issues.unknown_qualified_type]
 message = "unknown qualified type"
-help = "declare the type or import it"
+help = "use a type exported by the named {regio}, or import that type directly"
 
 [diagnostics.SEM002.issues.unknown_struct]
 message = "unknown struct"
@@ -1553,11 +1553,11 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "width marker cannot accept parameters"
-help = "declare the type or import it"
+help = "write a width marker bare, without `<...>` type arguments"
 
 [diagnostics.SEM002.issues.qualified_type_middle_not_namespace]
 message = "qualified type path segment is not a namespace"
-help = "qualify through a module namespace"
+help = "use a {regio} namespace for each path segment before the type name"
 
 [diagnostics.SEM003]
 message = "undefined function"
@@ -1577,7 +1577,7 @@ help = "initialize every required struct field"
 
 [diagnostics.SEM004.issues.ratio_field_missing]
 message = "missing required ratio field"
-help = "initialize every required ratio field"
+help = "initialize every required {ratio} field"
 
 [diagnostics.SEM004.issues.missing_variant_field_name]
 message = "missing variant field name"
@@ -1605,7 +1605,7 @@ help = "check the struct field name"
 
 [diagnostics.SEM004.issues.unknown_tuple_element_label]
 message = "unknown tuple element label"
-help = "use a label declared on the iuncta annotation, or index by position"
+help = "use a label declared by the {iuncta} type, or use positional indexing or destructuring"
 
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "unknown variant field"
@@ -1617,7 +1617,7 @@ help = "call it as a method: `.length()`"
 
 [diagnostics.SEM004.issues.type_has_no_field]
 message = "type '{type}' has no field '{member}'"
-help = "built-in types expose methods, not fields; check the receiver type and member name"
+help = "Check the receiver's type and field name; if it is a method, call it with parentheses"
 
 [diagnostics.SEM004.issues.static_field_read_through_instance]
 message = "static field '{field}' is read through the type name, not an instance"
@@ -1629,19 +1629,19 @@ help = "read an instance field through an instance; only a `{fixum}` member read
 
 [diagnostics.SEM004.issues.unknown_union_field]
 message = "unknown union field"
-help = "check the union's `@ commune` field name"
+help = "Check the field name; declare it in `@ {commune}` only if every variant has it, or use `{discerne}` for variant-specific fields"
 
 [diagnostics.SEM004.issues.union_member_not_common]
 message = "union member '{member}' is not common; lacking in: {lacking}"
-help = "narrow the receiver (`est M` branch, `discerne`) to recover per-member access"
+help = "Use an `{est}` type test or a `{discerne}` arm to narrow the receiver before accessing this member"
 
 [diagnostics.SEM004.issues.union_member_differs]
 message = "union member '{member}' differs: {detail}"
-help = "give every union member the same signature or type, or narrow the receiver (`est M`, `discerne`)"
+help = "Make this member's type or method signature agree across the union, or access it after narrowing with an `{est}` test or `{discerne}` arm"
 
 [diagnostics.SEM004.issues.namespace_missing_export]
 message = "imported file exports no member `{member}`"
-help = "check the imported file's `@ {publica}` exports"
+help = "Mark the intended declaration `@ {publica}` in the imported file, or import a member it already exports"
 
 [diagnostics.SEM005]
 message = "duplicate definition"
@@ -1661,7 +1661,7 @@ help = "alias one of them: `{importa} {ex} \"…\" other_name`"
 
 [diagnostics.SEM005.issues.inferred_import_name_collision]
 message = "inferred import name conflicts with an existing definition"
-help = "add an explicit import alias with `ut` so the imported binding has a unique name"
+help = "add an explicit alias with `{ut}` so the imported binding has a unique name"
 
 [diagnostics.SEM005.issues.schema_duplicate_source]
 message = "two visible columns resolve to the same source name"
@@ -1673,11 +1673,11 @@ help = "rename one of the columns"
 
 [diagnostics.SEM005.issues.duplicate_commune_field]
 message = "duplicate commune field"
-help = "declare each commune field once in the union region"
+help = "Declare each field once in the union's `@ {commune}` region"
 
 [diagnostics.SEM005.issues.union_variant_redeclares_shared_field]
 message = "variant redeclares a commune field"
-help = "omit the commune field from the variant payload"
+help = "Declare the field in `@ {commune}` only, not again in the variant"
 
 [diagnostics.SEM005.issues.companion_name_collision]
 message = "companion name collides with another definition"
@@ -1689,7 +1689,7 @@ help = "use a distinct alias for each imported member"
 
 [diagnostics.SEM005.issues.conversio_registry_builtin_shadow]
 message = "conversion row shadows a built-in conversion"
-help = "remove the row or convert through a different pair"
+help = "Remove the row; built-in conversions work without a registry entry"
 
 [diagnostics.SEM005.issues.conversio_registry_duplicate_pair]
 message = "conversion pair is registered more than once"
@@ -1705,23 +1705,23 @@ help = "remove the publica marker"
 
 [diagnostics.SEM006.issues.kernel_glob_named_alias]
 message = "`{path}` must be imported as a named glob alias"
-help = "check the import path"
+help = "Use a named import such as `{importa} {ex} \"faber:*\" faber`, not a wildcard or selective import"
 
 [diagnostics.SEM006.issues.kernel_invalid_path]
 message = "{reason}"
-help = "check the import path"
+help = "Use a current `norma:<module>` import; the `faber:` kernel import surface is retired"
 
 [diagnostics.SEM006.issues.kernel_unknown_module]
 message = "unknown faber kernel module '{module}'; see faber host manifest"
-help = "check the import path"
+help = "Use a current `norma:<module>` import; no `faber:` kernel modules are available"
 
 [diagnostics.SEM006.issues.import_interna_cross_package]
 message = "`{name}` is `@ interna` and cannot be imported across a package boundary"
-help = "import `@ interna` names only from a file in the same package"
+help = "Import `@ {interna}` names only from files in the same package"
 
 [diagnostics.SEM006.issues.import_module_private]
 message = "`{name}` is module-private and cannot be imported"
-help = "mark the declaration `@ publica` to export it, or `@ interna` for same-package use"
+help = "Mark the declaration `@ {publica}` to export it, or `@ {interna}` to make it available within the package"
 
 [diagnostics.SEM006.issues.import_absolute_path]
 message = "absolute import path"
@@ -1729,7 +1729,7 @@ help = "use a relative or scheme-based import path"
 
 [diagnostics.SEM006.issues.import_bare_glyph]
 message = "bare glyph in import path"
-help = "name the module after the glyph"
+help = "Use a declared template name after `§`, for example `§src/path`"
 
 [diagnostics.SEM006.issues.import_multiple_holes]
 message = "import path has more than one hole"
@@ -1741,11 +1741,11 @@ help = "import from inside the package root"
 
 [diagnostics.SEM006.issues.import_positional_hole]
 message = "positional hole in import path"
-help = "name the hole in the import path"
+help = "Use a named template, such as `§src/path`, instead of a numeric hole"
 
 [diagnostics.SEM006.issues.import_unknown_scheme]
 message = "unknown import scheme"
-help = "use a supported import scheme"
+help = "Use a relative path (`./file`), provider path (`provider:module`), or declared template (`§name/path`)"
 
 [diagnostics.SEM006.issues.import_unknown_template]
 message = "unknown import template"
@@ -1761,7 +1761,7 @@ help = "break the cycle between modules"
 
 [diagnostics.SEM007.issues.type_alias_cycle]
 message = "type alias cycle"
-help = "break the cycle between modules"
+help = "Make one alias resolve to a concrete type instead of another alias in the cycle"
 
 [diagnostics.SEM007.issues.constant_cycle]
 message = "constant `{name}` depends on itself"
@@ -1773,7 +1773,7 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring requires initializer"
-help = "fix the AST construct for lowering"
+help = "Initialize the pattern with a value, e.g. `{sit} [a, b] ← values`"
 
 [diagnostics.SEM008.issues.array_destructuring_not_expanded]
 message = "array destructuring should be expanded before statement lowering"
@@ -1781,11 +1781,11 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
 message = "atomic requires compiler-owned syntax; use atomic<T>"
-help = "fix the AST construct for lowering"
+help = "Use the dedicated `atomic<T>` type form"
 
 [diagnostics.SEM008.issues.implet_bound_on_type_declaration]
 message = "an {implet} bound is allowed only on a function's type parameter"
-help = "move the bound to the functions that use the type, or remove it"
+help = "Put the bound on each `{functio}` type parameter that needs it; a `{genus}` declares conformance with an `{implet}` clause"
 
 [diagnostics.SEM008.issues.iuncta_union_type_arg_unsupported]
 message = "iuncta element type argument ∪ is unsupported"
@@ -1805,19 +1805,19 @@ help = "use {lista}<T>, {lista}<T, {magnitudo} N> or {lista}<T, {magnitudo} lo�
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "map requires two type parameters"
-help = "fix the AST construct for lowering"
+help = "use `{tabula}<K, V>` for a key and value type"
 
 [diagnostics.SEM008.issues.tabulae_arity]
 message = "ledger requires two type parameters"
-help = "fix the AST construct for lowering"
+help = "use `{tabulae}<K, V>` for a key and value type"
 
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturating type requires exactly one integer width"
-help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
+help = "write exactly one width marker, such as `saturating<u8>` or `saturating<f32>`"
 
 [diagnostics.SEM008.issues.saturating_word_width_shape]
 message = "saturating width must be a bare integer width marker"
-help = "use a bare integer width marker such as u8 or i16"
+help = "use a bare width marker such as `u8`, `i16` or `f32`"
 
 [diagnostics.SEM008.issues.trapping_word_width_required]
 message = "trapping type requires exactly one width"
@@ -1825,7 +1825,7 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping width must be a bare width marker"
-help = "use a bare width marker such as u8 or i64"
+help = "use a bare width marker such as `u8`, `i64` or `f32`"
 
 [diagnostics.SEM008.issues.ranged_policy_word_required]
 message = "a range needs a store policy word; a bare width marker takes no range"
@@ -1833,7 +1833,7 @@ help = "write the policy word first, such as saturating<u32, 0‥8>, trapping<i3
 
 [diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
 message = "a range end must be an integer literal or ∞"
-help = "write both ends as integer literals, such as 0‥8; a named or size end is not built yet"
+help = "use integer values or infinity markers (`-∞` only at the low end), such as `0‥8` or `0‥∞`; names and size expressions are not constant bounds"
 
 [diagnostics.SEM008.issues.ranged_policy_arity]
 message = "a ranged store policy takes the width and then one range"
@@ -1841,11 +1841,11 @@ help = "write policy<W, lo‥hi>, such as saturating<u32, 0‥8>"
 
 [diagnostics.SEM008.issues.ranged_policy_range_empty]
 message = "the range holds no value"
-help = "the low end must be below the high end of lo‥hi, or not above it for lo…hi"
+help = "for `‥`, keep the low end below the exclusive high end; for `…`, it may equal but not exceed the high end"
 
 [diagnostics.SEM008.issues.ranged_policy_range_outside_width]
 message = "a range end lies outside the width"
-help = "keep both ends inside the width; ∞ is only a high end and -∞ only a low end"
+help = "keep every included value within the width; with `‥`, the exclusive high end may be one past the maximum. Use `∞` only high and `-∞` only low"
 
 [diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
 message = "an unsigned width cannot have a negative low end"
@@ -1865,15 +1865,15 @@ help = "give the list a finite constant size, such as {lista}<int, {magnitudo} 1
 
 [diagnostics.SEM008.issues.ranged_list_bound_not_constant]
 message = "a list length range end must be a non-negative integer literal or ∞"
-help = "write both ends as integer literals, such as {lista}<int, {magnitudo} 1‥8>; a named or size end is not built yet"
+help = "use integer values or infinity markers (`-∞` only at the low end), such as `{lista}<int, {magnitudo} 1‥∞>`; names and size expressions are not constant bounds"
 
 [diagnostics.SEM008.issues.ranged_list_range_empty]
 message = "the list length range holds no length"
-help = "the low end must be below the high end of lo‥hi, or not above it for lo…hi"
+help = "for `‥`, keep the low end below the exclusive high end; for `…`, it may equal but not exceed the high end"
 
 [diagnostics.SEM008.issues.ranged_list_bound_negative]
 message = "a list length range end cannot be negative"
-help = "a length is a count: start the range at 0 or above"
+help = "use non-negative values for both ends, since a list length cannot be negative"
 
 [diagnostics.SEM008.issues.ranged_list_policy_word]
 message = "a list length range takes no store policy word"
@@ -1905,11 +1905,11 @@ help = "write `functio name(Source) → Destination` for the conversion pair"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "set requires one type parameter"
-help = "fix the AST construct for lowering"
+help = "use `{copia}<T>` with one element type"
 
 [diagnostics.SEM008.issues.promissum_arity]
 message = "promissum requires one type parameter"
-help = "fix the AST construct for lowering"
+help = "use `{promissum}<T>` with one result type"
 
 [diagnostics.SEM008.issues.cursor_arity]
 message = "cursor requires one type parameter"
@@ -1917,11 +1917,11 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
-help = "use queue<T> or queue<T, {magnitudo} N>"
+help = "use `{queue}<T>` or `{queue}<T, {magnitudo} N>`"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack requires one or two type parameters"
-help = "use stack<T> or stack<T, {magnitudo} N>"
+help = "use `{stack}<T>` or `{stack}<T, {magnitudo} N>`"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "match {casu} requires a pattern"
@@ -1929,11 +1929,11 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.discerne_pattern_count]
 message = "match pattern count must match subject count"
-help = "fix the AST construct for lowering"
+help = "give each `{casu}` arm exactly one pattern per matched value; join multiple patterns with `{et}`"
 
 [diagnostics.SEM008.issues.discerne_subject_required]
 message = "match requires at least one subject"
-help = "fix the AST construct for lowering"
+help = "give `{discerne}` at least one value to match"
 
 [diagnostics.SEM008.issues.ego_outside_method]
 message = "ego used outside method context"
@@ -1941,15 +1941,15 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.elige_case_value_shape]
 message = "{elige} case value must be a literal or enum variant"
-help = "fix the AST construct for lowering"
+help = "use a literal or a named enum variant as the `{casu}` value"
 
 [diagnostics.SEM008.issues.empty_qualified_type_path]
 message = "empty qualified type path"
-help = "fix the AST construct for lowering"
+help = "write both the module and type name, such as `module.Type`"
 
 [diagnostics.SEM008.issues.empty_path_pattern]
 message = "empty path pattern"
-help = "fix the AST construct for lowering"
+help = "write a variant name or qualified variant, such as `Shape.Circle`"
 
 [diagnostics.SEM008.issues.empty_union_type]
 message = "empty union type"
@@ -5577,11 +5577,11 @@ help = "use an ordinary loop, or write only the iteration’s own coordinate and
 
 [diagnostics.SEM010.issues.break_in_thread_body]
 message = "`{rumpe}` cannot end a `{filum}` loop"
-help = "`{rumpe}` cannot stop a `{filum}` loop: lanes run independently. To find the first match use `{reducta} {via} {argminima} …`; to stop at a cutoff, compute it first and loop to it."
+help = "`{rumpe}` cannot stop other `{filum}` lanes. Use `{perge}` to skip the rest of this lane; to find the first match use `{reducta} {via} {argminima} …`, or compute a cutoff before looping."
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` cannot leave a `{filum}` loop"
-help = "`{redde}` cannot leave a `{filum}` loop: lanes run independently. To get one value out of the lanes use `{reducta}`; to stop at a cutoff, compute it first and loop to it."
+help = "`{redde}` cannot leave the function from a `{filum}` lane. Use `{perge}` to skip the rest of this lane; use `{reducta}` to combine lane results, or compute a cutoff before looping."
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "a reduction body can call only device intrinsics, fragments and private kernel helpers: {reason}"
