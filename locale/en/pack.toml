@@ -3249,11 +3249,11 @@ help = "use ⊙ for elementwise multiplication of two lists; `*` takes a scalar 
 
 [diagnostics.SEM011.issues.lista_bits_whole_equality_only]
 message = "ordering a list of bit values is unsupported; a bits list has whole-value equality only"
-help = "compare whole lists with `≡`/`≢`, or convert the elements to numbers with `↦` first; bits are not numbers, so `≺ ≻ ≤ ≥` do not lift over them"
+help = "Use `≡` or `≢` to compare whole lists. To order elements, convert the list with `↦` to numeric elements first; add `via Le` or `via Be` if the bit width changes"
 
 [diagnostics.SEM011.issues.approx_requires_numeric_operands]
 message = "{op} compares numbers; a {kind} that is not a numeric tensor cannot be compared with it"
-help = "compare the elements with a numeric operator, or use `≡`/`≢` to compare whole values"
+help = "Use `≡` or `≢` to compare the whole aggregate; `≈` and `≉` require numeric operands"
 
 [diagnostics.SEM011.issues.lista_divide_requires_glyph]
 message = "list `/` list is unsupported; use ⊘ (elementwise, like `/`) or ÷ (elementwise true division)"
@@ -3301,11 +3301,11 @@ help = "apply % against a scalar; there is no elementwise remainder between two 
 
 [diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
 message = "`≡` compares whole values, and a {kind} is never equal to a number"
-help = "use `≅` for a per-element mask (`a ≅ 2.0`), or compare a reduction"
+help = "For numeric aggregates, use `≅` to compare each element with the scalar; use `≡` or `≢` only to compare whole values of the same type"
 
 [diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
 message = "{kind} shapes differ: `{left}` and `{right}`; `≡` requires identical types"
-help = "`≡` requires identical types; compare aggregates of one shape"
+help = "`≡` requires identical types; compare aggregates with the same shape and element type"
 
 [diagnostics.SEM011.issues.aggregate_mask_not_truth_value]
 message = "a {kind} of bool is not a truth value"
@@ -3313,11 +3313,11 @@ help = "reduce it first: `{reducta} {via} {omnia} {ex} mask` or `{reducta} {via}
 
 [diagnostics.SEM011.issues.argument_type_mismatch]
 message = "argument type mismatch"
-help = "make the expression type match the expected type"
+help = "Pass a value of the parameter's declared type, or convert it explicitly with `↦` when that conversion is supported"
 
 [diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
-help = "convert operands explicitly before applying this numeric operator"
+help = "Convert one operand with `↦` so both have the same numeric type"
 
 [diagnostics.SEM011.issues.u64_signed_arithmetic_requires_conversion]
 message = "u64 and a signed integer have no lossless join in arithmetic"
@@ -3341,15 +3341,15 @@ help = "convert one operand explicitly with `↦`; a written constant may stand 
 
 [diagnostics.SEM011.issues.tensor_math_float_element_required]
 message = "this math function needs a float tensor"
-help = "convert the integer elements first with `↦` to a float tensor; only `absolutum` takes integer elements"
+help = "Convert the integer elements first with `↦` to a float tensor; only `abs` takes integer elements"
 
 [diagnostics.SEM011.issues.tensor_function_not_lifted]
 message = "a function of one number is not applied to a whole tensor"
-help = "user functions are not lifted over tensors; apply the function to each element in a `{filum}` loop or with map, or use a built-in math method such as `abs`, `sqrt`, or `exp`"
+help = "Use a `{itera}` loop over the tensor to call the function on each element, or use a built-in math method such as `abs`, `sqrt`, or `exp`"
 
 [diagnostics.SEM011.issues.ascii_literal_invalid_escape]
 message = "ascii literal contains invalid escape sequence"
-help = "use supported ASCII literal escape sequences"
+help = "Use supported escapes such as `\\n`, `\\t`, `\\r`, or `\\'`"
 
 [diagnostics.SEM011.issues.ascii_literal_non_ascii_scalar]
 message = "ascii literal contains non-ASCII character '{character}'"
@@ -3357,11 +3357,11 @@ help = "use string for Unicode text or keep ascii payloads ASCII-only"
 
 [diagnostics.SEM011.issues.ascii_literal_unescaped_control]
 message = "ascii literal contains unescaped control character U+{codepoint}"
-help = "escape control characters in ascii literals"
+help = "Write this control character as an ASCII Unicode escape, such as `\\u{{1}` for U+0001"
 
 [diagnostics.SEM011.issues.ascii_literal_too_long]
 message = "ascii literal exceeds the maximum payload of 64 bytes"
-help = "shorten the ascii literal or use a string literal instead"
+help = "Shorten it, increase `{ascii}` capacity up to 64, or use unbounded `{ascii}` or `{textus}` for longer text"
 
 [diagnostics.SEM011.issues.boolean_operands_required]
 message = "boolean operands required"
@@ -3381,15 +3381,15 @@ help = "call bitwise methods on int receivers"
 
 [diagnostics.SEM011.issues.deref_requires_reference]
 message = "deref requires reference"
-help = "dereference a reference value"
+help = "Use `*` only on a reference; otherwise access the value directly"
 
 [diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
 message = "densata requires sparse receiver"
-help = "call densata on a sparse value"
+help = "Call `{densata}()` on a sparse value"
 
 [diagnostics.SEM011.issues.ascii_literal_template_application]
 message = "ascii literals do not support template application"
-help = "use a string formatting literal for template calls"
+help = "Use a double-quoted `{textus}` template, for example `\"Hello, §\"(name)`"
 
 [diagnostics.SEM011.issues.directional_view_method_type_args]
 message = "directional view method does not accept type arguments"
