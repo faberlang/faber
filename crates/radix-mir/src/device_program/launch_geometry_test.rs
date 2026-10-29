@@ -602,18 +602,22 @@ fn matmul_plan_of(unit: &KernelUnit) -> MatMulPlan {
 #[test]
 fn runtime_matmul_class_equals_the_literal_selection_per_shape() {
     use crate::kernel_plan::{MatMulClass, MatMulDims, simdgroup_matmul_admission};
-    // (m, k, n, class): one per class, the section-5 rule-4 shapes, and the
-    // n > 8192 and n % 4 != 0 boundaries of the simdgroup predicate.
+    // (m, k, n, class): one per class, the section-5 rule-4 shapes, the
+    // square/tall tile-multiple full-band shapes, and the n > 8192 and
+    // n % 4 != 0 boundaries of the simdgroup predicate.
     let table = [
         (1, 960, 960, MatMulClass::OneRow),
         (16, 8, 1, MatMulClass::Gemv),
         (36, 64, 52, MatMulClass::Simdgroup),
         (2, 8, 4, MatMulClass::Simdgroup),
+        (16, 64, 52, MatMulClass::Simdgroup),
+        (64, 64, 64, MatMulClass::Simdgroup),
+        (512, 64, 8, MatMulClass::Simdgroup),
         (37, 65, 31, MatMulClass::Tiled),
         (36, 64, 8192, MatMulClass::Simdgroup),
         (36, 64, 8196, MatMulClass::Tiled),
         (36, 64, 50, MatMulClass::Tiled),
-        (16, 64, 52, MatMulClass::Tiled),
+        (16, 60, 52, MatMulClass::Tiled),
     ];
     let runtime = {
         let mut unit = matmul();
