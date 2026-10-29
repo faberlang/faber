@@ -1125,7 +1125,7 @@ fn constant_d64_intermediate_proven_to_overflow_remains_a_check_error() {
 @ kernel
 @ public
 fn constant_product() → d64 {
-    return 90000000000.0 * 90000000000.0 * 90000000000.0
+    return (90000000000 ↦ d64) * (90000000000 ↦ d64) * (90000000000 ↦ d64)
 }
 main {}
 ",
