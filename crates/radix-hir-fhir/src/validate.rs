@@ -1250,6 +1250,21 @@ fn validate_type_form(
                 root_slot,
             );
         }
+        radix_hir::HirTypeFormHead::ImportedAlias { path } => {
+            // An imported alias is carried as its resolved body, so the
+            // witness is the whole presentation: the authored path and no
+            // authored arguments.
+            if path.is_empty() {
+                return Err(type_presentation_issue("empty_imported_alias_path", site));
+            }
+            for symbol in path {
+                check_symbol(*symbol)?;
+            }
+            if !form.args.is_empty() {
+                return Err(type_presentation_issue("imported_alias_arguments", site));
+            }
+            return Ok(());
+        }
         radix_hir::HirTypeFormHead::Semantic(level) => {
             let ty = types
                 .types()

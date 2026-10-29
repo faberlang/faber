@@ -77,10 +77,10 @@ fn all_entries_validate() {
     assert_eq!(registry.entries().len(), 217);
 
     for entry in registry.entries() {
-        assert!(!entry.term.is_empty());
-        assert!(!entry.category.is_empty());
-        assert!(!entry.syntax.is_empty());
-        assert!(!entry.summary.is_empty());
+        assert_ne!(entry.term, "");
+        assert_ne!(entry.category, "");
+        assert_ne!(entry.syntax, "");
+        assert_ne!(entry.summary, "");
         assert!(
             entry.body.contains("```fab"),
             "{} missing fab example",
@@ -119,7 +119,7 @@ fn render_legacy_uses_distinct_layout() {
 fn search_returns_ranked_candidates() {
     let registry = disk_registry();
     let hits = registry.search("equality");
-    assert!(!hits.is_empty());
+    assert_ne!(hits, [] as [crate::explain::SearchHit<'_>; 0]);
     assert!(hits.iter().any(|hit| hit.entry.term == "≡"));
     assert!(hits.iter().any(|hit| hit.entry.term == "est"));
 
@@ -260,7 +260,7 @@ fn assert_legacy_term(registry: &Registry, term: &str, canonical_term: &str) {
 fn search_empty_query_returns_empty() {
     let registry = disk_registry();
     let hits = registry.search("");
-    assert!(hits.is_empty());
+    assert_eq!(hits, [] as [crate::explain::SearchHit<'_>; 0]);
     let rendered = render_search("", &hits);
     assert!(rendered.starts_with("Search: "));
 }

@@ -3269,5 +3269,9 @@ pub(super) fn rewrite_non_null_chain(
 }
 
 #[cfg(test)]
+#[path = "link_test.rs"]
+mod link_tests;
+
+#[cfg(test)]
 #[path = "nary_range_link_test.rs"]
 mod nary_range_link_tests;

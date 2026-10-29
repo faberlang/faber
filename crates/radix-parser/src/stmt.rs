@@ -541,7 +541,7 @@ impl Parser {
     /// Parse `fac`, the canonical block form for do/try-style execution.
     ///
     /// GRAMMAR:
-    ///   fac-stmt := `fac` [`omnia`] block [`cape` ident block] [`dum` expr]
+    ///   fac-stmt := `fac` [`omnia` | `machina`] block [`cape` ident block] [`dum` expr]
     ///
     /// At statement level, a trailing `dum` turns `fac` into a do-while form.
     /// Closure bodies call the shared construct with `allow_while = false` so
@@ -553,7 +553,25 @@ impl Parser {
     pub(super) fn parse_fac_construct(&mut self, allow_while: bool) -> Result<FacStmt, ParseError> {
         self.expect_keyword_ident(TokenKind::Fac)?;
 
-        let omnia = self.eat_keyword_ident(TokenKind::Omnia);
+        let modifier = if self.eat_keyword_ident(TokenKind::Omnia) {
+            FacModifier::Omnia
+        } else if self.eat_keyword_ident(TokenKind::Machina) {
+            FacModifier::Machina
+        } else {
+            FacModifier::None
+        };
+        if modifier != FacModifier::None
+            && (self.check_keyword_ident(TokenKind::Omnia)
+                || self.check_keyword_ident(TokenKind::Machina))
+        {
+            // `do all device` and `do device all` (and a repeat): `device`
+            // already delivers every fault once at the block's exit.
+            return Err(ParseError::structured(
+                ParseErrorKind::StatementInvalid,
+                self.current_span(),
+            )
+            .with_arg("issue", "fac_modifier_redundant"));
+        }
         let body = self.parse_block()?;
         let catch = self.try_parse_cape_stmt()?;
 
@@ -579,7 +597,7 @@ impl Parser {
         };
 
         Ok(FacStmt {
-            omnia,
+            modifier,
             body,
             catch,
             while_,

@@ -99,7 +99,7 @@ compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_bl
 # [044] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
 # [045] fac_block
-fac_block ::= 'ทำ' block_stmt cape_clause?
+fac_block ::= 'ทำ' fac_modifier? block_stmt cape_clause?
 # [046] clausura_legacy_expr
 clausura_legacy_expr ::= 'ปิดล้อม' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 # [047] clausura_params
@@ -547,50 +547,52 @@ proba_modifier ::= 'คาดหวัง_ล้มเหลว' | 'ละเว
 # [268] praepara_block
 praepara_block ::= ('เตรียม' | 'จะเตรียม' | 'หลังเตรียม' | 'จะหลังเตรียม') 'ทั้งหมด'? block_stmt
 # [269] fac_stmt
-fac_stmt ::= 'ทำ' block_stmt cape_clause? ('ขณะ' expression)?
-# [270] IDENTIFIER
+fac_stmt ::= 'ทำ' fac_modifier? block_stmt cape_clause? ('ขณะ' expression)?
+# [270] fac_modifier
+fac_modifier ::= 'ทั้งหมด' | 'อุปกรณ์'
+# [271] IDENTIFIER
 IDENTIFIER ::=
-# [271] NUMBER
+# [272] NUMBER
 NUMBER ::=
-# [272] NATURAL
+# [273] NATURAL
 NATURAL ::=
-# [273] STRING
+# [274] STRING
 STRING ::=
-# [274] ASCII_STRING
+# [275] ASCII_STRING
 ASCII_STRING ::=
-# [275] BACKTICK_STRING
+# [276] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [276] OCTETI_STRING
+# [277] OCTETI_STRING
 OCTETI_STRING ::=
-# [277] REGEX_TYPE_WORD
+# [278] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [278] REGEX_BODY
+# [279] REGEX_BODY
 REGEX_BODY ::=
-# [279] NEWLINE
+# [280] NEWLINE
 NEWLINE ::=
-# [280] WIDTH_MARKER
+# [281] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [281] LISTA_WIDTH_SUGAR
+# [282] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [282] TENSOR_WIDTH_SUGAR
+# [283] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [283] SPARSA_WIDTH_SUGAR
+# [284] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [284] VECTOR_WIDTH_SUGAR
+# [285] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [285] MATRIX_WIDTH_SUGAR
+# [286] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [286] FRONTMATTER_DELIMITER
+# [287] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [287] TOML_LINES
+# [288] TOML_LINES
 TOML_LINES ::=
-# [288] ANNOTATION_NAME
+# [289] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [289] ANNOTATION_FIELD_NAME
+# [290] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [290] NON_NEWLINE_TOKEN
+# [291] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [291] NO_NEWLINE
+# [292] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -889,6 +891,7 @@ NO_NEWLINE ::=
 | [`proba_modifier`](#proba-modifier) | `#ทดสอบ-modifier` | live |
 | [`praepara_block`](#praepara-block) | `#เตรียม-block` | live |
 | [`fac_stmt`](#fac-stmt) | `#ทำ-stmt` | live |
+| [`fac_modifier`](#fac-modifier) | `#ทำ-modifier` | live |
 
 ## Lexicon Appendix {#lexicon}
 
@@ -995,6 +998,7 @@ productions. It is not a second keyword authority.
 | Annotation | `เลน` | `@ radix` compiler-lane directive |
 | Builtin | `อ่าน` | read |
 | Builtin | `บรรทัด` | line |
+| Control | `อุปกรณ์` | device region modifier after `ทำ` (en `device`); contextual |
 | Declarations | `ขนาด` | size/index generic parameter |
 | Expression | `สูงสุด` | maximum reduction operator (en `max`) |
 | Testing | `วัด` | benchmark |
@@ -2623,7 +2627,7 @@ The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code
 - `"ff" ↦ i32 ผ่านทาง Hex` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
 - `lista<b8>[lo‥hi] ↦ W ผ่านทาง Be` / `… ↦ W ผ่านทาง Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). A `lista<b8>` itself has no endian; `lista<b8> ↦ u32` without `ผ่านทาง Be` / `ผ่านทาง Le` stays rejected. A short window fails (no pad).
 - `lista<b8>[lo‥hi] ↦ f32 ผ่านทาง Be|Le` / `… ↦ f64 ผ่านทาง Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `ผ่านทาง Be` / `ผ่านทาง Le` mandatory).
-- `lista<b8> ↦ tensor<E, [d1, …, dk]> ผ่านทาง Le` / `… ผ่านทาง Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, ขนาด N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `ขนาด n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `ผ่านทาง Le` / `ผ่านทาง Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`จับ`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse is the whole-tensor byte encode, `tensor<E, shape> ↦ lista<b8> ผ่านทาง Be|Le`: every element, in row-major order, becomes its `E`-width bytes in the byte order of the hint, so the byte count is the element count times the width and a round trip returns the tensor (shipped on the MIR runner and Rust; Go, TypeScript, Swift and several MIR targets decline it by name). The list form `lista<E> ↦ lista<b8> ผ่านทาง Be|Le` below is its list counterpart. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> ผ่านทาง Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> ผ่านทาง Be` prints `[258, 772]` where `ผ่านทาง Le` prints `[513, 1027]`.
+- `lista<b8> ↦ tensor<E, [d1, …, dk]> ผ่านทาง Le` / `… ผ่านทาง Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, ขนาด N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `ขนาด n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`, or a genus with a fixed byte layout (a record row, below). The `ผ่านทาง Le` / `ผ่านทาง Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`จับ`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse is the whole-tensor byte encode, `tensor<E, shape> ↦ lista<b8> ผ่านทาง Be|Le`: every element, in row-major order, becomes its `E`-width bytes in the byte order of the hint, so the byte count is the element count times the width and a round trip returns the tensor (shipped on the MIR runner and Rust; Go, TypeScript, Swift and several MIR targets decline it by name). The list form `lista<E> ↦ lista<b8> ผ่านทาง Be|Le` below is its list counterpart. A genus element (`tensor<Block, [n]>`, where `Block` is a non-generic genus whose fields all have a fixed size: sized numerics, register vectors and fixed-size `lista<…, ขนาด N>`; a nested genus, text or a nullable field has no fixed layout) is a record row: it takes `ผ่านทาง Le` only, because the row's byte image is the little-endian layout of its fields (`ผ่านทาง Be` is `SEM016` `octeti_to_tensor_record_big_endian`, and no hint is `octeti_to_tensor_unspecified`). The row width comes from that layout, so the byte length must be a whole number of rows and exactly `product(shape) · row width`; the checker cannot see the layout, so every length mismatch is a recoverable run-time failure with a stable issue (`runner_octeti_record_tensor_truncated`, `…_trailing_bytes`, `…_misaligned`, `…_overflow`), and a genus with no fixed layout is refused by name (`octeti_tensor_record_layout_refused`). The runner keeps the rows as the bytes and decodes one only when an element is read; a field store through an element (`t[[i]].f ← v`, also `↑`/`↓`) decodes the row, changes the field and stores the whole element back into the tensor, so the write is never lost. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> ผ่านทาง Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> ผ่านทาง Be` prints `[258, 772]` where `ผ่านทาง Le` prints `[513, 1027]`.
 - `lista<bN> ↦ lista<E>` / `lista<E> ↦ lista<bN>` — bulk conversion between a raw-bits list and a numeric list (a `ผ่านทาง Le` / `ผ่านทาง Be` clause exactly when the bit width changes, and never when it stays the same). A same-width conversion (`lista<b8> ↦ lista<u8>`, `lista<b16> ↦ lista<u16>`, the signed twins, and back) takes no clause at any width, and a clause written on one is `SEM016` `bits_via_clause_not_allowed`. A width change (`lista<b8> ↦ lista<u16>`, `lista<u16> ↦ lista<b8>`, `lista<b8> ↦ lista<b16>`, `lista<b8> ↦ lista<f32>`) requires the clause (`SEM016` `bits_via_clause_required`): each source element is written as width/8 bytes in the byte order of the clause and the byte stream is regrouped at the target width, so `lista<b8> ↦ lista<u16> ผ่านทาง Le` of `[1, 2, 3, 4]` is `[513, 1027]` and `ผ่านทาง Be` is `[258, 772]`. A byte total that is not a whole number of target elements is a recoverable run-time error (`bits list length mismatch`). Shipped on the checker and the MIR runner; every emitter refuses the width-changing form by name. The `lista<b8> ↦ tensor<E, [shape]>` row above follows the same rule (no clause on an 8-bit element).
 - `ผ่านทาง Bits` — **retired**. A bit pattern is a `bN` value (`b8`, `b16`, `b32`, `b64`), and the one rule is: from a number, `↦` converts the value; from bits, `↦` to a same-width type reads those bits as that type. A float to its pattern is `x ↦ b32` (b16 for f16 and bf16, b64 for f64); a pattern to a float is `p ↦ f32`; a number that holds a pattern says so in one step, `u16 ↦ b16 ↦ f16`. `n ↦ f32` on a `u32` stays the value conversion. Every `ผ่านทาง Bits` spelling is `SEM016` (`conversio_via_bits_retired`), whose help names the `↦ bN` replacement.
 - `W ↦ lista<b8, ขนาด N> ผ่านทาง Be` / `… ↦ lista<b8, ขนาด N> ผ่านทาง Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, ขนาด N>` whose `N` equals the source element's byte width. The `ผ่านทาง Le` / `ผ่านทาง Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, ขนาด 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, ขนาด N>`. Register targets take the clause today: `v ↦ lista<b8, ขนาด 16> ผ่านทาง Le`, `corpus[0‥16] ↦ vector<u32, ขนาด 4> ผ่านทาง Be`.
@@ -3261,6 +3265,9 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `ทำ { ... }` is the explicit `do` block and executes its body once.
 - `ทำ { ... } ขณะ condition` is the post-test loop form; postfix `ขณะ` attaches only to `ทำ`, not arbitrary preceding blocks.
 - `จับ` is an attachment shared by several structured forms, not a semantic mode owned by `ทำ`. A plain `ทำ` is often used when an otherwise unattached block needs a local handler: `ทำ { ... } จับ err { ... }`.
+- The modifier slot directly after `ทำ` holds `ทั้งหมด` (en `do all`) or `อุปกรณ์` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- `ทำ ทั้งหมด { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `จับ` once, at the block's exit (or, with a `ขณะ` tail, at each back edge).
+- `ทำ อุปกรณ์ { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `ทำ ทั้งหมด` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `ขณะ` / `วน ช่วง` loops are unchanged. Captures are classified by writes (a captured `ใน` scalar or genus is device state). The block's own `จับ` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `ขณะ` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `ทำ อุปกรณ์` (`fac_machina_nested`), a `คืน` / `หยุด` / `ไปต่อ` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `เส้นใย` loop or `ลดรูป` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `ทำ ทั้งหมด`, so every device route is unchanged.
 
 ---
 
@@ -3272,7 +3279,6 @@ typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `ทำ ทั้งหมด { … } จับ e { … }` (en `do all`) | admitted (FLD K1); `ทำ ทั้งหมด` is `PARSE001` |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `แยก` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |
