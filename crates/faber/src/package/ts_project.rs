@@ -31,7 +31,7 @@ pub(crate) struct TsProjectFiles {
 
 /// Emit every unit of the package as its own ES module: the entry in script
 /// mode, each sibling in library mode with named exports. Relative imports
-/// carry `.js` and resolve between the generated files under NodeNext.
+/// carry `.js` and resolve between the generated files under `NodeNext`.
 ///
 /// # Errors
 /// Returns the diagnostics when the package has no entry or a unit fails TypeScript

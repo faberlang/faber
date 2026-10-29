@@ -1271,7 +1271,9 @@ fn print_region_report(config: &radix::module::Config, input_path: &Path, mode: 
                     ))
                 );
             }
-            _ => eprintln!("{}", radix::module::diagnostics::render_plain(row)),
+            DiagnosticMode::Normal => {
+                eprintln!("{}", radix::module::diagnostics::render_plain(row))
+            }
         }
     }
 }
