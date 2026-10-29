@@ -10,9 +10,3 @@ domain = "collections"
 [expect]
 stdout = "stdout.expected"
 check_only = false
-
-[targets.roundtrip]
-outcome = "known-fail"
-phase = "emit"
-diagnostic_contains = "variant_path_spelling_reanalysis_failed"
-known_fail_why = "The Faber re-emit of a closure with a union-typed parameter inside a call fails its own re-validation (call_arguments_end), so the round trip refuses it by name; the program itself checks and runs."
