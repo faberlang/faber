@@ -1659,13 +1659,15 @@ scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
 lege_expr      := 'lege' 'lineam'?
 # General shaped-source reduction. `via` is mandatory; the operator is one of
 # the ten locale-pack words below. Grouping is contextual, and the optional
-# tail is either a body (with an optional `filum`) or a bodiless identity.
+# identity follows either the optional body or the source directly. A bare key
+# is unary-tight so `vel` remains available to the reduction identity.
 # The body is claimed only by `(fixum | varia) IDENTIFIER '{'`, so a following
 # declaration remains a separate statement. `reducta` and its operator words
 # stay ordinary identifiers outside their grammar slots.
-reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body)? reducta_identity?
 reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio' | 'prima'
-reducta_group := 'pro' expression
+reducta_group := 'pro' (group_key | '[' expression (',' expression)* ']')
+group_key := unary_expr
 reducta_body := ('sit' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression
 # Ordered prefix scan. `vel` is parsed at the ordinary outer expression level,

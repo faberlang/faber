@@ -2681,6 +2681,136 @@ fn lane_form_with_two_mut_outputs_binds_every_resource_at_its_declared_position(
     assert_eq!(signature.dispatch_size.x, 8);
 }
 
+/// If the exact source cannot be reconstructed, the build error points to the
+/// lane kernel and the call site that requested it rather than an earlier
+/// kernel in the launch chain.
+#[test]
+fn missing_lane_domain_error_names_the_kernel_and_call_site() {
+    use crate::MirValueKind;
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank1_tensor_ty(&mut types, 8);
+    let float = f32(&mut types);
+    let u32t = u32_ty(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let lane = MirOperand::Place(MirPlace::local(MirLocalId(2)));
+    let output = MirPlace {
+        base: crate::MirPlaceBase::Local(MirLocalId(1)),
+        projections: vec![crate::MirProjection::Index(lane)],
+    };
+    let kernel = MirFunction {
+        id: MirFunctionId(1),
+        source: Some(DefId(1)),
+        name: Some(interner.intern("missing_domain_kernel")),
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: Some(interner.intern("unused_domain")),
+                ty: tensor,
+                mode: MirParamMode::Ref,
+                span: span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: Some(interner.intern("out")),
+                ty: tensor,
+                mode: MirParamMode::MutRef,
+                span: span(),
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: Some(interner.intern("lane")),
+                ty: u32t,
+                mode: MirParamMode::Lane,
+                span: span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: tensor,
+                mutable: true,
+                span: span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: u32t,
+                mutable: false,
+                span: span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![lane_assign(
+                output,
+                0,
+                MirValueKind::Operand(MirOperand::Constant(crate::MirConstant::Float(1.0))),
+                float,
+            )],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: span(),
+            },
+            span: span(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    let caller = device_function(
+        2,
+        &mut interner,
+        "same_module_caller",
+        &[(10, "domain", tensor), (11, "out", tensor)],
+        &[10, 11],
+        vec![host_call(1, &[10, 11])],
+        None,
+        Vec::new(),
+        vacuum,
+        false,
+    );
+    let validated = validated(&types, vec![kernel, caller]);
+    let error = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect_err("an unused domain input cannot be guessed as the lane source");
+    let rendered = error.to_string();
+    assert!(
+        matches!(
+            &error,
+            super::DeviceProgramBuildError::KernelAbi { function, .. }
+                if *function == MirFunctionId(1)
+        ),
+        "the error belongs to the selected lane kernel: {error:?}"
+    );
+    assert!(rendered.contains("missing_domain_kernel"), "{rendered}");
+    assert!(rendered.contains("same_module_caller"), "{rendered}");
+    assert!(rendered.contains("bytes 0..0"), "{rendered}");
+    assert!(
+        rendered.contains("lane kernel has no carried lane-domain source identity"),
+        "{rendered}"
+    );
+}
+
 /// A single-lane kernel `name(tensor x, mut tensor y)`: both slots carry the
 /// declared names `x` and `y`, so two of them collide under the name join.
 fn single_lane_xy_kernel(

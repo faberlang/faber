@@ -1,0 +1,39 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "genus_decl", "genus_member", "field_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "assignment", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A mut genus binder from a list held in a record field aliases the element: scalar and list-field writes through the binder update the stored element."
+syntax = "mut T item ← box.items[index]; item.field ← value"
+related = ["lista", "mutabilitas", "genus"]
+locale = "en"
++++
+# =============================================================================
+# mut-list-element-alias-field — the element is reached through a record field.
+# =============================================================================
+# Each binder aliases its own list element, so writes through it (a scalar and a
+# list-field append) are visible when the element is read back from the list.
+
+class Comp {
+    mut int cid
+    mut int pw
+    mut list<int> plane
+}
+
+class Frame {
+    mut list<Comp> comps
+}
+
+main {
+    mut Frame f ← Frame { comps = empty }
+    f.comps.append(Comp { cid = 1, pw = 0, plane = empty })
+    mut Comp c ← f.comps[0]
+    c.pw ← 7
+    c.plane.append(5)
+    print f.comps[0].pw
+    print f.comps[0].plane.length()
+    mut Comp d ← f.comps[0]
+    d.cid ← 42
+    print f.comps[0].cid
+}

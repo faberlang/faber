@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 561
+    "analyzable": 567
   },
   "terms": [
     {
@@ -367,7 +367,7 @@
       "term": "genus",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 23
+      "analyzable": 25
     },
     {
       "term": "guillemet",
@@ -499,7 +499,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 21
+      "analyzable": 25
     },
     {
       "term": "manifest",

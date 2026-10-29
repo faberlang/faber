@@ -128,7 +128,7 @@ fn grouped_reductions_require_integer_keys_and_supported_operators() {
     assert_rejects_with_issue(
         r"
 functio no_coordinates(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-    redde reducta via summa ex xs pro keys[0]
+    redde reducta via summa ex xs pro [keys[0]]
 }
 ",
         "reducta_group_requires_apud",
@@ -136,7 +136,7 @@ functio no_coordinates(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → t
     assert_rejects_with_issue(
         r"
 functio non_integer_key(tensor<numerus, [3]> xs, tensor<fractus, [3]> keys) → tensor<numerus, [2]> {
-    redde reducta via summa ex xs apud [i] pro keys[i]
+    redde reducta via summa ex xs apud [i] pro [keys[i]]
 }
 ",
         "reducta_group_key_not_integer",
@@ -144,7 +144,7 @@ functio non_integer_key(tensor<numerus, [3]> xs, tensor<fractus, [3]> keys) → 
     assert_rejects_with_issue(
         r"
 functio grouped_argmax(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-    redde reducta via argmaxima ex xs apud [i] pro keys[i]
+    redde reducta via argmaxima ex xs apud [i] pro [keys[i]]
 }
 ",
         "reducta_group_op_unsupported",
@@ -152,7 +152,7 @@ functio grouped_argmax(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → t
     assert_rejects_with_issue(
         r"
 functio grouped_max(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-    redde reducta via maxima ex xs apud [i] pro keys[i]
+    redde reducta via maxima ex xs apud [i] pro [keys[i]]
 }
 ",
         "reducta_group_op_unsupported",
@@ -215,35 +215,16 @@ functio spread(tensor<numerus, [3]> xs, lista<numerus> ks) → tensor<numerus, [
 ",
         "reducta_group_keys_not_literal",
     );
-    assert_rejects_with_issue(
-        r"
-functio variable(tensor<numerus, [3]> xs, lista<numerus> ks) → tensor<numerus, [2, 4]> {
-    redde reducta via summa ex xs apud [i] pro ks
-}
-",
-        "reducta_group_keys_not_literal",
-    );
 }
 
 #[test]
-fn a_single_key_and_a_one_element_list_agree() {
+fn a_one_element_key_list_gives_the_rank_one_result() {
     assert_accepts(
         r"
-functio bare(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-    redde reducta via summa ex xs apud [i] pro keys[i]
-}
 functio listed(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
     redde reducta via summa ex xs apud [i] pro [keys[i]]
 }
 ",
-    );
-    assert_rejects_with_issue(
-        r"
-functio bare(tensor<numerus, [3]> xs, tensor<numerus, [3]> keys) → tensor<numerus, [2, 4]> {
-    redde reducta via summa ex xs apud [i] pro keys[i]
-}
-",
-        "reducta_group_rank_mismatch",
     );
     assert_rejects_with_issue(
         r"

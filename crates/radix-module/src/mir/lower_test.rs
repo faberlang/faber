@@ -4884,7 +4884,7 @@ incipit {
 #[test]
 fn reducta_grouping_preserves_source_and_key_tensors() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-  redde reducta via numeratio ex values apud [i] pro keys[i] sit value { redde value }
+  redde reducta via numeratio ex values apud [i] pro [keys[i]] sit v { redde v }
 }
 incipit {
   sit lista<bivalens> values_data ← [verum, falsum, verum]
@@ -4909,7 +4909,7 @@ incipit {
 #[test]
 fn reducta_group_out_of_range_uses_existing_tensor_write_failure() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-  redde reducta via numeratio ex values apud [i] pro keys[i] sit value { redde value }
+  redde reducta via numeratio ex values apud [i] pro [keys[i]] sit v { redde v }
 }
 incipit {
   sit lista<bivalens> values_data ← [verum, falsum, verum]

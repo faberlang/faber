@@ -91,21 +91,16 @@ impl Emitter<'_> {
         }
         let plans = jump_table_plan(&subjects, arms);
         let mut opened = false;
-        let mut done = false;
         if let Some(plans) = &plans {
             self.jump_table(out, &subjects, arms, plans)?;
             opened = true;
         }
         if !opened {
             for arm in arms {
-                if done {
-                    break;
-                }
                 let plan = self.plan_arm(&subjects, &arm.patterns)?;
                 let always = plan.tests.is_empty();
                 if always {
                     self.line(out, if opened { "} else {" } else { "{" });
-                    done = true;
                 } else {
                     // Each test carries its own parentheses; a lone one is the
                     // condition as it stands (a second pair trips clang's
@@ -130,6 +125,9 @@ impl Emitter<'_> {
                     let result = self.expr_statement(out, &arm.body);
                     self.depth -= 1;
                     result?;
+                }
+                if always {
+                    break;
                 }
             }
         }

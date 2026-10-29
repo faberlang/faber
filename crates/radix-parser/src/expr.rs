@@ -1910,7 +1910,14 @@ impl Parser {
         };
         let group = if self.is_keyword_key("pro") {
             self.advance();
-            Some(Box::new(self.parse_expression()?))
+            let group = if self.check(&TokenKind::LBracket) {
+                self.parse_primary()?
+            } else {
+                // GRAMMAR: group_key := unary. Stopping above `vel` leaves
+                // the reduction's optional identity for `reducta_identity`.
+                self.parse_unary_inner()?
+            };
+            Some(Box::new(group))
         } else {
             None
         };
@@ -1930,7 +1937,7 @@ impl Parser {
         } else {
             (AstMutability::Immutable, None, None)
         };
-        let mut identity = if body.is_none() && self.eat_keyword_ident(TokenKind::Vel) {
+        let mut identity = if self.eat_keyword_ident(TokenKind::Vel) {
             Some(Box::new(self.parse_expression()?))
         } else {
             None

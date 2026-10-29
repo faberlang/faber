@@ -459,6 +459,9 @@ mod rank2_reduction_readiness_tests;
 #[path = "record_literal_test.rs"]
 mod record_literal_tests;
 #[cfg(test)]
+#[path = "reducta_group_identity_test.rs"]
+mod reducta_group_identity_tests;
+#[cfg(test)]
 #[path = "saturating_word_test.rs"]
 mod saturating_word_tests;
 #[cfg(test)]

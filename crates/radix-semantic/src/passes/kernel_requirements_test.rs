@@ -1417,12 +1417,12 @@ fn grouped_reduction_keys_have_coordinate_facts_and_count_cells_keep_their_bound
 @ kernel
 @ public
 fn grouped(tf32[6] a, tensor<i32, [6]> keys) → tf32[3] {
-    return reduce via sum from a at [i] per keys[i]
+    return reduce via sum from a at [i] per [keys[i]]
 }
 @ kernel
 @ public
 fn too_many(tf32[65536, 65536] a) → tensor<i32, [1]> {
-    return reduce via count from a at [i, j] per 0 thread lane let s { return s ≻ 0.0 }
+    return reduce via count from a at [i, j] per [0] thread lane let s { return s ≻ 0.0 }
 }
 ",
     );

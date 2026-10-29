@@ -181,6 +181,7 @@ fn loops_program_is_pinned() {
     assert_eq!(source, LOOPS);
 }
 
+#[test]
 fn switch_program_is_pinned() {
     let source = include_str!("../tests/fixtures/run/switch.fab");
     let source = crate::test_support::program("switch.fab", source);
