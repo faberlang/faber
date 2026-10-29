@@ -1,0 +1,20 @@
+version = 1
+id = "corpus/mori/err002-permission.fab"
+group = "language"
+input_root = "corpus"
+input = "mori/err002-permission.fab"
+category = "error"
+domain = "control"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 77
+stdout_contains = "before\n"
+check_only = false
