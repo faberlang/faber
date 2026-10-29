@@ -869,3 +869,322 @@ mod ranged_list {
         assert!(!types.is_assignable(a, c), "ranges are invariant");
     }
 }
+// Behaviour tables for the width-level contracts. These exercise each marker
+// directly rather than relying on parser or Faber programs.
+#[test]
+fn every_bounded_integer_width_reports_its_marker_bounds_and_signedness() {
+    use NumericWidth::{I8, I16, I32, I64, U8, U16, U32, U64};
+
+    let cases = [
+        ("i8", I8, i128::from(i8::MIN), i128::from(i8::MAX), None),
+        ("i16", I16, i128::from(i16::MIN), i128::from(i16::MAX), None),
+        ("i32", I32, i128::from(i32::MIN), i128::from(i32::MAX), None),
+        ("i64", I64, i128::from(i64::MIN), i128::from(i64::MAX), None),
+        ("u8", U8, 0, i128::from(u8::MAX), Some(u64::from(u8::MAX))),
+        (
+            "u16",
+            U16,
+            0,
+            i128::from(u16::MAX),
+            Some(u64::from(u16::MAX)),
+        ),
+        (
+            "u32",
+            U32,
+            0,
+            i128::from(u32::MAX),
+            Some(u64::from(u32::MAX)),
+        ),
+        ("u64", U64, 0, i128::from(u64::MAX), Some(u64::MAX)),
+    ];
+
+    for (marker, width, min, max, unsigned_max) in cases {
+        assert_eq!(
+            NumericWidth::from_marker(marker, Primitive::Numerus),
+            Ok(width)
+        );
+        assert_eq!(width.faber_marker(), marker);
+        assert_eq!(width.rust_type(), marker);
+        assert_eq!(width.integer_range(), Some((min, max)), "{marker}");
+        assert_eq!(width.is_signed_int(), marker.starts_with('i'), "{marker}");
+        assert_eq!(width.is_unsigned_int(), marker.starts_with('u'), "{marker}");
+        assert!(!width.is_float(), "{marker}");
+        assert_eq!(width.unsigned_max(), unsigned_max, "{marker}");
+        assert_eq!(
+            width.float_truncation_bounds(),
+            Some((min.to_string(), (max + 1).to_string())),
+            "{marker}"
+        );
+        assert_eq!(
+            radix_width_resolve(width, min, max, true),
+            Ok((min, max)),
+            "both endpoints fit {marker}"
+        );
+        assert_eq!(
+            radix_width_resolve(width, 0, 0, true),
+            Ok((0, 0)),
+            "zero fits {marker}"
+        );
+    }
+}
+
+fn radix_width_resolve(
+    width: NumericWidth,
+    lo: i128,
+    hi: i128,
+    inclusive: bool,
+) -> Result<(i128, i128), crate::WidthLowerIssue> {
+    crate::resolve_ranged_int(
+        width,
+        crate::RangeEnd::Value(lo),
+        crate::RangeEnd::Value(hi),
+        inclusive,
+    )
+}
+
+#[test]
+fn every_integer_width_rejects_one_past_its_edges() {
+    use crate::WidthLowerIssue::{RangedOutsideWidth, RangedUnsignedNegative};
+    use NumericWidth::{I8, I16, I32, I64, U8, U16, U32, U64};
+
+    for (width, min, max, is_unsigned) in [
+        (I8, i128::from(i8::MIN), i128::from(i8::MAX), false),
+        (I16, i128::from(i16::MIN), i128::from(i16::MAX), false),
+        (I32, i128::from(i32::MIN), i128::from(i32::MAX), false),
+        (I64, i128::from(i64::MIN), i128::from(i64::MAX), false),
+        (U8, 0, i128::from(u8::MAX), true),
+        (U16, 0, i128::from(u16::MAX), true),
+        (U32, 0, i128::from(u32::MAX), true),
+        (U64, 0, i128::from(u64::MAX), true),
+    ] {
+        assert_eq!(
+            radix_width_resolve(width, min - 1, max, true),
+            Err(if is_unsigned {
+                RangedUnsignedNegative
+            } else {
+                RangedOutsideWidth
+            }),
+            "one below {width:?}"
+        );
+        assert_eq!(
+            radix_width_resolve(width, min, max + 1, true),
+            Err(RangedOutsideWidth),
+            "one above {width:?}"
+        );
+        // A half-open upper bound may be one past the width's inclusive max.
+        assert_eq!(
+            radix_width_resolve(width, min, max + 1, false),
+            Ok((min, max)),
+            "exclusive edge for {width:?}"
+        );
+    }
+}
+
+#[test]
+fn float_and_decimal_width_metadata_is_not_an_integer_range() {
+    use crate::WidthError;
+    use NumericWidth::{BF16, D64, F16, F32, F64};
+
+    for (marker, width) in [("f16", F16), ("bf16", BF16), ("f32", F32), ("f64", F64)] {
+        assert_eq!(
+            NumericWidth::from_marker(marker, Primitive::Fractus),
+            Ok(width)
+        );
+        assert_eq!(
+            NumericWidth::from_marker(marker, Primitive::Numerus),
+            Err(WidthError::FloatOnNumerus)
+        );
+        assert_eq!(width.faber_marker(), marker);
+        assert_eq!(width.rust_type(), marker);
+        assert!(width.is_float(), "{marker}");
+        assert!(!width.is_signed_int(), "{marker}");
+        assert!(!width.is_unsigned_int(), "{marker}");
+        assert_eq!(width.integer_range(), None, "{marker}");
+        assert_eq!(width.unsigned_max(), None, "{marker}");
+        assert_eq!(width.float_truncation_bounds(), None, "{marker}");
+        assert_eq!(width.decimal_scale(), None, "{marker}");
+    }
+
+    assert_eq!(
+        NumericWidth::from_marker("d64", Primitive::Numerus),
+        Ok(D64)
+    );
+    assert_eq!(
+        NumericWidth::from_marker("d64", Primitive::Fractus),
+        Err(WidthError::UnrecognizedMarker)
+    );
+    assert_eq!(D64.faber_marker(), "d64");
+    assert_eq!(D64.rust_type(), "d64");
+    assert!(D64.is_decimal());
+    assert!(!D64.is_float());
+    assert!(!D64.is_signed_int());
+    assert!(!D64.is_unsigned_int());
+    assert_eq!(D64.decimal_scale(), Some(8));
+    assert_eq!(D64.integer_range(), None);
+    assert_eq!(D64.float_truncation_bounds(), None);
+}
+
+#[test]
+fn raw_bits_markers_have_container_widths_but_no_numeric_width_entry() {
+    use crate::{BitsWidth, WidthError};
+
+    for (marker, bits) in [
+        ("b8", BitsWidth::B8),
+        ("b16", BitsWidth::B16),
+        ("b32", BitsWidth::B32),
+        ("b64", BitsWidth::B64),
+    ] {
+        assert_eq!(BitsWidth::from_marker(marker), Some(bits));
+        assert_eq!(bits.faber_marker(), marker);
+        assert_eq!(bits.bits(), marker[1..].parse::<u32>().unwrap());
+        assert_eq!(
+            NumericWidth::from_marker(marker, Primitive::Numerus),
+            Err(WidthError::UnrecognizedMarker)
+        );
+        assert_eq!(
+            NumericWidth::from_marker(marker, Primitive::Fractus),
+            Err(WidthError::UnrecognizedMarker)
+        );
+    }
+    for marker in ["b1", "b7", "b128", "B8", "b8x"] {
+        assert_eq!(BitsWidth::from_marker(marker), None, "{marker}");
+    }
+}
+
+#[test]
+fn width_widening_narrowing_and_checked_conversion_tables_are_complete() {
+    use NumericWidth::{BF16, D64, F16, F32, F64, I8, I16, I32, I64, U8, U16, U32, U64};
+
+    let widths = [
+        I8, I16, I32, I64, U8, U16, U32, U64, F16, BF16, F32, F64, D64,
+    ];
+    let widening_edges = [
+        (I8, I16),
+        (I8, I32),
+        (I8, I64),
+        (I16, I32),
+        (I16, I64),
+        (I32, I64),
+        (U8, U16),
+        (U8, U32),
+        (U8, U64),
+        (U8, I16),
+        (U8, I32),
+        (U8, I64),
+        (U16, U32),
+        (U16, U64),
+        (U16, I32),
+        (U16, I64),
+        (U32, U64),
+        (U32, I64),
+        (F16, F32),
+        (F16, F64),
+        (F32, F64),
+    ];
+    let narrowing_edges = [
+        (I16, I8),
+        (I32, I8),
+        (I32, I16),
+        (I64, I8),
+        (I64, I16),
+        (I64, I32),
+        (U16, U8),
+        (U32, U8),
+        (U32, U16),
+        (U64, U8),
+        (U64, U16),
+        (U64, U32),
+        (F32, F16),
+        (F64, F16),
+        (F64, F32),
+    ];
+
+    for from in widths {
+        for to in widths {
+            let same = from == to;
+            let widening = widening_edges.contains(&(from, to));
+            let narrowing = narrowing_edges.contains(&(from, to));
+            let unsigned_to_signed = matches!(
+                (from, to),
+                (U8, I16 | I32 | I64) | (U16, I32 | I64) | (U32, I64)
+            );
+            let expected_assignable = same || widening;
+            let expected_conversio_widening = (expected_assignable && !unsigned_to_signed)
+                || (matches!(from, I8 | I16 | I32 | I64) && to == F64);
+
+            assert_eq!(
+                NumericWidth::is_widening_assignable(from, to),
+                expected_assignable,
+                "implicit {from:?} -> {to:?}"
+            );
+            assert_eq!(
+                NumericWidth::is_conversio_widening(from, to),
+                expected_conversio_widening,
+                "explicit widening {from:?} -> {to:?}"
+            );
+            assert_eq!(
+                NumericWidth::is_explicit_narrowing_conversio(from, to),
+                narrowing,
+                "explicit narrowing {from:?} -> {to:?}"
+            );
+
+            match (from.integer_range(), to.integer_range()) {
+                (Some((from_min, from_max)), Some((to_min, to_max))) => {
+                    let fits = to_min <= from_min && from_max <= to_max;
+                    assert_eq!(
+                        NumericWidth::is_checked_integer_conversio(from, to),
+                        !fits,
+                        "checked integer conversion {from:?} -> {to:?}"
+                    );
+                    assert_eq!(
+                        NumericWidth::checked_integer_guards(from, to),
+                        (
+                            (to_min > from_min).then_some(to_min),
+                            (to_max < from_max).then_some(to_max)
+                        ),
+                        "integer conversion guards {from:?} -> {to:?}"
+                    );
+                }
+                _ => {
+                    assert!(!NumericWidth::is_checked_integer_conversio(from, to));
+                    assert_eq!(NumericWidth::checked_integer_guards(from, to), (None, None));
+                }
+            }
+        }
+    }
+    // bf16 has no widening rank: its precision/range tradeoff is incomparable
+    // with f16, despite both being 16-bit floating-point formats.
+    assert!(!NumericWidth::is_widening_assignable(F16, BF16));
+    assert!(!NumericWidth::is_widening_assignable(BF16, F16));
+}
+
+#[test]
+fn float_integer_fit_checks_each_precision_edge_and_signed_zero() {
+    use crate::{float_holds_integer as holds, float_overflows as over};
+    use NumericWidth::{BF16, F16, F32, F64};
+
+    for width in [F16, BF16, F32, F64] {
+        assert!(holds(width, 0), "zero in {width:?}");
+        assert!(holds(width, 1), "one in {width:?}");
+        assert!(holds(width, -1), "negative one in {width:?}");
+    }
+    assert!(holds(F16, 2048));
+    assert!(!holds(F16, 2049));
+    assert!(holds(F16, -2048));
+    assert!(!holds(F16, -2049));
+    assert!(holds(F16, 65_504));
+    assert!(over(F16, 65_520.0));
+
+    assert!(holds(BF16, 256));
+    assert!(!holds(BF16, 257));
+    assert!(holds(BF16, 1 << 20));
+    assert!(!holds(BF16, (1 << 20) + 1));
+
+    assert!(holds(F32, 1 << 24));
+    assert!(!holds(F32, (1 << 24) + 1));
+    assert!(holds(F32, 1 << 40));
+    assert!(holds(F64, 1 << 53));
+    assert!(!holds(F64, (1 << 53) + 1));
+    assert!(holds(F64, 1 << 100));
+    assert!(!holds(F64, i128::MAX));
+}
