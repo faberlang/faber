@@ -1445,7 +1445,7 @@ help = "drop the marker, or use {publica} to re-export"
 
 [diagnostics.PARSE050.issues.import_name_inference_failed]
 message = "could not infer import name from {path}"
-help = "spell {nomen} or an explicit alias for {path}"
+help = "provide a non-empty source path; if its name cannot be inferred, add an explicit binding after the path"
 
 [diagnostics.PARSE050.issues.import_target_unknown]
 message = "`{target}` is not a target name"
@@ -1465,11 +1465,11 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.name_not_variant]
 message = "name does not refer to a variant"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "use a variant declared by this {discretio}"
 
 [diagnostics.SEM001.issues.unknown_identifier]
 message = "unknown identifier"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "declare or import the name before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.scribe_callee]
 message = "unknown identifier"
@@ -1477,15 +1477,15 @@ help = "`{spelling}` is the output statement, not a function: import the console
 
 [diagnostics.SEM001.issues.unknown_record_field]
 message = "unknown record field"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "use a label declared in the {ratio} type; its fields are fixed by the type"
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "unknown variant"
-help = "declare the variable before use{?members| (|)}{?suggestion|; did you mean |?}"
+help = "use a variant declared by the {discretio}{?members| (|)}{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "unknown variant fields"
-help = "declare the variable before use{?suggestion|; did you mean |?}"
+help = "check the selected variant's payload declaration and use its declared fields"
 
 [diagnostics.SEM001.issues.variant_ambiguous]
 message = "variant name is ambiguous across in-scope unions"
@@ -1493,7 +1493,7 @@ help = "qualify the variant with its union name (e.g. A.X)"
 
 [diagnostics.SEM001.issues.name_not_value]
 message = "name does not denote a value"
-help = "use a value, or call the name if it is a function"
+help = "a type name alone is not a value; use a value binding or construct a value of that type"
 
 [diagnostics.SEM002]
 message = "undefined type"
@@ -1501,11 +1501,11 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.figura_unknown_index]
 message = "unknown index parameter in Figura"
-help = "declare the type or import it"
+help = "use a declared {magnitudo} parameter or a numeric literal for each shape dimension"
 
 [diagnostics.SEM002.issues.invalid_precision_marker]
 message = "instant accepts only ms, us, or ns as a precision marker"
-help = "declare the type or import it"
+help = "use `ms`, `us`, or `ns` as the bare {instans} precision marker"
 
 [diagnostics.SEM002.issues.removed_decimal_width_d32]
 message = "d32 is not a type"
@@ -1513,39 +1513,39 @@ help = "d32 was removed; use d64, the only decimal width"
 
 [diagnostics.SEM002.issues.name_not_type]
 message = "name does not refer to a type"
-help = "declare the type or import it"
+help = "use a type name here, such as a {genus}, {ordo}, {discretio}, {implendum}, type alias, or type parameter"
 
 [diagnostics.SEM002.issues.precision_marker_params]
 message = "precision marker cannot accept parameters"
-help = "declare the type or import it"
+help = "write one bare precision marker: `ms`, `us`, or `ns`, with no type arguments"
 
 [diagnostics.SEM002.issues.precision_marker_shape]
 message = "precision marker must be a bare spelling such as ms or us"
-help = "declare the type or import it"
+help = "use one bare marker (`ms`, `us`, or `ns`), without brackets or parameters"
 
 [diagnostics.SEM002.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
-help = "declare the type or import it"
+help = "export the type with `@ {publica}` in its {regio}, or import the type directly"
 
 [diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
 message = "qualified type prefix must name a namespace"
-help = "declare the type or import it"
+help = "use a {regio} namespace as the prefix, or import the type by name"
 
 [diagnostics.SEM002.issues.schema_unknown_type]
 message = "column type names an unknown type"
-help = "declare the type or import it"
+help = "use a declared or imported type for this {columna}"
 
 [diagnostics.SEM002.issues.unknown_namespace]
 message = "unknown namespace"
-help = "declare the type or import it"
+help = "import the {regio} before using its name as a type prefix"
 
 [diagnostics.SEM002.issues.unknown_qualified_type]
 message = "unknown qualified type"
-help = "declare the type or import it"
+help = "use a type exported by the named {regio}, or import that type directly"
 
 [diagnostics.SEM002.issues.unknown_struct]
 message = "unknown struct"
-help = "declare the type or import it"
+help = "construct a declared {genus} type, or import its declaration before constructing it"
 
 [diagnostics.SEM002.issues.unknown_type]
 message = "unknown type"
@@ -1553,11 +1553,11 @@ help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.width_marker_params]
 message = "width marker cannot accept parameters"
-help = "declare the type or import it"
+help = "write a width marker bare, without `<...>` type arguments"
 
 [diagnostics.SEM002.issues.qualified_type_middle_not_namespace]
 message = "qualified type path segment is not a namespace"
-help = "qualify through a module namespace"
+help = "use a {regio} namespace for each path segment before the type name"
 
 [diagnostics.SEM003]
 message = "undefined function"
@@ -1577,7 +1577,7 @@ help = "initialize every required struct field"
 
 [diagnostics.SEM004.issues.ratio_field_missing]
 message = "missing required ratio field"
-help = "initialize every required ratio field"
+help = "initialize every required {ratio} field"
 
 [diagnostics.SEM004.issues.missing_variant_field_name]
 message = "missing variant field name"
@@ -1605,7 +1605,7 @@ help = "check the struct field name"
 
 [diagnostics.SEM004.issues.unknown_tuple_element_label]
 message = "unknown tuple element label"
-help = "use a label declared on the iuncta annotation, or index by position"
+help = "use a label declared by the {iuncta} type, or use positional indexing or destructuring"
 
 [diagnostics.SEM004.issues.unknown_variant_field]
 message = "unknown variant field"
