@@ -1,0 +1,48 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "si_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A later conjunct that writes the list ends the length fact an earlier conjunct proved: the index in the guarded block keeps its run-time check, which aborts."
+syntax = "if i ≺ xs.length() and shrink(mut xs) { xs[i] }"
+related = ["lista", "si", "range-index-oob", "alias-length-index-trap"]
+locale = "en"
++++
+# =============================================================================
+# compound-guard-mutates-index-trap — a conjunct that writes ends the guard.
+# =============================================================================
+#
+# What this teaches:
+#   • `and` evaluates left to right. `i ≺ xs.length()` is true, then
+#     `shrink(mut xs)` removes the last element, and the block runs with a
+#     list one shorter. `xs[1]` is past the end and the run aborts with the
+#     index error (exit 70).
+#   • The compiler keeps the index check. A conjunct that can write the list
+#     takes every earlier length fact with it.
+#
+# Common mistakes:
+#   • Reading `A and B` as "A still holds in the block" when B can change what
+#     A measured.
+#
+# See also: while-empties-list-index-trap, alias-length-index-trap
+# =============================================================================
+
+fn shrink(mut list<int> zs) → bool {
+    zs.remove_last()
+    return true
+}
+
+fn pick(mut list<int> xs, int i) → int {
+    if i ≥ 0 and i ≺ xs.length() and shrink(mut xs) {
+        return xs[i]
+    }
+    return 0
+}
+
+main {
+    mut list<int> xs ← [10, 20]
+    print "before"
+    print pick(mut xs, 1)
+    print "unreached"
+}
