@@ -1,6 +1,6 @@
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;
-use radix::module::driver::Config;
+use radix::module::driver::{Config, LocalePackLoader};
 use radix::module::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
@@ -37,6 +37,17 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
     .with_arg("embedded_locales", embedded_locales)
 }
 
+/// The product's embedded reader-pack set, as a driver [`LocalePackLoader`].
+///
+/// Frontmatter `+++ locale = "\u{2026}" +++` resolution in the module driver
+/// consults this seam when the workspace language-pack root cannot serve the
+/// id, so an installed binary reads a declared locale with no checkout beside
+/// it (`faber build -t llvm-text` on a Latin source must not fall back to the
+/// English pack on the published binary).
+pub fn embedded_locale_pack_loader() -> LocalePackLoader {
+    LocalePackLoader::new(|locale| load_embedded_locale_pack(locale).map_err(|err| err.to_string()))
+}
+
 /// Build the product-default code config for inputs without package context.
 ///
 /// # Errors
@@ -44,7 +55,10 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
 /// Returns an error if the embedded product-default `en` pack cannot be loaded.
 pub fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
     let pack = embedded_conversion_locale_pack(DEFAULT_CODE_LOCALE)?;
-    Ok(Config::default().with_target(target).with_locale_pack(pack))
+    Ok(Config::default()
+        .with_target(target)
+        .with_locale_pack_loader(embedded_locale_pack_loader())
+        .with_locale_pack(pack))
 }
 
 /// Build a driver config (code locale) and the pack used for diagnostic rendering.
@@ -66,16 +80,15 @@ pub fn config_with_locale(
     cli_diagnostics_locale: Option<&str>,
 ) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
     let code_pack = load_locale_pack_for_input(input, cli_locale)?;
+    let base = Config::default()
+        .with_target(target)
+        .with_locale_pack_loader(embedded_locale_pack_loader());
     let config = match code_pack.as_ref() {
         Some(pack) => match cli_locale {
-            Some(_) => Config::default()
-                .with_target(target)
-                .with_resolved_locale_pack(pack.clone()),
-            None => Config::default()
-                .with_target(target)
-                .with_locale_pack(pack.clone()),
+            Some(_) => base.with_resolved_locale_pack(pack.clone()),
+            None => base.with_locale_pack(pack.clone()),
         },
-        None => Config::default().with_target(target),
+        None => base,
     };
     let diagnostic_pack =
         resolve_diagnostics_locale_pack(input, cli_diagnostics_locale, code_pack.as_ref())?;

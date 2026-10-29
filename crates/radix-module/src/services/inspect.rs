@@ -67,8 +67,10 @@ pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
 /// Lex the peeled body under the file's own frontmatter reader locale, as check
 /// and compile do; no frontmatter locale falls back to the no-locale default.
 fn lex_reader_surface(source_file: &crate::driver::SourceFile) -> Result<crate::lexer::LexResult, String> {
-    let pack = match crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref())
-    {
+    let pack = match crate::program::compile::frontmatter_locale_pack_from_frontmatter(
+        &crate::driver::Config::default(),
+        source_file.frontmatter.as_ref(),
+    ) {
         Some(pack) => pack,
         None => crate::driver::default_code_pack(&crate::driver::Config::default())
             .map_err(|diagnostic| diagnostic.message)?,
@@ -503,7 +505,10 @@ fn prepare_hir_prerequisites(
     }
     // Import bindings install after collection (as in the full pipeline) and
     // under the source's own reader locale; an unsupported export is skipped.
-    let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(source_file.frontmatter.as_ref());
+    let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(
+        &crate::driver::Config::default(),
+        source_file.frontmatter.as_ref(),
+    );
     if let Err(error) = resolver.set_file_interfaces_from_snapshots_with_locale(
         &contract.file_interfaces,
         interner,

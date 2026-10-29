@@ -546,7 +546,7 @@ fn prepare_program_module_with_bindings(
     let mut pack = if session.config.locale_pack_explicit {
         session.config.locale_pack.clone()
     } else {
-        frontmatter_locale_pack_from_source(&path.display().to_string(), source)
+        frontmatter_locale_pack_from_source(&session.config, &path.display().to_string(), source)
             .or_else(|| session.config.locale_pack.clone())
     };
     let mut parsed = parse_program_for_namespace_exports(&path.display().to_string(), source, pack.as_ref());
@@ -1094,7 +1094,7 @@ fn import_contract_for_session(
     // to the default English locale). Explicit caller packs still win.
     let resolved_pack = code_pack
         .map(ToOwned::to_owned)
-        .or_else(|| frontmatter_locale_pack_from_source(&path.display().to_string(), source));
+        .or_else(|| frontmatter_locale_pack_from_source(&session.config, &path.display().to_string(), source));
     let Some((program, interner)) =
         parse_program_for_namespace_exports(&path.display().to_string(), source, resolved_pack.as_ref())
     else {
@@ -1386,13 +1386,20 @@ fn collect_transitive_same_package_interfaces(
 
 /// Resolve the frontmatter `locale` reader pack when the caller supplied none.
 ///
+/// Resolution uses `config`'s language-pack root and product loader, so the
+/// session that will parse the source is also the one that resolves its
+/// declared locale.
+///
 /// Returns `None` when the source declares no locale or the declared pack
-/// cannot be loaded from the discovered workspace stdlib; the analysis driver
-/// surfaces the authoritative diagnostic for a malformed locale during the
-/// real compile.
-pub(crate) fn frontmatter_locale_pack_from_source(name: &str, source: &str) -> Option<crate::locale::LocalePack> {
+/// cannot be loaded; the analysis driver surfaces the authoritative
+/// diagnostic for a malformed locale during the real compile.
+pub(crate) fn frontmatter_locale_pack_from_source(
+    config: &crate::driver::Config,
+    name: &str,
+    source: &str,
+) -> Option<crate::locale::LocalePack> {
     let peeled = crate::driver::peel_raw_source(name, source).ok()?;
-    frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref())
+    frontmatter_locale_pack_from_frontmatter(config, peeled.frontmatter.as_ref())
 }
 
 /// Resolve the frontmatter `locale` reader pack from already-peeled metadata.
@@ -1400,13 +1407,13 @@ pub(crate) fn frontmatter_locale_pack_from_source(name: &str, source: &str) -> O
 /// Shared by the tool surfaces that hold a [`crate::driver::SourceFile`] (whose
 /// `content` is already frontmatter-stripped) and by source-level callers that
 /// re-peel first. Returns `None` when no locale is declared or the declared
-/// pack cannot be loaded from the discovered workspace stdlib.
+/// pack cannot be loaded from `config`'s pack sources.
 pub(crate) fn frontmatter_locale_pack_from_frontmatter(
+    config: &crate::driver::Config,
     frontmatter: Option<&crate::driver::FileFrontmatter>,
 ) -> Option<crate::locale::LocalePack> {
     let locale_id = frontmatter?.locale_result()?.ok()?;
-    let config = crate::driver::Config::default();
-    crate::driver::resolve_frontmatter_locale_pack(&config, locale_id).ok()
+    crate::driver::resolve_frontmatter_locale_pack(config, locale_id).ok()
 }
 
 /// Resolve an explicit `--locale <name>` to its reader pack via stdlib.
@@ -1444,7 +1451,7 @@ pub(crate) fn import_target_locale_pack(
     target_source: &str,
     reader_pack: ReaderPackRef<'_>,
 ) -> Option<crate::locale::LocalePack> {
-    frontmatter_locale_pack_from_source(&target_path.display().to_string(), target_source)
+    frontmatter_locale_pack_from_source(&session.config, &target_path.display().to_string(), target_source)
         .or_else(|| package_reader_locale_pack(session, target_path))
         .or_else(|| reader_pack.cloned())
 }

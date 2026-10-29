@@ -247,3 +247,125 @@ pack = "./locale/custom.toml"
 
     let _ = fs::remove_dir_all(root);
 }
+
+/// `faber build -t llvm-text` on a single `.fab` file compiles through
+/// `radix::module::Compiler::compile` (the command's non-package lane) and
+/// must honour the file's `+++ locale = "…" +++` frontmatter with no workspace
+/// language-pack root beside the binary — the installed-binary condition. The
+/// published 1.17.0 lost the declared locale there, read the source with the
+/// English pack, and failed with `PARSE001 item_list_missing_separator`; the
+/// product config's embedded reader packs are the frontmatter locale's source
+/// when no root is discovered.
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn llvm_text_single_file_build_honours_frontmatter_locale_without_pack_root() {
+    let dir = temp_dir("faber-llvm-text-locale");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio identitas(bivalens valor) → bivalens {\n    redde valor\n}\n",
+    )
+    .expect("source");
+
+    let mut config = default_config_with_locale(Target::MirLlvm).expect("product config");
+    // An installed binary discovers no workspace `locale/` tree; only the
+    // embedded reader packs remain as the frontmatter locale's source.
+    config.locale_root = None;
+
+    let result = radix::module::Compiler::new(config).compile(&entry);
+
+    assert!(
+        result.success(),
+        "frontmatter Latin must reach the llvm-text parse, diagnostics: {:?}",
+        result.diagnostics
+    );
+    let Some(radix::module::Output::LlvmText(output)) = result.output else {
+        panic!("llvm-text output missing");
+    };
+    assert!(
+        output.code.contains("identitas"),
+        "emitted IR must name the Latin function"
+    );
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+/// The same build path must resolve the frontmatter locale through the
+/// session's own language-pack root. The program layer used to re-discover
+/// the workspace root instead of the configured one, so a root the caller
+/// planted (the documented custom-layout override) never reached the parse:
+/// the source fell back to the English session pack and failed with
+/// `PARSE001 item_list_missing_separator` — the same lost-locale failure the
+/// installed binary shows for the embedded packs.
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn llvm_text_single_file_build_resolves_frontmatter_locale_through_session_root() {
+    let dir = temp_dir("faber-llvm-text-locale-root");
+    // Plant a root serving an id the workspace tree does not have: the Latin
+    // pack re-identified as `test-la` (with its exemplar tree, which
+    // `from_toml_path` validates relative to the pack file), so only the
+    // session's configured root can read the source below.
+    let workspace_locale = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../locale")
+        .canonicalize()
+        .expect("workspace locale root");
+    copy_dir(&workspace_locale.join("la"), &dir.join("test-la"));
+    let pack_path = dir.join("test-la").join("pack.toml");
+    let pack_toml = fs::read_to_string(&pack_path).expect("planted pack");
+    fs::write(
+        &pack_path,
+        pack_toml.replacen("id = \"la\"", "id = \"test-la\"", 1),
+    )
+    .expect("re-identified pack");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        "+++\nlocale = \"test-la\"\n+++\n\n@ publica\nfunctio identitas(bivalens valor) → bivalens {\n    redde valor\n}\n",
+    )
+    .expect("source");
+
+    let config = default_config_with_locale(Target::MirLlvm)
+        .expect("product config")
+        .with_locale_root(dir.clone());
+
+    let result = radix::module::Compiler::new(config).compile(&entry);
+
+    assert!(
+        result.success(),
+        "the session's locale root must serve the declared locale, diagnostics: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code.as_deref() == Some("PARSE001")),
+        "must not parse the Latin source as English: {:?}",
+        result.diagnostics
+    );
+    let Some(radix::module::Output::LlvmText(output)) = result.output else {
+        panic!("llvm-text output missing");
+    };
+    assert!(
+        output.code.contains("identitas"),
+        "emitted IR must name the Latin function"
+    );
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+/// Recursive copy for planted locale roots (`from_toml_path` validates
+/// exemplar paths relative to the pack file, so a planted pack needs its
+/// exemplar tree beside it).
+fn copy_dir(source: &std::path::Path, destination: &std::path::Path) {
+    fs::create_dir_all(destination).expect("planted dir");
+    for entry in fs::read_dir(source).expect("planted source") {
+        let entry = entry.expect("planted entry").path();
+        let target = destination.join(entry.file_name().expect("name"));
+        if entry.is_dir() {
+            copy_dir(&entry, &target);
+        } else {
+            fs::copy(&entry, &target).expect("planted file");
+        }
+    }
+}

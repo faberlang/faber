@@ -227,6 +227,7 @@ fn is_mir_backed_target(target: Target) -> bool {
 
 pub(crate) use embedded_locale::{EMBEDDED_LOCALE_IDS, load_embedded_locale_pack};
 pub use locale::available_locales;
+pub use locale::embedded_locale_pack_loader;
 pub use locale::locale_pack_for_emit;
 pub use locale::{
     DEFAULT_CODE_LOCALE, config_with_locale, default_config_with_locale,
