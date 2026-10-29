@@ -39,13 +39,13 @@ fn binding_identity() -> MirExternalFunctionIdentity {
 
 /// A non-generic `textus → textus` verb export, the shape
 /// `record_package_import_identities` records a concrete identity for.
-fn verb_callable() -> InterfaceCallable {
+fn verb_callable(failable: bool) -> InterfaceCallable {
     InterfaceCallable {
         type_params: Vec::new(),
         tensor_edge_policy_requirements: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus)),
-        err: None,
+        err: failable.then(|| Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
         is_async: false,
         is_generator: false,
         device: None,
@@ -72,7 +72,7 @@ struct ImportUnit {
 /// file interface under. When `decoy` is set, the identity map also carries
 /// the original name → a distinct target, so a wrong original-name lookup
 /// would resolve a decoy instead of the binding's row.
-fn import_unit(hir_name: &str, hir_alias: Option<&str>, binding: &str, decoy: bool) -> ImportUnit {
+fn import_unit(hir_name: &str, hir_alias: Option<&str>, binding: &str, decoy: bool, failable: bool) -> ImportUnit {
     let mut interner = Interner::new();
     let mut types = TypeTable::new();
     let mut resolver = Resolver::new();
@@ -84,7 +84,7 @@ fn import_unit(hir_name: &str, hir_alias: Option<&str>, binding: &str, decoy: bo
             identity: None,
             exports: BTreeMap::from([(
                 VERB.to_owned(),
-                FileExport { name: VERB.to_owned(), kind: FileExportKind::Function(verb_callable()) },
+                FileExport { name: VERB.to_owned(), kind: FileExportKind::Function(verb_callable(failable)) },
             )]),
             unavailable: BTreeMap::new(),
             routes: BTreeMap::new(),
@@ -148,6 +148,8 @@ struct Recorded {
     identities: Vec<MirExternalFunctionIdentity>,
     /// Call targets carried on the item's provider import.
     provider_targets: Option<FxHashMap<Symbol, DefId>>,
+    /// Imported error channels available to direct call lowering.
+    function_errors: Arc<FxHashMap<DefId, MirType>>,
 }
 
 fn collected(unit: &ImportUnit) -> Recorded {
@@ -192,7 +194,8 @@ fn collected(unit: &ImportUnit) -> Recorded {
         .provider_imports
         .get(&unit.import_item_def_id)
         .and_then(|import| import.file_interface_functions.clone());
-    Recorded { exports, identities, provider_targets }
+    let function_errors = Arc::clone(&maps.frozen.function_errors);
+    Recorded { exports, identities, provider_targets, function_errors }
 }
 
 /// Named alias: `importa ex "./ops" ops ut o` — the identity map is keyed by
@@ -202,7 +205,7 @@ fn collected(unit: &ImportUnit) -> Recorded {
 /// nothing.
 #[test]
 fn aliased_named_import_records_identity_under_the_binding() {
-    let mut unit = import_unit("ops", Some("o"), "o", true);
+    let mut unit = import_unit("ops", Some("o"), "o", true, false);
     let recorded = collected(&unit);
 
     let verb = unit.interner.intern(VERB);
@@ -219,12 +222,54 @@ fn aliased_named_import_records_identity_under_the_binding() {
     );
 }
 
+#[test]
+fn package_imported_failable_signature_lowers_as_try_call() {
+    let mut unit = import_unit("ops", Some("o"), "o", false, true);
+    let recorded = collected(&unit);
+    let verb = unit.interner.intern(VERB);
+    let imported_def = recorded.exports[&verb];
+    let error_ty = unit.types.primitive(Primitive::Textus);
+
+    assert_eq!(recorded.function_errors.get(&imported_def), Some(&MirType::semantic(error_ty)));
+
+    let context = FunctionBuilderContext {
+        function_errors: Arc::clone(&recorded.function_errors),
+        ..FunctionBuilderContext::empty()
+    };
+    let mut builder = FunctionBuilder::for_function(
+        &unit.types,
+        Some(MirType::semantic(error_ty)),
+        context,
+        MirFunctionId(0),
+        None,
+        None,
+    );
+    let entry = builder.fresh_block(Span::default());
+    builder.switch_to(entry);
+    let call = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Path(imported_def),
+        ty: Some(error_ty),
+        span: Span::default(),
+    };
+
+    assert!(
+        builder
+            .lower_definition_call(imported_def, Vec::new(), Vec::new(), None, 0, &call)
+            .is_some()
+    );
+    assert!(matches!(
+        builder.blocks[entry.0 as usize].terminator.as_ref().map(|terminator| &terminator.kind),
+        Some(MirTerminatorKind::TryCall { callee: MirCallee::Definition { source, .. }, .. }) if *source == imported_def
+    ));
+}
+
 /// Wildcard alias: `importa ex "./ops" * ut o` — the HIR item spells the
 /// binding in both slots, so the recording must keep finding the identity
 /// through the effective binding (a same-value path today).
 #[test]
 fn wildcard_alias_import_records_identity_under_the_binding() {
-    let mut unit = import_unit("o", Some("o"), "o", false);
+    let mut unit = import_unit("o", Some("o"), "o", false, false);
     let recorded = collected(&unit);
 
     let verb = unit.interner.intern(VERB);

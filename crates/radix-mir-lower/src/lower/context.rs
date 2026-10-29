@@ -1051,6 +1051,15 @@ impl<'a> LoweringContextMaps<'a> {
                             sig.err,
                         ),
                     );
+                    if let Some(error_ty) = sig.err {
+                        // Imported package exports have synthetic definition ids
+                        // which are absent from the local HIR function walk. Keep
+                        // their interface error channel in the same lookup used
+                        // by direct-call lowering, so they emit `TryCall` just
+                        // like local failable definitions.
+                        self.function_errors
+                            .insert(def_id, MirType::semantic(error_ty));
+                    }
                     self.validation.external_function_identities.insert(
                         def_id,
                         MirExternalFunctionIdentity::new(
