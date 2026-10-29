@@ -5913,6 +5913,7 @@ help = "Put the iteration coordinates in brackets after `{apud}`, as in `{itera}
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "expected ']' after the 'apud' coordinates"
+help = "Close the coordinate list with `]` after its names."
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "expected keyword '{keyword}'"
@@ -5920,36 +5921,47 @@ help = "add '{keyword}' here"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "expected a reduction source after the reduction operator"
+help = "Write `{ex} source` after the reduction operator."
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "expected '{lege}' or '{lineam}'"
+help = "Use `{lege}` to read all input, or `{lege} {lineam}` to read one line."
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "expected an opening brace for the elige body"
+help = "Write `{elige} value {{ ... }` with `{casu}` cases inside."
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "expected a closing brace after the elige cases"
+help = "Close the `{elige}` body after its `{casu}` cases and optional `{ceterum}` arm."
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "expected an opening brace for the discerne body"
+help = "Write `{discerne} value {{ ... }` with `{casu}` pattern arms inside."
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "expected a closing brace after the discerne arms"
+help = "Close the `{discerne}` body after its `{casu}` arms and optional `{ceterum}` arm."
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "expected an opening brace for the custodi body"
+help = "Start the body with `{custodi} {{` and add one or more `{si}` clauses."
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "expected a closing brace after the custodi clauses"
+help = "Close the `{custodi}` body after its `{si}` clauses."
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "expected '✗' after the conditional value"
+help = "Put `✗` between the then value and the else value."
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "expected ')' after the call arguments"
+help = "Close the call's argument list with `)`."
 
 [diagnostics.PARSE001.issues.index_end]
 message = "expected ']' after the index expression"
+help = "Close the index expression with `]`."
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "an index bracket takes one expression; separate coordinates are not per-axis slots"
@@ -5957,81 +5969,107 @@ help = "write the coordinate as a bracketed list, such as m[[r, c]]"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "expected ']' after the gradient selectors"
+help = "Close the bracketed selector list after its entries with `]`."
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "expected ']' after the optional index expression"
+help = "Finish an optional index as `value?[index]`."
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "expected ')' after the optional call arguments"
+help = "Finish an optional call as `value?(arguments)`."
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "expected ']' after the non-null index expression"
+help = "Finish a non-null index as `value![index]`."
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "expected ')' after the non-null call arguments"
+help = "Finish a non-null call as `value!(arguments)`."
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "expected a closing brace after the constructor fields"
+help = "Close the constructor fields with `}` after the last field."
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "expected ']' after the inferred constructor elements"
+help = "Close the inferred constructor's element list with `]`."
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "expected ']' after the array elements"
+help = "Close the list literal with `]` after its elements."
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "expected ')' after the parenthesized expression"
+help = "Close the parenthesized expression with `)`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "expected '<' after 'ratio'"
+help = "Write labeled type arguments after `record`, as in `record<label: Type>`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "expected '>' after the ratio type arguments"
+help = "Close the record type arguments with `>` before its fields."
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "expected an opening brace after the ratio type arguments"
+help = "After the record type arguments, start its fields with `{{`."
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "expected a closing brace after the ratio fields"
+help = "Close the record fields with `}` after the last field."
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "expected a closing brace after the typed constructor fields"
+help = "Close the typed constructor fields with `}` after the last field."
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "expected a closing brace after the finge fields"
+help = "Close the variant fields with `}` after the last field."
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "expected '<' after 'iuncta'"
+help = "Write tuple type arguments after `{iuncta}`, as in `{iuncta}<T, U>`."
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "expected '[' after the iuncta type arguments"
+help = "After its type arguments, write a bracketed list of tuple values."
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "expected ']' after the iuncta elements"
+help = "Close the tuple value list with `]` after its elements."
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "expected ')' after the closure parameters"
+help = "Close the parameter list with `)` before the optional signature and `∴`."
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "expected '∴' after the closure signature"
+help = "After the closure signature, write `∴` and then an expression or `{fac}` block."
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "expected ')' after the ad opener"
+help = "Close the optional opener expression with `)` after its value."
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "expected ':' after the argument label"
+help = "In a template call, put `:` between the argument label and its value."
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "expected ']' after the computed object key"
+help = "Close the computed field key with `]` before writing `= value`."
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "expected ':' after the JSON key"
+help = "Put `:` between each quoted JSON key and its value."
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "expected a closing brace after the JSON object"
+help = "Close the JSON object with `}` after its members."
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "expected ']' after the JSON array"
+help = "Close the JSON array with `]` after its values."
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "expected a closing brace after the inferred constructor fields"
