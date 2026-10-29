@@ -351,6 +351,14 @@ pub struct List {
 
 const TAG_INT: i32 = 0;
 const TAG_FLOAT: i32 = 1;
+/// A float cell of declared `f32` width: same payload law as [`TAG_FLOAT`],
+/// rendered at single precision.
+const TAG_FLOAT32: i32 = 18;
+
+/// A float cell tag: `f64` or the `f32` carrier.
+const fn is_float_tag(tag: i32) -> bool {
+    tag == TAG_FLOAT || tag == TAG_FLOAT32
+}
 const TAG_BOOL: i32 = 2;
 const TAG_TEXT: i32 = 3;
 const TAG_BITS: i32 = 4;
@@ -413,8 +421,10 @@ fn list_new_from(items: Vec<(i32, i64)>) -> *mut List {
 
 /// Display one element; text elements are quoted as the runner quotes them.
 fn element_text(tag: i32, bits: i64) -> String {
+    let float = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
     match tag {
-        TAG_FLOAT => display_fractus(f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()))),
+        TAG_FLOAT => display_fractus(float),
+        TAG_FLOAT32 => display_fractus(float as f32),
         TAG_BOOL => display_bivalens(bits != 0, tokens()).to_owned(),
         TAG_TEXT => format!("{:?}", text_str(unsafe { text_bytes(bits as *const u8) })),
         TAG_CHAR => format!(
@@ -567,7 +577,7 @@ fn map_key_hash(tag: i32, bits: i64) -> Option<u64> {
     tag.hash(&mut hasher);
     match tag {
         TAG_INT | TAG_BOOL | TAG_BITS => bits.hash(&mut hasher),
-        TAG_FLOAT => {
+        tag if is_float_tag(tag) => {
             let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
             let normalized = if value == 0.0 { 0 } else { value.to_bits() };
             normalized.hash(&mut hasher);
@@ -1090,7 +1100,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_set(
 
 fn element_equal(tag: i32, left: i64, right: i64) -> bool {
     match tag {
-        TAG_FLOAT => {
+        tag if is_float_tag(tag) => {
             f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
                 == f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))
         }
@@ -1174,7 +1184,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_reversed(list: *const List) -> *mu
 
 fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
     match tag {
-        TAG_FLOAT => f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
+        tag if is_float_tag(tag) => f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
             .total_cmp(&f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))),
         TAG_TEXT | TAG_CHAR => unsafe {
             text_bytes(left as *const u8).cmp(text_bytes(right as *const u8))
@@ -2186,7 +2196,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_arg_extremum(
             } else {
                 bits < best_bits
             }
-        } else if tag == TAG_FLOAT && best_tag == TAG_FLOAT {
+        } else if is_float_tag(tag) && is_float_tag(best_tag) {
             let best = f64::from_bits(u64::from_ne_bytes(best_bits.to_ne_bytes()));
             let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
             if best.is_nan() {
@@ -2684,7 +2694,7 @@ pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
 fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
     let payload = match tag {
         TAG_OPT => return (tag, bits),
-        TAG_INT | TAG_FLOAT | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
+        TAG_INT | TAG_FLOAT | TAG_FLOAT32 | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
         TAG_LIST => {
             let list = unsafe { list_ref(bits as *const List) };
             let items = list
