@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/mutabilitas/ref-list-parameter-index-iteration.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/ref-list-parameter-index-iteration.fab"
+category = "binding"
+domain = "types"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
