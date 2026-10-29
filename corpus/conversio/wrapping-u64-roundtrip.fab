@@ -1,0 +1,28 @@
++++
+term = "wrapping-u64-roundtrip"
+kind = "conversio"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "func_modifier", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "inline_default", "fixum_decl", "expression", "unary_expr", "primary", "call_expr", "call_suffix", "argument_list", "argument", "literal", "redde_stmt", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Signed integers convert to wrapping<u64>, high-bit unsigned constants survive lowering, and conversion back to int takes its fallback when out of range."
+syntax = "int ↦ wrapping<u64> ↦ int ⊥ default"
+related = ["↦", "wrapping", "u64", "⊥"]
+locale = "en"
++++
+# int and wrapping<u64> share the i64 carrier, but conversion uses the full
+# unsigned u64 range: negative signed values wrap, and high-bit words cannot
+# be represented as an int.
+fn as_word(int value) → wrapping<u64> {
+    return value ↦ wrapping<u64>
+}
+
+fn as_int(wrapping<u64> value) → int {
+    return value ↦ int ⊥ 0
+}
+
+main {
+    let wrapping<u64> maximum ← 18446744073709551615
+    print as_int(as_word(-1))
+    print as_int(maximum)
+    print as_int(as_word(7))
+}

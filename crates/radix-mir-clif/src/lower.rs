@@ -700,9 +700,9 @@ struct FunctionLower<'f, 'a> {
     wide_slots: handroll::FxHashSet<Slot>,
     /// Wide values known to be an `i64` extended.
     narrow: handroll::FxHashSet<Value>,
-    /// Wide constants beyond the `i64` carrier (a `u64` literal at or above
-    /// 2^63): narrowing one is declined, not trapped at run time.
-    huge: handroll::FxHashSet<Value>,
+    /// Unsigned u64 literals at or above 2^63, kept wide until they enter the
+    /// i64 carrier as their two's-complement bit pattern.
+    u64_constants: handroll::FxHashSet<Value>,
     /// The recovery region (an orphan block chain the success path skips) that
     /// defines each recovery temp: a failing conversion branches to it.
     recovery_regions: handroll::FxHashMap<MirTempId, MirBlockId>,
@@ -745,7 +745,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             pointer_params: Vec::new(),
             wide_slots: handroll::FxHashSet::default(),
             narrow: handroll::FxHashSet::default(),
-            huge: handroll::FxHashSet::default(),
+            u64_constants: handroll::FxHashSet::default(),
             recovery_regions: handroll::FxHashMap::default(),
         };
         lower.run(function)?;
@@ -1180,9 +1180,9 @@ impl FunctionLower<'_, '_> {
                 if let Ok(value) = i64::try_from(*value) {
                     (Some(self.builder.ins().iconst(types::I64, value)), Rep::Int)
                 } else {
-                    // Beyond the i64 carrier: an exact intermediate.
+                    // Keep the u64 value exact until it reaches a u64 carrier.
                     let constant = self.wide_const(i128::from(*value));
-                    self.huge.insert(constant);
+                    self.u64_constants.insert(constant);
                     (Some(constant), Rep::Int)
                 }
             }
@@ -5263,12 +5263,23 @@ impl FunctionLower<'_, '_> {
             return Err(Decline::new("store into an unbounded integer slot"));
         };
         let low = i64::try_from(low).map_err(|_| Decline::new("store range"))?;
-        // A u64 slot's upper bound is beyond the i64 carrier: only the sign
-        // can fail there.
+        // The u64 upper bound extends past this i64 carrier.
         let high = i64::try_from(high).unwrap_or(i64::MAX);
         let wide = self.is_wide(value);
         match policy {
             StorePolicy::Trapping => {
+                if width == NumericWidth::U64 && wide {
+                    let low = self.bound_const(0, true);
+                    let high = self.wide_const(i128::from(u64::MAX));
+                    let below = self.builder.ins().icmp(IntCC::SignedLessThan, value, low);
+                    let above = self
+                        .builder
+                        .ins()
+                        .icmp(IntCC::SignedGreaterThan, value, high);
+                    let outside = self.builder.ins().bor(below, above);
+                    self.trap_store_if(outside, value, site, width)?;
+                    return Ok(self.builder.ins().ireduce(types::I64, value));
+                }
                 if width == NumericWidth::I64 && !wide {
                     return Ok(value);
                 }
@@ -5282,17 +5293,7 @@ impl FunctionLower<'_, '_> {
                         .ins()
                         .icmp(IntCC::SignedGreaterThan, value, bound)
                 };
-                let outside = if wide && width == NumericWidth::U64 {
-                    // A u64 at or above 2^63 is a valid value the i64 carrier
-                    // cannot hold: refuse it by name at run time.
-                    self.trap_if(
-                        above,
-                        "u64 value beyond 2^63 is not carried by the clif target",
-                    )?;
-                    below
-                } else {
-                    self.builder.ins().bor(below, above)
-                };
+                let outside = self.builder.ins().bor(below, above);
                 self.trap_store_if(outside, value, site, width)?;
                 self.narrow(value)
             }
@@ -5318,7 +5319,7 @@ impl FunctionLower<'_, '_> {
                     NumericWidth::I8 => Ok(self.reduce_word(value, Reduction::Sign(8))),
                     NumericWidth::I16 => Ok(self.reduce_word(value, Reduction::Sign(16))),
                     NumericWidth::I32 => Ok(self.reduce_word(value, Reduction::Sign(32))),
-                    NumericWidth::I64 => Ok(value),
+                    NumericWidth::I64 | NumericWidth::U64 => Ok(value),
                     _ => Err(Decline::new("wrapping store at this width")),
                 }
             }
