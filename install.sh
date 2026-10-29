@@ -7,7 +7,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/faberlang/faber/main/install.sh | sh
-#   curl -fsSL .../install.sh | sh -s -- --version 1.16.0 --prefix "$HOME/.faber"
+#   curl -fsSL .../install.sh | sh -s -- --version 1.17.0 --prefix "$HOME/.faber"
 #
 # The default version is the release this script was exported from. Pass
 # --version to install another published release.
@@ -15,7 +15,7 @@
 set -eu
 
 PREFIX="${FABER_PREFIX:-${HOME:?HOME is not set}/.faber}"
-VERSION="${FABER_VERSION:-1.16.0}"
+VERSION="${FABER_VERSION:-1.17.0}"
 BASE_URL="${FABER_BASE_URL:-https://github.com/faberlang/releases/releases/download}"
 
 usage() {
@@ -47,7 +47,7 @@ VERSION="${VERSION#v}"
 BASE_URL="${BASE_URL%/}"
 case "$VERSION" in
     [0-9]*.[0-9]*.[0-9]*) ;;
-    *) echo "error: --version must look like 1.16.0 (got ${VERSION})" >&2; exit 2 ;;
+    *) echo "error: --version must look like 1.17.0 (got ${VERSION})" >&2; exit 2 ;;
 esac
 
 case "$(uname -s):$(uname -m)" in

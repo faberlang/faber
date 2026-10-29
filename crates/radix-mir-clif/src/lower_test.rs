@@ -488,6 +488,51 @@ fn sermo_lower_instant_materialization_emits_from_epoch() {
 }
 
 #[test]
+fn format_string_newline_escape_emits_a_real_newline() {
+    let types = TypeTable::new();
+    let textus = ty(&types, Primitive::Textus);
+    let mut interner = Interner::new();
+    let template = interner.intern(r"x,§\ny");
+    let slot = interner.intern("slot");
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, textus)],
+        temps: Vec::new(),
+        statements: vec![runtime_call(
+            MirIntrinsic::FormatString { template },
+            vec![MirOperand::Constant(MirConstant::String(slot))],
+            Some(MirPlace::local(MirLocalId(0))),
+            textus,
+        )],
+        terminator: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+            MirLocalId(0),
+        )))),
+        return_ty: textus,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    let object = emit_program(
+        &program,
+        &types,
+        &interner,
+        Some(MirFunctionId(0)),
+        ["true", "false", "none", "tuple"].map(str::to_owned),
+        &StructMeta::default(),
+    )
+    .expect("format string lowers");
+
+    assert!(
+        object.bytes.windows(2).any(|window| window == b"\ny"),
+        "the emitted literal contains a newline before y"
+    );
+    assert!(
+        !object.bytes.windows(3).any(|window| window == b"\\ny"),
+        "the emitted literal does not retain the backslash-n escape"
+    );
+}
+
+#[test]
 fn sermo_lower_text_materialization_still_declines() {
     let (program, types, interner) = open_then_convert(Primitive::Textus);
     let lowered = emit_program(

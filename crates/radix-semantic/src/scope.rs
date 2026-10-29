@@ -204,6 +204,15 @@ fn interface_nominal_kind_to_wire(kind: InterfaceNominalKind) -> radix_hir_fhir:
     }
 }
 
+#[cfg(feature = "hir-fhir")]
+fn nominal_kind_wire_sort_key(kind: radix_hir_fhir::NominalKind) -> u8 {
+    match kind {
+        radix_hir_fhir::NominalKind::Struct => 0,
+        radix_hir_fhir::NominalKind::Enum => 1,
+        radix_hir_fhir::NominalKind::Interface => 2,
+    }
+}
+
 /// Stable index into the resolver's scope arena.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ScopeId(pub u32);
@@ -4397,13 +4406,18 @@ impl Resolver {
             StructMethodSnapshot,
         };
 
-        let namespace_exports = self
+        let mut namespace_exports: Vec<_> = self
             .namespace_exports
             .iter()
-            .map(|(&ns, members)| (ns, members.keys().copied().collect()))
+            .map(|(&ns, members)| {
+                let mut members: Vec<_> = members.keys().copied().collect();
+                members.sort_by_key(|member| member.0);
+                (ns, members)
+            })
             .collect();
+        namespace_exports.sort_by_key(|(ns, _)| ns.0);
 
-        let file_interfaces = self
+        let mut file_interfaces: Vec<_> = self
             .file_interfaces
             .iter()
             .map(|(&ns, imported)| {
@@ -4490,20 +4504,26 @@ impl Resolver {
                 )
             })
             .collect();
+        file_interfaces.sort_by_key(|(ns, _)| ns.0);
 
-        let used_namespaces = self.used_namespaces.iter().copied().collect();
+        let mut used_namespaces: Vec<_> = self.used_namespaces.iter().copied().collect();
+        used_namespaces.sort_by_key(|namespace| namespace.0);
 
-        let imported_nominal_types = self
+        let mut imported_nominal_types: Vec<_> = self
             .imported_nominal_types
             .iter()
             .map(|(&(kind, name), &ty)| ((interface_nominal_kind_to_wire(kind), name), ty))
             .collect();
+        imported_nominal_types
+            .sort_by_key(|((kind, name), _)| (nominal_kind_wire_sort_key(*kind), name.0));
 
-        let ambiguous_imported_nominal_types: Vec<(radix_hir_fhir::NominalKind, LexSymbol)> = self
-            .ambiguous_imported_nominal_types
-            .iter()
-            .map(|&(kind, name)| (interface_nominal_kind_to_wire(kind), name))
-            .collect();
+        let mut ambiguous_imported_nominal_types: Vec<(radix_hir_fhir::NominalKind, LexSymbol)> =
+            self.ambiguous_imported_nominal_types
+                .iter()
+                .map(|&(kind, name)| (interface_nominal_kind_to_wire(kind), name))
+                .collect();
+        ambiguous_imported_nominal_types
+            .sort_by_key(|(kind, name)| (nominal_kind_wire_sort_key(*kind), name.0));
 
         let mut conversion_rows = self
             .conversion_rows

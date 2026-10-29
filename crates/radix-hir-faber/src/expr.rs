@@ -228,10 +228,14 @@ impl super::FaberCodegen<'_> {
                     // come from `ego` (self): a bare type name is not a value.
                     // Print the localized self keyword instead of the type name.
                     writer.write(surface.keyword(TokenKind::Ego));
-                } else if let Some(spelling) = self.authored_variant_spellings.get(def_id) {
+                } else if let Some(spelling) = self
+                    .authored_variant_spellings
+                    .get(def_id)
+                    .or_else(|| self.qualified_local_variants.get(def_id))
+                {
                     // Lowering keeps only the resolved variant `DefId`; use the
-                    // captured source path when value emission must preserve
-                    // its authored qualification.
+                    // captured source path when present, or the necessary union
+                    // qualifier when a local variant name is ambiguous.
                     writer.write(spelling);
                 } else {
                     writer.write(&self.name_for_def_imported(*def_id, names));

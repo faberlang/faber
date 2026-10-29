@@ -1285,7 +1285,10 @@ type_head       := IDENTIFIER | 'modulus'
 # is its own type (`width_type_sugar`); only the policy words `modulus`,
 # `saturatus` and `exactus` wrap a marker (`modulus<u32>`).
 type_arguments  := '<' type_argument (',' type_argument)* '>'
-type_argument   := labeled_type_argument | range_argument | sized_range_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument   := labeled_type_argument | range_argument | sized_range_argument | spelled_lift | type_annotation | NATURAL | '[' figura_list? ']'
+# A lone spelled lift is a size argument: `list<int, size 3>`, `ascii<size 8>`,
+# `queue<T, size n>`, `tensor<f32, size 4>`; the `size` marker is mandatory for a
+# capacity or count (`capacity_needs_size`, `list_count_needs_size`).
 labeled_type_argument := IDENTIFIER ':' type_annotation
 # A range argument is the second argument of a store policy: the range refines
 # the explicit width inside which a store applies the policy

@@ -388,6 +388,40 @@ fn imported_alias_qualified_variant_path_round_trips_in_each_locale() {
 }
 
 #[test]
+fn optional_call_with_variant_path_argument_round_trips() {
+    // Keep the optional-call suffix from optional-call-order while exercising
+    // an authored qualified variant path inside its argument list. The
+    // canonical emit must leave that path resolvable on the re-analysis pass.
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("installed en pack loads");
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack.clone()),
+    );
+    let emit = |input: &str| {
+        let result = reemit_faber(&session, &pack, "optional-variant-path.fab", input);
+        assert!(
+            result.success(),
+            "optional call re-emission failed: {:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+                .collect::<Vec<_>>()
+        );
+        result.output.expect("optional call output").code
+    };
+    let source = "enum Color { red, blue }\ntype Op = (Color) → Color\nfn identity(Color x) → Color { return x }\nmain {\n    mut Op ∪ none f ← identity\n    print f?(Color.red)\n}\n";
+    let first = emit(source);
+    assert!(
+        first.contains("f?(Color.red)"),
+        "variant path in optional call must survive:\n{first}"
+    );
+    assert_eq!(emit(&first), first, "optional call output must be idempotent");
+}
+
+#[test]
 fn canonical_revalidation_rejects_shortened_imported_variant_path() {
     let td = crate::test_support::test_temp_dir("canonical-revalidation-variant-path");
     let home = td.path().join("library-home");
@@ -527,6 +561,41 @@ fn canonical_revalidation_rejects_swapped_same_typed_sites() {
     .expect_err("swapping same-typed authored forms must fail the occurrence-aware gate");
     assert_eq!(diagnostic.code, Some("CODEGEN006"));
     assert_eq!(diagnostic.issue(), Some("authored_type_form_map_diverged"));
+}
+
+#[test]
+fn optional_union_over_function_alias_keeps_the_alias_spelling() {
+    // This uses the neighboring optional-call-flatten exemplar's English
+    // function-alias and local-binding syntax. Reconciliation may flatten the
+    // alias witness to its function payload, but the authored `Op ∪ none`
+    // stays named.
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("en pack should load");
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack.clone()),
+    );
+    let emit = |source: &str| {
+        let result = reemit_faber(&session, &pack, "optional-alias.fab", source);
+        assert!(
+            result.success(),
+            "optional function alias should re-emit: {:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+                .collect::<Vec<_>>()
+        );
+        result.output.expect("successful output").code
+    };
+    let source = "type Op = (int) → int ∪ none\n\nfn maybe(int x) → int ∪ none {\n    return null\n}\n\nmain {\n    let Op ∪ none f ← maybe\n}\n";
+    let first = emit(source);
+    assert!(
+        first.contains("let Op ∪ none f"),
+        "optional function alias must retain its authored spelling:\n{first}"
+    );
+    assert_eq!(emit(&first), first, "optional alias output must be idempotent");
 }
 
 #[test]

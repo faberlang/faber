@@ -1030,7 +1030,28 @@ impl super::FaberCodegen<'_> {
                 // authored child and delegate canonically.
                 [] => Ok(self.type_to_faber(form.ty, names, surface)),
                 [HirTypeFormArg::Type(child)] => {
-                    let inner = self.type_form_to_faber(child, names, surface)?;
+                    // Witness reconciliation can wrap an authored alias in a
+                    // semantic form when the checker flattens `Alias ∪ none`
+                    // to its payload. In this option position the nested named
+                    // form is the source spelling we must retain; rendering the
+                    // semantic function/constructor witness would expand it.
+                    let payload = match child.args.as_slice() {
+                        [HirTypeFormArg::Type(authored_alias)]
+                            if matches!(&child.head, HirTypeFormHead::Semantic(_))
+                                && matches!(
+                                    &authored_alias.head,
+                                    HirTypeFormHead::Named { .. }
+                                )
+                                && matches!(
+                                    self.types.get(authored_alias.ty),
+                                    Type::Alias(_, _)
+                                ) =>
+                        {
+                            authored_alias.as_ref()
+                        }
+                        _ => child.as_ref(),
+                    };
+                    let inner = self.type_form_to_faber(payload, names, surface)?;
                     Ok(format!(
                         "{inner} ∪ {}",
                         surface.type_surface(TypeBindingKind::Primitive(Primitive::Nihil))
