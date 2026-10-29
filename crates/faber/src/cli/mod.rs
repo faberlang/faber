@@ -727,9 +727,15 @@ pub struct ReplArgs {
     pub args: Vec<String>,
 }
 
-/// Compiled targets `faber run --target` builds and then runs.
+/// Engines `faber run --target` selects. Most build the package for a
+/// compiled target and run the result; `runner` names the default
+/// interpreted route instead.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum RunTarget {
+    /// Run on the MIR runner, the default interpreted route: identical to
+    /// omitting `--target`, named so an explicit engine choice is possible.
+    #[value(name = "runner")]
+    Runner,
     /// Build the package as a Node project and run it with `node`.
     #[value(name = "ts")]
     Ts,
@@ -749,10 +755,10 @@ pub enum RunTarget {
 ///
 /// Without `--target`, `run` is interpreted execution: a single `.fab` file,
 /// package directory, `faber.toml`, or archive is routed through the runner —
-/// never compiled. With `--target`, `run` builds the package for that target
-/// and runs the result with the arguments after `--`, standard streams and
-/// exit code passed straight through. Device packages keep a host-driver
-/// execution route.
+/// never compiled. `--target runner` names that same route. Every other
+/// `--target` builds the package for that target and runs the result with the
+/// arguments after `--`, standard streams and exit code passed straight
+/// through. Device packages keep a host-driver execution route.
 #[derive(clap::Args, Debug)]
 pub struct RunArgs {
     /// Use compact diagnostics instead of the default message and help
@@ -766,7 +772,8 @@ pub struct RunArgs {
     #[command(flatten)]
     pub library: LibraryHomeArgs,
 
-    /// Build the package for a compiled target, then run the built program.
+    /// Engine to run with: `runner` (the default interpreted route) or a
+    /// compiled target, whose build product is then run.
     #[arg(long = "target", short = 't', value_enum, value_name = "TARGET")]
     pub target: Option<RunTarget>,
 

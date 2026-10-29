@@ -55,6 +55,10 @@ pub(super) fn cmd_run(args: RunArgs) {
     }
 
     match args.target {
+        // The named default: exactly the no-`--target` route — the code below
+        // interprets the input, so behaviour, output, exit codes and trap
+        // stderr are identical.
+        Some(crate::cli::RunTarget::Runner) => {}
         Some(crate::cli::RunTarget::Ts) => package::cmd_run_ts(
             &input_path,
             args.locale.as_deref(),
