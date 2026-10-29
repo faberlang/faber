@@ -904,3 +904,88 @@ fn device_span_stats_carry_the_transport_audit() {
     assert_eq!((decoded.peer_bytes, decoded.host_staged_bytes), (0, 0));
     assert!(decoded.links.is_empty() && decoded.peer.is_none());
 }
+
+/// The owned-slab rows (need, S4): `span.capacity` and
+/// `span.placement[]` with every field name pinned; a replica row has no
+/// `axis`, `align` or `halo_bytes`, a run on a device that does not allocate
+/// per partition has no `capacity`, and an artifact from before them decodes.
+#[cfg(feature = "device-runtime")]
+#[test]
+fn device_span_stats_carry_the_capacity_and_placement_rows() {
+    use radix_device_core::runtime::{LayoutKind, SpanCapacity, SpanPlacement, SpanStats};
+    let span = SpanStats {
+        partitions: 2,
+        capacity: Some(SpanCapacity {
+            sum_budget: 512,
+            min_budget: 256,
+            replicated_bytes: 64,
+            slab_bytes: 384,
+            peak_per_partition: vec![288, 288],
+        }),
+        placement: vec![
+            SpanPlacement {
+                buffer: 3,
+                bytes: 384,
+                layout: LayoutKind::Slab,
+                axis: Some(0),
+                align_rows: Some(8),
+                shares: vec![192, 192],
+                halo_bytes: 16,
+                forced_by: None,
+            },
+            SpanPlacement {
+                buffer: 4,
+                bytes: 64,
+                layout: LayoutKind::Replica,
+                axis: None,
+                align_rows: None,
+                shares: vec![64, 64],
+                halo_bytes: 0,
+                forced_by: Some("bump binding 1 (single-lane)".to_owned()),
+            },
+        ],
+        ..SpanStats::default()
+    };
+    let metadata = run_stats::DeviceSpanMetadata::from_stats(&span);
+    let value = serde_json::to_value(&metadata).expect("span JSON");
+    assert_eq!(
+        value["capacity"],
+        serde_json::json!({
+            "sum_budget": 512, "min_budget": 256, "replicated_bytes": 64,
+            "slab_bytes": 384, "peak_per_partition": [288, 288]
+        })
+    );
+    assert_eq!(
+        value["placement"][0],
+        serde_json::json!({
+            "buffer": 3, "bytes": 384, "layout": "slab", "axis": 0, "align": 8,
+            "shares": [192, 192], "halo_bytes": 16
+        })
+    );
+    assert_eq!(
+        value["placement"][1],
+        serde_json::json!({
+            "buffer": 4, "bytes": 64, "layout": "replica", "shares": [64, 64],
+            "forced_by": "bump binding 1 (single-lane)"
+        })
+    );
+    let decoded: run_stats::DeviceSpanMetadata =
+        serde_json::from_value(value).expect("slab schema");
+    assert_eq!(decoded, metadata);
+
+    let plain = serde_json::to_value(run_stats::DeviceSpanMetadata::from_stats(&SpanStats {
+        partitions: 2,
+        ..SpanStats::default()
+    }))
+    .expect("span JSON");
+    assert!(plain.get("capacity").is_none(), "{plain}");
+    assert!(plain.get("placement").is_none(), "{plain}");
+    let old = serde_json::json!({
+        "partitions": 2, "moved_bytes": 8, "transfers": 1, "replica_write_bytes": 0,
+        "split_launches": 1, "replicated_launches": 0, "first_launches": 0,
+        "entries": []
+    });
+    let decoded: run_stats::DeviceSpanMetadata =
+        serde_json::from_value(old).expect("pre-slab artifact");
+    assert!(decoded.capacity.is_none() && decoded.placement.is_empty());
+}
