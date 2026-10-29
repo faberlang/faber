@@ -2921,27 +2921,27 @@ help = "Use the live cursor only as the source of {itera} {ex}; do not print or 
 
 [diagnostics.SEM010.issues.map_index_type_mismatch]
 message = "map index type mismatch"
-help = "make the expression type match the expected type"
+help = "Index a `{tabula}` with a key of its declared key type."
 
 [diagnostics.SEM010.issues.map_key_type_mismatch]
 message = "map key type mismatch"
-help = "make the expression type match the expected type"
+help = "Use keys of the declared `{tabula}` key type in the literal; explicitly convert computed keys with `↦` if needed."
 
 [diagnostics.SEM010.issues.map_spread_key_type_mismatch]
 message = "map spread key type mismatch"
-help = "make the expression type match the expected type"
+help = "Spread a `{tabula}` whose key type matches the destination's key type."
 
 [diagnostics.SEM010.issues.map_spread_value_type_mismatch]
 message = "map spread value type mismatch"
-help = "make the expression type match the expected type"
+help = "Spread a `{tabula}` whose value type matches the destination's value type."
 
 [diagnostics.SEM010.issues.map_value_type_mismatch]
 message = "map value type mismatch"
-help = "make the expression type match the expected type"
+help = "Give each `{tabula}` entry a value of the declared value type; explicitly convert values with `↦` if needed."
 
 [diagnostics.SEM010.issues.membership_operand_type_mismatch]
 message = "membership operand type mismatch"
-help = "make the expression type match the expected type"
+help = "Test a value matching the collection's element type or the `{tabula}` key type; explicitly convert it with `↦` if needed."
 
 [diagnostics.SEM010.issues.membership_requires_collection]
 message = "membership requires a collection or range on the right, found {found}"
@@ -2957,19 +2957,19 @@ help = "give the right operand a known type, for example annotate the list or bi
 
 [diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
 message = "matmul requires rank-2 tensor argument"
-help = "make the expression type match the expected type"
+help = "Use a rank-2 tensor argument, such as `{tensor}<T, [K, N]>`."
 
 [diagnostics.SEM010.issues.matmul_argument_shape_must_be_tuple]
 message = "matmul requires rank-2 tensor argument with tuple shape"
-help = "make the expression type match the expected type"
+help = "Give the tensor argument a bracketed dimension shape, such as `{tensor}<T, [K, N]>`."
 
 [diagnostics.SEM010.issues.matmul_receiver_rank_must_be_two]
 message = "matmul requires rank-2 tensor receiver"
-help = "make the expression type match the expected type"
+help = "Use a rank-2 tensor receiver, such as `{tensor}<T, [M, K]>`."
 
 [diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
 message = "matmul requires rank-2 tensor receiver with tuple shape"
-help = "make the expression type match the expected type"
+help = "Give the tensor receiver a bracketed dimension shape, such as `{tensor}<T, [M, K]>`."
 
 [diagnostics.SEM010.issues.nominal_ascription_not_provable]
 message = "`∷` states a fact the compiler can prove; '{found}' is not '{expected}' and no {implet} relation is declared"
@@ -2977,43 +2977,43 @@ help = "make the source type match the target, declare the contract in {implet},
 
 [diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
 message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
-help = "make the expression type match the expected type"
+help = "Convert one operand with `↦` so both operands have the same numeric type."
 
 [diagnostics.SEM010.issues.numeric_operand_required]
 message = "numeric operand required"
-help = "make the expression type match the expected type"
+help = "Use a numeric value with this operator."
 
 [diagnostics.SEM010.issues.numeric_operands_required]
 message = "numeric operands required"
-help = "make the expression type match the expected type"
+help = "Use numeric values for both operands of this operator."
 
 [diagnostics.SEM010.issues.boolean_operand_required]
 message = "boolean operand required"
-help = "make the expression type match the expected type"
+help = "Use a boolean value with this operator."
 
 [diagnostics.SEM010.issues.boolean_operands_required]
 message = "boolean operands required"
-help = "make the expression type match the expected type"
+help = "Use boolean values for both operands of this operator."
 
 [diagnostics.SEM010.issues.integer_operand_required]
 message = "integer operand required"
-help = "make the expression type match the expected type"
+help = "Use an integer value with this operator."
 
 [diagnostics.SEM010.issues.integer_operands_required]
 message = "integer operands required"
-help = "make the expression type match the expected type"
+help = "Use integer values for both operands of this operator."
 
 [diagnostics.SEM010.issues.instans_ordering_operands_required]
 message = "incompatible instant operands"
-help = "make the expression type match the expected type"
+help = "Compare two `{instans}` values with an ordering operator."
 
 [diagnostics.SEM010.issues.pattern_type_mismatch]
 message = "pattern type mismatch"
-help = "make the expression type match the expected type"
+help = "Make the pattern's literal or type agree with the value being matched."
 
 [diagnostics.SEM010.issues.discerne_pattern_not_in_closed_set]
 message = "`match` discriminates a closed set; pattern type '{pattern}' is not a member of '{scrutinee}'"
-help = "ask an integer width or range with an `is` test, and a length with `.length()` inside an `if`; `match` accepts only the members of a union, the variants of an enum, or variant types"
+help = "Test numeric widths with `{est}`; test lengths and range membership in `{si}` conditions. Use `{discerne}` for union members, enum variants, or boolean and null literals."
 
 [diagnostics.SEM010.issues.discerne_literal_arm_not_in_closed_set]
 message = "`{discerne}` discriminates a closed set; a literal arm tests a value of an open set"
@@ -3029,55 +3029,55 @@ help = "test values with `{elige}`, or branch on the value first and match close
 
 [diagnostics.SEM010.issues.parameter_default_type_mismatch]
 message = "parameter default type mismatch"
-help = "make the expression type match the expected type"
+help = "Give the parameter default its declared type; explicitly convert it with `↦` if needed."
 
 [diagnostics.SEM010.issues.range_operand_type_mismatch]
 message = "range operand type mismatch"
-help = "make the expression type match the expected type"
+help = "Use the same type for the tested value and range bounds; explicitly convert with `↦` if they differ."
 
 [diagnostics.SEM010.issues.range_step_must_be_numeric]
 message = "range step must be numeric"
-help = "make the expression type match the expected type"
+help = "Use a numeric value after `{per}` for the range step."
 
 [diagnostics.SEM010.issues.return_type_mismatch]
 message = "return type does not match function signature"
-help = "make the expression type match the expected type"
+help = "Return a value matching the function's declared result type; use `↦` for an explicit conversion."
 
 [diagnostics.SEM010.issues.regex_conversion_operand_type_mismatch]
 message = "regex conversion requires string or ascii"
-help = "make the expression type match the expected type"
+help = "Convert a `{textus}` or `{ascii}` value with `↦ regex`."
 
 [diagnostics.SEM010.issues.string_operands_required]
 message = "string operands required"
-help = "make the expression type match the expected type"
+help = "Use `{textus}` or `{ascii}` values on both sides of `+`; format other values with `¶` before joining."
 
 [diagnostics.SEM010.issues.atomic_arity]
 message = "atomic requires exactly one element type; use atomic<T>"
-help = "make the expression type match the expected type"
+help = "Write `{atomic}<T>` with exactly one element type, such as `{atomic}<i32>`."
 
 [diagnostics.SEM010.issues.atomic_element]
 message = "atomic element type must be i32 or u32"
-help = "make the expression type match the expected type"
+help = "Use `{atomic}<i32>` or `{atomic}<u32>`; these are the supported element types."
 
 [diagnostics.SEM010.issues.atomic_incomplete]
 message = "atomic requires one element type; use atomic<T>"
-help = "make the expression type match the expected type"
+help = "Write `{atomic}<T>` with one element type, such as `{atomic}<i32>`."
 
 [diagnostics.SEM010.issues.matrix_incomplete]
 message = "matrix requires element type and shape; use matrix<T, [R, C]>"
-help = "make the expression type match the expected type"
+help = "Supply an element type and two-dimensional shape, such as `{matrix}<f32, [2, 3]>`."
 
 [diagnostics.SEM010.issues.matrix_missing_figura]
 message = "matrix requires a two-dimensional shape; use matrix<T, [R, C]>"
-help = "make the expression type match the expected type"
+help = "Add a two-dimensional bracketed shape, such as `{matrix}<f32, [2, 3]>`."
 
 [diagnostics.SEM010.issues.matrix_shape_two_dim]
 message = "matrix shape must be exactly two dimensions"
-help = "make the expression type match the expected type"
+help = "Give the matrix exactly two dimensions in a bracketed shape, such as `{matrix}<f32, [2, 3]>`."
 
 [diagnostics.SEM010.issues.sparsa_incomplete]
 message = "sparse requires element type and Figura; use sparse<T, Figura>"
-help = "make the expression type match the expected type"
+help = "Supply an element type and a shape, such as `{sparsa}<f32, [2, 3]>`."
 
 [diagnostics.SEM010.issues.sparsa_missing_figura]
 message = "sparse requires a Figura shape; use sparse<T, []> for rank-0"
