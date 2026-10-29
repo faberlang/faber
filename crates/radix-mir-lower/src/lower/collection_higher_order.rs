@@ -338,6 +338,12 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         }
+        let item_is_optional = match self.normalized_type(receiver_ty) {
+            Type::Array(element) | Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
+                matches!(self.normalized_type(*element), Type::Option(_))
+            }
+            _ => false,
+        };
         let result_ty = self.expr_ty(expr)?;
         let collection_ty = MirType::semantic(receiver_ty);
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
@@ -421,7 +427,11 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(decisive_id);
         let decisive_value = if matches!(kind, TransformKind::Find) {
-            self.assign_temp(MirValueKind::Option(MirOptionOp::Some(item)), result_ty, expr.span)
+            if item_is_optional {
+                item
+            } else {
+                self.assign_temp(MirValueKind::Option(MirOptionOp::Some(item)), result_ty, expr.span)
+            }
         } else {
             MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::Any)))
         };

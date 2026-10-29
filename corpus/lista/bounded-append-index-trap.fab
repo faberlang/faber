@@ -1,0 +1,18 @@
++++
+term = "bounded collection push"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A bounded nested list checks its capacity when append is called through an index projection."
+syntax = "rows[i].append(value)"
+related = ["list<T, size N>", "append"]
+locale = "en"
++++
+# A projection does not remove the bounded list's push check.
+main {
+    mut list<list<int, size 1>> rows ← [[1]]
+    print "before"
+    rows[0].append(2)
+    print "after"
+}

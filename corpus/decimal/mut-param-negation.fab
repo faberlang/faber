@@ -1,0 +1,41 @@
++++
+term = "mutable scalar parameter negation"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "assignment", "incipit_stmt", "unary_expr", "expression", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "Unary negation updates a mut float, integer or d64 parameter using its scalar value."
+syntax = "fn negate(mut float p) { p ← -p }"
+related = ["mut", "float", "int", "d64"]
+locale = "en"
++++
+# Negation of mutable scalar parameters
+#
+# The parameter's mut access marker describes writable access; negation reads
+# the numeric value from its parameter place before assigning the result back.
+
+fn negate_float(mut float p) → void {
+    p ← -p
+}
+
+fn negate_int(mut i64 p) → void {
+    p ← -p
+}
+
+fn negate_decimal(mut d64 p) → void {
+    p ← -p
+}
+
+main {
+    mut float f ← 2.5
+    negate_float(mut f)
+    print f
+
+    mut i64 i ← 5
+    negate_int(mut i)
+    print i
+
+    mut d64 d ← 2.5
+    negate_decimal(mut d)
+    print d
+}

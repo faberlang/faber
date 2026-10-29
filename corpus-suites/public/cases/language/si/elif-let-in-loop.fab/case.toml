@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/si/elif-let-in-loop.fab"
+group = "language"
+input_root = "corpus"
+input = "si/elif-let-in-loop.fab"
+category = "branch"
+domain = "control"
+
+
+[expect]
+check_only = true

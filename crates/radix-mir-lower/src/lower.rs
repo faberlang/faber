@@ -4200,8 +4200,26 @@ impl<'a> FunctionBuilder<'a> {
             return Some(MirOperand::Constant(MirConstant::Int(i64::MIN)));
         }
         let op = mir_op;
-        let operand = self.lower_expr_value(operand)?;
-        let ty = self.expr_ty(expr)?;
+        let operand_expr = operand;
+        let mut operand = self.lower_expr_value(operand_expr)?;
+        let mut ty = self.expr_ty(expr)?;
+        if op == MirUnOp::Neg {
+            let operand_ty = self.expr_ty(operand_expr)?;
+            let (operand_marker, operand_payload) = self.types.peel_access_marker(operand_ty.semantic_id());
+            ty = MirType::semantic(self.types.peel_access_marker(ty.semantic_id()).1);
+            if operand_marker.is_some() {
+                // A marked scalar parameter is represented in HIR by its access
+                // type, while the MIR parameter local stores the numeric payload.
+                // Read that place into a payload-typed value before negating it;
+                // carrying the marker through to the unary result makes MIR see a
+                // non-numeric `ref`/`mut` type.
+                operand = self.assign_temp(
+                    MirValueKind::Operand(operand),
+                    MirType::semantic(operand_payload),
+                    operand_expr.span,
+                );
+            }
+        }
 
         Some(self.assign_temp(MirValueKind::Unary { op, operand }, ty, expr.span))
     }
@@ -5174,16 +5192,21 @@ impl<'a> FunctionBuilder<'a> {
         operands_effect_free: bool,
         ty: MirType,
         span: Span,
-        build: impl FnOnce(&mut Self) -> Option<MirOptionChainLink>,
+        build: impl FnOnce(&mut Self, &MirOperand) -> Option<MirOptionChainLink>,
     ) -> Option<MirOperand> {
+        // WHY: a place operand would otherwise be read once by the nil test and
+        // again after effectful index/call operands. Capture the receiver now,
+        // before the guard and before those operands run.
+        let base = if let MirOperand::Place(place) = base {
+            let base_ty = MirType::semantic(base_ty?);
+            self.assign_temp(MirValueKind::Operand(MirOperand::Place(place.clone())), base_ty, span)
+        } else {
+            base.clone()
+        };
         let base_nullable = base_ty.is_some_and(|ty| self.types.nullable_inner(ty).is_some());
         if operands_effect_free || !base_nullable {
-            let link = build(self)?;
-            return Some(self.assign_temp(
-                MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }),
-                ty,
-                span,
-            ));
+            let link = build(self, &base)?;
+            return Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Chain { base, link }), ty, span));
         }
         let result = self.push_temp(ty, span);
         let result_place = MirPlace::temp(result);
@@ -5207,7 +5230,7 @@ impl<'a> FunctionBuilder<'a> {
         let absent_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
 
         self.switch_to(present_id);
-        let link = build(self)?;
+        let link = build(self, &base)?;
         let chained = self.assign_temp(MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }), ty, span);
         self.assign(result_place, chained, ty, span);
         let present_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);

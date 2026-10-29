@@ -4,6 +4,7 @@
 use super::rep_of;
 use super::{MemberTest, Num, Seq, member_tests, numeric_conversion, sequence_conversion};
 use crate::{StructMeta, emit_program};
+use radix_hir::{HirStoreKind, HirStoreSite};
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirBlock, MirBlockId, MirConstant, MirConversion, MirConversionFlavor, MirFunction,
@@ -61,9 +62,9 @@ fn integer_narrowing_widening_and_policy_words_lower() {
     assert!(f.supported(u8_, int));
     assert!(f.supported(i8_, u8_));
     assert!(f.supported(int, wrapping_i8));
+    assert!(f.supported(int, wrapping_u64));
+    assert!(f.supported(wrapping_u64, int));
     assert!(f.supported(int, saturating_u8));
-    // A wrapping u64 result leaves the i64 carrier.
-    assert!(!f.supported(int, wrapping_u64));
 }
 
 #[test]
@@ -87,6 +88,130 @@ fn float_text_and_bool_pairs() {
     // Float and text sources never feed a policy word here.
     assert!(!f.supported(float, wrapping_u8));
     assert!(!f.supported(int, text));
+}
+
+#[test]
+fn clif_lowers_wrapping_conversions_and_u64_constants() {
+    let mut types = TypeTable::new();
+    let int = MirType::semantic(types.primitive(Primitive::Numerus));
+    let wrapping_u64 = MirType::semantic(types.intern(Type::ModularWord(NumericWidth::U64)));
+    let u64_ty =
+        MirType::semantic(types.intern(Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let convert = |source_ty, target_ty, args, recovery, destination| MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::local(MirLocalId(destination))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Convert(MirConversion {
+                    store: None,
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty,
+                    target_ty,
+                    params: Vec::new(),
+                    recovery,
+                    struct_defaults: Vec::new(),
+                }),
+                args,
+                return_ty: target_ty,
+            },
+        },
+        span: Span::default(),
+    };
+    let to_wrapping = convert(
+        int,
+        wrapping_u64,
+        vec![MirOperand::Constant(MirConstant::Int(-1))],
+        None,
+        0,
+    );
+    let to_int = convert(
+        wrapping_u64,
+        int,
+        vec![MirOperand::Constant(MirConstant::UInt(u64::MAX))],
+        Some(MirOperand::Constant(MirConstant::Int(0))),
+        1,
+    );
+    let u64_constant_store = MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::local(MirLocalId(2))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Convert(MirConversion {
+                    store: Some(HirStoreSite {
+                        kind: HirStoreKind::Declaration,
+                        slot: None,
+                        inferred_from: None,
+                        inferred_text: None,
+                    }),
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty: u64_ty,
+                    target_ty: u64_ty,
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                args: vec![MirOperand::Constant(MirConstant::UInt(u64::MAX))],
+                return_ty: u64_ty,
+            },
+        },
+        span: Span::default(),
+    };
+    let program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: vec![
+                MirLocal {
+                    id: MirLocalId(0),
+                    name: None,
+                    ty: wrapping_u64,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(1),
+                    name: None,
+                    ty: int,
+                    mutable: false,
+                    span: Span::default(),
+                },
+                MirLocal {
+                    id: MirLocalId(2),
+                    name: None,
+                    ty: u64_ty,
+                    mutable: false,
+                    span: Span::default(),
+                },
+            ],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![to_wrapping, to_int, u64_constant_store],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }],
+            return_ty: vacuum,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+    };
+    let interner = Interner::new();
+    emit_program(
+        &program,
+        &types,
+        &interner,
+        Some(MirFunctionId(0)),
+        ["true", "false", "none", "tuple"].map(str::to_owned),
+        &StructMeta::default(),
+    )
+    .expect("integer/wrapping conversions and u64 constants lower");
 }
 
 #[test]

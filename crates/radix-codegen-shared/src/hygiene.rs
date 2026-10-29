@@ -30,6 +30,9 @@ pub const INPUT: &str = "u0";
 /// Optional-chain / map-get scratch receiver.
 pub const OPTIONAL: &str = "o0";
 
+/// Optional-chain receiver captured before the chain's operands run.
+pub const OPTIONAL_RECEIVER: &str = "o0r";
+
 /// `filter` / `map` / `fold` closure item parameter.
 pub const CLOSURE_ITEM: &str = "x";
 
@@ -68,13 +71,14 @@ pub const RUST_TENSOR_ELEMENT_PARAM: &str = "__FaberTensorElement";
 pub const RUST_STRUCT_TYPE_MARKER_FIELD: &str = "__faber_type_marker";
 
 /// Every fixed hygiene name; a [`TempScope`] never hands one out as a temporary.
-const FIXED_NAMES: [&str; 14] = [
+const FIXED_NAMES: [&str; 15] = [
     FAC_OK,
     FAC_ERR,
     YIELDED,
     YIELD_FN,
     INPUT,
     OPTIONAL,
+    OPTIONAL_RECEIVER,
     CLOSURE_ITEM,
     CLOSURE_ACC,
     CLOSURE_SPLIT,

@@ -801,8 +801,8 @@ impl FunctionBuilder<'_> {
             HirOptionalChainKind::Index(index) => index.is_effect_free_operand(),
             HirOptionalChainKind::Call(args) => args.iter().all(|arg| arg.expr.is_effect_free_operand()),
         };
-        self.lower_option_chain_guarded(&base, object.ty, operands_effect_free, ty, expr.span, |this| {
-            this.lower_optional_chain_link(base.clone(), chain)
+        self.lower_option_chain_guarded(&base, object.ty, operands_effect_free, ty, expr.span, |this, captured_base| {
+            this.lower_optional_chain_link(captured_base.clone(), chain)
         })
     }
 

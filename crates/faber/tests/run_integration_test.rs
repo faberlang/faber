@@ -1480,6 +1480,48 @@ main args args {
 }
 
 #[test]
+fn run_optional_chain_captures_receiver_before_operands() {
+    // OC-3: `xs?[idx()]` and `f?(arg())` evaluate and test the receiver first;
+    // an operand that clears the receiver's place cannot change the result.
+    let dir = temp_dir("optional-chain-receiver-first");
+    let path = dir.join("main.fab");
+    fs::write(
+        &path,
+        r#"+++
+locale = "en"
++++
+type Op = (int) → int
+
+fn identity(int x) → int {
+    return x
+}
+
+main {
+    mut list<int> ∪ none xs ← [10]
+    let () → int idx ← () → int ∴ do {
+        xs ← null
+        return 0
+    }
+    print xs?[idx()]
+
+    mut Op ∪ none f ← identity
+    let () → int arg ← () → int ∴ do {
+        f ← null
+        return 7
+    }
+    print f?(arg())
+}
+"#,
+    )
+    .expect("write source");
+
+    let (stdout, stderr, ok) = run_faber(&["run", path.to_str().expect("utf8 path")]);
+
+    assert!(ok, "optional chain receiver-first run failed:\n{stderr}");
+    assert_eq!(stdout, "10\n7\n");
+}
+
+#[test]
 fn run_cli_root_optional_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-optional-option");
     fs::write(

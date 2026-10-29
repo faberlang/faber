@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/importa/python-norma-import.fab"
+group = "language"
+input_root = "corpus"
+input = "importa/python-norma-import.fab"
+category = "package"
+domain = "program"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

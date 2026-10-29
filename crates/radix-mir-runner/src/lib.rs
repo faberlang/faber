@@ -3925,6 +3925,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Width of a modular word operand, following type aliases. A bitwise
+    /// intermediate can lose its word result type even though the other
+    /// multiplication operand remains a `wrapping<W>` value.
+    fn operand_modular_word_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
+        let mut ty = self.operand_static_type(operand)?;
+        loop {
+            match self.types.get(ty) {
+                Type::ModularWord(width) => return Some(*width),
+                Type::Alias(_, inner) => ty = *inner,
+                _ => return None,
+            }
+        }
+    }
+
     /// Whether an operand's *static* type is a `wrapping<W>` word, following
     /// type aliases to their underlying word. Range-based typing can give
     /// arithmetic on such operands a plain integer result, so the result type
@@ -4228,7 +4242,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         {
             return value::bits_binop(&left, &right, op, bits, span);
         }
-        if let Some(modular) = self.modular_word_width(result_ty) {
+        let modular = self.modular_word_width(result_ty);
+        // Range-based typing can erase the `wrapping<u64>` result type from a
+        // bitwise intermediate. When that value feeds multiplication, keep
+        // the word's modular product instead of trapping before the wrapping
+        // destination store.
+        if modular.is_none()
+            && op == MirBinOp::Mul
+            && let Some(NumericWidth::U64) = self
+                .operand_modular_word_width(lhs)
+                .or_else(|| self.operand_modular_word_width(rhs))
+        {
+            return modular_word_numeric_binop(left, right, op, NumericWidth::U64, span);
+        }
+        if let Some(modular) = modular {
             return match op {
                 MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod => {
                     modular_word_numeric_binop(left, right, op, modular, span)

@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/lista/generic-ranged-list.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/generic-ranged-list.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
