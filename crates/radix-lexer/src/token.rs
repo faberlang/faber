@@ -236,6 +236,8 @@ pub enum TokenKind {
     Lege,
     Lineam,
     Omnia,
+    /// `machina` (en `device`): the device-region modifier directly after `fac`.
+    Machina,
     Praefixum,
     /// Build-time file embed in a constant initializer (en `embed`, D8.10).
     Insere,

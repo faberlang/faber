@@ -401,7 +401,7 @@ fn success_stats_frames_output_and_writes_equivalent_dual_sink_artifact() {
     let dual_file = file_dir.path().join("dual.json");
     let dual_arg = dual_file.to_str().expect("UTF-8 dual stats path");
     let dual = run_faber(&package, &["--stats", "--stats-file", dual_arg]);
-    assert!(dual.status.success(), "dual stats run failed: {:?}", dual);
+    assert!(dual.status.success(), "dual stats run failed: {dual:?}");
     let (prefix, stdout_artifact) = framed_artifact(&dual.stdout);
     assert_eq!(
         prefix, plain.stdout,
@@ -483,8 +483,7 @@ fn pre_execution_and_single_source_failures_emit_no_artifact() {
                 .stderr
                 .windows(b"single `.fab` file".len())
                 .any(|window| window == b"single `.fab` file"),
-            "single-source refusal must be clear: {:?}",
-            output
+            "single-source refusal must be clear: {output:?}"
         );
         assert!(
             !output
@@ -503,10 +502,10 @@ fn pre_execution_and_single_source_failures_emit_no_artifact() {
 fn named_consumer_proof_discovers_hot_function_conversion_and_cursor_rows() {
     let (_dir, package) = write_package("consumer", CONSUMER_FIXTURE);
     let plain = run_faber(&package, &[]);
-    assert!(plain.status.success(), "plain run failed: {:?}", plain);
+    assert!(plain.status.success(), "plain run failed: {plain:?}");
 
     let stats = run_faber(&package, &["--stats"]);
-    assert!(stats.status.success(), "stats run failed: {:?}", stats);
+    assert!(stats.status.success(), "stats run failed: {stats:?}");
     let (prefix, artifact) = framed_artifact(&stats.stdout);
     assert_eq!(
         prefix, plain.stdout,
@@ -587,6 +586,8 @@ fn named_consumer_proof_discovers_hot_function_conversion_and_cursor_rows() {
 #[cfg(feature = "device-runtime")]
 #[test]
 fn device_refusal_is_observed_before_launch_with_no_artifact() {
+    const DEVICE_REFUSALS: [&str; 2] = ["E_DEVICE_NONE_ADMITTED", "E_DEVICE_UNAVAILABLE"];
+
     // Device-bearing fixture (manifest-declared selection): the seam receives
     // the stats request and refuses before any device callback/launch.
     let (dir, package) = write_package("device-refusal", "main { print 1 }\n");
@@ -622,7 +623,6 @@ device = "metal"
     let stderr = String::from_utf8_lossy(&output.stderr);
     // The explicit device selection fails closed with a device-admission issue
     // before launch, regardless of which admission/no-kernel refusal applies.
-    const DEVICE_REFUSALS: [&str; 2] = ["E_DEVICE_NONE_ADMITTED", "E_DEVICE_UNAVAILABLE"];
     assert!(
         DEVICE_REFUSALS.iter().any(|code| stderr.contains(code)),
         "a device selection with --stats must fail closed with one of {DEVICE_REFUSALS:?}: {stderr}"

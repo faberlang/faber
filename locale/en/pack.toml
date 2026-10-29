@@ -106,6 +106,7 @@ axis = "axis"
 lege = "read"
 lineam = "line"
 omnia = "all"
+machina = "device"
 scriptum = "format"
 sparge = "spread"
 ut = "as"
@@ -1124,6 +1125,10 @@ help = "use {replacement}"
 message = "'{cape}' must come before '{dum}' in a '{fac}' loop"
 help = "write the handler before the condition: {fac} … {cape} … {dum} …"
 
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "a '{fac}' block takes one modifier word, not '{omnia}' and '{machina}' together"
+help = "'{machina}' already delivers every fault once at the block's exit; drop '{omnia}'"
+
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "a comma no longer separates '{discerne}' subjects"
 help = "separate the subjects with '{et}'"
@@ -2111,6 +2116,26 @@ help = "drop the parameter and bind the iteration coordinate with `{apud}` on a 
 [diagnostics.SEM008.issues.nucleum_recovery]
 message = "a kernel body cannot install a local handler ('{construct}')"
 help = "let the error reach the launching call, where the host handles it"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "a '{fac} {machina}' region cannot contain another '{fac} {machina}'"
+help = "keep one device region and call kernels from it directly"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' leaves a '{fac} {machina}' region; the region has no exit word yet"
+help = "finish the region and decide after it, or move the exit outside the block"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "a lane loop ('{construct}') directly in a '{fac} {machina}' region is not built yet"
+help = "call a kernel from the region for the parallel work"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "a '{fac} {machina}' region cannot allocate a tensor yet ({construct})"
+help = "allocate the tensor before the region and use it inside"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' in a '{fac} {machina}' region reads a value computed on the device; device-side loop control is not built"
+help = "keep conditions, bounds and scalar arguments to values known before the region, and read device results after it"
 
 [diagnostics.SEM008.issues.nucleum_saturating_float_not_built]
 message = "a kernel cannot use a saturating float yet ({site}); device lowering of saturating floats is not built"
