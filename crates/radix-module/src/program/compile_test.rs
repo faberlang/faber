@@ -3507,7 +3507,7 @@ functio cells(atomic<numerus> cell, sparsa<fractus, [2, 3]> values) → fractus 
     };
     assert_eq!(handler.params.len(), 1);
     assert_eq!(
-        *handler.params[0].ty,
+        handler.params[0].ty,
         crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus)
     );
     assert_eq!(
