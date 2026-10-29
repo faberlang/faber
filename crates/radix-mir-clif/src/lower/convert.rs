@@ -171,10 +171,7 @@ pub(crate) fn numeric_conversion(
     let source = num_of(table, source)?;
     let target = num_of(table, target)?;
     let supported = match (source, target) {
-        (Num::Int(_), Num::Int(to)) => match to.policy {
-            IntPolicy::Trap | IntPolicy::Saturate => true,
-            IntPolicy::Wrap => to.width != NumericWidth::U64,
-        },
+        (Num::Int(_), Num::Int(_)) => true,
         (Num::Int(_) | Num::Bool | Num::Float(_) | Num::Text | Num::Dec, Num::Float(_))
         | (Num::Text | Num::Float(_) | Num::Int(_), Num::Bool)
         | (Num::Text | Num::Int(_), Num::Char)
@@ -1501,6 +1498,23 @@ impl FunctionLower<'_, '_> {
     ) -> (Value, Option<(Value, Failure)>) {
         match to.policy {
             IntPolicy::Trap => {
+                if from.width == NumericWidth::U64 {
+                    if to.width == NumericWidth::U64 {
+                        return (value, None);
+                    }
+                    let bound = self.builder.ins().iconst(types::I64, to.high);
+                    let above = self
+                        .builder
+                        .ins()
+                        .icmp(IntCC::UnsignedGreaterThan, value, bound);
+                    return (
+                        value,
+                        Some((
+                            above,
+                            Failure::Static("numerus to numerus conversion out of range"),
+                        )),
+                    );
+                }
                 if from.low >= to.low && from.high <= to.high {
                     return (value, None);
                 }
