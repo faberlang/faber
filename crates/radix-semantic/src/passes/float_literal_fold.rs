@@ -110,17 +110,14 @@ impl Fold<'_> {
         };
         let width = self.float_width(expr.ty?)?;
         let mut operators = 0;
-        let rounded = match self.exact(expr, &mut operators) {
-            Some(exact) => {
-                if operators == 0 {
-                    return None;
-                }
-                exact.round_to_width(width)?
+        let rounded = if let Some(exact) = self.exact(expr, &mut operators) {
+            if operators == 0 {
+                return None;
             }
-            None => {
-                let value = integer_constant(expr)?;
-                ExactRational::from_integer(Magnus::from_i128(value)).round_to_width(width)?
-            }
+            exact.round_to_width(width)?
+        } else {
+            let value = integer_constant(expr)?;
+            ExactRational::from_integer(Magnus::from_i128(value)).round_to_width(width)?
         };
         if !rounded.is_finite() {
             return None;

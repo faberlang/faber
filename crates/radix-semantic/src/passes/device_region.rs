@@ -140,7 +140,7 @@ pub fn for_each_region<'f>(hir: &HirModule, on_region: &'f mut RegionCallback<'f
 /// Check every region of `hir` against the region rules.
 pub(super) fn check_regions(env: &Env<'_>, sink: &mut Sink, hir: &HirModule) {
     for_each_region(hir, &mut |body, depth, _| {
-        check_region(env, sink, body, depth)
+        check_region(env, sink, body, depth);
     });
 }
 

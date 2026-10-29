@@ -353,10 +353,6 @@ impl UseVisitor<'_> {
             | Type::RangedArray { element, .. }
             | Type::BoundedQueue { element, .. }
             | Type::BoundedStack { element, .. } => vec![element],
-            Type::BoundedTextus { .. }
-            | Type::BoundedAscii { .. }
-            | Type::BoundedOcteti { .. }
-            | Type::TensorEdgePolicy(_) => Vec::new(),
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {
                 vec![success, alternate]
             }
@@ -397,6 +393,10 @@ impl UseVisitor<'_> {
             | Type::RangedInt { .. }
             | Type::PolicyFloat(_, _)
             | Type::SizedInstans(_)
+            | Type::BoundedTextus { .. }
+            | Type::BoundedAscii { .. }
+            | Type::BoundedOcteti { .. }
+            | Type::TensorEdgePolicy(_)
             | Type::Tuple(_)
             | Type::Param(_)
             | Type::Infer(_)

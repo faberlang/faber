@@ -2467,9 +2467,9 @@ fn call_arg_unmarked_size_span(
     match arg {
         GenericArgExpr::Size(
             radix_syntax::FiguraExpr::Lift(_) | radix_syntax::FiguraExpr::Infer,
-        ) => None,
+        )
+        | GenericArgExpr::Range(_) => None,
         GenericArgExpr::Size(_) => Some(lowerer.current_span),
-        GenericArgExpr::Range(_) => None,
         GenericArgExpr::Type(ty) => {
             let name = call_arg_bare_name(arg)?;
             let is_natural =

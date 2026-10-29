@@ -640,7 +640,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::RANGED_ARITY => {
             Some("write policy<W, lo‥hi>, such as saturating<u32, 0‥8>".to_owned())
         }
-        WidthLowerIssue::RANGED_EMPTY => Some(
+        WidthLowerIssue::RANGED_EMPTY | WidthLowerIssue::RANGED_LIST_EMPTY => Some(
             "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
         ),
         WidthLowerIssue::RANGED_OUTSIDE_WIDTH => Some(
@@ -651,9 +651,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         WidthLowerIssue::RANGED_LIST_BOUND_NOT_CONSTANT => Some(
             "write both ends as integer literals, such as list<int, size 1‥8>; a named or size end is not built yet".to_owned(),
-        ),
-        WidthLowerIssue::RANGED_LIST_EMPTY => Some(
-            "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
         ),
         WidthLowerIssue::RANGED_LIST_BOUND_NEGATIVE => {
             Some("a length is a count: start the range at 0 or above".to_owned())
