@@ -5262,6 +5262,63 @@ fn summa(tf32[2] x) → f32 {
     );
 }
 
+/// `faber build` of a `[device]` package always emits the Metal artifact, so a
+/// kernel Metal's requirement row refuses (a 48-bit intermediate in a `u32`
+/// expression) stops the build by name before any emission.
+#[cfg(feature = "device-runtime")]
+#[test]
+fn package_fmir_image_refuses_a_kernel_the_metal_row_refuses() {
+    let dir = test_temp_dir("package-device-metal-row");
+    fs::create_dir_all(dir.join("src")).expect("src dir");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "device-metal-row"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir"
+kind = "bin"
+
+[device]
+device = "auto"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src").join("main.fab"),
+        "+++\nlocale = \"en\"\n+++\n@ kernel
+@ public
+fn k_wide(tensor<u32, [8]> a, tensor<u32, [8]> b, mut tensor<u32, [8]> out) → void {
+    for from a at [i] thread lane let x {
+        out[[i]] ← ((x ∧ 16777215) * (b[[i]] ∧ 16777215)) / 1048576
+    }
+}
+main {}
+",
+    )
+    .expect("write entry");
+    let entry = dir.join("src").join("main.fab");
+    let result = build_fmir_image_for_faber(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    );
+    let diagnostics = result.expect_err("a kernel Metal refuses must not build a device section");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "kernel_target_requirements_not_met")),
+        "{diagnostics:?}"
+    );
+}
+
 #[cfg(feature = "hir-rust")]
 #[test]
 fn compile_package_resolves_builtin_norma_text_native_body() {
@@ -11101,6 +11158,87 @@ kind = "bin"
         code.contains("kernel void"),
         "expected emitted MSL kernels, got:\n{code}"
     );
+}
+
+/// Write a one-file package whose `main.fab` is `source`; return its entry and
+/// the temp dir that must outlive it.
+#[cfg(feature = "mir-metal")]
+fn metal_kernel_package(name: &str, source: &str) -> (PathBuf, impl Sized) {
+    let dir = test_temp_dir(name);
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/main.fab"), source).expect("entry");
+    fs::write(
+        dir.join("faber.toml"),
+        format!(
+            r#"
+[package]
+name = "{name}"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#
+        ),
+    )
+    .expect("manifest");
+    (dir.join("src/main.fab"), dir)
+}
+
+/// `faber emit -t metal-text` on a package takes the package lane, which never
+/// ran the per-target kernel requirement rows. A `u32` expression with a
+/// 48-bit intermediate reached the Metal emitter and was multiplied in a
+/// 32-bit `uint` (a silent wrap); the row's refusal now stops it by name.
+#[cfg(feature = "mir-metal")]
+#[test]
+fn emit_metal_text_package_refuses_a_narrow_expression_with_a_wide_intermediate() {
+    let (entry, _dir) = metal_kernel_package(
+        "emit-metal-wide-intermediate",
+        "+++\nlocale = \"en\"\n+++\n@ kernel
+@ public
+fn k_wide(tensor<u32, [8]> a, tensor<u32, [8]> b, mut tensor<u32, [8]> out) → void {
+    for from a at [i] thread lane let x {
+        out[[i]] ← ((x ∧ 16777215) * (b[[i]] ∧ 16777215)) / 1048576
+    }
+}
+main {}
+",
+    );
+    let (config, _) = config_with_locale(Target::MirMetal, &entry, None, None).expect("config");
+    let diagnostics = compile_package_metal_text(&config, &entry)
+        .expect_err("a narrow-typed wide intermediate must not emit");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("kernel_target_requirements_not_met")),
+        "{diagnostics:?}"
+    );
+}
+
+/// The refusal is the row's, not a blanket 64-bit ban: an `i64` kernel whose
+/// intermediate is its own 64-bit type is admitted and emitted in `long`.
+#[cfg(feature = "mir-metal")]
+#[test]
+fn emit_metal_text_package_still_emits_a_native_64_bit_kernel() {
+    let (entry, _dir) = metal_kernel_package(
+        "emit-metal-native-i64",
+        "+++\nlocale = \"en\"\n+++\n@ kernel
+@ public
+fn k_sum(tensor<i64, [8]> a, tensor<i64, [8]> b, mut tensor<i64, [8]> out) → void {
+    for from a at [i] thread lane let x {
+        out[[i]] ← (x ∧ 4294967295) + (b[[i]] ∧ 4294967295)
+    }
+}
+main {}
+",
+    );
+    let (config, _) = config_with_locale(Target::MirMetal, &entry, None, None).expect("config");
+    let code = compile_package_metal_text(&config, &entry).expect("an i64 kernel emits");
+    assert!(code.contains("constant long* b0 [[buffer(0)]]"), "{code}");
 }
 
 /// The `clif` package build emits a native object through the package-MIR

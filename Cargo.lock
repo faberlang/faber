@@ -1242,6 +1242,7 @@ dependencies = [
  "radix-runtime-contract",
  "radix-semantic",
  "radix-syntax",
+ "radix-target",
  "radix-types",
 ]
 

@@ -38,6 +38,7 @@ radix-mir = { path = "../radix-mir" }
 radix-runtime-contract = { path = "../radix-runtime-contract" }
 radix-semantic = { path = "../radix-semantic" }
 radix-syntax = { path = "../radix-syntax" }
+radix-target = { path = "../radix-target" }
 radix-types = { path = "../radix-types" }
 
 [dev-dependencies]
