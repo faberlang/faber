@@ -1805,19 +1805,19 @@ help = "use {lista}<T>, {lista}<T, {magnitudo} N> or {lista}<T, {magnitudo} lo�
 
 [diagnostics.SEM008.issues.tabula_arity]
 message = "map requires two type parameters"
-help = "fix the AST construct for lowering"
+help = "use `{tabula}<K, V>` for a key and value type"
 
 [diagnostics.SEM008.issues.tabulae_arity]
 message = "ledger requires two type parameters"
-help = "fix the AST construct for lowering"
+help = "use `{tabulae}<K, V>` for a key and value type"
 
 [diagnostics.SEM008.issues.saturating_word_width_required]
 message = "saturating type requires exactly one integer width"
-help = "write the saturating type with one integer width, such as saturating<u8> or saturating<i16>"
+help = "write exactly one width marker, such as `saturating<u8>` or `saturating<f32>`"
 
 [diagnostics.SEM008.issues.saturating_word_width_shape]
 message = "saturating width must be a bare integer width marker"
-help = "use a bare integer width marker such as u8 or i16"
+help = "use a bare width marker such as `u8`, `i16` or `f32`"
 
 [diagnostics.SEM008.issues.trapping_word_width_required]
 message = "trapping type requires exactly one width"
@@ -1825,7 +1825,7 @@ help = "write the trapping type with one width, such as trapping<u8> or trapping
 
 [diagnostics.SEM008.issues.trapping_word_width_shape]
 message = "trapping width must be a bare width marker"
-help = "use a bare width marker such as u8 or i64"
+help = "use a bare width marker such as `u8`, `i64` or `f32`"
 
 [diagnostics.SEM008.issues.ranged_policy_word_required]
 message = "a range needs a store policy word; a bare width marker takes no range"
@@ -1833,7 +1833,7 @@ help = "write the policy word first, such as saturating<u32, 0‥8>, trapping<i3
 
 [diagnostics.SEM008.issues.ranged_policy_bound_not_constant]
 message = "a range end must be an integer literal or ∞"
-help = "write both ends as integer literals, such as 0‥8; a named or size end is not built yet"
+help = "use integer values or infinity markers (`-∞` only at the low end), such as `0‥8` or `0‥∞`; names and size expressions are not constant bounds"
 
 [diagnostics.SEM008.issues.ranged_policy_arity]
 message = "a ranged store policy takes the width and then one range"
@@ -1841,11 +1841,11 @@ help = "write policy<W, lo‥hi>, such as saturating<u32, 0‥8>"
 
 [diagnostics.SEM008.issues.ranged_policy_range_empty]
 message = "the range holds no value"
-help = "the low end must be below the high end of lo‥hi, or not above it for lo…hi"
+help = "for `‥`, keep the low end below the exclusive high end; for `…`, it may equal but not exceed the high end"
 
 [diagnostics.SEM008.issues.ranged_policy_range_outside_width]
 message = "a range end lies outside the width"
-help = "keep both ends inside the width; ∞ is only a high end and -∞ only a low end"
+help = "keep every included value within the width; with `‥`, the exclusive high end may be one past the maximum. Use `∞` only high and `-∞` only low"
 
 [diagnostics.SEM008.issues.ranged_policy_unsigned_negative_bound]
 message = "an unsigned width cannot have a negative low end"
@@ -1853,7 +1853,7 @@ help = "start the range at 0, or use a signed width such as i32"
 
 [diagnostics.SEM008.issues.ranged_policy_width_unsupported]
 message = "a ranged store policy needs a bounded integer width"
-help = "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet"
+help = "use an integer width such as `u8` or `i32`; float and decimal widths cannot be ranged, and `inf` only accepts `-∞…∞`"
 
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "a kernel cannot use a ranged store policy yet ({site}); a kernel applies no range"
@@ -1865,15 +1865,15 @@ help = "give the list a finite constant size, such as {lista}<int, {magnitudo} 1
 
 [diagnostics.SEM008.issues.ranged_list_bound_not_constant]
 message = "a list length range end must be a non-negative integer literal or ∞"
-help = "write both ends as integer literals, such as {lista}<int, {magnitudo} 1‥8>; a named or size end is not built yet"
+help = "use integer values or infinity markers (`-∞` only at the low end), such as `{lista}<int, {magnitudo} 1‥∞>`; names and size expressions are not constant bounds"
 
 [diagnostics.SEM008.issues.ranged_list_range_empty]
 message = "the list length range holds no length"
-help = "the low end must be below the high end of lo‥hi, or not above it for lo…hi"
+help = "for `‥`, keep the low end below the exclusive high end; for `…`, it may equal but not exceed the high end"
 
 [diagnostics.SEM008.issues.ranged_list_bound_negative]
 message = "a list length range end cannot be negative"
-help = "a length is a count: start the range at 0 or above"
+help = "use non-negative values for both ends, since a list length cannot be negative"
 
 [diagnostics.SEM008.issues.ranged_list_policy_word]
 message = "a list length range takes no store policy word"
@@ -1893,63 +1893,63 @@ help = "write `{vector}<f32, {magnitudo} 4>` for four lanes; the shorthand `vf32
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' conflicts with written posture '{written_posture}'"
-help = "fix the AST construct for lowering"
+help = "use one matching posture word (`fiet`, `fiunt` or `fient`) and remove any conflicting `@ {futura}` or `@ {cursor}` annotation"
 
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "comment has no lowered statement or item to attach to"
-help = "fix the AST construct for lowering"
+help = "move the comment before a statement or item that remains in the source"
 
 [diagnostics.SEM008.issues.conversio_signature]
 message = "a `@ conversion` function must take exactly one parameter and declare exactly one return type"
-help = "write `functio name(Source) → Destination` for the conversion pair"
+help = "write `@ {conversio} {functio} name(Source) → Destination` with exactly one parameter and one return type"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "set requires one type parameter"
-help = "fix the AST construct for lowering"
+help = "use `{copia}<T>` with one element type"
 
 [diagnostics.SEM008.issues.promissum_arity]
 message = "promissum requires one type parameter"
-help = "fix the AST construct for lowering"
+help = "use `{promissum}<T>` with one result type"
 
 [diagnostics.SEM008.issues.cursor_arity]
 message = "cursor requires one type parameter"
-help = "fix the AST construct for lowering"
+help = "use `{cursor}<T>` with one item type"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
-help = "use queue<T> or queue<T, {magnitudo} N>"
+help = "use `{queue}<T>` or `{queue}<T, {magnitudo} N>`"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack requires one or two type parameters"
-help = "use stack<T> or stack<T, {magnitudo} N>"
+help = "use `{stack}<T>` or `{stack}<T, {magnitudo} N>`"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "match {casu} requires a pattern"
-help = "fix the AST construct for lowering"
+help = "add a `{casu}` arm with a pattern to the `{discerne}` statement"
 
 [diagnostics.SEM008.issues.discerne_pattern_count]
 message = "match pattern count must match subject count"
-help = "fix the AST construct for lowering"
+help = "give each `{casu}` arm exactly one pattern per matched value; join multiple patterns with `{et}`"
 
 [diagnostics.SEM008.issues.discerne_subject_required]
 message = "match requires at least one subject"
-help = "fix the AST construct for lowering"
+help = "give `{discerne}` at least one value to match"
 
 [diagnostics.SEM008.issues.ego_outside_method]
 message = "ego used outside method context"
-help = "fix the AST construct for lowering"
+help = "move this into a `{genus}` method, or replace `ego` with an instance parameter in the free function"
 
 [diagnostics.SEM008.issues.elige_case_value_shape]
 message = "{elige} case value must be a literal or enum variant"
-help = "fix the AST construct for lowering"
+help = "use a literal or a named enum variant as the `{casu}` value"
 
 [diagnostics.SEM008.issues.empty_qualified_type_path]
 message = "empty qualified type path"
-help = "fix the AST construct for lowering"
+help = "write both the module and type name, such as `module.Type`"
 
 [diagnostics.SEM008.issues.empty_path_pattern]
 message = "empty path pattern"
-help = "fix the AST construct for lowering"
+help = "write a variant name or qualified variant, such as `Shape.Circle`"
 
 [diagnostics.SEM008.issues.empty_union_type]
 message = "empty union type"
