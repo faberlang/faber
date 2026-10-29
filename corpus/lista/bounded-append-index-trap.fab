@@ -1,0 +1,24 @@
++++
+term = "list<T, size N>.append"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "assignment", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "array_literal", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "An append through a list index still traps at the bounded list's capacity."
+syntax = "rows[0].append(value)"
+related = ["list<T, size N>", "append", "index-oob-trap"]
+locale = "en"
++++
+# =============================================================================
+# list<T, size N>.append — an indexed receiver still has its capacity
+# =============================================================================
+# `rows[0]` is a bounded list, even though the receiver is a projection.
+# Appending to the full inner list traps with "bounded collection push at
+# capacity" and does not reach the final print.
+
+main {
+    mut list<list<int, size 2>, size 1> rows ← [[1, 2]]
+    print "before"
+    rows[0].append(3)
+    print "unreached"
+}

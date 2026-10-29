@@ -1,0 +1,28 @@
++++
+term = "list<T, size N>.append"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "assignment", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "array_literal", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "An append through a field still traps at the bounded list's capacity."
+syntax = "box.values.append(value)"
+related = ["list<T, size N>", "append", "genus"]
+locale = "en"
++++
+# =============================================================================
+# list<T, size N>.append — a field receiver still has its capacity
+# =============================================================================
+# `box.values` is a bounded list, even though it is a field projection.
+# Appending to the full field traps with "bounded collection push at
+# capacity" and does not reach the final print.
+
+class Box {
+    mut list<int, size 2> values = [1, 2]
+}
+
+main {
+    mut Box box ← Box { }
+    print "before"
+    box.values.append(3)
+    print "unreached"
+}

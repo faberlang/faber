@@ -1,0 +1,23 @@
++++
+term = "list<T, size N>.append"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "assignment", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "array_literal", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "Appending to a full bounded list aborts with the capacity trap."
+syntax = "xs.append(value)"
+related = ["list<T, size N>", "append"]
+locale = "en"
++++
+# =============================================================================
+# list<T, size N>.append — append past capacity aborts
+# =============================================================================
+# The bounded list is full before the append. The operation traps with
+# "bounded collection push at capacity" and does not reach the final print.
+
+main {
+    mut list<int, size 2> xs ← [1, 2]
+    print "before"
+    xs.append(3)
+    print "unreached"
+}
