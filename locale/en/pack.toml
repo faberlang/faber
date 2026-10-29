@@ -1617,7 +1617,7 @@ help = "call it as a method: `.length()`"
 
 [diagnostics.SEM004.issues.type_has_no_field]
 message = "type '{type}' has no field '{member}'"
-help = "built-in types expose methods, not fields; check the receiver type and member name"
+help = "Check the receiver's type and field name; if it is a method, call it with parentheses"
 
 [diagnostics.SEM004.issues.static_field_read_through_instance]
 message = "static field '{field}' is read through the type name, not an instance"
@@ -1629,19 +1629,19 @@ help = "read an instance field through an instance; only a `{fixum}` member read
 
 [diagnostics.SEM004.issues.unknown_union_field]
 message = "unknown union field"
-help = "check the union's `@ commune` field name"
+help = "Check the field name; declare it in `@ {commune}` only if every variant has it, or use `{discerne}` for variant-specific fields"
 
 [diagnostics.SEM004.issues.union_member_not_common]
 message = "union member '{member}' is not common; lacking in: {lacking}"
-help = "narrow the receiver (`est M` branch, `discerne`) to recover per-member access"
+help = "Use an `{est}` type test or a `{discerne}` arm to narrow the receiver before accessing this member"
 
 [diagnostics.SEM004.issues.union_member_differs]
 message = "union member '{member}' differs: {detail}"
-help = "give every union member the same signature or type, or narrow the receiver (`est M`, `discerne`)"
+help = "Make this member's type or method signature agree across the union, or access it after narrowing with an `{est}` test or `{discerne}` arm"
 
 [diagnostics.SEM004.issues.namespace_missing_export]
 message = "imported file exports no member `{member}`"
-help = "check the imported file's `@ {publica}` exports"
+help = "Mark the intended declaration `@ {publica}` in the imported file, or import a member it already exports"
 
 [diagnostics.SEM005]
 message = "duplicate definition"
@@ -1661,7 +1661,7 @@ help = "alias one of them: `{importa} {ex} \"…\" other_name`"
 
 [diagnostics.SEM005.issues.inferred_import_name_collision]
 message = "inferred import name conflicts with an existing definition"
-help = "add an explicit import alias with `ut` so the imported binding has a unique name"
+help = "add an explicit alias with `{ut}` so the imported binding has a unique name"
 
 [diagnostics.SEM005.issues.schema_duplicate_source]
 message = "two visible columns resolve to the same source name"
@@ -1673,11 +1673,11 @@ help = "rename one of the columns"
 
 [diagnostics.SEM005.issues.duplicate_commune_field]
 message = "duplicate commune field"
-help = "declare each commune field once in the union region"
+help = "Declare each field once in the union's `@ {commune}` region"
 
 [diagnostics.SEM005.issues.union_variant_redeclares_shared_field]
 message = "variant redeclares a commune field"
-help = "omit the commune field from the variant payload"
+help = "Declare the field in `@ {commune}` only, not again in the variant"
 
 [diagnostics.SEM005.issues.companion_name_collision]
 message = "companion name collides with another definition"
@@ -1689,7 +1689,7 @@ help = "use a distinct alias for each imported member"
 
 [diagnostics.SEM005.issues.conversio_registry_builtin_shadow]
 message = "conversion row shadows a built-in conversion"
-help = "remove the row or convert through a different pair"
+help = "Remove the row; built-in conversions work without a registry entry"
 
 [diagnostics.SEM005.issues.conversio_registry_duplicate_pair]
 message = "conversion pair is registered more than once"
@@ -1701,27 +1701,27 @@ help = "check the import path"
 
 [diagnostics.SEM006.issues.kernel_glob_reexport]
 message = "`{path}` glob imports cannot be re-exported"
-help = "remove the publica marker"
+help = "Remove `@ {publica}`; a `faber:*` import cannot be re-exported"
 
 [diagnostics.SEM006.issues.kernel_glob_named_alias]
 message = "`{path}` must be imported as a named glob alias"
-help = "check the import path"
+help = "Use a named import such as `{importa} {ex} \"faber:*\" faber`, not a wildcard or selective import"
 
 [diagnostics.SEM006.issues.kernel_invalid_path]
 message = "{reason}"
-help = "check the import path"
+help = "Use a current `norma:<module>` import; the `faber:` kernel import surface is retired"
 
 [diagnostics.SEM006.issues.kernel_unknown_module]
 message = "unknown faber kernel module '{module}'; see faber host manifest"
-help = "check the import path"
+help = "Use a current `norma:<module>` import; no `faber:` kernel modules are available"
 
 [diagnostics.SEM006.issues.import_interna_cross_package]
 message = "`{name}` is `@ interna` and cannot be imported across a package boundary"
-help = "import `@ interna` names only from a file in the same package"
+help = "Import `@ {interna}` names only from files in the same package"
 
 [diagnostics.SEM006.issues.import_module_private]
 message = "`{name}` is module-private and cannot be imported"
-help = "mark the declaration `@ publica` to export it, or `@ interna` for same-package use"
+help = "Mark the declaration `@ {publica}` to export it, or `@ {interna}` to make it available within the package"
 
 [diagnostics.SEM006.issues.import_absolute_path]
 message = "absolute import path"
@@ -1729,7 +1729,7 @@ help = "use a relative or scheme-based import path"
 
 [diagnostics.SEM006.issues.import_bare_glyph]
 message = "bare glyph in import path"
-help = "name the module after the glyph"
+help = "Use a declared template name after `§`, for example `§src/path`"
 
 [diagnostics.SEM006.issues.import_multiple_holes]
 message = "import path has more than one hole"
@@ -1737,19 +1737,19 @@ help = "use at most one hole in an import path"
 
 [diagnostics.SEM006.issues.import_parent_traversal]
 message = "import path traverses to a parent directory"
-help = "import from inside the package root"
+help = "Use a relative path that stays inside the package root"
 
 [diagnostics.SEM006.issues.import_positional_hole]
 message = "positional hole in import path"
-help = "name the hole in the import path"
+help = "Use a named template, such as `§src/path`, instead of a numeric hole"
 
 [diagnostics.SEM006.issues.import_unknown_scheme]
 message = "unknown import scheme"
-help = "use a supported import scheme"
+help = "Use a relative path (`./file`), provider path (`provider:module`), or declared template (`§name/path`)"
 
 [diagnostics.SEM006.issues.import_unknown_template]
 message = "unknown import template"
-help = "use a declared import template"
+help = "Use a declared template after `§`, such as `§src/path`"
 
 [diagnostics.SEM006.issues.selective_import_missing_member]
 message = "selective import names a member the module does not export"
@@ -1761,7 +1761,7 @@ help = "break the cycle between modules"
 
 [diagnostics.SEM007.issues.type_alias_cycle]
 message = "type alias cycle"
-help = "break the cycle between modules"
+help = "Make one alias resolve to a concrete type instead of another alias in the cycle"
 
 [diagnostics.SEM007.issues.constant_cycle]
 message = "constant `{name}` depends on itself"
@@ -1773,23 +1773,23 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.array_destructuring_initializer]
 message = "array destructuring requires initializer"
-help = "fix the AST construct for lowering"
+help = "Initialize the pattern with a value, e.g. `{sit} [a, b] ← values`"
 
 [diagnostics.SEM008.issues.array_destructuring_not_expanded]
 message = "array destructuring should be expanded before statement lowering"
-help = "fix the AST construct for lowering"
+help = "Use array destructuring in a binding initializer, e.g. `{sit} [a, b] ← values`"
 
 [diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
 message = "atomic requires compiler-owned syntax; use atomic<T>"
-help = "fix the AST construct for lowering"
+help = "Use the dedicated `atomic<T>` type form"
 
 [diagnostics.SEM008.issues.implet_bound_on_type_declaration]
 message = "an {implet} bound is allowed only on a function's type parameter"
-help = "move the bound to the functions that use the type, or remove it"
+help = "Put the bound on each `{functio}` type parameter that needs it; a `{genus}` declares conformance with an `{implet}` clause"
 
 [diagnostics.SEM008.issues.iuncta_union_type_arg_unsupported]
 message = "iuncta element type argument ∪ is unsupported"
-help = "use _ for a monomorphic hole or a concrete union type"
+help = "Use `_` for an inferred element or spell out the union, such as `iuncta<A ∪ B>`"
 
 [diagnostics.SEM008.issues.radix_typus_bounded_param]
 message = "@ radix typus cannot constrain a type parameter that already has an {implet} bound"
