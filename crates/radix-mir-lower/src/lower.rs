@@ -4200,8 +4200,26 @@ impl<'a> FunctionBuilder<'a> {
             return Some(MirOperand::Constant(MirConstant::Int(i64::MIN)));
         }
         let op = mir_op;
-        let operand = self.lower_expr_value(operand)?;
-        let ty = self.expr_ty(expr)?;
+        let operand_expr = operand;
+        let mut operand = self.lower_expr_value(operand_expr)?;
+        let mut ty = self.expr_ty(expr)?;
+        if op == MirUnOp::Neg {
+            let operand_ty = self.expr_ty(operand_expr)?;
+            let (operand_marker, operand_payload) = self.types.peel_access_marker(operand_ty.semantic_id());
+            ty = MirType::semantic(self.types.peel_access_marker(ty.semantic_id()).1);
+            if operand_marker.is_some() {
+                // A marked scalar parameter is represented in HIR by its access
+                // type, while the MIR parameter local stores the numeric payload.
+                // Read that place into a payload-typed value before negating it;
+                // carrying the marker through to the unary result makes MIR see a
+                // non-numeric `ref`/`mut` type.
+                operand = self.assign_temp(
+                    MirValueKind::Operand(operand),
+                    MirType::semantic(operand_payload),
+                    operand_expr.span,
+                );
+            }
+        }
 
         Some(self.assign_temp(MirValueKind::Unary { op, operand }, ty, expr.span))
     }
