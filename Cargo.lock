@@ -565,6 +565,7 @@ dependencies = [
  "faber-leaf",
  "flate2",
  "handroll",
+ "libc",
  "postcard",
  "proba",
  "radix",
