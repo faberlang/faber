@@ -231,7 +231,9 @@ impl HirVisitor for ExitScan<'_> {
                 self.loops -= 1;
             }
             HirExpressionKind::Block(block)
-                if block.breakable.is_some_and(|kind| kind.is_scope()) =>
+                if block
+                    .breakable
+                    .is_some_and(radix_hir::HirBreakableKind::is_scope) =>
             {
                 // A plain `fac { }` is a breakable scope: `rumpe` leaves it.
                 self.loops += 1;

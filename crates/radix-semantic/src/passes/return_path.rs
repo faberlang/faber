@@ -213,7 +213,6 @@ fn stmt_terminates(
     match &stmt.kind {
         // `redde` is the only statement that satisfies the normal channel.
         HirStatementKind::Redde(_) => true,
-        HirStatementKind::ReddeFilum(_) => false,
         // Control-flow expressions embedded as statements may terminate; other
         // expression statements (calls, assignments, projections) fall through.
         HirStatementKind::Expr(expr) => expr_terminates(expr, types, enum_variants),
