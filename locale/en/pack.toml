@@ -3573,15 +3573,15 @@ help = "use numeric elements for this {lista} intrinsic"
 
 [diagnostics.SEM011.issues.extend_requires_plain_list]
 message = "`extend` needs a plain list receiver; a bounded or length-ranged list cannot grow in place"
-help = "extend into an unbounded list, or append one element at a time with `append`"
+help = "use an unbounded list as the receiver, or append one element at a time with `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "the keyed `.sorted(key)` method was removed; use the sort expression"
-help = "write `{ordinata} {via} {ascendens} {ex} source {fixum} x` followed by a block that ends in `{redde}` key; `{descendens}` gives the reverse order"
+help = "write `{ordinata} {via} {ascendens} {ex} source {sit} x` followed by a block that ends in `{redde}` key; `{descendens}` gives the reverse order"
 
 [diagnostics.SEM011.issues.loop_collection_shape_change]
 message = "this loop iterates `{binding}`, so `{method}` cannot change its shape or order"
-help = "update an element with a bracket store, or use a {queue} with {dum} for a worklist"
+help = "update an element or existing map value with a bracket store, or use a {queue} with {dum} for a worklist"
 
 [diagnostics.SEM011.issues.ordina_key_not_ordered]
 message = "sort key must be a number or {textus}"
@@ -3589,7 +3589,7 @@ help = "return a number or {textus} from the key selector"
 
 [diagnostics.SEM011.issues.octeti_literal_invalid_character]
 message = "{lista}<b8> literal contains invalid character '{character}'"
-help = "use only hexadecimal digits in {lista}<b8> literals"
+help = "use hexadecimal digits and ASCII whitespace only in {lista}<b8> literals"
 
 [diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
 message = "{lista}<b8> literal has odd hex digit count"
@@ -3597,11 +3597,11 @@ help = "provide complete byte pairs in {lista}<b8> literals"
 
 [diagnostics.SEM011.issues.octeti_literal_template_application]
 message = "{lista}<b8> literals do not support template application"
-help = "use string formatting instead of {lista}<b8> literal calls"
+help = "use a string template call for formatted text; keep {lista}<b8> literals for fixed hexadecimal bytes"
 
 [diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
 message = "{method} accepts at most one payload type argument"
-help = "remove the explicit type argument list"
+help = "pass at most one payload type argument to {method}"
 
 [diagnostics.SEM011.issues.template_application_type_args]
 message = "template application does not accept type arguments"
@@ -3617,7 +3617,7 @@ help = "convert integer operands to the same width before applying this operator
 
 [diagnostics.SEM011.issues.bits_arithmetic_refused]
 message = "bits have no arithmetic"
-help = "use the bit operations, or convert to a number type with ↦ first"
+help = "use bit operations, or convert to a same-width numeric type with ↦ first"
 
 [diagnostics.SEM011.issues.bits_operand_mismatch]
 message = "bit operands must have the same width and may not mix with numbers"
@@ -3625,7 +3625,7 @@ help = "use two values of the same bN width; a bN does not mix with numbers or o
 
 [diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
 message = "postfix increment/decrement requires int operand"
-help = "apply postfix increment/decrement to int values"
+help = "apply postfix increment or decrement to an integer value"
 
 [diagnostics.SEM011.issues.array_spread_requires_lista]
 message = "array spread requires {lista} operand"
@@ -3637,11 +3637,11 @@ help = "use declared struct field names in struct construction"
 
 [diagnostics.SEM011.issues.vector_constructor_forbids_spread]
 message = "vector constructor does not accept spread arguments"
-help = "provide explicit vector elements instead of spread arguments"
+help = "use explicit elements in the list literal before converting to a vector"
 
 [diagnostics.SEM011.issues.object_spread_requires_tabula]
 message = "object spread requires map operand"
-help = "spread a map value inside map construction"
+help = "spread a {tabula} or {tabulae} value inside {tabula} or {tabulae} construction"
 
 [diagnostics.SEM011.issues.interval_bound_single_scalar]
 message = "interval bound must be a single Unicode scalar"
@@ -3669,15 +3669,15 @@ help = "use an integer operand for this operator"
 
 [diagnostics.SEM011.issues.range_operand_must_be_numeric]
 message = "range operand must be numeric"
-help = "compare numeric values with ranges"
+help = "use an integer or instant value that matches the range bounds"
 
 [diagnostics.SEM011.issues.scalar_text_operands_required]
 message = "scalar text operands required"
-help = "compare single-scalar string or ascii operands"
+help = "compare strings or ASCII values that each contain one Unicode scalar"
 
 [diagnostics.SEM011.issues.string_operands_required]
 message = "string operands required"
-help = "use string operands for string addition"
+help = "use two string or ASCII values with `+`"
 
 [diagnostics.SEM011.issues.object_field_requires_value]
 message = "object field requires value"
@@ -3685,11 +3685,11 @@ help = "provide an explicit value for this object field"
 
 [diagnostics.SEM011.issues.vacua_requires_collection_type]
 message = "empty requires a collection type"
-help = "give empty a list, map, set, tensor, or sparse context"
+help = "give {vacua} a {lista}, {tabula}, {tabulae}, {copia}, {queue}, {stack}, tensor, vector, matrix, or {sparsa} type"
 
 [diagnostics.SEM011.issues.vacua_requires_resolved_extents]
 message = "empty needs a shape with a value for every extent"
-help = "declare every extent as a number or a size name (no `_`), or write the typed zero of a resolved shape"
+help = "for tensor extents, use literals or size names; vector and matrix extents must be literals. Do not use `_` or computed extents"
 
 [diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
 message = "string index must be int or range"
@@ -3709,7 +3709,7 @@ help = "format {instans} with \"iso\", \"date\", or \"time\""
 
 [diagnostics.SEM011.issues.format_spec_preset_not_allowed]
 message = "'¶' presets apply only to {instans}"
-help = "the named presets format {instans} only"
+help = "use a layout spec for numbers or strings; named presets are only for {instans}"
 
 [diagnostics.SEM011.issues.format_type_unsupported]
 message = "'¶' does not format this type"
@@ -3721,7 +3721,7 @@ help = "index a {lista}<b8> with int or an integer range"
 
 [diagnostics.SEM011.issues.window_requires_list]
 message = "a window [lo‥hi] needs a list"
-help = "take a window [lo‥hi] only of a {lista}, string or {lista}<b8> value"
+help = "take a window [lo‥hi] only of a {lista}, {textus}, {ascii}, or {lista}<b8> value"
 
 [diagnostics.SEM011.issues.array_index_must_be_numerus]
 message = "array index must be int"
@@ -5577,11 +5577,11 @@ help = "use an ordinary loop, or write only the iteration’s own coordinate and
 
 [diagnostics.SEM010.issues.break_in_thread_body]
 message = "`{rumpe}` cannot end a `{filum}` loop"
-help = "`{rumpe}` cannot stop a `{filum}` loop: lanes run independently. To find the first match use `{reducta} {via} {argminima} …`; to stop at a cutoff, compute it first and loop to it."
+help = "`{perge}` skips the rest of this lane but does not stop other lanes. To find the first match, use `{reducta} {via} {argminima} …`; to stop at a cutoff, compute it first and loop to it."
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` cannot leave a `{filum}` loop"
-help = "`{redde}` cannot leave a `{filum}` loop: lanes run independently. To get one value out of the lanes use `{reducta}`; to stop at a cutoff, compute it first and loop to it."
+help = "`{perge}` skips the rest of this lane but does not leave the function. Use `{reducta}` to get one value out of the lanes; to stop at a cutoff, compute it first and loop to it."
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "a reduction body can call only device intrinsics, fragments and private kernel helpers: {reason}"
