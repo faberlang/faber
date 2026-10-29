@@ -2981,7 +2981,7 @@ impl BodyFacts<'_> {
                             normalize_d64_constant(value, scale)
                         }))
                     }
-                    _ => unreachable!("the d64 constant operation was filtered above"),
+                    _ => None,
                 }
             }
             HirExpressionKind::Conversio { source, .. } => {

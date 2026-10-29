@@ -8672,8 +8672,8 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     assert!(rust.contains("if p_mark >= 90"));
     assert!(rust.contains("return true;"));
     assert!(rust.contains("return false;"));
-    assert!(rust.contains("fn นับคะแนน(p_marks: Vec<i64>) -> i64"));
-    assert!(rust.contains("for l_mark in 0..((p_marks).len() as i64)"));
+    assert!(rust.contains("fn นับคะแนน(p_marks: &Vec<i64>) -> i64"));
+    assert!(rust.contains("for l_mark in 0..(((*p_marks)).len() as i64)"));
     assert!(rust.contains("continue;"));
     assert!(rust.contains("break;"));
     assert!(rust.contains("fn ลดลง(p_start: i64) -> i64"));
@@ -8688,7 +8688,7 @@ fn thai_reader_locale_example_compiles_from_manifest() {
         ),
         "{rust}"
     );
-    assert!(rust.contains("นับคะแนน(l_marks.clone())"));
+    assert!(rust.contains("นับคะแนน(&l_marks)"));
     assert!(rust.contains("ลดลง(4)"));
 }
 
