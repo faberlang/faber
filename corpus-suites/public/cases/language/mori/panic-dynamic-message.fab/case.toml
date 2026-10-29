@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/mori/panic-dynamic-message.fab"
+group = "language"
+input_root = "corpus"
+input = "mori/panic-dynamic-message.fab"
+category = "error"
+domain = "control"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout_contains = "before\n"
+stderr_contains = "abort: boom"
+check_only = false
