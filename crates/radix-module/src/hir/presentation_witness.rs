@@ -483,13 +483,17 @@ fn is_named_witness(types: &TypeTable, ty: TypeId) -> bool {
 
 fn normalize_type_form_arg(child: &mut radix_hir::HirTypeForm, expected: TypeId, types: &TypeTable) {
     if child.ty != expected {
-        if is_named_witness(types, expected) {
+        let named_function_alias = matches!(
+            (&child.head, types.get(expected)),
+            (radix_hir::HirTypeFormHead::Named { .. }, Type::Func(_))
+        );
+        if is_named_witness(types, expected) || named_function_alias {
             // A named witness is its own constructor head: the recorded child
             // already names the type, so pairing it with the finalized witness
-            // needs no canonical form. The two differ only as members of the
-            // same transparent alias (an alias against its body, or one alias
-            // against another in a chain); the validator re-checks the retained
-            // head against the alias body and fails closed on a real mismatch.
+            // needs no canonical form. A function alias has the same rule: its
+            // signature is canonical in FHIR, but the alias head is preserved
+            // and the validator checks its transparent body against that exact
+            // signature.
             child.ty = expected;
         } else {
             let original = child.clone();

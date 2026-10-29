@@ -806,6 +806,24 @@ fn alias_body_matches(
                     .zip(right)
                     .all(|(left, right)| pair(*left, *right))
         }
+        (Some(radix_types::Type::Func(left)), Some(radix_types::Type::Func(right))) => {
+            left.type_params == right.type_params
+                && left.params.len() == right.params.len()
+                && left.params.iter().zip(&right.params).all(|(left, right)| {
+                    left.mode == right.mode
+                        && left.optional == right.optional
+                        && left.sponte == right.sponte
+                        && pair(left.ty, right.ty)
+                })
+                && pair(left.ret, right.ret)
+                && match (left.err, right.err) {
+                    (Some(left), Some(right)) => pair(left, right),
+                    (None, None) => true,
+                    _ => false,
+                }
+                && left.is_async == right.is_async
+                && left.is_generator == right.is_generator
+        }
         _ => false,
     }
 }
