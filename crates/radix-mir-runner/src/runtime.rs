@@ -5791,16 +5791,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 other => Ok(other),
             };
         }
-        let mut float_sum = 0.0_f64;
-        for value in &values {
-            match value {
-                Value::Int(v) => float_sum += *v as f64,
-                Value::UInt(v) => float_sum += *v as f64,
-                Value::Float(v) => float_sum += *v,
-                _ => return Err(RunnerError::internal(span, "sum element type mismatch")),
-            }
-        }
-        Ok(Value::Float(float_sum))
+        // Float inputs are represented as f64 in the runner, so each f32
+        // tensor element widens exactly and the sum rounds only at its store.
+        Ok(Value::Float(sum_float_values(values, span)?))
     }
 
     /// LSR-W0 argmax/argmin scan over an array-backed collection.
@@ -7219,6 +7212,21 @@ fn matmul_values(
         }
     }
     Ok(out)
+}
+
+fn sum_float_values(
+    values: impl IntoIterator<Item = Value>,
+    span: Span,
+) -> Result<f64, RunnerError> {
+    values.into_iter().try_fold(0.0, |total, value| {
+        let value = match value {
+            Value::Int(value) => value as f64,
+            Value::UInt(value) => value as f64,
+            Value::Float(value) => value,
+            _ => return Err(RunnerError::internal(span, "sum element type mismatch")),
+        };
+        Ok(total + value)
+    })
 }
 
 fn numeric_as_f64(value: &Value, span: Span) -> Result<f64, RunnerError> {
