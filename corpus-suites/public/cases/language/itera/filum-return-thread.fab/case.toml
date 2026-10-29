@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/itera/filum-return-thread.fab"
+group = "language"
+input_root = "corpus"
+input = "itera/filum-return-thread.fab"
+category = "loop"
+domain = "control"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "return_thread_outside_lane"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "return_thread_outside_lane"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "return_thread_outside_lane"

@@ -4012,7 +4012,6 @@ help = "لا يمكن لـ `{rumpe}` إيقاف حلقة `{filum}`: المسار
 message = "لا يمكن لـ `{redde}` مغادرة حلقة `{filum}`"
 help = "يُنهي `{redde} {filum}` هذا المسار من أي عمق، ويُنهي `{perge}` المسار عند مستواه الأعلى."
 
-
 [diagnostics.SEM010.issues.return_thread_outside_lane]
 message = "لا يصح `{redde} {filum}` إلا داخل جسم حلقة مسارات"
 help = "استخدم `{redde} {filum}` داخل جسم حلقة `{filum}` فقط"
@@ -4024,6 +4023,7 @@ help = "احذف القيمة؛ تنشر المسارات نتائجها عبر 
 [diagnostics.SEM010.issues.return_thread_in_nested_body]
 message = "لا يستطيع `{redde} {filum}` داخل جسم متداخل إنهاء المسار الخارجي"
 help = "استخدم `{redde} {filum}` في جسم المسار نفسه، لا في إغلاق أو جسم اختزال متداخل"
+
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "يمكن لجسم الاختزال استدعاء الدوال الجوهرية للجهاز والمقاطع والمساعدات الخاصة بالنواة فقط: {reason}"
 help = "انقل الاستدعاء خارج الاختزال، أو استدعِ مساعد نواة خاصًا"
@@ -4414,8 +4414,3 @@ message = "النواة `{kernel}` تعمل بشكل متسلسل على جها�
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "النواة `{kernel}`: يمكن تجنّب {kind} عبر الأقسام الـ {partitions}: {avoidable} ({reason})"
-
-
-[diagnostics.PKG001.issues.return_thread_lowering_pending]
-message = "لم يكتمل خفض `{redde} {filum}` إلى MIR بعد"
-help = "استخدم صيغة التحكم المكافئة حتى يكتمل خفض إنهاء المسار"

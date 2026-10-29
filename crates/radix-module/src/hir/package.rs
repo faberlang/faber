@@ -1039,7 +1039,9 @@ fn walk_block_callees(block: &HirBlock, index: &NucleumIndex, names: &mut Vec<St
                     walk_expr_callees(init, index, names);
                 }
             }
-            HirStatementKind::Redde(Some(expr)) | HirStatementKind::Expr(expr) => {
+            HirStatementKind::Redde(Some(expr))
+            | HirStatementKind::ReddeFilum(Some(expr))
+            | HirStatementKind::Expr(expr) => {
                 walk_expr_callees(expr, index, names);
             }
             HirStatementKind::Custodi(custodi) => {
@@ -1050,6 +1052,7 @@ fn walk_block_callees(block: &HirBlock, index: &NucleumIndex, names: &mut Vec<St
             }
             HirStatementKind::IncDec(inc) => walk_expr_callees(&inc.target, index, names),
             HirStatementKind::Redde(None)
+            | HirStatementKind::ReddeFilum(None)
             | HirStatementKind::Rumpe
             | HirStatementKind::Perge
             | HirStatementKind::Tacet => {}

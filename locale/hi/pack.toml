@@ -3880,7 +3880,6 @@ help = "`{rumpe}` `{filum}` लूप को रोक नहीं सकता
 message = "`{redde}` `{filum}` लूप से बाहर नहीं निकल सकता"
 help = "`{redde} {filum}` किसी भी गहराई से इस लेन को समाप्त करता है, और `{perge}` ऐसा केवल लेन के शीर्ष स्तर पर करता है।"
 
-
 [diagnostics.SEM010.issues.return_thread_outside_lane]
 message = "`{redde} {filum}` केवल थ्रेड-लेन लूप के भीतर मान्य है"
 help = "इसे केवल `{filum}` लूप के शरीर के भीतर उपयोग करें"
@@ -3892,6 +3891,7 @@ help = "मान हटाएँ; लेन अपने स्टोर के
 [diagnostics.SEM010.issues.return_thread_in_nested_body]
 message = "नेस्टेड बॉडी में `{redde} {filum}` बाहरी लेन समाप्त नहीं कर सकता"
 help = "इसे लेन बॉडी में उपयोग करें, नेस्टेड क्लोज़र या रिडक्शन बॉडी में नहीं"
+
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "रिडक्शन का मुख्य भाग केवल डिवाइस इंट्रिंसिक, फ्रैगमेंट और निजी कर्नेल सहायकों को बुला सकता है: {reason}"
 help = "कॉल को रिडक्शन से बाहर ले जाएँ, या निजी कर्नेल सहायक को बुलाएँ"
@@ -4282,8 +4282,3 @@ message = "कर्नेल `{kernel}` {device} डिवाइस पर क�
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "कर्नेल `{kernel}`: {partitions} विभाजनों के पार इसका {kind} टाला जा सकता है: {avoidable} ({reason})"
-
-
-[diagnostics.PKG001.issues.return_thread_lowering_pending]
-message = "`{redde} {filum}` का MIR लोअरिंग अभी लागू नहीं है"
-help = "लेन-रिटर्न लोअरिंग आने तक समतुल्य स्पष्ट कंट्रोल-फ्लो रूप का उपयोग करें"

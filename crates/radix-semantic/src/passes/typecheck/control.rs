@@ -1559,7 +1559,10 @@ impl TypeChecker<'_> {
             // other edge. The loop-entry policy already drops facts for every
             // binding the body assigns, and a body-scope fact never survives
             // the loop, so ignoring the edge here cannot leak a stale fact.
-            HirStatementKind::Redde(_) | HirStatementKind::Rumpe | HirStatementKind::Perge => true,
+            HirStatementKind::Redde(_)
+            | HirStatementKind::ReddeFilum(_)
+            | HirStatementKind::Rumpe
+            | HirStatementKind::Perge => true,
             HirStatementKind::Expr(expr) => self.expression_diverges(expr),
             _ => false,
         }

@@ -5581,12 +5581,11 @@ help = "`{rumpe}` cannot stop a `{filum}` loop: lanes run independently. To find
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` cannot leave a `{filum}` loop"
-help = "`{redde} {filum}` ends this lane from any depth, and `{perge}` does so at the lane’s top level."
-
+help = "`{redde} {filum}` ends this lane from any depth, and `{perge}` does so at the lane's top level."
 
 [diagnostics.SEM010.issues.return_thread_outside_lane]
 message = "`{redde} {filum}` is valid only inside a thread-lane loop body"
-help = "use `{redde} {filum}` only inside an `itera ... {filum}` loop body"
+help = "use `{redde} {filum}` only inside an `{itera} ... {filum}` loop body"
 
 [diagnostics.SEM010.issues.return_thread_with_value]
 message = "`{redde} {filum}` takes no value"
@@ -5595,6 +5594,7 @@ help = "remove the value; lanes deliver results through their stores"
 [diagnostics.SEM010.issues.return_thread_in_nested_body]
 message = "`{redde} {filum}` in a nested body cannot end the enclosing lane"
 help = "use `{redde} {filum}` in the lane body itself, not in a nested closure or reduction body"
+
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "a reduction body can call only device intrinsics, fragments and private kernel helpers: {reason}"
 help = "move the call out of the reduction, or call a private kernel helper"
@@ -6122,8 +6122,3 @@ message = "kernel `{kernel}` is not placed on the {device} device: {reason}"
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
-
-
-[diagnostics.PKG001.issues.return_thread_lowering_pending]
-message = "MIR lowering for `{redde} {filum}` is not implemented yet"
-help = "use the equivalent explicit control-flow form until lane-return lowering lands"

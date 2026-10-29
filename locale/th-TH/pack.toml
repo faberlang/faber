@@ -3880,7 +3880,6 @@ help = "`{rumpe}` หยุดลูป `{filum}` ไม่ได้: แต่�
 message = "`{redde}` ไม่สามารถออกจากลูป `{filum}` ได้"
 help = "`{redde} {filum}` จบเลนนี้ได้จากทุกระดับ และ `{perge}` ทำเช่นนั้นได้ที่ระดับบนสุดของเลน"
 
-
 [diagnostics.SEM010.issues.return_thread_outside_lane]
 message = "`{redde} {filum}` ใช้ได้เฉพาะภายในบอดีของลูปเลนเธรด"
 help = "ใช้ `{redde} {filum}` เฉพาะภายในบอดีของลูป `{filum}`"
@@ -3892,6 +3891,7 @@ help = "ลบค่าออก เลนส่งผลลัพธ์ผ่�
 [diagnostics.SEM010.issues.return_thread_in_nested_body]
 message = "`{redde} {filum}` ในบอดีที่ซ้อนกันไม่สามารถจบเลนรอบนอกได้"
 help = "ใช้ในบอดีของเลนเอง ไม่ใช่ในคลosureหรือบอดี reduction ที่ซ้อนกัน"
+
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "เนื้อหาของการลดรูปเรียกได้เฉพาะอินทรินซิกของอุปกรณ์ ฟรากเมนต์ และตัวช่วยเคอร์เนลส่วนตัว: {reason}"
 help = "ย้ายการเรียกออกจากการลดรูป หรือเรียกตัวช่วยเคอร์เนลส่วนตัว"
@@ -4282,8 +4282,3 @@ message = "เคอร์เนล `{kernel}` ทำงานแบบอนุ
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "เคอร์เนล `{kernel}`: {kind} ข้าม {partitions} พาร์ติชันสามารถหลีกเลี่ยงได้: {avoidable} ({reason})"
-
-
-[diagnostics.PKG001.issues.return_thread_lowering_pending]
-message = "การลด `{redde} {filum}` เป็น MIR ยังไม่พร้อม"
-help = "ใช้รูปแบบควบคุมแบบชัดแจ้งที่เทียบเท่าจนกว่าจะรองรับการลดการจบเลน"

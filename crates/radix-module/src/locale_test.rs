@@ -238,7 +238,6 @@ fn locale_pack_completeness_thread_body_exit_rows_in_every_pack() {
         ] {
             assert_issue_template(&pack, "SEM010", issue);
         }
-        assert_issue_template(&pack, "PKG001", "return_thread_lowering_pending");
     }
 }
 

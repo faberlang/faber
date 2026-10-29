@@ -181,9 +181,27 @@ fn thread_return_with_a_value_is_refused_by_issue_code() {
 
 #[test]
 fn thread_return_in_a_nested_closure_body_is_refused_by_issue_code() {
+    // The independence proof also declines the closure on its own account;
+    // the placement refusal must be among the reasons.
+    let found = issues(&lane(
+        "sit (f32) → vacuum f ← clausura f32 x → vacuum { redde filum }",
+    ));
+    assert!(
+        found
+            .iter()
+            .any(|found| found == "return_thread_in_nested_body"),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn thread_return_in_a_closure_outside_any_lane_is_refused_as_outside() {
     refused(
-        &lane("sit (f32) → vacuum f ← f32 x { redde filum }"),
-        "return_thread_in_nested_body",
+        r"functio f() → vacuum {
+    sit (f32) → vacuum g ← clausura f32 x → vacuum { redde filum }
+}
+",
+        "return_thread_outside_lane",
     );
 }
 

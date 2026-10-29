@@ -165,6 +165,11 @@ fn scan_go_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
                 scan_go_expr(value, file, diagnostics);
             }
         }
+        StmtKind::ReddeFilum(ret) => {
+            if let Some(value) = &ret.value {
+                scan_go_expr(value, file, diagnostics);
+            }
+        }
         StmtKind::Iace(stmt) => {
             scan_go_expr(&stmt.value, file, diagnostics);
         }
@@ -548,6 +553,11 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
         }
         StmtKind::Redde(ret) => {
+            if let Some(value) = &ret.value {
+                scan_rust_expr(value, file, diagnostics);
+            }
+        }
+        StmtKind::ReddeFilum(ret) => {
             if let Some(value) = &ret.value {
                 scan_rust_expr(value, file, diagnostics);
             }
