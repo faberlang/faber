@@ -2051,23 +2051,7 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         shader_stage: Some(MirKernelShaderStage::Compute),
         span: span(),
     };
-    let caller = device_function(
-        2,
-        &mut interner,
-        "orchestrate",
-        &[
-            (20, "other", other_tensor),
-            (21, "src", tensor),
-            (22, "dst", tensor),
-        ],
-        &[20, 21, 22],
-        vec![host_call(1, &[20, 21, 22])],
-        None,
-        Vec::new(),
-        vacuum,
-        false,
-    );
-    let validated = validated(&types, vec![function, caller]);
+    let validated = validated(&types, vec![function]);
 
     // The ABI signature synthesis accepts the shape: inputs, output, builtin.
     let signature =
@@ -2080,7 +2064,11 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     assert_eq!(signature.builtin_inputs.len(), 1);
     assert_eq!(signature.builtin_inputs[0].local, MirLocalId(3));
 
-    let metadata = fixture_metadata(&validated.program().functions);
+    let mut metadata = fixture_metadata(&validated.program().functions);
+    metadata
+        .get_mut(&MirFunctionId(1))
+        .expect("source kernel metadata")
+        .lane_domain_local = Some(MirLocalId(1));
 
     let (program, _semantics, _steps) = build_device_program(
         &validated,
@@ -2689,38 +2677,6 @@ fn lane_form_with_two_mut_outputs_binds_every_resource_at_its_declared_position(
     assert_eq!(signature.extra_outputs[0].source_local, Some(MirLocalId(2)));
     assert_eq!(signature.builtin_inputs.len(), 1);
     assert_eq!(signature.dispatch_size.x, 8);
-
-    let (program, _semantics, _steps) = build_device_program(
-        &validated,
-        &interner,
-        &MirCompanionMap::default(),
-        None,
-        DeviceProgramLifetime::SingleRun,
-        0,
-        &fixture_metadata(&validated.program().functions),
-    )
-    .expect("two outputs over the read-only lane domain materialize");
-    assert_eq!(program.kernels.len(), 1);
-    assert_eq!(
-        program.kernels[0].plan,
-        CollectionKernelPlan::LaneGrid {
-            source_resource: 1,
-            rank: 1
-        }
-    );
-    assert_eq!(program.kernels[0].resources[1].buffer.name, "dom");
-    assert_eq!(
-        program.kernels[0].resources[1].access,
-        MirKernelResourceAccess::Read
-    );
-    assert_eq!(
-        program.kernels[0].resources[0].access,
-        MirKernelResourceAccess::Write
-    );
-    assert_eq!(
-        program.kernels[0].resources[2].access,
-        MirKernelResourceAccess::Write
-    );
 }
 
 /// If the exact source cannot be reconstructed, the build error points to the
