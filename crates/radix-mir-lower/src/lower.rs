@@ -2742,6 +2742,15 @@ impl HirVisitor for TopLevelConstCollector<'_> {
 /// `current` is `None` after a terminator, `breakables` records `perge`/`rumpe`
 /// targets, and `handlers` records active alternate-exit handlers. Any attempt
 /// to keep emitting after a block is sealed becomes a lowering error.
+/// One record tensor element an assignment target reaches through: the
+/// receiver and coordinate list it was read with, and the decoded copy the
+/// target's field store mutates (see `FunctionBuilder::element_writebacks`).
+pub(crate) struct ElementWriteback {
+    receiver: MirOperand,
+    index: MirOperand,
+    element: MirPlace,
+}
+
 pub struct FunctionBuilder<'a> {
     types: &'a TypeTable,
     error_ty: Option<MirType>,
@@ -2794,6 +2803,12 @@ pub struct FunctionBuilder<'a> {
     closure_local_callees: FxHashMap<MirLocalId, MirClosureCallee>,
     captured_bindings: FxHashMap<DefId, MirPlace>,
     captured_binding_metadata: FxHashMap<DefId, (Symbol, MirType)>,
+    /// While an assignment target is lowered: the record tensor elements the
+    /// target's place reaches through. A record row decodes to a fresh value
+    /// on every read, so a store into one of its fields lands in that copy
+    /// and the store of the whole element back into the tensor finishes the
+    /// write. `None` outside an assignment target.
+    element_writebacks: Option<Vec<ElementWriteback>>,
     /// `var` locals of this body that closures capture and that are rebound
     /// somewhere: their storage is a shared cell (operator ruling 2026-09-24,
     /// unmarked closures share the enclosing scope).
@@ -2868,6 +2883,7 @@ impl<'a> FunctionBuilder<'a> {
             closure_local_callees: FxHashMap::default(),
             captured_bindings: FxHashMap::default(),
             captured_binding_metadata: FxHashMap::default(),
+            element_writebacks: None,
             shared_bindings: FxHashSet::default(),
             shared_cells: FxHashMap::default(),
             size_params: FxHashMap::default(),
@@ -3479,8 +3495,9 @@ impl<'a> FunctionBuilder<'a> {
         }
 
         let fallback_ty = self.expr_ty(rhs)?;
-        let (place, ty) = self.lower_assignment_place_with_fallback(lhs, fallback_ty)?;
+        let (place, ty, writebacks) = self.lower_assignment_place_writeback(lhs, fallback_ty)?;
         self.lower_expr_to_destination(rhs, place.clone(), ty)?;
+        self.flush_element_writebacks(writebacks, expr.span);
         Some(MirOperand::Place(place))
     }
 
@@ -3509,8 +3526,9 @@ impl<'a> FunctionBuilder<'a> {
             return self.lower_expr_value(expr);
         };
         let fallback_ty = self.expr_ty(source)?;
-        let (place, ty) = self.lower_assignment_place_with_fallback(target, fallback_ty)?;
+        let (place, ty, writebacks) = self.lower_assignment_place_writeback(target, fallback_ty)?;
         self.lower_conversio_assign_to_destination(source, recovery.as_deref(), place.clone(), ty, expr.span, expr)?;
+        self.flush_element_writebacks(writebacks, expr.span);
         Some(MirOperand::Place(place))
     }
 
@@ -3570,7 +3588,7 @@ impl<'a> FunctionBuilder<'a> {
         let Some(fallback_ty) = self.expr_ty(&inc_dec.target) else {
             return;
         };
-        let Some((place, ty)) = self.lower_assignment_place_with_fallback(&inc_dec.target, fallback_ty) else {
+        let Some((place, ty, writebacks)) = self.lower_assignment_place_writeback(&inc_dec.target, fallback_ty) else {
             return;
         };
         let bin_op = match inc_dec.op {
@@ -3613,6 +3631,7 @@ impl<'a> FunctionBuilder<'a> {
             value
         };
         self.assign(place, value, ty, span);
+        self.flush_element_writebacks(writebacks, span);
     }
 
     /// Whether `ty` is an integer slot whose policy a store applies: a
@@ -3658,7 +3677,59 @@ impl<'a> FunctionBuilder<'a> {
         )
     }
 
+    /// The place a mutation of `expr` writes, for a caller that cannot finish
+    /// a write-back. A target that reaches through a record tensor element
+    /// needs the whole element stored back after the write, so it is refused
+    /// by name here rather than written into a copy and lost.
     fn lower_assignment_place_with_fallback(
+        &mut self,
+        expr: &HirExpression,
+        fallback_ty: MirType,
+    ) -> Option<(MirPlace, MirType)> {
+        let (place, ty, writebacks) = self.lower_assignment_place_writeback(expr, fallback_ty)?;
+        if !writebacks.is_empty() {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "in-place mutation through a record tensor element is not lowered; assign the field or the whole element",
+            ));
+            return None;
+        }
+        Some((place, ty))
+    }
+
+    /// The place an assignment to `expr` writes, with the record tensor
+    /// elements it reaches through: the caller stores the written place and
+    /// then calls [`Self::flush_element_writebacks`].
+    fn lower_assignment_place_writeback(
+        &mut self,
+        expr: &HirExpression,
+        fallback_ty: MirType,
+    ) -> Option<(MirPlace, MirType, Vec<ElementWriteback>)> {
+        let outer = self.element_writebacks.replace(Vec::new());
+        let result = self.lower_assignment_place_inner(expr, fallback_ty);
+        let writebacks = std::mem::replace(&mut self.element_writebacks, outer).unwrap_or_default();
+        result.map(|(place, ty)| (place, ty, writebacks))
+    }
+
+    /// Store each element read for an assignment target back into its tensor
+    /// (`TensorSet`), after the target's field store.
+    fn flush_element_writebacks(&mut self, writebacks: Vec<ElementWriteback>, span: Span) {
+        let vacuum = MirType::semantic(self.types.primitive(Primitive::Vacuum));
+        for writeback in writebacks.into_iter().rev() {
+            self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+                vec![
+                    writeback.receiver,
+                    writeback.index,
+                    MirOperand::Place(writeback.element),
+                ],
+                vacuum,
+                span,
+            );
+        }
+    }
+
+    fn lower_assignment_place_inner(
         &mut self,
         expr: &HirExpression,
         fallback_ty: MirType,

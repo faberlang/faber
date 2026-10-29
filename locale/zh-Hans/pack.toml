@@ -101,6 +101,7 @@ axis = "轴"
 lege = "读取"
 lineam = "行"
 omnia = "全部"
+machina = "设备"
 scriptum = "格式化"
 sparge = "展开"
 ut = "作为"
@@ -768,6 +769,10 @@ help = "使用 {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "在 '{fac}' 循环中，'{cape}' 必须位于 '{dum}' 之前"
 help = "将处理器写在条件之前：{fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "'{fac}' 块只接受一个修饰词，不能同时使用 '{omnia}' 和 '{machina}'"
+help = "'{machina}' 已在块结束时统一交付所有故障；去掉 '{omnia}'"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "逗号不再用于分隔 '{discerne}' 的主体"
@@ -1636,6 +1641,26 @@ help = "浮点 kernel 值请使用 f32"
 [diagnostics.SEM008.issues.nucleum_trapping_store]
 message = "宽度为 {width} 的 store 在 nucleum kernel 中可能 trap"
 help = "证明 store 在范围内，或改用 wrapping 或 saturating cell"
+
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "'{fac} {machina}' 区域不能包含另一个 '{fac} {machina}'"
+help = "只保留一个设备区域，并直接从中调用 kernel"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' 会离开 '{fac} {machina}' 区域；区域尚无退出词"
+help = "先结束区域再在其后决定，或把退出移到块外"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "在 '{fac} {machina}' 区域中直接写 lane 循环 ('{construct}') 尚未实现"
+help = "从区域中调用 kernel 来完成并行工作"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "'{fac} {machina}' 区域暂不能分配 tensor ({construct})"
+help = "在区域之前分配 tensor，再在区域内使用"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{fac} {machina}' 区域中的 '{construct}' 读取了设备上计算的值；设备端循环控制尚未实现"
+help = "条件、边界和标量实参只用区域之前已知的值，并在区域之后读取设备结果"
 
 [diagnostics.SEM008.issues.nucleum_wide_integer]
 message = "integer width {width} 超出受支持的 nucleum kernel width"

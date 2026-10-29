@@ -135,3 +135,39 @@ fn a_metal_check_prints_no_sync_audit() {
     assert_eq!(code, Some(0), "{stderr}");
     assert!(!stderr.contains("INFO001:avoidable_sync"), "{stderr}");
 }
+
+/// The placement table (need, S4): weights are a row slab, and a
+/// lane output a single-lane kernel reads is a replica forced by that kernel.
+#[test]
+fn a_cuda_check_prints_the_placement_table() {
+    let (stderr, code) = faber_check(
+        &["--device", "cuda", "--partitions", "2"],
+        &acceptance("c4-slab-placement"),
+    );
+    assert_eq!(code, Some(0), "advice never fails the check:\n{stderr}");
+    let table: Vec<&str> = stderr
+        .lines()
+        .skip_while(|line| !line.starts_with("placement"))
+        .skip(1)
+        .map(str::trim)
+        .collect();
+    assert!(table.contains(&"w: slab axis 0 align 8"), "{stderr}");
+    assert!(
+        table
+            .iter()
+            .any(|line| line.starts_with("t: replica, forced_by bump")),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn a_check_without_a_spanned_cuda_device_prints_no_placement_table() {
+    for args in [
+        &["--device", "cuda"][..],
+        &["--device", "metal", "--partitions", "2"][..],
+    ] {
+        let (stderr, code) = faber_check(args, &acceptance("c4-slab-placement"));
+        assert_eq!(code, Some(0), "{stderr}");
+        assert!(!stderr.contains("placement ("), "{stderr}");
+    }
+}

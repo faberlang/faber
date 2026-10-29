@@ -420,7 +420,6 @@ pub fn generate_from_analyzed_with_options(
                 r#gen.set_display_tokens(display_tokens_for_module(analysis));
                 r#gen.set_failable_facts(&failable_facts(analysis.function_facts()));
                 r#gen.set_library_registry(analysis.libraries());
-                r#gen.set_imported_failable_members(ts_imported_failable_members(analysis, hir));
                 r#gen.set_gpu_builtins(&ts_gpu_builtins(analysis.gpu_builtins()));
                 r#gen.set_intrinsic_surface(&ts_surface);
                 r#gen.set_ordo_order_rows(&analysis.tensor_edge_policies().ordo_order.comparisons);
@@ -638,6 +637,22 @@ fn register_cross_file_defids(
             r#gen.register_named_def(export.def_id, canonical);
         }
     }
+    // A `ns.f(..)` call to an imported failable function: the importing
+    // module's own function facts do not cover the callee, so its `⇥` channel
+    // is read from the file interface.
+    for item in &hir.items {
+        let crate::hir::HirItemKind::Import(import) = &item.kind else {
+            continue;
+        };
+        for import_item in &import.items {
+            let binding = import_item.alias.unwrap_or(import_item.name);
+            for (member, sig) in resolver.namespace_file_function_exports(binding) {
+                if sig.err.is_some() {
+                    r#gen.register_external_failable_fn(import_item.def_id, member);
+                }
+            }
+        }
+    }
 }
 
 /// Map compiler-owned GPU builtin `DefId`s to their TypeScript spellings.
@@ -701,53 +716,6 @@ fn register_go_cross_file_defids(
             r#gen.register_external_def(export.def_id, canonical);
         }
     }
-}
-
-#[cfg(feature = "hir-ts")]
-fn ts_imported_failable_members(
-    analysis: &dyn CodegenAnalysis,
-    hir: &HirModule,
-) -> handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId> {
-    use crate::hir::HirExpressionKind;
-    use crate::hir::visit::HirVisitor;
-    struct Reads<'u> {
-        analysis: &'u dyn CodegenAnalysis,
-        found: handroll::FxHashMap<(crate::hir::DefId, crate::lexer::Symbol), radix_types::TypeId>,
-    }
-    impl Reads<'_> {
-        fn note(&mut self, object: &crate::hir::HirExpression, member: crate::lexer::Symbol) {
-            if let HirExpressionKind::Path(module) = &object.kind
-                && let Some(namespace) = self.analysis.resolver().get_symbol(*module)
-                && namespace.kind == crate::semantic::SymbolKind::Module
-                && let Some(err) = self
-                    .analysis
-                    .resolver()
-                    .namespace_file_function_canonical(namespace.name, member)
-                    .and_then(|sig| sig.err)
-            {
-                self.found.insert((*module, member), err);
-            }
-        }
-    }
-    impl HirVisitor for Reads<'_> {
-        fn visit_expr(&mut self, expr: &crate::hir::HirExpression) {
-            match &expr.kind {
-                HirExpressionKind::Call(callee, ..) => {
-                    if let HirExpressionKind::Field(object, member) = &callee.kind {
-                        self.note(object, *member);
-                    }
-                }
-                HirExpressionKind::MethodCall(receiver, method, ..) => {
-                    self.note(receiver, *method);
-                }
-                _ => {}
-            }
-            crate::hir::visit::walk_expr(self, expr);
-        }
-    }
-    let mut reads = Reads { analysis, found: handroll::FxHashMap::default() };
-    crate::hir::visit::walk_program(&mut reads, hir);
-    reads.found
 }
 
 #[cfg(feature = "hir-go")]

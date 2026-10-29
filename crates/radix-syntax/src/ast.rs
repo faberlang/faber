@@ -934,11 +934,23 @@ pub struct CustodiClause {
     pub span: Span,
 }
 
+/// The modifier slot of a `fac` block.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FacModifier {
+    /// Plain `fac { … }`.
+    None,
+    /// `fac omnia` (en `do all`): launches inside defer their faults to the
+    /// block's exit.
+    Omnia,
+    /// `fac machina` (en `do device`): a checked device-resident region.
+    Machina,
+}
+
 #[derive(Debug)]
 pub struct FacStmt {
-    /// `fac omnia` marker (en `do all`): surface-only intent flag; the
-    /// construct keeps plain `fac` host semantics.
-    pub omnia: bool,
+    /// The word directly after `fac`: `omnia` (en `do all`) or `machina`
+    /// (en `do device`). Neither changes the construct's host control flow.
+    pub modifier: FacModifier,
     pub body: BlockStmt,
     pub catch: Option<CapeClause>,
     pub while_: Option<Box<Expr>>,

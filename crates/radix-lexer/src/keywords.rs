@@ -185,6 +185,9 @@ pub enum KeywordOwner {
     /// (`sub` / `implet` / `omnia` / `sponte`).
     DeclarationMarker,
 
+    /// Modifier word directly after `fac` (`omnia` / `machina`).
+    FacModifier,
+
     /// Route expression in expression or statement position (`ad`).
     RouteExpression,
 
@@ -398,7 +401,11 @@ const SCAN_ORDER: &[KeywordOwner] = &[KeywordOwner::ScanOrder];
 const DECLARATION_MARKER_OR_REDUCTION_OPERATOR: &[KeywordOwner] = &[
     KeywordOwner::DeclarationMarker,
     KeywordOwner::ReductionOperator,
+    KeywordOwner::FacModifier,
 ];
+// WHY: `machina` (en `device`) is claimed only directly after `fac`; everywhere
+// else it stays an ordinary identifier, so `let int device ← 1` is legal.
+const FAC_MODIFIER: &[KeywordOwner] = &[KeywordOwner::FacModifier];
 const CONVERSION_HINT_REDUCTION_SCAN_HEAD: &[KeywordOwner] = &[
     KeywordOwner::ConversionHint,
     KeywordOwner::ReductionHead,
@@ -1196,6 +1203,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Misc,
     },
     KeywordSpec {
+        text: "machina",
+        token_kind: Some(TokenKind::Machina),
+        scope: KeywordScope::Contextual(FAC_MODIFIER),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
         text: "praefixum",
         token_kind: Some(TokenKind::Praefixum),
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
@@ -1682,6 +1695,7 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::RetiredMembership
         | KeywordOwner::StatementIntroducer
         | KeywordOwner::DeclarationMarker
+        | KeywordOwner::FacModifier
         | KeywordOwner::RouteExpression
         | KeywordOwner::ConversionHint
         | KeywordOwner::ReductionHead

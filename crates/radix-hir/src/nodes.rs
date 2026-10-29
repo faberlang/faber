@@ -38,6 +38,17 @@ use radix_types::{
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+// An optional wire value is still a required field: explicit `None` is not
+// equivalent to a missing contract fact. `deserialize_with` prevents serde's
+// implicit missing-field default for Option without changing either wire shape.
+fn required_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
+
 /// Stable identity for a named semantic definition.
 ///
 /// Most `DefId` values come from name resolution; lowering also allocates
@@ -898,14 +909,52 @@ pub enum HirBreakableKind {
     /// the loop keeps plain `fac … dum` semantics in every backend and the
     /// marker only lets the re-emitter print `omnia`.
     FacOmniaLoop,
+    /// `fac machina { }` (en `do device`) try body: a checked device-resident
+    /// region. It is a breakable scope like [`Fac`] and lowers exactly as
+    /// [`FacOmnia`] in V0.
+    FacMachina,
+    /// Marker on the synthesized loop block of `fac machina { } … dum cond`;
+    /// like [`HirBreakableKind::FacOmniaLoop`] it is not a breakable scope.
+    FacMachinaLoop,
 }
 
 impl HirBreakableKind {
     /// Whether the block is a breakable scope that `rumpe` exits (every kind
-    /// except the loop-marker [`HirBreakableKind::FacOmniaLoop`]).
+    /// except the loop markers [`HirBreakableKind::FacOmniaLoop`] and
+    /// [`HirBreakableKind::FacMachinaLoop`]).
     #[must_use]
     pub fn is_scope(self) -> bool {
-        !matches!(self, Self::FacOmniaLoop)
+        !matches!(self, Self::FacOmniaLoop | Self::FacMachinaLoop)
+    }
+
+    /// Latin keyword key of the modifier the authored `fac` carried, for the
+    /// re-emitter (`omnia` or `machina`); `None` for a plain `fac`.
+    #[must_use]
+    pub fn fac_modifier_key(self) -> Option<&'static str> {
+        match self {
+            Self::Fac => None,
+            Self::FacOmnia | Self::FacOmniaLoop => Some("omnia"),
+            Self::FacMachina | Self::FacMachinaLoop => Some("machina"),
+        }
+    }
+
+    /// Whether launches inside the block defer their faults to the block's
+    /// exit (`omnia` and `machina` alike).
+    #[must_use]
+    pub fn defers_faults(self) -> bool {
+        self.fac_modifier_key().is_some()
+    }
+
+    /// Whether the block is a device region (`fac machina`).
+    #[must_use]
+    pub fn is_device_region(self) -> bool {
+        matches!(self, Self::FacMachina | Self::FacMachinaLoop)
+    }
+
+    /// Whether the kind is one of the synthesized loop-block markers.
+    #[must_use]
+    pub fn is_loop_marker(self) -> bool {
+        !self.is_scope()
     }
 }
 
@@ -1090,7 +1139,7 @@ pub struct HirLocal {
     /// after the await, the value is checked against the slot under its
     /// policy (trap, `wrapping` reduce, `saturating` clamp). `None` when the
     /// result is assignable to the slot.
-    #[serde(default)]
+    #[serde(deserialize_with = "required_option")]
     pub await_store: Option<HirStoreSite>,
 
     /// Source declared this binding with the `size` (la `magnitudo`) form.
@@ -1592,7 +1641,7 @@ pub enum HirExpressionKind {
         /// applies: a built-in `ordo` row (D9.4) or a registered
         /// `@ conversio` function (D9.3). `None` means the backend's own
         /// scalar/structural conversion rules decide the lowering.
-        #[serde(default)]
+        #[serde(deserialize_with = "required_option")]
         route: Option<HirConversioRoute>,
 
         /// `Some` marks an **implicit store node** inserted by typecheck where
@@ -1601,7 +1650,7 @@ pub enum HirExpressionKind {
         /// decides the outcome: a trapping slot traps (never routed to `⇥`
         /// or `cape`), a `wrapping` slot reduces, a `saturating` slot clamps.
         /// Authored `↦` sites carry `None` and stay recoverable.
-        #[serde(default)]
+        #[serde(deserialize_with = "required_option")]
         implicit: Option<HirStoreSite>,
     },
 
@@ -2685,6 +2734,14 @@ pub enum HirTypeFormHead {
     /// and expand to several canonical children); validation proves the
     /// instantiation equivalent to the site's canonical type.
     Named { def_id: DefId, path: Vec<Symbol> },
+    /// An imported type alias written by its authored path (`decl.Quad`).
+    ///
+    /// A file-interface import carries an alias as its resolved body and no
+    /// definition of its own, so the alias has no `DefId` for a `Named` head to
+    /// name. The witness `ty` is the alias body; the path is the authored
+    /// spelling, with no authored arguments (an applied imported alias keeps
+    /// the semantic head).
+    ImportedAlias { path: Vec<Symbol> },
     /// Authored `_` inference hole.
     Infer,
     /// Authored standalone `∪` hole.
