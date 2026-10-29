@@ -118,8 +118,8 @@ pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build_default
 #[cfg(feature = "mir-llvm")]
 pub use llvm_host::{
     LlvmHostBuild, LlvmHostProfile, build_host_program, build_host_program_in, compile_nvvm_to_ptx,
-    discover_llvm_host_toolchain, ensure_llvm_runtime_archive, host_llvm_target_triple,
-    host_triple_for, llvm_program::cmd_run_llvm_host,
+    discover_llvm_host_toolchain, ensure_llvm_runtime_archive, ensure_llvm_runtime_archive_in,
+    host_llvm_target_triple, host_triple_for, llvm_program::cmd_run_llvm_host,
 };
 pub(crate) use manifest::manifest_device_inputs;
 pub(crate) use manifest::manifest_locale;
