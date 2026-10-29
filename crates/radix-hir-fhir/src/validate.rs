@@ -3602,10 +3602,10 @@ pub(crate) fn validate_referential_integrity(
                 HirStatementKind::Local(local) => {
                     checks.check_def(local.def_id)?;
                     checks.check_symbol(local.name)?;
-                    if let Some(site) = &local.await_store {
-                        if let Some(slot) = site.slot {
-                            checks.check_symbol(slot)?;
-                        }
+                    if let Some(site) = &local.await_store
+                        && let Some(slot) = site.slot
+                    {
+                        checks.check_symbol(slot)?;
                     }
                     if let Some(ty) = local.ty {
                         checks.check_type(ty)?;
@@ -4080,10 +4080,10 @@ pub(crate) fn validate_referential_integrity(
                     }
                     None => {}
                 }
-                if let Some(site) = implicit {
-                    if let Some(slot) = site.slot {
-                        checks.check_symbol(slot)?;
-                    }
+                if let Some(site) = implicit
+                    && let Some(slot) = site.slot
+                {
+                    checks.check_symbol(slot)?;
                 }
                 validate_expr(source, checks)?;
                 match target {
