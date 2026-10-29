@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 482,
-    "analyzable": 548
+    "capable": 483,
+    "analyzable": 551
   },
   "terms": [
     {
@@ -499,7 +499,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 16,
-      "analyzable": 18
+      "analyzable": 20
     },
     {
       "term": "manifest",
@@ -810,8 +810,8 @@
     {
       "term": "si",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "sin",

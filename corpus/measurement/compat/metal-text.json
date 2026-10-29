@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 548
+    "analyzable": 551
   },
   "terms": [
     {
@@ -499,7 +499,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 18
+      "analyzable": 20
     },
     {
       "term": "manifest",
@@ -811,7 +811,7 @@
       "term": "si",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "sin",
