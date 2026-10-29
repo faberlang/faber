@@ -4789,19 +4789,19 @@ help = "declare the parameter as '{in}' if mutation is intended"
 
 [diagnostics.SEM056.issues.assign_to_de_parameter]
 message = "cannot write through a `ref` or unmarked parameter"
-help = "declare the parameter '{in}' if the caller's value should change; re-pointing the name is allowed"
+help = "declare the parameter '{in}' and pass it with '{in}' if the caller's value should change; assign to the name itself to re-point it"
 
 [diagnostics.SEM056.issues.assign_to_nonmut_tensor_param]
 message = "cannot write through tensor parameter{?name| '|'} that is not marked `mut`"
-help = "mark the parameter `mut` if the caller's tensor should be written"
+help = "mark the parameter '{in}' and pass the caller's tensor with '{in}' if it should be written"
 
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
 message = "cannot call a mutating receiver through a `ref` view"
-help = "drop the `ref` marker, or use a non-mutating method"
+help = "use a `{in}` binding or parameter instead of `{de}`, or choose a non-mutating method"
 
 [diagnostics.SEM056.issues.assign_through_ref]
 message = "cannot assign through a `ref` view"
-help = "drop the `ref` marker if mutation is intended"
+help = "use a `{in}` binding or parameter instead of `{de}` if the referenced value should be writable"
 
 [diagnostics.SEM057]
 message = "parameter mode mismatch"
@@ -4809,7 +4809,7 @@ help = "align parameter modes between caller and callee"
 
 [diagnostics.SEM057.issues.de_to_in_or_ex_position]
 message = "cannot pass `de` parameter to `in` or `ex` position"
-help = "align parameter modes between caller and callee"
+help = "use a read-only parameter at the destination, or change this parameter to '{in}' or '{own}' to match the destination"
 
 [diagnostics.SEM057.issues.tensor_view_escape]
 message = "a borrowed tensor view cannot escape or initialize mutable storage"
@@ -4817,27 +4817,27 @@ help = "call materialize() to create an owned tensor before storing, returning, 
 
 [diagnostics.SEM057.issues.tensor_view_read_only]
 message = "a borrowed tensor view is read-only and aliases its base"
-help = "pass the view as ref, or call materialize() before using it as mut or own"
+help = "pass the view as `{de}` for read-only use; call `materialize()` into a writable local before writing or passing it to `{in}`/`{own}` code"
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
-help = "pass a `mut` or `own` value, or bind through `copy`"
+help = "make a writable local copy, then pass it with the parameter's `{in}` or `{own}` marker"
 
 [diagnostics.SEM057.issues.own_argument_not_local_binding]
 message = "only a whole local binding can be passed as `own`"
-help = "pass `copy` to duplicate the field or element, or bind it to a local first"
+help = "make a local copy first, then pass that whole binding as `{own}`"
 
 [diagnostics.SEM057.issues.own_argument_unmarked_parameter]
 message = "an unmarked parameter is shared read-only and cannot be given away as `own`"
-help = "pass `copy` to duplicate it, or declare the parameter `own`"
+help = "make a local copy before passing it as `{own}`, or declare this parameter `{own}` so it can be forwarded"
 
 [diagnostics.SEM057.issues.own_argument_module_constant]
 message = "a module constant cannot be given away as `own`"
-help = "pass `copy` to duplicate it"
+help = "copy it into a local binding first, then pass that binding as `{own}`"
 
 [diagnostics.SEM057.issues.own_argument_loop_binder]
 message = "a loop binder aliases a live element and cannot be given away as `own`"
-help = "pass `copy` to duplicate it"
+help = "copy it into a local binding first, then pass that binding as `{own}`"
 
 [diagnostics.SEM057.issues.call_marker_missing]
 message = "this argument needs the `{expected}` marker its parameter declares"
@@ -4861,7 +4861,7 @@ help = "convert the tensor to a floating-point element type first, or use sum"
 
 [diagnostics.SEM010.issues.axis_reduction_not_constant]
 message = "the axis of a reduction must be a compile-time constant"
-help = "write a literal axis such as `axis 1`; the result shape depends on it"
+help = "write a literal axis such as `axis 1`, or use a compile-time constant; the result shape depends on it"
 
 [diagnostics.SEM010.issues.axis_reduction_out_of_range]
 message = "the axis is outside the rank of the tensor"
@@ -4877,7 +4877,7 @@ help = "remove the repeated axis; each axis may appear once"
 
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
 message = "an axis reduction is built for tensors of rank 2 to 8 only"
-help = "reduce a tensor of rank 2 to 8 with literal dimensions, or write the explicit reduction with `reducta ... per [...]`"
+help = "use axis reduction only on tensors of rank 2 to 8; for other ranks, write the reduction explicitly"
 
 [diagnostics.SEM010.issues.expanded_axis_out_of_range]
 message = "the axis is outside the range of the expanded tensor"
@@ -4885,7 +4885,7 @@ help = "use an axis from 0 up to the rank of the source tensor; the new dimensio
 
 [diagnostics.SEM010.issues.expanded_axis_not_constant]
 message = "the axis of an expansion must be a compile-time constant"
-help = "write a literal axis such as `axis 1`"
+help = "write a literal axis such as `axis 1`, or use a compile-time constant"
 
 [diagnostics.SEM010.issues.expanded_axis_rank_mismatch]
 message = "an expansion with `axis` adds exactly one dimension"
