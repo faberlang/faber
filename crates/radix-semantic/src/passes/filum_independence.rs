@@ -1199,6 +1199,15 @@ fn prove(
                     .cloned()
                     .collect::<Vec<_>>()
             });
+            // A single-coordinate lane loop may keep a whole private row in
+            // scratch: once the leading storage coordinate is exactly the
+            // lane coordinate, inner coordinates only select cells within
+            // that lane's disjoint row. Keep the composed-coordinate proof for
+            // nests and multidimensional lane domains, where the leading
+            // coordinate alone may not distinguish every concurrent lane.
+            let leading_lane_coordinate = access.depth == 1
+                && access.composed.len() == 1
+                && physical.as_ref().and_then(|coords| coords.first()) == access.composed.first();
             // One loop keeps its element fetch as the expected address (a write
             // into the storage the loop reads takes no invariant components).
             // In a nest the address must be the whole chain's composed
@@ -1214,12 +1223,13 @@ fn prove(
                     .collect();
                 !access.composed.is_empty()
                     && lane_part.is_some()
-                    && if expected.is_empty() {
-                        lane_part.as_ref() == Some(&access.composed)
-                    } else {
-                        !source_facts.unknown
-                            && expected.iter().all(|e| e.is_some() && *e == physical)
-                    }
+                    && (leading_lane_coordinate
+                        || if expected.is_empty() {
+                            lane_part.as_ref() == Some(&access.composed)
+                        } else {
+                            !source_facts.unknown
+                                && expected.iter().all(|e| e.is_some() && *e == physical)
+                        })
             } else {
                 access.every_loop_has_coordinates && lane_part.as_ref() == Some(&access.composed)
             };

@@ -47,6 +47,7 @@ functio gemv<magnitudo N, magnitudo K>(
     de tensor<f32, [N, K]> w,
     de tensor<f32, [K]> x,
     varia tensor<f32, [N]> out,
+    varia tensor<f32, [N, K]> scratch,
     varia tensor<f32, [K]> tmp,
     varia tensor<i32, [N]> lens,
     i32 n
@@ -138,6 +139,27 @@ fn iteration_local_scratch_inside_the_range_accepted() {
         }
         out[[i]] ← acc",
     ));
+}
+
+#[test]
+fn lane_owned_scratch_row_with_inner_range_accepted() {
+    accepted(&kernel(
+        "itera ab 0‥n sit j {
+            scratch[[i, j]] ← w[[i, j]]
+        }",
+    ));
+}
+
+#[test]
+fn scratch_write_with_non_lane_leading_coordinate_rejected() {
+    rejected(
+        &kernel(
+            "itera ab 0‥n sit j {
+                scratch[[j, 0]] ← w[[i, j]]
+            }",
+        ),
+        "write_not_own_coordinate",
+    );
 }
 
 #[test]
