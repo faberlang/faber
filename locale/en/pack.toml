@@ -4225,15 +4225,15 @@ help = "use runtime `↦ T` conversion with a `⊥` default instead"
 
 [diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
 message = "json/class conversion requires the class to be marked `@ json`"
-help = "add `@ json` to the class or convert through `{valor}` explicitly"
+help = "mark the class `@ json` before converting it to or from `json`"
 
 [diagnostics.SEM016.issues.lista_to_tabula_unsupported]
 message = "{lista} to map conversion has no default key/value derivation; use a map constructor verb or `.in.map(k, v)`; pair-destructuring default deferred"
-help = "construct the map with explicit key/value selection"
+help = "build a keyed map with explicit keys and values instead of converting the list"
 
 [diagnostics.SEM016.issues.array_ascription_to_map]
 message = "an array is not a map: `∷` asserts a type the expression already has, and treating an array's indexes as the key values is still a conversion"
-help = "write the map with `empty`, an empty or keyed object literal, or convert explicitly with `↦`"
+help = "use `empty` for an empty map or build one from explicit key/value entries"
 
 [diagnostics.SEM016.issues.array_ascription_to_tensor]
 message = "an array is not a tensor: `∷` asserts a type the expression already has, and matching rank and lengths is a coincidence, not structural compatibility"
@@ -4245,15 +4245,15 @@ help = "convert explicitly with `↦`, as in `n ↦ u8`"
 
 [diagnostics.SEM016.issues.size_lift_negative]
 message = "negative size argument"
-help = "size arguments are lift stores checked at the call; pass a non-negative value"
+help = "use a non-negative value after `{magnitudo}`"
 
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
-help = "use an explicit stdlib conversion verb"
+help = "build the target collection explicitly; `↦` has no default conversion for this pair"
 
 [diagnostics.SEM016.issues.lista_to_tensor_nested]
 message = "{lista} to tensor conversio requires a flat {lista}; flatten nested {lista} values explicitly before `↦`"
-help = "flatten the nested {lista} before converting to tensor"
+help = "use a flat `{lista}` for `↦ tensor`; a rectangular nested literal works for a rank-2 tensor"
 
 [diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
 message = "{lista} to tensor conversio requires matching element types; convert elements explicitly before `↦`"
@@ -4261,11 +4261,11 @@ help = "convert {lista} elements to the tensor element type first"
 
 [diagnostics.SEM016.issues.lista_to_tensor_non_numeric]
 message = "{lista} to tensor conversio requires numeric elements"
-help = "convert to a tensor of numeric elements; a tensor of bivalens comes only from comparisons"
+help = "use numeric elements for a bounded list-to-tensor conversion; keep other element types in a list"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_target]
 message = "rectangular {lista} literal conversio requires a rank-2 literal tensor Figura target"
-help = "convert nested {lista} literals to a rank-2 tensor target"
+help = "use a tensor target with a literal rank-2 shape for a nested list literal"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_ragged]
 message = "ragged nested {lista} literal cannot convert to tensor; use crea or an explicit flatten verb"
@@ -4277,7 +4277,7 @@ help = "make every nested row the same length"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_shape]
 message = "rectangular {lista} literal shape does not match conversio target"
-help = "match the nested literal dimensions to the target Figura"
+help = "make the nested literal dimensions match the target tensor shape"
 
 [diagnostics.SEM016.issues.rectangular_lista_literal_spread]
 message = "rectangular {lista} literal conversio does not allow spread elements"
@@ -4293,27 +4293,27 @@ help = "remove the recovery arm; use the truthiness result directly"
 
 [diagnostics.SEM016.issues.decimal_endianness_hint_rejected]
 message = "decimal conversion does not take an endianness hint"
-help = "remove the endianness hint"
+help = "decode bytes to a fixed-width integer or float with `via Be` or `via Le`, then convert to decimal; convert decimal to a fixed-width number before byte output"
 
 [diagnostics.SEM016.issues.decimal_radix_hint_rejected]
 message = "decimal conversion does not take a radix hint"
-help = "remove the radix hint"
+help = "parse decimal text without a radix hint; for radix formatting, first convert to an integer with a rounding hint"
 
 [diagnostics.SEM016.issues.lista_to_tensor_capacity_mismatch]
 message = "list length does not match the tensor capacity"
-help = "use a list whose length equals the tensor capacity"
+help = "use a rank-1 tensor whose literal extent matches the bounded list capacity"
 
 [diagnostics.SEM016.issues.octeti_to_vector_unspecified]
 message = "{lista}<b8> to vector conversion needs an element type"
-help = "name the vector element type"
+help = "add `via Be` or `via Le`; the byte window needs 2 bytes per `u16` element or 4 per `u32` element"
 
 [diagnostics.SEM016.issues.vector_to_octeti_unspecified]
 message = "vector to {lista}<b8> conversion needs an element type"
-help = "name the vector element type"
+help = "add `via Be` or `via Le` and use a bounded `{lista}<b8, {magnitudo} N>` target"
 
 [diagnostics.SEM016.issues.register_bridge_element_unsupported]
 message = "register bridge element type is not supported"
-help = "use a supported register element type"
+help = "use numeric element types in both vectors"
 
 [diagnostics.SEM016.issues.register_bridge_width_mismatch]
 message = "register bridge width does not match"
@@ -4321,11 +4321,11 @@ help = "use matching register widths"
 
 [diagnostics.SEM016.issues.register_out_element_mismatch]
 message = "register output element type does not match"
-help = "use a matching output element type"
+help = "use a list with the same element type as the vector"
 
 [diagnostics.SEM016.issues.register_window_width_mismatch]
 message = "register window width does not match"
-help = "use matching window widths"
+help = "use `u16` or `u32` elements and match the byte count to the vector width (2 or 4 bytes per element)"
 
 [diagnostics.SEM016.issues.unsupported_conversio]
 message = "conversion is not supported"
@@ -4333,7 +4333,7 @@ help = "use a supported conversion or add a conversion row"
 
 [diagnostics.SEM016.issues.valor_to_sized_numeric_unsupported]
 message = "valor extraction to a sized numeric type is not supported"
-help = "extract to an unsized numeric type and convert"
+help = "extract numeric values as `{numerus}` or `{fractus}` first, then convert to a sized type"
 
 [diagnostics.SEM017]
 message = "unavailable declaration"
@@ -4381,7 +4381,7 @@ help = "give the handler {functio} a body"
 
 [diagnostics.SEM018.issues.ad_handler_arity]
 message = "a route handler takes zero or one parameter, found {count}"
-help = "pass a {genus} or {iuncta} as the single opener parameter"
+help = "use zero parameters or one opener parameter; group multiple input values in an `@ json` {genus}"
 
 [diagnostics.SEM018.issues.ad_route_shape]
 message = "route '{route}' is not an exact `prefix:name` or `prefix/name` route"
