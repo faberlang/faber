@@ -1,0 +1,32 @@
++++
+term = "d64 decimal literal in a mutable parameter"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "assignment", "place", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "A decimal literal beside a mut d64 parameter takes the same decimal expectation as beside a local."
+syntax = "p ← p + 1.0"
+related = ["d64", "mut", "literal"]
+locale = "en"
++++
+# A decimal literal in a mutable decimal parameter
+#
+# A written decimal literal in arithmetic with a `mut d64` parameter belongs
+# to the decimal family, just as it does beside a local `d64` value.
+
+fn increment(mut d64 p) → void {
+    p ← p + 1.0
+}
+
+fn increment_local() → d64 {
+    mut d64 p ← 2.5
+    p ← p + 1.0
+    return p
+}
+
+main {
+    mut d64 p ← 2.5
+    increment(mut p)
+    print p
+    print increment_local()
+}
