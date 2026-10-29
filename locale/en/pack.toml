@@ -3081,15 +3081,15 @@ help = "Supply an element type and a shape, such as `{sparsa}<f32, [2, 3]>`."
 
 [diagnostics.SEM010.issues.sparsa_missing_figura]
 message = "sparse requires a Figura shape; use sparse<T, []> for rank-0"
-help = "make the expression type match the expected type"
+help = "Add the shape argument, for example `sparse<T, [4]>`; use `sparse<T, []>` for rank 0."
 
 [diagnostics.SEM010.issues.scalar_text_operands_required]
 message = "scalar text operands required"
-help = "make the expression type match the expected type"
+help = "Use one-character `string` or `ascii` operands for ordering or interval bounds."
 
 [diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
 message = "stream ad opener must lower to {valor}"
-help = "make the expression type match the expected type"
+help = "Pass a `{valor}` opener to an untyped route."
 
 [diagnostics.SEM010.issues.ad_route_opener_type_mismatch]
 message = "the opener does not match the parameter of the handler serving `{route}`"
@@ -3105,27 +3105,27 @@ help = "remove the opener: ad '{route}'"
 
 [diagnostics.SEM010.issues.sermo_reply_type_mismatch]
 message = "a typed conversation materializes only as its reply type R or as {lista}<R>"
-help = "materialize as the handler's item type, or assign it to a bare {sermo} first"
+help = "materialize as the reply type or a `{lista}` of replies, or assign to bare `{sermo}` first"
 
 [diagnostics.SEM010.issues.sermo_view_type_mismatch]
 message = "the view type must match the conversation: {tuus} takes the reply type R, {meus} takes the opener type O"
-help = "use the conversation's type or omit the type argument to infer it"
+help = "use the reply type with `.recv<T>()` and the opener type with `.send<T>()`; omit `<T>` to infer it"
 
 [diagnostics.SEM010.issues.ad_handler_send_closed]
 message = "a Faber route handler cannot read later frames, so sending toward it is not allowed"
-help = "pass all data in the opener; closing the outbound side with fini() stays legal"
+help = "Put all request data in the opener; call `send<T>().finish()` to close the outbound side."
 
 [diagnostics.SEM010.issues.sermo_typed_from_untyped]
 message = "a bare {sermo} carries {valor} frames and cannot become a typed conversation"
-help = "declare the binding as bare {sermo}, or open the conversation on a Faber route"
+help = "Keep a bare `{sermo}` bare, or open a Faber route with `ad 'route' (opener)` to get a typed conversation."
 
 [diagnostics.SEM010.issues.sermo_type_arguments_mismatch]
 message = "the conversation types do not match the declared {sermo}<O, R>"
-help = "declare the handler's opener and item types, or omit the annotation to infer them"
+help = "Make both conversations use the same opener type `O` and reply type `R`."
 
 [diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
 message = "formata target element type must match the receiver element type"
-help = "make the expression type match the expected type"
+help = "Choose the same element type as the source; use `↦` first if the elements need conversion."
 
 [diagnostics.SEM010.issues.tensor_formata_element_count_mismatch]
 message = "formata target shape must hold the same element count as the receiver"
@@ -3133,27 +3133,27 @@ help = "the reshaped type must keep the receiver element count"
 
 [diagnostics.SEM010.issues.tensor_incomplete]
 message = "tensor requires element type and Figura; use tensor<T, Figura>"
-help = "make the expression type match the expected type"
+help = "Write both the element type and shape, for example `tensor<f32, [2, 3]>`; use `[]` for rank 0."
 
 [diagnostics.SEM010.issues.tensor_missing_figura]
 message = "tensor requires a Figura shape; use tensor<T, []> for rank-0"
-help = "make the expression type match the expected type"
+help = "Add the shape argument, for example `tensor<f32, [2, 3]>`; use `tensor<f32, []>` for rank 0."
 
 [diagnostics.SEM010.issues.variant_pattern_scrutinee_mismatch]
 message = "variant does not match scrutinee type"
-help = "make the expression type match the expected type"
+help = "Use a variant belonging to the type of the value being matched."
 
 [diagnostics.SEM010.issues.vector_element_type_mismatch]
 message = "vector element type mismatch"
-help = "make the expression type match the expected type"
+help = "Make each vector element match the declared element type, converting elements with `↦` first if needed."
 
 [diagnostics.SEM010.issues.vector_incomplete]
 message = "vector requires element type and width; use vector<T, size N>"
-help = "make the expression type match the expected type"
+help = "Include both the element type and width, for example `vector<f32, size 4>` or `vf32[4]`."
 
 [diagnostics.SEM010.issues.vector_missing_width]
 message = "vector requires a width; use vector<T, size 4> or vf32[4]"
-help = "make the expression type match the expected type"
+help = "Add a width, for example `vector<f32, size 4>` or `vf32[4]`."
 
 [diagnostics.SEM010.issues.tuple_index_out_of_bounds]
 message = "tuple index {index} out of bounds for arity {arity}"
@@ -3161,7 +3161,7 @@ help = "use an index between 0 and {max_index}"
 
 [diagnostics.SEM010.issues.octeti_index_out_of_bounds]
 message = "{lista}<b8> index out of bounds"
-help = "use a range fully inside the {lista}<b8>"
+help = "Use an index below the byte length, or a range that stays within the `{lista}<b8>`."
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
 message = "postfix gradient selection (`call(...) ∇ [places]`) is not lowered until the tensor-glyphs 2B autograd surface lands; no operand, selector, or result rule is active in Phase 2A"
@@ -3177,7 +3177,7 @@ help = "make the right side the same tensor type as the target, or convert it fi
 
 [diagnostics.SEM010.issues.copy_into_value_used]
 message = "a '⇇' statement has no value"
-help = "write the copy as its own statement; to rebind a name to a tensor, use '←' on a local binding"
+help = "Keep `target ⇇ source` as a statement; if you meant to rebind a mutable local, use `←` instead."
 
 [diagnostics.SEM010.issues.sink_into_item_type_mismatch]
 message = "the item of '⇜' must be exactly the sink's 'T'"
@@ -3197,7 +3197,7 @@ help = "round each element with a loop or a scalar rounding method; the per-elem
 
 [diagnostics.SEM011.issues.generic_type_arg_bound]
 message = "type argument {rejected} does not satisfy {param} {implet} {contract}"
-help = "declare `{implet} {contract}` on the type, or call with a type that does"
+help = "Pass a type that implements `{contract}`, or declare `{implet} {contract}` on the supplied type."
 
 [diagnostics.SEM011.issues.ranged_list_length_out_of_range]
 message = "this list's length lies outside the list length range"
@@ -3205,19 +3205,19 @@ help = "give the literal a length inside the range, or build the list with ↦ a
 
 [diagnostics.SEM011.issues.ordering_operands_differ]
 message = "ordered operands have different types"
-help = "compare values of one {implet} Orderable type, or tuples of the same element types"
+help = "Compare values of the same type; custom types must implement `Orderable`, and tuples must have matching element types."
 
 [diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
 message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
-help = "keep caller and fragment lane bindings distinct"
+help = "Avoid two explicit lane bindings; let a lane-using fragment be the first lane-bearing call, or have it use the caller's inherited lane."
 
 [diagnostics.SEM011.issues.est_value_rhs]
 message = "`est` tests types; this right-hand side names a value"
-help = "compare values with the equality operator: `≡`, or `≢` for `non est`"
+help = "Compare values with `≡` or `≢`; use `is` only to test a type."
 
 [diagnostics.SEM011.issues.range_step_must_be_numeric]
 message = "range step must be numeric"
-help = "use a numeric range step"
+help = "Use a numeric step, such as `step 2`."
 
 [diagnostics.SEM011.issues.range_step_not_positive]
 message = "range step must be positive"
@@ -3229,7 +3229,7 @@ help = "use int, float, instant, or sized scalar bounds"
 
 [diagnostics.SEM011.issues.intervallum_longitudo_bound]
 message = "range longitudo requires int bounds until momentum ships"
-help = "use int range bounds for longitudo today"
+help = "Use `int` bounds for a range passed to `.length()`."
 
 [diagnostics.SEM011.issues.numeric_lista_operator_law]
 message = "numeric list operator {operator} is elementwise; scalars broadcast on either side, lists must have equal length; use ↦ for explicit width conversion"
@@ -3241,7 +3241,7 @@ help = "apply + or - elementwise between two numeric queues or stacks, ⊙ or �
 
 [diagnostics.SEM011.issues.numeric_operands_required]
 message = "numeric operands required"
-help = "use numeric operands for this operator"
+help = "Use numeric values for both operands; convert non-numeric values with `↦` first if appropriate."
 
 [diagnostics.SEM011.issues.lista_multiply_requires_glyph]
 message = "list `*` list is unsupported; use ⊙ (elementwise)"
