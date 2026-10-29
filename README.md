@@ -361,32 +361,32 @@ runner's; a construct a target cannot express yet is rejected by name
 (`unsupported on target <t>: <construct>`), never approximated.
 
 <!-- target-maturity:begin -->
-How mature each target is, measured on the corpus (777 programs the suite runs, each with expected output; 269 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell have no corpus lane: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
+How mature each target is, measured on the corpus (897 programs the suite runs, each with expected output; 302 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell have no corpus lane: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
 
 | Target | `-t` | Output | Evidence | Source |
 | --- | --- | --- | --- | --- |
 | **Reference** | | | | |
-| MIR runner | (`faber run`) | executes the program; the oracle | suite 774 / 777 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
-| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 753 / 760 | public |
+| MIR runner | (`faber run`) | executes the program; the oracle | suite 892 / 897 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
+| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 861 / 869 | public |
 | FMIR / FHIR | `fmir`, `fhir` | serialized MIR and analyzed HIR artifacts | no corpus lane (exercised by the package build and run tests) | public |
 | **Application languages** | | | | |
-| Rust | `rust` | Rust source, or a full Cargo project | suite 750 / 769 | official binary |
-| Go | `go` | Go source | suite 646 / 776 | official binary |
-| TypeScript | `ts` | TypeScript source | suite 710 / 777 | official binary |
-| Swift | `swift` | Swift source | suite 408 / 777 | official binary |
-| Python | `python` | self-contained Python | suite 575 / 762 | official binary |
+| Rust | `rust` | Rust source, or a full Cargo project | suite 854 / 889 | official binary |
+| Go | `go` | Go source | suite 730 / 896 | official binary |
+| TypeScript | `ts` | TypeScript source | suite 804 / 897 | official binary |
+| Swift | `swift` | Swift source | suite 468 / 897 | official binary |
+| Python | `python` | self-contained Python | suite 640 / 871 | official binary |
 | Haskell | `haskell` | Haskell source | 85 of 704 single-file programs emit; 34 of those match the runner | official binary |
 | **Systems and native** | | | | |
 | C | `c` | C11 with a header-only runtime | preview: 342 of 704 single-file programs emit; 338 of those match the runner | public |
-| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 598 / 777 | official binary |
-| WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 536 / 777 assemble (no host runtime yet) | official binary |
-| Cranelift | `clif` | native objects with no external toolchain | preview: suite 570 / 760 | public |
+| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 692 / 897 | official binary |
+| WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 605 / 897 assemble (no host runtime yet) | official binary |
+| Cranelift | `clif` | native objects with no external toolchain | preview: suite 646 / 869 | public |
 | **GPU kernels** (kernel functions only) | | | | |
 | Metal | `metal-text` | Metal Shading Language | kernel programs only | official binary |
 | WGSL | `wgsl-text` | WebGPU compute shaders | kernel programs only | official binary |
 | CUDA | (`--device cuda`) | PTX built at run time from NVVM IR (needs `clang` with the NVPTX target) | kernel programs only: `faber run --device cuda` runs whole-tensor kernels on NVIDIA GPUs; lane-form kernels are not lowered yet and fail closed | official binary |
 | **Validation** | | | | |
-| Racket | `sexp` | Racket s-expressions (a validation target) | suite 606 / 767 | official binary |
+| Racket | `sexp` | Racket s-expressions (a validation target) | suite 673 / 878 | official binary |
 | **Experimental** (not in the released `faber`) | | | | |
 | Fortran, COBOL, Pascal, Odin, BASIC | `fortran`, `cobol`, `pascal`, `odin`, `basic` | historical languages, a deliberate subset | default-off features; no corpus lane | private source |
 <!-- target-maturity:end -->
