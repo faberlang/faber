@@ -1,0 +1,27 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "member_suffix"]
+category = "list"
+canonical = false
+summary = "Indexing a mutable list parameter uses a checked access that traps when the index is out of range."
+syntax = "fn get(mut list<int> xs, int i) → int { return xs[i] }"
+related = ["lista", "index-oob-trap", "reads-three-ways"]
+locale = "en"
++++
+# =============================================================================
+# mut-list-param-index — mutable list parameters keep checked indexing.
+# =============================================================================
+#
+# Indexing a `mut` list parameter uses the same checked `get` access as an
+# ordinary list. An out-of-range index traps rather than using Rust's native
+# bracket indexing or failing to compile because the source index is an `int`.
+#
+# The empty entry keeps this as an emitter/build case: compiling the function
+# checks the access path without requiring a run-time invocation.
+
+fn get(mut list<int> xs, int i) → int {
+    return xs[i]
+}
+
+main {}
