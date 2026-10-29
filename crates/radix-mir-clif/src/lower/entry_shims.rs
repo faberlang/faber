@@ -1,19 +1,21 @@
-//! The program entry shims: `faber_clif_incipit` and the C `main`.
+//! The program entry shims: `faber_clif_incipit` and, for a linked
+//! executable, the C `main`.
 
 use super::*;
 
-/// `faber_clif_incipit` (tokens, then the program entry) and the C `main`.
+/// `faber_clif_incipit` (tokens, then the program entry), and in
+/// [`EntryMode::Process`] the C `main`. Returns the id of the incipit.
 pub(super) fn define_entry_shims(
     state: &mut ModuleState<'_>,
     entry: Option<FuncId>,
-) -> Lowered<()> {
+    mode: EntryMode,
+) -> Lowered<FuncId> {
     let tokens = state.input.tokens.clone();
     let token_data: Vec<DataId> = tokens
         .iter()
         .map(|token| state.string_data(token.as_bytes()))
         .collect::<Lowered<_>>()?;
     let set_tokens = state.runtime_id(&abi::SET_DISPLAY_TOKENS)?;
-    let main_target = state.runtime_id(&abi::MAIN)?;
 
     // faber_clif_incipit() -> i32: the process exit status the entry hands back
     // (`main exit <expr>`), 0 when the entry returns nothing.
@@ -67,7 +69,12 @@ pub(super) fn define_entry_shims(
         .define_function(incipit_id, &mut context)
         .map_err(cranelift_error)?;
 
-    // main(argc, argv) -> __faber_clif_v1_main(argc, argv)
+    if mode == EntryMode::InProcess {
+        return Ok(incipit_id);
+    }
+    let main_target = state.runtime_id(&abi::MAIN)?;
+
+    // main(argc, argv) -> __faber_clif_v1_main(argc, argv, faber_clif_incipit)
     let mut main_signature = state.module.make_signature();
     main_signature.params.push(AbiParam::new(types::I32));
     main_signature.params.push(AbiParam::new(state.pointer));
@@ -87,7 +94,11 @@ pub(super) fn define_entry_shims(
         let count = builder.block_params(block)[0];
         let values = builder.block_params(block)[1];
         let target = state.module.declare_func_in_func(main_target, builder.func);
-        let call = builder.ins().call(target, &[count, values]);
+        let incipit_ref = state.module.declare_func_in_func(incipit_id, builder.func);
+        let incipit_address = builder.ins().func_addr(state.pointer, incipit_ref);
+        let call = builder
+            .ins()
+            .call(target, &[count, values, incipit_address]);
         let result = builder.inst_results(call)[0];
         builder.ins().return_(&[result]);
         builder.seal_all_blocks();
@@ -96,5 +107,6 @@ pub(super) fn define_entry_shims(
     state
         .module
         .define_function(main_id, &mut context)
-        .map_err(cranelift_error)
+        .map_err(cranelift_error)?;
+    Ok(incipit_id)
 }

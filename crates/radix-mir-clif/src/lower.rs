@@ -10,10 +10,8 @@ use cranelift_codegen::ir::{
     AbiParam, Block, BlockArg, FuncRef, InstBuilder, MemFlagsData, Signature, StackSlot,
     StackSlotData, StackSlotKind, TrapCode, Type as ClType, Value, types,
 };
-use cranelift_codegen::settings::{self, Configurable, Flags};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default_libcall_names};
-use cranelift_object::{ObjectBuilder, ObjectModule};
+use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Interner;
 use radix_mir::{
@@ -36,9 +34,12 @@ use crate::abi::{self, AbiTy, RuntimeSymbol};
 mod closure;
 mod convert;
 mod entry_shims;
+mod jit;
 mod lift;
 mod wide;
 pub(crate) use convert::{byte_element, member_tests, numeric_conversion, sequence_conversion};
+pub(crate) use jit::EntryMode;
+pub use jit::{JitProgram, lower_program, lower_program_jit};
 
 /// A named refusal discovered during lowering.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -387,7 +388,8 @@ type TryCallInfo = (TryTarget, Vec<Rep>, Rep, Rep, Option<Signature>, Vec<bool>)
 
 /// Module-level state shared by every function being lowered.
 struct ModuleState<'a> {
-    module: ObjectModule,
+    /// The module being filled: an object file or an in-memory JIT image.
+    module: &'a mut (dyn Module + 'static),
     input: &'a ProgramInput<'a>,
     pointer: ClType,
     functions: FxHashMap<MirFunctionId, FuncId>,
@@ -589,24 +591,16 @@ impl ModuleState<'_> {
     }
 }
 
-/// Lower `input` to relocatable object bytes for the host triple.
-///
-/// # Errors
-///
-/// Returns the [`Decline`] naming the first shape the lowering cannot emit.
-pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
-    let mut flags = settings::builder();
-    flags.set("opt_level", "speed").map_err(cranelift_error)?;
-    flags.set("is_pic", "true").map_err(cranelift_error)?;
-    let isa = cranelift_native::builder_with_options(false)
-        .map_err(cranelift_error)?
-        .finish(Flags::new(flags))
-        .map_err(cranelift_error)?;
-    let pointer = isa.pointer_type();
-    let builder = ObjectBuilder::new(isa, "radix-mir-clif", default_libcall_names())
-        .map_err(cranelift_error)?;
+/// Declare and define every function the program reaches in `module`, then the
+/// entry shims. Returns the id of `faber_clif_incipit`.
+pub(super) fn lower_module(
+    module: &mut (dyn Module + 'static),
+    input: &ProgramInput<'_>,
+    mode: EntryMode,
+) -> Result<FuncId, Decline> {
+    let pointer = module.isa().pointer_type();
     let mut state = ModuleState {
-        module: ObjectModule::new(builder),
+        module,
         input,
         pointer,
         functions: FxHashMap::default(),
@@ -649,8 +643,7 @@ pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
             break;
         }
     }
-    entry_shims::define_entry_shims(&mut state, entry)?;
-    state.module.finish().emit().map_err(cranelift_error)
+    entry_shims::define_entry_shims(&mut state, entry, mode)
 }
 
 /// The policy family of an integer store slot.

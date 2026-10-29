@@ -46,9 +46,10 @@ struct FaberTargetRowSpec {
 fn faber_target_row_specs() -> Result<Vec<FaberTargetRowSpec>, String> {
     let mut rows = Vec::new();
     for variant in FaberCliTarget::value_variants() {
-        if matches!(variant, FaberCliTarget::MirScena) {
-            // Hidden CLI spelling (legacy source-backed scena runtime) — not
-            // a discoverable `faber targets` row.
+        if matches!(variant, FaberCliTarget::MirScena | FaberCliTarget::ClifJit) {
+            // Hidden CLI spellings — not discoverable `faber targets` rows:
+            // the legacy source-backed scena runtime, and the `clif-jit`
+            // engine, which is the `clif` row's in-memory run route.
             continue;
         }
         let target = variant.to_radix();

@@ -1372,7 +1372,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
 /// classifier names the package shape when it is outside the CLIF subset;
 /// every other target keeps the plan-driven package emitter.
 #[cfg_attr(not(feature = "mir-clif"), allow(unused_variables))]
-fn package_compile_result(
+pub(super) fn package_compile_result(
     config: &radix::module::Config,
     input_path: &Path,
     target: Target,

@@ -885,10 +885,11 @@ pub const UNION_IS_STRUCT: RuntimeSymbol = RuntimeSymbol {
     ret: Some(I8),
 };
 
-/// The runtime entry the emitted `main` shim calls.
+/// The runtime entry the emitted `main` shim calls: (argc, argv, the program's
+/// `faber_clif_incipit`).
 pub const MAIN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_main",
-    params: &[I32, Ptr],
+    params: &[I32, Ptr, Ptr],
     ret: Some(I32),
 };
 

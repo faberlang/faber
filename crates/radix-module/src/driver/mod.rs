@@ -346,7 +346,7 @@ pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: A
     }
 
     if analysis.cli_program.is_some() {
-        return compile_cli_program(session.config.target, name, source, analysis, session.config.no_fuse);
+        return compile_cli_program(&session.config, name, source, analysis);
     }
 
     // -------------------------------------------------------------------------
@@ -369,6 +369,8 @@ pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: A
         session.config.no_fuse,
         session.config.emit_nvvm_device_module,
         &session.config.target_bindings,
+        #[cfg(feature = "mir-clif")]
+        &session.config.clif_engine,
     ) {
         Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
         Err(err) => compile_codegen_error(analysis, name, source, err),
@@ -382,13 +384,9 @@ fn missing_cli_program(analysis: AnalyzedModule, name: &str) -> CompileResult {
     )
 }
 
-fn compile_cli_program(
-    target: Target,
-    name: &str,
-    source: &str,
-    analysis: AnalyzedModule,
-    no_fuse: bool,
-) -> CompileResult {
+fn compile_cli_program(config: &Config, name: &str, source: &str, analysis: AnalyzedModule) -> CompileResult {
+    let target = config.target;
+    let no_fuse = config.no_fuse;
     if let Some(diagnostic) = cli_codegen_diagnostic(target, name, &analysis) {
         return compile_error(analysis, diagnostic);
     }
@@ -405,7 +403,7 @@ fn compile_cli_program(
         #[cfg(feature = "mir-clif")]
         Target::MirClif => {
             let mut analysis = analysis;
-            match generate_clif_object_output(&mut analysis, no_fuse) {
+            match generate_clif_output(&mut analysis, no_fuse, &config.clif_engine) {
                 Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
                 Err(err) => compile_codegen_error(analysis, name, source, err),
             }
@@ -745,6 +743,7 @@ fn generate_output(
     no_fuse: bool,
     emit_nvvm_device_module: bool,
     target_bindings: &TargetBindings,
+    #[cfg(feature = "mir-clif")] clif_engine: &crate::ClifEngine,
 ) -> Result<crate::Output, SpannedCodegenError> {
     // Raw-bits types (b8..b64) have a carrier only on the Faber source emitter
     // and the MIR runner; every other target fails closed, named, before emit.
@@ -790,7 +789,7 @@ fn generate_output(
         #[cfg(not(feature = "mir-llvm"))]
         Target::MirLlvm | Target::MirLlvmHost => Err(unavailable_target_spanned(Target::MirLlvm)),
         #[cfg(feature = "mir-clif")]
-        Target::MirClif => generate_clif_object_output(analysis, no_fuse),
+        Target::MirClif => generate_clif_output(analysis, no_fuse, clif_engine),
         #[cfg(not(feature = "mir-clif"))]
         Target::MirClif => Err(unavailable_target_spanned(Target::MirClif)),
         Target::MirAmd => {
@@ -1104,23 +1103,35 @@ fn generate_llvm_text_output(
     }
 }
 
-/// Lower one unit to a native Cranelift object (public `clif` target).
+/// Lower one unit with the Cranelift backend (public `clif` target): a native
+/// object for the linker, or an in-memory image, per the configured engine.
 #[cfg(feature = "mir-clif")]
-fn generate_clif_object_output(
+fn generate_clif_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
+    engine: &crate::ClifEngine,
 ) -> Result<crate::Output, SpannedCodegenError> {
     prepare_mir_lowering_interner(analysis);
     let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-    let object = radix_mir_clif::emit_object(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+    let codegen_error = |error: radix_mir_clif::ClifError| codegen::CodegenError {
         message: error.message,
         args: vec![
             DiagnosticArg::new("category", error.category),
             DiagnosticArg::new("shape", error.shape),
             DiagnosticArg::new("detail", error.detail),
         ],
-    })?;
-    Ok(crate::Output::ClifObject(crate::ClifObjectOutput { bytes: object.bytes }))
+    };
+    match engine {
+        crate::ClifEngine::Object => {
+            let object = radix_mir_clif::emit_object(&mir.validated, &mir.interner).map_err(codegen_error)?;
+            Ok(crate::Output::ClifObject(crate::ClifObjectOutput { bytes: object.bytes }))
+        }
+        crate::ClifEngine::Jit(runtime) => {
+            let program =
+                radix_mir_clif::emit_jit(&mir.validated, &mir.interner, &runtime.symbols()).map_err(codegen_error)?;
+            Ok(crate::Output::ClifJit(crate::ClifJitOutput { program }))
+        }
+    }
 }
 
 /// Build the NVVM kernel descriptor JSON sidecar for a source unit targeting
