@@ -2847,16 +2847,13 @@ main {
 fn assert_default_route_matches_cpu_or_refuses(stdout: &str, stderr: &str, code: Option<i32>) {
     match code {
         Some(0) => {
-            // The device route announces the selected backend ahead of the
-            // program output.
-            let program: Vec<&str> = stdout
-                .lines()
-                .filter(|line| !line.starts_with("device: "))
-                .collect();
             assert_eq!(
-                program,
-                ["2.0"],
-                "the default route must equal the CPU result"
+                stdout, "2.0\n",
+                "the default route's stdout must be only the program output"
+            );
+            assert!(
+                !stdout.contains("device: selected backend"),
+                "the backend receipt belongs on stderr, not stdout:\n{stdout}"
             );
         }
         Some(1) => assert!(
@@ -2940,13 +2937,29 @@ fn run_kernel_package_default_route_and_reference_route_by_flag_manifest_and_wit
     assert_default_route_matches_cpu_or_refuses(&stdout, &stderr, status.code());
 }
 
-/// The CPU device line every device session prints ahead of the program.
+/// The CPU device line every device session reports on stderr.
 const CPU_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `cpu` on ";
+
+#[test]
+fn run_cpu_device_stdout_contains_only_program_output() {
+    let package = write_basic_package("run-cpu-device-stdout", KERNEL_SOURCE);
+    let path = package.to_str().expect("utf8 package path");
+    let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cpu", path]);
+
+    assert!(status.success(), "cpu device run failed:\n{stderr}");
+    assert_eq!(stdout, "2.0\n", "stdout contains only program output");
+    assert!(
+        stderr
+            .lines()
+            .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+        "the device-selection receipt is reported on stderr:\n{stderr}"
+    );
+}
 
 /// `--device cpu` (gpu-reset rule 16.9): the A2 flood stencil's lane-grid and
 /// single-lane kernels run through the CPU device session on one worker and
-/// on eight, and each run prints exactly what the sequential reference route
-/// prints, after the device receipt line.
+/// on eight, and each run's stdout is exactly the sequential reference output;
+/// device-selection status is reported separately on stderr.
 #[test]
 fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_eight_workers() {
     let path = repo_root().join("acceptance/a2-flood-stencil");
@@ -2961,16 +2974,15 @@ fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_eight_workers() {
         let (stdout, stderr, ok) =
             run_faber(&["run", "--device", "cpu", "--threads", threads, &path]);
         assert!(ok, "--threads {threads}: cpu device run failed:\n{stderr}");
-        let (receipt, program) = stdout
-            .split_once('\n')
-            .unwrap_or_else(|| panic!("--threads {threads}: no output:\n{stdout}"));
         assert!(
-            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
-            "--threads {threads}: the cpu device session runs the kernels:\n{stdout}"
+            stderr
+                .lines()
+                .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+            "--threads {threads}: the cpu device session reports its receipt on stderr:\n{stderr}"
         );
         assert_eq!(
-            program, reference,
-            "--threads {threads}: cpu device output differs from the reference"
+            stdout, reference,
+            "--threads {threads}: cpu device stdout differs from the reference"
         );
     }
 }
@@ -2994,27 +3006,25 @@ fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_three_partitions()
             ok,
             "--partitions {partitions}: cpu device run failed:\n{stderr}"
         );
-        let (receipt, program) = stdout
-            .split_once('\n')
-            .unwrap_or_else(|| panic!("--partitions {partitions}: no output:\n{stdout}"));
         assert!(
-            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
-            "--partitions {partitions}: the cpu device session runs the kernels:\n{stdout}"
+            stderr
+                .lines()
+                .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+            "--partitions {partitions}: the cpu device session reports its receipt on stderr:\n{stderr}"
         );
         assert_eq!(
-            receipt.contains(", 3 partitions)"),
+            stderr.contains(", 3 partitions)"),
             partitions == "3",
-            "--partitions {partitions}: the receipt names a spanned device only:\n{receipt}"
+            "--partitions {partitions}: the receipt names a spanned device only:\n{stderr}"
         );
         assert_eq!(
-            program, reference,
-            "--partitions {partitions}: cpu device output differs from the reference"
+            stdout, reference,
+            "--partitions {partitions}: cpu device stdout differs from the reference"
         );
     }
 }
 
-/// The Metal device line every Metal device session prints ahead of the
-/// program.
+/// The Metal device line every Metal device session reports on stderr.
 #[cfg(target_os = "macos")]
 const METAL_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `metal` on ";
 
@@ -3072,13 +3082,17 @@ fn run_metal_device_a2_stencil_matches_plain_metal_at_one_and_three_partitions()
     let path = package.display().to_string();
     let (plain, stderr, ok) = run_faber(&["run", "--device", "metal", &path]);
     assert!(ok, "plain metal run failed:\n{stderr}");
-    let (plain_receipt, plain_program) = plain
-        .split_once('\n')
-        .unwrap_or_else(|| panic!("plain metal run printed nothing:\n{plain}"));
     assert!(
-        plain_receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX),
-        "{plain}"
+        stderr
+            .lines()
+            .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX)),
+        "Metal receipt must be reported on stderr:\n{stderr}"
     );
+    assert!(
+        !plain.contains("device: selected backend"),
+        "Metal stdout contains only program output:\n{plain}"
+    );
+    let plain_program = plain;
     assert!(
         !plain_program.is_empty(),
         "the stencil prints its depth plane"
@@ -3093,20 +3107,19 @@ fn run_metal_device_a2_stencil_matches_plain_metal_at_one_and_three_partitions()
             &path,
         ]);
         assert!(ok, "--partitions {partitions}: metal run failed:\n{stderr}");
-        let (receipt, program) = stdout
-            .split_once('\n')
-            .unwrap_or_else(|| panic!("--partitions {partitions}: no output:\n{stdout}"));
         assert!(
-            receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX),
-            "--partitions {partitions}: the metal device session runs the kernels:\n{stdout}"
+            stderr
+                .lines()
+                .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX)),
+            "--partitions {partitions}: the metal device session reports its receipt on stderr:\n{stderr}"
         );
         assert_eq!(
-            receipt.contains(", 3 partitions)"),
+            stderr.contains(", 3 partitions)"),
             partitions == "3",
-            "--partitions {partitions}: the receipt names a spanned device only:\n{receipt}"
+            "--partitions {partitions}: the receipt names a spanned device only:\n{stderr}"
         );
         assert_eq!(
-            program, plain_program,
+            stdout, plain_program,
             "--partitions {partitions}: spanned output differs from plain metal"
         );
         assert!(
@@ -3157,9 +3170,13 @@ fn run_metal_device_grid_reduce_matches_plain_metal_over_partitions() {
         plain_args.extend(shape);
         let (plain, stderr, ok) = run_faber(&plain_args);
         assert!(ok, "plain metal run failed:\n{stderr}");
-        let (_, plain_program) = plain
-            .split_once('\n')
-            .unwrap_or_else(|| panic!("plain metal run printed nothing:\n{plain}"));
+        assert!(
+            stderr
+                .lines()
+                .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX)),
+            "plain Metal receipt must be reported on stderr:\n{stderr}"
+        );
+        let plain_program = plain;
         for partitions in ["1", "3", "4"] {
             let mut args = vec![
                 "run",
@@ -3176,9 +3193,13 @@ fn run_metal_device_grid_reduce_matches_plain_metal_over_partitions() {
                 ok,
                 "{shape:?} --partitions {partitions}: metal run failed:\n{stderr}"
             );
-            let (_, program) = stdout.split_once('\n').unwrap_or_else(|| {
-                panic!("{shape:?} --partitions {partitions}: no output:\n{stdout}")
-            });
+            assert!(
+                stderr
+                    .lines()
+                    .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX)),
+                "{shape:?} --partitions {partitions}: Metal receipt must be reported on stderr:\n{stderr}"
+            );
+            let program = stdout;
             assert_eq!(
                 program, plain_program,
                 "{shape:?} --partitions {partitions}: spanned output differs from plain metal"
@@ -3249,14 +3270,13 @@ fn run_cpu_device_grid_reductions_match_the_reference() {
         cpu_args.extend_from_slice(args);
         let (stdout, stderr, ok) = run_faber(&cpu_args);
         assert!(ok, "{package}: cpu device run failed:\n{stderr}");
-        let (receipt, program) = stdout
-            .split_once('\n')
-            .unwrap_or_else(|| panic!("{package}: no output:\n{stdout}"));
         assert!(
-            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
-            "{package}: the cpu device session runs the kernels:\n{stdout}"
+            stderr
+                .lines()
+                .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+            "{package}: the cpu device session reports its receipt on stderr:\n{stderr}"
         );
-        assert_eq!(program, reference, "{package}: cpu device output differs");
+        assert_eq!(stdout, reference, "{package}: cpu device stdout differs");
     }
 }
 
@@ -3309,14 +3329,13 @@ fn run_cpu_device_manifest_threads_run_and_match_the_reference() {
         args.push(&path);
         let (stdout, stderr, ok) = run_faber(&args);
         assert!(ok, "{flags:?}: cpu device run failed:\n{stderr}");
-        let (receipt, program) = stdout
-            .split_once('\n')
-            .unwrap_or_else(|| panic!("{flags:?}: no output:\n{stdout}"));
         assert!(
-            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
-            "{flags:?}: the cpu device session runs the kernel:\n{stdout}"
+            stderr
+                .lines()
+                .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+            "{flags:?}: the cpu device session reports its receipt on stderr:\n{stderr}"
         );
-        assert_eq!(program, reference, "{flags:?}: cpu output differs");
+        assert_eq!(stdout, reference, "{flags:?}: cpu device stdout differs");
     }
 }
 
@@ -3424,8 +3443,8 @@ fn test_threads_requires_the_cpu_device() {
 }
 
 /// Run `package` with `args` on `--device reference` and on `--device cpu` at
-/// one and eight workers; the cpu run must succeed and print, after its
-/// receipt line, exactly what the reference prints.
+/// one and eight workers; the cpu run must succeed and its stdout must be
+/// exactly what the reference prints; status is reported on stderr.
 fn assert_cpu_device_matches_reference(package: &str, args: &[&str]) {
     let path = repo_root().join(package).display().to_string();
     let mut reference_args = vec!["run", "--device", "reference", &path, "--"];
@@ -3440,16 +3459,15 @@ fn assert_cpu_device_matches_reference(package: &str, args: &[&str]) {
             ok,
             "{package} {args:?} --threads {threads}: cpu device run failed:\n{stderr}"
         );
-        let (receipt, program) = stdout
-            .split_once('\n')
-            .unwrap_or_else(|| panic!("{package} --threads {threads}: no output:\n{stdout}"));
         assert!(
-            receipt.starts_with(CPU_DEVICE_RECEIPT_PREFIX),
-            "{package} --threads {threads}: the cpu device session runs the kernels:\n{stdout}"
+            stderr
+                .lines()
+                .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+            "{package} --threads {threads}: the cpu device session reports its receipt on stderr:\n{stderr}"
         );
         assert_eq!(
-            program, reference,
-            "{package} {args:?} --threads {threads}: cpu device output differs from the reference"
+            stdout, reference,
+            "{package} {args:?} --threads {threads}: cpu device stdout differs from the reference"
         );
     }
 }
@@ -3498,7 +3516,7 @@ fn run_cpu_device_kernel_fault_prints_one_coded_error() {
         .join("acceptance/c4-single-lane-index-fault")
         .display()
         .to_string();
-    let (stdout, stderr, status) = run_faber_status(&[
+    let (_stdout, stderr, status) = run_faber_status(&[
         "run",
         "--device",
         "cpu",
@@ -3511,7 +3529,12 @@ fn run_cpu_device_kernel_fault_prints_one_coded_error() {
         "0",
     ]);
     assert_eq!(status.code(), Some(1), "{stderr}");
-    assert!(stdout.starts_with(CPU_DEVICE_RECEIPT_PREFIX), "{stdout}");
+    assert!(
+        stderr
+            .lines()
+            .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+        "the cpu device receipt is reported on stderr:\n{stderr}"
+    );
     let errors = error_lines(&stderr);
     assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
     assert!(
@@ -3531,7 +3554,7 @@ fn run_cpu_device_region_fault_ends_the_run_once() {
         .join("acceptance/c4-single-lane-index-fault")
         .display()
         .to_string();
-    let (stdout, stderr, status) = run_faber_status(&[
+    let (_stdout, stderr, status) = run_faber_status(&[
         "run",
         "--device",
         "cpu",
@@ -3544,7 +3567,12 @@ fn run_cpu_device_region_fault_ends_the_run_once() {
         "3",
     ]);
     assert_eq!(status.code(), Some(1), "{stderr}");
-    assert!(stdout.starts_with(CPU_DEVICE_RECEIPT_PREFIX), "{stdout}");
+    assert!(
+        stderr
+            .lines()
+            .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+        "the cpu device receipt is reported on stderr:\n{stderr}"
+    );
     let errors = error_lines(&stderr);
     assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
     assert!(
@@ -3577,9 +3605,13 @@ fn run_metal_device_kernel_fault_prints_one_coded_error() {
         .join("acceptance/c4-single-lane-index-fault")
         .display()
         .to_string();
-    let (stdout, stderr, status) =
+    let (_stdout, stderr, status) =
         run_faber_status(&["run", "--device", "metal", &path, "--", "1", "0", "0"]);
-    if !cfg!(target_os = "macos") || !stdout.starts_with(METAL_DEVICE_RECEIPT_PREFIX) {
+    if !cfg!(target_os = "macos")
+        || !stderr
+            .lines()
+            .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX))
+    {
         eprintln!("no Metal device: skipped");
         return;
     }
@@ -3606,7 +3638,7 @@ fn assert_faulting_device_run_writes_stats(device: &str, receipt_prefix: &str) {
     let dir = temp_dir(&format!("fault-stats-{device}"));
     let stats = dir.join("stats.json");
     let stats_arg = stats.display().to_string();
-    let (stdout, stderr, status) = run_faber_status(&[
+    let (_stdout, stderr, status) = run_faber_status(&[
         "run",
         "--device",
         device,
@@ -3618,7 +3650,7 @@ fn assert_faulting_device_run_writes_stats(device: &str, receipt_prefix: &str) {
         "0",
         "0",
     ]);
-    if !stdout.starts_with(receipt_prefix) {
+    if !stderr.lines().any(|line| line.starts_with(receipt_prefix)) {
         eprintln!("no {device} device: skipped");
         return;
     }
@@ -3662,7 +3694,11 @@ fn run_auto_device_kernel_fault_runs_the_program_once() {
         .to_string();
     let (stdout, stderr, status) =
         run_faber_status(&["run", "--device", "auto", &path, "--", "1", "0", "2"]);
-    if !cfg!(target_os = "macos") || !stdout.starts_with(METAL_DEVICE_RECEIPT_PREFIX) {
+    if !cfg!(target_os = "macos")
+        || !stderr
+            .lines()
+            .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX))
+    {
         eprintln!("no Metal device: skipped");
         return;
     }
@@ -3678,9 +3714,9 @@ fn run_auto_device_kernel_fault_runs_the_program_once() {
         "{stdout}"
     );
     assert_eq!(
-        stdout.matches("device: selected backend").count(),
+        stderr.matches("device: selected backend").count(),
         1,
-        "{stdout}"
+        "{stderr}"
     );
     let errors = error_lines(&stderr);
     assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
@@ -3761,9 +3797,10 @@ fn assert_metal_route_matches_reference_fixture(package: &str) {
         .display()
         .to_string();
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "metal", &path]);
-    let Some((_, program)) = stdout
-        .split_once('\n')
-        .filter(|(receipt, _)| receipt.starts_with(METAL_DEVICE_RECEIPT_PREFIX))
+    let Some(program) = stderr
+        .lines()
+        .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX))
+        .then_some(stdout.as_str())
     else {
         assert!(
             !metal_required(),
@@ -3776,7 +3813,7 @@ fn assert_metal_route_matches_reference_fixture(package: &str) {
     assert_prints_reference_fixture(package, "metal route", program);
 }
 
-/// The CUDA device line every CUDA device session prints ahead of the program.
+/// The CUDA device line every CUDA device session reports on stderr.
 const CUDA_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `cuda` on ";
 
 /// The CUDA device route must print what the hand-computed `main.ref.json`
@@ -3789,9 +3826,10 @@ fn assert_cuda_route_matches_reference_fixture(package: &str) {
         .display()
         .to_string();
     let (stdout, stderr, status) = run_faber_status(&["run", "--device", "cuda", &path]);
-    let Some((_, program)) = stdout
-        .split_once('\n')
-        .filter(|(receipt, _)| receipt.starts_with(CUDA_DEVICE_RECEIPT_PREFIX))
+    let Some(program) = stderr
+        .lines()
+        .any(|line| line.starts_with(CUDA_DEVICE_RECEIPT_PREFIX))
+        .then_some(stdout.as_str())
     else {
         assert!(
             std::env::var_os("FABER_REQUIRE_CUDA").is_none(),
@@ -3905,10 +3943,11 @@ fn empty_grid_reduction_returns_its_coalesce_fallback_on_every_device() {
                 run_faber_status(&["run", "--device", device, &path, "--", rows, cols]);
             let program = if device == "reference" {
                 stdout.as_str()
-            } else if let Some((receipt, program)) = stdout.split_once('\n')
-                && receipt.starts_with("device: selected backend `")
+            } else if stderr
+                .lines()
+                .any(|line| line.starts_with("device: selected backend `"))
             {
-                program
+                stdout.as_str()
             } else {
                 #[cfg(target_os = "macos")]
                 assert!(

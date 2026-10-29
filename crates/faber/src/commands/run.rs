@@ -947,10 +947,10 @@ fn finish_device_run(
     if let (Some(metadata), Some(runner_stats)) = (metadata, run_stats_value) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
         // `--stats` writes the structured artifact to stdout, so stdout stays
-        // marker-only there and the peak high-water note goes to stderr; the
-        // file-only mode (`--stats-file` alone) has no other channel and keeps
-        // both receipt lines on stdout. Either way the artifact carries
-        // `peak_allocated_bytes`.
+        // marker-only there and the peak high-water note goes to stderr. In
+        // file-only mode (`--stats-file` alone), the peak note remains on
+        // stdout; the backend-selection receipt is reported to stderr in both
+        // modes. Either way the artifact carries `peak_allocated_bytes`.
         let peak_note = format!(
             "device: peak allocated {} bytes",
             device.runtime.peak_allocated_bytes
