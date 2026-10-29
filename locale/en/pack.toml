@@ -5990,21 +5990,27 @@ message = "expected ']' after the JSON array"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "expected a closing brace after the inferred constructor fields"
+help = "Close the inferred constructor with `}`."
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "expected '>' after the call type arguments"
+help = "Close the type-argument list with '>' before the call's '('."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "expected '<' before the constructor type arguments"
+help = "Add '<' before the constructor's type arguments."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "expected '>' after the constructor type arguments"
+help = "Close the constructor's type-argument list with '>'."
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "expected '(' after 'scriptum'"
+help = "Start the `{scriptum}` call with '('."
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "expected ')' after the scriptum arguments"
+help = "Close the `{scriptum}` call with ')' after its arguments."
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "expected an identifier"
@@ -6016,7 +6022,7 @@ help = "put a quoted string literal here"
 
 [diagnostics.PARSE001.issues.expected_mutability_keyword]
 message = "expected '{fixum}' or '{varia}'"
-help = "start the declaration with a mutability keyword"
+help = "Use `{fixum}` for a compile-time constant or `{varia}` for a mutable binding."
 
 [diagnostics.PARSE001.issues.await_binding_requires_name]
 message = "expected a named binding before '↢'"
@@ -6061,15 +6067,15 @@ help = "llvm-host builds natively on aarch64 or x86_64 macOS and Linux only; bui
 
 [diagnostics.PKG001.issues.llvm_host_toolchain_unavailable]
 message = "llvm-host needs a coherent LLVM toolchain (llvm-as and clang of one version): {reason}"
-help = "install LLVM so that llvm-as and clang are on PATH"
+help = "Install matching LLVM tools so `llvm-as` and `clang` of the same version are on PATH"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_unavailable]
 message = "the faber-host-llvm runtime archive is unavailable ({cause}): {detail}"
-help = "make sure cargo is installed and on PATH and that the runtime sources are present, then build again"
+help = "Fix the reported cause: restore runtime sources, fix Cargo, or make the archive path writable, then build again"
 
 [diagnostics.PKG001.issues.llvm_host_runtime_archive_identity_mismatch]
 message = "the faber-host-llvm runtime archive failed identity verification: {detail}"
-help = "delete the stale runtime archive and its receipt under the runtime target directory, then build again"
+help = "Check the archive named in the detail; if it is stale, remove it and its adjacent `.sha256` receipt, then rebuild"
 
 [diagnostics.PKG001.issues.llvm_host_verify_failed]
 message = "llvm-as rejected the module {path}: {detail}"
@@ -6077,7 +6083,7 @@ help = "the emitted LLVM module is invalid; report it as a compiler defect with 
 
 [diagnostics.PKG001.issues.llvm_host_opt_failed]
 message = "opt failed on the module {path}: {detail}"
-help = "check that opt comes from the same LLVM install as llvm-as and clang"
+help = "Check the reported detail and confirm `opt`, `llvm-as`, and `clang` come from the same LLVM install"
 
 [diagnostics.PKG001.issues.llvm_host_opt_unavailable]
 message = "a release llvm-host build needs the opt tool, but it was not found beside llvm-as or on PATH"
@@ -6095,18 +6101,24 @@ message = "kernel `{kernel}` runs serialized on the {device} device"
 
 [diagnostics.INFO001.issues.single_lane]
 message = "kernel `{kernel}` runs on one lane"
+help = "Use an `@ {nucleum}` function with an `{itera}` loop and `{filum}` clause when each lane should handle an item."
 
 [diagnostics.INFO001.issues.not_split]
 message = "kernel `{kernel}` runs on one of the {partitions} partitions: {reason}"
+help = "Check the reason: splitting needs a linear lane grid, a lane range, and writes confined to each lane's range."
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
 message = "kernel `{kernel}`: whether it splits across the {partitions} partitions depends on run-time shapes"
+help = "Choose run-time shapes that give the lane grid and its writes matching ranges for predictable splitting."
 
 [diagnostics.INFO001.issues.whole_call]
 message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
+help = "For independent per-item work, use an `@ {nucleum}` function with an `{itera}` loop and `{filum}` clause."
 
 [diagnostics.INFO001.issues.not_placed]
 message = "kernel `{kernel}` is not placed on the {device} device: {reason}"
+help = "Check the reason and use a kernel form supported by the selected device."
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
+help = "Follow the audit reason to find the dependency. Keep partitioned reads and writes lane-local and use matching buffer layouts where possible."
