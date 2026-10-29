@@ -1,0 +1,17 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "conversio_expr", "assignment", "expr_stmt"]
+category = "conversion"
+summary = "An out-of-range numeric cast exits with the conversion sysexits class 65."
+syntax = "<expression> ↦ <type>"
+related = ["↦", "conversio"]
+locale = "en"
++++
+# An explicit numeric cast beyond the target width is a conversion failure.
+# The runner and llvm-host both report exit 65.
+main {
+    print "before"
+    mut int big ← 300
+    print big ↦ u8
+}
