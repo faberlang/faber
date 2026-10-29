@@ -3373,16 +3373,23 @@ impl FunctionBuilder<'_> {
             let base = self.lower_expr_value(object)?;
             let ty = self.expr_ty(expr)?;
             let operands_effect_free = args.iter().all(|arg| arg.expr.is_effect_free_operand());
-            return self.lower_option_chain_guarded(&base, object.ty, operands_effect_free, ty, expr.span, |this| {
-                let mut call_args = Vec::with_capacity(args.len() + 1);
-                call_args.push(base.clone());
-                call_args.extend(this.lower_hir_call_args(args)?);
-                this.emit_call_shape_check(expr.id, &call_args, 1, expr.span)?;
-                Some(MirOptionChainLink::Call {
-                    callee: MirCallee::definition_with_type_args(target.def_id, Vec::new()),
-                    args: call_args,
-                })
-            });
+            return self.lower_option_chain_guarded(
+                &base,
+                object.ty,
+                operands_effect_free,
+                ty,
+                expr.span,
+                |this, captured_base| {
+                    let mut call_args = Vec::with_capacity(args.len() + 1);
+                    call_args.push(captured_base.clone());
+                    call_args.extend(this.lower_hir_call_args(args)?);
+                    this.emit_call_shape_check(expr.id, &call_args, 1, expr.span)?;
+                    Some(MirOptionChainLink::Call {
+                        callee: MirCallee::definition_with_type_args(target.def_id, Vec::new()),
+                        args: call_args,
+                    })
+                },
+            );
         }
 
         // Callable value: a local binding or non-path expression. Positional args,
