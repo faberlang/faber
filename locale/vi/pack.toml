@@ -150,6 +150,8 @@ brevis = "ngắn"
 descriptio = "mô_tả"
 longum = "dài"
 lane = "làn"
+laxus = "nới_lỏng"
+intutus = "không_an_toàn"
 ubique = "toàn_cục"
 annotatio = "chú_thích"
 versio = "phiên_bản"
@@ -705,6 +707,22 @@ help = "dùng `@ {expected}` cho locale reader của tệp này"
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "một khai báo mang nhiều hơn một annotation `@ nucleum`"
 help = "giữ lại một annotation nucleum duy nhất"
+
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "chú thích `@ {nucleum}` nêu nhiều hơn một mức"
+help = "viết `{laxus}` hoặc `{intutus}`, hoặc không viết gì để dùng mức mặc định"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` không phải là mức của kernel"
+help = "các mức là `{laxus}` và `{intutus}`; không viết gì để dùng mức mặc định"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` không nhận mức"
+help = "mảnh dùng mức của kernel ghép nó; hãy đặt mức trên kernel đó"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "mức kernel cần một hàm kernel"
+help = "viết mức trên khai báo hàm `@ {nucleum}`, hoặc xóa nó"
 
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "fragment `@ nucleum` xung đột với graphics fragment annotation"

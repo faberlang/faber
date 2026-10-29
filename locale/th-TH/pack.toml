@@ -150,6 +150,8 @@ brevis = "สั้น"
 descriptio = "คำอธิบาย"
 longum = "ยาว"
 lane = "เลน"
+laxus = "ผ่อนปรน"
+intutus = "ไม่ปลอดภัย"
 ubique = "โกลบอล"
 annotatio = "คำอธิบายประกอบ"
 versio = "เวอร์ชัน"
@@ -705,6 +707,22 @@ help = "ใช้ `@ {expected}` สำหรับ locale ของไฟล์
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "การประกาศมี annotation `@ nucleum` มากกว่าหนึ่งรายการ"
 help = "เก็บ annotation nucleum ไว้เพียงรายการเดียว"
+
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "คำอธิบายประกอบ `@ {nucleum}` ระบุระดับมากกว่าหนึ่งระดับ"
+help = "เขียน `{laxus}` หรือ `{intutus}` อย่างใดอย่างหนึ่ง หรือไม่เขียนเพื่อใช้ระดับเริ่มต้น"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` ไม่ใช่ระดับของเคอร์เนล"
+help = "ระดับที่มีคือ `{laxus}` และ `{intutus}` ไม่เขียนเพื่อใช้ระดับเริ่มต้น"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` ไม่รับระดับ"
+help = "ส่วนย่อยใช้ระดับของเคอร์เนลที่นำไปประกอบ ให้ใส่ระดับที่เคอร์เนลนั้น"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "ระดับเคอร์เนลต้องใช้กับฟังก์ชันเคอร์เนล"
+help = "เขียนระดับที่การประกาศฟังก์ชัน `@ {nucleum}` หรือลบออก"
 
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "fragment `@ nucleum` ขัดแย้งกับ graphics fragment annotation"

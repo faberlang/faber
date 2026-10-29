@@ -568,6 +568,15 @@ impl Lowerer<'_> {
                 span,
             });
         }
+        // The tier is carried as its Latin keyword identity (`laxus`,
+        // `intutus`); the default tier writes nothing.
+        if let Some(identity) = nucleum.tier.identity() {
+            fields.push(HirAnnotationField {
+                name: self.intern_field_name("tier"),
+                value: HirAnnotationValue::Symbol(self.intern_field_name(identity)),
+                span,
+            });
+        }
         // Authored brace shape: `@ nucleum { … }` keeps braces; the sugar
         // markers (`@ kernel`, `@ kernel fragment`) stay bare.
         let mut annotation = HirAnnotation::with_fields(family, fields, span);

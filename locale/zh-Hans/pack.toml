@@ -150,6 +150,8 @@ brevis = "简"
 descriptio = "描述"
 longum = "详"
 lane = "车道"
+laxus = "宽松"
+intutus = "不安全"
 ubique = "全局"
 annotatio = "注解"
 versio = "版本"
@@ -749,6 +751,22 @@ help = "对该文件的读取器语言环境使用 `@ {expected}`"
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "一个声明携带了多个 `@ nucleum` annotation"
 help = "只保留一个 nucleum annotation"
+
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "`@ {nucleum}` annotation 指定了多个层级"
+help = "写 `{laxus}` 或 `{intutus}`，或什么都不写以使用默认层级"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` 不是 kernel 层级"
+help = "层级为 `{laxus}` 和 `{intutus}`；什么都不写则为默认层级"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` 不接受层级"
+help = "fragment 沿用组合它的 kernel 的层级；请把层级写在那个 kernel 上"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "kernel 层级需要 kernel 函数"
+help = "把层级写在 `@ {nucleum}` 函数声明上，或删除它"
 
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "`@ nucleum` fragment 与图形 fragment annotation 冲突"

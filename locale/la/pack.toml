@@ -137,6 +137,8 @@ futura = "futura"
 imperium = "imperium"
 longum = "longum"
 lane = "lane"
+laxus = "laxus"
+intutus = "intutus"
 operandus = "operandus"
 optio = "optio"
 ubique = "ubique"
@@ -870,6 +872,22 @@ help = "use `target = {functio}` in v1"
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "a declaration carries more than one `@ nucleum` annotation"
 help = "keep a single nucleum annotation"
+
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "adnotatio `@ {nucleum}` plus quam unum gradum nominat"
+help = "scribe `{laxus}` aut `{intutus}`, aut neutrum pro gradu communi"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` non est gradus nuclei"
+help = "gradus sunt `{laxus}` et `{intutus}`; neutrum scribe pro gradu communi"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` gradum non accipit"
+help = "fragmentum gradum nuclei componentis sequitur; gradum in nucleo pone"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "gradus nuclei functionem nuclei requirit"
+help = "gradum in declaratione functionis `@ {nucleum}` scribe, aut remove"
 
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "a `@ nucleum` fragment conflicts with a graphics fragment annotation"

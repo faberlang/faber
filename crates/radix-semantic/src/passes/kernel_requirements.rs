@@ -19,7 +19,7 @@ use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirAnnotation, HirArrayElement, HirBinOp, HirBlock, HirExpression, HirExpressionKind,
     HirFunction, HirId, HirIncDecOp, HirItemKind, HirLocal, HirStatement, HirStatementKind,
-    HirUnOp,
+    HirUnOp, KernelTier,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_target::Target;
@@ -59,6 +59,10 @@ pub struct DeviceRegionRequirement {
 pub struct KernelRequirement {
     pub def_id: DefId,
     pub name: String,
+    /// The tier the author declared (`@ kernel relaxed` / `unsafe`). Under
+    /// the safe switch analysis already read it as the default tier, so this
+    /// is the tier the emitters will see.
+    pub tier: KernelTier,
     pub target_reports: Vec<KernelTargetRequirement>,
 }
 
@@ -324,7 +328,47 @@ fn extent_label(range: &KernelValueRange) -> String {
     "unknown".to_string()
 }
 
+/// The declared tier of every kernel function and kernel method of a module,
+/// keyed by definition. A kernel with no tier word maps to
+/// [`KernelTier::Default`].
+#[must_use]
+pub fn declared_kernel_tiers(
+    hir: &radix_hir::HirModule,
+    interner: &Interner,
+) -> FxHashMap<DefId, KernelTier> {
+    let mut tiers = FxHashMap::default();
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(function) if function.is_kernel => {
+                tiers.insert(
+                    item.def_id,
+                    radix_hir::kernel_tier_of(&item.annotations, interner),
+                );
+            }
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    if method.func.is_kernel {
+                        tiers.insert(
+                            method.def_id,
+                            radix_hir::kernel_tier_of(&method.annotations, interner),
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    tiers
+}
+
 impl KernelRequirementsReport {
+    /// Record each kernel's declared tier on its row.
+    pub fn apply_tiers(&mut self, tiers: &FxHashMap<DefId, KernelTier>) {
+        for kernel in &mut self.kernels {
+            kernel.tier = tiers.get(&kernel.def_id).copied().unwrap_or_default();
+        }
+    }
+
     #[must_use]
     pub fn kernel(&self, def_id: DefId) -> Option<&KernelRequirement> {
         self.kernels.iter().find(|kernel| kernel.def_id == def_id)
@@ -502,7 +546,9 @@ pub fn check(
             ));
         }
     });
-    KernelRequirementsReport { kernels, regions }
+    let mut report = KernelRequirementsReport { kernels, regions };
+    report.apply_tiers(&declared_kernel_tiers(hir, interner));
+    report
 }
 
 /// Whether a kernel declaration carries the `publica` launch marker.
@@ -906,6 +952,7 @@ fn analyze_kernel(
     KernelRequirement {
         def_id,
         name: interner.resolve(function.name).to_owned(),
+        tier: KernelTier::Default,
         target_reports: target_rows(
             &failures,
             &wide_intermediates,

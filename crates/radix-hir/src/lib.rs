@@ -22,6 +22,7 @@ pub mod visit;
 
 use handroll::{FxHashMap, FxHashSet};
 pub use nodes::*;
+pub use radix_syntax::KernelTier;
 pub use radix_types::{DefId, TypeId};
 pub use tensor_edge_policy::{
     ResolvedTensorEdgePolicy, TensorEdgePolicyProviderImpl, TensorEdgePolicyRequirement,

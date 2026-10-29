@@ -150,6 +150,8 @@ brevis = "مختصر"
 descriptio = "وصف"
 longum = "مفصل"
 lane = "مسار"
+laxus = "مسترخ"
+intutus = "غير_آمن"
 ubique = "عمومي"
 annotatio = "تعليق_توضيحي"
 versio = "إصدار"
@@ -705,6 +707,22 @@ help = "استخدم `@ {expected}` للغة القارئ في هذا الملف
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "يوجد في الإعلان أكثر من تعليمة `@ nucleum`"
 help = "أبقِ على تعليمة nucleum واحدة"
+
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "تحدد التعليمة `@ {nucleum}` أكثر من مستوى واحد"
+help = "اكتب `{laxus}` أو `{intutus}`، أو لا تكتب شيئا للمستوى الافتراضي"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` ليس مستوى للنواة"
+help = "المستويان هما `{laxus}` و`{intutus}`؛ لا تكتب شيئا للمستوى الافتراضي"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "لا يقبل `@ {nucleum} {fragment}` مستوى"
+help = "يتبع الجزء مستوى النواة التي تركبه؛ ضع المستوى على تلك النواة"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "يتطلب مستوى النواة دالة نواة"
+help = "اكتب المستوى على إعلان دالة `@ {nucleum}`، أو احذفه"
 
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "جزء `@ nucleum` يتعارض مع تعليمة جزء رسومي"

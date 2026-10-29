@@ -157,6 +157,8 @@ brevis = "short"
 descriptio = "description"
 longum = "long"
 lane = "lane"
+laxus = "relaxed"
+intutus = "unsafe"
 ubique = "global"
 annotatio = "annotation"
 versio = "version"
@@ -1104,6 +1106,22 @@ help = "use `target = {functio}` in v1"
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "a declaration carries more than one `@ nucleum` annotation"
 help = "keep a single nucleum annotation"
+
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "the `@ {nucleum}` annotation names more than one tier"
+help = "write `{laxus}` or `{intutus}`, or neither for the default tier"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` is not a kernel tier"
+help = "the tiers are `{laxus}` and `{intutus}`; write neither for the default tier"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "a `@ {nucleum} {fragment}` takes no tier"
+help = "a fragment uses the tier of the kernel that composes it; put the tier on that kernel"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "a kernel tier needs a kernel function"
+help = "write the tier on an `@ {nucleum}` function declaration, or remove it"
 
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "a `@ nucleum` fragment conflicts with a graphics fragment annotation"

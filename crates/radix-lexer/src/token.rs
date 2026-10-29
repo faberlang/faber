@@ -186,6 +186,10 @@ pub enum TokenKind {
     Descriptio,
     Fragment,
     Imperium,
+    /// `intutus` (en `unsafe`): the `@ nucleum` tier that also drops unproven index checks.
+    Intutus,
+    /// `laxus` (en `relaxed`): the `@ nucleum` tier that allows relaxed float math.
+    Laxus,
     Longum,
     Lane,
     Nomen,

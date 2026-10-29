@@ -118,6 +118,7 @@ fn fixture_metadata(program: &MirProgram) -> MirDeviceFunctionMetadataMap {
                     origin: MirFunctionOrigin::SyntheticKernelClosure,
                     lane_domain_local: None,
                     refused_backends: Default::default(),
+                    tier: crate::device::KernelTier::Default,
                 },
             )
         })
@@ -897,6 +898,7 @@ fn synthetic_row(function_id: u32) -> (MirFunctionId, MirDeviceFunctionMetadata)
             origin: MirFunctionOrigin::SyntheticKernelClosure,
             lane_domain_local: None,
             refused_backends: Default::default(),
+            tier: crate::device::KernelTier::Default,
         },
     )
 }

@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/kernel/tier-unknown-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "kernel/tier-unknown-reject.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_nucleum_tier"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "unknown_nucleum_tier"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "unknown_nucleum_tier"

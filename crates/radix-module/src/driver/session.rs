@@ -136,6 +136,12 @@ pub struct Config {
     /// gates kernel admission (kernel-purity owns that).
     pub kernel_complexity_budget: Option<u32>,
 
+    /// The kernel safe switch (`faber run --safe`, `faber build --safe`,
+    /// `safe = true` in `faber.toml`): every kernel runs at the default tier
+    /// whatever its annotation says. It can only lower a tier. No environment
+    /// variable sets it.
+    pub deny_kernel_tiers: bool,
+
     /// Keep the author's constant expressions as written: analysis does not
     /// fold literal-only float expressions to one literal (F9 ruling 31). Set
     /// by the Faber re-emit behind `faber format` and `faber convert`, which
@@ -178,6 +184,7 @@ impl Default for Config {
             import_path_templates: None,
             complexity_budget: None,
             kernel_complexity_budget: None,
+            deny_kernel_tiers: false,
             keep_authored_constants: false,
             defer_imported_praefixum: false,
             target_bindings: TargetBindings::default(),
@@ -298,6 +305,13 @@ impl Config {
     #[must_use]
     pub fn with_kernel_complexity_budget(mut self, budget: u32) -> Self {
         self.kernel_complexity_budget = Some(budget);
+        self
+    }
+
+    /// Run every kernel at the default tier (the `--safe` switch).
+    #[must_use]
+    pub fn with_safe_kernels(mut self) -> Self {
+        self.deny_kernel_tiers = true;
         self
     }
 

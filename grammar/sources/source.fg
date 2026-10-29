@@ -805,6 +805,8 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Builtin | `lineam` | line |
 # | Builtin | `scriptum` | write |
 # | Annotation | `fragment` | nucleum fragment |
+# | Annotation | `laxus` | kernel tier `@ nucleum laxus` (en `relaxed`); contextual |
+# | Annotation | `intutus` | kernel tier `@ nucleum intutus` (en `unsafe`); contextual |
 # | Annotation | `nondum` | availability marker `@ nondum` (en `@ unstable`) |
 # | Annotation | `nucleum` | kernel annotation |
 # | Annotation | `radix` | compiler-reserved annotation family |
@@ -1139,9 +1141,18 @@ annotation_field_list   := annotation_field (',' annotation_field)*
 annotation_field       := ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
 annotation_sugar       := '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
 nucleum_annotation     := nucleum_sugar | nucleum_braced
+# A tier word (`laxus`, `intutus`; en `relaxed`, `unsafe`) sets the kernel's
+# safety tier (operator ruling 2026-10-28). The tiers are ordered and one
+# choice, never both: a second tier word is `duplicate_nucleum_tier`, an
+# unknown word `unknown_nucleum_tier`. A tier belongs to a kernel function:
+# on a `fragment` it is `nucleum_tier_on_fragment` (a fragment takes the tier
+# of the entry that composes it), and on any other declaration it is
+# `nucleum_tier_non_kernel`. `--safe` / `safe = true` lowers every kernel to
+# the default tier. The braced form carries `fragment` only.
 nucleum_sugar          := '@' 'nucleum' nucleum_modifier? NEWLINE
 nucleum_braced         := '@' 'nucleum' '{' nucleum_field_list? '}'
-nucleum_modifier       := 'fragment'
+nucleum_modifier       := 'fragment' | nucleum_tier
+nucleum_tier           := 'laxus' | 'intutus'
 nucleum_field_list      := nucleum_field (',' nucleum_field)*
 nucleum_field          := 'fragment' '=' ('verum' | 'falsum')
 # `@ radix` is reserved for compiler-owned metadata; applications must not

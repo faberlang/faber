@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/kernel/tier.fab"
+group = "language"
+input_root = "corpus"
+input = "kernel/tier.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

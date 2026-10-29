@@ -75,6 +75,7 @@ mod kernel_legality_body;
 mod kernel_legality_types;
 pub mod kernel_namespace;
 pub mod kernel_requirements;
+pub mod kernel_tier;
 pub mod leading_underscore;
 pub mod ledger_gate;
 pub mod lint;
@@ -255,6 +256,10 @@ mod device_region_test;
 #[cfg(test)]
 #[path = "kernel_requirements_test.rs"]
 mod kernel_requirements_test;
+
+#[cfg(test)]
+#[path = "kernel_tier_test.rs"]
+mod kernel_tier_test;
 
 #[cfg(test)]
 #[path = "kernel_namespace_test.rs"]

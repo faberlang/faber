@@ -2460,6 +2460,7 @@ impl FunctionBuilder<'_> {
                 origin: MirFunctionOrigin::SyntheticKernelClosure,
                 lane_domain_local: None,
                 refused_backends: Default::default(),
+                tier: radix_mir::device::KernelTier::Default,
             },
         );
         Some(id)
@@ -2598,6 +2599,7 @@ impl FunctionBuilder<'_> {
                 origin: MirFunctionOrigin::SyntheticKernelClosure,
                 lane_domain_local: None,
                 refused_backends: Default::default(),
+                tier: radix_mir::device::KernelTier::Default,
             },
         );
         let declaration = MirFilumReduceOp {

@@ -1469,6 +1469,20 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordKind::Annotation,
     },
+    // The `@ nucleum` tier words. Claimed only after `@ nucleum`, so `relaxed`
+    // and `unsafe` stay ordinary identifiers everywhere else.
+    KeywordSpec {
+        text: "laxus",
+        token_kind: Some(TokenKind::Laxus),
+        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
+        category: KeywordKind::Annotation,
+    },
+    KeywordSpec {
+        text: "intutus",
+        token_kind: Some(TokenKind::Intutus),
+        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
+        category: KeywordKind::Annotation,
+    },
     KeywordSpec {
         text: "lane",
         token_kind: Some(TokenKind::Lane),

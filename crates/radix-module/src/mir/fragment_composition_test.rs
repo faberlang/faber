@@ -1618,6 +1618,7 @@ fn synthetic_row(function_id: u32, parent: u32, ordinal: u32) -> (MirFunctionId,
             origin: MirFunctionOrigin::SyntheticKernelClosure,
             lane_domain_local: None,
             refused_backends: Default::default(),
+            tier: radix_mir::device::KernelTier::Default,
         },
     )
 }

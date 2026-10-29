@@ -404,6 +404,7 @@ fn manifest_target_command_probe() {
             },
             false,
             false,
+            false,
         ),
         other => panic!("unknown probe operation {other}"),
     }
