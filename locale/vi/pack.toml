@@ -4346,18 +4346,23 @@ help = "khai báo `{implendum} Sink<T>` với `{functio} sink(T res) → vacuum 
 message = "kernel `{kernel}` chạy tuần tự trên thiết bị {device}"
 
 [diagnostics.INFO001.issues.single_lane]
+message = "kernel `{kernel}` chạy trên một làn"
 help = "Dùng hàm `@ {nucleum}` với vòng lặp `{itera}` và mệnh đề `{filum}` khi mỗi lane cần xử lý một mục."
 
 [diagnostics.INFO001.issues.not_split]
+message = "kernel `{kernel}` chạy trên một trong {partitions} phân vùng: {reason}"
 help = "Kiểm tra lý do: việc tách cần lưới lane tuyến tính, một phạm vi lane và các thao tác ghi chỉ trong phạm vi của từng lane."
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "kernel `{kernel}`: việc chia ra {partitions} phân vùng phụ thuộc vào hình dạng lúc chạy"
 help = "Chọn các shape thời gian chạy sao cho lưới lane và các thao tác ghi có phạm vi khớp nhau để việc tách có thể dự đoán."
 
 [diagnostics.INFO001.issues.whole_call]
+message = "kernel `{kernel}` chạy như một lệnh gọi tuần tự trên một worker CPU"
 help = "Với công việc độc lập trên từng mục, hãy dùng hàm `@ {nucleum}` với vòng lặp `{itera}` và mệnh đề `{filum}`."
 
 [diagnostics.INFO001.issues.not_placed]
+message = "kernel `{kernel}` không được đặt trên thiết bị {device}: {reason}"
 help = "Kiểm tra lý do và dùng dạng kernel được thiết bị đã chọn hỗ trợ."
 
 [diagnostics.INFO001.issues.avoidable_sync]

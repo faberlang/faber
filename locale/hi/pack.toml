@@ -4358,18 +4358,23 @@ help = "`{implendum} Sink<T>` में `{functio} sink(T res) → vacuum ⇥ E`
 message = "कर्नेल `{kernel}` {device} डिवाइस पर क्रमिक रूप से चलता है"
 
 [diagnostics.INFO001.issues.single_lane]
+message = "कर्नेल `{kernel}` एक लेन पर चलता है"
 help = "जब हर lane को एक item संभालना हो, तो `@ {nucleum}` फ़ंक्शन में `{itera}` loop और `{filum}` clause का उपयोग करें।"
 
 [diagnostics.INFO001.issues.not_split]
+message = "कर्नेल `{kernel}` {partitions} विभाजनों में से एक पर चलता है: {reason}"
 help = "कारण देखें: splitting के लिए linear lane grid, lane range, और हर lane की range तक सीमित writes आवश्यक हैं।"
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "कर्नेल `{kernel}`: यह {partitions} विभाजनों में बँटेगा या नहीं, यह रन-टाइम आकारों पर निर्भर है"
 help = "अनुमानित splitting के लिए ऐसे run-time shapes चुनें जिनमें lane grid और उसके writes की ranges मेल खाती हों।"
 
 [diagnostics.INFO001.issues.whole_call]
+message = "कर्नेल `{kernel}` एक CPU वर्कर पर एक क्रमिक कॉल के रूप में चलता है"
 help = "स्वतंत्र per-item कार्य के लिए, `@ {nucleum}` फ़ंक्शन में `{itera}` loop और `{filum}` clause का उपयोग करें।"
 
 [diagnostics.INFO001.issues.not_placed]
+message = "कर्नेल `{kernel}` {device} डिवाइस पर नहीं रखा गया: {reason}"
 help = "कारण देखें और चुने गए device द्वारा समर्थित kernel रूप का उपयोग करें।"
 
 [diagnostics.INFO001.issues.avoidable_sync]
