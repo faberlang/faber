@@ -1083,6 +1083,24 @@ fn named_witness(
     None
 }
 
+fn range_endpoint(
+    bound: &radix_hir::HirRangeBound,
+) -> Option<radix_types::numeric_width::RangeEnd> {
+    match bound {
+        radix_hir::HirRangeBound::Literal(value) => value
+            .parse::<i128>()
+            .ok()
+            .map(radix_types::numeric_width::RangeEnd::Value),
+        radix_hir::HirRangeBound::Unbounded { negative: true } => {
+            Some(radix_types::numeric_width::RangeEnd::NegInf)
+        }
+        radix_hir::HirRangeBound::Unbounded { negative: false } => {
+            Some(radix_types::numeric_width::RangeEnd::PosInf)
+        }
+        radix_hir::HirRangeBound::Name { .. } => None,
+    }
+}
+
 fn validate_policy_range(
     form: &radix_hir::HirTypeForm,
     ty: &radix_types::Type,
@@ -1097,20 +1115,7 @@ fn validate_policy_range(
             check_symbol(*name)?;
         }
     }
-    let endpoint = |bound: &radix_hir::HirRangeBound| match bound {
-        radix_hir::HirRangeBound::Literal(value) => value
-            .parse::<i128>()
-            .ok()
-            .map(radix_types::numeric_width::RangeEnd::Value),
-        radix_hir::HirRangeBound::Unbounded { negative: true } => {
-            Some(radix_types::numeric_width::RangeEnd::NegInf)
-        }
-        radix_hir::HirRangeBound::Unbounded { negative: false } => {
-            Some(radix_types::numeric_width::RangeEnd::PosInf)
-        }
-        radix_hir::HirRangeBound::Name { .. } => None,
-    };
-    let (Some(lo), Some(hi)) = (endpoint(&range.lo), endpoint(&range.hi)) else {
+    let (Some(lo), Some(hi)) = (range_endpoint(&range.lo), range_endpoint(&range.hi)) else {
         return Err(type_presentation_issue("policy_range_not_constant", site));
     };
     if matches!(
@@ -1156,20 +1161,7 @@ fn validate_list_size_range(
     types: &radix_types::TypeTableSnapshot,
     site: &radix_hir::HirTypeSite,
 ) -> Result<(), HirArtifactError> {
-    let endpoint = |bound: &radix_hir::HirRangeBound| match bound {
-        radix_hir::HirRangeBound::Literal(value) => value
-            .parse::<i128>()
-            .ok()
-            .map(radix_types::numeric_width::RangeEnd::Value),
-        radix_hir::HirRangeBound::Unbounded { negative: true } => {
-            Some(radix_types::numeric_width::RangeEnd::NegInf)
-        }
-        radix_hir::HirRangeBound::Unbounded { negative: false } => {
-            Some(radix_types::numeric_width::RangeEnd::PosInf)
-        }
-        radix_hir::HirRangeBound::Name { .. } => None,
-    };
-    let (Some(lo), Some(hi)) = (endpoint(&range.lo), endpoint(&range.hi)) else {
+    let (Some(lo), Some(hi)) = (range_endpoint(&range.lo), range_endpoint(&range.hi)) else {
         return Err(type_presentation_issue("list_range_not_constant", site));
     };
     let resolved = radix_types::numeric_width::resolve_ranged_list(lo, hi, range.inclusive)
