@@ -5305,11 +5305,11 @@ help = "end every path of the body with `{redde}` and the value"
 
 [diagnostics.SEM064.issues.praefixum_result_not_literal]
 message = "the value of `{praefixum}` initializer `{name}` has no literal form"
-help = "return scalars, text, collections of those, tuples, or a non-generic genus; never closures or handles"
+help = "return scalars, text, collections of those, tuples, or a non-generic class; never closures or handles"
 
 [diagnostics.SEM064.issues.praefixum_unsupported]
 message = "`{praefixum}` initializer of `{name}` cannot run at build time: {detail}"
-help = "use only constructs the build-time runner supports"
+help = "Rewrite the body using constructs supported by the build-time runner, such as pure expressions, loops, and pure Faber calls"
 
 [diagnostics.SEM064.issues.praefixum_import_unavailable]
 message = "`{praefixum}` initializer of `{name}` reaches `{callee}`, an import that build-time evaluation does not run in this analysis"
@@ -5321,7 +5321,7 @@ help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or
 
 [diagnostics.SEM065.issues.const_shared_into_var]
 message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
-help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
+help = "write `{varia} {name} ← {copy} {binding}` for an independent value"
 
 [diagnostics.WARN001]
 message = "unused variable"
@@ -5329,11 +5329,11 @@ help = "remove the variable or prefix it with '_'"
 
 [diagnostics.WARN001.issues.unused_variable]
 message = "unused variable"
-help = "remove the variable or prefix it with '_'"
+help = "remove the binding if it is unnecessary; otherwise use its value"
 
 [diagnostics.WARN001.issues.unused_binding]
 message = "unused binding"
-help = "remove the variable or prefix it with '_'"
+help = "remove the binding, or replace it with `_` if the matched value is intentionally ignored"
 
 [diagnostics.WARN002]
 message = "unused import"
@@ -5349,7 +5349,7 @@ help = "remove the function or mark it as used"
 
 [diagnostics.WARN003.issues.unused_function]
 message = "unused function"
-help = "remove the function or mark it as used"
+help = "remove the function, or mark it `@ {publica}` if it belongs in the module's public API"
 
 [diagnostics.WARN004]
 message = "unreachable code"
@@ -5377,7 +5377,7 @@ help = "change '{in}' to '{de}' if mutation is unnecessary"
 
 [diagnostics.WARN008.issues.unused_mut_parameter]
 message = "mutable parameter is never mutated"
-help = "drop the mut marker or mutate the parameter"
+help = "remove `{in}` if the parameter need not be mutable, or mutate it"
 
 [diagnostics.WARN009]
 message = "unused move parameter"
@@ -5385,7 +5385,7 @@ help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
 
 [diagnostics.WARN009.issues.unused_own_parameter]
 message = "owned parameter is never consumed"
-help = "drop the own marker or consume the parameter"
+help = "remove `{own}` if ownership transfer is unnecessary, or consume the parameter"
 
 [diagnostics.WARN010]
 message = "explicit ignotum annotation"
@@ -5409,7 +5409,7 @@ help = "use `let` when the binding is never reassigned"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
 message = "unnecessary mut: binding is never reassigned"
-help = "use `let` when the binding is never reassigned"
+help = "use `{sit}` when the binding is never reassigned"
 
 [diagnostics.WARN014]
 message = "file interface skipped unsupported export"
@@ -5417,7 +5417,7 @@ help = "use a supported export from the module, or wait for fuller file-interfac
 
 [diagnostics.WARN014.issues.file_interface_export_skipped]
 message = "file interface skipped export `{namespace}.{export}` ({reason}); other exports still available"
-help = "use a supported export from the module, or wait for fuller file-interface coverage of this signature"
+help = "if this name is only used in its module, remove `@ {publica}`; otherwise use a signature the file interface supports"
 
 [diagnostics.WARN016]
 message = "monomorphic hole solved to multi-member union"
@@ -5469,7 +5469,7 @@ help = "convert to textus<{magnitudo} N> for O(1) indexing or iterate scalars"
 
 [diagnostics.WARN022.issues.unbounded_textus_index]
 message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
-help = "convert to textus<{magnitudo} N> for O(1) indexing or iterate scalars"
+help = "convert to `string<{magnitudo} N>` for O(1) indexing, or use `{itera} {ex}` to visit Unicode scalars"
 
 [diagnostics.WARN023]
 message = "type test names a member its union cannot hold"
@@ -5485,7 +5485,7 @@ help = "narrow with `est`/`discerne` before any member access; the union itself 
 
 [diagnostics.WARN025.issues.union_no_common_members]
 message = "union `{union}` shares no members; it is store-only until narrowed"
-help = "narrow with `est`/`discerne` before any member access; the union itself is store-only"
+help = "narrow with `{est}` or `{discerne}` before any member access; the union itself is store-only"
 
 [diagnostics.WARN026]
 message = "same-name method with disagreeing signatures is not common"
@@ -5541,7 +5541,7 @@ help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera
 
 [diagnostics.WARN032.issues.positional_lane_param]
 message = "`{parameter}` is the lane id of kernel `{kernel}` only because it is the trailing `u32`; the positional lane form is retiring in favor of `{filum}`"
-help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {fixum} v`"
+help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i, j] {filum} f {sit} v`"
 
 [diagnostics.WARN033]
 message = "an index inside a kernel could not be proven in range; it stays checked (one compare per lane, fatal on a miss)"
@@ -5569,23 +5569,23 @@ help = "number every hole (`§0`, `§1`, …) so each reads the argument you mea
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern alternatives must bind the same names and types"
-help = "make every `aut` alternative bind the same names with the same types"
+help = "make every `{aut}` alternative bind the same names with the same types"
 
 [diagnostics.SEM010.issues.filum_independence_unproven]
 message = "cannot prove thread iteration independence: {reason}"
-help = "use an ordinary loop, or write only the iteration’s own coordinate and read written storage only at that coordinate; do not mutate outer locals or call unproved effects"
+help = "Use an ordinary `{itera}` loop if independence cannot be proved. In a `{filum}` loop, write only each lane's own coordinate, read written storage only there, and avoid outer-local mutation or unproved effects"
 
 [diagnostics.SEM010.issues.break_in_thread_body]
 message = "`{rumpe}` cannot end a `{filum}` loop"
-help = "`{rumpe}` cannot stop a `{filum}` loop: lanes run independently. To find the first match use `{reducta} {via} {argminima} …`; to stop at a cutoff, compute it first and loop to it."
+help = "`{rumpe}` cannot stop a `{filum}` loop, but `{perge}` skips the rest of its lane. Use `{reducta} {via} {prima} …` to find the first match, or compute a cutoff before the loop"
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` cannot leave a `{filum}` loop"
-help = "`{redde}` cannot leave a `{filum}` loop: lanes run independently. To get one value out of the lanes use `{reducta}`; to stop at a cutoff, compute it first and loop to it."
+help = "`{redde}` cannot leave a `{filum}` loop because lanes run independently. `{perge}` skips the rest of its lane; use `{reducta}` to combine lane results, or compute a cutoff before the loop"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "a reduction body can call only device intrinsics, fragments and private kernel helpers: {reason}"
-help = "move the call out of the reduction, or call a private kernel helper"
+help = "move the work before the reduction, or make the helper a private `@ {nucleum}` function"
 
 [diagnostics.SEM010.issues.reducta_body_effect]
 message = "a reduction body must not write or call effects outside its own values: {reason}"
