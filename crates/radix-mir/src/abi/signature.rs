@@ -253,7 +253,8 @@ fn scan_tensor_element_count(
         .ok_or_else(|| MirAbiError::new("scan tensor element count overflows u64"))
 }
 
-/// Append a runtime-extent count resource when the kernel is scalar-shaped.
+/// Append a runtime-extent count resource when the kernel is scalar-shaped
+/// or a run-time-shaped whole-tensor elementwise body.
 ///
 /// "Where the runtime extent applies" (U2): a kernel whose static IO element
 /// count is 1 has `dispatch_size = (1, 1, 1)`, so a guard over the static
@@ -262,6 +263,24 @@ fn scan_tensor_element_count(
 /// the guard reads the binding. Kernels with statically-known multi-element
 /// shapes keep the static limit (correct), and collection-op contracts
 /// (reduction/matmul) stay static per the U2 non-goals.
+///
+/// The same hazard applies to a run-time-shaped whole-tensor elementwise
+/// output-parameter kernel (`o ⇇ a + b` over a `size N` extent,
+/// [`MirKernelSignature::is_elementwise_output_form`]): its buffers carry the
+/// [`RUNTIME_SHAPED_ELEMENT_COUNT`] marker, the one-lane dispatch is the
+/// placeholder, and the per-call launch geometry rounds the real count up to
+/// whole workgroups — so the emitted bounds guard must read the per-call
+/// count channel exactly like the decomposed elementwise emission signature
+/// ([`crate::device_program_plans::append_runtime_extent_count_channel`]).
+/// Without the channel the Metal emitter refuses the kernel fail-closed
+/// (`mir_metal_runtime_shaped_elementwise_extent_missing`). TensorAdd and
+/// friends are collection ops, but they carry NO dispatch contract — the
+/// contract-bearing kernels (reduction, matmul, transpose, ...) stay static
+/// per the U2 non-goals. Lane-form and sequential single-lane bodies are
+/// excluded from the runtime rule: the lane domain carries its own
+/// axis-extent guard and a single-lane body runs one invocation, so neither
+/// dispatches per element — and a run-time-shaped surface outside the
+/// elementwise rule keeps the pre-U2 skip.
 ///
 /// The count type (`numerus<u32>`, L8/L9) must already exist in the frozen
 /// type table; when it cannot be resolved the kernel keeps the static
@@ -275,10 +294,25 @@ fn maybe_append_runtime_extent(
     signature: &mut MirKernelSignature,
     validation: &MirValidationContext<'_>,
 ) {
-    if kernel_has_collection_op(function, |_| true) {
+    let runtime_shaped = signature
+        .resources()
+        .any(MirKernelResource::is_runtime_shaped);
+    // The whole-tensor elementwise output-parameter rule (below): a
+    // run-time-shaped `o ⇇ a + b` body whose collection op carries NO
+    // dispatch contract. Everything else keeps the pre-existing guard
+    // story — collection-op contracts stay static (U2 non-goal), lane-form
+    // bodies guard at the lane domain's axis extents, a sequential
+    // single-lane body runs one invocation, and statically-shaped
+    // multi-element kernels keep the honest static limit.
+    let elementwise_runtime = runtime_shaped
+        && matches!(collection_op_contract(function, validation), Ok(None))
+        && MirKernelSignature::is_elementwise_output_form(function, validation);
+    if kernel_has_collection_op(function, |_| true) && !elementwise_runtime {
         return;
     }
-    if signature.input.element_count != 1 || signature.output.element_count != 1 {
+    if !elementwise_runtime
+        && (signature.input.element_count != 1 || signature.output.element_count != 1)
+    {
         return;
     }
     let Some(extent_ty) = validation
