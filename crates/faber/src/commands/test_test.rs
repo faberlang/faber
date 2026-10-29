@@ -116,7 +116,11 @@ fn package_analysis_failures_render_file_line_and_message() {
         .with_span(Span::new(42, 50))
         .with_source_line("    nomen missing");
     let check_line = radix::module::diagnostics::render_plain(&error);
-    let rendered = super::render_package_analysis_diagnostics(std::slice::from_ref(&error));
+    let rendered = super::render_package_analysis_diagnostics(
+        std::slice::from_ref(&error),
+        radix::services::DiagnosticMode::Normal,
+        None,
+    );
 
     assert_eq!(rendered, check_line);
     assert!(
@@ -160,7 +164,11 @@ fn package_analysis_repeated_warning_codes_collapse_to_a_count() {
         unique.clone(),
         error.clone(),
     ];
-    let rendered = super::render_package_analysis_diagnostics(&diagnostics);
+    let rendered = super::render_package_analysis_diagnostics(
+        &diagnostics,
+        radix::services::DiagnosticMode::Normal,
+        None,
+    );
 
     assert!(
         rendered.contains(&radix::module::diagnostics::render_plain(&error)),

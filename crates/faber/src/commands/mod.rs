@@ -177,11 +177,11 @@ mod air_json {
     }
 }
 
-fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
-    if enabled {
-        DiagnosticMode::Diagnostics
-    } else {
+fn diagnostic_mode(no_diagnostics: bool) -> DiagnosticMode {
+    if no_diagnostics {
         DiagnosticMode::Normal
+    } else {
+        DiagnosticMode::Diagnostics
     }
 }
 
@@ -292,6 +292,7 @@ fn dispatch(command: Command) {
                     deny_codes: args.deny,
                     locale: args.locale,
                     diagnostics_locale: args.diagnostics_locale,
+                    diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 },
                 args.format,
                 args.linter,
@@ -361,7 +362,7 @@ fn dispatch(command: Command) {
                 target: args.target.to_radix(),
                 reflection: args.reflection,
                 output: args.output,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: args.locale,
                 diagnostics_locale: args.diagnostics_locale,
@@ -396,6 +397,7 @@ fn dispatch(command: Command) {
             }
         }
         Command::Convert(args) => cmd_convert(&convert::ConvertCommand {
+            diagnostic_mode: diagnostic_mode(args.no_diagnostics),
             paths: args.paths,
             to: args.to,
             from: args.from,
@@ -405,6 +407,7 @@ fn dispatch(command: Command) {
             stdin: args.stdin,
         }),
         Command::Format(args) => cmd_format(&format::FormatCommand {
+            diagnostic_mode: diagnostic_mode(args.no_diagnostics),
             paths: args.paths,
             check: args.check,
             stdout: args.stdout,
@@ -465,7 +468,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
                 permissive: args.permissive,
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: None,
                 diagnostics_locale: args.diagnostics_locale,
@@ -481,7 +484,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
                 permissive: args.permissive,
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: args.locale,
                 diagnostics_locale: args.diagnostics_locale,
@@ -502,7 +505,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
                 permissive: args.permissive,
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: None,
                 diagnostics_locale: args.diagnostics_locale,

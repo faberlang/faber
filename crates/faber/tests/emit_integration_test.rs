@@ -230,7 +230,7 @@ main {
 }
 
 #[test]
-fn package_check_normal_diagnostics_uses_coded_compact_headers() {
+fn package_check_no_diagnostics_keeps_coded_compact_headers() {
     let package = write_basic_package(
         "package-check-normal",
         r#"
@@ -241,8 +241,11 @@ main {
 "#,
     );
 
-    let (normal_stdout, normal_stderr, normal_ok) =
-        run_faber(&["check", package.to_str().expect("package path")]);
+    let (normal_stdout, normal_stderr, normal_ok) = run_faber(&[
+        "check",
+        "--no-diagnostics",
+        package.to_str().expect("package path"),
+    ]);
     assert!(!normal_ok, "invalid package check should fail");
     assert!(normal_stdout.is_empty());
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI rendered diagnostic contract
@@ -252,12 +255,12 @@ main {
     );
     assert!(
         !normal_stderr.contains("\nphase:"),
-        "normal package check must not render expanded records:\n{normal_stderr}"
+        "compact package check must not render expanded records:\n{normal_stderr}"
     );
 }
 
 #[test]
-fn package_check_expanded_diagnostics_includes_phase_and_span() {
+fn package_check_default_diagnostics_includes_phase_and_span() {
     let package = write_basic_package(
         "package-check-expanded",
         r#"
@@ -268,15 +271,9 @@ main {
 "#,
     );
 
-    let (expanded_stdout, expanded_stderr, expanded_ok) = run_faber(&[
-        "check",
-        "--diagnostics",
-        package.to_str().expect("package path"),
-    ]);
-    assert!(
-        !expanded_ok,
-        "invalid package check --diagnostics should fail"
-    );
+    let (expanded_stdout, expanded_stderr, expanded_ok) =
+        run_faber(&["check", package.to_str().expect("package path")]);
+    assert!(!expanded_ok, "invalid package check should fail");
     assert!(expanded_stdout.is_empty());
     // ALLOW_DIAGNOSTIC_RENDER_TEXT: CLI rendered diagnostic contract
     assert!(

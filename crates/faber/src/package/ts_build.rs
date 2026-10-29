@@ -19,7 +19,7 @@ use radix::module::diagnostics::Diagnostic;
 use radix::module::driver::Config;
 use radix::program::discovery::BuildLayout;
 
-use super::build_recipe::{exit_code_of, report_and_exit, sanitize_file_stem};
+use super::build_recipe::{exit_code_of, sanitize_file_stem};
 use super::ts_project::{
     TS_TARGET, TsProjectFiles, generate_ts_library_files, generate_ts_project_files,
 };
@@ -219,27 +219,44 @@ pub fn cmd_run_ts(
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
     program_args: &[String],
+    diagnostic_mode: radix::services::DiagnosticMode,
 ) -> ! {
     let input = super::absolutize_path(input);
     let (config, locale_pack) =
         match super::config_with_locale(TS_TARGET, &input, locale, diagnostics_locale) {
             Ok(pair) => pair,
-            Err(diag) => report_and_exit(std::slice::from_ref(&*diag), None),
+            Err(diag) => crate::package::build_recipe::report_run_and_exit_mode(
+                std::slice::from_ref(&*diag),
+                None,
+                diagnostic_mode,
+            ),
         };
     // A single `.fab` file has no package of its own: its project goes to a
     // scratch directory instead of beside the source.
     let scratch = std::env::temp_dir().join("faber-run-ts");
     let layout = match super::cmd::discover_build_layout(&input, &scratch) {
         Ok(layout) => layout,
-        Err(diag) => report_and_exit(std::slice::from_ref(&*diag), locale_pack.as_ref()),
+        Err(diag) => crate::package::build_recipe::report_run_and_exit_mode(
+            std::slice::from_ref(&*diag),
+            locale_pack.as_ref(),
+            diagnostic_mode,
+        ),
     };
     let program = match build_ts_program(&config, &input, &layout) {
         Ok(program) => program,
-        Err(diagnostics) => report_and_exit(&diagnostics, locale_pack.as_ref()),
+        Err(diagnostics) => crate::package::build_recipe::report_run_and_exit_mode(
+            &diagnostics,
+            locale_pack.as_ref(),
+            diagnostic_mode,
+        ),
     };
     match run_ts_program(&program, program_args) {
         Ok(status) => std::process::exit(exit_code_of(status)),
-        Err(diag) => report_and_exit(std::slice::from_ref(&diag), locale_pack.as_ref()),
+        Err(diag) => crate::package::build_recipe::report_run_and_exit_mode(
+            std::slice::from_ref(&diag),
+            locale_pack.as_ref(),
+            diagnostic_mode,
+        ),
     }
 }
 

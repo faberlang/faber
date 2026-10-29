@@ -49,14 +49,10 @@ entry = "main.fab"
     );
 }
 
-/// A bodyless function in an `en` file (need, items 3 and 4).
-///
-/// Plain mode is terse by design for every coded diagnostic: code, location
-/// and source line, with no prose (the prose lives in the reader pack and
-/// shows under `--diagnostics`). The `--diagnostics` text names the `en`
-/// keyword `fn`, never the Latin `functio`.
+/// A bodyless function in an `en` file: expanded check output is the default,
+/// and `--no-diagnostics` preserves the compact form.
 #[test]
-fn check_bodyless_function_in_en_file_plain_is_terse_and_diagnostics_prints_en_keyword() {
+fn check_default_prints_help_and_no_diagnostics_keeps_the_compact_form() {
     let root = tempfile::tempdir().expect("create check fixture root");
     let file = root.path().join("bodyless.fab");
     std::fs::write(
@@ -69,33 +65,41 @@ fn check_bodyless_function_in_en_file_plain_is_terse_and_diagnostics_prints_en_k
         .expect("locate faber binary");
 
     let plain = Command::new(&binary)
-        .args(["check"])
+        .args(["check", "--no-diagnostics"])
         .arg(&file)
         .output()
         .expect("run faber check");
     let plain = String::from_utf8_lossy(&plain.stderr);
     assert!(
         plain.contains("error[PARSE012]"),
-        "plain mode keeps the code header:\n{plain}"
+        "--no-diagnostics keeps the code header:\n{plain}"
     );
     assert!(
         !plain.contains("expected function body"),
-        "plain mode is terse by design: no message prose:\n{plain}"
+        "--no-diagnostics omits message prose:\n{plain}"
+    );
+    assert!(
+        !plain.contains("help:"),
+        "compact output omits help:\n{plain}"
     );
 
     let expanded = Command::new(&binary)
-        .args(["check", "--diagnostics"])
+        .args(["check"])
         .arg(&file)
         .output()
-        .expect("run faber check --diagnostics");
+        .expect("run faber check");
     let expanded = String::from_utf8_lossy(&expanded.stderr);
     assert!(
         expanded.contains("expected function body for 'fn' declaration"),
-        "--diagnostics names the en keyword:\n{expanded}"
+        "default diagnostics names the en keyword:\n{expanded}"
+    );
+    assert!(
+        expanded.contains("\nhelp:"),
+        "default diagnostics shows the help text:\n{expanded}"
     );
     assert!(
         !expanded.contains("'functio'"),
-        "an en diagnostic must not print the Latin keyword:\n{expanded}"
+        "the default diagnostic must not print the Latin keyword:\n{expanded}"
     );
 }
 
@@ -207,17 +211,17 @@ fn check_lower_accepts_the_optional_parameter_exemplar() {
     );
 }
 
-/// `--diagnostics` renders the lowering failure with its named issue too.
+/// Default expanded diagnostics render the lowering failure with its named issue too.
 #[test]
 fn check_lower_diagnostics_mode_keeps_the_named_issue() {
     let root = tempfile::tempdir().expect("create fixture root");
     let file = root.path().join("located.fab");
     std::fs::write(&file, CHECKS_BUT_DOES_NOT_LOWER_SOURCE).expect("write source");
-    let (ok, stderr) = run_check(&["--lower", "--diagnostics"], &file);
+    let (ok, stderr) = run_check(&["--lower"], &file);
     assert!(!ok, "{stderr}");
     assert!(
         stderr.contains("package_mir_cli_surface_unsupported"),
-        "--diagnostics keeps the named issue:\n{stderr}"
+        "default diagnostics keeps the named issue:\n{stderr}"
     );
 }
 

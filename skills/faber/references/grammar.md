@@ -635,5 +635,5 @@ When asked whether syntax is valid:
 3. If behavior depends on parser reality, start in `crates/radix` and follow the live parser crate.
 4. If behavior depends on codegen or CLI runtime, inspect the live driver and the relevant backend.
 5. Probe small: write a `.fab` under the scratchpad (a file with no `locale` frontmatter reads as en), then
-   `faber check --diagnostics f.fab` (message and help text; plain `check` prints only the code and issue),
+   `faber check f.fab` (message and help text; `check --no-diagnostics` prints only the code and issue),
    `faber explain <CODE>` for a diagnostic, and `faber run f.fab`. `faber parse` / `faber lex` print the AST/tokens.

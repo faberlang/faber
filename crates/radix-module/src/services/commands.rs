@@ -3,9 +3,10 @@
 use std::path::PathBuf;
 
 /// Diagnostic reporting style for command paths that support expanded records.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum DiagnosticMode {
     /// Preserve the command's existing human terminal output.
+    #[default]
     Normal,
 
     /// Print one expanded phase-aware record per normalized diagnostic.
@@ -127,4 +128,7 @@ pub struct BuildCommand {
 
     /// Project-wide diagnostic message locale; independent of code locale.
     pub diagnostics_locale: Option<String>,
+
+    /// Reporting style for source diagnostics.
+    pub diagnostic_mode: DiagnosticMode,
 }

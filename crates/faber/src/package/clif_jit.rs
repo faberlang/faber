@@ -24,7 +24,6 @@ use radix::module::codegen::Target;
 use radix::module::{ClifEngine, ClifRuntimeTable, Output};
 
 use super::cmd::{package_compile_result, use_package_compiler};
-use crate::package::build_recipe::report_and_exit;
 
 /// `faber run --target clif-jit`: compile `input` in memory, run it with
 /// `program_args` and exit with the program's own status.
@@ -36,6 +35,7 @@ pub fn cmd_run_clif_jit(
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
     program_args: &[String],
+    diagnostic_mode: radix::services::DiagnosticMode,
 ) -> ! {
     let target = Target::MirClif;
     let is_package = use_package_compiler(target, input, false);
@@ -47,7 +47,11 @@ pub fn cmd_run_clif_jit(
     let (config, locale_pack) =
         match crate::package::config_with_locale(target, &input_path, locale, diagnostics_locale) {
             Ok(pair) => pair,
-            Err(diagnostic) => report_and_exit(std::slice::from_ref(&*diagnostic), None),
+            Err(diagnostic) => crate::package::build_recipe::report_run_and_exit_mode(
+                std::slice::from_ref(&*diagnostic),
+                None,
+                diagnostic_mode,
+            ),
         };
     let config = config.with_clif_engine(ClifEngine::Jit(ClifRuntimeTable::new(
         faber_rt_clif::runtime_symbols(),
@@ -59,11 +63,12 @@ pub fn cmd_run_clif_jit(
     };
     crate::postprocess::print_diagnostics(
         &result.diagnostics,
-        radix::services::DiagnosticMode::Normal,
+        diagnostic_mode,
         locale_pack.as_ref(),
     );
     let Some(output) = result.output else {
         eprintln!("compilation failed");
+        crate::package::build_recipe::print_run_explain_footer(&result.diagnostics);
         crate::exit_status::exit_for_compile_failure(&result.diagnostics);
     };
     let Output::ClifJit(image) = output else {

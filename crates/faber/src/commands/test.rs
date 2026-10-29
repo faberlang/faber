@@ -45,6 +45,8 @@ struct TestRunOptions {
     /// The CPU device worker count: `--threads` > manifest `[device]
     /// threads`; `None` is the device default (half the cores).
     cpu_workers: Option<std::num::NonZeroU32>,
+    diagnostic_mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<radix::module::locale::LocalePack>,
 }
 
 #[derive(Debug, Default)]
@@ -79,7 +81,15 @@ pub(super) fn cmd_test(args: &TestArgs) {
         && !args.path.exists()
     {
         let diagnostic = package::missing_package_path_diagnostic(&args.path);
-        eprintln!("{}", radix::module::diagnostics::render_plain(&diagnostic));
+        faber_cli::postprocess::print_diagnostics(
+            std::slice::from_ref(&diagnostic),
+            if args.no_diagnostics {
+                radix::services::DiagnosticMode::Normal
+            } else {
+                radix::services::DiagnosticMode::Diagnostics
+            },
+            None,
+        );
         exit_status::exit_for_diagnostic(&diagnostic);
     }
 
@@ -115,7 +125,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
     }
     // --test-timeout 0 is rejected fail-closed at parse time (cli parser);
     // cmd_test never sees a zero default here.
-    let options = TestRunOptions {
+    let mut options = TestRunOptions {
         filters,
         skips: args.skip.clone(),
         suites: args.suite.clone(),
@@ -129,6 +139,12 @@ pub(super) fn cmd_test(args: &TestArgs) {
         kernel_policy: selection.kernel_policy(),
         cpu_session,
         cpu_workers,
+        diagnostic_mode: if args.no_diagnostics {
+            radix::services::DiagnosticMode::Normal
+        } else {
+            radix::services::DiagnosticMode::Diagnostics
+        },
+        diagnostics_locale_pack: None,
     };
 
     // A named `.proba` argument is the source selection. `--include` on
@@ -178,18 +194,19 @@ pub(super) fn cmd_test(args: &TestArgs) {
                 exit_status::exit_for_diagnostic(&diag);
             }
         };
-    let config = match package::config_with_locale(
+    let (config, diagnostics_locale_pack) = match package::config_with_locale(
         analysis_target,
         &input_path,
         args.locale.as_deref(),
         args.diagnostics_locale.as_deref(),
     ) {
-        Ok((config, _locale_pack)) => config.with_warn_policy(warn_policy),
+        Ok((config, locale_pack)) => (config.with_warn_policy(warn_policy), locale_pack),
         Err(diag) => {
             eprintln!("error: {}", diag.message);
             exit_status::exit_for_diagnostic(&diag);
         }
     };
+    options.diagnostics_locale_pack = diagnostics_locale_pack;
     // Rule 16.3: `reference` (and `cpu` outside the CPU session) lower `@
     // kernel` functions as ordinary host functions; the runner policy in
     // `options` then executes them. The CPU session keeps device-form
@@ -368,7 +385,11 @@ fn run_single_file_with_options(
     match run_source_with_options(&session, &name, &source, options, include_ignored, focused) {
         Ok(result) => result,
         Err(error) => {
-            print_run_error(&error);
+            print_run_error(
+                &error,
+                options.diagnostic_mode,
+                options.diagnostics_locale_pack.as_ref(),
+            );
             std::process::exit(crate::script::status_for_run_source_error(&error));
         }
     }
@@ -478,14 +499,24 @@ fn run_package_with_options(
 ) -> Result<(ProbaReport, bool, RunMetadata), PackageAnalysisFailure> {
     let package = match package::analyze_package_for_tests(config, input, proba_filter) {
         Ok(package) => package,
-        Err(diagnostics) => return Err(package_analysis_failure(&diagnostics)),
+        Err(diagnostics) => {
+            return Err(package_analysis_failure(
+                &diagnostics,
+                options.diagnostic_mode,
+                options.diagnostics_locale_pack.as_ref(),
+            ));
+        }
     };
     if package
         .diagnostics
         .iter()
         .any(radix::module::diagnostics::Diagnostic::is_error)
     {
-        return Err(package_analysis_failure(&package.diagnostics));
+        return Err(package_analysis_failure(
+            &package.diagnostics,
+            options.diagnostic_mode,
+            options.diagnostics_locale_pack.as_ref(),
+        ));
     }
 
     let unmatched_include = proba_filter.is_some_and(|filter| {
@@ -551,7 +582,11 @@ fn run_package_with_options(
                     UnitFailure::Setup(diagnostics) => (diagnostics, "test unit setup failed"),
                     UnitFailure::Link(diagnostics) => (diagnostics, "package MIR test link failed"),
                 };
-                super::eprint_compile_diagnostics(&diagnostics);
+                faber_cli::postprocess::print_diagnostics(
+                    &diagnostics,
+                    options.diagnostic_mode,
+                    options.diagnostics_locale_pack.as_ref(),
+                );
                 eprintln!("error: {what} for {}", unit_path.display());
                 let report = blocked_unit_report_with_options(
                     &unit_path,
@@ -1094,8 +1129,11 @@ impl std::fmt::Display for PackageAnalysisFailure {
 
 fn package_analysis_failure(
     diagnostics: &[radix::module::diagnostics::Diagnostic],
+    diagnostic_mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
 ) -> PackageAnalysisFailure {
-    let rendered = render_package_analysis_diagnostics(diagnostics);
+    let rendered =
+        render_package_analysis_diagnostics(diagnostics, diagnostic_mode, diagnostics_locale_pack);
     let message = if rendered.is_empty() {
         "error: package analysis failed".to_owned()
     } else {
@@ -1111,7 +1149,18 @@ fn package_analysis_failure(
 /// `faber check`; repeated warning codes collapse to one counted line (E4).
 fn render_package_analysis_diagnostics(
     diagnostics: &[radix::module::diagnostics::Diagnostic],
+    diagnostic_mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
 ) -> String {
+    if diagnostic_mode == radix::services::DiagnosticMode::Diagnostics {
+        return match diagnostics_locale_pack {
+            Some(pack) => {
+                radix::module::diagnostics::render_expanded_diagnostics_with_pack(diagnostics, pack)
+                    .unwrap_or_else(|error| format!("error: failed to render diagnostics: {error}"))
+            }
+            None => radix::module::diagnostics::render_expanded_diagnostics(diagnostics),
+        };
+    }
     let mut warning_counts = HashMap::<&str, usize>::new();
     for diag in diagnostics {
         if diag.severity == radix::module::diagnostics::Severity::Warning
@@ -1139,16 +1188,18 @@ fn render_package_analysis_diagnostics(
     lines.join("\n")
 }
 
-fn print_run_error(error: &radix::module::mir::RunSourceError) {
+fn print_run_error(
+    error: &radix::module::mir::RunSourceError,
+    diagnostic_mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
+) {
     match error {
         radix::module::mir::RunSourceError::Frontend(diagnostics) => {
-            for diag in diagnostics {
-                if diag.is_error() {
-                    eprintln!("error: {}", diag.message);
-                } else {
-                    eprintln!("warning: {}", diag.message);
-                }
-            }
+            faber_cli::postprocess::print_diagnostics(
+                diagnostics,
+                diagnostic_mode,
+                diagnostics_locale_pack,
+            );
         }
         radix::module::mir::RunSourceError::Mir(errors) => {
             for error in errors {

@@ -40,6 +40,7 @@ fn run_args(path: PathBuf, device: Option<DeviceChoice>) -> RunArgs {
         stats_file: None,
         shuffle_seed: None,
         debug: false,
+        no_diagnostics: false,
         deny_warnings: false,
         deny: Vec::new(),
         args: Vec::new(),
@@ -816,9 +817,9 @@ fn single_file_cli_run_binds_operands_after_double_dash() {
 
 /// A single-file `@ cli` run with no operand value must refuse, not silently
 /// run with an unbound operand. The identity is asserted by code and issue
-/// (reader-locale D7 renders the compact identity; message prose is a pack and
-/// `--diagnostics` render, never stderr text), naming the CLI surface the
-/// shared package planning rejected.
+/// (reader-locale D7 renders the compact identity; message prose is in the
+/// pack and `--no-diagnostics` preserves that compact form), naming the CLI
+/// surface that shared package planning rejected.
 #[test]
 fn single_file_cli_run_missing_operand_refuses_by_name() {
     let dir = temp_dir("single-file-cli");
