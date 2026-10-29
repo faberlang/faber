@@ -2157,67 +2157,67 @@ help = "keep conditions, bounds and scalar arguments to values known before the 
 
 [diagnostics.SEM008.issues.nucleum_saturating_float_not_built]
 message = "a kernel cannot use a saturating float yet ({site}); device lowering of saturating floats is not built"
-help = "use the bare float width in the kernel and convert at the host boundary with `↦`"
+help = "use a bare float width in the kernel; keep `{saturatus}<f32>` at the host boundary and convert with `↦`"
 
 [diagnostics.SEM008.issues.nucleum_typed_error_channel]
 message = "kernel '{kernel}' declares a typed error channel; a kernel may declare only a text error"
-help = "declare `⇥ text` (a constant message per failure site) and let the launching host map it to its own error type"
+help = "declare `⇥ {textus}` (one constant message per failure site) and let the launching host map it to its own error type"
 
 [diagnostics.SEM008.issues.nucleum_workgroup]
 message = "a kernel cannot name '{construct}' ({site}); workgroup state is compiler-internal"
-help = "express the parallel pattern with a filum loop or a reduction"
+help = "express the parallel pattern with a `{filum}` loop or a built-in reduction"
 
 [diagnostics.SEM008.issues.object_destructuring_initializer]
 message = "object destructuring requires initializer"
-help = "fix the AST construct for lowering"
+help = "add an initializer after the destructuring pattern with `←`"
 
 [diagnostics.SEM008.issues.object_destructuring_not_expanded]
 message = "object destructuring should be expanded before statement lowering"
-help = "fix the AST construct for lowering"
+help = "this is an internal lowering error; report it with the source instead of rewriting valid destructuring"
 
 [diagnostics.SEM008.issues.precision_marker_shape]
 message = "precision marker must be a bare spelling such as ms or us"
-help = "fix the AST construct for lowering"
+help = "use one bare precision marker: `{instans}<ms>`, `{instans}<us>`, or `{instans}<ns>`"
 
 [diagnostics.SEM008.issues.ascii_format_hint_not_capacity]
 message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<{magnitudo} N> via Hex|Bin|Oct"
-help = "write ascii<{magnitudo} N> via Hex, ascii<{magnitudo} N> via Bin, or ascii<{magnitudo} N> via Oct with N as digit width"
+help = "put the capacity in the type and the format on a conversion, for example `value ↦ ascii<{magnitudo} N> via Hex` (or `Bin`/`Oct`); N is the digit width"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
-help = "string<{magnitudo} N>, ascii<{magnitudo} N>, and {lista}<b8, {magnitudo} N> are bounded forms, spelled with their own type words"
+help = "remove unsupported parameters; bounded forms are `string<{magnitudo} N>`, `ascii<{magnitudo} N>`, and `{lista}<b8, {magnitudo} N>`, while instant precision uses `{instans}<ms>`, `{instans}<us>`, or `{instans}<ns>`"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
-help = "fix the AST construct for lowering"
+help = "export the type from its module with `@ public`, or import it directly by name"
 
 [diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
 message = "qualified type prefix must name a namespace"
-help = "fix the AST construct for lowering"
+help = "qualify the type with an imported module namespace, or import the type directly by name"
 
 [diagnostics.SEM008.issues.radix_typus_allowed_type_not_concrete]
 message = "@ radix typus allowed type must be concrete"
-help = "fix the AST construct for lowering"
+help = "remove application-authored `@ radix` metadata; it is reserved for the compiler"
 
 [diagnostics.SEM008.issues.radix_typus_non_type_param]
 message = "@ radix typus can constrain only type parameters"
-help = "fix the AST construct for lowering"
+help = "remove application-authored `@ radix` metadata; it is reserved for the compiler"
 
 [diagnostics.SEM008.issues.radix_typus_unknown_generic]
 message = "@ radix typus names an unknown generic parameter"
-help = "fix the AST construct for lowering"
+help = "remove application-authored `@ radix` metadata; it is reserved for the compiler"
 
 [diagnostics.SEM008.issues.schema_nested_column]
 message = "a column cannot be a nested schema declaration"
-help = "declare the nested schema separately and name it as the column type"
+help = "use a non-schema type for each column; schemas describe flat result columns"
 
 [diagnostics.SEM008.issues.scrinium_arity]
 message = "scrinium accepts at most one payload type parameter"
-help = "fix the AST construct for lowering"
+help = "use `{scrinium}<T>` for one payload type, or bare `{scrinium}` for the default payload"
 
 [diagnostics.SEM008.issues.scrinium_missing_builtin]
 message = "builtin scrinium type is not registered"
-help = "fix the AST construct for lowering"
+help = "this is a compiler registration error; report it rather than changing the type"
 
 [diagnostics.SEM008.issues.sermo_arity]
 message = "{sermo} takes no type arguments or exactly two: {sermo}<O, R>"
@@ -2225,39 +2225,39 @@ help = "write {sermo}<Opener, Reply> or bare {sermo}"
 
 [diagnostics.SEM008.issues.sermo_missing_builtin]
 message = "builtin sermo type is not registered"
-help = "fix the AST construct for lowering"
+help = "this is a compiler registration error; report it rather than changing the type"
 
 [diagnostics.SEM008.issues.series_params]
 message = "series cannot accept parameters"
-help = "fix the AST construct for lowering"
+help = "use bare `{series}`; the type takes no parameters"
 
 [diagnostics.SEM008.issues.tensor_element_unbounded]
 message = "a tensor, vector, matrix, or sparse element cannot be the unbounded integer `inf`"
-help = "use `lista<inf>`; a tensor element must have a device layout"
+help = "use `{lista}<inf>` for unbounded integers; tensor elements need a bounded device layout"
 
 [diagnostics.SEM008.issues.sparsa_element_non_numeric]
 message = "sparse element type must be numeric in v1"
-help = "fix the AST construct for lowering"
+help = "use a numeric element type such as `f32` or `i32`"
 
 [diagnostics.SEM008.issues.sparsa_incomplete]
 message = "sparse requires element type and Figura; use sparse<T, Figura>"
-help = "fix the AST construct for lowering"
+help = "write the element type and shape, for example `{sparsa}<f32, [2, 3]>`"
 
 [diagnostics.SEM008.issues.sparsa_missing_figura]
 message = "sparse requires a Figura shape; use sparse<T, []> for rank-0"
-help = "fix the AST construct for lowering"
+help = "add a shape argument, such as `{sparsa}<f32, []>` for rank 0"
 
 [diagnostics.SEM008.issues.standalone_width_internal]
 message = "internal error lowering standalone width type"
-help = "fix the AST construct for lowering"
+help = "this is an internal type-lowering error; report it with the source instead of changing a valid width type"
 
 [diagnostics.SEM008.issues.tensor_incomplete]
 message = "tensor requires element type and Figura; use tensor<T, Figura>"
-help = "fix the AST construct for lowering"
+help = "write the element type and shape, for example `tensor<f32, [2, 3]>`"
 
 [diagnostics.SEM008.issues.tensor_missing_figura]
 message = "tensor requires a Figura shape; use tensor<T, []> for rank-0"
-help = "fix the AST construct for lowering"
+help = "add a shape argument, such as `tensor<f32, []>` for rank 0"
 
 [diagnostics.SEM008.issues.template_application_arity_mismatch]
 message = "template application has {actual} arguments but template has {expected} holes"
@@ -2265,11 +2265,11 @@ help = "match the argument count to the template hole count"
 
 [diagnostics.SEM008.issues.template_hole_index_gap]
 message = "numbered hole §{index} is never filled; the numbers must cover every position from §0"
-help = "renumber the holes without a gap, or remove the unused argument"
+help = "renumber holes to cover every position from `§0`; repeated numbers may reuse an argument"
 
 [diagnostics.SEM008.issues.template_type_args]
 message = "template application does not accept type arguments"
-help = "fix the AST construct for lowering"
+help = "remove the type arguments; string-template applications take value arguments for their holes"
 
 [diagnostics.SEM008.issues.top_level_initializer]
 message = "top-level variable declaration requires initializer"
