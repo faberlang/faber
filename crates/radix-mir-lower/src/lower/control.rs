@@ -2398,6 +2398,28 @@ impl FunctionBuilder<'_> {
             self.device_role,
             None,
         );
+        // Admission above proved each tensor read against the source
+        // coordinates. Carry that fact on the existing checked-index carrier;
+        // the helper itself has no lane from which to rediscover it.
+        struct ProvenReads<'a> {
+            types: &'a TypeTable,
+            ids: Vec<radix_hir::HirId>,
+        }
+        impl HirVisitor for ProvenReads<'_> {
+            fn visit_expr(&mut self, expr: &HirExpression) {
+                if let HirExpressionKind::Index(receiver, _) = &expr.kind
+                    && receiver.ty.is_some_and(|ty| {
+                        matches!(self.types.get(self.types.peel_access_marker(ty).1), Type::Tensor(..))
+                    })
+                {
+                    self.ids.push(expr.id);
+                }
+                radix_hir::visit::walk_expr(self, expr);
+            }
+        }
+        let mut reads = ProvenReads { types: self.types, ids: Vec::new() };
+        reads.visit_expr(key);
+        Arc::make_mut(&mut nested.context.proven_indexes).extend(reads.ids);
         for capture in captures {
             nested.add_param(
                 capture.source,
