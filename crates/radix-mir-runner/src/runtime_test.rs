@@ -8,6 +8,24 @@ use radix_mir::{
 };
 use radix_types::{Primitive, TypeTable};
 
+#[test]
+fn float_sum_accumulates_f32_elements_wide_at_large_extent() {
+    const ELEMENT_COUNT: u32 = (1 << 25) + 1;
+    let count = usize::try_from(ELEMENT_COUNT).unwrap();
+    let total = sum_float_values(
+        std::iter::repeat_with(|| Value::Float(1.0)).take(count),
+        Span::default(),
+    )
+    .expect("large f32 sum must succeed");
+
+    #[allow(clippy::cast_possible_truncation)]
+    let got = total as f32;
+    #[allow(clippy::cast_possible_truncation)]
+    let expected = f64::from(ELEMENT_COUNT) as f32;
+    assert_eq!(got.to_bits(), expected.to_bits());
+    assert_eq!(got, 33_554_432.0);
+}
+
 fn eval_collection(op: MirCollectionOp, values: Vec<Value>) -> Result<Value, RunnerError> {
     let mut types = TypeTable::new();
     let result_ty = types.primitive(Primitive::Valor);
