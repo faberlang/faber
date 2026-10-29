@@ -5121,51 +5121,51 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 
 [diagnostics.SEM059.issues.reference_place_op]
 message = "@ radix lane \"{lane}\" rejects this function body: reference/place operations are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Pass values directly to AIR functions; remove explicit `{de}` bindings and dereferences from the AIR body"
 
 [diagnostics.SEM059.issues.rethrow_in_recovery]
 message = "@ radix lane \"{lane}\" rejects this function body: `iace` inside a recovery arm (a rethrow) is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Handle the error in the recovery arm; do not use `{iace}` there"
 
 [diagnostics.SEM059.issues.runtime_assertion]
 message = "@ radix lane \"{lane}\" rejects this function body: runtime assertions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Check the condition before calling the AIR function, or use `{si}` to choose a result instead of asserting at runtime"
 
 [diagnostics.SEM059.issues.runtime_conversion]
 message = "@ radix lane \"{lane}\" rejects this function body: runtime `↦` conversion is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Convert the value before calling the AIR function, then pass it in its target type"
 
 [diagnostics.SEM059.issues.runtime_provided_binding]
 message = "@ radix lane \"{lane}\" rejects this function body: runtime-provided bindings are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Pass each needed value as an explicit parameter instead of reading a runtime-provided binding"
 
 [diagnostics.SEM059.issues.runtime_variant_check]
 message = "@ radix lane \"{lane}\" rejects this function body: runtime `est` variant check is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Use `{discerne}` to handle each variant explicitly"
 
 [diagnostics.SEM059.issues.sort_expression_unsupported]
 message = "@ radix lane \"{lane}\" rejects this function body: sort expressions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Sort the data outside the AIR lane, then pass the ordered value in"
 
 [diagnostics.SEM059.issues.spread_call_arg]
 message = "@ radix lane \"{lane}\" rejects this function body: spread call arguments are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Pass each argument explicitly to the AIR function instead of spreading a collection"
 
 [diagnostics.SEM059.issues.tacet]
 message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Remove `{tacet}`; leave the block empty if it has no work to do"
 
 [diagnostics.SEM059.issues.tensor_method_receiver]
 message = "@ radix lane \"{lane}\" rejects this function body: tensor method `{method}` on a non-tensor receiver is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Call this intrinsic on a tensor receiver; use a scalar operation when the value is scalar"
 
 [diagnostics.SEM059.issues.unapproved_effect]
 message = "@ radix lane \"{lane}\" rejects this function body: scan expressions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "Run the scan outside the AIR lane; use a tensor reduction such as `.sum()` when you need one aggregate result"
 
 [diagnostics.SEM059.issues.closure_capture]
 message = "closure capture is not allowed here"
-help = "pass the value as a parameter instead of capturing it"
+help = "Keep the callback capture-free: use module constants for fixed values, and make varying data part of the callback input"
 
 [diagnostics.SEM060]
 message = "invalid constant initializer"
@@ -5173,7 +5173,7 @@ help = "move the computation into a function, or use a `{praefixum}` block"
 
 [diagnostics.SEM060.issues.constant_initializer_not_constant]
 message = "the initializer of constant `{name}` is not a compile-time constant"
-help = "`=` states a compile-time fact: use literals, arithmetic, text, collection literals of those, and other constants; compute with a `{praefixum}` block, or for a value computed at runtime write `{fixum} T name ← value`"
+help = "`=` needs literals, supported arithmetic or text expressions, collection literals, or other constants; use `{praefixum}` for build-time work or `{sit} T name ← value` for a runtime value"
 
 [diagnostics.SEM060.issues.constant_arithmetic_overflow]
 message = "the initializer of constant `{name}` does not fit its type"
@@ -5185,7 +5185,7 @@ help = "fix the divisor"
 
 [diagnostics.SEM060.issues.constant_deferred]
 message = "constant initializer is deferred"
-help = "use a compile-time computable initializer"
+help = "This `{praefixum}` initializer is evaluated later in the build; dependent constants are folded afterward"
 
 [diagnostics.SEM060.issues.constant_dependency]
 message = "constant initializer depends on a non-constant"
@@ -5197,7 +5197,7 @@ help = "embed a package-relative file that exists, as `textus` (UTF-8) or `{list
 
 [diagnostics.SEM061.issues.insere_file_missing]
 message = "embedded file `{path}` does not exist"
-help = "paths resolve against the package root (the nearest `faber.toml`), or the source file's directory when there is none"
+help = "Check the spelling and make sure the file exists relative to the package root, or to this source file's directory when there is no package"
 
 [diagnostics.SEM061.issues.insere_file_unreadable]
 message = "embedded file `{path}` cannot be read"
@@ -5281,7 +5281,7 @@ help = "move the computation into a constant initializer: `{fixum} T NAME = {pra
 
 [diagnostics.SEM064.issues.praefixum_captures_local]
 message = "`{praefixum}` initializer of `{name}` reads `{captured}`, a parameter or local of the enclosing body"
-help = "a build-time body stands alone: hoist `{captured}` to a module-level `{fixum} T NAME = …`, or compute it inside the body"
+help = "A build-time body cannot read enclosing locals. Move local-dependent work outside `{praefixum}`, or hoist only values independent of those locals to a module constant"
 
 [diagnostics.SEM064.issues.praefixum_type_parameter]
 message = "`{praefixum}` initializer of `{name}` depends on the type parameter `{param}`"
@@ -5293,11 +5293,11 @@ help = "a build-time body may compute, loop, and call pure Faber functions; it m
 
 [diagnostics.SEM064.issues.praefixum_failed]
 message = "`{praefixum}` initializer of `{name}` failed at build time: {message}"
-help = "fix the computation or the condition it asserts"
+help = "Fix the operation or condition that caused the build-time computation to fail"
 
 [diagnostics.SEM064.issues.praefixum_step_limit]
 message = "`{praefixum}` initializer of `{name}` did not finish within {limit} steps"
-help = "check for an endless loop or runaway recursion"
+help = "Reduce the work, and check for an endless loop or runaway recursion"
 
 [diagnostics.SEM064.issues.praefixum_no_result]
 message = "`{praefixum}` initializer of `{name}` finished without a value"
