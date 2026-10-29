@@ -4605,7 +4605,7 @@ help = "declare `{binding}` with `mut` so it can be changed in place, or call a 
 
 [diagnostics.SEM020.issues.copy_into_target_immutable]
 message = "'⇇' needs writable tensor storage on its left"
-help = "write into a `{varia}` tensor local, a `{varia}` parameter, or a tensor field of a writable value; a `{fixum}` binding or a non-`{varia}` parameter cannot be written"
+help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"
 
 [diagnostics.SEM020.issues.mut_argument_not_writable]
 message = "argument {position}{?binding| (`|`)} is passed to a `mut` parameter but is not a writable place"
@@ -4877,7 +4877,7 @@ help = "remove the repeated axis; each axis may appear once"
 
 [diagnostics.SEM010.issues.axis_reduction_rank_unsupported]
 message = "an axis reduction is built for tensors of rank 2 to 8 only"
-help = "use axis reduction only on tensors of rank 2 to 8; for other ranks, write the reduction explicitly"
+help = "reduce a tensor of rank 2 to 8 with literal dimensions, or write the explicit reduction with `reducta ... per [...]`"
 
 [diagnostics.SEM010.issues.expanded_axis_out_of_range]
 message = "the axis is outside the range of the expanded tensor"
@@ -5001,7 +5001,7 @@ help = "compute new values with immutable bindings instead of assigning back to 
 
 [diagnostics.SEM059.issues.breakable_block]
 message = "@ radix lane \"{lane}\" rejects this function body: breakable blocks are outside the v1 AIR subset"
-help = "use a {si} or {discerne} expression to choose the result instead of leaving a breakable block early"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM059.issues.cede]
 message = "@ radix lane \"{lane}\" rejects this function body: `cede` is outside the v1 AIR subset"
@@ -5077,7 +5077,7 @@ help = "use a finite {itera} {ab} loop the AIR unroller can expand, or move this
 
 [diagnostics.SEM059.issues.loop_control]
 message = "@ radix lane \"{lane}\" rejects this function body: loop control is outside the v1 AIR subset"
-help = "replace early loop exits with a {si} expression that chooses a value, or move the control flow outside AIR"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM059.issues.method_call]
 message = "@ radix lane \"{lane}\" rejects this function body: method call `{method}` is outside the v1 AIR subset"
@@ -5141,7 +5141,7 @@ help = "Pass each needed value as an explicit parameter instead of reading a run
 
 [diagnostics.SEM059.issues.runtime_variant_check]
 message = "@ radix lane \"{lane}\" rejects this function body: runtime `est` variant check is outside the v1 AIR subset"
-help = "Use `{discerne}` to handle each variant explicitly"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
 [diagnostics.SEM059.issues.sort_expression_unsupported]
 message = "@ radix lane \"{lane}\" rejects this function body: sort expressions are outside the v1 AIR subset"
@@ -5321,7 +5321,7 @@ help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or
 
 [diagnostics.SEM065.issues.const_shared_into_var]
 message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
-help = "write `{varia} {name} ← {copy} {binding}` for an independent value"
+help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
 
 [diagnostics.WARN001]
 message = "unused variable"
@@ -5613,7 +5613,7 @@ help = "Use `{cede}` only in a `{fiunt}` or `{fient}` function"
 
 [diagnostics.SEM010.issues.cede_requires_promissum]
 message = "cede operand is not a promise"
-help = "Yield the value itself with `{cede}`; use `{reddet}` or `{tacebit}` to await a promise"
+help = "cede an awaitable promise value"
 
 [diagnostics.SEM010.issues.reddet_requires_async_function]
 message = "reddet requires an async function"
@@ -5625,7 +5625,7 @@ help = "Use `{tacebit}` in a `{fiet}` or `{fient}` function, or a `{incipiet}` e
 
 [diagnostics.SEM010.issues.intervallum_value_step_unsupported]
 message = "value step is not supported for this range"
-help = "Use `{per}` with a positive integer literal for a stored range; keep a run-time step in a range loop or bracket window"
+help = "use a supported range step form"
 
 [diagnostics.SEM010.issues.itera_lockstep_at_coordinate_cardinality]
 message = "lockstep coordinate binder count does not match the sources"
@@ -5781,7 +5781,7 @@ help = "Close the array binding with `]`, as in `{sit} [first, second] ← value
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "expected an opening brace for the object binding pattern"
-help = "Start an object binding with `{`, as in `{sit} {{ name } ← value`."
+help = "Start an object binding with `{{`, as in `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "expected a closing brace for the object binding pattern"
@@ -5801,7 +5801,7 @@ help = "Close the class after its members, as in `{genus} Name {{ {sit} int valu
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "expected an opening brace for the interface body"
-help = "Start the interface body with `{`, as in `{implendum} Name {{ {functio} method() }`."
+help = "Start the interface body with `{{`, as in `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "expected '(' before interface method parameters"
@@ -5821,7 +5821,7 @@ help = "Write a type alias with `=`, as in `{typus} Name = string`."
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "expected an opening brace for the schema body"
-help = "Start the schema body with `{`, as in `{schema} Name {{ {columna} int id }`."
+help = "Start the schema body with `{{`, as in `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "expected a closing brace after the schema body"
@@ -5829,7 +5829,7 @@ help = "Close the schema after its columns, as in `{schema} Name {{ {columna} in
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "expected an opening brace for the enum body"
-help = "Start the enum body with `{`, as in `{ordo} Name {{ First, Second }`."
+help = "Start the enum body with `{{`, as in `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "expected a closing brace after the enum body"
@@ -5837,7 +5837,7 @@ help = "Close the enum after its members, as in `{ordo} Name {{ First, Second }`
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "expected an opening brace for the union body"
-help = "Start the union body with `{`, as in `{discretio} Name {{ First, Second }`."
+help = "Start the union body with `{{`, as in `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "expected a closing brace after the union variant fields"
@@ -5849,7 +5849,7 @@ help = "Close the union after its variants, as in `{discretio} Name {{ First, Se
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "expected an opening brace for the import record"
-help = "Start an import record with `{`, as in `{importa} {{ {ex} = \"norma:console\" }`."
+help = "Start an import record with `{{`, as in `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "expected '=' after the import field name"
@@ -5861,7 +5861,7 @@ help = "Close the import record after its fields, as in `{importa} {{ {ex} = \"n
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "expected an opening brace for the probandum body"
-help = "Start a test suite body with `{`, as in `{probandum} \"suite\" {{`."
+help = "Start a test suite body with `{{`, as in `{probandum} \"suite\" {{`."
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "expected a closing brace after the probandum body"
@@ -5925,7 +5925,7 @@ help = "Write `{ex} source` after the reduction operator."
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "expected '{lege}' or '{lineam}'"
-help = "Use `{lege}` to read all input, or `{lege} {lineam}` to read one line."
+help = "Use `{lege}` to read all input, or `{lineam}` to read one line."
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "expected an opening brace for the elige body"
