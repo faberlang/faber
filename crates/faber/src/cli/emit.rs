@@ -144,6 +144,12 @@ pub enum FaberCliTarget {
     #[value(name = "clif-jit", hide = true)]
     ClifJit,
 
+    /// The MIR interpreter: `faber run --target runner` only, the default
+    /// `faber run` route. Named here so `build` and `emit` can refuse it by
+    /// name; it interprets MIR and emits nothing.
+    #[value(name = "runner", hide = true)]
+    Runner,
+
     /// Legacy source-backed MIR package artifact runtime.
     #[value(name = "scena", hide = true)]
     MirScena,
@@ -164,9 +170,10 @@ impl FaberCliTarget {
     }
 
     /// Whether this spelling names an engine that runs in memory and has no
-    /// build or emit output (`clif-jit`).
+    /// build or emit output: `clif-jit` (Cranelift, in this process) and
+    /// `runner` (the MIR interpreter).
     pub fn is_in_memory_engine(self) -> bool {
-        matches!(self, Self::ClifJit)
+        matches!(self, Self::ClifJit | Self::Runner)
     }
 
     /// Convert to the radix backend target.
@@ -193,6 +200,10 @@ impl FaberCliTarget {
             FaberCliTarget::HirFhir => Target::HirFhir,
             FaberCliTarget::MirLlvmHost => Target::MirLlvmHost,
             FaberCliTarget::MirClif | FaberCliTarget::ClifJit => Target::MirClif,
+            // The interpreter route: `faber run --target runner` and plain
+            // `faber run` share it. Unreachable through `build`/`emit`, which
+            // refuse the spelling before mapping (see `is_in_memory_engine`).
+            FaberCliTarget::Runner => Target::MirStepper,
             FaberCliTarget::MirScena => Target::MirScena,
             FaberCliTarget::MirFmir => Target::MirFmir,
             FaberCliTarget::MirFmirBinary => Target::MirFmirBinary,

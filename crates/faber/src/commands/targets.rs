@@ -11,7 +11,8 @@
 //!
 //! The emit-target row set is **derived** (defect-audit S09-3 / B3-2), never
 //! hand-typed: the universe is the CLI grammar's own enumeration
-//! ([`FaberCliTarget::value_variants`], minus the hidden `scena` spelling),
+//! ([`FaberCliTarget::value_variants`], minus the hidden `scena`, `clif-jit`
+//! and `runner` spellings),
 //! row names come from [`Target`]'s `Display` (the CLI spellings), and each
 //! row's feature gate from [`Target::required_feature`] with the documented
 //! faber-specific overrides below. A target added to the CLI joins this
@@ -46,10 +47,14 @@ struct FaberTargetRowSpec {
 fn faber_target_row_specs() -> Result<Vec<FaberTargetRowSpec>, String> {
     let mut rows = Vec::new();
     for variant in FaberCliTarget::value_variants() {
-        if matches!(variant, FaberCliTarget::MirScena | FaberCliTarget::ClifJit) {
+        if matches!(
+            variant,
+            FaberCliTarget::MirScena | FaberCliTarget::ClifJit | FaberCliTarget::Runner
+        ) {
             // Hidden CLI spellings — not discoverable `faber targets` rows:
-            // the legacy source-backed scena runtime, and the `clif-jit`
-            // engine, which is the `clif` row's in-memory run route.
+            // the legacy source-backed scena runtime; the `clif-jit` engine,
+            // which is the `clif` row's in-memory run route; and the
+            // `runner` interpreter, which is the default `faber run` route.
             continue;
         }
         let target = variant.to_radix();
