@@ -747,7 +747,7 @@ pub fn synthetic_library_item_def_id(
     module.module_path.hash(&mut hasher);
     exported_name.hash(&mut hasher);
     kind.hash(&mut hasher);
-    DefId(0x8000_0000 | ((hasher.finish() as u32) & 0x7fff_ffff))
+    DefId(0x8000_0000 | ((hasher.finish() & 0x7fff_ffff) as u32))
 }
 
 fn library_generated_call_path_with_crate(
