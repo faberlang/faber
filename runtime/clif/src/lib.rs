@@ -3,8 +3,9 @@
 //!
 //! The C `main` is emitted into the program object (the LLVM route's
 //! pattern), so this archive never defines `main` and links cleanly as an
-//! rlib. The runtime captures argv, installs the program's output tokens,
-//! runs the program's `faber_clif_incipit`, flushes, and exits with the
+//! rlib. The emitted `main` hands the runtime the address of the program's
+//! `faber_clif_incipit`; the runtime captures argv, installs the program's
+//! output tokens, runs the incipit, flushes, and exits with the
 //! runner's codes (D5: the entry's own exit status, 0 unless `main exit` names
 //! one, and 1 on an uncaught failure or a trap).
 //! Display goes through `radix-runtime-contract`, the same helpers the MIR
@@ -24,10 +25,13 @@ mod ins;
 mod magnus;
 mod regex_program;
 mod regex_rt;
+mod symbols;
 // Public so the ABI layer (`crates/radix-mir-clif`) can reach it without an
 // export of its own: `-D warnings` treats an unreachable `pub` item in a
 // private module as dead code.
 pub mod sermo;
+
+pub use symbols::runtime_symbols;
 
 use std::collections::hash_map::DefaultHasher;
 use std::ffi::CStr;
@@ -41,11 +45,6 @@ use radix_runtime_contract::display::{display_bivalens, display_fractus};
 use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_runtime_contract::trap::text::{self as trap_text, window_inside};
 use radix_runtime_contract::trap::{TrapKind, abort_exit_status, exit_status, trap_line};
-
-// The program's `incipit`, emitted into the linked object by the backend.
-unsafe extern "C" {
-    fn faber_clif_incipit() -> i32;
-}
 
 /// Process-global runtime state, written once by [`__faber_clif_v1_main`].
 struct Context {
@@ -118,20 +117,47 @@ fn emit(stream: i32, line: &str) {
     }
 }
 
-/// The runtime entry the emitted `main` shim calls.
-#[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_main(
-    argument_count: i32,
-    argument_values: *const *const c_char,
-) -> i32 {
-    let _ = CONTEXT.set(Context {
-        arguments: capture_arguments(argument_count, argument_values),
-    });
+/// The program's entry as the backend emits it: installs the output words,
+/// runs the program, and returns the process exit status.
+pub type Incipit = unsafe extern "C" fn() -> i32;
+
+/// Run a program: record its arguments, call its `incipit`, flush stdout and
+/// hand back the exit status. A trap or an uncaught failure never returns; it
+/// flushes and exits the process with its own status.
+///
+/// This is the one entry both routes share. A linked executable reaches it
+/// through the emitted C `main` ([`__faber_clif_v1_main`]); an in-process image
+/// (`faber run --target clif-jit`) calls it directly with the address of the
+/// JIT-compiled `incipit`, so the program owns the process exactly as it does
+/// when linked.
+///
+/// # Safety
+///
+/// `incipit` must be the `faber_clif_incipit` the backend emitted for the
+/// program: a `() -> i32` function in the C calling convention that stays
+/// callable for the duration of the call.
+pub unsafe fn run_program(arguments: Vec<String>, incipit: Incipit) -> i32 {
+    let _ = CONTEXT.set(Context { arguments });
     // The entry hands back the process exit status (`main exit <expr>`), 0
     // when it returns nothing.
-    let status = unsafe { faber_clif_incipit() };
+    let status = unsafe { incipit() };
     flush();
     status
+}
+
+/// The runtime entry the emitted `main` shim calls.
+///
+/// # Safety
+///
+/// `argument_values` addresses `argument_count` C strings (or is null) and
+/// `incipit` is the program's emitted `faber_clif_incipit`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_main(
+    argument_count: i32,
+    argument_values: *const *const c_char,
+    incipit: Incipit,
+) -> i32 {
+    unsafe { run_program(capture_arguments(argument_count, argument_values), incipit) }
 }
 
 /// Install the program's output tokens: true, false, none, tuple.

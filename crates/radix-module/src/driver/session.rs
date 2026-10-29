@@ -160,6 +160,11 @@ pub struct Config {
     /// spelling through these maps; every other path ignores them. Empty by
     /// default, in which case a stage-body library call fails closed.
     pub target_bindings: TargetBindings,
+
+    /// How the `clif` target produces code: an object file for the linker
+    /// (the default) or an in-memory image for `faber run --target clif-jit`.
+    #[cfg(feature = "mir-clif")]
+    pub clif_engine: crate::ClifEngine,
 }
 
 impl Default for Config {
@@ -188,6 +193,8 @@ impl Default for Config {
             keep_authored_constants: false,
             defer_imported_praefixum: false,
             target_bindings: TargetBindings::default(),
+            #[cfg(feature = "mir-clif")]
+            clif_engine: crate::ClifEngine::default(),
         }
     }
 }
@@ -326,6 +333,14 @@ impl Config {
     #[must_use]
     pub fn with_module_name(mut self, module_name: Option<String>) -> Self {
         self.module_name = module_name;
+        self
+    }
+
+    /// Select how the `clif` target produces code.
+    #[cfg(feature = "mir-clif")]
+    #[must_use]
+    pub fn with_clif_engine(mut self, engine: crate::ClifEngine) -> Self {
+        self.clif_engine = engine;
         self
     }
 

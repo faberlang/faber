@@ -727,6 +727,10 @@ pub enum RunTarget {
     /// Build the package as a native LLVM program and run the built program.
     #[value(name = "llvm-host")]
     LlvmHost,
+    /// Compile the package to native code in memory (Cranelift JIT) and run it
+    /// in this process: no object file, no linker, nothing else installed.
+    #[value(name = "clif-jit")]
+    ClifJit,
 }
 
 /// Arguments for `faber run`.

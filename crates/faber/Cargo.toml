@@ -63,6 +63,10 @@ semver = "1"
 handroll = { path = "../handroll" }
 # Shared native leaves (core-norma N2): plan-time `solum:*` classification.
 faber-leaf = { path = "../faber-leaf" }
+# `faber run --target clif-jit` runs the program in this process: the CLIF
+# runtime is linked as an rlib and its entry points are registered with the JIT
+# from an explicit table. `faber build --target clif` still links the archive.
+faber-host-clif = { path = "../../runtime/clif", optional = true }
 
 # Unix advisory locks protect shared llvm-host output and archive materialization.
 [target.'cfg(unix)'.dependencies]
@@ -85,7 +89,7 @@ hir-faber = ["radix/hir-faber", "dep:radix-hir-faber"]
 hir-c = ["radix/hir-c"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]
-mir-clif = ["radix/mir-clif"]
+mir-clif = ["radix/mir-clif", "dep:faber-host-clif"]
 runner = ["radix/runner", "dep:radix-mir-runner", "dep:proba", "proba/runner"]
 
 [lints]

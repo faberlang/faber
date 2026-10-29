@@ -138,6 +138,12 @@ pub enum FaberCliTarget {
     #[value(name = "clif", alias = "cranelift")]
     MirClif,
 
+    /// In-memory Cranelift engine: `faber run --target clif-jit` only. Named
+    /// here so `build` and `emit` can refuse it by name; it lowers exactly as
+    /// `clif` does.
+    #[value(name = "clif-jit", hide = true)]
+    ClifJit,
+
     /// Legacy source-backed MIR package artifact runtime.
     #[value(name = "scena", hide = true)]
     MirScena,
@@ -155,6 +161,12 @@ impl FaberCliTarget {
     /// Return true when emit should reject package mode for canonical Faber output.
     pub fn is_faber(self) -> bool {
         matches!(self, Self::HirFaber)
+    }
+
+    /// Whether this spelling names an engine that runs in memory and has no
+    /// build or emit output (`clif-jit`).
+    pub fn is_in_memory_engine(self) -> bool {
+        matches!(self, Self::ClifJit)
     }
 
     /// Convert to the radix backend target.
@@ -180,7 +192,7 @@ impl FaberCliTarget {
             FaberCliTarget::HirSwift => Target::HirSwift,
             FaberCliTarget::HirFhir => Target::HirFhir,
             FaberCliTarget::MirLlvmHost => Target::MirLlvmHost,
-            FaberCliTarget::MirClif => Target::MirClif,
+            FaberCliTarget::MirClif | FaberCliTarget::ClifJit => Target::MirClif,
             FaberCliTarget::MirScena => Target::MirScena,
             FaberCliTarget::MirFmir => Target::MirFmir,
             FaberCliTarget::MirFmirBinary => Target::MirFmirBinary,

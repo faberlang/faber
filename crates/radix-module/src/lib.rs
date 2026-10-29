@@ -191,6 +191,12 @@ pub enum Output {
     #[cfg(feature = "mir-clif")]
     ClifObject(ClifObjectOutput),
 
+    /// A program compiled into this process's memory by the Cranelift JIT
+    /// engine (`clif-jit`); produced instead of [`Output::ClifObject`] when the
+    /// configuration selects [`ClifEngine::Jit`].
+    #[cfg(feature = "mir-clif")]
+    ClifJit(ClifJitOutput),
+
     /// Experimental Metal Shading Language source emitted from validated MIR.
     #[cfg(feature = "mir-metal")]
     MetalText(MetalTextOutput),
@@ -305,6 +311,56 @@ pub struct LlvmTextOutput {
 pub struct ClifObjectOutput {
     /// Relocatable object file bytes for the host triple.
     pub bytes: Vec<u8>,
+}
+
+/// A program compiled into this process's memory.
+#[cfg(feature = "mir-clif")]
+pub struct ClifJitOutput {
+    /// The compiled image; keep it alive while the program runs.
+    pub program: radix_mir_clif::JitProgram,
+}
+
+/// How the Cranelift target (`clif`) turns the lowered program into code.
+///
+/// The lowering and the capability pre-pass are the same for both engines;
+/// only the module the functions are defined in differs.
+#[cfg(feature = "mir-clif")]
+#[derive(Debug, Clone, Default)]
+pub enum ClifEngine {
+    /// Write a relocatable object for the system linker (`faber build`).
+    #[default]
+    Object,
+    /// Compile in memory and hand the image back (`faber run --target clif-jit`).
+    Jit(ClifRuntimeTable),
+}
+
+/// The runtime's `extern "C"` entry points a JIT image resolves its imports
+/// from: each C name with its address.
+#[cfg(feature = "mir-clif")]
+#[derive(Debug, Clone, Default)]
+pub struct ClifRuntimeTable(std::sync::Arc<[(&'static str, usize)]>);
+
+#[cfg(feature = "mir-clif")]
+impl ClifRuntimeTable {
+    /// A table of `(C name, address)` entries.
+    #[must_use]
+    pub fn new(symbols: Vec<(&'static str, *const u8)>) -> Self {
+        Self(
+            symbols
+                .into_iter()
+                .map(|(name, address)| (name, address as usize))
+                .collect(),
+        )
+    }
+
+    /// The entries as the JIT lowering takes them.
+    #[must_use]
+    pub fn symbols(&self) -> Vec<(&'static str, *const u8)> {
+        self.0
+            .iter()
+            .map(|(name, address)| (*name, *address as *const u8))
+            .collect()
+    }
 }
 
 /// Experimental Metal Shading Language source output.

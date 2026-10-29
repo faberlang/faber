@@ -83,6 +83,20 @@ pub(super) fn cmd_run(args: RunArgs) {
             );
             exit_status::exit_usage();
         }
+        #[cfg(feature = "mir-clif")]
+        Some(crate::cli::RunTarget::ClifJit) => package::cmd_run_clif_jit(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+        ),
+        #[cfg(not(feature = "mir-clif"))]
+        Some(crate::cli::RunTarget::ClifJit) => {
+            eprintln!(
+                "error: this faber build has no Cranelift target; rebuild with feature `mir-clif`"
+            );
+            exit_status::exit_usage();
+        }
         None => {}
     }
 
